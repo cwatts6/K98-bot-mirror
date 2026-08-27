@@ -18,7 +18,7 @@ from kvk.services.kvk_target_publication_service import (
     parse_target_publication_metadata,
     resolve_target_publication_state,
 )
-from kvk_state import get_kvk_context_today
+from kvk_state import get_kvk_fighting_context_today
 import stats_cache_helpers
 from utils import load_stat_row
 
@@ -242,7 +242,11 @@ def _publication_details(
     resolution = resolve_target_publication_state(
         metadata,
         requested_kvk_no=_optional_int_from_variants(kvk_context, ["kvk_no"]),
-        fighting_state=_str_from_variants(kvk_context, ["state"], default=""),
+        fighting_state=_str_from_variants(
+            kvk_context,
+            ["fighting_state", "state"],
+            default="",
+        ),
     )
     reason = resolution.reason or MISSING_PUBLICATION_METADATA
     return (
@@ -291,7 +295,7 @@ async def build_kvk_targets_presentation_input(
         )
 
     try:
-        kvk_context = get_kvk_context_today() or {}
+        kvk_context = get_kvk_fighting_context_today() or {}
     except Exception:
         logger.exception("kvk_targets_context_lookup_failed governor_id=%s", gid)
         kvk_context = {}

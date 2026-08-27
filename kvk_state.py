@@ -9,7 +9,24 @@ from file_utils import fetch_one_dict, get_conn_with_retries
 
 log = logging.getLogger(__name__)
 
-State = Literal["DRAFT", "ACTIVE", "ENDED"]
+KvkFightingState = Literal["DRAFT", "ACTIVE", "ENDED"]
+
+# Compatibility alias for callers that imported the original generic name.
+State = KvkFightingState
+
+
+class KvkFightingContext(TypedDict):
+    kvk_no: int
+    kvk_name: str
+    start_date: dt.date | None
+    end_date: dt.date | None
+    fighting_state: KvkFightingState
+    next_kvk_no: int | None
+    matchmaking_scan: int | None
+    pass4_start_scan: int | None
+    kvk_end_scan: int | None
+    max_scan_order: int | None
+    fighting_state_reason: str
 
 
 class KVKContext(TypedDict):
@@ -17,7 +34,7 @@ class KVKContext(TypedDict):
     kvk_name: str
     start_date: dt.date | None
     end_date: dt.date | None
-    state: State
+    state: KvkFightingState
     next_kvk_no: int | None
     matchmaking_scan: int | None
     pass4_start_scan: int | None
@@ -39,7 +56,7 @@ class KVKDetails(TypedDict):
     pass4_start_scan: int | None
     next_kvk_no: int | None
     max_scan_order: int | None
-    state: State
+    state: KvkFightingState
     state_reason: str
 
 
@@ -88,12 +105,12 @@ def is_scan_within_open_window(
     return True
 
 
-def resolve_kvk_scan_state(
+def resolve_kvk_fighting_state(
     *,
     pass4_start_scan: int | None,
     kvk_end_scan: int | None,
     max_scan_order: int | None,
-) -> tuple[State, str]:
+) -> tuple[KvkFightingState, str]:
     if not isinstance(pass4_start_scan, int) or pass4_start_scan <= 0:
         return "DRAFT", "invalid_pass4_start_scan"
     if not isinstance(max_scan_order, int):
@@ -108,6 +125,20 @@ def resolve_kvk_scan_state(
     if max_scan_order < pass4_start_scan:
         return "DRAFT", "max_scan_order_before_pass4_start_scan"
     return "ACTIVE", "max_scan_order_within_fighting_window"
+
+
+def resolve_kvk_scan_state(
+    *,
+    pass4_start_scan: int | None,
+    kvk_end_scan: int | None,
+    max_scan_order: int | None,
+) -> tuple[State, str]:
+    """Compatibility adapter for the explicit fighting-lifecycle resolver."""
+    return resolve_kvk_fighting_state(
+        pass4_start_scan=pass4_start_scan,
+        kvk_end_scan=kvk_end_scan,
+        max_scan_order=max_scan_order,
+    )
 
 
 def _get_max_scan_order() -> int | None:
@@ -181,17 +212,17 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
     max_scan_order = _get_max_scan_order()
 
     if mm_start and today < mm_start:
-        state: State = "DRAFT"
+        state: KvkFightingState = "DRAFT"
         reason = "today_before_matchmaking_start_date"
     else:
-        state, reason = resolve_kvk_scan_state(
+        state, reason = resolve_kvk_fighting_state(
             pass4_start_scan=pass4_start_scan,
             kvk_end_scan=kvk_end_scan,
             max_scan_order=max_scan_order,
         )
 
     log.info(
-        "[kvk_state] resolved KVK state kvk_no=%s matchmaking_scan=%r pass4_start_scan=%r "
+        "[kvk_state] resolved KVK fighting state kvk_no=%s matchmaking_scan=%r pass4_start_scan=%r "
         "kvk_end_scan=%r max_scan_order=%r resolved_state=%s reason=%s",
         kvk_no,
         matchmaking_scan,
@@ -301,21 +332,41 @@ def get_kvk_window_with_fallback() -> KVKWindow | None:
     return fallback
 
 
-def get_kvk_context_today(today: dt.date | None = None) -> KVKContext | None:
+def get_kvk_fighting_context_today(today: dt.date | None = None) -> KvkFightingContext | None:
     details = get_latest_kvk_details(today=today)
     if not details:
         return None
 
-    return KVKContext(
+    return KvkFightingContext(
         kvk_no=details["kvk_no"],
         kvk_name=details["kvk_name"],
         start_date=details["matchmaking_start_date"],
         end_date=details["end_date"],
-        state=details["state"],
+        fighting_state=details["state"],
         next_kvk_no=details["next_kvk_no"],
         matchmaking_scan=details["matchmaking_scan"],
         pass4_start_scan=details["pass4_start_scan"],
         kvk_end_scan=details["kvk_end_scan"],
         max_scan_order=details["max_scan_order"],
-        state_reason=details["state_reason"],
+        fighting_state_reason=details["state_reason"],
+    )
+
+
+def get_kvk_context_today(today: dt.date | None = None) -> KVKContext | None:
+    """Compatibility adapter returning the original generic state keys."""
+    context = get_kvk_fighting_context_today(today=today)
+    if not context:
+        return None
+    return KVKContext(
+        kvk_no=context["kvk_no"],
+        kvk_name=context["kvk_name"],
+        start_date=context["start_date"],
+        end_date=context["end_date"],
+        state=context["fighting_state"],
+        next_kvk_no=context["next_kvk_no"],
+        matchmaking_scan=context["matchmaking_scan"],
+        pass4_start_scan=context["pass4_start_scan"],
+        kvk_end_scan=context["kvk_end_scan"],
+        max_scan_order=context["max_scan_order"],
+        state_reason=context["fighting_state_reason"],
     )

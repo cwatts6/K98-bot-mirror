@@ -92,5 +92,8 @@ Phase 2 does not reopen the publication model or target formulas. It incremental
 bot-side target architecture by introducing typed target rows, making the typed service the single
 retrieval/presentation-input path, extracting target-specific cache repository ownership with
 proved refresh outcomes and cross-process coordination, and making the shared Pass 4 state
-terminology explicit without changing its thresholds. See
+terminology explicit without changing its thresholds. Phase 2C is deployed and accepted; Phase 2D
+adds compatible explicit fighting names while retaining the original public adapters. A separately
+gated Phase 2E will consider extracting lifecycle SQL reads from `kvk_state.py` without changing
+queries, thresholds, result shapes, or fallback behavior. See
 `docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`.

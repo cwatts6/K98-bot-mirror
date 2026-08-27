@@ -20,7 +20,8 @@ Phase 1 keeps target publication state separate from the shared Pass 4 fighting 
 documented in `docs/kvk/target_publication_contract.md`. Its completed task pack and chat starter
 are archived under `docs/task_packs/archive/`. The active Phase 2 quality pack is deliberately
 split into approval-gated slices covering typed target rows, legacy-path consolidation,
-target-domain cache ownership/single-flight behavior, and explicit fighting-lifecycle terminology.
+target-domain cache ownership/single-flight behavior, explicit fighting-lifecycle terminology,
+and a final lifecycle DAL extraction.
 These Phase 2 planning and Phase 1 closeout documents are intentionally carried into the first
 Phase 2 implementation PR.
 
@@ -29,15 +30,16 @@ standardises only `dbo.EXEMPT_FROM_STATS.GovernorID` from `float NOT NULL` to `b
 The approved SQL slice preserves every row, duplicate, exemption value, KVK value, procedure
 contract, and player rule. The operator also confirmed that production automatically transitioned
 the target cache from Draft to Official after Phase 1 deployment. That operator-attested live
-transition satisfies the Phase 2C evidence prerequisite; Phase 2C implementation remains a
-separately approval-gated slice.
+transition satisfied the Phase 2C evidence prerequisite.
 
 Phase 2B was subsequently merged, deployed, and operator accepted on 2026-08-27 after Discord
 smoke covered numeric and fuzzy-name lookup, account selection, public output, exemptions, and
-last-KVK comparison. Phase 2C implementation is prepared in mirror PR #239 with its required
-Changes-only security review complete and no reportable findings. It retains cache schema version
-2 and adds only a target-specific durable single-flight coordination sidecar; Phase 2D remains
-separately approval-gated.
+last-KVK comparison. Phase 2C was then merged through mirror PR #239 and production PR #546,
+deployed, smoke tested, and operator accepted with clear logs. It retains cache schema version 2
+and adds only a target-specific durable single-flight coordination sidecar. Phase 2D's explicit
+fighting-lifecycle architecture and exact bot-only manifest were approved on 2026-08-27. The
+operator also promoted the proposed `kvk_state.py` SQL-read extraction into a separately gated
+Phase 2E after Phase 2D is deployed and accepted.
 
 ## CrystalTech Path Refresh Delivery
 

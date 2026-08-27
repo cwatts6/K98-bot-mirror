@@ -96,7 +96,7 @@ async def test_targets_payload_active_progress(monkeypatch):
     received_contexts = []
     monkeypatch.setattr(
         service,
-        "get_kvk_context_today",
+        "get_kvk_fighting_context_today",
         lambda: kvk_context,
     )
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
@@ -160,7 +160,7 @@ async def test_targets_payload_active_progress(monkeypatch):
 
 
 async def test_targets_payload_complete(monkeypatch):
-    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
@@ -192,7 +192,7 @@ async def test_targets_payload_complete(monkeypatch):
 
 
 async def test_targets_payload_reports_no_target_values_for_unset_amounts(monkeypatch):
-    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
@@ -214,7 +214,7 @@ async def test_targets_payload_reports_no_target_values_for_unset_amounts(monkey
 
 
 async def test_targets_payload_exempt_uses_sql_contract(monkeypatch):
-    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
@@ -241,7 +241,7 @@ async def test_targets_payload_exempt_uses_sql_contract(monkeypatch):
 
 
 async def test_targets_payload_source_unavailable_when_stats_missing(monkeypatch):
-    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
@@ -263,7 +263,7 @@ async def test_targets_payload_source_unavailable_when_stats_missing(monkeypatch
 
 
 async def test_targets_payload_preserves_historical_denominators_and_minimum_kills(monkeypatch):
-    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,

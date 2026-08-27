@@ -43,7 +43,7 @@ from kvk.services.kvk_target_publication_service import (
     parse_target_publication_metadata,
     resolve_target_publication_state,
 )
-from kvk_state import get_kvk_context_today
+from kvk_state import get_kvk_fighting_context_today
 from process_utils import get_process_info, matches_process
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,15 @@ def _epoch(value: Any) -> float | None:
     return parsed.timestamp()
 
 
+def _context_fighting_state(context: Mapping[str, Any]) -> str:
+    return str(context.get("fighting_state") or context.get("state") or "")
+
+
+def _context_fighting_state_reason(context: Mapping[str, Any]) -> str | None:
+    value = context.get("fighting_state_reason") or context.get("state_reason")
+    return str(value) if value else None
+
+
 class TargetCacheRepository:
     """Own target cache validation, refresh, serialization, and single-flight state."""
 
@@ -95,7 +104,7 @@ class TargetCacheRepository:
         self,
         cache_path: str | Path,
         *,
-        context_provider: Callable[[], Mapping[str, Any] | None] = get_kvk_context_today,
+        context_provider: Callable[[], Mapping[str, Any] | None] = get_kvk_fighting_context_today,
         metadata_fetcher: Callable[[int], TargetPublicationMetadata | None] = (
             fetch_current_publication_metadata
         ),
@@ -231,7 +240,7 @@ class TargetCacheRepository:
         current_resolution = resolve_target_publication_state(
             current_metadata,
             requested_kvk_no=kvk_no,
-            fighting_state=str(ctx.get("state") or ""),
+            fighting_state=_context_fighting_state(ctx),
         )
         if not current_resolution.is_verified:
             logger.error(
@@ -415,7 +424,7 @@ class TargetCacheRepository:
         resolution = resolve_target_publication_state(
             metadata,
             requested_kvk_no=_positive_int(ctx.get("kvk_no")),
-            fighting_state=str(ctx.get("state") or ""),
+            fighting_state=_context_fighting_state(ctx),
             observed_row_count=len(raw_rows),
         )
         if metadata is None or not resolution.is_verified:
@@ -451,10 +460,8 @@ class TargetCacheRepository:
             generated_at=(
                 str(raw_meta.get("generated_at")) if raw_meta.get("generated_at") else None
             ),
-            kvk_fighting_state=str(ctx.get("state") or "") or None,
-            kvk_fighting_state_reason=(
-                str(ctx.get("state_reason")) if ctx.get("state_reason") else None
-            ),
+            kvk_fighting_state=_context_fighting_state(ctx) or None,
+            kvk_fighting_state_reason=_context_fighting_state_reason(ctx),
         )
 
     def _snapshot_from_publication(
@@ -467,7 +474,7 @@ class TargetCacheRepository:
         resolution = resolve_target_publication_state(
             metadata,
             requested_kvk_no=_positive_int(ctx.get("kvk_no")),
-            fighting_state=str(ctx.get("state") or ""),
+            fighting_state=_context_fighting_state(ctx),
             observed_row_count=len(rows),
         )
         if not resolution.is_verified:
@@ -490,10 +497,8 @@ class TargetCacheRepository:
             publication_reason=resolution.reason,
             cache_written_at_utc=written_at,
             generated_at=written_at,
-            kvk_fighting_state=str(ctx.get("state") or "") or None,
-            kvk_fighting_state_reason=(
-                str(ctx.get("state_reason")) if ctx.get("state_reason") else None
-            ),
+            kvk_fighting_state=_context_fighting_state(ctx) or None,
+            kvk_fighting_state_reason=_context_fighting_state_reason(ctx),
         )
 
     def _claim_refresh(
@@ -806,10 +811,8 @@ class TargetCacheRepository:
             rows=(),
             publication_state="UNKNOWN",
             publication_reason=reason,
-            kvk_fighting_state=str((ctx or {}).get("state") or "") or None,
-            kvk_fighting_state_reason=(
-                str((ctx or {}).get("state_reason")) if (ctx or {}).get("state_reason") else None
-            ),
+            kvk_fighting_state=_context_fighting_state(ctx or {}) or None,
+            kvk_fighting_state_reason=_context_fighting_state_reason(ctx or {}),
         )
 
     @staticmethod

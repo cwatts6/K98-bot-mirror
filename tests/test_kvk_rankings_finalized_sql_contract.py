@@ -18,7 +18,7 @@ def test_hall_of_fame_is_final_output_only_and_healed_is_engaged_ascending() -> 
     assert "kvk_history_service.get_finalized_kvks" in ranking_service_source
     assert "fetch_output_complete_kvk_candidates" in history_dal_source
     assert "history.KVK_NO IN ({finalized_placeholders})" in history_dal_source
-    assert "kvk_state.resolve_kvk_scan_state" in history_service_source
+    assert "kvk_state.resolve_kvk_fighting_state" in history_service_source
     assert 'state == "ENDED"' in history_service_source
     assert 'direction = "ASC" if healed_metric else "DESC"' in source
     assert "src.[KillPointsDelta]" in source

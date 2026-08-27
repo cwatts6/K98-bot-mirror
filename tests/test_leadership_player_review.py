@@ -124,6 +124,39 @@ def _kvk(kvk_no: int) -> KvkPerformance:
     )
 
 
+def test_finalized_kvk_numbers_keep_ended_and_output_complete_boundary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        service.kvk_state,
+        "get_latest_kvk_details",
+        lambda: {"max_scan_order": 1200},
+    )
+    candidates = (
+        SimpleNamespace(
+            kvk_no=12,
+            pass4_start_scan=1000,
+            kvk_end_scan=1200,
+            final_output_state="OUTPUT_COMPLETE",
+            final_data_at_utc=NOW,
+        ),
+        SimpleNamespace(
+            kvk_no=11,
+            pass4_start_scan=800,
+            kvk_end_scan=999,
+            final_output_state="OUTPUT_COMPLETE",
+            final_data_at_utc=NOW,
+        ),
+        SimpleNamespace(
+            kvk_no=10,
+            pass4_start_scan=600,
+            kvk_end_scan=799,
+            final_output_state="PENDING",
+            final_data_at_utc=NOW,
+        ),
+    )
+
+    assert service._finalized_kvk_numbers(candidates) == {11}
+
+
 def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipPlayerPayload:
     header = ReviewHeader(
         governor_id=123,

@@ -24,8 +24,16 @@ from process_utils import matches_process
 def _context(*, kvk_no: int = 16, state: str = "DRAFT") -> dict[str, object]:
     return {
         "kvk_no": kvk_no,
+        "fighting_state": state,
+        "fighting_state_reason": "test_fighting_state",
+    }
+
+
+def _legacy_context(*, kvk_no: int = 16, state: str = "DRAFT") -> dict[str, object]:
+    return {
+        "kvk_no": kvk_no,
         "state": state,
-        "state_reason": "test_fighting_state",
+        "state_reason": "legacy_test_fighting_state",
     }
 
 
@@ -520,3 +528,19 @@ def test_snapshot_governor_index_is_immutable_and_constant_time(tmp_path):
     assert snapshot.target_for("123") is snapshot.by_governor["123"]
     with pytest.raises(TypeError):
         snapshot.by_governor["789"] = snapshot.rows[0]  # type: ignore[index]
+
+
+def test_legacy_context_state_keys_remain_compatible(tmp_path):
+    publication = _publication()
+    repository = TargetCacheRepository(
+        tmp_path / "targets.json",
+        context_provider=lambda: _legacy_context(state="ENDED"),
+        metadata_fetcher=lambda _kvk_no: publication.metadata,
+        publication_fetcher=lambda _kvk_no: publication,
+    )
+
+    snapshot = repository.refresh().snapshot
+
+    assert snapshot.publication_state == "HISTORIC"
+    assert snapshot.kvk_fighting_state == "ENDED"
+    assert snapshot.kvk_fighting_state_reason == "legacy_test_fighting_state"

@@ -230,7 +230,7 @@ def _finalized_kvk_numbers(candidates) -> set[int]:
     for candidate in candidates:
         if candidate.final_output_state != "OUTPUT_COMPLETE" or candidate.final_data_at_utc is None:
             continue
-        state, _reason = kvk_state.resolve_kvk_scan_state(
+        state, _reason = kvk_state.resolve_kvk_fighting_state(
             pass4_start_scan=candidate.pass4_start_scan,
             kvk_end_scan=candidate.kvk_end_scan,
             max_scan_order=max_scan_order,

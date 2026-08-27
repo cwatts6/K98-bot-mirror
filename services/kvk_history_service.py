@@ -192,7 +192,7 @@ def get_finalized_kvks() -> list[int]:
         kvk_no = _optional_int(candidate.get("KVK_NO"))
         if kvk_no is None or candidate.get("FinalOutputState") != "OUTPUT_COMPLETE":
             continue
-        state, _reason = kvk_state.resolve_kvk_scan_state(
+        state, _reason = kvk_state.resolve_kvk_fighting_state(
             pass4_start_scan=_optional_int(candidate.get("PASS4_START_SCAN")),
             kvk_end_scan=_optional_int(candidate.get("KVK_END_SCAN")),
             max_scan_order=_optional_int(candidate.get("MaxScanOrder")),

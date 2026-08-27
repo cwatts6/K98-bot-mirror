@@ -10,7 +10,7 @@
 - Owner/context: `Chris Watts / KD98; approved Phase 1 deferred optimisations`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
-- Delivery shape: `approval-gated Phase 2A, 2B, 2C, and 2D slices`
+- Delivery shape: `approval-gated Phase 2A, 2B, 2C, 2D, and 2E slices`
 
 ## 2. Required Reading
 
@@ -93,9 +93,14 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
 - Phase 2C architecture, 60-second refresh lease, five-second cold-follower bound, durable Draft
   poll coordination, crash recovery, and exact bot-only manifest were approved on 2026-08-27.
   This approval does not approve Phase 2D.
-- Phase 2C implementation is prepared in mirror PR #239. Its final bot `Changes + Deep Off`
-  review completed with full coverage and zero reportable findings; the SQL repository remains
-  unchanged and is a documented security-review skip. Phase 2D remains unapproved.
+- Phase 2C was merged through mirror PR #239 and production PR #546, deployed, smoke tested, and
+  operator accepted on 2026-08-27 with clear logs. Its final bot `Changes + Deep Off` review
+  completed with full coverage and zero reportable findings; the SQL repository remained
+  unchanged and was a documented security-review skip.
+- Phase 2D architecture and its exact bot-only compatibility manifest were approved on 2026-08-27.
+  Phase 2D implementation does not approve Phase 2E automatically.
+- The operator promoted the proposed `kvk_state.py` SQL-read extraction into a separately gated
+  Phase 2E. Phase 2E requires its own post-Phase-2D architecture audit and implementation approval.
 
 ## 4. Objective
 
@@ -161,11 +166,13 @@ Scoring uses `Priority Score = (Impact + Frequency + Risk Reduction) - Effort`.
 | One service-owned retrieval/presentation-input path | 4 | 4 | 4 | 4 | 8 | Phase 2B after typed rows |
 | Target-domain cache repository and cross-process single-flight | 3 | 4 | 4 | 4 | 7 | Phase 2C implementation approved |
 | Explicit fighting-lifecycle terminology | 3 | 4 | 3 | 4 | 6 | Phase 2D, isolated due blast radius |
+| Extract lifecycle SQL reads behind a KVK DAL | 3 | 4 | 3 | 2 | 8 | Phase 2E after Phase 2D acceptance |
 
 The first three items form one coherent target-data ownership chain. The terminology item scores
 lower but remains in this programme because it directly reduces the risk of repeating the defect
-that caused Phase 1. It must remain a separate final slice because it crosses stats alerts, daily
-overview, history, and leadership review.
+that caused Phase 1. It must remain a separate slice because it crosses stats alerts, daily
+overview, history, and leadership review. The SQL-read extraction is a separate final slice so the
+terminology adapters can be deployed and proved before data-access ownership moves.
 
 Excluded from this batch:
 
@@ -282,6 +289,41 @@ Phase 2D must:
 - stop without implementation if the audit finds the rename cost exceeds its safety benefit and
   present a documentation/type-alias alternative for approval.
 
+Approved Phase 2D implementation manifest:
+
+- modify `kvk_state.py`, `stats_alerts/kvk_meta.py`, `services/kvk_history_service.py`,
+  `leadership_player_review/service.py`, `kvk/services/kvk_targets_card_service.py`,
+  `kvk/target_cache_repository.py`, focused lifecycle/target tests, `README-DEV.md`,
+  `docs/kvk/target_publication_contract.md`, and this task pack;
+- create `tests/test_stats_alerts_fighting_lifecycle.py` and
+  `tests/test_daily_kvk_overview_lifecycle.py`;
+- preserve `State`, `resolve_kvk_scan_state()`, and `get_kvk_context_today()` as documented
+  compatibility adapters while making explicit fighting names canonical;
+- review only broad-window, command, import, publication, renderer, registration, SQL, and
+  persistence paths not requiring a compatibility handoff;
+- create, modify, or delete no SQL file, migration, command registration, cache schema, renderer,
+  configuration, or player target rule.
+
+### Phase 2E - KVK Lifecycle DAL Extraction
+
+After Phase 2D is deployed and accepted, audit and separately approve extracting the SQL reads from
+`kvk_state.py` into a narrow KVK lifecycle DAL while leaving the public compatibility façade and
+pure fighting resolver in place.
+
+Phase 2E must:
+
+- preserve the exact `dbo.KVK_Details`, `dbo.ProcConfig`, and `dbo.KingdomScanData4` queries,
+  parameters, retry/connection helpers, integer/date coercion, warnings, and fallback order unless
+  a separately approved finding proves a correction is required;
+- preserve every fighting value, reason code, Pass 4/end boundary, broad-window rule, returned
+  context/detail shape, and Phase 2D compatibility adapter;
+- place SQL execution and row mapping under `kvk/dal/` without adding a general lifecycle or cache
+  framework;
+- introduce no SQL repository change unless a new exact finding receives separate approval;
+- include DAL mapping/failure tests plus the complete Phase 2D lifecycle regression suite;
+- remain blocked until Phase 2D deployment and operator smoke are accepted and its architecture
+  and exact PR-sized manifest receive separate approval.
+
 ## 8. Scope
 
 ### In Scope
@@ -292,6 +334,7 @@ Phase 2D must:
 - modern/fallback payload parity and bounded Discord smoke;
 - target-specific concurrency and restart safety;
 - compatibility-preserving fighting-lifecycle terminology;
+- a separately gated KVK lifecycle DAL extraction after Phase 2D acceptance;
 - focused and broad regression coverage;
 - documentation, deferred-register closeout, deployment, smoke, and rollback evidence.
 
@@ -333,7 +376,7 @@ Provisional runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B and Phase 2C completed separately with zero reportable findings |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D/2E base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B and Phase 2C completed separately with zero reportable findings |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes
@@ -361,12 +404,15 @@ Security focus for runtime diffs:
 5. Run separate bot and SQL Changes reviews with Deep Off, complete `k98-pr-review` for both Git
    targets, prepare the companion PRs, and stop for merge/promotion approval.
 6. Complete promotion, deployment, and operator smoke before starting Phase 2B.
-7. Repeat the approval/review/promotion cycle independently for Phase 2B, Phase 2C, and Phase 2D.
+7. Repeat the approval/review/promotion cycle independently for Phase 2B, Phase 2C, Phase 2D, and
+   Phase 2E.
 8. Treat the Phase 2C production-transition evidence gate as satisfied by the operator-attested
    successful live Draft-to-Official transition; do not start implementation without separate
    Phase 2C approval.
-9. Do not start Phase 2D implementation without its separate cross-feature architecture approval.
-10. Close the programme only after all accepted slices are deployed, smoke tested, documented, and
+9. Phase 2D implementation approval was recorded on 2026-08-27.
+10. Do not start Phase 2E implementation until Phase 2D is deployed and accepted and Phase 2E has
+    its own architecture and exact-manifest approval.
+11. Close the programme only after all accepted slices are deployed, smoke tested, documented, and
     removed from the active deferred backlog.
 
 No one-pass implementation is approved. Approval of this pack does not approve all slice diffs in
@@ -389,7 +435,7 @@ Return:
 11. Proposed Target Cache Repository API And Explicit Refresh Outcomes
 12. Cross-Process Single-Flight, Lock Expiry, Crash Recovery, And Failure Matrix
 13. Proposed Fighting-Lifecycle Naming And Compatibility Plan
-14. Exact Phase 2A/2B/2C/2D Review, Modify, Create, And Delete Manifests
+14. Exact Phase 2A/2B/2C/2D/2E Review, Modify, Create, And Delete Manifests
 15. Candidate Scores, Dependencies, Exclusions, And Recommended Slice Order
 16. Focused, Broader, Manual, Concurrency, Restart, And Output-Parity Test Selection
 17. Provisional Bot And SQL Security Decisions And Exact Targets
@@ -497,6 +543,18 @@ implementation.
   tests/docs consumers proved by search
 - no SQL files
 
+### Expected Phase 2E Modify/Create
+
+- create a narrow lifecycle DAL under `kvk/dal/`, exact name chosen by the Phase 2E audit;
+- modify `kvk_state.py` only to delegate its existing SQL reads and row mapping while retaining the
+  Phase 2D public façade and pure resolver;
+- add focused DAL mapping, missing/malformed row, SQL failure, ProcConfig fallback, and compatibility
+  tests;
+- review all Phase 2D consumers and tests; modify them only if required to preserve injection or
+  monkeypatch boundaries;
+- create, modify, or delete no SQL file, migration, command, renderer, cache schema, config, or
+  state value.
+
 ### Phase 2A SQL Companion Modify/Create
 
 - create
@@ -520,7 +578,7 @@ implementation.
 - `migrations/20260825_001_kvk_target_publication_provenance.sql`
 
 After the approved Phase 2A companion, the expected SQL modify/create/delete manifest for Phase
-2B, 2C, and 2D remains `none`. Any additional proposed SQL change requires a fresh exact
+2B, 2C, 2D, and 2E remains `none`. Any additional proposed SQL change requires a fresh exact
 manifest, migration/rollback plan, separate approval, separate PR, and SQL Changes review.
 
 ## 15. Invariants And Failure Rules
@@ -585,6 +643,16 @@ last-known-good, cross-KVK rejection, and fail-closed no-cache behavior.
 .\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_state_open_window.py tests\test_stats_alerts_state.py tests\test_kvk_history_service.py tests\test_leadership_player_review.py tests\test_kvk_target_publication.py
 ```
 
+Also run `tests/test_stats_alerts_fighting_lifecycle.py`,
+`tests/test_daily_kvk_overview_lifecycle.py`, `tests/test_kvk_targets_card_service.py`,
+`tests/test_kvk_target_cache_repository.py`, and `tests/test_targets_sql_cache_publication.py`.
+
+### Phase 2E Focus
+
+Reuse the complete Phase 2D focus and add the exact DAL test file approved by the Phase 2E audit.
+Cover exact query ownership, named/positional row mapping, malformed and absent KVK details,
+ProcConfig fallback, maximum-scan failure, connection failure, and unchanged adapter outputs.
+
 ### Per-PR Gates
 
 ```powershell
@@ -606,7 +674,7 @@ record why visual regeneration is unnecessary.
 
 ## 17. Deployment, Smoke, And Rollback
 
-Phase 2B, 2C, and 2D are expected to be bot-only and may deploy against the already verified Phase
+Phase 2B, 2C, 2D, and 2E are expected to be bot-only and may deploy against the already verified Phase
 1 SQL contract. Phase 2A also has the approved `EXEMPT_FROM_STATS.GovernorID` SQL companion. For
 every slice:
 
@@ -656,6 +724,8 @@ Rollback is per slice:
 - [ ] Shared state terminology communicates fighting-lifecycle meaning without changing values or
   thresholds.
 - [ ] Stats alerts, daily overview, history, and leadership review retain their Phase 1 behavior.
+- [ ] Phase 2E moves lifecycle SQL reads behind a narrow DAL without changing queries, fallback,
+  mappings, values, reasons, thresholds, or public helpers.
 - [ ] `/kvk targets` arguments, decorators, permissions, channel, visibility, account selection,
   command counts, and registration are unchanged.
 - [ ] No new direct SQL exists in commands or views.
@@ -664,7 +734,8 @@ Rollback is per slice:
 - [ ] Focused, full, cache/restart/concurrency, output, and manual smoke evidence is recorded.
 - [ ] Each runtime slice has a separate bot Changes review with Deep Off.
 - [ ] No standard or deep codebase audit is started without explicit operator request.
-- [ ] The four source deferred items are closed only after their slices are deployed and accepted.
+- [ ] The four source deferred items are closed only after their slices are deployed and accepted;
+  the operator-promoted Phase 2E is closed only after its independent deployment and smoke.
 - [ ] Any new non-security debt is captured structurally; security findings remain in the private
   security workflow.
 
@@ -690,7 +761,7 @@ archived Phase 1 pack/starter, this Phase 2 pack/starter, and deferred-register 
 
 The first response to this task is audit and scope only. Do not edit code, SQL, migrations, tests,
 or documentation. Stop after the Step 1 Required Output and wait for approval. Do not interpret
-approval of one slice as approval of the next.
+approval of one slice as approval of the next, including Phase 2D approval as Phase 2E approval.
 
 ## 21. PR Summary Template
 

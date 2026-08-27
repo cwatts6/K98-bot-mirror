@@ -10,7 +10,7 @@ from constants import (
 )
 import gsheet_module as gm
 from kvk_state import (
-    get_kvk_context_today,
+    get_kvk_fighting_context_today,
     get_kvk_window_with_fallback,
     get_latest_kvk_details,
     is_scan_within_open_window,
@@ -118,8 +118,8 @@ def is_currently_kvk(*_args: Any, **_kwargs: Any) -> bool:
 
 def is_kvk_fighting_open() -> bool:
     try:
-        ctx = get_kvk_context_today()
-        return bool(ctx and ctx.get("state") == "ACTIVE")
+        ctx = get_kvk_fighting_context_today()
+        return bool(ctx and ctx.get("fighting_state") == "ACTIVE")
     except Exception:
         logger.exception("[KVK CHECK] Unexpected failure in Pass4 gate")
         return False
