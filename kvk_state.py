@@ -5,7 +5,7 @@ import datetime as dt
 import logging
 from typing import Literal, TypedDict
 
-from file_utils import fetch_one_dict, get_conn_with_retries
+from kvk.dal import kvk_lifecycle_dal
 
 log = logging.getLogger(__name__)
 
@@ -69,26 +69,6 @@ class KVKWindow(TypedDict):
     source: str
 
 
-def _as_date(v) -> dt.date | None:
-    if not v:
-        return None
-    if isinstance(v, dt.date):
-        return v
-    try:
-        return dt.datetime.fromisoformat(str(v)).date()
-    except Exception:
-        return None
-
-
-def _as_int(v) -> int | None:
-    if v is None:
-        return None
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return None
-
-
 def is_scan_within_open_window(
     start_scan: int | None,
     end_scan: int | None,
@@ -143,14 +123,7 @@ def resolve_kvk_scan_state(
 
 def _get_max_scan_order() -> int | None:
     try:
-        with get_conn_with_retries() as conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT MAX(ScanOrder) AS MaxScanOrder FROM ROK_TRACKER.dbo.kingdomscandata4"
-            )
-            row = fetch_one_dict(cur)
-            if not row:
-                return None
-            return _as_int(row.get("MaxScanOrder", next(iter(row.values()), None)))
+        return kvk_lifecycle_dal.fetch_max_scan_order()
     except Exception as e:
         log.warning("[kvk_state] Could not read max ScanOrder: %s", e)
         return None
@@ -159,56 +132,27 @@ def _get_max_scan_order() -> int | None:
 def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
     today = today or dt.date.today()
     try:
-        with get_conn_with_retries() as conn, conn.cursor() as cur:
-            cur.execute("""
-                SELECT TOP 1
-                    KVK_NO,
-                    KVK_NAME,
-                    KVK_REGISTRATION_DATE,
-                    KVK_START_DATE,
-                    KVK_END_DATE,
-                    CAST(MATCHMAKING_START_DATE AS date) AS MATCHMAKING_START_DATE,
-                    CAST(FIGHTING_START_DATE AS date) AS FIGHTING_START_DATE,
-                    NEXT_KVK_NO,
-                    MATCHMAKING_SCAN,
-                    PASS4_START_SCAN,
-                    KVK_END_SCAN
-                FROM dbo.KVK_Details
-                WHERE KVK_NO IS NOT NULL
-                ORDER BY KVK_NO DESC
-            """)
-            row = fetch_one_dict(cur)
-            if not row:
-                return None
+        row = kvk_lifecycle_dal.fetch_latest_kvk_details_record()
+        if not row:
+            return None
     except Exception as e:
         log.warning("[kvk_state] Could not read dbo.KVK_Details: %s", e)
         return None
 
-    # Prefer named columns where available, fall back to positional ordering of returned values.
-    vals = list(row.values())
-
-    def by_name(*names, idx):
-        for n in names:
-            if n in row:
-                return row[n]
-        # positional fallback
-        return vals[idx] if idx < len(vals) else None
-
-    kvk_no = _as_int(by_name("KVK_NO", idx=0))
+    kvk_no = row.kvk_no
     if not kvk_no:
         log.warning("[kvk_state] Ignoring KVK_Details row with invalid KVK_NO=%r", kvk_no)
         return None
-    name = (by_name("KVK_NAME", idx=1) or f"KVK {kvk_no}").strip()
-    registration = _as_date(by_name("KVK_REGISTRATION_DATE", idx=2))
-    start_d = _as_date(by_name("KVK_START_DATE", idx=3))
-    end_d = _as_date(by_name("KVK_END_DATE", idx=4))
-    mm_start = _as_date(by_name("MATCHMAKING_START_DATE", idx=5))
-    fight_start = _as_date(by_name("FIGHTING_START_DATE", idx=6))
-    next_no_raw = by_name("NEXT_KVK_NO", "NextKVKNo", idx=7)
-    next_no = _as_int(next_no_raw)
-    matchmaking_scan = _as_int(by_name("MATCHMAKING_SCAN", idx=8))
-    pass4_start_scan = _as_int(by_name("PASS4_START_SCAN", idx=9))
-    kvk_end_scan = _as_int(by_name("KVK_END_SCAN", idx=10))
+    name = (row.kvk_name or f"KVK {kvk_no}").strip()
+    registration = row.registration
+    start_d = row.start_date
+    end_d = row.end_date
+    mm_start = row.matchmaking_start_date
+    fight_start = row.fighting_start_date
+    next_no = row.next_kvk_no
+    matchmaking_scan = row.matchmaking_scan
+    pass4_start_scan = row.pass4_start_scan
+    kvk_end_scan = row.kvk_end_scan
     max_scan_order = _get_max_scan_order()
 
     if mm_start and today < mm_start:
@@ -261,30 +205,14 @@ def _is_valid_kvk_window(matchmaking_scan: int | None, kvk_end_scan: int | None)
 
 def _get_proc_config_window(max_scan_order: int | None) -> KVKWindow | None:
     try:
-        with get_conn_with_retries() as conn, conn.cursor() as cur:
-            cur.execute("""
-                SELECT MAX(TRY_CAST(ConfigValue AS int)) AS CurrentKVK
-                FROM dbo.ProcConfig
-                WHERE ConfigKey = 'CURRENTKVK3'
-            """)
-            row = fetch_one_dict(cur)
-            current_kvk = _as_int(row.get("CurrentKVK")) if row else None
-            if not current_kvk:
-                log.warning("[kvk_state] No CURRENTKVK3 found in ProcConfig.")
-                return None
+        row = kvk_lifecycle_dal.fetch_proc_config_window_record()
+        current_kvk = row.current_kvk
+        if not current_kvk:
+            log.warning("[kvk_state] No CURRENTKVK3 found in ProcConfig.")
+            return None
 
-            cur.execute(
-                """
-                SELECT ConfigKey, ConfigValue
-                FROM dbo.ProcConfig
-                WHERE KVKVersion = ? AND ConfigKey IN ('MATCHMAKING_SCAN', 'KVK_END_SCAN')
-                """,
-                (current_kvk,),
-            )
-            kv_map = {x.ConfigKey: x.ConfigValue for x in cur.fetchall()}
-
-        matchmaking_scan = _as_int(kv_map.get("MATCHMAKING_SCAN"))
-        kvk_end_scan = _as_int(kv_map.get("KVK_END_SCAN"))
+        matchmaking_scan = row.matchmaking_scan
+        kvk_end_scan = row.kvk_end_scan
         if not _is_valid_kvk_window(matchmaking_scan, kvk_end_scan):
             log.warning(
                 "[kvk_state] Invalid ProcConfig KVK window. kvk_no=%s matchmaking_scan=%r kvk_end_scan=%r",

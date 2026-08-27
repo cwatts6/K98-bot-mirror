@@ -99,8 +99,13 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
   unchanged and was a documented security-review skip.
 - Phase 2D architecture and its exact bot-only compatibility manifest were approved on 2026-08-27.
   Phase 2D implementation does not approve Phase 2E automatically.
+- Phase 2D was merged through mirror PR #240 and production PR #547, deployed, smoke tested, and
+  operator accepted on 2026-08-27. Its exact operational lifecycle log remained compatible.
 - The operator promoted the proposed `kvk_state.py` SQL-read extraction into a separately gated
   Phase 2E. Phase 2E requires its own post-Phase-2D architecture audit and implementation approval.
+- Phase 2E architecture and its exact bot-only DAL extraction manifest were approved on 2026-08-27.
+  The approved implementation retains all public helpers, state values, reasons, warnings, query
+  semantics, broad-window behavior, and consumer contracts.
 
 ## 4. Objective
 
@@ -323,6 +328,16 @@ Phase 2E must:
 - include DAL mapping/failure tests plus the complete Phase 2D lifecycle regression suite;
 - remain blocked until Phase 2D deployment and operator smoke are accepted and its architecture
   and exact PR-sized manifest receive separate approval.
+
+Approved Phase 2E implementation manifest:
+
+- create `kvk/dal/kvk_lifecycle_dal.py` and `tests/test_kvk_lifecycle_dal.py`;
+- modify `kvk_state.py`, `tests/test_kvk_state_open_window.py`, `README-DEV.md`,
+  `docs/kvk/target_publication_contract.md`, and this task pack;
+- review only stats-alert, daily-overview, history, leadership-review, target service/cache,
+  honor-import, admin/stats, command-registration, and complete Phase 2D lifecycle consumers;
+- create, modify, or delete no SQL file, migration, command, renderer, cache schema, configuration,
+  fighting value, reason, threshold, or player target rule.
 
 ## 8. Scope
 

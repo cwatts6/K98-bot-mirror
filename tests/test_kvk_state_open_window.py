@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
+from kvk.dal import kvk_lifecycle_dal
 import kvk_state
 from kvk_state import (
     get_kvk_context_today,
@@ -199,18 +200,54 @@ class _KvkConn:
 
 def test_latest_kvk_details_filters_null_kvk_no(monkeypatch) -> None:
     conn = _KvkConn()
-    monkeypatch.setattr(kvk_state, "get_conn_with_retries", lambda: conn)
-    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: None)
+    monkeypatch.setattr(kvk_lifecycle_dal, "get_conn_with_retries", lambda: conn)
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_one_dict", lambda _cur: None)
 
     assert kvk_state.get_latest_kvk_details() is None
     assert "WHERE KVK_NO IS NOT NULL" in conn.cursor_obj.sql
 
 
 def test_latest_kvk_details_returns_none_for_invalid_kvk_no(monkeypatch) -> None:
-    monkeypatch.setattr(kvk_state, "get_conn_with_retries", lambda: _KvkConn())
-    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: {"KVK_NO": None})
+    monkeypatch.setattr(kvk_lifecycle_dal, "get_conn_with_retries", lambda: _KvkConn())
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_one_dict", lambda _cur: {"KVK_NO": None})
 
     assert kvk_state.get_latest_kvk_details() is None
+
+
+def test_latest_kvk_details_preserves_sql_failure_warning(monkeypatch, caplog) -> None:
+    def fail_read():
+        raise RuntimeError("details unavailable")
+
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_latest_kvk_details_record", fail_read)
+
+    with caplog.at_level(logging.WARNING, logger=kvk_state.log.name):
+        assert kvk_state.get_latest_kvk_details() is None
+
+    assert "[kvk_state] Could not read dbo.KVK_Details: details unavailable" in caplog.messages
+
+
+def test_max_scan_order_preserves_sql_failure_warning(monkeypatch, caplog) -> None:
+    def fail_read():
+        raise RuntimeError("scan unavailable")
+
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_max_scan_order", fail_read)
+
+    with caplog.at_level(logging.WARNING, logger=kvk_state.log.name):
+        assert kvk_state._get_max_scan_order() is None
+
+    assert "[kvk_state] Could not read max ScanOrder: scan unavailable" in caplog.messages
+
+
+def test_proc_config_window_preserves_sql_failure_warning(monkeypatch, caplog) -> None:
+    def fail_read():
+        raise RuntimeError("config unavailable")
+
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_proc_config_window_record", fail_read)
+
+    with caplog.at_level(logging.WARNING, logger=kvk_state.log.name):
+        assert kvk_state._get_proc_config_window(max_scan_order=1066) is None
+
+    assert "[kvk_state] Could not read ProcConfig KVK window: config unavailable" in caplog.messages
 
 
 def test_latest_kvk_details_preserves_operational_log_message(monkeypatch, caplog) -> None:
@@ -232,8 +269,8 @@ def test_latest_kvk_details_preserves_operational_log_message(monkeypatch, caplo
             {"MaxScanOrder": 1066},
         ]
     )
-    monkeypatch.setattr(kvk_state, "get_conn_with_retries", lambda: _KvkConn())
-    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: next(rows))
+    monkeypatch.setattr(kvk_lifecycle_dal, "get_conn_with_retries", lambda: _KvkConn())
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_one_dict", lambda _cur: next(rows))
 
     with caplog.at_level(logging.INFO, logger=kvk_state.log.name):
         details = kvk_state.get_latest_kvk_details()
@@ -269,8 +306,8 @@ def test_kvk_window_uses_proc_config_fallback_for_missing_detail_scans(monkeypat
             "max_scan_order": 875,
         },
     )
-    monkeypatch.setattr(kvk_state, "get_conn_with_retries", lambda: _ProcConfigConn())
-    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: {"CurrentKVK": 15})
+    monkeypatch.setattr(kvk_lifecycle_dal, "get_conn_with_retries", lambda: _ProcConfigConn())
+    monkeypatch.setattr(kvk_lifecycle_dal, "fetch_one_dict", lambda _cur: {"CurrentKVK": 15})
 
     window = kvk_state.get_kvk_window_with_fallback()
 

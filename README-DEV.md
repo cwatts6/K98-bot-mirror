@@ -36,10 +36,13 @@ Phase 2B was subsequently merged, deployed, and operator accepted on 2026-08-27 
 smoke covered numeric and fuzzy-name lookup, account selection, public output, exemptions, and
 last-KVK comparison. Phase 2C was then merged through mirror PR #239 and production PR #546,
 deployed, smoke tested, and operator accepted with clear logs. It retains cache schema version 2
-and adds only a target-specific durable single-flight coordination sidecar. Phase 2D's explicit
-fighting-lifecycle architecture and exact bot-only manifest were approved on 2026-08-27. The
-operator also promoted the proposed `kvk_state.py` SQL-read extraction into a separately gated
-Phase 2E after Phase 2D is deployed and accepted.
+and adds only a target-specific durable single-flight coordination sidecar. Phase 2D was merged
+through mirror PR #240 and production PR #547, deployed, smoke tested, and operator accepted on
+2026-08-27. It makes the fighting-lifecycle terminology explicit while retaining the original
+public adapters and exact operational log template. The operator then approved Phase 2E's exact
+bot-only architecture and manifest: lifecycle SQL execution and row mapping move into
+`kvk/dal/kvk_lifecycle_dal.py`, while `kvk_state.py` retains every public façade, fighting resolver,
+reason code, warning, broad-window rule, and fallback decision.
 
 ## CrystalTech Path Refresh Delivery
 
