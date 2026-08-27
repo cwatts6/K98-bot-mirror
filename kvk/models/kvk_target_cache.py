@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 
 from kvk.models.kvk_target_publication import (
     TargetPublicationMetadata,
@@ -34,13 +36,20 @@ class TargetCacheSnapshot:
     generated_at: str | None = None
     kvk_fighting_state: str | None = None
     kvk_fighting_state_reason: str | None = None
+    by_governor: Mapping[str, TargetRow] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        rows_by_governor = {row.governor_id: row for row in self.rows}
+        if len(rows_by_governor) != len(self.rows):
+            raise ValueError("Target cache snapshot contains duplicate governor IDs.")
+        object.__setattr__(self, "by_governor", MappingProxyType(rows_by_governor))
 
     @property
     def is_verified(self) -> bool:
         return self.metadata is not None and self.publication_state != "UNKNOWN"
 
     def target_for(self, governor_id: str) -> TargetRow | None:
-        return next((row for row in self.rows if row.governor_id == governor_id), None)
+        return self.by_governor.get(governor_id)
 
 
 @dataclass(frozen=True, slots=True)

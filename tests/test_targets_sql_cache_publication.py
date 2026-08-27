@@ -108,6 +108,26 @@ def test_refresh_preserves_nullable_target_amounts(monkeypatch, tmp_path):
     assert meta["publication_state"] == "OFFICIAL"
 
 
+def test_single_row_and_meta_reads_do_not_serialize_full_snapshot(monkeypatch, tmp_path):
+    repository = _install_repository(monkeypatch, tmp_path)
+    cache.refresh_targets_cache()
+    monkeypatch.setattr(
+        repository,
+        "snapshot_to_cache_document",
+        lambda _snapshot: (_ for _ in ()).throw(
+            AssertionError("hot-path lookup must not serialize all target rows")
+        ),
+    )
+
+    legacy_row, legacy_meta = cache.get_target_cache_entry("123")
+    typed_row, typed_meta = cache.get_typed_target_cache_entry("123")
+    current_meta = cache.get_current_target_cache_meta()
+
+    assert legacy_row is not None and legacy_row["GovernorID"] == "123"
+    assert typed_row is not None and typed_row.governor_id == "123"
+    assert legacy_meta == typed_meta == current_meta
+
+
 def test_schema_two_cache_rejects_missing_canonical_field(monkeypatch, tmp_path):
     repository = _install_repository(monkeypatch, tmp_path)
     cache.refresh_targets_cache()

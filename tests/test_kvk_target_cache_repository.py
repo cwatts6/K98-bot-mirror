@@ -9,6 +9,8 @@ import sys
 import threading
 import time
 
+import pytest
+
 from kvk.models.kvk_target_cache import TargetCacheRefreshOutcome
 from kvk.models.kvk_target_publication import (
     TargetPublicationMetadata,
@@ -210,6 +212,34 @@ def test_draft_poll_deadline_survives_repository_restart(tmp_path):
     assert reads == [16]
 
 
+def test_impossible_future_draft_poll_deadline_is_non_authoritative(tmp_path):
+    now = [1000.0]
+    draft = _publication(state="DRAFT")
+    cache_path = tmp_path / "targets.json"
+    first = _repository(cache_path, draft, wall_clock=lambda: now[0])
+    assert first.refresh().outcome == TargetCacheRefreshOutcome.REFRESHED
+
+    coordination = json.loads(Path(first.coordination_path).read_text(encoding="utf-8"))
+    coordination["draft_poll"]["not_before_utc"] = datetime.fromtimestamp(
+        now[0] + 600, UTC
+    ).isoformat()
+    Path(first.coordination_path).write_text(json.dumps(coordination), encoding="utf-8")
+
+    reads: list[int] = []
+    restarted = TargetCacheRepository(
+        cache_path,
+        context_provider=lambda: _context(),
+        metadata_fetcher=lambda kvk_no: reads.append(kvk_no) or draft.metadata,
+        publication_fetcher=lambda _kvk_no: draft,
+        wall_clock=lambda: now[0],
+    )
+
+    assert restarted.read_snapshot().publication_state == "DRAFT"
+    assert reads == [16]
+    repaired = json.loads(Path(first.coordination_path).read_text(encoding="utf-8"))
+    assert datetime.fromisoformat(repaired["draft_poll"]["not_before_utc"]).timestamp() == 1060
+
+
 def test_explicit_maintenance_bypasses_draft_poll_without_refetching_rows(tmp_path):
     draft = _publication(state="DRAFT")
     metadata_reads: list[int] = []
@@ -291,6 +321,55 @@ def test_live_owner_wait_is_bounded_and_fails_closed_without_cache(tmp_path):
     assert result.outcome == TargetCacheRefreshOutcome.FAILED_CLOSED
     assert result.snapshot.publication_state == "UNKNOWN"
     assert result.reason == "coordination_wait_expired"
+
+
+def test_follower_wait_uses_monotonic_clock_during_wall_clock_rollback(tmp_path):
+    wall_now = [1020.0]
+    wall_calls = [0]
+    monotonic_now = [0.0]
+
+    def rolling_back_wall_clock():
+        wall_calls[0] += 1
+        if wall_calls[0] > 50:
+            raise AssertionError("wall-clock rollback must not extend the follower timeout")
+        wall_now[0] -= 0.001
+        return wall_now[0]
+
+    def advance_monotonic(seconds):
+        monotonic_now[0] += seconds
+
+    repository = _repository(
+        tmp_path / "targets.json",
+        process_matcher=lambda *_args, **_kwargs: True,
+        wall_clock=rolling_back_wall_clock,
+        monotonic_clock=lambda: monotonic_now[0],
+        sleeper=advance_monotonic,
+        follower_wait_seconds=0.006,
+        follower_poll_seconds=0.002,
+    )
+    Path(repository.coordination_path).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_refresh": {
+                    "requested_kvk_no": 16,
+                    "owner_token": "live-owner",
+                    "owner_pid": os.getpid(),
+                    "owner_executable": sys.executable,
+                    "claimed_at_utc": datetime.fromtimestamp(1000, UTC).isoformat(),
+                    "lease_expires_at_utc": datetime.fromtimestamp(1050, UTC).isoformat(),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = repository.refresh()
+
+    assert result.outcome == TargetCacheRefreshOutcome.FAILED_CLOSED
+    assert result.reason == "coordination_wait_expired"
+    assert monotonic_now[0] >= 0.006
+    assert wall_calls[0] < 50
 
 
 def test_impossible_future_lease_is_non_authoritative(tmp_path):
@@ -433,3 +512,11 @@ def test_malformed_coordination_is_non_authoritative(tmp_path):
     coordination = json.loads(Path(repository.coordination_path).read_text(encoding="utf-8"))
     assert coordination["schema_version"] == 1
     assert "active_refresh" not in coordination
+
+
+def test_snapshot_governor_index_is_immutable_and_constant_time(tmp_path):
+    snapshot = _repository(tmp_path / "targets.json").refresh().snapshot
+
+    assert snapshot.target_for("123") is snapshot.by_governor["123"]
+    with pytest.raises(TypeError):
+        snapshot.by_governor["789"] = snapshot.rows[0]  # type: ignore[index]

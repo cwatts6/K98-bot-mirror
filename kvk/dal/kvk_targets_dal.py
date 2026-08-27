@@ -40,16 +40,17 @@ def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
         return None
     repository = get_default_target_cache_repository()
     snapshot = repository.read_snapshot()
-    document = repository.snapshot_to_cache_document(snapshot)
-    row = document["by_gov"].get(str(gid))
-    return dict(row) if isinstance(row, Mapping) else None
+    typed_row = snapshot.target_for(str(gid))
+    if typed_row is None:
+        return None
+    return repository.target_row_to_cache_entry(snapshot, typed_row)
 
 
 def fetch_target_cache_meta() -> dict[str, Any]:
     """Compatibility wrapper returning verified current-KVK publication metadata."""
     repository = get_default_target_cache_repository()
     snapshot = repository.read_snapshot()
-    return dict(repository.snapshot_to_cache_document(snapshot)["_meta"])
+    return repository.snapshot_to_cache_meta(snapshot)
 
 
 def fetch_target_entry(
@@ -70,8 +71,7 @@ def fetch_target_entry(
         }
     repository = get_default_target_cache_repository()
     snapshot = repository.read_snapshot(kvk_context)
-    meta = repository.snapshot_to_cache_document(snapshot)["_meta"]
-    return snapshot.target_for(governor_key), dict(meta)
+    return snapshot.target_for(governor_key), repository.snapshot_to_cache_meta(snapshot)
 
 
 def fetch_exemption_row(governor_id: str | int, kvk_no: int | None = None) -> dict[str, Any] | None:

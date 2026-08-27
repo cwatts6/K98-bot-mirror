@@ -30,6 +30,7 @@ from kvk.models.kvk_target_publication import (
     TargetPublicationSnapshot,
 )
 from kvk.models.kvk_target_row import (
+    TargetRow,
     TargetRowContractError,
     serialize_target_row,
     target_row_from_mapping,
@@ -102,6 +103,7 @@ class TargetCacheRepository:
             fetch_current_target_publication
         ),
         wall_clock: Callable[[], float] = time.time,
+        monotonic_clock: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
         process_matcher: Callable[..., bool] = matches_process,
         lease_seconds: float = REFRESH_LEASE_SECONDS,
@@ -116,6 +118,7 @@ class TargetCacheRepository:
         self._metadata_fetcher = metadata_fetcher
         self._publication_fetcher = publication_fetcher
         self._wall_clock = wall_clock
+        self._monotonic_clock = monotonic_clock
         self._sleeper = sleeper
         self._process_matcher = process_matcher
         self._lease_seconds = max(0.01, float(lease_seconds))
@@ -310,40 +313,59 @@ class TargetCacheRepository:
         snapshot: TargetCacheSnapshot,
     ) -> dict[str, Any]:
         """Serialize a typed snapshot to the stable schema-version-2 cache document."""
+        meta = self.snapshot_to_cache_meta(snapshot)
+        if not snapshot.is_verified or snapshot.metadata is None:
+            return {"_meta": meta, "by_gov": {}}
+        by_gov = {
+            row.governor_id: self.target_row_to_cache_entry(snapshot, row, meta=meta)
+            for row in snapshot.rows
+        }
+        return {"_meta": meta, "by_gov": by_gov}
+
+    def snapshot_to_cache_meta(self, snapshot: TargetCacheSnapshot) -> dict[str, Any]:
+        """Serialize only snapshot metadata without materializing player rows."""
         if not snapshot.is_verified or snapshot.metadata is None:
             return {
-                "_meta": {
-                    "schema_version": CACHE_SCHEMA_VERSION,
-                    "kvk_no": snapshot.requested_kvk_no,
-                    "publication_state": "UNKNOWN",
-                    "publication_reason": snapshot.publication_reason,
-                },
-                "by_gov": {},
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "kvk_no": snapshot.requested_kvk_no,
+                "publication_state": "UNKNOWN",
+                "publication_reason": snapshot.publication_reason,
             }
-        metadata = snapshot.metadata
         written_at = snapshot.cache_written_at_utc or datetime.now(UTC).isoformat()
-        meta = {
+        return {
             "schema_version": CACHE_SCHEMA_VERSION,
             "generated_at": snapshot.generated_at or written_at,
             "cache_written_at_utc": written_at,
-            **metadata_to_cache_fields(metadata),
+            **metadata_to_cache_fields(snapshot.metadata),
             "publication_state": snapshot.publication_state,
             "publication_reason": snapshot.publication_reason,
             "kvk_fighting_state": snapshot.kvk_fighting_state,
             "kvk_fighting_state_reason": snapshot.kvk_fighting_state_reason,
         }
-        by_gov: dict[str, dict[str, Any]] = {}
-        for typed_row in snapshot.rows:
-            row = serialize_target_row(typed_row)
-            row["TargetState"] = snapshot.publication_state
-            row["PublicationReason"] = snapshot.publication_reason
-            row["TargetSourceScan"] = metadata.source_scan_order
-            row["TargetSourceType"] = metadata.source_scan_type
-            row["TargetPublishedAt"] = meta.get("target_published_at")
-            row["PublicationVersion"] = metadata.publication_version
-            row["PublicationSignature"] = metadata.publication_signature
-            by_gov[typed_row.governor_id] = row
-        return {"_meta": meta, "by_gov": by_gov}
+
+    def target_row_to_cache_entry(
+        self,
+        snapshot: TargetCacheSnapshot,
+        typed_row: TargetRow,
+        *,
+        meta: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Serialize one row with the snapshot's stable compatibility aliases."""
+        metadata = snapshot.metadata
+        if not snapshot.is_verified or metadata is None or typed_row.kvk_no != metadata.kvk_no:
+            raise TargetPublicationContractError(
+                "Target row cannot be serialized outside its verified publication snapshot."
+            )
+        resolved_meta = meta or self.snapshot_to_cache_meta(snapshot)
+        row = serialize_target_row(typed_row)
+        row["TargetState"] = snapshot.publication_state
+        row["PublicationReason"] = snapshot.publication_reason
+        row["TargetSourceScan"] = metadata.source_scan_order
+        row["TargetSourceType"] = metadata.source_scan_type
+        row["TargetPublishedAt"] = resolved_meta.get("target_published_at")
+        row["PublicationVersion"] = metadata.publication_version
+        row["PublicationSignature"] = metadata.publication_signature
+        return row
 
     def _bound_context(
         self,
@@ -521,8 +543,8 @@ class TargetCacheRepository:
             return "owner", token, snapshot
 
     def _wait_for_owner(self, ctx: Mapping[str, Any]) -> TargetCacheRefreshResult:
-        deadline = self._wall_clock() + self._follower_wait_seconds
-        while self._wall_clock() < deadline:
+        deadline = self._monotonic_clock() + self._follower_wait_seconds
+        while self._monotonic_clock() < deadline:
             snapshot = self._read_validated_snapshot(ctx)
             if snapshot is not None:
                 return TargetCacheRefreshResult(
@@ -590,11 +612,13 @@ class TargetCacheRepository:
         identity = snapshot.metadata.cache_identity if snapshot.metadata else None
         if not isinstance(poll, Mapping) or identity is None:
             return False
+        not_before = _epoch(poll.get("not_before_utc"))
         return (
             _positive_int(poll.get("kvk_no")) == identity[0]
             and _positive_int(poll.get("publication_version")) == identity[1]
             and str(poll.get("publication_signature") or "") == identity[2]
-            and (_epoch(poll.get("not_before_utc")) or 0.0) > now
+            and not_before is not None
+            and now < not_before <= now + self._draft_poll_seconds + 1.0
         )
 
     def _set_draft_poll(

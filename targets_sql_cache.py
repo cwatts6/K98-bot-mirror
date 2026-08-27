@@ -25,8 +25,7 @@ def _maintenance_summary(
     repository: TargetCacheRepository,
     result: TargetCacheRefreshResult,
 ) -> dict[str, Any]:
-    document = repository.snapshot_to_cache_document(result.snapshot)
-    meta = document["_meta"]
+    meta = repository.snapshot_to_cache_meta(result.snapshot)
     return {
         "_meta": meta,
         "summary": {
@@ -71,9 +70,11 @@ def get_target_cache_entry(
             "publication_reason": PUBLICATION_READ_FAILED,
         }
     repository, snapshot = _current_snapshot(kvk_context)
-    document = repository.snapshot_to_cache_document(snapshot)
-    row = document["by_gov"].get(governor_key)
-    return (dict(row) if isinstance(row, Mapping) else None), dict(document["_meta"])
+    typed_row = snapshot.target_for(governor_key)
+    row = (
+        repository.target_row_to_cache_entry(snapshot, typed_row) if typed_row is not None else None
+    )
+    return row, repository.snapshot_to_cache_meta(snapshot)
 
 
 def get_typed_target_cache_entry(
@@ -90,15 +91,14 @@ def get_typed_target_cache_entry(
             "publication_reason": PUBLICATION_READ_FAILED,
         }
     repository, snapshot = _current_snapshot(kvk_context)
-    meta = repository.snapshot_to_cache_document(snapshot)["_meta"]
-    return snapshot.target_for(governor_key), dict(meta)
+    return snapshot.target_for(governor_key), repository.snapshot_to_cache_meta(snapshot)
 
 
 def get_current_target_cache_meta(
     kvk_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     repository, snapshot = _current_snapshot(kvk_context)
-    return dict(repository.snapshot_to_cache_document(snapshot)["_meta"])
+    return repository.snapshot_to_cache_meta(snapshot)
 
 
 def get_targets_for_governor(governor_id: int | str) -> dict[str, Any] | None:
