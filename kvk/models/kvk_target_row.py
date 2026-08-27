@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
+import math
 from typing import Any
 
 _CANONICAL_FIELDS = frozenset(
@@ -48,10 +50,18 @@ def _positive_int(value: Any, field: str) -> int:
 def _optional_nonnegative_int(value: Any, field: str) -> int | None:
     if value in (None, ""):
         return None
-    if isinstance(value, bool) or isinstance(value, float):
+    if isinstance(value, bool):
         raise TargetRowContractError(f"Target row contained an invalid {field}.")
     if isinstance(value, int):
         converted = value
+    elif isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise TargetRowContractError(f"Target row contained an invalid {field}.")
+        converted = int(value)
+    elif isinstance(value, Decimal):
+        if not value.is_finite() or value != value.to_integral_value():
+            raise TargetRowContractError(f"Target row contained an invalid {field}.")
+        converted = int(value)
     elif isinstance(value, str) and value.strip().isdigit():
         converted = int(value.strip())
     else:
@@ -64,10 +74,18 @@ def _optional_nonnegative_int(value: Any, field: str) -> int | None:
 def _optional_int(value: Any, field: str) -> int | None:
     if value in (None, ""):
         return None
-    if isinstance(value, bool) or isinstance(value, float):
+    if isinstance(value, bool):
         raise TargetRowContractError(f"Target row contained an invalid {field}.")
     if isinstance(value, int):
         return value
+    if isinstance(value, float):
+        if math.isfinite(value) and value.is_integer():
+            return int(value)
+        raise TargetRowContractError(f"Target row contained an invalid {field}.")
+    if isinstance(value, Decimal):
+        if value.is_finite() and value == value.to_integral_value():
+            return int(value)
+        raise TargetRowContractError(f"Target row contained an invalid {field}.")
     if isinstance(value, str):
         normalized = value.strip()
         digits = normalized[1:] if normalized[:1] in ("+", "-") else normalized

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from decimal import Decimal
 
 import pytest
 
@@ -74,6 +75,30 @@ def test_target_row_preserves_exact_nullable_bigint_rank(target_rank: object):
     assert row.target_rank == int(target_rank)
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        ("TargetRank", Decimal("4"), 4),
+        ("TargetRank", 4.0, 4),
+        ("DKP_Target", Decimal("50000000"), 50_000_000),
+        ("Kill_Target", 20_000_000.0, 20_000_000),
+    ],
+)
+def test_target_row_accepts_exact_integral_sql_numeric_values(
+    field: str,
+    value: object,
+    expected: int,
+):
+    row = target_row_from_mapping(_mapping(**{field: value}))
+
+    attribute = {
+        "TargetRank": "target_rank",
+        "DKP_Target": "dkp_target",
+        "Kill_Target": "kill_target",
+    }[field]
+    assert getattr(row, attribute) == expected
+
+
 def test_target_row_ignores_extra_publication_fields_but_requires_canonical_fields():
     row = target_row_from_mapping(_mapping(PublicationVersion=3))
     assert row.governor_id == "2441482"
@@ -92,7 +117,10 @@ def test_target_row_ignores_extra_publication_fields_but_requires_canonical_fiel
         ("GovernorID", 0),
         ("KVK_NO", 0),
         ("TargetRank", 1.5),
+        ("TargetRank", Decimal("1.5")),
+        ("TargetRank", float("inf")),
         ("DKP_Target", -1),
+        ("DKP_Target", Decimal("NaN")),
         ("Kill_Target", 1.25),
         ("Deads_Target", True),
     ],
