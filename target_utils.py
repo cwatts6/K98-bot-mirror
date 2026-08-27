@@ -92,8 +92,8 @@ def sync_refresh_worker() -> dict[str, Any]:
 async def warm_target_cache() -> None:
     """
     Legacy async wrapper kept for compatibility.
-    Uses the existing SQL-backed refresh_targets_cache for full targets cache.
-    Prefer process offload for heavy refresh when available.
+    Uses the target-domain repository through the compatibility refresh entrypoint.
+    Process and in-thread callers share the same bounded durable single-flight lease.
     """
     try:
         # Local import to avoid module-level import cycles

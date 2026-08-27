@@ -32,6 +32,12 @@ the target cache from Draft to Official after Phase 1 deployment. That operator-
 transition satisfies the Phase 2C evidence prerequisite; Phase 2C implementation remains a
 separately approval-gated slice.
 
+Phase 2B was subsequently merged, deployed, and operator accepted on 2026-08-27 after Discord
+smoke covered numeric and fuzzy-name lookup, account selection, public output, exemptions, and
+last-KVK comparison. Phase 2C architecture and its exact bot-only manifest are now approved for
+implementation. It retains cache schema version 2 and adds only a target-specific durable
+single-flight coordination sidecar; Phase 2D remains separately approval-gated.
+
 ## CrystalTech Path Refresh Delivery
 
 The 2026-08-25 CrystalTech path refresh is complete and operator accepted in mirror PR #234 and

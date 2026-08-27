@@ -88,6 +88,11 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
 - The final Phase 2B bot working-tree diff completed its required `Changes + Deep Off` security
   review with zero reportable findings. The SQL repository remained review-only with no diff, so
   the Phase 2B SQL security decision is a documented skip.
+- Phase 2B was merged, deployed, and operator accepted on 2026-08-27. Discord smoke passed numeric
+  lookup, account selection, fuzzy lookup, public view, exemption, and last-KVK comparison paths.
+- Phase 2C architecture, 60-second refresh lease, five-second cold-follower bound, durable Draft
+  poll coordination, crash recovery, and exact bot-only manifest were approved on 2026-08-27.
+  This approval does not approve Phase 2D.
 
 ## 4. Objective
 
@@ -151,7 +156,7 @@ Scoring uses `Priority Score = (Impact + Frequency + Risk Reduction) - Effort`.
 |---|---:|---:|---:|---:|---:|---|
 | Immutable typed target-row boundary | 3 | 5 | 3 | 3 | 8 | Phase 2A foundation |
 | One service-owned retrieval/presentation-input path | 4 | 4 | 4 | 4 | 8 | Phase 2B after typed rows |
-| Target-domain cache repository and cross-process single-flight | 3 | 4 | 4 | 4 | 7 | Phase 2C evidence satisfied; separate approval still required |
+| Target-domain cache repository and cross-process single-flight | 3 | 4 | 4 | 4 | 7 | Phase 2C implementation approved |
 | Explicit fighting-lifecycle terminology | 3 | 4 | 3 | 4 | 6 | Phase 2D, isolated due blast radius |
 
 The first three items form one coherent target-data ownership chain. The terminology item scores
@@ -241,6 +246,20 @@ Phase 2C must:
 - avoid a generic cache abstraction until another proven consumer exists;
 - include crash, stale-lock, timeout, concurrent refresh, restart, and rollback tests.
 
+Approved Phase 2C implementation manifest:
+
+- create `kvk/models/kvk_target_cache.py`;
+- create `kvk/target_cache_repository.py`;
+- create `tests/test_kvk_target_cache_repository.py`;
+- create `tests/test_targets_sql_cache_subproc.py`;
+- modify `targets_sql_cache.py`, `target_utils.py`, `kvk/dal/kvk_targets_dal.py`,
+  `tests/test_targets_sql_cache_publication.py`, `tests/test_target_utils_governor_lookup.py`,
+  `README-DEV.md`, `docs/kvk/target_publication_contract.md`, and this task pack;
+- review only the publication DAL/service, card service, processing/import handoff, atomic-write,
+  maintenance-worker, process-identity, command, view, renderer, and fallback paths;
+- create, modify, or delete no SQL file, migration, command registration, configuration, startup
+  hook, renderer, or Phase 2D fighting-lifecycle consumer.
+
 ### Phase 2D - Explicit Fighting-Lifecycle Terminology
 
 Audit and, only after separate architecture approval, introduce compatibility-preserving names
@@ -311,7 +330,7 @@ Provisional runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B completed with zero reportable findings; later slices remain pending |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B completed with zero reportable findings; Phase 2C pending final diff review |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes

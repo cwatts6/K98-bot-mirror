@@ -48,9 +48,9 @@ state.
 
 - A missing or legacy cache is rebuilt only from a verified SQL publication.
 - A Draft cache is polled and promoted when a new Official identity appears. Command-path metadata
-  polling is single-process bounded to once per verified publication identity per 60 seconds;
-  explicit maintenance refreshes bypass that hot-read cadence. A restart may perform one immediate
-  metadata check, then restores the same bound.
+  polling is durably bounded across bot and maintenance processes to once per verified publication
+  identity per 60 seconds; explicit maintenance refreshes bypass that hot-read cadence while still
+  joining the same single-flight coordination. The poll deadline survives restart.
 - An Official cache is not rewritten because later scans arrive or Pass 4 begins.
 - KVK end projects a verified Official cache as Historical without changing the fixed rows.
 - A previous-KVK cache is never served as the current KVK.
@@ -62,6 +62,14 @@ state.
 - Writes use atomic replacement. A cross-process write lock covers the final disk-version check and
   replacement, so a lower or conflicting publication version cannot overwrite a newer valid cache
   already on disk.
+- Cache reads and refreshes are owned by `kvk/target_cache_repository.py`. Refreshes expose the
+  typed outcomes `REUSED`, `REFRESHED`, `RETAINED_LAST_KNOWN_GOOD`, `REJECTED_MISMATCH`,
+  `UNAVAILABLE`, and `FAILED_CLOSED`; `targets_sql_cache.py` remains a compatibility façade.
+- Cross-process refresh ownership uses a 60-second lease in
+  `player_targets_cache.json.coordination.json`. A live follower with matching last-known-good
+  data returns immediately; a cold follower waits no more than five seconds. A proven dead owner
+  is reclaimed immediately, an uncertain or hung owner is reclaimable after lease expiry, and a
+  late owner cannot commit after losing its token. The lock is never held during SQL reads.
 
 Routine SQL processing does not replace an existing Official publication. An operator force
 republish is default-off, requires an explicit reason, and creates a new version/signature.

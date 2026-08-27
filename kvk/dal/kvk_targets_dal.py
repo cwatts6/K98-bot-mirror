@@ -6,11 +6,8 @@ from typing import Any
 
 from file_utils import fetch_all_dicts, fetch_one_dict, get_conn_with_retries
 from kvk.models.kvk_target_row import TargetRow
-from targets_sql_cache import (
-    get_current_target_cache_meta,
-    get_target_cache_entry,
-    get_typed_target_cache_entry,
-)
+from kvk.services.kvk_target_publication_service import PUBLICATION_READ_FAILED
+from kvk.target_cache_repository import get_default_target_cache_repository
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +38,18 @@ def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
         gid = int(str(governor_id).strip())
     except (TypeError, ValueError):
         return None
-    row, _ = get_target_cache_entry(gid)
-    return dict(row) if isinstance(row, dict) else None
+    repository = get_default_target_cache_repository()
+    snapshot = repository.read_snapshot()
+    document = repository.snapshot_to_cache_document(snapshot)
+    row = document["by_gov"].get(str(gid))
+    return dict(row) if isinstance(row, Mapping) else None
 
 
 def fetch_target_cache_meta() -> dict[str, Any]:
     """Compatibility wrapper returning verified current-KVK publication metadata."""
-    return get_current_target_cache_meta()
+    repository = get_default_target_cache_repository()
+    snapshot = repository.read_snapshot()
+    return dict(repository.snapshot_to_cache_document(snapshot)["_meta"])
 
 
 def fetch_target_entry(
@@ -55,7 +57,21 @@ def fetch_target_entry(
     kvk_context: Mapping[str, Any] | None = None,
 ) -> tuple[TargetRow | None, dict[str, Any]]:
     """Return a target row and publication metadata from one cache snapshot."""
-    return get_typed_target_cache_entry(governor_id, kvk_context)
+    try:
+        governor_key = str(int(str(governor_id).strip()))
+    except (TypeError, ValueError):
+        governor_key = ""
+    if not governor_key.isdigit():
+        return None, {
+            "schema_version": 2,
+            "kvk_no": None,
+            "publication_state": "UNKNOWN",
+            "publication_reason": PUBLICATION_READ_FAILED,
+        }
+    repository = get_default_target_cache_repository()
+    snapshot = repository.read_snapshot(kvk_context)
+    meta = repository.snapshot_to_cache_document(snapshot)["_meta"]
+    return snapshot.target_for(governor_key), dict(meta)
 
 
 def fetch_exemption_row(governor_id: str | int, kvk_no: int | None = None) -> dict[str, Any] | None:
