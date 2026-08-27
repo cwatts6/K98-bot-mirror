@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import json
 
+from kvk.dal import kvk_targets_dal
 from kvk.models.kvk_target_publication import (
     TargetPublicationMetadata,
     TargetPublicationSnapshot,
@@ -126,6 +127,15 @@ def test_single_row_and_meta_reads_do_not_serialize_full_snapshot(monkeypatch, t
     assert legacy_row is not None and legacy_row["GovernorID"] == "123"
     assert typed_row is not None and typed_row.governor_id == "123"
     assert legacy_meta == typed_meta == current_meta
+
+
+def test_dal_invalid_target_entry_uses_shared_cache_schema_version(monkeypatch):
+    monkeypatch.setattr(kvk_targets_dal, "CACHE_SCHEMA_VERSION", 99)
+
+    row, meta = kvk_targets_dal.fetch_target_entry("not-a-governor-id")
+
+    assert row is None
+    assert meta["schema_version"] == 99
 
 
 def test_schema_two_cache_rejects_missing_canonical_field(monkeypatch, tmp_path):

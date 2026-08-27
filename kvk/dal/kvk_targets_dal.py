@@ -7,7 +7,10 @@ from typing import Any
 from file_utils import fetch_all_dicts, fetch_one_dict, get_conn_with_retries
 from kvk.models.kvk_target_row import TargetRow
 from kvk.services.kvk_target_publication_service import PUBLICATION_READ_FAILED
-from kvk.target_cache_repository import get_default_target_cache_repository
+from kvk.target_cache_repository import (
+    CACHE_SCHEMA_VERSION,
+    get_default_target_cache_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +67,7 @@ def fetch_target_entry(
         governor_key = ""
     if not governor_key.isdigit():
         return None, {
-            "schema_version": 2,
+            "schema_version": CACHE_SCHEMA_VERSION,
             "kvk_no": None,
             "publication_state": "UNKNOWN",
             "publication_reason": PUBLICATION_READ_FAILED,
