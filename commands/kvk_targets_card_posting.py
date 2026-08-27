@@ -99,6 +99,26 @@ async def _render_targets_file(
     )
 
 
+async def _acknowledge_public_post(interaction: discord.Interaction) -> None:
+    """Complete a deferred component interaction after its public channel post."""
+    try:
+        await interaction.edit_original_response(
+            content="Targets posted in this channel.",
+            embed=None,
+            view=None,
+        )
+        return
+    except Exception:
+        logger.debug("kvk_targets_public_ack_edit_failed", exc_info=True)
+    try:
+        await interaction.followup.send(
+            content="Targets posted in this channel.",
+            ephemeral=True,
+        )
+    except Exception:
+        logger.exception("kvk_targets_public_ack_followup_failed")
+
+
 async def post_kvk_targets_output(
     interaction: discord.Interaction,
     governor_id: str | int,
@@ -144,6 +164,7 @@ async def post_kvk_targets_channel_output(
         )
         if channel is not None and rendered_file is not None:
             await channel.send(file=rendered_file)
+            await _acknowledge_public_post(interaction)
             return payload
     except Exception:
         logger.exception("kvk_targets_public_card_send_failed governor_id=%s", governor_id)
@@ -152,6 +173,7 @@ async def post_kvk_targets_channel_output(
     if channel is not None:
         try:
             await channel.send(embed=embed)
+            await _acknowledge_public_post(interaction)
             return payload
         except Exception:
             logger.exception("kvk_targets_public_embed_send_failed governor_id=%s", governor_id)

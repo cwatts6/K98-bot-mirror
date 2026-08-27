@@ -232,7 +232,8 @@ def _draw_metric_grid(draw: ImageDraw.ImageDraw, payload: KvkTargetsCardPayload)
         comparison_value = _compact(metric.current)
         if metric.has_target:
             comparison_value = (
-                f"{_compact(metric.current)} / {_compact(metric.target)} / {_pct(metric.percent)}"
+                f"{_compact(metric.current)} / "
+                f"{_compact(metric.comparison_denominator)} / {_pct(metric.percent)}"
             )
         comparison_values.append(comparison_value)
 

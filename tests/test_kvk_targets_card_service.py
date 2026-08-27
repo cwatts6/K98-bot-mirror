@@ -36,6 +36,17 @@ async def _kills_last_kvk_map():
     return {"9": {"T4&T5_Kills": 50}}
 
 
+async def _historical_targets_last_kvk_map():
+    return {
+        "9": {
+            "T4&T5_Kills": 75,
+            "Kill Target": 50,
+            "DKP_SCORE": 120,
+            "DKP Target": 100,
+        }
+    }
+
+
 def _target_row(
     governor_id: str,
     *,
@@ -249,3 +260,40 @@ async def test_targets_payload_source_unavailable_when_stats_missing(monkeypatch
     assert payload.target_state == "active"
     assert payload.metrics[0].current == 50
     assert payload.metrics[0].target == 100
+
+
+async def test_targets_payload_preserves_historical_denominators_and_minimum_kills(monkeypatch):
+    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
+    monkeypatch.setattr(
+        service.kvk_targets_dal,
+        "fetch_target_entry",
+        lambda _gid, _kvk_context=None: (
+            _target_row(
+                "9",
+                kill_target=100,
+                min_kill_target=25,
+                dkp_target=200,
+            ),
+            _publication_meta(),
+        ),
+    )
+    monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
+    monkeypatch.setattr(
+        service.stats_cache_helpers,
+        "load_last_kvk_map",
+        _historical_targets_last_kvk_map,
+    )
+    monkeypatch.setattr(service, "load_stat_row", lambda _gid: None)
+
+    payload = await service.build_kvk_targets_card_payload("9")
+
+    kills, _, dkp, _ = payload.metrics
+    assert kills.target == 100
+    assert kills.comparison_target == 50
+    assert kills.percent == 150.0
+    assert kills.remaining == 0
+    assert dkp.target == 200
+    assert dkp.comparison_target == 100
+    assert dkp.percent == 120.0
+    assert payload.min_kill_target == 25

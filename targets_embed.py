@@ -77,14 +77,19 @@ def build_targets_fallback_embed(payload: KvkTargetsCardPayload) -> discord.Embe
             remaining = "complete"
         else:
             remaining = f"{_compact(metric.remaining)} remaining"
-        embed.add_field(
-            name=metric.label,
-            value=(
-                f"{_compact(metric.current)} / {_compact(metric.target)} - "
-                f"{_percent(metric.percent)}\n{remaining}"
-            ),
-            inline=False,
+        lines = [f"Current target: {_compact(metric.target)}"]
+        if payload.min_kill_target and "kill" in metric.label.lower():
+            lines.append(f"Minimum kills: {_compact(payload.min_kill_target)}")
+        lines.extend(
+            [
+                (
+                    f"Last KVK: {_compact(metric.current)} / "
+                    f"{_compact(metric.comparison_denominator)} - {_percent(metric.percent)}"
+                ),
+                remaining,
+            ]
         )
+        embed.add_field(name=metric.label, value="\n".join(lines), inline=False)
     embed.add_field(name="Next Action", value=payload.next_action, inline=False)
     footer = f"GovernorID: {payload.governor_id}"
     if payload.target_published_at:

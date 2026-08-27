@@ -78,7 +78,13 @@ def _display_datetime(value: Any) -> str | None:
         return text
 
 
-def _progress(label: str, current: int | None, target: int | None) -> KvkTargetMetricProgress:
+def _progress(
+    label: str,
+    current: int | None,
+    target: int | None,
+    *,
+    comparison_target: int | None = None,
+) -> KvkTargetMetricProgress:
     if not target or target <= 0:
         return KvkTargetMetricProgress(
             label=label,
@@ -86,15 +92,18 @@ def _progress(label: str, current: int | None, target: int | None) -> KvkTargetM
             target=target,
             percent=None,
             remaining=None,
+            comparison_target=comparison_target,
         )
-    percent = None if current is None else (float(current) / float(target)) * 100.0
-    remaining = None if current is None else max(int(target) - int(current), 0)
+    denominator = comparison_target if comparison_target and comparison_target > 0 else target
+    percent = None if current is None else (float(current) / float(denominator)) * 100.0
+    remaining = None if current is None else max(int(denominator) - int(current), 0)
     return KvkTargetMetricProgress(
         label=label,
         current=current,
         target=target,
         percent=percent,
         remaining=remaining,
+        comparison_target=comparison_target,
     )
 
 
@@ -137,22 +146,37 @@ def _target_metrics(
         ["DKP_SCORE", "DKP Score", "DKP_Score", "DKP KVK -1"],
     )
     acclaim_current = _optional_int_from_variants(last_kvk, ["Acclaim", "AcclaimScore"])
+    historical_kill_target = _optional_int_from_variants(
+        last_kvk,
+        ["Kill Target", "Kill_Target", "KillTarget", "kill_target", "kill_target_value"],
+    )
+    historical_deads_target = _optional_int_from_variants(
+        last_kvk,
+        ["Dead Target", "Dead_Target", "Deads Target", "Deads_Target", "deads_target"],
+    )
+    historical_dkp_target = _optional_int_from_variants(
+        last_kvk,
+        ["DKP Target", "DKP_Target", "DKPTarget", "dkp_target", "dkp_target_value"],
+    )
 
     metrics = [
         _progress(
             "Kills Target",
             kills_current,
             targets.kill_target,
+            comparison_target=historical_kill_target,
         ),
         _progress(
             "Deads Target",
             deads_current,
             targets.deads_target,
+            comparison_target=historical_deads_target,
         ),
         _progress(
             "DKP Target",
             dkp_current,
             targets.dkp_target,
+            comparison_target=historical_dkp_target,
         ),
     ]
     metrics.append(
@@ -390,6 +414,7 @@ async def build_kvk_targets_presentation_input(
             next_action=next_action,
             power=target_row.power,
             metrics=metrics,
+            min_kill_target=target_row.min_kill_target,
             last_refreshed=last_refreshed,
             publication_state=publication_state,
             publication_reason=publication_reason,

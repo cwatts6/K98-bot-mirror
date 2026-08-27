@@ -17,6 +17,7 @@ class KvkTargetMetricProgress:
     percent: float | None
     remaining: int | None
     note: str | None = None
+    comparison_target: int | None = None
 
     @property
     def has_target(self) -> bool:
@@ -25,8 +26,17 @@ class KvkTargetMetricProgress:
     @property
     def is_complete(self) -> bool:
         return (
-            self.has_target and self.current is not None and self.current >= int(self.target or 0)
+            self.has_target
+            and self.current is not None
+            and self.current >= int(self.comparison_denominator or 0)
         )
+
+    @property
+    def comparison_denominator(self) -> int | None:
+        """Target that applied to the historical value, falling back compatibly."""
+        if self.comparison_target and self.comparison_target > 0:
+            return self.comparison_target
+        return self.target
 
 
 @dataclass(frozen=True)
@@ -42,6 +52,7 @@ class KvkTargetsCardPayload:
     next_action: str
     power: int | None
     metrics: tuple[KvkTargetMetricProgress, ...]
+    min_kill_target: int | None = None
     last_refreshed: str | None = None
     publication_state: str = "UNKNOWN"
     publication_reason: str | None = None

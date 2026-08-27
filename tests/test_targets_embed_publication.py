@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from kvk.models.kvk_targets_card import KvkTargetsCardPayload
+from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
 from targets_embed import build_targets_fallback_embed
 
 
@@ -53,3 +53,21 @@ def test_fallback_embed_legacy_active_state_is_not_official():
 
     assert "Unverified targets" in embed.description
     assert "Official targets" not in embed.description
+
+
+def test_fallback_embed_preserves_historical_denominator_and_minimum_kills():
+    metric = KvkTargetMetricProgress(
+        label="Kills Target",
+        current=75,
+        target=100,
+        percent=150.0,
+        remaining=0,
+        comparison_target=50,
+    )
+
+    embed = build_targets_fallback_embed(_payload(metrics=(metric,), min_kill_target=25))
+
+    kills = next(field for field in embed.fields if field.name == "Kills Target")
+    assert "Current target: 100" in kills.value
+    assert "Minimum kills: 25" in kills.value
+    assert "Last KVK: 75 / 50 - 150%" in kills.value

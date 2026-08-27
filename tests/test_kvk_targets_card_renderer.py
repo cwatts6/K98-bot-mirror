@@ -71,3 +71,32 @@ def test_targets_renderer_prefers_canonical_unknown_publication_warning(monkeypa
     assert rendered is not None
     assert "Do not treat this target set as Official." in drawn_text
     assert "Target publication provenance could not be verified." not in drawn_text
+
+
+def test_targets_renderer_uses_historical_comparison_denominator(monkeypatch):
+    payload = replace(
+        _payload(),
+        metrics=(
+            KvkTargetMetricProgress(
+                "Kills Target",
+                12_000_000,
+                20_000_000,
+                120.0,
+                0,
+                comparison_target=10_000_000,
+            ),
+        ),
+    )
+    drawn_text: list[str] = []
+    original_draw_text = renderer._draw_text
+
+    def capture_draw_text(draw, xy, text, **kwargs):
+        drawn_text.append(text)
+        return original_draw_text(draw, xy, text, **kwargs)
+
+    monkeypatch.setattr(renderer, "_draw_text", capture_draw_text)
+
+    rendered = renderer.render_kvk_targets_card(payload)
+
+    assert rendered is not None
+    assert "12M / 10M / 120%" in drawn_text

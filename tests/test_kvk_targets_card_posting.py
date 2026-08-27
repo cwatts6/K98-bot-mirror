@@ -164,10 +164,16 @@ async def test_send_or_edit_rewinds_file_before_followup_after_edit_failure():
 async def test_channel_output_uses_same_payload_for_public_image(monkeypatch):
     payload = _payload()
     channel = DummyChannel()
+    acknowledgement_edits = []
+
+    async def edit_original_response(**kwargs):
+        acknowledgement_edits.append(kwargs)
+
     interaction = SimpleNamespace(
         channel=channel,
         followup=DummyFollowup(),
         user=SimpleNamespace(id=1),
+        edit_original_response=edit_original_response,
     )
     rendered_file = DummyFile()
 
@@ -187,15 +193,24 @@ async def test_channel_output_uses_same_payload_for_public_image(monkeypatch):
     assert result is payload
     assert channel.sent == [{"file": rendered_file}]
     assert interaction.followup.sent == []
+    assert acknowledgement_edits == [
+        {"content": "Targets posted in this channel.", "embed": None, "view": None}
+    ]
 
 
 async def test_channel_output_falls_back_to_canonical_embed(monkeypatch):
     payload = _payload()
     channel = DummyChannel()
+    acknowledgement_edits = []
+
+    async def edit_original_response(**kwargs):
+        acknowledgement_edits.append(kwargs)
+
     interaction = SimpleNamespace(
         channel=channel,
         followup=DummyFollowup(),
         user=SimpleNamespace(id=1),
+        edit_original_response=edit_original_response,
     )
 
     async def fake_payload(_gid):
@@ -211,6 +226,38 @@ async def test_channel_output_falls_back_to_canonical_embed(monkeypatch):
 
     assert channel.sent[0]["embed"].title == "KVK Targets - Gov"
     assert interaction.followup.sent == []
+    assert acknowledgement_edits == [
+        {"content": "Targets posted in this channel.", "embed": None, "view": None}
+    ]
+
+
+async def test_channel_output_acknowledgement_falls_back_to_ephemeral_followup(monkeypatch):
+    payload = _payload()
+    channel = DummyChannel()
+    followup = DummyFollowup()
+
+    async def fail_edit(**_kwargs):
+        raise RuntimeError("edit failed")
+
+    interaction = SimpleNamespace(
+        channel=channel,
+        followup=followup,
+        user=SimpleNamespace(id=1),
+        edit_original_response=fail_edit,
+    )
+
+    async def fake_payload(_gid):
+        return payload
+
+    async def no_render(_payload, *, user):
+        return None
+
+    monkeypatch.setattr(posting, "build_kvk_targets_card_payload", fake_payload)
+    monkeypatch.setattr(posting, "_render_targets_file", no_render)
+
+    await posting.post_kvk_targets_channel_output(interaction, "1")
+
+    assert followup.sent == [{"content": "Targets posted in this channel.", "ephemeral": True}]
 
 
 async def test_fallback_embed_formats_placeholder_metric_note():
