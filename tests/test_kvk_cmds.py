@@ -84,6 +84,16 @@ def test_kvk_commands_use_consistent_channel_limits():
     assert "admin_override=False" not in source
 
 
+def test_kvk_targets_command_delegates_target_enrichment_and_fallback():
+    import commands.kvk_cmds as kvk_cmds
+
+    source = inspect.getsource(kvk_cmds._send_personal_kvk_targets)
+
+    assert "post_kvk_targets_output" in source
+    assert "load_last_kvk_map" not in source
+    assert "run_target_lookup" not in source
+
+
 @pytest.mark.asyncio
 async def test_kvk_rankings_routes_all_modes(monkeypatch):
     kvk_cmds, group, _bot = _register_kvk(monkeypatch)

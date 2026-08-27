@@ -2,49 +2,87 @@ from __future__ import annotations
 
 import pytest
 
-import file_utils
 from kvk.models.kvk_target_row import TargetRow
+from kvk.models.kvk_targets_card import KvkTargetsCardPayload, KvkTargetsPresentationInput
 import target_utils
 
 
-@pytest.mark.asyncio
-async def test_run_target_lookup_unwraps_ok_tuple_from_maintenance(monkeypatch):
-    target = {
-        "GovernorID": "2441482",
-        "GovernorName": "Alice",
-        "TargetState": "ACTIVE",
-        "KVK_NO": 15,
-    }
-
-    async def fake_run_maintenance_with_isolation(*_args, **_kwargs):
-        return True, target
-
-    monkeypatch.setattr(
-        file_utils,
-        "run_maintenance_with_isolation",
-        fake_run_maintenance_with_isolation,
-        raising=True,
+def _presentation(
+    *,
+    target_row: TargetRow | None,
+    progress_state: str = "active",
+) -> KvkTargetsPresentationInput:
+    return KvkTargetsPresentationInput(
+        payload=KvkTargetsCardPayload(
+            governor_id="2441482",
+            governor_name="Alice",
+            kvk_no=16,
+            kvk_name="Tides of War",
+            camp_name=None,
+            progress_state=progress_state,
+            status_label="Target review",
+            status_detail="Target details",
+            next_action="Act",
+            power=100,
+            metrics=(),
+            publication_state="OFFICIAL",
+            publication_reason="matchmaking_source_confirmed",
+            target_source_scan=1059,
+            target_source_type="MATCHMAKING_SCAN",
+            target_published_at="2026-08-26 19:22 UTC",
+            publication_version=1,
+            publication_signature="sig-1",
+        ),
+        target_row=target_row,
+        last_kvk={"KVK_NO": 15, "T4&T5_Kills": 50},
     )
 
-    res = await target_utils.run_target_lookup("2441482")
 
-    assert res == {"status": "found", "data": target}
+@pytest.mark.asyncio
+async def test_run_target_lookup_uses_service_owned_presentation_input(monkeypatch):
+    target_row = TargetRow("2441482", "Alice", 100, 300, 200, 10, 50, 1, 16)
+    calls: list[str] = []
+
+    async def fake_build(governor_id):
+        calls.append(str(governor_id))
+        return _presentation(target_row=target_row)
+
+    monkeypatch.setattr(target_utils, "build_kvk_targets_presentation_input", fake_build)
+
+    result = await target_utils.run_target_lookup("2441482")
+
+    assert calls == ["2441482"]
+    assert result is not None
+    assert result["status"] == "found"
+    assert result["data"]["GovernorID"] == "2441482"
+    assert result["data"]["TargetState"] == "OFFICIAL"
+    assert result["data"]["last_kvk"]["KVK_NO"] == 15
 
 
-def test_unwrap_targets_result_accepts_worker_parsed_tuple():
-    target = {"GovernorID": "2441482", "TargetState": "ACTIVE"}
+@pytest.mark.asyncio
+async def test_name_lookup_routes_resolved_id_through_same_target_service(monkeypatch):
+    target_row = TargetRow("2441482", "Alice", 100, 300, 200, 10, 50, 1, 16)
+    calls: list[str] = []
 
-    assert target_utils._unwrap_targets_result((target, {"status": "success"})) == target
+    async def fake_lookup(_query):
+        return {
+            "status": "found",
+            "data": {"GovernorID": "2441482", "GovernorName": "Alice"},
+        }
 
+    async def fake_build(governor_id):
+        calls.append(str(governor_id))
+        return _presentation(target_row=target_row)
 
-def test_unwrap_targets_result_raises_for_failed_maintenance_tuple():
-    raw_error = "Return code 1. Output:\n" + ("secret-ish output " * 100)
+    monkeypatch.setattr(target_utils, "lookup_governor_id", fake_lookup)
+    monkeypatch.setattr(target_utils, "build_kvk_targets_presentation_input", fake_build)
 
-    with pytest.raises(RuntimeError) as exc:
-        target_utils._unwrap_targets_result((False, raw_error))
+    result = await target_utils.run_target_lookup("Alice")
 
-    assert str(exc.value) == "Target maintenance failed"
-    assert "secret-ish output" not in str(exc.value)
+    assert calls == ["2441482"]
+    assert result is not None
+    assert result["status"] == "found"
+    assert result["data"]["GovernorName"] == "Alice"
 
 
 def test_legacy_target_adapter_prefers_canonical_values_over_aliases():
@@ -92,19 +130,27 @@ def test_legacy_target_adapter_serializes_typed_row_to_canonical_keys():
 
 
 @pytest.mark.asyncio
-async def test_run_target_lookup_reports_error_for_failed_maintenance(monkeypatch):
-    async def fake_run_maintenance_with_isolation(*_args, **_kwargs):
-        return False, "database unavailable"
+async def test_run_target_lookup_reports_service_failure(monkeypatch):
+    async def fail_build(_governor_id):
+        raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr(
-        file_utils,
-        "run_maintenance_with_isolation",
-        fake_run_maintenance_with_isolation,
-        raising=True,
-    )
+    monkeypatch.setattr(target_utils, "build_kvk_targets_presentation_input", fail_build)
 
-    res = await target_utils.run_target_lookup("2441482")
+    result = await target_utils.run_target_lookup("2441482")
 
-    assert res is not None
-    assert res["status"] == "error"
-    assert res["message"] == "Internal error retrieving targets by ID"
+    assert result == {"status": "error", "message": "Internal error retrieving targets by ID"}
+
+
+@pytest.mark.asyncio
+async def test_run_target_lookup_preserves_exempt_outcome(monkeypatch):
+    async def fake_build(_governor_id):
+        return _presentation(target_row=None, progress_state="exempt")
+
+    monkeypatch.setattr(target_utils, "build_kvk_targets_presentation_input", fake_build)
+
+    result = await target_utils.run_target_lookup("2441482")
+
+    assert result == {
+        "status": "not_found",
+        "message": "Governor Alice is exempt from KVK targets.",
+    }

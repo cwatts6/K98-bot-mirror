@@ -9,8 +9,8 @@ import discord
 
 from kvk.models.kvk_targets_card import KvkTargetsCardPayload
 from kvk.rendering.kvk_targets_card_renderer import render_kvk_targets_card
-from kvk.services.kvk_target_publication_service import target_publication_display
 from kvk.services.kvk_targets_card_service import build_kvk_targets_card_payload
+from targets_embed import build_targets_fallback_embed
 
 logger = logging.getLogger(__name__)
 
@@ -22,83 +22,6 @@ def _card_enabled() -> bool:
         "no",
         "off",
     }
-
-
-def _compact(value: int | float | None) -> str:
-    if value is None:
-        return "N/A"
-    val = float(value)
-    abs_val = abs(val)
-    for limit, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
-        if abs_val >= limit:
-            return f"{val / limit:.1f}".rstrip("0").rstrip(".") + suffix
-    return f"{int(val):,}"
-
-
-def _pct(value: float | None) -> str:
-    if value is None:
-        return "N/A"
-    return f"{value:.1f}".rstrip("0").rstrip(".") + "%"
-
-
-def build_targets_fallback_embed(payload: KvkTargetsCardPayload) -> discord.Embed:
-    publication = target_publication_display(
-        payload.publication_state,
-        source_scan_order=payload.target_source_scan,
-    )
-    publication_colors = {
-        "DRAFT": 0x2563EB,
-        "OFFICIAL": 0x16A34A,
-        "HISTORIC": 0x334155,
-        "UNKNOWN": 0xD97706,
-    }
-    embed = discord.Embed(
-        title=f"KVK Targets - {payload.governor_name}",
-        description=(
-            f"**{publication.label} targets** | "
-            f"{payload.display_kvk_label} | {payload.display_mode}"
-        ),
-        color=discord.Color(publication_colors[publication.state]),
-    )
-    embed.add_field(name="Target Publication", value=publication.source_text, inline=False)
-    warning_text = publication.warning_text or (payload.warnings[0] if payload.warnings else None)
-    if warning_text:
-        embed.add_field(name="Publication Warning", value=warning_text, inline=False)
-    embed.add_field(name="Status", value=payload.status_detail, inline=False)
-    if payload.metrics:
-        for metric in payload.metrics:
-            if not metric.has_target:
-                lines = [_compact(metric.current)]
-                if metric.note:
-                    lines.append(metric.note)
-                embed.add_field(
-                    name=metric.label,
-                    value="\n".join(lines),
-                    inline=False,
-                )
-                continue
-            if metric.remaining is None:
-                remaining = "progress unavailable"
-            elif metric.remaining <= 0:
-                remaining = "complete"
-            else:
-                remaining = f"{_compact(metric.remaining)} remaining"
-            embed.add_field(
-                name=metric.label,
-                value=(
-                    f"{_compact(metric.current)} / {_compact(metric.target)} - "
-                    f"{_pct(metric.percent)}\n{remaining}"
-                ),
-                inline=False,
-            )
-    embed.add_field(name="Next Action", value=payload.next_action, inline=False)
-    footer = f"GovernorID: {payload.governor_id}"
-    if payload.target_published_at:
-        footer += f" | Published {payload.target_published_at}"
-    if payload.last_refreshed:
-        footer += f" | Cache {payload.last_refreshed}"
-    embed.set_footer(text=footer)
-    return embed
 
 
 async def _read_avatar_bytes(user) -> bytes | None:
@@ -155,6 +78,27 @@ async def _send_or_edit(
     await _send_followup(interaction, ephemeral=ephemeral, file=file, embed=embed)
 
 
+async def _render_targets_file(
+    payload: KvkTargetsCardPayload,
+    *,
+    user,
+) -> discord.File | None:
+    if not _card_enabled():
+        return None
+    avatar_bytes = await _read_avatar_bytes(user)
+    rendered = await asyncio.to_thread(
+        render_kvk_targets_card,
+        payload,
+        avatar_bytes=avatar_bytes,
+    )
+    if rendered is None:
+        return None
+    return discord.File(
+        BytesIO(rendered.image_bytes.getvalue()),
+        filename=rendered.filename,
+    )
+
+
 async def post_kvk_targets_output(
     interaction: discord.Interaction,
     governor_id: str | int,
@@ -163,28 +107,53 @@ async def post_kvk_targets_output(
 ) -> KvkTargetsCardPayload:
     """Build and send modern targets output, falling back to an embed if image rendering fails."""
     payload = await build_kvk_targets_card_payload(governor_id)
-    if _card_enabled():
-        try:
-            avatar_bytes = await _read_avatar_bytes(getattr(interaction, "user", None))
-            rendered = await asyncio.to_thread(
-                render_kvk_targets_card, payload, avatar_bytes=avatar_bytes
+    try:
+        rendered_file = await _render_targets_file(
+            payload,
+            user=getattr(interaction, "user", None),
+        )
+        if rendered_file is not None:
+            await _send_or_edit(
+                interaction,
+                file=rendered_file,
+                ephemeral=ephemeral,
             )
-            if rendered is not None:
-                await _send_or_edit(
-                    interaction,
-                    file=discord.File(
-                        BytesIO(rendered.image_bytes.getvalue()),
-                        filename=rendered.filename,
-                    ),
-                    ephemeral=ephemeral,
-                )
-                return payload
-        except Exception:
-            logger.exception("kvk_targets_card_render_or_send_failed governor_id=%s", governor_id)
+            return payload
+    except Exception:
+        logger.exception("kvk_targets_card_render_or_send_failed governor_id=%s", governor_id)
 
     await _send_or_edit(
         interaction,
         embed=build_targets_fallback_embed(payload),
         ephemeral=ephemeral,
     )
+    return payload
+
+
+async def post_kvk_targets_channel_output(
+    interaction: discord.Interaction,
+    governor_id: str | int,
+) -> KvkTargetsCardPayload:
+    """Post the canonical target output publicly, retaining an ephemeral fallback."""
+    payload = await build_kvk_targets_card_payload(governor_id)
+    channel = getattr(interaction, "channel", None)
+    try:
+        rendered_file = await _render_targets_file(
+            payload,
+            user=getattr(interaction, "user", None),
+        )
+        if channel is not None and rendered_file is not None:
+            await channel.send(file=rendered_file)
+            return payload
+    except Exception:
+        logger.exception("kvk_targets_public_card_send_failed governor_id=%s", governor_id)
+
+    embed = build_targets_fallback_embed(payload)
+    if channel is not None:
+        try:
+            await channel.send(embed=embed)
+            return payload
+        except Exception:
+            logger.exception("kvk_targets_public_embed_send_failed governor_id=%s", governor_id)
+    await interaction.followup.send(embed=embed, ephemeral=True)
     return payload

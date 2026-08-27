@@ -77,6 +77,14 @@ class DummyMessage:
         self.edits.append(kwargs)
 
 
+class DummyChannel:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, **kwargs):
+        self.sent.append(kwargs)
+
+
 class DummyFile:
     def __init__(self):
         self.reset_calls = []
@@ -151,6 +159,58 @@ async def test_send_or_edit_rewinds_file_before_followup_after_edit_failure():
 
     assert file.reset_calls == [True]
     assert followup.sent == [{"file": file, "ephemeral": True}]
+
+
+async def test_channel_output_uses_same_payload_for_public_image(monkeypatch):
+    payload = _payload()
+    channel = DummyChannel()
+    interaction = SimpleNamespace(
+        channel=channel,
+        followup=DummyFollowup(),
+        user=SimpleNamespace(id=1),
+    )
+    rendered_file = DummyFile()
+
+    async def fake_payload(_gid):
+        return payload
+
+    async def fake_render(received_payload, *, user):
+        assert received_payload is payload
+        assert user is interaction.user
+        return rendered_file
+
+    monkeypatch.setattr(posting, "build_kvk_targets_card_payload", fake_payload)
+    monkeypatch.setattr(posting, "_render_targets_file", fake_render)
+
+    result = await posting.post_kvk_targets_channel_output(interaction, "1")
+
+    assert result is payload
+    assert channel.sent == [{"file": rendered_file}]
+    assert interaction.followup.sent == []
+
+
+async def test_channel_output_falls_back_to_canonical_embed(monkeypatch):
+    payload = _payload()
+    channel = DummyChannel()
+    interaction = SimpleNamespace(
+        channel=channel,
+        followup=DummyFollowup(),
+        user=SimpleNamespace(id=1),
+    )
+
+    async def fake_payload(_gid):
+        return payload
+
+    async def no_render(_payload, *, user):
+        return None
+
+    monkeypatch.setattr(posting, "build_kvk_targets_card_payload", fake_payload)
+    monkeypatch.setattr(posting, "_render_targets_file", no_render)
+
+    await posting.post_kvk_targets_channel_output(interaction, "1")
+
+    assert channel.sent[0]["embed"].title == "KVK Targets - Gov"
+    assert interaction.followup.sent == []
 
 
 async def test_fallback_embed_formats_placeholder_metric_note():

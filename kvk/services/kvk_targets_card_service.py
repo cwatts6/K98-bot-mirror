@@ -7,7 +7,11 @@ from typing import Any
 
 from kvk.dal import kvk_targets_dal
 from kvk.models.kvk_target_row import TargetRow
-from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
+from kvk.models.kvk_targets_card import (
+    KvkTargetMetricProgress,
+    KvkTargetsCardPayload,
+    KvkTargetsPresentationInput,
+)
 from kvk.services.kvk_stats_card_service import load_kvk_stats_card_context
 from kvk.services.kvk_target_publication_service import (
     MISSING_PUBLICATION_METADATA,
@@ -228,21 +232,38 @@ def _publication_details(
     )
 
 
-async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCardPayload:
+def _presentation(
+    payload: KvkTargetsCardPayload,
+    *,
+    target_row: TargetRow | None = None,
+    last_kvk: dict[str, Any] | None = None,
+) -> KvkTargetsPresentationInput:
+    return KvkTargetsPresentationInput(
+        payload=payload,
+        target_row=target_row,
+        last_kvk=dict(last_kvk) if isinstance(last_kvk, dict) else None,
+    )
+
+
+async def build_kvk_targets_presentation_input(
+    governor_id: str | int,
+) -> KvkTargetsPresentationInput:
     gid = str(governor_id or "").strip()
     if not gid.isdigit():
-        return KvkTargetsCardPayload(
-            governor_id=gid or "unknown",
-            governor_name="Unknown governor",
-            kvk_no=None,
-            kvk_name=None,
-            camp_name=None,
-            progress_state="missing_governor",
-            status_label="Invalid ID",
-            status_detail="That Governor ID is not valid.",
-            next_action="Use a numeric Governor ID or register an account.",
-            power=None,
-            metrics=(),
+        return _presentation(
+            KvkTargetsCardPayload(
+                governor_id=gid or "unknown",
+                governor_name="Unknown governor",
+                kvk_no=None,
+                kvk_name=None,
+                camp_name=None,
+                progress_state="missing_governor",
+                status_label="Invalid ID",
+                status_detail="That Governor ID is not valid.",
+                next_action="Use a numeric Governor ID or register an account.",
+                power=None,
+                metrics=(),
+            )
         )
 
     try:
@@ -278,18 +299,42 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     if not target_row:
         exemption = await asyncio.to_thread(kvk_targets_dal.fetch_exemption_row, gid, kvk_no)
         if exemption and bool(exemption.get("Exempt")):
-            return KvkTargetsCardPayload(
+            return _presentation(
+                KvkTargetsCardPayload(
+                    governor_id=gid,
+                    governor_name=_str_from_variants(
+                        exemption, ["GovernorName", "Governor_Name"], default=f"Governor {gid}"
+                    ),
+                    kvk_no=kvk_no or _int_from_variants(exemption, ["KVK_NO"], default=0) or None,
+                    kvk_name=kvk_name,
+                    camp_name=context.camp_name,
+                    progress_state="exempt",
+                    status_label="Exempt",
+                    status_detail="This governor is exempt from KVK targets.",
+                    next_action="No action needed unless leadership asks for an update.",
+                    power=None,
+                    metrics=(),
+                    last_refreshed=last_refreshed,
+                    publication_state=publication_state,
+                    publication_reason=publication_reason,
+                    target_source_scan=target_source_scan,
+                    target_source_type=target_source_type,
+                    target_published_at=target_published_at,
+                    publication_version=publication_version,
+                    publication_signature=publication_signature,
+                )
+            )
+        return _presentation(
+            KvkTargetsCardPayload(
                 governor_id=gid,
-                governor_name=_str_from_variants(
-                    exemption, ["GovernorName", "Governor_Name"], default=f"Governor {gid}"
-                ),
-                kvk_no=kvk_no or _int_from_variants(exemption, ["KVK_NO"], default=0) or None,
+                governor_name=f"Governor {gid}",
+                kvk_no=kvk_no,
                 kvk_name=kvk_name,
                 camp_name=context.camp_name,
-                progress_state="exempt",
-                status_label="Exempt",
-                status_detail="This governor is exempt from KVK targets.",
-                next_action="No action needed unless leadership asks for an update.",
+                progress_state="no_target",
+                status_label="No target",
+                status_detail="No target row was found for this governor.",
+                next_action="Check the Governor ID or ask leadership if targets are still being prepared.",
                 power=None,
                 metrics=(),
                 last_refreshed=last_refreshed,
@@ -301,26 +346,6 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
                 publication_version=publication_version,
                 publication_signature=publication_signature,
             )
-        return KvkTargetsCardPayload(
-            governor_id=gid,
-            governor_name=f"Governor {gid}",
-            kvk_no=kvk_no,
-            kvk_name=kvk_name,
-            camp_name=context.camp_name,
-            progress_state="no_target",
-            status_label="No target",
-            status_detail="No target row was found for this governor.",
-            next_action="Check the Governor ID or ask leadership if targets are still being prepared.",
-            power=None,
-            metrics=(),
-            last_refreshed=last_refreshed,
-            publication_state=publication_state,
-            publication_reason=publication_reason,
-            target_source_scan=target_source_scan,
-            target_source_type=target_source_type,
-            target_published_at=target_published_at,
-            publication_version=publication_version,
-            publication_signature=publication_signature,
         )
 
     try:
@@ -352,25 +377,35 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     elif publication_state == "UNKNOWN":
         warnings.append("Target publication provenance could not be verified.")
 
-    return KvkTargetsCardPayload(
-        governor_id=gid,
-        governor_name=governor_name,
-        kvk_no=kvk_no or target_row.kvk_no,
-        kvk_name=kvk_name,
-        camp_name=context.camp_name,
-        progress_state=target_state,
-        status_label=label,
-        status_detail=detail,
-        next_action=next_action,
-        power=target_row.power,
-        metrics=metrics,
-        last_refreshed=last_refreshed,
-        publication_state=publication_state,
-        publication_reason=publication_reason,
-        target_source_scan=target_source_scan,
-        target_source_type=target_source_type,
-        target_published_at=target_published_at,
-        publication_version=publication_version,
-        publication_signature=publication_signature,
-        warnings=tuple(warnings),
+    return _presentation(
+        KvkTargetsCardPayload(
+            governor_id=gid,
+            governor_name=governor_name,
+            kvk_no=kvk_no or target_row.kvk_no,
+            kvk_name=kvk_name,
+            camp_name=context.camp_name,
+            progress_state=target_state,
+            status_label=label,
+            status_detail=detail,
+            next_action=next_action,
+            power=target_row.power,
+            metrics=metrics,
+            last_refreshed=last_refreshed,
+            publication_state=publication_state,
+            publication_reason=publication_reason,
+            target_source_scan=target_source_scan,
+            target_source_type=target_source_type,
+            target_published_at=target_published_at,
+            publication_version=publication_version,
+            publication_signature=publication_signature,
+            warnings=tuple(warnings),
+        ),
+        target_row=target_row,
+        last_kvk=last_kvk_row,
     )
+
+
+async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCardPayload:
+    """Compatibility entry point returning the canonical renderer payload."""
+    result = await build_kvk_targets_presentation_input(governor_id)
+    return result.payload

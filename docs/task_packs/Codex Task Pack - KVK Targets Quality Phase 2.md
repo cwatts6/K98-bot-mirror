@@ -80,6 +80,14 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
   transitioned from Draft to Official successfully. This operator-attested live transition
   satisfies the Phase 2C production-evidence prerequisite. Phase 2C implementation still requires
   its own architecture and implementation approval.
+- Phase 2A was promoted through mirror PR #237, SQL PR #74, and production PR #544. The operator
+  accepted the production Discord smoke on 2026-08-27 after the cache remained schema version 2,
+  retained the matching Official KVK 16 publication identity, and exposed all 350 expected rows.
+- Phase 2B architecture and its exact bot-only implementation manifest were separately approved on
+  2026-08-27. This approval does not approve Phase 2C or Phase 2D implementation.
+- The final Phase 2B bot working-tree diff completed its required `Changes + Deep Off` security
+  review with zero reportable findings. The SQL repository remained review-only with no diff, so
+  the Phase 2B SQL security decision is a documented skip.
 
 ## 4. Objective
 
@@ -303,7 +311,7 @@ Provisional runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Pending each final diff |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B completed with zero reportable findings; later slices remain pending |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes

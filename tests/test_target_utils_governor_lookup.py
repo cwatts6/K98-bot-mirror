@@ -3,6 +3,24 @@ from __future__ import annotations
 import pytest
 
 
+def test_sync_refresh_worker_uses_target_dal_directory_contract(monkeypatch):
+    import target_utils
+
+    monkeypatch.setattr(
+        target_utils.kvk_targets_dal,
+        "fetch_governor_lookup_rows",
+        lambda: [
+            {"GovernorID": 123, "GovernorName": " Ada ", "CityHallLevel": 25.0},
+            {"GovernorID": None, "GovernorName": "Invalid", "CityHallLevel": 1.0},
+        ],
+    )
+
+    result = target_utils.sync_refresh_worker()
+
+    assert result["rows"] == [{"GovernorID": "123", "GovernorName": "Ada", "CityHallLevel": 25.0}]
+    assert result["norm_to_row"]["ada"]["GovernorID"] == "123"
+
+
 @pytest.mark.asyncio
 async def test_lookup_governor_row_by_id_uses_existing_cache(monkeypatch):
     import target_utils

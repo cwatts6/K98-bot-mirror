@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from io import BytesIO
+from typing import Any
+
+from kvk.models.kvk_target_row import TargetRow
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,15 @@ class KvkTargetsCardPayload:
         if not percentages:
             return None
         return min(percentages)
+
+
+@dataclass(frozen=True)
+class KvkTargetsPresentationInput:
+    """Service-owned target result shared by modern and compatibility output paths."""
+
+    payload: KvkTargetsCardPayload
+    target_row: TargetRow | None = None
+    last_kvk: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)

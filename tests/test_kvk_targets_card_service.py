@@ -126,8 +126,13 @@ async def test_targets_payload_active_progress(monkeypatch):
         },
     )
 
-    payload = await service.build_kvk_targets_card_payload("2441482")
+    presentation = await service.build_kvk_targets_presentation_input("2441482")
+    payload = presentation.payload
 
+    assert presentation.target_row is not None
+    assert presentation.target_row.governor_id == "2441482"
+    assert presentation.last_kvk is not None
+    assert presentation.last_kvk["Acclaim"] == 4_700_000
     assert payload.governor_name == "Stats Gov"
     assert payload.display_camp == "Wind"
     assert payload.target_state == "active"

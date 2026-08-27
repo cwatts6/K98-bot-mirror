@@ -15,6 +15,7 @@ Business logic lives in services/kvk_personal_service.py.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable, Sequence
 import logging
 
 import discord
@@ -36,47 +37,9 @@ async def _send_targets_to_channel(interaction: discord.Interaction, governor_id
     ``defer(ephemeral=True)``) before calling this helper.
     """
     try:
-        from kvk_state import get_kvk_context_today
-        from target_utils import run_target_lookup
-        from targets_embed import build_kvk_targets_embed
+        from commands.kvk_targets_card_posting import post_kvk_targets_channel_output
 
-        # Non-interactive call — returns a data dict without touching the interaction
-        result = await run_target_lookup(str(governor_id))
-        channel = interaction.channel
-
-        if result and result.get("status") == "found":
-            tgt = result["data"]
-            kvk_ctx = get_kvk_context_today() or {}
-            kvk_name = kvk_ctx.get("kvk_name")
-            gov_name = tgt.get("GovernorName") or str(governor_id)
-            embed = build_kvk_targets_embed(
-                gov_name=gov_name,
-                governor_id=int(governor_id),
-                targets=tgt,
-                kvk_name=kvk_name,
-            )
-            if channel is not None:
-                try:
-                    await channel.send(embed=embed)
-                    return
-                except Exception:
-                    logger.exception(
-                        "[kvk_personal_views] channel.send failed for governor_id=%s", governor_id
-                    )
-            # Fallback if channel unavailable
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            msg = (result or {}).get("message", "No targets found for this governor.")
-            if channel is not None:
-                try:
-                    await channel.send(content=msg)
-                    return
-                except Exception:
-                    logger.exception(
-                        "[kvk_personal_views] channel.send (error msg) failed for governor_id=%s",
-                        governor_id,
-                    )
-            await interaction.followup.send(content=msg, ephemeral=True)
+        await post_kvk_targets_channel_output(interaction, governor_id)
     except Exception:
         logger.exception(
             "[kvk_personal_views] _send_targets_to_channel failed governor_id=%s", governor_id
@@ -87,6 +50,63 @@ async def _send_targets_to_channel(interaction: discord.Interaction, governor_id
             )
         except Exception:
             pass
+
+
+TargetLookupCallback = Callable[..., Awaitable[dict | None]]
+
+
+class KvkTargetsLookupSelect(discord.ui.Select):
+    """Stable name-disambiguation selector for the legacy target lookup route."""
+
+    def __init__(
+        self,
+        options: Sequence[discord.SelectOption],
+        *,
+        on_select: TargetLookupCallback,
+        ephemeral: bool,
+    ) -> None:
+        super().__init__(
+            placeholder="Choose an account to view…",
+            min_values=1,
+            max_values=1,
+            options=list(options),
+        )
+        self._on_select = on_select
+        self._ephemeral = ephemeral
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            await self._on_select(interaction, self.values[0], ephemeral=self._ephemeral)
+        except Exception:
+            logger.exception("kvk_targets_lookup_select_failed")
+            try:
+                await interaction.followup.send(
+                    "Failed to process selection",
+                    ephemeral=self._ephemeral,
+                )
+            except Exception:
+                pass
+
+
+class KvkTargetsLookupSelectView(discord.ui.View):
+    """Top-level view replacing the former nested target-utils selector classes."""
+
+    def __init__(
+        self,
+        options: Sequence[discord.SelectOption],
+        *,
+        on_select: TargetLookupCallback,
+        ephemeral: bool,
+        timeout: float | None = 300,
+    ) -> None:
+        super().__init__(timeout=timeout)
+        self.add_item(
+            KvkTargetsLookupSelect(
+                options,
+                on_select=on_select,
+                ephemeral=ephemeral,
+            )
+        )
 
 
 class MyKVKStatsSelectView(discord.ui.View):

@@ -27,6 +27,10 @@ Phase 2 is a deferred-optimisation programme split into approval-gated slices. I
 the Phase 1 publication model, target formulas, shared fighting-state thresholds, command surface,
 permissions, visibility, or SQL deployment contract.
 
+Phase 2A was deployed and operator accepted on 2026-08-27 through mirror PR #237, SQL PR #74, and
+production PR #544. Phase 2B architecture and its bot-only implementation manifest are approved;
+Phase 2C and Phase 2D remain separately approval gated.
+
 Do not continue the completed DL_bot programme as Phase 6M. Open a fresh task pack for the
 queue-domain redesign, optional SQL-backed queue persistence, SQL deployment workflow, or pinned
 calendar tracker atomic-write hardening when one of those programmes is approved.

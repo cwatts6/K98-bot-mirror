@@ -6,7 +6,7 @@ Unit tests for ui.views.kvk_personal_views.
 Tests cover:
 - MyKVKStatsSelectView instantiation with accounts
 - interaction_check rejects wrong user
-- TargetLookupView.make_callback calls run_target_lookup only (no double-lookup)
+- TargetLookupView.make_callback uses the canonical target posting path
 - FuzzySelectView interaction_check rejects wrong user
 """
 
@@ -115,34 +115,22 @@ async def test_my_kvk_stats_select_view_interaction_check_allows_correct_user():
 # ---------------------------------------------------------------------------
 
 
-async def test_target_lookup_view_make_callback_calls_run_target_lookup_only(monkeypatch):
-    """
-    make_callback should call run_target_lookup and NOTHING ELSE.
-    No get_cached_target_info, no get_fallback_target_info, no build_target_embed.
-    """
+async def test_target_lookup_view_make_callback_calls_canonical_target_posting(monkeypatch):
     from ui.views.kvk_personal_views import TargetLookupView
 
-    run_called = {}
-    extra_calls = []
+    posted = {}
 
-    async def fake_run_target_lookup(governor_id):
-        run_called["governor_id"] = governor_id
-        return {"status": "not_found", "message": "no targets"}
+    async def fake_post(interaction, governor_id):
+        posted["interaction"] = interaction
+        posted["governor_id"] = governor_id
 
-    async def fake_extra(*args, **kwargs):
-        extra_calls.append(args)
+    from commands import kvk_targets_card_posting
 
-    # Patch target_utils module
-    import target_utils
-
-    monkeypatch.setattr(target_utils, "run_target_lookup", fake_run_target_lookup)
-
-    # Patch anything that should NOT be called
-    try:
-        monkeypatch.setattr(target_utils, "get_cached_target_info", fake_extra, raising=False)
-        monkeypatch.setattr(target_utils, "get_fallback_target_info", fake_extra, raising=False)
-    except AttributeError:
-        pass
+    monkeypatch.setattr(
+        kvk_targets_card_posting,
+        "post_kvk_targets_channel_output",
+        fake_post,
+    )
 
     matches = [{"GovernorName": "TestGov", "GovernorID": "555"}]
     view = TargetLookupView(matches)
@@ -152,12 +140,7 @@ async def test_target_lookup_view_make_callback_calls_run_target_lookup_only(mon
     callback = view.make_callback("555")
     await callback(interaction)
 
-    assert (
-        run_called.get("governor_id") == "555"
-    ), "run_target_lookup was not called with the correct gid"
-    assert (
-        extra_calls == []
-    ), "Unexpected extra calls detected (dead code path may still be present)"
+    assert posted == {"interaction": interaction, "governor_id": "555"}
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +170,31 @@ async def test_fuzzy_select_view_interaction_check_allows_correct_user():
     interaction = DummyInteraction(user_id=10)
     result = await view.interaction_check(interaction)
     assert result is True
+
+
+async def test_kvk_targets_lookup_select_routes_selected_id_and_visibility():
+    import discord
+
+    from ui.views.kvk_personal_views import KvkTargetsLookupSelectView
+
+    calls = []
+
+    async def on_select(interaction, governor_id, *, ephemeral):
+        calls.append((interaction, governor_id, ephemeral))
+
+    view = KvkTargetsLookupSelectView(
+        [discord.SelectOption(label="Alice • 123", value="123")],
+        on_select=on_select,
+        ephemeral=False,
+    )
+    selector = view.children[0]
+    selector._selected_values = ["123"]
+    selector._interaction = types.SimpleNamespace(data={})
+    interaction = DummyInteraction(user_id=1)
+
+    await selector.callback(interaction)
+
+    assert calls == [(interaction, "123", False)]
 
 
 # ---------------------------------------------------------------------------

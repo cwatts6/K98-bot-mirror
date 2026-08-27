@@ -12,10 +12,11 @@ from rapidfuzz import fuzz, process
 from unidecode import unidecode
 
 # NOTE: _conn is the repo's SQL connection helper imported from constants
+from kvk.dal import kvk_targets_dal
 from kvk.models.kvk_target_row import TargetRow, serialize_target_row
-from kvk_state import get_kvk_context_today
-from targets_embed import build_kvk_targets_embed
-from targets_sql_cache import get_targets_for_governor, refresh_targets_cache
+from kvk.models.kvk_targets_card import KvkTargetsPresentationInput
+from kvk.services.kvk_targets_card_service import build_kvk_targets_presentation_input
+from targets_sql_cache import refresh_targets_cache
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,6 @@ _name_cache = {
     "rows": [],  # full ALL_COMMANDERS rows
 }
 CACHE_DURATION_SECONDS = 86400  # 24h
-
-
-def _get_conn():
-    from file_utils import get_conn_with_retries
-
-    return get_conn_with_retries()
 
 
 # small normalization helper to keep behavior consistent across file
@@ -53,100 +48,41 @@ def sync_refresh_worker() -> dict[str, Any]:
     the maintenance subprocess to import and call it via 'target_utils:sync_refresh_worker'.
     """
     try:
-        import pandas as pd
-
         logger.debug("[TARGET_UTILS] Starting SQL name cache refresh (module-level worker)")
-        sql = """
-        SELECT [GovernorID], [GovernorName], [CityHallLevel]
-        FROM dbo.vw_All_Governors_Clean
-        WHERE GovernorName IS NOT NULL
-        """
-
-        conn = _get_conn()
-        use_pandas = True
-        try:
-            df = pd.read_sql(sql, conn)
-            logger.debug("[TARGET_UTILS] pandas.read_sql returned %d rows", len(df))
-        except Exception as e:
-            logger.warning(
-                "[TARGET_UTILS] pandas.read_sql failed (%s). Falling back to cursor fetch.",
-                type(e).__name__,
-            )
-            use_pandas = False
-
-        try:
-            name_map: dict[str, str] = {}
-            norm_to_row: dict[str, dict] = {}
-            rows: list[dict[str, Any]] = []
-
-            if use_pandas:
-                for _, r in df.iterrows():
-                    original = str(r["GovernorName"]).strip()
-                    if not original:
-                        continue
-                    try:
-                        gov_id = int(r["GovernorID"])
-                    except Exception:
-                        continue
-                    norm = _normalize_name(original)
-                    row = {
-                        "GovernorName": original,
-                        "GovernorID": str(gov_id),
-                        "CityHallLevel": r.get("CityHallLevel"),
-                    }
-                    if norm not in norm_to_row:
-                        norm_to_row[norm] = row
-                        name_map[norm] = original
-                    rows.append(row)
-            else:
-                cur = conn.cursor()
-                try:
-                    cur.execute(sql)
-                    fetched = cur.fetchall()
-                    logger.debug("[TARGET_UTILS] cursor.fetchall returned %d rows", len(fetched))
-                    for row in fetched:
-                        try:
-                            gov_id = int(row[0])
-                            original = str(row[1]).strip()
-                            city_hall = row[2] if len(row) > 2 else None
-                        except Exception:
-                            continue
-                        if not original:
-                            continue
-                        norm = _normalize_name(original)
-                        item = {
-                            "GovernorName": original,
-                            "GovernorID": str(gov_id),
-                            "CityHallLevel": city_hall,
-                        }
-                        if norm not in norm_to_row:
-                            norm_to_row[norm] = item
-                            name_map[norm] = original
-                        rows.append(item)
-                finally:
-                    try:
-                        cur.close()
-                    except Exception:
-                        pass
-
-            # Atomically swap cache contents
-            _name_cache["names"] = name_map
-            _name_cache["norm_to_row"] = norm_to_row
-            _name_cache["rows"] = rows
-            _name_cache["last_updated"] = int(time.time())
-            logger.info("[TARGET_UTILS] Name cache refreshed from SQL (%d rows)", len(rows))
-            return {
-                "names": name_map,
-                "norm_to_row": norm_to_row,
-                "rows": rows,
-                "last_updated": _name_cache["last_updated"],
-            }
-        finally:
+        fetched = kvk_targets_dal.fetch_governor_lookup_rows()
+        name_map: dict[str, str] = {}
+        norm_to_row: dict[str, dict[str, Any]] = {}
+        rows: list[dict[str, Any]] = []
+        for raw_row in fetched:
             try:
-                conn.close()
-            except Exception:
-                pass
+                gov_id = int(raw_row.get("GovernorID"))
+                original = str(raw_row.get("GovernorName") or "").strip()
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not original:
+                continue
+            norm = _normalize_name(original)
+            row = {
+                "GovernorName": original,
+                "GovernorID": str(gov_id),
+                "CityHallLevel": raw_row.get("CityHallLevel"),
+            }
+            if norm not in norm_to_row:
+                norm_to_row[norm] = row
+                name_map[norm] = original
+            rows.append(row)
 
+        _name_cache["names"] = name_map
+        _name_cache["norm_to_row"] = norm_to_row
+        _name_cache["rows"] = rows
+        _name_cache["last_updated"] = int(time.time())
+        logger.info("[TARGET_UTILS] Name cache refreshed from SQL (%d rows)", len(rows))
+        return {
+            "names": name_map,
+            "norm_to_row": norm_to_row,
+            "rows": rows,
+            "last_updated": _name_cache["last_updated"],
+        }
     except Exception:
         logger.exception("[TARGET_UTILS] sync_refresh_worker failed")
         raise
@@ -253,28 +189,6 @@ def get_name_cache_rows() -> list[dict[str, Any]]:
     return [dict(row) for row in rows if isinstance(row, dict)]
 
 
-def _unwrap_targets_result(result: Any) -> dict[str, Any] | None:
-    if isinstance(result, dict):
-        return result
-    if not isinstance(result, tuple) or len(result) < 2:
-        return None
-
-    first, second = result[0], result[1]
-    if isinstance(first, bool):
-        if not first:
-            raise RuntimeError("Target maintenance failed")
-        return second if isinstance(second, dict) else None
-    if isinstance(second, bool):
-        if not second:
-            raise RuntimeError("Target maintenance failed")
-        return first if isinstance(first, dict) else None
-    if isinstance(first, dict):
-        return first
-    if isinstance(second, dict) and isinstance(second.get("result"), dict):
-        return second["result"]
-    return None
-
-
 _LEGACY_TARGET_ALIASES: dict[str, tuple[str, ...]] = {
     "GovernorID": ("governor_id", "Governor ID", "Governor_ID", "Gov_ID"),
     "GovernorName": ("governor_name", "Governor Name", "Governor_Name"),
@@ -332,88 +246,6 @@ def adapt_target_row_for_legacy(
         if field in row:
             result[field] = row[field]
     return result
-
-
-# ---------------- Targets: EXEMPT/NOT ACTIVE fallback (still via SQL) ----------------
-
-
-async def _fallback_exempt_or_not_active(governor_id: str) -> dict[str, Any] | None:
-    """
-    SQL-backed check against dbo.EXEMPT_FROM_STATS.
-    Returns:
-      - {"status": "exempt", "message": "..."}          if exempt
-      - {"status": "not_active", "message": "..."}      if not active this KVK
-      - None                                            if no matching rule found
-    """
-    try:
-        ctx = get_kvk_context_today()
-        current_kvk_no = ctx["kvk_no"] if ctx else None
-
-        conn = _get_conn()
-        try:
-            cur = conn.cursor()
-            try:
-                params: list[Any] = [int(governor_id)]
-                where_kvk = ""
-                if current_kvk_no is not None:
-                    where_kvk = "AND (KVK_NO = ? OR KVK_NO = 0 OR KVK_NO IS NULL)"
-                    params.append(int(current_kvk_no))
-                else:
-                    where_kvk = "AND (KVK_NO = 0 OR KVK_NO IS NULL)"
-
-                sql = f"""
-                SELECT
-                    GovernorID,
-                    COALESCE(GovernorName, '') AS GovernorName,
-                    COALESCE(CAST(KVK_NO AS int), 0) AS KVK_NO,
-                    COALESCE(Exempt_Reason, '') AS Exempt_Reason,
-                    CASE
-                        WHEN Status IS NOT NULL THEN Status
-                        WHEN TRY_CAST(IsExempt AS int) = 1 THEN 'EXEMPT'
-                        ELSE NULL
-                    END AS Status
-                FROM dbo.EXEMPT_FROM_STATS
-                WHERE GovernorID = ?
-                {where_kvk}
-                """
-                cur.execute(sql, params)
-                row = cur.fetchone()
-                if not row:
-                    return None
-                try:
-                    r = {
-                        k: getattr(row, k)
-                        for k in ("GovernorID", "GovernorName", "KVK_NO", "Exempt_Reason", "Status")
-                    }
-                except Exception:
-                    r = {
-                        "GovernorID": row[0],
-                        "GovernorName": row[1] if len(row) > 1 else "",
-                        "KVK_NO": row[2] if len(row) > 2 else 0,
-                        "Exempt_Reason": row[3] if len(row) > 3 else "",
-                        "Status": row[4] if len(row) > 4 else None,
-                    }
-
-                status_field = (r.get("Status") or "").strip().upper()
-                if status_field == "EXEMPT":
-                    return {
-                        "status": "exempt",
-                        "message": f"Governor {r.get('GovernorName','?')} is exempt: {r.get('Exempt_Reason','')}",
-                    }
-                return None
-            finally:
-                try:
-                    cur.close()
-                except Exception:
-                    pass
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
-    except Exception:
-        logger.exception("[TARGETS] _fallback_exempt_or_not_active failed")
-        return None
 
 
 # ---------------- Governor name lookup + autocomplete ----------------
@@ -639,6 +471,57 @@ async def autocomplete_governor_names(ctx: discord.AutocompleteContext):
         return []
 
 
+def _legacy_data_from_presentation(
+    result: KvkTargetsPresentationInput,
+) -> dict[str, Any] | None:
+    row = adapt_target_row_for_legacy(result.target_row)
+    if row is None:
+        return None
+    payload = result.payload
+    row.update(
+        {
+            "TargetState": payload.publication_state,
+            "PublicationReason": payload.publication_reason,
+            "TargetSourceScan": payload.target_source_scan,
+            "TargetSourceType": payload.target_source_type,
+            "TargetPublishedAt": payload.target_published_at,
+            "PublicationVersion": payload.publication_version,
+            "PublicationSignature": payload.publication_signature,
+        }
+    )
+    if result.last_kvk:
+        row["last_kvk"] = dict(result.last_kvk)
+    return row
+
+
+def _legacy_missing_result(result: KvkTargetsPresentationInput) -> dict[str, Any]:
+    payload = result.payload
+    if payload.progress_state == "exempt":
+        message = f"Governor {payload.governor_name} is exempt from KVK targets."
+    elif payload.progress_state == "missing_governor":
+        message = payload.status_detail
+    else:
+        message = "No targets found for that GovernorID"
+    return {"status": "not_found", "message": message}
+
+
+async def _send_legacy_target_payload(
+    interaction: discord.Interaction,
+    result: KvkTargetsPresentationInput,
+    *,
+    ephemeral: bool,
+) -> None:
+    from targets_embed import build_targets_fallback_embed
+
+    await _respond(
+        interaction,
+        embed=build_targets_fallback_embed(result.payload),
+        content=None,
+        view=None,
+        ephemeral_flag=ephemeral,
+    )
+
+
 async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
     """
     Backwards-compatible run_target_lookup.
@@ -692,113 +575,32 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
     try:
         # numeric? treat as GovernorID
         if str(query).strip().isdigit():
-            gid = int(str(query).strip())
+            gid = str(query).strip()
             try:
-                # Local import to avoid module-level cycles
-                try:
-                    from file_utils import run_maintenance_with_isolation  # type: ignore
-                except Exception:
-                    run_maintenance_with_isolation = None
-
-                try:
-                    from file_utils import run_blocking_in_thread
-                except Exception:
-                    run_blocking_in_thread = None
-
-                if run_maintenance_with_isolation is not None:
-                    targets = _unwrap_targets_result(
-                        await run_maintenance_with_isolation(
-                            get_targets_for_governor,
-                            gid,
-                            name="get_targets_for_governor",
-                            prefer_process=True,
-                            meta={"governor_id": gid},
-                        )
-                    )
-                elif run_blocking_in_thread is not None:
-                    targets = await run_blocking_in_thread(
-                        get_targets_for_governor,
-                        gid,
-                        name="get_targets_for_governor",
-                        meta={"governor_id": gid},
-                    )
-                else:
-                    import asyncio as _asyncio
-
-                    targets = await _asyncio.to_thread(get_targets_for_governor, gid)
-
-                tgt = adapt_target_row_for_legacy(targets)
-
-                # ---- Attach last-KVK data (non-fatal) ----
-                try:
-                    # local import to avoid module-level cycles
-                    from stats_cache_helpers import load_last_kvk_map
-
-                    try:
-                        last_map = await load_last_kvk_map()
-                        if isinstance(last_map, dict):
-                            lk = last_map.get(str(gid))
-                            if lk and isinstance(tgt, dict):
-                                tgt["last_kvk"] = lk
-                    except Exception:
-                        logger.debug(
-                            "[TARGETS] load_last_kvk_map failed (continuing)", exc_info=True
-                        )
-                except Exception:
-                    logger.debug("[TARGETS] stats_cache_helpers import failed (continuing)")
-
-                if tgt:
-                    if interaction:
-                        kvk_ctx = get_kvk_context_today() or {}
-                        kvk_name = kvk_ctx.get("kvk_name")
-                        gov_name = tgt.get("GovernorName") or _name_cache.get("names", {}).get(
-                            _normalize_name(tgt.get("GovernorName") or ""), "Governor"
-                        )
-                        embed = build_kvk_targets_embed(
-                            gov_name=gov_name,
-                            governor_id=gid,
-                            targets=tgt,
-                            kvk_name=kvk_name,
-                        )
-                        await _respond(
+                result = await build_kvk_targets_presentation_input(gid)
+                legacy_data = _legacy_data_from_presentation(result)
+                if interaction:
+                    if legacy_data is not None:
+                        await _send_legacy_target_payload(
                             interaction,
-                            embed=embed,
-                            content=None,
-                            view=None,
-                            ephemeral_flag=ephemeral,
+                            result,
+                            ephemeral=ephemeral,
                         )
-                        return None
                     else:
-                        return {"status": "found", "data": tgt}
-                # no targets found, check exempt/not active
-                fb = await _fallback_exempt_or_not_active(str(gid))
-                if fb and fb.get("status") in ("exempt", "not_active"):
-                    if interaction:
+                        missing = _legacy_missing_result(result)
                         await _respond(
                             interaction,
-                            content=fb.get("message", "No targets (exempt/not active)"),
+                            content=missing["message"],
                             embed=None,
                             view=None,
                             ephemeral_flag=ephemeral,
                         )
-                        return None
-                    else:
-                        return {
-                            "status": "not_found",
-                            "message": fb.get("message", "No targets (exempt/not active)"),
-                        }
-                if interaction:
-                    await _respond(
-                        interaction,
-                        content="No targets found for that GovernorID",
-                        embed=None,
-                        view=None,
-                        ephemeral_flag=ephemeral,
-                    )
                     return None
-                return {"status": "not_found", "message": "No targets found for that GovernorID"}
+                if legacy_data is not None:
+                    return {"status": "found", "data": legacy_data}
+                return _legacy_missing_result(result)
             except Exception:
-                logger.exception("[TARGETS] get_targets_for_governor failed for id=%s", gid)
+                logger.exception("[TARGETS] target service failed for id=%s", gid)
                 if interaction:
                     await _respond(
                         interaction,
@@ -825,111 +627,40 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
             return {"status": "not_found", "message": "No governor matches found"}
 
         if lookup.get("status") == "found":
-            gid = int(lookup["data"]["GovernorID"])
+            gid = str(lookup["data"]["GovernorID"])
             try:
-                try:
-                    from file_utils import run_maintenance_with_isolation  # type: ignore
-                except Exception:
-                    run_maintenance_with_isolation = None
-
-                try:
-                    from file_utils import run_blocking_in_thread
-                except Exception:
-                    run_blocking_in_thread = None
-
-                if run_maintenance_with_isolation is not None:
-                    targets = _unwrap_targets_result(
-                        await run_maintenance_with_isolation(
-                            get_targets_for_governor,
-                            gid,
-                            name="get_targets_for_governor",
-                            prefer_process=True,
-                            meta={"governor_id": gid},
-                        )
-                    )
-                elif run_blocking_in_thread is not None:
-                    targets = await run_blocking_in_thread(
-                        get_targets_for_governor,
-                        gid,
-                        name="get_targets_for_governor",
-                        meta={"governor_id": gid},
-                    )
-                else:
-                    import asyncio as _asyncio
-
-                    targets = await _asyncio.to_thread(get_targets_for_governor, gid)
-
-                tgt = adapt_target_row_for_legacy(targets)
-
-                # ---- Attach last-KVK data (non-fatal) ----
-                try:
-                    from stats_cache_helpers import load_last_kvk_map
-
-                    try:
-                        last_map = await load_last_kvk_map()
-                        if isinstance(last_map, dict):
-                            lk = last_map.get(str(gid))
-                            if lk and isinstance(tgt, dict):
-                                tgt["last_kvk"] = lk
-                    except Exception:
-                        logger.debug(
-                            "[TARGETS] load_last_kvk_map failed (continuing)", exc_info=True
-                        )
-                except Exception:
-                    logger.debug("[TARGETS] stats_cache_helpers import failed (continuing)")
-
-                if tgt:
-                    if interaction:
-                        kvk_ctx = get_kvk_context_today() or {}
-                        kvk_name = kvk_ctx.get("kvk_name")
-                        gov_name = lookup["data"].get("GovernorName") or "Governor"
-                        embed = build_kvk_targets_embed(
-                            gov_name=gov_name,
-                            governor_id=gid,
-                            targets=tgt,
-                            kvk_name=kvk_name,
-                        )
-                        await _respond(
+                result = await build_kvk_targets_presentation_input(gid)
+                legacy_data = _legacy_data_from_presentation(result)
+                if interaction:
+                    if legacy_data is not None:
+                        await _send_legacy_target_payload(
                             interaction,
-                            embed=embed,
-                            content=None,
-                            view=None,
-                            ephemeral_flag=ephemeral,
+                            result,
+                            ephemeral=ephemeral,
                         )
-                        return None
                     else:
-                        return {"status": "found", "data": tgt}
-                # no targets for found governor
-                fb = await _fallback_exempt_or_not_active(str(gid))
-                if fb and fb.get("status") in ("exempt", "not_active"):
-                    if interaction:
+                        missing = _legacy_missing_result(result)
+                        message = (
+                            missing["message"]
+                            if result.payload.progress_state == "exempt"
+                            else "Governor found but no targets configured"
+                        )
                         await _respond(
                             interaction,
-                            content=fb.get("message", "No targets (exempt/not active)"),
+                            content=message,
                             embed=None,
                             view=None,
                             ephemeral_flag=ephemeral,
                         )
-                        return None
-                    return {
-                        "status": "not_found",
-                        "message": fb.get("message", "No targets (exempt/not active)"),
-                    }
-                if interaction:
-                    await _respond(
-                        interaction,
-                        content="Governor found but no targets configured",
-                        embed=None,
-                        view=None,
-                        ephemeral_flag=ephemeral,
-                    )
                     return None
-                return {
-                    "status": "not_found",
-                    "message": "Governor found but no targets configured",
-                }
+                if legacy_data is not None:
+                    return {"status": "found", "data": legacy_data}
+                missing = _legacy_missing_result(result)
+                if result.payload.progress_state != "exempt":
+                    missing["message"] = "Governor found but no targets configured"
+                return missing
             except Exception:
-                logger.exception("[TARGETS] get_targets_for_governor failed for id=%s", gid)
+                logger.exception("[TARGETS] target service failed for id=%s", gid)
                 if interaction:
                     await _respond(
                         interaction,
@@ -946,38 +677,8 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
 
         elif lookup.get("status") == "fuzzy_matches":
             matches = lookup.get("matches", []) or []
-            # Interactive: build select view to let user choose an account
             if interaction:
-
-                class _KVKTargetsSelect(discord.ui.Select):
-                    def __init__(self, options, ephemeral_flag: bool = False):
-                        super().__init__(
-                            placeholder="Choose an account to view…",
-                            min_values=1,
-                            max_values=1,
-                            options=options,
-                        )
-                        self.ephemeral_flag = ephemeral_flag
-
-                    async def callback(self, inter: discord.Interaction):
-                        try:
-                            chosen = self.values[0]
-                            await run_target_lookup(inter, chosen, ephemeral=self.ephemeral_flag)
-                        except Exception:
-                            logger.exception("[TARGETS] _KVKTargetsSelect callback failed")
-                            try:
-                                await inter.followup.send(
-                                    "Failed to process selection", ephemeral=self.ephemeral_flag
-                                )
-                            except Exception:
-                                pass
-
-                class _KVKTargetsView(discord.ui.View):
-                    def __init__(
-                        self, options, ephemeral_flag: bool = False, timeout: int | None = 300
-                    ):
-                        super().__init__(timeout=timeout)
-                        self.add_item(_KVKTargetsSelect(options, ephemeral_flag=ephemeral_flag))
+                from ui.views.kvk_personal_views import KvkTargetsLookupSelectView
 
                 sel_options = []
                 for m in matches[:25]:  # cap for safety
@@ -986,7 +687,12 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
                     label = f"{name} • {gid}"
                     sel_options.append(discord.SelectOption(label=label, value=gid))
 
-                view = _KVKTargetsView(sel_options, ephemeral_flag=ephemeral, timeout=300)
+                view = KvkTargetsLookupSelectView(
+                    sel_options,
+                    on_select=run_target_lookup,
+                    ephemeral=ephemeral,
+                    timeout=300,
+                )
                 await _respond(
                     interaction,
                     content="Multiple matches found — choose one:",

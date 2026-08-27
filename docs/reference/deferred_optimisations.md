@@ -6,6 +6,15 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
+- Area: `account_picker.py`, `kvk_ui.py`
+- Type: cleanup
+- Description: KVK Targets Quality Phase 2B removes command-owned last-KVK attachment, but the generic account-picker compatibility APIs still carry an optional `_last_kvk_map` value through selector refresh and timeout reconstruction. No current target output consumer needs that value, while the generic picker also serves non-target flows.
+- Suggested Fix: During a later account-picker compatibility audit, prove all callers and persisted interaction paths no longer require `last_kvk_map`, then remove the unused parameter and internal field with focused selector refresh, timeout, stats, history, and targets tests.
+- Impact: low
+- Risk: low
+- Dependencies: Phase 2B deployed and smoke tested; repository-wide account-picker caller search; no interaction-flow or visibility change.
+
+### Deferred Optimisation
 - Area: `event_calendar/reminder_state.py`, `player_self_service/service.py`, `event_calendar/reminder_candidates.py`
 - Type: performance
 - Description: Phase 5D.1 must read Calendar sent-key state to exclude already delivered alerts. The existing file-backed `CalendarReminderState` stores one global, append-only mapping and exposes only a full-file load, so each private summary request parses the complete history and the pure projection copies every sent key before applying user-scoped eligibility. Codex Security reproduced approximately linear cost with synthetic state: about 93 ms and 28 MB traced peak at 100,000 keys, and about 514 ms and 135 MB at 500,000 keys. Ordinary members cannot directly grow the state, and representative production size or material shared-service impact is not yet established, so this is not a reportable security finding or an approved Phase 5D.1 persistence change.

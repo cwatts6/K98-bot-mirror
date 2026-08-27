@@ -29,7 +29,6 @@ from kvk.services import kvk_rankings_service
 from kvk_ui import make_kvk_targets_view
 from registry.account_slots import ACCOUNT_ORDER
 from services import governor_account_service, kvk_history_service, kvk_personal_service
-from target_utils import run_target_lookup
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
 from ui.views.kvk_rankings_views import (
     CurrentRankingsBrowserView,
@@ -211,20 +210,15 @@ async def _send_personal_kvk_targets(
 ) -> None:
     await safe_defer(ctx, ephemeral=only_me)
 
-    try:
-        last_kvk_map = await kvk_personal_service.load_last_kvk_map()
-        if not isinstance(last_kvk_map, dict):
-            last_kvk_map = {}
-    except Exception:
-        logger.exception("[/kvk targets] load_last_kvk_map failed")
-        last_kvk_map = {}
-
     if governor_id and governor_id.strip().isdigit():
         try:
             await post_kvk_targets_output(ctx.interaction, governor_id.strip(), ephemeral=only_me)
         except Exception:
-            logger.exception("[/kvk targets] modern target output failed; falling back")
-            await run_target_lookup(ctx.interaction, governor_id.strip(), ephemeral=only_me)
+            logger.exception("[/kvk targets] target output failed")
+            await ctx.followup.send(
+                "Targets are temporarily unavailable. Please try again later.",
+                ephemeral=only_me,
+            )
         try:
             await ctx.interaction.edit_original_response(content=" ", view=None)
         except Exception:
@@ -248,8 +242,11 @@ async def _send_personal_kvk_targets(
         try:
             await post_kvk_targets_output(ctx.interaction, options[0].value, ephemeral=only_me)
         except Exception:
-            logger.exception("[/kvk targets] modern target output failed; falling back")
-            await run_target_lookup(ctx.interaction, options[0].value, ephemeral=only_me)
+            logger.exception("[/kvk targets] target output failed")
+            await ctx.followup.send(
+                "Targets are temporarily unavailable. Please try again later.",
+                ephemeral=only_me,
+            )
         try:
             await ctx.interaction.edit_original_response(content=" ", view=None)
         except Exception:
@@ -262,8 +259,11 @@ async def _send_personal_kvk_targets(
         try:
             await post_kvk_targets_output(interaction, selected_governor_id, ephemeral=ephemeral)
         except Exception:
-            logger.exception("[/kvk targets] selected modern target output failed; falling back")
-            await run_target_lookup(interaction, selected_governor_id, ephemeral=ephemeral)
+            logger.exception("[/kvk targets] selected target output failed")
+            await interaction.followup.send(
+                "Targets are temporarily unavailable. Please try again later.",
+                ephemeral=ephemeral,
+            )
 
     if options:
         try:
@@ -273,7 +273,6 @@ async def _send_personal_kvk_targets(
                 on_select_governor=_on_select,
                 show_register_btn=True,
                 ephemeral=only_me,
-                last_kvk_map=last_kvk_map,
                 lookup_callback=_open_governor_lookup,
                 register_callback=_open_registration_flow,
             )
@@ -303,7 +302,6 @@ async def _send_personal_kvk_targets(
             on_select_governor=_on_select,
             show_register_btn=True,
             ephemeral=only_me,
-            last_kvk_map=last_kvk_map,
             lookup_callback=_open_governor_lookup,
             register_callback=_open_registration_flow,
         )

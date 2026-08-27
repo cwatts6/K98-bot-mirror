@@ -1,63 +1,55 @@
 from __future__ import annotations
 
-from targets_embed import build_kvk_targets_embed
+from dataclasses import replace
+
+from kvk.models.kvk_targets_card import KvkTargetsCardPayload
+from targets_embed import build_targets_fallback_embed
 
 
-def _targets(**overrides):
-    values = {
-        "GovernorID": "123",
-        "GovernorName": "Governor",
-        "KVK_NO": 16,
-        "DKP_Target": 100,
-        "Kill_Target": 200,
-        "Deads_Target": 10,
-        "Min_Kill_Target": 50,
-        "TargetState": "OFFICIAL",
-        "TargetSourceScan": 1059,
-        "TargetPublishedAt": "2026-08-25T12:00:00+00:00",
-    }
-    values.update(overrides)
-    return values
+def _payload(**overrides) -> KvkTargetsCardPayload:
+    payload = KvkTargetsCardPayload(
+        governor_id="123",
+        governor_name="Governor",
+        kvk_no=16,
+        kvk_name="Tides of War",
+        camp_name=None,
+        progress_state="active",
+        status_label="Target review",
+        status_detail="Target details",
+        next_action="Act",
+        power=100,
+        metrics=(),
+        publication_state="OFFICIAL",
+        target_source_scan=1059,
+        target_published_at="2026-08-26 19:22 UTC",
+    )
+    return replace(payload, **overrides)
 
 
-def test_legacy_embed_shows_canonical_official_source():
-    embed = build_kvk_targets_embed("Governor", 123, _targets(), "Tides of War")
+def test_fallback_embed_shows_canonical_official_source():
+    embed = build_targets_fallback_embed(_payload())
 
-    assert "OFFICIAL" in embed.description
-    assert "exact matchmaking scan 1059" in embed.description
-    assert "Official targets" in embed.footer.text
-    assert "Published 2026-08-25T12:00:00+00:00" in embed.footer.text
+    assert "Official targets" in embed.description
+    assert "matchmaking scan 1059" in embed.fields[0].value
 
 
-def test_legacy_embed_missing_state_defaults_unverified():
-    targets = _targets()
-    targets.pop("TargetState")
-    targets.pop("TargetSourceScan")
-
-    embed = build_kvk_targets_embed("Governor", 123, targets, "Tides of War")
-
-    assert "UNVERIFIED" in embed.description
-    assert "could not be verified" in embed.description
-    assert "Do not treat this target set as Official" in embed.description
-
-
-def test_legacy_embed_known_state_without_source_scan_is_unverified():
-    targets = _targets()
-    targets.pop("TargetSourceScan")
-
-    embed = build_kvk_targets_embed("Governor", 123, targets, "Tides of War")
-
-    assert "UNVERIFIED" in embed.description
-    assert "could not be verified" in embed.description
-    assert "Do not treat this target set as Official" in embed.description
-
-
-def test_legacy_active_state_is_not_treated_as_official():
-    embed = build_kvk_targets_embed(
-        "Governor",
-        123,
-        _targets(TargetState="ACTIVE"),
-        "Tides of War",
+def test_fallback_embed_unknown_publication_is_unverified():
+    embed = build_targets_fallback_embed(
+        _payload(publication_state="UNKNOWN", target_source_scan=None)
     )
 
-    assert "UNVERIFIED" in embed.description
+    assert "Unverified targets" in embed.description
+    assert any("Do not treat this target set as Official" in field.value for field in embed.fields)
+
+
+def test_fallback_embed_known_state_without_source_scan_is_unverified():
+    embed = build_targets_fallback_embed(_payload(target_source_scan=None))
+
+    assert "Unverified targets" in embed.description
+
+
+def test_fallback_embed_legacy_active_state_is_not_official():
+    embed = build_targets_fallback_embed(_payload(publication_state="ACTIVE"))
+
+    assert "Unverified targets" in embed.description
+    assert "Official targets" not in embed.description

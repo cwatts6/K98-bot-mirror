@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-from file_utils import fetch_one_dict, get_conn_with_retries
+from file_utils import fetch_all_dicts, fetch_one_dict, get_conn_with_retries
 from kvk.models.kvk_target_row import TargetRow
 from targets_sql_cache import (
     get_current_target_cache_meta,
@@ -13,6 +13,26 @@ from targets_sql_cache import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def fetch_governor_lookup_rows() -> list[dict[str, Any]]:
+    """Return the authoritative governor directory shape used by target lookup."""
+    sql = """
+        SELECT
+            GovernorID,
+            GovernorName,
+            CityHallLevel
+        FROM dbo.vw_All_Governors_Clean
+        WHERE GovernorName IS NOT NULL
+    """
+    try:
+        with get_conn_with_retries() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql)
+                return fetch_all_dicts(cursor)
+    except Exception:
+        logger.exception("kvk_target_governor_directory_read_failed")
+        raise
 
 
 def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
