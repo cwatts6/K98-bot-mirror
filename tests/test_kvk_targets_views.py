@@ -40,9 +40,7 @@ async def test_targets_view_refresh_rebuilds_equivalent_view(monkeypatch):
     async def fake_summary(_discord_id):
         from services.governor_account_service import summarize_accounts
 
-        return summarize_accounts(
-            {"Main": {"GovernorID": "99", "GovernorName": "Refreshed"}}
-        )
+        return summarize_accounts({"Main": {"GovernorID": "99", "GovernorName": "Refreshed"}})
 
     monkeypatch.setattr(
         "services.governor_account_service.get_account_summary_for_user",
@@ -84,9 +82,7 @@ async def test_targets_view_timeout_disables_old_controls_and_reopens(monkeypatc
     async def fake_summary(_discord_id):
         from services.governor_account_service import summarize_accounts
 
-        return summarize_accounts(
-            {"Main": {"GovernorID": "99", "GovernorName": "Refreshed"}}
-        )
+        return summarize_accounts({"Main": {"GovernorID": "99", "GovernorName": "Refreshed"}})
 
     monkeypatch.setattr(
         "services.governor_account_service.get_account_summary_for_user",
