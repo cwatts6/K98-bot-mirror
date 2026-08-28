@@ -206,7 +206,7 @@ def test_build_cache_rejects_invalid_sql_snapshots(monkeypatch, mutation, expect
     assert exc_info.value.code == expected_code
 
 
-def test_build_cache_rejects_mapping_schema_loss(monkeypatch):
+def test_build_cache_rejects_mapping_schema_loss(monkeypatch, caplog):
     import player_stats_cache as mod
 
     columns, row = _source_columns_and_row(mod)
@@ -220,6 +220,16 @@ def test_build_cache_rejects_mapping_schema_loss(monkeypatch):
         mod._build_cache_sync()
 
     assert exc_info.value.code == "source_schema_mismatch"
+    assert "LAST_REFRESH" in caplog.text
+
+
+def test_last_refresh_validation_normalizes_equivalent_offsets():
+    import player_stats_cache as mod
+
+    expected = "2026-08-28T08:12:00+00:00"
+    assert mod._validate_last_refresh("2026-08-28T08:12:00Z") == expected
+    assert mod._validate_last_refresh("2026-08-28T08:12:00+00:00") == expected
+    assert mod._validate_last_refresh("2026-08-28T09:12:00+01:00") == expected
 
 
 def test_build_and_persist_success_writes_atomic_and_utc(monkeypatch, tmp_path):
@@ -330,6 +340,29 @@ def test_build_and_persist_failure_writes_fallback_when_missing(monkeypatch, tmp
 
     dt = datetime.fromisoformat(persisted["_meta"]["generated_at"])
     assert dt.tzinfo == UTC
+
+
+def test_build_and_persist_unexpected_write_failure_propagates(monkeypatch, tmp_path):
+    import player_stats_cache as mod
+
+    cache_path = tmp_path / "player_stats_cache.json"
+    monkeypatch.setattr(mod, "PLAYER_STATS_CACHE", str(cache_path))
+    monkeypatch.setattr(
+        mod,
+        "_build_cache_sync",
+        lambda: {
+            "123": {"GovernorID": "123"},
+            "_meta": {"count": 1, "source_refresh_status": "refreshed"},
+        },
+    )
+
+    def fail_write(*_args, **_kwargs):
+        raise OSError("simulated cache write failure")
+
+    monkeypatch.setattr(mod, "_atomic_write_json_with_retries", fail_write)
+
+    with pytest.raises(OSError, match="simulated cache write failure"):
+        mod._build_and_persist_cache_sync()
 
 
 @pytest.mark.asyncio

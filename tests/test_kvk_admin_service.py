@@ -191,6 +191,27 @@ async def test_cache_admin_reports_failed_refresh_and_preserved_json() -> None:
     assert "Existing JSON was preserved" in message
 
 
+@pytest.mark.asyncio
+async def test_cache_admin_reports_metadata_fallback_write() -> None:
+    async def builder():
+        return {
+            "_meta": {
+                "count": 0,
+                "source_refresh_status": "failed",
+                "source_refresh_error_code": "source_snapshot_empty",
+                "cache_write_status": "fallback_written",
+                "existing_json_preserved": False,
+            }
+        }
+
+    outcome = await kvk_admin_service._run_cache_builder("Player stats cache", builder)
+    message = kvk_admin_service._format_cache_outcome(outcome)
+
+    assert message.startswith("Failed:")
+    assert "A metadata-only fallback JSON was written" in message
+    assert "No safe replacement was written" not in message
+
+
 def test_load_embed_test_context_uses_utc_label_and_checker() -> None:
     captured = {}
 

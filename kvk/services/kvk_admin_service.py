@@ -321,12 +321,13 @@ def _format_cache_outcome(outcome: KvkCacheBuildOutcome) -> str:
                 f"Warning: {outcome.label} build failed (non-fatal): `{outcome.error}` - "
                 "the main cache is available."
             )
-        preservation = (
-            " Existing JSON was preserved."
-            if outcome.existing_json_preserved
-            else " No safe replacement was written."
-        )
-        return f"Failed: {outcome.label} build failed: `{outcome.error}`.{preservation}"
+        if outcome.existing_json_preserved:
+            write_result = "Existing JSON was preserved."
+        elif outcome.cache_write_status == "fallback_written":
+            write_result = "A metadata-only fallback JSON was written."
+        else:
+            write_result = "No safe replacement was written."
+        return f"Failed: {outcome.label} build failed: `{outcome.error}`. {write_result}"
 
     provenance = _format_source_provenance(outcome)
     count_text = f" ({outcome.count} records)" if outcome.count is not None else ""

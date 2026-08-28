@@ -410,8 +410,9 @@ def _validate_source_columns(cols: list[str]) -> None:
     ]
     if missing:
         logger.error(
-            "[CACHE] STATS_FOR_UPLOAD mapping is incomplete; missing %d required columns.",
+            "[CACHE] STATS_FOR_UPLOAD mapping is incomplete; missing %d required columns: %s.",
             len(missing),
+            ", ".join(sorted(missing)),
         )
         raise CacheSnapshotValidationError("source_schema_mismatch")
 
@@ -421,10 +422,12 @@ def _validate_last_refresh(value: str) -> str:
     if not normalized:
         raise CacheSnapshotValidationError("source_last_refresh_missing")
     try:
-        datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
     except ValueError as exc:
         raise CacheSnapshotValidationError("source_last_refresh_invalid") from exc
-    return normalized
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC)
+    return parsed.isoformat()
 
 
 def _execute_sp_with_retries(
@@ -1146,7 +1149,7 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
             existing_json_preserved=os.path.exists(PLAYER_STATS_CACHE),
         )
         _emit("failed", output=failure, error=e)
-        return failure
+        raise
 
 
 async def build_player_stats_cache() -> dict[str, Any] | None:
