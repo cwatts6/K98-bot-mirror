@@ -1,11 +1,20 @@
 # Codex Task Pack — King of All Britain KVK Card Background
 
+## Archive Status
+
+Completed and operator smoke accepted on `2026-08-28`. Delivered through mirror PR
+[#244](https://github.com/cwatts6/K98-bot-mirror/pull/244) and production PR
+[#551](https://github.com/cwatts6/k98-bot/pull/551), pending the operator's manual merges.
+This file is retained as the historical execution and completion record; it is no longer an active
+task pack.
+
 ## 1. Task Header
 
 - Task name: `King of All Britain KVK Card Background`
 - Date: `2026-08-26`
 - Owner/context: `Chris Watts — add a King of All Britain visual identity to the player KVK Targets and Stats cards`
 - Task type: `feature / visual asset integration`
+- Final status: `complete / operator smoke accepted / archived`
 - One-pass approved: `yes`
 - One-pass basis: The operator has supplied and approved the production background asset and has explicitly requested the focused renderer updates and PR-ready deployment task.
 
@@ -392,22 +401,54 @@ Confirm:
 
 ## 15. Acceptance Criteria
 
-- [ ] The supplied PNG is committed at `assets/kvk/cards/King_of_All_Britain_Stats_Card.png`.
-- [ ] The committed file is exactly `1180 × 640`.
-- [ ] The committed file SHA-256 is `987be4495471936db491d25d00bb3eb9c23e259a86ed02d3e46b361fa3b6d605`.
-- [ ] The asset contains no embedded title, subtitle, game logo, or replacement wording.
-- [ ] `kvk_stats_card_renderer.MODE_BACKGROUNDS` contains the exact key `king of all britain`.
-- [ ] `kvk_targets_card_renderer.MODE_BACKGROUNDS` contains the exact key `king of all britain`.
-- [ ] Both mappings point to the same exact PNG filename.
-- [ ] Exact, lowercase, underscore, and hyphen naming variants resolve through the existing normaliser.
-- [ ] Unknown-mode fallback still selects `Default_card.jpg`.
-- [ ] Stats, More Stats, and Targets render valid `1180 × 640` PNGs for King of All Britain.
-- [ ] Existing target-publication rendering and warnings are unchanged.
-- [ ] No SQL, command, payload, permission, persistence, or registration change is included.
-- [ ] Focused tests and selected repository gates pass.
-- [ ] Local visual smoke artifacts are inspected and documented.
-- [ ] A Changes review with Deep Off is completed against the final diff.
-- [ ] The PR is created and handed back without merge or deployment.
+- [x] The supplied PNG is committed at `assets/kvk/cards/King_of_All_Britain_Stats_Card.png`.
+- [x] The committed file is exactly `1180 × 640`.
+- [x] The committed file SHA-256 is `987be4495471936db491d25d00bb3eb9c23e259a86ed02d3e46b361fa3b6d605`.
+- [x] The asset contains no embedded title, subtitle, game logo, or replacement wording.
+- [x] `kvk_stats_card_renderer.MODE_BACKGROUNDS` contains the exact key `king of all britain`.
+- [x] `kvk_targets_card_renderer.MODE_BACKGROUNDS` contains the exact key `king of all britain`.
+- [x] Both mappings point to the same exact PNG filename.
+- [x] Exact, lowercase, underscore, and hyphen naming variants resolve through the existing normaliser.
+- [x] Unknown-mode fallback still selects `Default_card.jpg`.
+- [x] Stats, More Stats, and Targets render valid `1180 × 640` PNGs for King of All Britain.
+- [x] Existing target-publication rendering and warnings are unchanged.
+- [x] No SQL, command, payload, permission, persistence, or registration change is included.
+- [x] Focused tests and selected repository gates pass.
+- [x] Local visual smoke artifacts are inspected and documented.
+- [x] Changes reviews with Deep Off are completed against the mirror and production code/asset diffs.
+- [x] Both PRs are created and handed back without merge or deployment.
+
+### Completion Evidence
+
+- Mirror delivery: PR `#244`; review-fix head `3f1760a3` before this documentation-only archive update.
+- Production delivery: PR `#551`; review-fix head `4b1b4afa` before this documentation-only archive update.
+- Asset contract: `856,548` bytes, `1180 × 640`, `RGB`, SHA-256
+  `987be4495471936db491d25d00bb3eb9c23e259a86ed02d3e46b361fa3b6d605`.
+- Renderer delivery: both local `MODE_BACKGROUNDS` maps use the exact normalized key and PNG;
+  normalisation and mode → default → Tides fallback order are unchanged.
+- Focused tests: `32 passed` across the Stats and Targets renderer test modules.
+- Broader validation: architecture, deferred-item, security-routing, import-smoke,
+  command-registration, Black, Ruff, and whitespace checks passed. One unrelated real-timeout test
+  was transient during a full-suite run and passed immediately in isolation.
+- Review comments: redundant test parentheses were removed and the exact asset SHA-256 contract was
+  added in mirror commit `3f1760a3` and production commit `4b1b4afa`.
+- Security: separate Codex Security `Changes` reviews with Deep Off completed with zero findings for
+  mirror scan `4a04c229-8330-4505-a3b4-4de135fc3b7b` and production scan
+  `09581aab-7a74-4d02-b46f-706f5d279697`.
+- Final-head routing: the subsequent commits only update `README-DEV.md`, the archive index, and
+  the completed task-pack Markdown through mechanical archive moves. Security review is therefore
+  documented as skipped for that documentation-only delta: no executable code, SQL, configuration,
+  dependency, deployment, permission, input, network, filesystem-runtime, or persistence behaviour
+  changed after the completed code/asset scans.
+- Local smoke artifacts retained at `smoke_artifacts/king_of_all_britain/` cover Stats, More Stats,
+  active Targets, and exempt Targets; all are `1180 × 640` RGB PNGs.
+- Operator smoke acceptance: Stats and Targets displayed the new backdrop correctly and were
+  confirmed to look perfect. The local More Stats artifact also passed visual inspection.
+- SQL and command surface: unchanged; no SQL deployment or Discord command resync is required.
+- Deployment state: not merged or deployed by Codex. After the operator merges, deploy the bot code
+  and asset together and restart the bot so the module-level maps reload.
+- Deferred optimisations: none created; the known duplicate local mapping remains intentionally
+  outside this narrow delivery.
 
 ## 16. Required Delivery Output
 

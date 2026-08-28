@@ -1,5 +1,9 @@
 # Codex Chat Starter — King of All Britain KVK Card Background
 
+> Status: completed, operator smoke accepted, and archived on `2026-08-28`.
+> Delivered through mirror PR `#244` and production PR `#551`, pending manual merge.
+> Retained for historical reference only; use the archived task pack as the completion record.
+
 Execute the attached **Codex Task Pack — King of All Britain KVK Card Background** in one pass.
 
 The supplied production asset is:

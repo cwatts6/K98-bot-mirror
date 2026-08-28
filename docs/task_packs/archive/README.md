@@ -2,6 +2,17 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+King of All Britain KVK Card Background completed implementation, review, and operator visual smoke
+on 2026-08-28 through mirror PR #244 and production PR #551, pending manual merge. Both KVK Stats
+and Targets renderers select the pinned `1180 × 640` RGB production backdrop through the existing
+normalised fixed mapping and unchanged fallback chain. Focused renderer coverage passes 32 tests,
+the mirror and production Changes reviews ran with Deep Off and returned zero findings, and the
+operator confirmed the live Stats and Targets cards display the backdrop correctly and look
+perfect. Local Stats, More Stats, active Targets, and exempt Targets artifacts are retained under
+`smoke_artifacts/king_of_all_britain/`. No SQL, command, payload, publication, permission,
+persistence, or registration contract changed; deployment requires only the normal bot rollout and
+restart. The archived task pack and starter are the historical completion records.
+
 KVK Target Publication State Separation Phase 1 was deployed and operator accepted on 2026-08-26
 through mirror PR #235, production PR #542, and SQL PR #73. The import-path transaction follow-up
 was deployed through mirror PR #236 and production PR #543. Production publication metadata,

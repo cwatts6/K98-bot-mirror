@@ -51,6 +51,18 @@ and without the prior history rank result-set error. No SQL deployment, command 
 publication/cache contract, or fighting-lifecycle behavior changed. The final follow-up review found
 no new Phase 2 requirement or active target-subsystem deferred optimisation.
 
+The King of All Britain KVK Card Background delivery is complete and operator smoke accepted on
+2026-08-28 through mirror PR #244 and production PR #551, pending the operator's manual merges.
+The exact `1180 × 640` RGB production PNG is pinned by SHA-256 and is selected by both the Stats and
+Targets renderers through the existing normalised fixed mapping and unchanged fallback chain.
+Focused Stats/Targets coverage passes 32 tests, both final code/asset Changes reviews ran with Deep
+Off and returned zero findings, and the operator confirmed that Stats and Targets display the new
+backdrop correctly and look perfect. Local Stats, More Stats, active Targets, and exempt Targets
+smoke artifacts are retained under `smoke_artifacts/king_of_all_britain/`. There is no SQL,
+command, payload, publication, permission, persistence, or registration change. Deployment only
+requires the normal bot code/asset rollout and process restart. The completed task pack and chat
+starter are archived under `docs/task_packs/archive/`.
+
 ## CrystalTech Path Refresh Delivery
 
 The 2026-08-25 CrystalTech path refresh is complete and operator accepted in mirror PR #234 and
