@@ -63,6 +63,33 @@ command, payload, publication, permission, persistence, or registration change. 
 requires the normal bot code/asset rollout and process restart. The completed task pack and chat
 starter are archived under `docs/task_packs/archive/`.
 
+## KVK Post-Pass-4 Stats Correctness And Refresh Provenance Delivery
+
+The post-Pass-4 healed-troop and provenance-safe stats-refresh fix is complete and archived. Bot
+mirror PR #245 and SQL PR #75 merged on 2026-08-28; the initial SQL deployment then exposed a
+compile-time `CONVERT` syntax error in a named stored-procedure argument. SQL hotfix PR #76 replaced
+that expression with a typed local-variable binding, added deploy-syntax regression coverage, and
+was merged before the corrected migration was deployed.
+
+The delivered SQL uses the strict `PRE_PASS_4_SCAN` boundary for current healed deltas, preserves
+the starting-healed baseline and existing KP Loss/Tanking Score formulas, and makes
+`STATS_FOR_UPLOAD` publication atomic, serialized, and dependent on the successful output
+provenance already held in `KVKFinalReportHeader`. `LAST_REFRESH` now comes from the proven output
+scan rather than the global newest scan. The bot-side cache contract validates fallback snapshots,
+preserves healthy JSON when SQL output is invalid, returns structured refresh outcomes, and reports
+last-known-good reuse as degraded rather than unqualified success.
+
+Automated evidence includes `2,999 passed, 2 skipped` in the full bot suite, a passing full
+pre-commit run, passing focused SQL rehearsal and repository validation, and zero findings from the
+final bot, SQL, and SQL-hotfix Changes security reviews. Operator smoke for KVK 16 Governor
+`Chrislos` (`2441482`) confirmed Healed changed from `19.4K` to `0`, KP Loss from `387.1K` to `0`,
+and Tanking Score from `0%` to `N/A`, while Rank, Power, Kills, Deads, and Acclaim remained
+unchanged. The evidence supplied in this task covers one player; the archived pack records the
+additional three-player/provenance checks without claiming they were completed here.
+
+The completed historical record is retained at
+`docs/task_packs/archive/Codex Task Pack - KVK Post-Pass-4 Healed Troops and Provenance-Safe Stats Refresh.md`.
+
 ## CrystalTech Path Refresh Delivery
 
 The 2026-08-25 CrystalTech path refresh is complete and operator accepted in mirror PR #234 and

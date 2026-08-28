@@ -1,7 +1,77 @@
 # Codex Task Pack - KVK Post-Pass-4 Healed Troops and Provenance-Safe Stats Refresh
 
 > Coordinated two-repository bug-fix pack for `K98-bot-mirror` and `K98-bot-SQL-Server`.
-> This pack is intentionally implementation-ready but is **not one-pass approved**. Codex must complete the audit and architecture checkpoints, report its findings, and stop for approval before changing either repository.
+> This archived pack is retained as the historical scope, execution, and delivery record. Its
+> implementation approval gates are no longer active.
+
+## Archive Status
+
+Completed, merged, SQL-deployed, operator smoke accepted for the supplied KVK 16 player sample,
+and archived on `2026-08-28`.
+
+Delivery was coordinated through:
+
+- bot mirror PR [#245](https://github.com/cwatts6/K98-bot-mirror/pull/245), merged as
+  `0a1cbf8480db70f0c1b5e10b824df8f07d341385`;
+- SQL PR [#75](https://github.com/cwatts6/K98-bot-SQL-Server/pull/75), merged as
+  `d53976068eae6673213451581684cea71cdc2ba7`;
+- SQL deployment hotfix PR [#76](https://github.com/cwatts6/K98-bot-SQL-Server/pull/76), merged as
+  `44ab0ce04e68893856d889e3473d19b5e8f5c9ef`.
+
+The SQL deployment of PR #75 initially stopped safely while compiling
+`dbo.SP_Stats_for_Upload`: SQL Server rejected `CONVERT(...)` directly in the named stored-procedure
+argument binding. PR #76 assigns the converted value to a typed local variable before the call and
+adds regression coverage for the deployable syntax. The corrected migration then delivered the
+intended healed-window and provenance-safe publication behaviour.
+
+### Delivered Outcome
+
+- `HealedTroopsDelta` now uses the configured strict post-`PRE_PASS_4_SCAN` combat boundary while
+  the matchmaking/draft starting-healed baseline remains unchanged.
+- KP Loss and Tanking Score formulas remain unchanged and now receive the corrected healed input.
+- `dbo.SP_Stats_for_Upload` validates the successful KVK output recorded by
+  `dbo.KVKFinalReportHeader`, derives `LAST_REFRESH` from that proven scan, serializes publication,
+  and preserves the last-known-good table on rejected or failed refreshes.
+- The bot cache builder distinguishes refreshed data from last-known-good reuse, validates SQL
+  snapshots before replacing healthy JSON, returns structured build metadata, and surfaces degraded
+  outcomes through admin/startup/telemetry reporting.
+- No command name, option, permission, registration, combat formula, KVK target rule, or card layout
+  changed.
+
+### Validation And Review Evidence
+
+- Bot focused cache/admin coverage: `50 passed` before review; final review slices passed `40` and
+  `12` tests respectively.
+- Bot full regression: `2,999 passed, 2 skipped`; full pre-commit passed.
+- SQL focused rehearsal: `deploy/Test-KvkHealedWindowAndStatsRefreshProvenance.ps1` passed.
+- SQL repository validation passed with only documented pre-existing/advisory warnings.
+- Final Changes security reviews returned zero findings for the bot, original SQL delivery, and SQL
+  syntax hotfix (`bb3ded61-393d-4b52-a571-7af6167c30af`,
+  `a1bc0692-abf8-47c0-b92f-f4c52f3f947d`, and
+  `b9884613-f2ec-4d1e-9042-04d513b60785`).
+- All three PRs completed review without an outstanding requested change, merge conflict, or
+  failing required check.
+
+### Operator Smoke Evidence
+
+The operator supplied a before/after KVK 16 Stats-card comparison for Governor `Chrislos`
+(`2441482`) on `2026-08-28`:
+
+| Metric | Before | After |
+|---|---:|---:|
+| Healed | `19.4K` | `0` |
+| KP Loss | `387.1K` | `0` |
+| Tanking Score | `0%` | `N/A` (`Not enough data`) |
+
+Rank `#2`, Power `125.9M`, Kills `0`, Deads `0`, and Acclaim `0` remained unchanged in the supplied
+comparison. This confirms the intended pre-Pass-4 correction for the evidenced player without a
+combat-formula or unrelated-card regression.
+
+Evidence boundary: the supplied operator evidence covers one known player. The original extended
+smoke plan also requested two additional known players plus direct SQL checks for
+`KVKFinalReportHeader`, `STATS_FOR_UPLOAD.LAST_REFRESH`, and simulated stale-output reuse. Those
+checks remain useful additional operational evidence if captured later; this archived record does
+not claim that they were supplied in this thread.
 
 ## 1. Task Header
 
@@ -9,11 +79,13 @@
 - Date: `2026-08-27`
 - Owner/context: `Chris Watts / KVK 16 King of All Britain pre-fighting stats investigation`
 - Task type: `bug fix`
+- Final status: `complete / merged / SQL deployed after hotfix / operator sample smoke accepted / archived`
 - One-pass approved: `no`
+- Approval outcome: `audit, architecture, implementation, PR, and deployment work subsequently approved and completed`
 - Repositories:
   - Bot: `cwatts6/K98-bot-mirror`
   - SQL: `cwatts6/K98-bot-SQL-Server`
-- Recommended branch name in each repository: `fix/kvk-healed-window-refresh-provenance`
+- Delivered branch name in each repository: `codex/kvk-post-pass4-provenance-safe-refresh`
 - Coordinated deployment order: `SQL first, bot second`
 
 ## 2. Required Reading
@@ -870,53 +942,57 @@ Before PR handoff:
 
 ## 15. Acceptance Criteria
 
+The checkboxes below record delivered implementation and validation. The coordinated bot production
+deployment was not evidenced in this thread, so that deployment-order item remains open even though
+the bot mirror PR is merged. The narrower operator-smoke evidence boundary is recorded above.
+
 ### Healed troops and combat metrics
 
-- [ ] `HealedTroopsDelta` includes only rows with `DeltaOrder > PRE_PASS_4_SCAN`.
-- [ ] A current pre-Pass-4 KVK produces zero current healing for every player.
-- [ ] `Starting_HealedTroops` remains the snapshot baseline.
-- [ ] KP Loss formula remains unchanged.
-- [ ] Tanking Score formula remains unchanged.
-- [ ] Pre-Pass-4 healing no longer creates KP Loss or Tanking Score.
-- [ ] Other metric windows are unchanged.
+- [x] `HealedTroopsDelta` includes only rows with `DeltaOrder > PRE_PASS_4_SCAN`.
+- [x] A current pre-Pass-4 KVK produces zero current healing for every player.
+- [x] `Starting_HealedTroops` remains the snapshot baseline.
+- [x] KP Loss formula remains unchanged.
+- [x] Tanking Score formula remains unchanged.
+- [x] Pre-Pass-4 healing no longer creates KP Loss or Tanking Score.
+- [x] Other metric windows are unchanged.
 
 ### Provenance and SQL publication safety
 
-- [ ] `KVKFinalReportHeader` is reused as canonical successful-output provenance.
-- [ ] No duplicate provenance table is introduced.
-- [ ] `SP_Stats_for_Upload` validates expected versus proven final scan before mutation.
-- [ ] Source object, KVK identity, row count and scan date are validated.
-- [ ] `LAST_REFRESH` is derived from the proven output scan date.
-- [ ] Global max scan cannot be applied to an older materialised output.
-- [ ] Missing/stale provenance fails before destructive publication.
-- [ ] `STATS_FOR_UPLOAD` replacement is atomic.
-- [ ] Concurrent publishers are serialized or otherwise proven safe.
-- [ ] Last-known-good SQL rows survive every tested negative path.
-- [ ] Completed KVKs work when global max scan is later than `KVK_END_SCAN`.
+- [x] `KVKFinalReportHeader` is reused as canonical successful-output provenance.
+- [x] No duplicate provenance table is introduced.
+- [x] `SP_Stats_for_Upload` validates expected versus proven final scan before mutation.
+- [x] Source object, KVK identity, row count and scan date are validated.
+- [x] `LAST_REFRESH` is derived from the proven output scan date.
+- [x] Global max scan cannot be applied to an older materialised output.
+- [x] Missing/stale provenance fails before destructive publication.
+- [x] `STATS_FOR_UPLOAD` replacement is atomic.
+- [x] Concurrent publishers are serialized or otherwise proven safe.
+- [x] Last-known-good SQL rows survive every tested negative path.
+- [x] Completed KVKs work when global max scan is later than `KVK_END_SCAN`.
 
 ### Cache and operator behaviour
 
-- [ ] Cache metadata distinguishes refreshed, last-known-good, skipped and failed outcomes.
-- [ ] `sp_executed` is removed or explicitly redefined as attempted.
-- [ ] Invalid SQL fallback data cannot overwrite a healthy JSON cache.
-- [ ] The async builder returns structured metadata.
-- [ ] Startup logs and telemetry report degraded refreshes.
-- [ ] `/kvk_admin refresh_stats_cache` warns when using last-known-good data.
-- [ ] No command surface or permission contract changes.
-- [ ] No secrets enter logs, cache metadata or Discord output.
+- [x] Cache metadata distinguishes refreshed, last-known-good, skipped and failed outcomes.
+- [x] `sp_executed` is removed or explicitly redefined as attempted.
+- [x] Invalid SQL fallback data cannot overwrite a healthy JSON cache.
+- [x] The async builder returns structured metadata.
+- [x] Startup logs and telemetry report degraded refreshes.
+- [x] `/kvk_admin refresh_stats_cache` warns when using last-known-good data.
+- [x] No command surface or permission contract changes.
+- [x] No secrets enter logs, cache metadata or Discord output.
 
 ### Delivery and validation
 
-- [ ] Forward and rollback SQL migrations exist and follow repository standards.
-- [ ] Authoritative SQL schema snapshots match the migration.
-- [ ] Focused SQL verification tooling exists and passes.
-- [ ] Focused bot tests pass.
-- [ ] Architecture, deferred-item and security-routing validators pass.
-- [ ] Separate diff-focused Changes reviews complete for SQL and bot.
-- [ ] SQL deployment and current-KVK rebuild precede bot deployment.
-- [ ] Post-deployment smoke evidence is captured.
-- [ ] Rollback steps are tested or rehearsed.
-- [ ] Out-of-scope findings are captured without expanding the PRs.
+- [x] Forward and rollback SQL migrations exist and follow repository standards.
+- [x] Authoritative SQL schema snapshots match the migration.
+- [x] Focused SQL verification tooling exists and passes.
+- [x] Focused bot tests pass.
+- [x] Architecture, deferred-item and security-routing validators pass.
+- [x] Separate diff-focused Changes reviews complete for SQL and bot.
+- [ ] SQL deployment and current-KVK rebuild precede bot production deployment (bot production deployment not evidenced here).
+- [x] Post-deployment smoke evidence is captured for the supplied player sample.
+- [x] Rollback steps are tested or rehearsed.
+- [x] Out-of-scope findings are captured without expanding the PRs.
 
 ## 16. Required Delivery Output
 
