@@ -44,6 +44,11 @@ class KvkCacheBuildOutcome:
     duration_seconds: float
     error: str | None = None
     non_fatal: bool = False
+    source_refresh_status: str | None = None
+    source_kvk_no: int | None = None
+    source_last_refresh: str | None = None
+    cache_write_status: str | None = None
+    existing_json_preserved: bool = False
 
 
 @dataclass(frozen=True)
@@ -236,21 +241,44 @@ async def _run_cache_builder(
     try:
         result = await builder()
     except Exception as exc:
-        logger.exception("[KVK ADMIN] %s refresh failed", label)
+        logger.error(
+            "[KVK ADMIN] %s refresh failed (error_type=%s)",
+            label,
+            type(exc).__name__,
+        )
         return KvkCacheBuildOutcome(
             label=label,
             count=None,
             duration_seconds=time.perf_counter() - started,
-            error=f"{type(exc).__name__}: {exc}",
+            error=type(exc).__name__,
             non_fatal=non_fatal,
         )
+
+    meta = _extract_meta(result)
+    source_status = _optional_text(meta.get("source_refresh_status"))
+    error = None
+    if source_status == "failed":
+        error = _optional_text(meta.get("source_refresh_error_code")) or "cache_build_failed"
 
     return KvkCacheBuildOutcome(
         label=label,
         count=_extract_count(result),
         duration_seconds=time.perf_counter() - started,
+        error=error,
         non_fatal=non_fatal,
+        source_refresh_status=source_status,
+        source_kvk_no=_optional_int(meta.get("source_kvk_no")),
+        source_last_refresh=_optional_text(meta.get("source_last_refresh")),
+        cache_write_status=_optional_text(meta.get("cache_write_status")),
+        existing_json_preserved=bool(meta.get("existing_json_preserved", False)),
     )
+
+
+def _extract_meta(result: Any) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return {}
+    meta = result.get("_meta")
+    return meta if isinstance(meta, dict) else {}
 
 
 def _extract_count(result: Any) -> int | None:
@@ -263,6 +291,29 @@ def _extract_count(result: Any) -> int | None:
     return None
 
 
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text[:160] if text else None
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_source_provenance(outcome: KvkCacheBuildOutcome) -> str:
+    details: list[str] = []
+    if outcome.source_kvk_no is not None:
+        details.append(f"KVK {outcome.source_kvk_no}")
+    if outcome.source_last_refresh:
+        details.append(f"source {outcome.source_last_refresh}")
+    return f" ({', '.join(details)})" if details else ""
+
+
 def _format_cache_outcome(outcome: KvkCacheBuildOutcome) -> str:
     if outcome.error:
         if outcome.non_fatal:
@@ -270,14 +321,32 @@ def _format_cache_outcome(outcome: KvkCacheBuildOutcome) -> str:
                 f"Warning: {outcome.label} build failed (non-fatal): `{outcome.error}` - "
                 "the main cache is available."
             )
-        return f"Failed: {outcome.label} build failed: `{outcome.error}`"
+        preservation = (
+            " Existing JSON was preserved."
+            if outcome.existing_json_preserved
+            else " No safe replacement was written."
+        )
+        return f"Failed: {outcome.label} build failed: `{outcome.error}`.{preservation}"
+
+    provenance = _format_source_provenance(outcome)
+    count_text = f" ({outcome.count} records)" if outcome.count is not None else ""
+    if outcome.source_refresh_status == "last_known_good":
+        return (
+            f"Warning: {outcome.label} rebuilt from last-known-good SQL{count_text}"
+            f"{provenance} in {outcome.duration_seconds:.1f}s"
+        )
+    if outcome.source_refresh_status == "skipped":
+        return (
+            f"Warning: {outcome.label} source refresh was skipped; validated SQL was used"
+            f"{count_text}{provenance} in {outcome.duration_seconds:.1f}s"
+        )
 
     if outcome.count is not None:
         return (
             f"Success: {outcome.label} refreshed "
-            f"({outcome.count} records) in {outcome.duration_seconds:.1f}s"
+            f"({outcome.count} records){provenance} in {outcome.duration_seconds:.1f}s"
         )
-    return f"Success: {outcome.label} refreshed in {outcome.duration_seconds:.1f}s"
+    return f"Success: {outcome.label} refreshed{provenance} in {outcome.duration_seconds:.1f}s"
 
 
 def _build_export_test_sections(meta: dict[str, Any]) -> list[KvkExportTestSection]:

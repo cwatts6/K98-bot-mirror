@@ -129,11 +129,66 @@ async def test_refresh_stats_caches_reports_partial_failure(caplog) -> None:
     message = kvk_admin_service.format_cache_refresh_message(result)
 
     assert result.main.count == 10
-    assert result.last_kvk.error == "RuntimeError: cache unavailable"
+    assert result.last_kvk.error == "RuntimeError"
     assert "Success: Player stats cache refreshed (10 records)" in message
     assert "Warning: Last-KVK cache build failed" in message
     assert "Last-KVK cache refresh failed" in caplog.text
-    assert "Traceback" in caplog.text
+    assert "cache unavailable" not in caplog.text
+    assert "Traceback" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "expected_prefix"),
+    [
+        ("refreshed", "Success:"),
+        ("last_known_good", "Warning:"),
+        ("skipped", "Warning:"),
+    ],
+)
+async def test_cache_admin_reports_source_refresh_status(status, expected_prefix) -> None:
+    async def builder():
+        return {
+            "_meta": {
+                "count": 415,
+                "source_refresh_status": status,
+                "source_kvk_no": 16,
+                "source_last_refresh": "2026-08-28T08:12:00",
+                "cache_write_status": "written",
+            }
+        }
+
+    outcome = await kvk_admin_service._run_cache_builder("Player stats cache", builder)
+    message = kvk_admin_service._format_cache_outcome(outcome)
+
+    assert message.startswith(expected_prefix)
+    assert "KVK 16" in message
+    assert "2026-08-28T08:12:00" in message
+    if status == "last_known_good":
+        assert "last-known-good SQL" in message
+    if status == "skipped":
+        assert "refresh was skipped" in message
+
+
+@pytest.mark.asyncio
+async def test_cache_admin_reports_failed_refresh_and_preserved_json() -> None:
+    async def builder():
+        return {
+            "_meta": {
+                "count": 0,
+                "source_refresh_status": "failed",
+                "source_refresh_error_code": "source_kvk_mismatch",
+                "cache_write_status": "preserved_existing",
+                "existing_json_preserved": True,
+            }
+        }
+
+    outcome = await kvk_admin_service._run_cache_builder("Player stats cache", builder)
+    message = kvk_admin_service._format_cache_outcome(outcome)
+
+    assert outcome.error == "source_kvk_mismatch"
+    assert message.startswith("Failed:")
+    assert "Existing JSON was preserved" in message
 
 
 def test_load_embed_test_context_uses_utc_label_and_checker() -> None:

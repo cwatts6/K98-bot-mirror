@@ -43,6 +43,26 @@ _REFRESH_BEFORE_BUILD = os.getenv("PLAYER_STATS_REFRESH_BEFORE_BUILD", "true").l
 # =========================
 _SQL_EXEC_SP = "EXEC dbo.SP_Stats_for_Upload;"
 _SQL_SELECT = "SELECT * FROM dbo.[STATS_FOR_UPLOAD]"
+_SQL_SELECT_EXPECTED_KVK = """
+SELECT TOP (1) KVKVersion
+FROM dbo.ProcConfig
+WHERE ConfigKey = 'MATCHMAKING_SCAN'
+  AND TRY_CONVERT(int, ConfigValue) IS NOT NULL
+  AND ConfigValue = CONVERT(float, TRY_CONVERT(int, ConfigValue))
+  AND TRY_CONVERT(int, ConfigValue) <= (SELECT MAX(SCANORDER) FROM dbo.KingdomScanData4)
+ORDER BY KVKVersion DESC;
+"""
+
+_SOURCE_REFRESH_STATUSES = frozenset({"refreshed", "last_known_good", "skipped", "failed"})
+
+
+class CacheSnapshotValidationError(RuntimeError):
+    """Raised when SQL rows cannot safely replace the existing JSON cache."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code[:80]
+
 
 # =========================
 # Canonical mapping
@@ -373,6 +393,40 @@ def _find_first_col(lookup: dict[str, str], candidates: list[str]) -> str | None
     return None
 
 
+def _safe_error_code(error: Exception) -> str:
+    if isinstance(error, CacheSnapshotValidationError):
+        return error.code
+    if isinstance(error, pyodbc.Error):
+        return "sql_refresh_failed"
+    return f"{type(error).__name__.lower()}_failure"[:80]
+
+
+def _validate_source_columns(cols: list[str]) -> None:
+    lookup = _build_lookup_from_cols(cols)
+    missing = [
+        canonical
+        for canonical, candidates in _CANONICAL_FIELD_CANDIDATES.items()
+        if _find_first_col(lookup, candidates) is None
+    ]
+    if missing:
+        logger.error(
+            "[CACHE] STATS_FOR_UPLOAD mapping is incomplete; missing %d required columns.",
+            len(missing),
+        )
+        raise CacheSnapshotValidationError("source_schema_mismatch")
+
+
+def _validate_last_refresh(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise CacheSnapshotValidationError("source_last_refresh_missing")
+    try:
+        datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise CacheSnapshotValidationError("source_last_refresh_invalid") from exc
+    return normalized
+
+
 def _execute_sp_with_retries(
     cn: pyodbc.Connection,
     *,
@@ -428,11 +482,11 @@ def _execute_sp_with_retries(
             sqlstate = getattr(e, "args", [None])[0] if e.args else None
 
             logger.warning(
-                "[CACHE] SP_Stats_for_Upload failed (attempt %d/%d): SQLSTATE=%s, Error=%s",
+                "[CACHE] SP_Stats_for_Upload failed (attempt %d/%d): SQLSTATE=%s, error_type=%s",
                 attempt,
                 retries,
                 sqlstate,
-                e,
+                type(e).__name__,
             )
 
             # Rollback on error
@@ -452,7 +506,10 @@ def _execute_sp_with_retries(
 
         except Exception as e:
             last_exc = e
-            logger.exception("[CACHE] Unexpected error executing SP_Stats_for_Upload: %s", e)
+            logger.error(
+                "[CACHE] Unexpected error executing SP_Stats_for_Upload (error_type=%s)",
+                type(e).__name__,
+            )
 
             try:
                 cn.rollback()
@@ -697,37 +754,56 @@ def _build_cache_sync() -> dict[str, Any]:
     Build in-memory dict for cache payload.
     Uses centralized DB connection retries via file_utils.get_conn_with_retries().
 
-    NEW: Executes SP_Stats_for_Upload BEFORE reading to ensure fresh data.
+    Refreshes STATS_FOR_UPLOAD when enabled, then validates the complete SQL
+    snapshot before allowing it to replace the JSON cache.
     """
     from file_utils import get_conn_with_retries
-    from utils import score_player_stats_rec
 
     _warn_legacy_db_envs_once()
 
     output: dict[str, Any] = {}
+    refresh_status = "skipped"
+    refresh_succeeded: bool | None = None
+    refresh_error_code: str | None = None
+    sp_attempted = False
+    source_kvks: set[int] = set()
+    source_refreshes: set[str] = set()
 
     # Standardized DB_* env vars are honored inside get_conn_with_retries()
     with get_conn_with_retries(meta={"operation": "player_stats_cache"}) as cn:
-        # NEW: Execute stored procedure to refresh STATS_FOR_UPLOAD table
         if _REFRESH_BEFORE_BUILD:
+            sp_attempted = True
             try:
                 _execute_sp_with_retries(cn)
+                refresh_status = "refreshed"
+                refresh_succeeded = True
             except Exception as e:
-                logger.error(
-                    "[CACHE] Failed to execute SP_Stats_for_Upload: %s. Proceeding with existing data.",
-                    e,
+                refresh_status = "last_known_good"
+                refresh_succeeded = False
+                refresh_error_code = _safe_error_code(e)
+                logger.warning(
+                    "[CACHE] SP_Stats_for_Upload failed; validating existing SQL data "
+                    "before reuse (error_code=%s).",
+                    refresh_error_code,
                 )
-                # Don't fail the entire cache build if SP fails - use existing data
         else:
             logger.info("[CACHE] Skipping SP execution (PLAYER_STATS_REFRESH_BEFORE_BUILD=false)")
 
-        # Read from STATS_FOR_UPLOAD table
+        cur = cn.cursor()
+        cur.execute(_SQL_SELECT_EXPECTED_KVK)
+        expected_kvk_row = cur.fetchone()
+        if not expected_kvk_row:
+            raise CacheSnapshotValidationError("expected_kvk_missing")
+        expected_kvk = _to_int(expected_kvk_row[0])
+        if expected_kvk <= 0:
+            raise CacheSnapshotValidationError("expected_kvk_invalid")
+
         logger.info("[CACHE] Reading from STATS_FOR_UPLOAD table...")
         read_start = time.perf_counter()
 
-        cur = cn.cursor()
         cur.execute(_SQL_SELECT)
         cols = [c[0] for c in cur.description]
+        _validate_source_columns(cols)
 
         row_count = 0
         batch_count = 0
@@ -742,15 +818,29 @@ def _build_cache_sync() -> dict[str, Any]:
                 row_count += 1
                 mapped = _map_row(r, cols)
                 if not mapped:
-                    continue
+                    raise CacheSnapshotValidationError("source_governor_invalid")
                 gid = mapped["GovernorID"]
                 if gid in output:
-                    existing = output[gid]
-                    # Shared scoring helper (keeps builder+loader consistent)
-                    if score_player_stats_rec(mapped) > score_player_stats_rec(existing):
-                        output[gid] = mapped
-                else:
-                    output[gid] = mapped
+                    raise CacheSnapshotValidationError("source_governor_duplicate")
+
+                source_kvk = _to_int(mapped.get("KVK_NO"))
+                if source_kvk <= 0:
+                    raise CacheSnapshotValidationError("source_kvk_invalid")
+                source_kvks.add(source_kvk)
+
+                source_refreshes.add(_validate_last_refresh(_to_str(mapped.get("LAST_REFRESH"))))
+                output[gid] = mapped
+
+        cur.close()
+
+        if row_count <= 0:
+            raise CacheSnapshotValidationError("source_snapshot_empty")
+        if len(output) != row_count:
+            raise CacheSnapshotValidationError("source_mapping_row_loss")
+        if source_kvks != {expected_kvk}:
+            raise CacheSnapshotValidationError("source_kvk_mismatch")
+        if len(source_refreshes) != 1:
+            raise CacheSnapshotValidationError("source_last_refresh_incoherent")
 
         read_duration = time.perf_counter() - read_start
         logger.info(
@@ -761,12 +851,28 @@ def _build_cache_sync() -> dict[str, Any]:
             row_count / read_duration if read_duration > 0 else 0,
         )
 
+    source_last_refresh = next(iter(source_refreshes))
     output["_meta"] = {
         "source": "SQL:dbo.STATS_FOR_UPLOAD",
         "generated_at": _utc_now_iso(),
-        "count": len([k for k in output.keys() if k != "_meta"]),
-        "sp_executed": _REFRESH_BEFORE_BUILD,
+        "count": len(output),
+        "sp_attempted": sp_attempted,
+        "source_refresh_status": refresh_status,
+        "source_refresh_succeeded": refresh_succeeded,
+        "source_kvk_no": next(iter(source_kvks)),
+        "source_last_refresh": source_last_refresh,
+        "source_row_count": row_count,
     }
+    if refresh_error_code:
+        output["_meta"]["source_refresh_error_code"] = refresh_error_code
+
+    logger.info(
+        "[CACHE] SQL snapshot validated: status=%s kvk=%s last_refresh=%s rows=%s",
+        refresh_status,
+        next(iter(source_kvks)),
+        source_last_refresh,
+        row_count,
+    )
 
     return output
 
@@ -867,6 +973,30 @@ def _build_last_kvk_cache_sync() -> dict[str, Any] | None:
         return None
 
 
+def _failed_cache_outcome(
+    error: Exception,
+    *,
+    cache_write_status: str,
+    existing_json_preserved: bool,
+) -> dict[str, Any]:
+    return {
+        "_meta": {
+            "source": "SQL:dbo.STATS_FOR_UPLOAD",
+            "generated_at": _utc_now_iso(),
+            "count": 0,
+            "sp_attempted": None,
+            "source_refresh_status": "failed",
+            "source_refresh_succeeded": None,
+            "source_kvk_no": None,
+            "source_last_refresh": None,
+            "source_row_count": None,
+            "source_refresh_error_code": _safe_error_code(error),
+            "cache_write_status": cache_write_status,
+            "existing_json_preserved": existing_json_preserved,
+        }
+    }
+
+
 def _build_and_persist_cache_sync() -> dict[str, Any] | None:
     """
     Sync worker intended to run off the event loop.
@@ -892,6 +1022,7 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
         except Exception:
             count = None
 
+        meta = (output or {}).get("_meta", {}) if isinstance(output, dict) else {}
         payload: dict[str, Any] = {
             "event": "player_stats_cache.build",
             "status": status,
@@ -899,11 +1030,16 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
             "count": count,
             "cache_path": PLAYER_STATS_CACHE,
             "lock_path": lock_path,
-            "sp_executed": _REFRESH_BEFORE_BUILD,
+            "sp_attempted": meta.get("sp_attempted"),
+            "source_refresh_status": meta.get("source_refresh_status"),
+            "source_kvk_no": meta.get("source_kvk_no"),
+            "source_last_refresh": meta.get("source_last_refresh"),
+            "source_row_count": meta.get("source_row_count"),
+            "cache_write_status": meta.get("cache_write_status"),
+            "existing_json_preserved": meta.get("existing_json_preserved"),
         }
         if error is not None:
             payload["error_type"] = type(error).__name__
-            payload["error"] = str(error)
         emit_telemetry_event(payload)
 
     try:
@@ -918,10 +1054,17 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
                     output["_meta"] = meta
                 meta.setdefault("source", "SQL:dbo.STATS_FOR_UPLOAD")
                 meta["generated_at"] = _utc_now_iso()
+                source_status = meta.get("source_refresh_status")
+                if source_status not in _SOURCE_REFRESH_STATUSES:
+                    raise CacheSnapshotValidationError("source_refresh_status_invalid")
+                meta["cache_write_status"] = "written"
+                meta["existing_json_preserved"] = False
 
             except Exception as e:
-                logger.exception(
-                    "build_player_stats_cache failed while building cache from SQL: %s", e
+                logger.error(
+                    "build_player_stats_cache failed while building cache from SQL "
+                    "(error_code=%s)",
+                    _safe_error_code(e),
                 )
 
                 # Preserve existing cache if present (availability first)
@@ -930,27 +1073,30 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
                         "Existing cache %s found; leaving it unchanged after SQL failure.",
                         PLAYER_STATS_CACHE,
                     )
-                    _emit("preserved_existing", error=e)
-                    return None
+                    failure = _failed_cache_outcome(
+                        e,
+                        cache_write_status="preserved_existing",
+                        existing_json_preserved=True,
+                    )
+                    _emit("failed", output=failure, error=e)
+                    return failure
 
-                err_output = {
-                    "_meta": {
-                        "source": "SQL:dbo.STATS_FOR_UPLOAD",
-                        "generated_at": _utc_now_iso(),
-                        "count": 0,
-                        "error": "Failed to build cache from SQL server. See logs for details.",
-                    }
-                }
+                err_output = _failed_cache_outcome(
+                    e,
+                    cache_write_status="fallback_written",
+                    existing_json_preserved=False,
+                )
                 _atomic_write_json_with_retries(PLAYER_STATS_CACHE, err_output)
                 logger.info(
                     "Wrote fallback player_stats_cache.json with error metadata at %s",
                     PLAYER_STATS_CACHE,
                 )
-                _emit("fallback_written", output=err_output, error=e)
+                _emit("failed", output=err_output, error=e)
                 return err_output
 
             _atomic_write_json_with_retries(PLAYER_STATS_CACHE, output)
-            _emit("ok", output=output)
+            source_status = (output.get("_meta") or {}).get("source_refresh_status")
+            _emit(source_status or "ok", output=output)
 
             # Build/persist last-KVK cache independently (non-fatal)
             try:
@@ -972,21 +1118,38 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
             return output
 
     except TimeoutError as e:
-        logger.exception(
+        logger.error(
             "[CACHE] Timeout acquiring cache lock; build aborted. lock=%s cache=%s",
             lock_path,
             PLAYER_STATS_CACHE,
         )
-        _emit("lock_timeout", error=e)
-        return None
+        failure = _failed_cache_outcome(
+            e,
+            cache_write_status=(
+                "preserved_existing" if os.path.exists(PLAYER_STATS_CACHE) else "not_written"
+            ),
+            existing_json_preserved=os.path.exists(PLAYER_STATS_CACHE),
+        )
+        _emit("failed", output=failure, error=e)
+        return failure
     except Exception as e:
         # Defensive: telemetry if something unexpected happens outside the lock.
-        logger.exception("[CACHE] Unexpected failure in cache build/persist: %s", e)
-        _emit("error", error=e)
-        raise
+        logger.error(
+            "[CACHE] Unexpected failure in cache build/persist (error_code=%s)",
+            _safe_error_code(e),
+        )
+        failure = _failed_cache_outcome(
+            e,
+            cache_write_status=(
+                "preserved_existing" if os.path.exists(PLAYER_STATS_CACHE) else "not_written"
+            ),
+            existing_json_preserved=os.path.exists(PLAYER_STATS_CACHE),
+        )
+        _emit("failed", output=failure, error=e)
+        return failure
 
 
-async def build_player_stats_cache():
+async def build_player_stats_cache() -> dict[str, Any] | None:
     from file_utils import run_blocking_in_thread
 
     output = await run_blocking_in_thread(
@@ -996,14 +1159,30 @@ async def build_player_stats_cache():
     )
 
     if output is None:
-        return
+        return None
 
     try:
         count = (output.get("_meta") or {}).get("count")
     except Exception:
         count = None
 
-    logger.info("[CACHE] ✅ player_stats_cache.json written with %s entries.", count)
+    meta = output.get("_meta") or {}
+    source_status = meta.get("source_refresh_status")
+    if source_status == "failed":
+        logger.error(
+            "[CACHE] Cache build failed; cache_write_status=%s existing_json_preserved=%s",
+            meta.get("cache_write_status"),
+            meta.get("existing_json_preserved"),
+        )
+    elif source_status in {"last_known_good", "skipped"}:
+        logger.warning(
+            "[CACHE] player_stats_cache.json written with %s entries using source status=%s",
+            count,
+            source_status,
+        )
+    else:
+        logger.info("[CACHE] ✅ player_stats_cache.json written with %s entries.", count)
+    return output
 
 
 async def build_lastkvk_player_stats_cache():

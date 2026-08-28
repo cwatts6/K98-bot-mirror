@@ -24,6 +24,204 @@ def _read_json(p: Path) -> dict:
         return json.load(f)
 
 
+def _source_columns_and_row(
+    mod,
+    *,
+    governor_id: str = "123",
+    kvk_no: int = 16,
+    last_refresh: str = "2026-08-28T08:12:00",
+):
+    columns = [candidates[0] for candidates in mod._CANONICAL_FIELD_CANDIDATES.values()]
+    values = []
+    for canonical in mod._CANONICAL_FIELD_CANDIDATES:
+        if canonical == "GovernorID":
+            values.append(governor_id)
+        elif canonical == "GovernorName":
+            values.append(f"Governor {governor_id}")
+        elif canonical == "KVK_NO":
+            values.append(kvk_no)
+        elif canonical == "LAST_REFRESH":
+            values.append(last_refresh)
+        elif canonical in {"STATUS", "Civilization"}:
+            values.append("INCLUDED" if canonical == "STATUS" else "Rome")
+        else:
+            values.append(0)
+    return columns, tuple(values)
+
+
+class _FakeStatsCursor:
+    def __init__(self, *, expected_kvk, columns, rows):
+        self.expected_kvk = expected_kvk
+        self.columns = columns
+        self.rows = rows
+        self.mode = None
+        self.returned_rows = False
+        self.description = None
+
+    def execute(self, sql):
+        if "FROM dbo.ProcConfig" in sql:
+            self.mode = "expected_kvk"
+            self.description = [("KVKVersion",)]
+        elif "STATS_FOR_UPLOAD" in sql:
+            self.mode = "stats"
+            self.returned_rows = False
+            self.description = [(column,) for column in self.columns]
+        else:
+            raise AssertionError(f"Unexpected SQL in fake cursor: {sql}")
+        return self
+
+    def fetchone(self):
+        return (self.expected_kvk,) if self.mode == "expected_kvk" else None
+
+    def fetchmany(self, _size):
+        if self.mode != "stats" or self.returned_rows:
+            return []
+        self.returned_rows = True
+        return self.rows
+
+    def close(self):
+        return None
+
+
+class _FakeStatsConnection:
+    def __init__(self, *, expected_kvk, columns, rows):
+        self.cursor_instance = _FakeStatsCursor(
+            expected_kvk=expected_kvk,
+            columns=columns,
+            rows=rows,
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def cursor(self):
+        return self.cursor_instance
+
+
+def _install_fake_stats_connection(monkeypatch, mod, *, rows, columns, expected_kvk=16):
+    connection = _FakeStatsConnection(
+        expected_kvk=expected_kvk,
+        columns=columns,
+        rows=rows,
+    )
+    monkeypatch.setattr(
+        "file_utils.get_conn_with_retries",
+        lambda **_kwargs: connection,
+    )
+    return connection
+
+
+def test_build_cache_reports_refreshed_source(monkeypatch):
+    import player_stats_cache as mod
+
+    columns, row = _source_columns_and_row(mod)
+    _install_fake_stats_connection(monkeypatch, mod, rows=[row], columns=columns)
+    monkeypatch.setattr(mod, "_REFRESH_BEFORE_BUILD", True)
+    monkeypatch.setattr(mod, "_execute_sp_with_retries", lambda _cn: None)
+
+    result = mod._build_cache_sync()
+    meta = result["_meta"]
+
+    assert meta["source_refresh_status"] == "refreshed"
+    assert meta["source_refresh_succeeded"] is True
+    assert meta["source_kvk_no"] == 16
+    assert meta["source_last_refresh"] == "2026-08-28T08:12:00"
+    assert meta["source_row_count"] == 1
+    assert "sp_executed" not in meta
+
+
+def test_build_cache_reuses_valid_last_known_good_without_error_leak(monkeypatch):
+    import player_stats_cache as mod
+
+    columns, row = _source_columns_and_row(mod)
+    _install_fake_stats_connection(monkeypatch, mod, rows=[row], columns=columns)
+    monkeypatch.setattr(mod, "_REFRESH_BEFORE_BUILD", True)
+
+    def fail_refresh(_cn):
+        raise mod.pyodbc.Error("password=should-not-leak")
+
+    monkeypatch.setattr(mod, "_execute_sp_with_retries", fail_refresh)
+
+    result = mod._build_cache_sync()
+    serialized = json.dumps(result)
+
+    assert result["_meta"]["source_refresh_status"] == "last_known_good"
+    assert result["_meta"]["source_refresh_succeeded"] is False
+    assert result["_meta"]["source_refresh_error_code"] == "sql_refresh_failed"
+    assert "should-not-leak" not in serialized
+
+
+def test_build_cache_reports_skipped_refresh(monkeypatch):
+    import player_stats_cache as mod
+
+    columns, row = _source_columns_and_row(mod)
+    _install_fake_stats_connection(monkeypatch, mod, rows=[row], columns=columns)
+    monkeypatch.setattr(mod, "_REFRESH_BEFORE_BUILD", False)
+
+    result = mod._build_cache_sync()
+
+    assert result["_meta"]["source_refresh_status"] == "skipped"
+    assert result["_meta"]["source_refresh_succeeded"] is None
+    assert result["_meta"]["sp_attempted"] is False
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("empty", "source_snapshot_empty"),
+        ("mixed_kvk", "source_kvk_mismatch"),
+        ("duplicate_governor", "source_governor_duplicate"),
+        ("incoherent_refresh", "source_last_refresh_incoherent"),
+    ],
+)
+def test_build_cache_rejects_invalid_sql_snapshots(monkeypatch, mutation, expected_code):
+    import player_stats_cache as mod
+
+    columns, row = _source_columns_and_row(mod)
+    rows = [row]
+    if mutation == "empty":
+        rows = []
+    elif mutation == "mixed_kvk":
+        _, second = _source_columns_and_row(mod, governor_id="456", kvk_no=15)
+        rows.append(second)
+    elif mutation == "duplicate_governor":
+        rows.append(row)
+    elif mutation == "incoherent_refresh":
+        _, second = _source_columns_and_row(
+            mod,
+            governor_id="456",
+            last_refresh="2026-08-28T08:13:00",
+        )
+        rows.append(second)
+
+    _install_fake_stats_connection(monkeypatch, mod, rows=rows, columns=columns)
+    monkeypatch.setattr(mod, "_REFRESH_BEFORE_BUILD", False)
+
+    with pytest.raises(mod.CacheSnapshotValidationError) as exc_info:
+        mod._build_cache_sync()
+
+    assert exc_info.value.code == expected_code
+
+
+def test_build_cache_rejects_mapping_schema_loss(monkeypatch):
+    import player_stats_cache as mod
+
+    columns, row = _source_columns_and_row(mod)
+    missing_index = columns.index("LAST_REFRESH")
+    columns.pop(missing_index)
+    row = row[:missing_index] + row[missing_index + 1 :]
+    _install_fake_stats_connection(monkeypatch, mod, rows=[row], columns=columns)
+    monkeypatch.setattr(mod, "_REFRESH_BEFORE_BUILD", False)
+
+    with pytest.raises(mod.CacheSnapshotValidationError) as exc_info:
+        mod._build_cache_sync()
+
+    assert exc_info.value.code == "source_schema_mismatch"
+
+
 def test_build_and_persist_success_writes_atomic_and_utc(monkeypatch, tmp_path):
     import player_stats_cache as mod
 
@@ -33,7 +231,12 @@ def test_build_and_persist_success_writes_atomic_and_utc(monkeypatch, tmp_path):
     # Force a deterministic output from builder
     fake_out = {
         "123": {"GovernorID": "123", "STATUS": "INCLUDED", "LAST_REFRESH": "2025-01-01T00:00:00"},
-        "_meta": {"source": "SQL:dbo.STATS_FOR_UPLOAD", "generated_at": "OLD", "count": 1},
+        "_meta": {
+            "source": "SQL:dbo.STATS_FOR_UPLOAD",
+            "generated_at": "OLD",
+            "count": 1,
+            "source_refresh_status": "refreshed",
+        },
     }
     monkeypatch.setattr(mod, "_build_cache_sync", lambda: fake_out)
 
@@ -91,7 +294,9 @@ def test_build_and_persist_failure_preserves_existing_cache(monkeypatch, tmp_pat
     monkeypatch.setattr("file_utils.atomic_write_json", fail_atomic)
 
     out = mod._build_and_persist_cache_sync()
-    assert out is None
+    assert out["_meta"]["source_refresh_status"] == "failed"
+    assert out["_meta"]["cache_write_status"] == "preserved_existing"
+    assert out["_meta"]["existing_json_preserved"] is True
     assert _read_json(cache_path) == {"ok": True}
 
 
@@ -119,7 +324,9 @@ def test_build_and_persist_failure_writes_fallback_when_missing(monkeypatch, tmp
     persisted = _read_json(cache_path)
 
     assert persisted["_meta"]["count"] == 0
-    assert "error" in persisted["_meta"]
+    assert persisted["_meta"]["source_refresh_status"] == "failed"
+    assert persisted["_meta"]["source_refresh_error_code"] == "runtimeerror_failure"
+    assert "db down" not in json.dumps(persisted)
 
     dt = datetime.fromisoformat(persisted["_meta"]["generated_at"])
     assert dt.tzinfo == UTC
@@ -148,14 +355,19 @@ async def test_async_build_uses_run_blocking_in_thread(monkeypatch, tmp_path):
         "_build_cache_sync",
         lambda: {
             "123": {"GovernorID": "123"},
-            "_meta": {"source": "SQL:dbo.STATS_FOR_UPLOAD", "count": 1},
+            "_meta": {
+                "source": "SQL:dbo.STATS_FOR_UPLOAD",
+                "count": 1,
+                "source_refresh_status": "refreshed",
+            },
         },
     )
     monkeypatch.setattr("file_utils.atomic_write_json", lambda *a, **k: None)
 
-    await mod.build_player_stats_cache()
+    result = await mod.build_player_stats_cache()
     assert called["n"] == 1
     assert called["func"].__name__ == "_build_and_persist_cache_sync"
+    assert result["_meta"]["source_refresh_status"] == "refreshed"
 
 
 def test_build_and_persist_uses_acquire_lock(monkeypatch, tmp_path):
@@ -166,7 +378,12 @@ def test_build_and_persist_uses_acquire_lock(monkeypatch, tmp_path):
 
     # Avoid DB work
     monkeypatch.setattr(
-        mod, "_build_cache_sync", lambda: {"_meta": {"count": 0}, "123": {"GovernorID": "123"}}
+        mod,
+        "_build_cache_sync",
+        lambda: {
+            "_meta": {"count": 0, "source_refresh_status": "refreshed"},
+            "123": {"GovernorID": "123"},
+        },
     )
 
     calls = {"lock_path": None, "timeout": None, "entered": 0}
@@ -213,7 +430,8 @@ def test_build_and_persist_lock_timeout_aborts_without_writing(monkeypatch, tmp_
     monkeypatch.setattr("file_utils.atomic_write_json", fake_atomic_write_json)
 
     out = mod._build_and_persist_cache_sync()
-    assert out is None
+    assert out["_meta"]["source_refresh_status"] == "failed"
+    assert out["_meta"]["cache_write_status"] == "not_written"
     assert wrote["n"] == 0
 
 
@@ -313,7 +531,14 @@ def test_build_emits_telemetry_ok(monkeypatch, tmp_path):
         "_build_cache_sync",
         lambda: {
             "123": {"GovernorID": "123"},
-            "_meta": {"source": "SQL:dbo.STATS_FOR_UPLOAD", "count": 1},
+            "_meta": {
+                "source": "SQL:dbo.STATS_FOR_UPLOAD",
+                "count": 1,
+                "source_refresh_status": "refreshed",
+                "source_kvk_no": 16,
+                "source_last_refresh": "2026-08-28T08:12:00",
+                "source_row_count": 1,
+            },
         },
     )
 
@@ -340,5 +565,7 @@ def test_build_emits_telemetry_ok(monkeypatch, tmp_path):
     assert events, "expected telemetry event"
     cache_build_events = [e for e in events if e.get("event") == "player_stats_cache.build"]
     assert cache_build_events, "expected player_stats_cache.build telemetry event"
-    assert cache_build_events[0].get("status") == "ok"
+    assert cache_build_events[0].get("status") == "refreshed"
     assert cache_build_events[0].get("cache_path") == str(cache_path)
+    assert cache_build_events[0].get("source_refresh_status") == "refreshed"
+    assert cache_build_events[0].get("source_kvk_no") == 16
