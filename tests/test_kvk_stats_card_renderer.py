@@ -4,6 +4,7 @@ from dataclasses import replace
 from io import BytesIO
 
 from PIL import Image, ImageDraw
+import pytest
 
 from kvk.models.kvk_stats_card import (
     KvkStatsCardPayload,
@@ -134,6 +135,42 @@ def test_background_selection_uses_mode_specific_assets_and_default():
     assert _background_for_mode("Songs of Troy").name == "Songs_of_Troy_Stats_card.jpg"
     assert _background_for_mode("Unknown Mode").name == "Default_card.jpg"
     assert _background_for_mode(None).name == "Default_card.jpg"
+
+
+@pytest.mark.parametrize(
+    "kvk_name",
+    (
+        "King of All Britain",
+        "king of all britain",
+        "king_of_all_britain",
+        "king-of-all-britain",
+        "  king   of   all   britain  ",
+    ),
+)
+def test_background_selection_normalizes_king_of_all_britain_variants(kvk_name):
+    assert _background_for_mode(kvk_name).name == "King_of_All_Britain_Stats_Card.png"
+
+
+def test_king_of_all_britain_asset_contract():
+    path = _background_for_mode("King of All Britain")
+
+    assert path is not None
+    assert path.exists()
+    with Image.open(path) as image:
+        assert image.size == (1180, 640)
+        assert image.mode == "RGB"
+
+
+def test_king_of_all_britain_stats_and_more_stats_cards_render():
+    payload = replace(_payload(), kvk_name="King of All Britain")
+
+    rendered = render_kvk_stats_card(payload)
+    more = render_kvk_more_stats_card(payload)
+
+    assert rendered is not None
+    assert more is not None
+    assert Image.open(BytesIO(rendered.image_bytes.getvalue())).size == (1180, 640)
+    assert Image.open(BytesIO(more.image_bytes.getvalue())).size == (1180, 640)
 
 
 def test_main_rank_uses_kvk_rank_not_power_rank():

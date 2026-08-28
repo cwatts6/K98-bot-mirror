@@ -19,6 +19,7 @@ MODE_BACKGROUNDS = {
     "heroic anthem": ASSET_DIR / "Heroic_Anthem_Stats_Card.jpg",
     "storm of stratagems": ASSET_DIR / "Storm_of_Stratagems_Stats_card.png",
     "songs of troy": ASSET_DIR / "Songs_of_Troy_Stats_card.jpg",
+    "king of all britain": ASSET_DIR / "King_of_All_Britain_Stats_Card.png",
 }
 
 WIDTH = 1180

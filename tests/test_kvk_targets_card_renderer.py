@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from io import BytesIO
+
+from PIL import Image
+import pytest
 
 from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
 from kvk.rendering import kvk_targets_card_renderer as renderer
@@ -48,6 +52,38 @@ def test_targets_renderer_returns_png_bytes_for_empty_state():
 
     assert rendered is not None
     assert rendered.image_bytes.getvalue().startswith(b"\x89PNG")
+
+
+@pytest.mark.parametrize(
+    "kvk_name",
+    (
+        "King of All Britain",
+        "king of all britain",
+        "king_of_all_britain",
+        "king-of-all-britain",
+        "  king   of   all   britain  ",
+    ),
+)
+def test_targets_background_selection_normalizes_king_of_all_britain_variants(kvk_name):
+    assert renderer._background_for_mode(kvk_name).name == ("King_of_All_Britain_Stats_Card.png")
+
+
+def test_targets_background_selection_preserves_unknown_mode_fallback():
+    assert renderer._background_for_mode("Unknown Mode").name == "Default_card.jpg"
+    assert renderer._background_for_mode(None).name == "Default_card.jpg"
+
+
+@pytest.mark.parametrize("state", ("active", "exempt"))
+def test_king_of_all_britain_targets_card_renders_populated_and_empty_states(state):
+    payload = replace(_payload(state=state), kvk_name="King of All Britain")
+
+    rendered = renderer.render_kvk_targets_card(payload)
+
+    assert rendered is not None
+    assert rendered.filename == "kvk_targets_2441482.png"
+    image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
+    assert image.format == "PNG"
+    assert image.size == (1180, 640)
 
 
 def test_targets_renderer_prefers_canonical_unknown_publication_warning(monkeypatch):
