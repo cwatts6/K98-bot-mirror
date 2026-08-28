@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### KVK Targets Quality Phase 2 Completed Programme
+
+- Area: `kvk/models/kvk_target_row.py`, target DAL/services/cache, `kvk_state.py`, `kvk/dal/kvk_lifecycle_dal.py`, `account_picker.py`, `ui/views/kvk_targets_views.py`, and `/kvk history` rank retrieval
+- Type: architecture
+- Description: Phase 1 separated target publication from the shared fighting lifecycle but intentionally deferred typed target rows, duplicated retrieval/presentation ownership, target-specific durable single-flight coordination, explicit lifecycle terminology, lifecycle DAL ownership, and the final generic-picker/history-result-set cleanup.
+- Resolution: Phases 2A-2F delivered immutable typed rows and explicit schema-version-2 serialization, one service-owned numeric/name/card/fallback payload, typed cache outcomes with bounded crash-recoverable cross-process coordination, compatibility-preserving fighting-lifecycle names, narrow lifecycle DAL ownership, bounded history rank result-set advancement, the target view move into `ui/views/`, and removal of the proved-unused generic-picker `_last_kvk_map` plumbing. Target formulas, values, thresholds, populations, exemptions, publication identity/state rules, cache safety, fighting-state semantics, command surface, permissions, visibility, and registration remained unchanged.
+- Validation: Mirror PRs #237-#242, production PRs #544-#549, and Phase 2A SQL PR #74 carry the accepted programme. Phase 2F validation recorded 245 focused/complete subsystem tests and `2972 passed, 2 skipped` for the full suite; all architecture, deferred, security-routing, import-smoke, registration, pre-commit, type, and log-noise gates passed. Final Changes review `50765b97-2025-4987-919c-514a4ea048b9` ran with Deep Off and zero reportable findings. Production smoke on 2026-08-28 passed history, targets, stats, CrystalTech, and shared account-picker flows with clear logs and without the prior history rank result-set error. A final target-scope review found no new Phase 2 requirement or active target-subsystem deferred optimisation; the separately active cross-command deprecated-route retirement item is not unfinished target architecture.
+
 ### GovernorOS v2 Phase 8 Leadership Compatibility Cleanup Completed Item
 
 - Area: removed `embed_my_stats.py`, root `stats_service.py`, `stats_helpers.py`, retired `/player_profile` registration/view/renderer/tests, and retained shared lookup/location/cache helpers

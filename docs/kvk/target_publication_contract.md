@@ -2,8 +2,9 @@
 
 > Deployment status: Phase 1 deployed and operator accepted on 2026-08-26 through mirror PR #235,
 > production PR #542, and SQL PR #73. The import-path transaction follow-up was deployed through
-> mirror PR #236 and production PR #543. Production metadata/source/row-count checks and bot cache
-> rebuild smoke passed.
+> mirror PR #236 and production PR #543. Phase 2 completed through mirror PRs #237-#242,
+> production PRs #544-#549, and the Phase 2A SQL PR #74. Production publication/cache checks and
+> all final Discord smoke passed.
 
 KVK target publication is separate from the shared KVK fighting lifecycle and the broader KVK
 window. These concepts must not be used as aliases:
@@ -92,14 +93,15 @@ Phase 2 does not reopen the publication model or target formulas. It incremental
 bot-side target architecture by introducing typed target rows, making the typed service the single
 retrieval/presentation-input path, extracting target-specific cache repository ownership with
 proved refresh outcomes and cross-process coordination, and making the shared Pass 4 state
-terminology explicit without changing its thresholds. Phases 2A through 2E are deployed and
+terminology explicit without changing its thresholds. Phases 2A through 2F are deployed and
 operator accepted. Phase 2E moved the existing lifecycle SQL execution and row mapping into the
 narrow `kvk/dal/kvk_lifecycle_dal.py` boundary while retaining the `kvk_state.py` public façade,
 pure fighting resolver, query semantics, thresholds, result shapes, logging, and fallback behavior.
-Phase 2F is the approved final wrap-up. It hardens the separate `/kvk history` summary-rank DAL
-against non-row SQL batch results and completes target interaction-layer cleanup without changing
-this publication contract, cache schema, target values, visibility, or command registration. The
-programme documents remain active until Phase 2F production smoke is accepted and the separately
-gated archive closeout is delivered.
-See
-`docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`.
+Phase 2F hardened the separate `/kvk history` summary-rank DAL
+against non-row SQL batch results and completed target interaction-layer cleanup without changing
+this publication contract, cache schema, target values, visibility, or command registration.
+Production smoke on 2026-08-28 passed `/kvk history`, `/kvk targets`, `/kvk stats`, CrystalTech,
+and their account-picker paths with clear logs and without the prior history rank result-set error.
+The completed programme record is archived at
+`docs/task_packs/archive/Codex Task Pack - KVK Targets Quality Phase 2.md`. The final follow-up
+review found no new Phase 2 requirement or active target-subsystem deferred optimisation.

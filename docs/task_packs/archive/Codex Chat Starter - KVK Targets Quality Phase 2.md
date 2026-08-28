@@ -1,10 +1,17 @@
 # Codex Chat Starter - KVK Targets Quality Phase 2
 
-## Copy/Paste Starter
+Status: archived completed starter. Phases 2A-2F shipped through mirror PRs #237-#242,
+production PRs #544-#549, and Phase 2A SQL PR #74. Final Phase 2F production smoke was operator
+accepted on 2026-08-28 after history, targets, stats, CrystalTech, and shared account-picker flows
+passed with clear logs. The docs-only closeout found no new Phase 2 requirement or active
+target-subsystem deferred optimisation. This prompt is retained as historical execution context;
+future target work requires a fresh task pack.
+
+## Copy/Paste Starter (Historical)
 
 Codex, continue the final Phase 2F wrap-up defined in:
 
-`docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`
+`docs/task_packs/archive/Codex Task Pack - KVK Targets Quality Phase 2.md`
 
 Phases 2A through 2E are deployed, smoke tested, and operator accepted. Preserve their complete
 contract: immutable target rows, the single service-owned target payload, cache schema version 2,
@@ -39,8 +46,8 @@ Non-negotiable constraints:
 - Run the bot `Changes review` with `Deep Off`; do not start a standard or deep codebase audit.
 - Do not archive this starter/task pack or remove the deferred item in the runtime PR.
 
-After the runtime PR is promoted, deployed, and its Discord smoke is operator accepted, prepare a
-separate docs-only closeout PR that:
+After the runtime PR was promoted, deployed, and its Discord smoke was operator accepted, the
+approved separate docs-only closeout:
 
 - archives this task pack and starter under `docs/task_packs/archive/`;
 - removes the resolved account-picker/targets `_last_kvk_map` item from the active deferred register;
@@ -50,5 +57,5 @@ separate docs-only closeout PR that:
 - completes a follow-up target-scope review and states whether any new Phase 2 requirement or active
   target deferred optimisation remains.
 
-Stop after the reviewed runtime PR is opened. Do not perform the archive closeout before production
-smoke acceptance.
+This historical starter's stop point was satisfied. The runtime and docs-only closeout gates are
+complete; do not continue the programme as Phase 2G.

@@ -7,7 +7,7 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
-## KVK Target Publication Phase 1 Delivery
+## KVK Target Publication And Quality Delivery
 
 KVK Target Publication State Separation Phase 1 was deployed and operator accepted on
 2026-08-26 through mirror PR #235, production PR #542, and SQL PR #73. The follow-up import-path
@@ -17,13 +17,11 @@ version/signature, output object, and row-count consistency; the rebuilt bot cac
 `/kvk targets` output were then tested successfully.
 
 Phase 1 keeps target publication state separate from the shared Pass 4 fighting lifecycle and is
-documented in `docs/kvk/target_publication_contract.md`. Its completed task pack and chat starter
-are archived under `docs/task_packs/archive/`. The active Phase 2 quality pack is deliberately
-split into approval-gated slices covering typed target rows, legacy-path consolidation,
-target-domain cache ownership/single-flight behavior, explicit fighting-lifecycle terminology,
-the lifecycle DAL extraction, and a final reliability/documentation closeout.
-These Phase 2 planning and Phase 1 closeout documents are intentionally carried into the first
-Phase 2 implementation PR.
+documented in `docs/kvk/target_publication_contract.md`. Phase 2 completed the deferred quality
+programme through six independently approved slices covering typed target rows, legacy-path
+consolidation, target-domain cache ownership/single-flight behavior, explicit fighting-lifecycle
+terminology, lifecycle DAL extraction, and final reliability/interaction cleanup. Both programmes'
+completed task packs and chat starters are archived under `docs/task_packs/archive/`.
 
 On 2026-08-27 the operator approved Phase 2A implementation together with a companion SQL PR that
 standardises only `dbo.EXEMPT_FROM_STATS.GovernorID` from `float NOT NULL` to `bigint NOT NULL`.
@@ -32,7 +30,8 @@ contract, and player rule. The operator also confirmed that production automatic
 the target cache from Draft to Official after Phase 1 deployment. That operator-attested live
 transition satisfied the Phase 2C evidence prerequisite.
 
-Phase 2B was subsequently merged, deployed, and operator accepted on 2026-08-27 after Discord
+Phase 2A shipped through mirror PR #237, production PR #544, and SQL PR #74. Phase 2B shipped
+through mirror PR #238 and production PR #545 and was operator accepted on 2026-08-27 after Discord
 smoke covered numeric and fuzzy-name lookup, account selection, public output, exemptions, and
 last-KVK comparison. Phase 2C was then merged through mirror PR #239 and production PR #546,
 deployed, smoke tested, and operator accepted with clear logs. It retains cache schema version 2
@@ -43,11 +42,14 @@ public adapters and exact operational log template. Phase 2E was then deployed a
 accepted through mirror PR #241 and production PR #548 on 2026-08-28. Lifecycle SQL execution and
 row mapping now live in `kvk/dal/kvk_lifecycle_dal.py`, while `kvk_state.py` retains every public
 façade, fighting resolver, reason code, warning, broad-window rule, and fallback decision.
-Phase 2F is the approved final runtime wrap-up: make `/kvk history` summary-rank retrieval tolerate
-SQL statement-count result sets, move the KVK targets selector into `ui/views/`, remove its
-proved-unused `_last_kvk_map` compatibility plumbing, and complete the programme
-documentation/archive closeout only after Phase 2F production smoke is accepted. No SQL or
-command-registration change is part of Phase 2F.
+Phase 2F shipped through mirror PR #242 and production PR #549 and was deployed and operator
+accepted on 2026-08-28. It makes `/kvk history` summary-rank retrieval tolerate SQL statement-count
+result sets, moves the KVK targets selector into `ui/views/`, and removes its proved-unused generic
+picker `_last_kvk_map` plumbing while preserving the live `/kvk stats` comparison state. Production
+smoke passed history, targets, stats, CrystalTech, and shared account-picker flows with clear logs
+and without the prior history rank result-set error. No SQL deployment, command resync, target rule,
+publication/cache contract, or fighting-lifecycle behavior changed. The final follow-up review found
+no new Phase 2 requirement or active target-subsystem deferred optimisation.
 
 ## CrystalTech Path Refresh Delivery
 

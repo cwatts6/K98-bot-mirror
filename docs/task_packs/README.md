@@ -18,22 +18,13 @@ import caller so `dbo.sp_TARGETS_MASTER` owns its transaction through a temporar
 boundary. Production object, source-scan, row-count, cache rebuild, and Discord smoke checks passed.
 The Phase 1 task pack and starter are archived under `archive/`.
 
-Active KVK Targets Phase 2 planning records:
-
-- `Codex Task Pack - KVK Targets Quality Phase 2.md`
-- `Codex Chat Starter - KVK Targets Quality Phase 2.md`
-
-Phase 2 is a deferred-optimisation programme split into approval-gated slices. It does not reopen
-the Phase 1 publication model, target formulas, shared fighting-state thresholds, command surface,
-permissions, visibility, or SQL deployment contract.
-
-Phases 2A through 2E are deployed and operator accepted. Phase 2A shipped through mirror PR #237,
-SQL PR #74, and production PR #544; Phase 2B completed the canonical target payload path; Phase 2C
-shipped through mirror PR #239 and production PR #546; Phase 2D through mirror PR #240 and
-production PR #547; and Phase 2E through mirror PR #241 and production PR #548. Phase 2F is the
-approved final runtime and documentation wrap-up. Its task pack and starter remain active until
-production smoke acceptance, after which a separate docs-only closeout will archive them and close
-the final active target-related deferred item.
+KVK Targets Quality Phase 2 is complete and archived. Its independently approved slices shipped
+through mirror PRs #237-#242, production PRs #544-#549, and the Phase 2A SQL PR #74. Final Phase 2F
+production smoke on 2026-08-28 passed `/kvk history`, `/kvk targets`, `/kvk stats`, CrystalTech,
+and shared account-picker paths with clear logs and without the prior history rank result-set error.
+The final follow-up review closed the last target-specific deferred item and found no new Phase 2
+requirement. The broader deprecated-command retirement programme remains separately active and is
+not unfinished target architecture.
 
 Do not continue the completed DL_bot programme as Phase 6M. Open a fresh task pack for the
 queue-domain redesign, optional SQL-backed queue persistence, SQL deployment workflow, or pinned

@@ -6,7 +6,16 @@ KVK Target Publication State Separation Phase 1 was deployed and operator accept
 through mirror PR #235, production PR #542, and SQL PR #73. The import-path transaction follow-up
 was deployed through mirror PR #236 and production PR #543. Production publication metadata,
 source-scan, row-count, cache rebuild, and Discord smoke checks passed. Its task pack and chat
-starter are archived here; further work starts from the active KVK Targets Quality Phase 2 pack.
+starter are archived here.
+
+KVK Targets Quality Phase 2 completed the deferred target-architecture programme through mirror
+PRs #237-#242, production PRs #544-#549, and Phase 2A SQL PR #74. The six independently gated
+slices delivered immutable typed target rows, one service-owned presentation-input path, a bounded
+crash-recoverable target cache repository, explicit fighting-lifecycle terminology, lifecycle DAL
+ownership, history rank result-set hardening, and final target interaction cleanup. Phase 2F
+production smoke on 2026-08-28 passed history, targets, stats, CrystalTech, and shared account-picker
+flows with clear logs. Its task pack and chat starter are archived here; the final follow-up review
+found no new Phase 2 requirement or active target-subsystem deferred optimisation.
 
 CrystalTech Path Refresh and Config Corrections completed operator smoke and acceptance on
 2026-08-25 in mirror PR #234 and production PR #541, pending manual merge. The archived bundle

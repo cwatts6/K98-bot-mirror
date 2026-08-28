@@ -1,14 +1,15 @@
 # Codex Task Pack - KVK Targets Quality Phase 2
 
-> Active deferred-optimisation programme for completing the bot-side KVK targets architecture
-> after the deployed target-publication separation.
+> Archived completed programme. Phases 2A-2F were independently approved, deployed, smoke tested,
+> and operator accepted by 2026-08-28.
 
 ## 1. Task Header
 
 - Task name: `KVK Targets Quality Phase 2`
 - Date: `2026-08-26`
+- Completion date: `2026-08-28`
 - Owner/context: `Chris Watts / KD98; approved Phase 1 deferred optimisations`
-- Task type: `deferred optimisation batch`
+- Task type: `completed deferred optimisation batch`
 - One-pass approved: `no`
 - Delivery shape: `approval-gated Phase 2A, 2B, 2C, 2D, 2E, and final Phase 2F slices`
 
@@ -65,7 +66,7 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
 - target formulas, values, exemptions, command behavior, permissions, visibility, selection, and
   fallback behavior remain unchanged.
 
-### 3.1 Operator Decisions Recorded On 2026-08-27
+### 3.1 Operator Decisions And Delivery Evidence Recorded Through 2026-08-28
 
 - Phase 2A architecture and implementation are approved.
 - Phase 2A includes a separate SQL-repository companion PR that changes only
@@ -111,15 +112,20 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
   separate `/kvk history` summary-rank result-set error; the history output itself retained its
   existing rankless fallback.
 - The operator approved Phase 2F architecture, its exact runtime manifest, and the post-smoke
-  documentation/archive closeout on 2026-08-28. The runtime PR must land first. Archiving and
-  deferred-register removal remain gated on Phase 2F production deployment and operator smoke
-  acceptance and will be delivered in a separate docs-only closeout PR.
+  documentation/archive closeout on 2026-08-28. The runtime slice shipped through mirror PR #242
+  and production PR #549 and was deployed from production `main` at merge commit `705becc8`.
 - The approved Phase 2F runtime implementation passed 245 focused/complete subsystem tests and
   the full suite at 2,972 passed with 2 skipped. Architecture, deferred-item, security-routing,
   import-smoke, command-registration, pre-commit, type, and production-log-noise gates passed.
-  Bot Changes review `b90355bd-2a51-41c6-8a73-dfa87d901d33` completed with Deep Off, complete
-  five-file source coverage, and zero reportable findings. The SQL repository tracked diff remains
-  empty and is a documented skip.
+  Final bot Changes review `50765b97-2025-4987-919c-514a4ea048b9` completed with Deep Off,
+  complete source coverage, and zero reportable findings. The SQL repository tracked diff remained
+  empty and was a documented skip.
+- The operator accepted Phase 2F production smoke on 2026-08-28. `/kvk history`, `/kvk targets`,
+  `/kvk stats`, CrystalTech, and shared account-picker flows all worked; logs were clear and did
+  not contain the prior `No results. Previous SQL was not a query` history-rank failure.
+- The approved separate docs-only closeout archived this pack/starter, closed the final
+  target-specific deferred item, and recorded the final follow-up review. No new Phase 2
+  requirement or active target-subsystem deferred optimisation remains.
 
 ## 4. Objective
 
@@ -134,8 +140,8 @@ rewrite the target formulas, or alter the player command surface.
 
 ## 5. Source Deferred Items
 
-These items have been promoted from `docs/reference/deferred_optimisations.md` into this active
-pack. Keep their disposition visible until their corresponding slice is deployed and accepted.
+These items were promoted from `docs/reference/deferred_optimisations.md` into this programme.
+Their completed disposition is retained here and summarized in the resolved register.
 
 ### Deferred Optimisation
 - Area: `target_utils.py`, `targets_embed.py`, `commands/kvk_targets_card_posting.py`, `kvk/services/kvk_targets_card_service.py`
@@ -360,8 +366,8 @@ Approved Phase 2E implementation manifest:
 
 ### Phase 2F - Final Reliability And Documentation Closeout
 
-Phase 2F is a final, separately approved bot-only runtime slice followed by a separately gated
-docs-only closeout. The runtime slice must:
+Phase 2F was the final, separately approved bot-only runtime slice followed by a separately gated
+docs-only closeout. The runtime slice delivered:
 
 - add `SET NOCOUNT ON` to the Python batch used by
   `fetch_history_summary_metric_ranks()` and advance through bounded non-row result sets before
@@ -393,7 +399,7 @@ Approved Phase 2F runtime implementation manifest:
   schema, target value, lifecycle value, reason, or threshold.
 
 After Phase 2F runtime promotion, deployment, and operator smoke acceptance, the approved separate
-docs-only closeout must:
+docs-only closeout:
 
 - move this task pack and chat starter to `docs/task_packs/archive/`;
 - remove the resolved `account_picker.py` / `kvk_ui.py` `_last_kvk_map` item from
@@ -404,6 +410,20 @@ docs-only closeout must:
   indexes with final PR, deployment, and smoke evidence;
 - perform one final targets-scope/deferred review and explicitly record whether any new Phase 2
   requirement or active target-related deferred optimisation remains.
+
+### Phase 2F Final Follow-Up Review
+
+- The final target-runtime marker search found no actionable unfinished-work annotation.
+- `target_utils.py` and `targets_sql_cache.py` retain only their approved compatibility façades;
+  removing those public compatibility boundaries is not required for this programme.
+- Remaining last-KVK maps belong to live `/kvk stats` comparison or the service-owned target
+  comparison calculation. The unused generic-picker/target-view plumbing is gone.
+- The active deferred register contains no target-subsystem item after closing the generic picker
+  cleanup. Its broader deprecated-command retirement item still mentions `/mykvktargets`, but is a
+  cross-command governance programme and not an unfinished Phase 2 target requirement.
+- No SQL, migration, runtime, configuration, command, test, or registration change was identified
+  for a further target phase. Phase 2 is complete; future target work requires a genuinely new
+  requirement and a fresh task pack.
 
 ## 8. Scope
 
@@ -450,15 +470,16 @@ docs-only closeout must:
 
 ## 10. Security Review Decision
 
-This task-pack preparation is a documented skip: only Markdown planning, delivery-status, archive,
-and deferred-register files change; no runtime, SQL, config, dependency, permission, input,
-network, filesystem, deployment, or persistence behavior changes.
+The Phase 2F docs-only closeout is a documented security-review skip: only Markdown delivery-status,
+archive, index, contract-description, and deferred-register files change. The inspected Git diff
+contains no runtime, SQL, config, dependency, permission, input, network, filesystem, deployment,
+or persistence behavior change. A standard or deep codebase audit was not requested or run.
 
-Provisional runtime-slice decisions:
+Completed runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D/2E/2F base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2F scan `b90355bd-2a51-41c6-8a73-dfa87d901d33` completed with complete coverage and zero findings |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D/2E/2F base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Final Phase 2F scan `50765b97-2025-4987-919c-514a4ea048b9` completed with complete coverage and zero findings |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes
@@ -858,16 +879,16 @@ Rollback is per slice:
 - [x] No new direct SQL exists in commands or views.
 - [x] SQL changes remain limited to the separately audited and approved Phase 2A
   `EXEMPT_FROM_STATS.GovernorID` companion migration.
-- [ ] Focused, full, cache/restart/concurrency, output, and manual smoke evidence is recorded.
+- [x] Focused, full, cache/restart/concurrency, output, and manual smoke evidence is recorded.
 - [x] Each runtime slice has a separate bot Changes review with Deep Off.
-- [ ] No standard or deep codebase audit is started without explicit operator request.
-- [ ] The four source deferred items are closed only after their slices are deployed and accepted;
+- [x] No standard or deep codebase audit is started without explicit operator request.
+- [x] The four source deferred items are closed only after their slices are deployed and accepted;
   the operator-promoted Phase 2E is closed only after its independent deployment and smoke.
-- [ ] Phase 2F removes the history rank result-set error and unused target selector compatibility
+- [x] Phase 2F removes the history rank result-set error and unused target selector compatibility
   state without changing the rankless failure fallback or `/kvk stats` comparison state.
-- [ ] Phase 2F production smoke is accepted and the separate docs-only archive/deferred closeout
+- [x] Phase 2F production smoke is accepted and the separate docs-only archive/deferred closeout
   records that no active target-related deferred optimisation or new Phase 2 requirement remains.
-- [ ] Any new non-security debt is captured structurally; security findings remain in the private
+- [x] Any new non-security debt is captured structurally; security findings remain in the private
   security workflow.
 
 ## 19. Required Delivery Output Per Slice
