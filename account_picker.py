@@ -3,7 +3,7 @@ account_picker.py
 
 Small utility module to provide the account-select option builder used across
 Commands and UI modules. This decouples the account picker helper from Commands.py
-so UI modules (kvk_ui, crystaltech UI, etc.) don't need to import Commands at runtime.
+so feature UI modules don't need to import Commands at runtime.
 
 Exports:
 - build_unique_gov_options(accounts_or_summary) -> list[discord.SelectOption]
@@ -174,7 +174,7 @@ async def _rebuild_options_from_registry(
 ) -> list[discord.SelectOption]:
     """
     Helper to rebuild options by loading the user's registry. Mirrors the
-    behaviour used in kvk_ui._rebuild_options. Returns empty list on error.
+    behaviour used by feature-specific account selectors. Returns empty list on error.
     """
     try:
         from services.governor_account_service import get_account_summary_for_user
@@ -199,7 +199,6 @@ class AccountPickerView(discord.ui.View):
       - show_register_btn: whether to show the "Register" button
       - ephemeral: whether interactions should be handled as ephemeral by default (passed to callbacks)
       - timeout: view timeout
-      - last_kvk_map: optional map attached for reference
       - lookup_callback, register_callback: optional callbacks invoked by corresponding buttons
     """
 
@@ -213,14 +212,12 @@ class AccountPickerView(discord.ui.View):
         show_register_btn: bool = True,
         ephemeral: bool = True,
         timeout: float = 300.0,
-        last_kvk_map: dict | None = None,
         lookup_callback: LookupCallback | None = None,
         register_callback: RegisterCallback | None = None,
     ):
         super().__init__(timeout=timeout)
         self.ctx = ctx
         self.ephemeral = ephemeral
-        self._last_kvk_map = last_kvk_map or {}
         self.heading = heading or "Select an account to view:"
         self._on_select_governor = on_select_governor
         self._lookup_cb = lookup_callback
@@ -380,7 +377,6 @@ class _RefreshSelectorButton(discord.ui.Button):
                 ),
                 show_register_btn=self._show_register_btn,
                 ephemeral=self._parent_view_ref.ephemeral,
-                last_kvk_map=getattr(self._parent_view_ref, "_last_kvk_map", {}),
                 lookup_callback=getattr(self._parent_view_ref, "_lookup_cb", None),
                 register_callback=getattr(self._parent_view_ref, "_register_cb", None),
             )

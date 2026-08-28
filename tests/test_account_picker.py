@@ -1,5 +1,9 @@
+import inspect
+from types import SimpleNamespace
+
 import pytest
 
+import account_picker
 from account_picker import AccountPickerView, build_unique_gov_options
 
 
@@ -120,3 +124,51 @@ async def test_account_picker_uses_generic_governor_placeholder():
     select = view.children[0]
 
     assert select.placeholder == "Select Governor"
+
+
+@pytest.mark.asyncio
+async def test_account_picker_does_not_expose_unused_last_kvk_state():
+    signature = inspect.signature(AccountPickerView)
+    view = AccountPickerView(
+        ctx=object(),
+        options=[],
+        on_select_governor=lambda *_args: None,
+        show_register_btn=False,
+    )
+
+    assert "last_kvk_map" not in signature.parameters
+    assert not hasattr(view, "_last_kvk_map")
+
+
+@pytest.mark.asyncio
+async def test_account_picker_refresh_preserves_interaction_contract(monkeypatch):
+    async def rebuilt(_ctx):
+        return build_unique_gov_options({"Main": {"GovernorID": "99", "GovernorName": "Refreshed"}})
+
+    monkeypatch.setattr(account_picker, "_rebuild_options_from_registry", rebuilt)
+
+    class _Response:
+        edited = None
+
+        async def edit_message(self, **kwargs):
+            self.edited = kwargs
+
+    response = _Response()
+    view = AccountPickerView(
+        ctx=object(),
+        options=[],
+        on_select_governor=lambda *_args: None,
+        heading="Choose an account",
+        show_register_btn=False,
+        ephemeral=False,
+    )
+    refresh = next(child for child in view.children if child.label == "Refresh")
+
+    await refresh.callback(SimpleNamespace(response=response))
+
+    refreshed = response.edited["view"]
+    assert response.edited["content"] == "Select Governor"
+    assert refreshed.heading == "Choose an account"
+    assert refreshed.ephemeral is False
+    assert not hasattr(refreshed, "_last_kvk_map")
+    assert refreshed.children[0].options[0].value == "99"

@@ -10,7 +10,7 @@
 - Owner/context: `Chris Watts / KD98; approved Phase 1 deferred optimisations`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
-- Delivery shape: `approval-gated Phase 2A, 2B, 2C, 2D, and 2E slices`
+- Delivery shape: `approval-gated Phase 2A, 2B, 2C, 2D, 2E, and final Phase 2F slices`
 
 ## 2. Required Reading
 
@@ -106,6 +106,20 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
 - Phase 2E architecture and its exact bot-only DAL extraction manifest were approved on 2026-08-27.
   The approved implementation retains all public helpers, state values, reasons, warnings, query
   semantics, broad-window behavior, and consumer contracts.
+- Phase 2E was deployed through mirror PR #241 and production PR #548, smoke tested, and operator
+  accepted on 2026-08-28. The smoke retained the exact fighting-lifecycle log and identified a
+  separate `/kvk history` summary-rank result-set error; the history output itself retained its
+  existing rankless fallback.
+- The operator approved Phase 2F architecture, its exact runtime manifest, and the post-smoke
+  documentation/archive closeout on 2026-08-28. The runtime PR must land first. Archiving and
+  deferred-register removal remain gated on Phase 2F production deployment and operator smoke
+  acceptance and will be delivered in a separate docs-only closeout PR.
+- The approved Phase 2F runtime implementation passed 245 focused/complete subsystem tests and
+  the full suite at 2,972 passed with 2 skipped. Architecture, deferred-item, security-routing,
+  import-smoke, command-registration, pre-commit, type, and production-log-noise gates passed.
+  Bot Changes review `b90355bd-2a51-41c6-8a73-dfa87d901d33` completed with Deep Off, complete
+  five-file source coverage, and zero reportable findings. The SQL repository tracked diff remains
+  empty and is a documented skip.
 
 ## 4. Objective
 
@@ -172,12 +186,17 @@ Scoring uses `Priority Score = (Impact + Frequency + Risk Reduction) - Effort`.
 | Target-domain cache repository and cross-process single-flight | 3 | 4 | 4 | 4 | 7 | Phase 2C implementation approved |
 | Explicit fighting-lifecycle terminology | 3 | 4 | 3 | 4 | 6 | Phase 2D, isolated due blast radius |
 | Extract lifecycle SQL reads behind a KVK DAL | 3 | 4 | 3 | 2 | 8 | Phase 2E after Phase 2D acceptance |
+| History result-set hardening and final interaction cleanup | 3 | 3 | 4 | 2 | 8 | Phase 2F final runtime wrap-up |
 
 The first three items form one coherent target-data ownership chain. The terminology item scores
 lower but remains in this programme because it directly reduces the risk of repeating the defect
 that caused Phase 1. It must remain a separate slice because it crosses stats alerts, daily
 overview, history, and leadership review. The SQL-read extraction is a separate final slice so the
 terminology adapters can be deployed and proved before data-access ownership moves.
+Phase 2F is deliberately last: it fixes the production-observed history result-set handling defect,
+removes the final proved-unused target interaction compatibility state, moves the remaining root
+target view into the target architecture, and then closes the programme only after production
+smoke.
 
 Excluded from this batch:
 
@@ -339,6 +358,53 @@ Approved Phase 2E implementation manifest:
 - create, modify, or delete no SQL file, migration, command, renderer, cache schema, configuration,
   fighting value, reason, threshold, or player target rule.
 
+### Phase 2F - Final Reliability And Documentation Closeout
+
+Phase 2F is a final, separately approved bot-only runtime slice followed by a separately gated
+docs-only closeout. The runtime slice must:
+
+- add `SET NOCOUNT ON` to the Python batch used by
+  `fetch_history_summary_metric_ranks()` and advance through bounded non-row result sets before
+  fetching the procedure rowset;
+- preserve the existing service-owned rankless history payload/card/embed fallback when the SQL
+  contract genuinely fails;
+- remove the unused `last_kvk_map` parameter and `_last_kvk_map` field only from
+  `AccountPickerView` and the KVK targets selector reconstruction path;
+- leave the separate `/kvk stats` `_last_kvk_map` comparison state unchanged;
+- move the root KVK targets selector from `kvk_ui.py` to
+  `ui/views/kvk_targets_views.py` without changing its controls, visibility, callbacks, refresh,
+  timeout, or response behavior;
+- change no SQL repository object, target rule, publication/cache contract, lifecycle rule,
+  renderer, command definition, permission, channel, registration, or command count.
+
+Approved Phase 2F runtime implementation manifest:
+
+- create `ui/views/kvk_targets_views.py`, `tests/test_kvk_history_dal.py`, and
+  `tests/test_kvk_targets_views.py`;
+- modify `account_picker.py`, `commands/kvk_cmds.py`, `kvk/dal/kvk_history_dal.py`,
+  `tests/test_account_picker.py`, `tests/test_kvk_cmds.py`, `tests/test_kvk_history_service.py`,
+  `README-DEV.md`, `docs/kvk/target_publication_contract.md`, this task pack, its chat starter, and
+  `docs/task_packs/README.md`;
+- delete `kvk_ui.py` after its implementation moves to `ui/views/kvk_targets_views.py`;
+- review only the history procedure contract, service fallback, target command/view handoff,
+  account-picker callers, `/kvk stats` last-KVK state, registration, publication/cache/lifecycle,
+  deferred register, and relevant tests;
+- create, modify, or delete no SQL file, migration, config, command registration, renderer, cache
+  schema, target value, lifecycle value, reason, or threshold.
+
+After Phase 2F runtime promotion, deployment, and operator smoke acceptance, the approved separate
+docs-only closeout must:
+
+- move this task pack and chat starter to `docs/task_packs/archive/`;
+- remove the resolved `account_picker.py` / `kvk_ui.py` `_last_kvk_map` item from
+  `docs/reference/deferred_optimisations.md`;
+- add the completed programme record to
+  `docs/reference/archive/deferred_optimisations_resolved.md`;
+- update `README-DEV.md`, `docs/kvk/target_publication_contract.md`, and active/archive task-pack
+  indexes with final PR, deployment, and smoke evidence;
+- perform one final targets-scope/deferred review and explicitly record whether any new Phase 2
+  requirement or active target-related deferred optimisation remains.
+
 ## 8. Scope
 
 ### In Scope
@@ -350,6 +416,7 @@ Approved Phase 2E implementation manifest:
 - target-specific concurrency and restart safety;
 - compatibility-preserving fighting-lifecycle terminology;
 - a separately gated KVK lifecycle DAL extraction after Phase 2D acceptance;
+- production-observed KVK history result-set hardening and final target-view compatibility cleanup;
 - focused and broad regression coverage;
 - documentation, deferred-register closeout, deployment, smoke, and rollback evidence.
 
@@ -391,7 +458,7 @@ Provisional runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D/2E base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B and Phase 2C completed separately with zero reportable findings |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D/2E/2F base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2F scan `b90355bd-2a51-41c6-8a73-dfa87d901d33` completed with complete coverage and zero findings |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes
@@ -419,8 +486,8 @@ Security focus for runtime diffs:
 5. Run separate bot and SQL Changes reviews with Deep Off, complete `k98-pr-review` for both Git
    targets, prepare the companion PRs, and stop for merge/promotion approval.
 6. Complete promotion, deployment, and operator smoke before starting Phase 2B.
-7. Repeat the approval/review/promotion cycle independently for Phase 2B, Phase 2C, Phase 2D, and
-   Phase 2E.
+7. Repeat the approval/review/promotion cycle independently for Phase 2B, Phase 2C, Phase 2D,
+   Phase 2E, and Phase 2F.
 8. Treat the Phase 2C production-transition evidence gate as satisfied by the operator-attested
    successful live Draft-to-Official transition; do not start implementation without separate
    Phase 2C approval.
@@ -429,6 +496,8 @@ Security focus for runtime diffs:
     its own architecture and exact-manifest approval.
 11. Close the programme only after all accepted slices are deployed, smoke tested, documented, and
     removed from the active deferred backlog.
+12. Land Phase 2F runtime separately; only after its production smoke is accepted, deliver the
+    approved docs-only archive/deferred closeout and final follow-up review.
 
 No one-pass implementation is approved. Approval of this pack does not approve all slice diffs in
 advance.
@@ -450,7 +519,7 @@ Return:
 11. Proposed Target Cache Repository API And Explicit Refresh Outcomes
 12. Cross-Process Single-Flight, Lock Expiry, Crash Recovery, And Failure Matrix
 13. Proposed Fighting-Lifecycle Naming And Compatibility Plan
-14. Exact Phase 2A/2B/2C/2D/2E Review, Modify, Create, And Delete Manifests
+14. Exact Phase 2A/2B/2C/2D/2E/2F Review, Modify, Create, And Delete Manifests
 15. Candidate Scores, Dependencies, Exclusions, And Recommended Slice Order
 16. Focused, Broader, Manual, Concurrency, Restart, And Output-Parity Test Selection
 17. Provisional Bot And SQL Security Decisions And Exact Targets
@@ -570,6 +639,32 @@ implementation.
 - create, modify, or delete no SQL file, migration, command, renderer, cache schema, config, or
   state value.
 
+### Approved Phase 2F Runtime Modify/Create/Delete
+
+- create `ui/views/kvk_targets_views.py`;
+- create `tests/test_kvk_history_dal.py`;
+- create `tests/test_kvk_targets_views.py`;
+- modify `account_picker.py`;
+- modify `commands/kvk_cmds.py`;
+- modify `kvk/dal/kvk_history_dal.py`;
+- modify `tests/test_account_picker.py`, `tests/test_kvk_cmds.py`, and
+  `tests/test_kvk_history_service.py`;
+- modify `README-DEV.md`, `docs/kvk/target_publication_contract.md`, this task pack, its chat
+  starter, and `docs/task_packs/README.md`;
+- delete `kvk_ui.py`;
+- no SQL, migration, command-registration, configuration, renderer, cache-schema, target-rule, or
+  lifecycle-contract change.
+
+### Approved Phase 2F Post-Smoke Docs-Only Closeout
+
+- move this task pack and starter to `docs/task_packs/archive/`;
+- modify `docs/reference/deferred_optimisations.md` and
+  `docs/reference/archive/deferred_optimisations_resolved.md`;
+- modify `README-DEV.md`, `docs/kvk/target_publication_contract.md`, and active/archive task-pack
+  indexes with final evidence;
+- no runtime, SQL, migration, configuration, command, test, or registration change;
+- use the promotion tooling's explicit archive-change allowance when promoting that later PR.
+
 ### Phase 2A SQL Companion Modify/Create
 
 - create
@@ -593,7 +688,7 @@ implementation.
 - `migrations/20260825_001_kvk_target_publication_provenance.sql`
 
 After the approved Phase 2A companion, the expected SQL modify/create/delete manifest for Phase
-2B, 2C, 2D, and 2E remains `none`. Any additional proposed SQL change requires a fresh exact
+2B, 2C, 2D, 2E, and 2F remains `none`. Any additional proposed SQL change requires a fresh exact
 manifest, migration/rollback plan, separate approval, separate PR, and SQL Changes review.
 
 ## 15. Invariants And Failure Rules
@@ -668,6 +763,19 @@ Reuse the complete Phase 2D focus and add the exact DAL test file approved by th
 Cover exact query ownership, named/positional row mapping, malformed and absent KVK details,
 ProcConfig fallback, maximum-scan failure, connection failure, and unchanged adapter outputs.
 
+### Phase 2F Focus
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_history_dal.py tests\test_kvk_history_service.py tests\test_account_picker.py tests\test_kvk_targets_views.py tests\test_kvk_cmds.py
+```
+
+Cover an initial non-row result followed by the expected history-rank rowset, omitted rowset,
+empty finalized-KVK input, unchanged rankless service fallback, account-picker reconstruction,
+targets selector controls/refresh, the new `ui/views` import boundary, and absence of the unused
+target selector `_last_kvk_map`. Reuse the complete targets/publication/cache/lifecycle suite and
+the full repository gates because the slice closes the programme. No visual regeneration is
+required because no renderer, payload copy, font, image, or layout changes.
+
 ### Per-PR Gates
 
 ```powershell
@@ -689,9 +797,8 @@ record why visual regeneration is unnecessary.
 
 ## 17. Deployment, Smoke, And Rollback
 
-Phase 2B, 2C, 2D, and 2E are expected to be bot-only and may deploy against the already verified Phase
-1 SQL contract. Phase 2A also has the approved `EXEMPT_FROM_STATS.GovernorID` SQL companion. For
-every slice:
+Phase 2B, 2C, 2D, 2E, and 2F are bot-only and deploy against their already verified SQL contracts.
+Phase 2A also had the approved `EXEMPT_FROM_STATS.GovernorID` SQL companion. For every slice:
 
 1. revalidate the exact deployed SQL contract used by the bot;
 2. complete focused and broad bot validation;
@@ -704,6 +811,11 @@ every slice:
    state/source wording, target values, and a negative path;
 9. confirm imports can still run `dbo.sp_TARGETS_MASTER` with restored autocommit behavior;
 10. retain enough logs to prove cache decision and publication identity without player payloads.
+
+For Phase 2F also smoke `/kvk history` Summary for a governor with completed history and confirm
+the prior `No results. Previous SQL was not a query` log is absent, then repeat numeric targets,
+account selection, refresh, timeout/reopen, and one fallback/negative path. No SQL deployment or
+command resync is required.
 
 For Phase 2A, deploy and verify the approved SQL migration first, then deploy the bot. The bot is
 compatible with both the old float and new bigint column, but SQL-first keeps the intended
@@ -721,36 +833,40 @@ Rollback is per slice:
 
 ## 18. Acceptance Criteria
 
-- [ ] Every target row crosses the primary DAL/service boundary as one immutable typed model.
-- [ ] Legacy row aliases exist only in one named compatibility adapter.
-- [ ] Cache serialization/deserialization is explicit, deterministic, and regression tested.
-- [ ] Target formulas and values are unchanged byte-for-byte or value-for-value as appropriate.
-- [ ] Numeric and name lookup use the same service-owned retrieval and presentation-input path.
-- [ ] Exemption, last-KVK, no-target, and progress ownership is unambiguous.
-- [ ] Modern card and fallback embed use the same payload and canonical publication display copy.
-- [ ] `target_utils.py` and `targets_sql_cache.py` are thin compatibility façades or their retained
+- [x] Every target row crosses the primary DAL/service boundary as one immutable typed model.
+- [x] Legacy row aliases exist only in one named compatibility adapter.
+- [x] Cache serialization/deserialization is explicit, deterministic, and regression tested.
+- [x] Target formulas and values are unchanged byte-for-byte or value-for-value as appropriate.
+- [x] Numeric and name lookup use the same service-owned retrieval and presentation-input path.
+- [x] Exemption, last-KVK, no-target, and progress ownership is unambiguous.
+- [x] Modern card and fallback embed use the same payload and canonical publication display copy.
+- [x] `target_utils.py` and `targets_sql_cache.py` are thin compatibility façades or their retained
   responsibilities are explicitly justified.
-- [ ] Cache refresh exposes typed outcomes and one validated snapshot API.
-- [ ] Cross-process fetch coordination is bounded, crash recoverable, and deterministic.
-- [ ] Publication identity, atomic replacement, no downgrade, cross-KVK rejection,
+- [x] Cache refresh exposes typed outcomes and one validated snapshot API.
+- [x] Cross-process fetch coordination is bounded, crash recoverable, and deterministic.
+- [x] Publication identity, atomic replacement, no downgrade, cross-KVK rejection,
   last-known-good, and fail-closed behavior are preserved.
 - [x] Phase 2C evidence prerequisite is satisfied by the operator-attested successful production
   Draft-to-Official transition observed after Phase 1 deployment.
-- [ ] Shared state terminology communicates fighting-lifecycle meaning without changing values or
+- [x] Shared state terminology communicates fighting-lifecycle meaning without changing values or
   thresholds.
-- [ ] Stats alerts, daily overview, history, and leadership review retain their Phase 1 behavior.
-- [ ] Phase 2E moves lifecycle SQL reads behind a narrow DAL without changing queries, fallback,
+- [x] Stats alerts, daily overview, history, and leadership review retain their Phase 1 behavior.
+- [x] Phase 2E moves lifecycle SQL reads behind a narrow DAL without changing queries, fallback,
   mappings, values, reasons, thresholds, or public helpers.
-- [ ] `/kvk targets` arguments, decorators, permissions, channel, visibility, account selection,
+- [x] `/kvk targets` arguments, decorators, permissions, channel, visibility, account selection,
   command counts, and registration are unchanged.
-- [ ] No new direct SQL exists in commands or views.
-- [ ] SQL changes remain limited to the separately audited and approved Phase 2A
+- [x] No new direct SQL exists in commands or views.
+- [x] SQL changes remain limited to the separately audited and approved Phase 2A
   `EXEMPT_FROM_STATS.GovernorID` companion migration.
 - [ ] Focused, full, cache/restart/concurrency, output, and manual smoke evidence is recorded.
-- [ ] Each runtime slice has a separate bot Changes review with Deep Off.
+- [x] Each runtime slice has a separate bot Changes review with Deep Off.
 - [ ] No standard or deep codebase audit is started without explicit operator request.
 - [ ] The four source deferred items are closed only after their slices are deployed and accepted;
   the operator-promoted Phase 2E is closed only after its independent deployment and smoke.
+- [ ] Phase 2F removes the history rank result-set error and unused target selector compatibility
+  state without changing the rankless failure fallback or `/kvk stats` comparison state.
+- [ ] Phase 2F production smoke is accepted and the separate docs-only archive/deferred closeout
+  records that no active target-related deferred optimisation or new Phase 2 requirement remains.
 - [ ] Any new non-security debt is captured structurally; security findings remain in the private
   security workflow.
 

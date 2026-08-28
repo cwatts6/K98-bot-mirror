@@ -1,4 +1,5 @@
-# kvk_ui.py
+"""Discord interaction views for the personal KVK targets journey."""
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
@@ -8,7 +9,6 @@ import discord
 
 logger = logging.getLogger(__name__)
 
-# Type of the callback invoked when a governor is selected.
 OnSelectGovernor = Callable[[discord.Interaction, str, bool], Awaitable[None]]
 LookupCallback = Callable[[discord.Interaction], Awaitable[None]]
 RegisterCallback = Callable[[discord.Interaction], Awaitable[None]]
@@ -21,28 +21,17 @@ def make_kvk_targets_view(
     *,
     show_register_btn: bool = True,
     ephemeral: bool = True,
-    last_kvk_map: dict[str, dict] | None = None,
     timeout: float = 300.0,
     lookup_callback: LookupCallback | None = None,
     register_callback: RegisterCallback | None = None,
 ) -> discord.ui.View:
-    """
-    Factory: returns a View wired to call on_select_governor(interaction, gid, ephemeral)
-    when the user picks an account.
-
-    Optional:
-      - lookup_callback(interaction) will be invoked when "Look up Governor ID" is clicked
-      - register_callback(interaction) will be invoked when "Register New Account" clicked
-
-    The returned view has attribute `_last_kvk_map` (may be None).
-    """
+    """Build the account-selection view used by ``/kvk targets``."""
 
     class _KVKTargetsView(discord.ui.View):
         def __init__(self):
             super().__init__(timeout=timeout)
             self.ctx = ctx
             self.ephemeral = ephemeral
-            self._last_kvk_map = last_kvk_map or {}
             if options:
                 self.add_item(_KVKTargetsSelect(options, self))
             self.add_item(_LookupGovIDButton())
@@ -60,7 +49,6 @@ def make_kvk_targets_view(
                     on_select_governor=on_select_governor,
                     show_register_btn=show_register_btn,
                     ephemeral=self.ephemeral,
-                    last_kvk_map=getattr(self, "_last_kvk_map", {}),
                     lookup_callback=lookup_callback,
                     register_callback=register_callback,
                 )
@@ -113,7 +101,6 @@ def make_kvk_targets_view(
                 if lookup_callback:
                     await lookup_callback(interaction)
                 else:
-                    # fallback: inform user this action is not available here
                     await interaction.followup.send("Lookup not available.", ephemeral=True)
             except Exception:
                 logger.exception("[KVK_UI] lookup_callback failed")
@@ -158,7 +145,6 @@ def make_kvk_targets_view(
                     on_select_governor=on_select_governor,
                     show_register_btn=show_register_btn,
                     ephemeral=ephemeral,
-                    last_kvk_map=getattr(self.view, "_last_kvk_map", {}),
                     lookup_callback=lookup_callback,
                     register_callback=register_callback,
                 )

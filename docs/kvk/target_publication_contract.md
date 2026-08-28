@@ -92,9 +92,14 @@ Phase 2 does not reopen the publication model or target formulas. It incremental
 bot-side target architecture by introducing typed target rows, making the typed service the single
 retrieval/presentation-input path, extracting target-specific cache repository ownership with
 proved refresh outcomes and cross-process coordination, and making the shared Pass 4 state
-terminology explicit without changing its thresholds. Phases 2A through 2D are deployed and
-operator accepted. Phase 2E moves the existing lifecycle SQL execution and row mapping into the
+terminology explicit without changing its thresholds. Phases 2A through 2E are deployed and
+operator accepted. Phase 2E moved the existing lifecycle SQL execution and row mapping into the
 narrow `kvk/dal/kvk_lifecycle_dal.py` boundary while retaining the `kvk_state.py` public façade,
 pure fighting resolver, query semantics, thresholds, result shapes, logging, and fallback behavior.
+Phase 2F is the approved final wrap-up. It hardens the separate `/kvk history` summary-rank DAL
+against non-row SQL batch results and completes target interaction-layer cleanup without changing
+this publication contract, cache schema, target values, visibility, or command registration. The
+programme documents remain active until Phase 2F production smoke is accepted and the separately
+gated archive closeout is delivered.
 See
 `docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`.

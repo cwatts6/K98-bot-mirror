@@ -10,6 +10,17 @@ from file_utils import fetch_one_dict, get_conn_with_retries
 logger = logging.getLogger(__name__)
 
 
+def _fetch_next_rowset(cursor: Any) -> list[dict[str, Any]]:
+    """Return the first row-bearing result set from a SQL batch."""
+    for _result_set in range(8):
+        if cursor.description is not None:
+            columns = [str(column[0]) for column in cursor.description]
+            return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+        if not cursor.nextset():
+            break
+    raise ValueError("KVK history rank SQL contract omitted a result set")
+
+
 def resolve_current_kvk_no_from_cursor(cursor: Any, kvk_no: int | None = None) -> int:
     """Resolve an explicit/current KVK number using the provided DB cursor."""
     if kvk_no and kvk_no > 0:
@@ -197,6 +208,7 @@ def fetch_history_summary_metric_ranks(
         return []
     padded: list[int | None] = [*normalized, *([None] * (20 - len(normalized)))]
     sql = """
+        SET NOCOUNT ON;
         DECLARE @FinalizedKvkNos dbo.IntList;
         INSERT INTO @FinalizedKvkNos (ID)
         SELECT DISTINCT ID
@@ -210,6 +222,4 @@ def fetch_history_summary_metric_ranks(
     with get_conn_with_retries() as cn:
         cur = cn.cursor()
         cur.execute(sql, [*padded, governor_id])
-        rows = cur.fetchall()
-        cols = [c[0] for c in cur.description]
-    return [dict(zip(cols, row, strict=False)) for row in rows]
+        return _fetch_next_rowset(cur)

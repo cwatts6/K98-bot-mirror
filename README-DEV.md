@@ -21,7 +21,7 @@ documented in `docs/kvk/target_publication_contract.md`. Its completed task pack
 are archived under `docs/task_packs/archive/`. The active Phase 2 quality pack is deliberately
 split into approval-gated slices covering typed target rows, legacy-path consolidation,
 target-domain cache ownership/single-flight behavior, explicit fighting-lifecycle terminology,
-and a final lifecycle DAL extraction.
+the lifecycle DAL extraction, and a final reliability/documentation closeout.
 These Phase 2 planning and Phase 1 closeout documents are intentionally carried into the first
 Phase 2 implementation PR.
 
@@ -39,10 +39,15 @@ deployed, smoke tested, and operator accepted with clear logs. It retains cache 
 and adds only a target-specific durable single-flight coordination sidecar. Phase 2D was merged
 through mirror PR #240 and production PR #547, deployed, smoke tested, and operator accepted on
 2026-08-27. It makes the fighting-lifecycle terminology explicit while retaining the original
-public adapters and exact operational log template. The operator then approved Phase 2E's exact
-bot-only architecture and manifest: lifecycle SQL execution and row mapping move into
-`kvk/dal/kvk_lifecycle_dal.py`, while `kvk_state.py` retains every public façade, fighting resolver,
-reason code, warning, broad-window rule, and fallback decision.
+public adapters and exact operational log template. Phase 2E was then deployed and operator
+accepted through mirror PR #241 and production PR #548 on 2026-08-28. Lifecycle SQL execution and
+row mapping now live in `kvk/dal/kvk_lifecycle_dal.py`, while `kvk_state.py` retains every public
+façade, fighting resolver, reason code, warning, broad-window rule, and fallback decision.
+Phase 2F is the approved final runtime wrap-up: make `/kvk history` summary-rank retrieval tolerate
+SQL statement-count result sets, move the KVK targets selector into `ui/views/`, remove its
+proved-unused `_last_kvk_map` compatibility plumbing, and complete the programme
+documentation/archive closeout only after Phase 2F production smoke is accepted. No SQL or
+command-registration change is part of Phase 2F.
 
 ## CrystalTech Path Refresh Delivery
 
@@ -520,7 +525,7 @@ pytest -q tests/test_honor_rankings_view.py
 
 pytest -q tests/test_crystaltech_service.py
 pytest -q tests/test_account_picker.py
-pytest -q tests/test_kvk_ui_rebuild_options.py
+pytest -q tests/test_kvk_targets_views.py
 
 pytest -q tests/test_registry_io.py
 pytest -q tests/test_registry_io_xlsx.py

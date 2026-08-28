@@ -2,78 +2,53 @@
 
 ## Copy/Paste Starter
 
-Codex, take on the task defined in:
+Codex, continue the final Phase 2F wrap-up defined in:
 
 `docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`
 
-Phase 1 of KVK Target Publication State Separation is deployed, production-verified, cache rebuilt,
-and working successfully. Preserve that deployed contract. Phase 2 is the approved
-deferred-optimisation programme to make the targets subsystem as strong as practical without
-changing player target rules or the command surface.
+Phases 2A through 2E are deployed, smoke tested, and operator accepted. Preserve their complete
+contract: immutable target rows, the single service-owned target payload, cache schema version 2,
+bounded crash-recoverable target single-flight coordination, explicit fighting-lifecycle names,
+and lifecycle SQL ownership under `kvk/dal/kvk_lifecycle_dal.py`.
 
-The programme has four approval-gated slices:
+Phase 2F is the separately approved final runtime and documentation closeout. Its runtime PR must:
 
-1. Phase 2A: immutable typed target rows and explicit cache serialization/compatibility.
-2. Phase 2B: one service-owned retrieval and presentation-input path for numeric lookup, name
-   lookup, modern card, and fallback embed.
-3. Phase 2C: a target-domain cache repository with explicit outcomes and bounded, crash-recoverable
-   cross-process single-flight coordination.
-4. Phase 2D: compatibility-preserving shared fighting-lifecycle terminology with no state-value or
-   threshold changes.
+1. Fix `/kvk history` summary-rank retrieval so the Python batch uses `SET NOCOUNT ON` and advances
+   through bounded non-row result sets before `fetchall()`, while preserving the current rankless
+   card/embed fallback on a genuine SQL failure.
+2. Remove the proved-unused `last_kvk_map` compatibility parameter and `_last_kvk_map` field only
+   from `AccountPickerView` and the KVK targets selector path. Do not change the separate,
+   live `/kvk stats` last-KVK comparison state.
+3. Move the root `kvk_ui.py` KVK targets selector implementation to
+   `ui/views/kvk_targets_views.py`, update the command import, and preserve account selection,
+   direct lookup, registration, refresh, timeout, visibility, and error behavior.
+4. Add focused DAL, service-fallback, account-picker, targets-view, and command-boundary tests.
+5. Update active delivery documentation to record Phases 2A-2E as accepted and Phase 2F as pending
+   production review/smoke.
 
 Non-negotiable constraints:
 
-- Do not change target formulas, values, thresholds, populations, exemptions, or the fixed Official
-  matchmaking snapshot.
-- Do not change `DRAFT / ACTIVE / ENDED` fighting-state semantics, the Pass 4 boundary, broad KVK
-  window, stats-alert timing, daily overview timing, history finalisation, or leadership-review
-  finalisation.
-- Do not change the `DRAFT / OFFICIAL / HISTORIC / UNKNOWN` publication rules or fail-closed
-  Unverified behavior.
-- Preserve publication version/signature identity, atomic writes, no downgrade, cross-KVK
-  rejection, empty/mismatched refresh protection, and matching last-known-good behavior.
-- Preserve `/kvk targets` arguments, decorators, permissions, channel, visibility, account
-  selection, direct-ID/name behavior, image fallback, command count, and registration.
-- Phase 2A includes the separately approved SQL companion that changes only
-  `dbo.EXEMPT_FROM_STATS.GovernorID` from `float NOT NULL` to `bigint NOT NULL`. Keep it in a
-  separate SQL Git target and PR with a guarded migration, matching snapshot, rollback, validation,
-  and `Changes + Deep Off` review. Any additional SQL change requires fresh approval.
-- Do not build a universal cache framework or perform unrelated KVK cleanup.
-- The operator confirmed that production automatically transitioned targets from Draft to
-  Official successfully after Phase 1 deployment. Treat the Phase 2C evidence prerequisite as
-  satisfied, but do not start Phase 2C implementation without its separate approval.
-- Do not start Phase 2D implementation without separate cross-feature architecture approval.
-- Include the already-local Phase 1 deployment documentation and Phase 2 planning documents in the
-  first Phase 2 implementation PR.
+- Do not change target formulas, values, thresholds, populations, exemptions, publication states,
+  fixed Official identity, cache schema, or cache safety behavior.
+- Do not change `DRAFT / ACTIVE / ENDED` values, Pass 4/end thresholds, broad-window semantics, or
+  any stats-alert, daily-overview, history-finalisation, or leadership-finalisation timing.
+- Preserve `/kvk targets` arguments, decorators, permissions, channel, visibility, command count,
+  registration, numeric/name behavior, account selection, modern image, and fallback embed.
+- Make no SQL repository change. Validate the existing
+  `dbo.usp_GetKvkHistorySummaryMetricRanks` contract and record a SQL documented skip.
+- Run the bot `Changes review` with `Deep Off`; do not start a standard or deep codebase audit.
+- Do not archive this starter/task pack or remove the deferred item in the runtime PR.
 
-This is **not** one-pass approved.
+After the runtime PR is promoted, deployed, and its Discord smoke is operator accepted, prepare a
+separate docs-only closeout PR that:
 
-Before implementation:
+- archives this task pack and starter under `docs/task_packs/archive/`;
+- removes the resolved account-picker/targets `_last_kvk_map` item from the active deferred register;
+- records Phase 2 completion in `docs/reference/archive/deferred_optimisations_resolved.md`;
+- updates the developer quickstart, publication contract, and active/archive task-pack indexes with
+  the final mirror PR, production PR, deployment, and smoke evidence;
+- completes a follow-up target-scope review and states whether any new Phase 2 requirement or active
+  target deferred optimisation remains.
 
-1. Read the active bot and SQL repository instructions and every Required Reading item in the pack.
-2. Use `k98-architecture-scope`, `k98-discord-command-feature`, `k98-sql-validation`,
-   `k98-test-selection`, and `k98-deferred-optimisation-capture` as directed.
-3. Use `k98-security-review-routing` to record separate bot and approved Phase 2A SQL
-   `Changes review` decisions with `Changes + Deep Off`. Record a SQL documented skip for later
-   slices while SQL remains review-only. Do not start a standard or deep codebase audit.
-4. Audit both repositories and return the exact Step 1 output from the task pack.
-5. Recommend the first PR-sized Phase 2A plan and its dependencies, but do not implement it.
-6. Stop for approval. Do not edit code, SQL, migrations, tests, or docs in the first response.
-
-The audit must prove:
-
-- the exact SQL target row shape and every current dictionary alias;
-- the typed target-row, serialization, and compatibility boundary;
-- how numeric and name lookup reach one service without changing Discord behavior;
-- which duplicate retrieval, last-KVK, exemption, response, and fallback responsibilities can be
-  removed safely;
-- the current cache callers/processes and a bounded cross-process single-flight design;
-- cache lock expiry/crash recovery without publication downgrade;
-- whether the Phase 2C production-transition evidence prerequisite is satisfied;
-- the full shared fighting-state consumer map and a compatibility rename with unchanged semantics;
-- exact per-slice file manifests, test selection, security targets, deployment, smoke, and rollback;
-- why SQL remains limited to the approved Phase 2A GovernorID datatype companion and why command
-  registration remains unchanged.
-
-Stop after the audit, approval questions, recommended Phase 2A PR-sized plan, and explicit stop
-point. Approval of Phase 2A will not approve Phase 2B, 2C, or 2D automatically.
+Stop after the reviewed runtime PR is opened. Do not perform the archive closeout before production
+smoke acceptance.

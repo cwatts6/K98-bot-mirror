@@ -26,7 +26,6 @@ from kvk.rendering.kvk_rankings_embed import (
     build_hall_of_fame_embed,
 )
 from kvk.services import kvk_rankings_service
-from kvk_ui import make_kvk_targets_view
 from registry.account_slots import ACCOUNT_ORDER
 from services import governor_account_service, kvk_history_service, kvk_personal_service
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
@@ -34,6 +33,7 @@ from ui.views.kvk_rankings_views import (
     CurrentRankingsBrowserView,
     HallOfFameRecordsView,
 )
+from ui.views.kvk_targets_views import make_kvk_targets_view
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
 from utils import normalize_governor_id
 from versioning import versioned

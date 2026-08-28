@@ -205,6 +205,38 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.trends["tanking_score"].value_count == 2
 
 
+def test_history_payload_retains_rankless_fallback_when_rank_fetch_fails(monkeypatch, caplog):
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [15])
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids, finalized: [
+            {
+                "Gov_ID": 2441482,
+                "Governor_Name": "Tester",
+                "KVK_NO": 15,
+                "T4T5_Kills": 123456,
+            }
+        ],
+    )
+
+    def fail_rank_fetch(_gid, _finalized):
+        raise RuntimeError("rank result unavailable")
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_history_summary_metric_ranks",
+        fail_rank_fetch,
+    )
+
+    with caplog.at_level("ERROR"):
+        payload = kvk_history_service.build_kvk_history_payload(2441482)
+
+    assert payload.history_summary["Most Kills"] == 123456
+    assert payload.history_summary_metrics["Most Kills"].overall_rank is None
+    assert "kvk_history_summary_rank_fetch_failed governor_id=2441482" in caplog.text
+
+
 def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypatch):
     rows = [
         {

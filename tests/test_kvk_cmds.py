@@ -94,6 +94,15 @@ def test_kvk_targets_command_delegates_target_enrichment_and_fallback():
     assert "run_target_lookup" not in source
 
 
+def test_kvk_targets_view_uses_target_ui_boundary():
+    import commands.kvk_cmds as kvk_cmds
+
+    source = inspect.getsource(kvk_cmds)
+
+    assert "from ui.views.kvk_targets_views import make_kvk_targets_view" in source
+    assert "from kvk_ui import" not in source
+
+
 @pytest.mark.asyncio
 async def test_kvk_rankings_routes_all_modes(monkeypatch):
     kvk_cmds, group, _bot = _register_kvk(monkeypatch)
