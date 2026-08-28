@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from hashlib import sha256
 from io import BytesIO
 
 from PIL import Image, ImageDraw
@@ -156,6 +157,10 @@ def test_king_of_all_britain_asset_contract():
 
     assert path is not None
     assert path.exists()
+    assert (
+        sha256(path.read_bytes()).hexdigest()
+        == "987be4495471936db491d25d00bb3eb9c23e259a86ed02d3e46b361fa3b6d605"
+    )
     with Image.open(path) as image:
         assert image.size == (1180, 640)
         assert image.mode == "RGB"

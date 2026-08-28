@@ -65,7 +65,7 @@ def test_targets_renderer_returns_png_bytes_for_empty_state():
     ),
 )
 def test_targets_background_selection_normalizes_king_of_all_britain_variants(kvk_name):
-    assert renderer._background_for_mode(kvk_name).name == ("King_of_All_Britain_Stats_Card.png")
+    assert renderer._background_for_mode(kvk_name).name == "King_of_All_Britain_Stats_Card.png"
 
 
 def test_targets_background_selection_preserves_unknown_mode_fallback():
