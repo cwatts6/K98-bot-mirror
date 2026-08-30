@@ -1,7 +1,8 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit
 
-Use this starter after Task C Slice 12 is merged, deployed, restarted, and at least a few
-fallback imports have produced `update_all2_*` phase rows.
+> **Execution gate — 2026-08-30:** Do not execute the July workflow as written. Begin with a
+> post-August SQL-object and Production-evidence refresh. The July batch `67` sample is historical,
+> and `dbo.IMPORT_STAGING_PROC_CORE` now owns the remaining staging decomposition boundary.
 
 ```markdown
 # Files mentioned by the user:
@@ -9,7 +10,19 @@ fallback imports have produced `update_all2_*` phase rows.
 ## Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md: C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md
 
 ## My request for Codex:
-Begin Task C Slice 13 - Import Pipeline Deferred Optimisation: UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.
+Begin with the mandatory post-August refresh gate for Task C Slice 13 - Import Pipeline Deferred
+Optimisation: UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.
+
+Do not run the July evidence workflow or recommend implementation until you verify this current map
+against C:\K98-bot-SQL-Server and refresh the Production sample:
+
+- dbo.IMPORT_STAGING_PROC is the public claim wrapper and delegates to dbo.IMPORT_STAGING_PROC_CORE.
+- Python invokes dbo.UPDATE_ALL2 separately through update_all2_log_manager.py.
+- dbo.UPDATE_ALL2 emits update_all2_* phase rows and calls dbo.SUMMARY_PROC downstream.
+- dbo.SUMMARY_PROC calls the current Power/Kills/Deads/Healed/Ranged summary helpers.
+- Account for the post-July immutable-handoff, claim-ACL, delta-serialization, and stats-provenance
+  migrations. Treat batch 67 and the approximately 78-second SUMMARY_PROC observation as
+  historical evidence only.
 
 Use the task pack:
 C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md
@@ -58,7 +71,7 @@ Confirmed delivered baseline:
 - Task C Slice 2 added dbo.ImportAuditBatch, dbo.ImportAuditPhase, SQL-owned audit writer procedures, bot audit DAL/service wrappers, and fallback-first audit wiring correlated to dbo.FallbackImportBatchControl.
 - Task C Slice 3 through Slice 10 adopted generic durable audit for player-location, Honor, PreKvK, weekly activity, MGE, inventory, KVK_ALL, and Rally Forts import families.
 - Task C Slice 11 normalized generic ImportAuditPhase timestamp handling.
-- Task C Slice 12 added non-invasive dbo.UPDATE_ALL2 phase audit output rows, bot parser/projection, and production smoke confirmed 13 update_all2_* subphase rows on fallback batch 67.
+- Task C Slice 12 added non-invasive dbo.UPDATE_ALL2 phase audit output rows and bot parser/projection; the historical 2026-07-09 production smoke confirmed 13 update_all2_* subphase rows on fallback batch 67, but it is not the current baseline.
 - Slice 12 review follow-up confirmed _update_all2_phase_results no longer leaks into fallback_update_all2 coarse phase details after bot restart.
 
 Start with audit/scope and evidence review only.
@@ -73,7 +86,7 @@ Next-slice goal:
 Explicitly out of scope unless separately approved:
 - dbo.UPDATE_ALL2 decomposition or wholesale rewrite.
 - dbo.SUMMARY_PROC rewrite/decomposition/performance tuning.
-- dbo.IMPORT_STAGING_PROC decomposition.
+- dbo.IMPORT_STAGING_PROC_CORE decomposition.
 - Discord route UX or embed text changes.
 - Attachment/file handling changes.
 - Importer contract changes.
@@ -95,10 +108,10 @@ Audit these before proposing implementation:
 
 Required first response:
 - Scope summary and why this follows Slice 12.
-- Current evidence state, including the 2026-07-09 smoke and update_all2_summary_proc timing.
+- Current evidence state, contrasting the historical 2026-07-09 smoke with a post-August sample.
 - SQL position and whether any SQL repo change appears necessary now.
 - Implementation-boundary proposal: audit/query-only, helper script/report, SQL view/procedure, or later decomposition task.
-- Remaining slice map for SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC split, stats_module cleanup, PreKvK cleanup, weekly view cleanup, and inventory orchestration.
+- Remaining slice map for SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC_CORE split, stats_module cleanup, PreKvK cleanup, weekly view cleanup, and inventory orchestration.
 - Validation plan including SQL evidence queries, focused docs/tests if changed, smoke expectations, and Codex Security decision.
 - Open questions or approval needed.
 

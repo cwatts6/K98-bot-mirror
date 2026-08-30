@@ -1,5 +1,21 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit
 
+> **Execution gate refreshed — 2026-08-30:** This remains an active evidence pack, but the July
+> object map and batch `67` timing sample are historical. Before running its evidence queries or
+> recommending implementation, refresh the post-August production sample and revalidate the
+> authoritative SQL definitions. The current repository map is:
+>
+> - `dbo.IMPORT_STAGING_PROC` is the public no-caller-transaction entry point; it calls
+>   `dbo.CLAIM_KS4_IMPORT_FILE` and delegates staging/receipt work to
+>   `dbo.IMPORT_STAGING_PROC_CORE`;
+> - Python invokes `dbo.UPDATE_ALL2` separately through `update_all2_log_manager.py`; the procedure
+>   emits `update_all2_*` rows and calls `dbo.SUMMARY_PROC` as one downstream phase;
+> - `dbo.SUMMARY_PROC` calls the current Power/Kills/Deads/Healed/Ranged summary helpers;
+> - the refresh must account for the immutable handoff, claim ACL hardening, serialized delta
+>   preprocessing, and stats-publication provenance migrations delivered after the July sample.
+>
+> No current Production dominance conclusion is asserted by this refresh.
+
 ## 1. Task Header
 
 - Task name: `Import Pipeline Deferred Optimisation Task C Slice 13 - UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit`
@@ -7,7 +23,8 @@
 - Owner/context: `Chris Watts / K98 bot import architecture`
 - Task type: `deferred optimisation batch | SQL observability analysis | performance scope audit`
 - One-pass approved: `no`
-- Status: `active next-slice task pack, starts with audit/scope and evidence review only`
+- Status: `active evidence pack — post-August object/timing refresh required before execution`
+- Object map last verified: `2026-08-30 against C:\K98-bot-SQL-Server`
 
 ## 2. Required Reading
 
@@ -36,7 +53,7 @@ Use the production `ImportAuditPhase` evidence introduced by Task C Slice 12 to 
 performance/decomposition slice.
 
 This slice is intentionally evidence-first. It should not rewrite, decompose, or optimize
-`dbo.UPDATE_ALL2`, `dbo.SUMMARY_PROC`, or `dbo.IMPORT_STAGING_PROC` unless a separate
+`dbo.UPDATE_ALL2`, `dbo.SUMMARY_PROC`, or `dbo.IMPORT_STAGING_PROC_CORE` unless a separate
 implementation slice is approved after the audit.
 
 ## 4. Background
@@ -47,9 +64,10 @@ Task C Slice 12 delivered non-invasive `dbo.UPDATE_ALL2` phase audit outputs:
   polling, and the final 8-column result set.
 - Bot code parses optional phase-shaped result sets and writes durable generic
   `ImportAuditPhase` rows while preserving the existing coarse `fallback_update_all2` phase.
-- Production smoke on 2026-07-09 confirmed batch `67` recorded 13 `update_all2_*` subphase rows.
-- The first observed sample showed `update_all2_summary_proc` at about 78 seconds, making it the
-  visible dominant phase in that run.
+- Historical Production smoke on 2026-07-09 confirmed batch `67` recorded 13 `update_all2_*`
+  subphase rows. It must not be used as the current baseline.
+- That historical sample showed `update_all2_summary_proc` at about 78 seconds, making it the
+  visible dominant phase in that run only; current dominance is unverified.
 - A review-follow-up fix removed `_update_all2_phase_results` from coarse phase/batch details;
   post-restart smoke confirmed zero rows still containing the internal payload.
 
@@ -116,7 +134,7 @@ Confirmed delivered baseline:
 
 - `dbo.UPDATE_ALL2` decomposition or wholesale rewrite.
 - `dbo.SUMMARY_PROC` rewrite, decomposition, or performance tuning.
-- `dbo.IMPORT_STAGING_PROC` decomposition.
+- `dbo.IMPORT_STAGING_PROC_CORE` decomposition.
 - SQL output table behavior changes.
 - Importer route, Discord UX, embed text, queue behavior, attachment/file handling, or import contract changes.
 - New generic audit schema objects.
@@ -238,7 +256,7 @@ Do not lose these later slices:
    - Only if Slice 13 confirms it consistently dominates runtime or failure evidence.
 3. **Later SQL Slice - `dbo.UPDATE_ALL2` Decomposition**
    - Prepare only after evidence identifies stable phase boundaries and hotspots.
-4. **Later SQL Slice - `dbo.IMPORT_STAGING_PROC` Responsibility Split**
+4. **Later SQL Slice - `dbo.IMPORT_STAGING_PROC_CORE` Responsibility Split**
    - Split only after durable audit evidence and compatibility wrappers are stable.
 5. **Later Python Slice - Residual `stats_module.py` Import Cleanup**
    - Continue shrinking `stats_module.py` once audit and SQL instrumentation are stable.
@@ -270,7 +288,7 @@ Use this shape and stop for approval before code or SQL changes:
 <why Slice 13 follows Slice 12 and what evidence it will collect>
 
 **Current Evidence State**
-<what the 2026-07-09 smoke shows, including SUMMARY_PROC timing and any missing timing gap>
+<what the historical 2026-07-09 smoke showed, the post-August sample now shows, and any missing timing gap>
 
 **SQL Position**
 <which SQL objects/procedures must be validated and whether a SQL repo change appears necessary>
@@ -279,7 +297,7 @@ Use this shape and stop for approval before code or SQL changes:
 <audit/query-only vs helper script vs SQL view/procedure vs later decomposition proposal>
 
 **Remaining Slice Map**
-<SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC split, stats_module cleanup, PreKvK cleanup, weekly view cleanup, inventory orchestration follow-up>
+<SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC_CORE split, stats_module cleanup, PreKvK cleanup, inventory orchestration follow-up>
 
 **Validation Plan**
 <SQL evidence queries, focused checks, docs/tests if changed, smoke expectations, Codex Security decision>

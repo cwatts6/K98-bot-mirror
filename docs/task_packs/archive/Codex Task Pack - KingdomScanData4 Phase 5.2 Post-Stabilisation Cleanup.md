@@ -1,9 +1,11 @@
 # Codex Task Pack - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup
 
-> Cross-machine audit, retention, removal, Git cleanup, and closeout pack for the completed KingdomScanData4 Phase 5.2 production programme.
-> This pack is **not one-pass approved**. Begin with a read-only audit, present an exact retain/archive/quarantine/delete manifest, and stop for operator approval before any destructive action.
+> **Archived status — 2026-08-29:** Phase 5.2 cleanup is complete. This pack is preserved only as
+> historical operator context; do not execute it or reuse its former RDP, `\\tsclient`, SQL,
+> filesystem, Git, backup, scheduler, or destructive-cleanup approvals. The MINI_AMD backup-cadence
+> question is a separate deferred policy decision and does not reopen Phase 5.2.
 
-## 1. Task Header
+## 1. Historical Task Header — Do Not Execute
 
 - Task name: `KingdomScanData4 Phase 5.2 post-stabilisation cleanup`
 - Date: `2026-08-28`
@@ -374,8 +376,8 @@ Default rules:
 - `README-DEV.md`
 - deletion of `docs/task_packs/Codex Task Pack - KVK Post-Pass-4 Healed Troops and Provenance-Safe Stats Refresh.md`
 - `docs/task_packs/archive/Codex Task Pack - KVK Post-Pass-4 Healed Troops and Provenance-Safe Stats Refresh.md`
-- `docs/task_packs/Codex Task Pack - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
-- `docs/task_packs/Codex Chat Starter - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
+- `docs/task_packs/archive/Codex Task Pack - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
+- `docs/task_packs/archive/Codex Chat Starter - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
 
 ### Modify Or Create Only If Audit Justifies It
 

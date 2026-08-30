@@ -39,7 +39,7 @@ complete; record any proved gap as a separately approved follow-on."*
 | K | Rule editing | ✅ Complete | Bot | Delivered end-to-end: leadership/admin rules editor, per-event rule overrides, audited edits/resets, embed refresh, and service-level max-length guard |
 | L | Completion/freeze/report | ✅ Complete | Bot | Scheduler-driven completion at StartUtc+6d, admin-only reopen to `reopened`, internal summary (ephemeral + leadership channel) |
 | M | Results import scaffold | ✅ Completed | SQL + Bot | Phase 2, non-blocking |
-| N | Wiring & regression | 🟨 Closure audit pending | Bot | Existing command/startup/cache/scheduler/permission/rehydration wiring is present. Run one bounded closure and cross-module regression audit; document any proved gap as a separate follow-on rather than silently expanding Task N. |
+| N | Wiring & regression | 🟨 Closure audit pending | Bot | Existing command/startup/cache/scheduler/permission wiring is present. Dedicated startup/view-rehydration integration and cross-module regression coverage remain pending; document any proved gap as a separate follow-on rather than silently expanding Task N. |
 
 ### Task N closure audit
 
