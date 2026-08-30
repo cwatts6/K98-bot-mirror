@@ -4,8 +4,9 @@
 
 Phase 1 has been delivered in branch `codex/mge-process-polish` and promoted to production after local validation and production smoke testing.
 
-This Phase 1 task pack is archived. Follow-on architecture work remains active in
-`docs/task_packs/MGE Process Polish - Phase 2 Initiation Statement.md`.
+This Phase 1 task pack is archived. The completed follow-on architecture work's historical,
+non-executable initiation record is retained at
+`docs/task_packs/archive/MGE Process Polish - Phase 2 Initiation Statement.md`.
 
 ### Phase 1 Delivered
 
@@ -62,7 +63,8 @@ The following items were explicitly deferred because they are broader architectu
   * Phase 1 reused that existing boundary to avoid broad refactoring of publish, republish, reminders, award DMs, unpublish, and board refresh in the same PR.
   * Captured as a structured deferred optimisation in `docs/deferred_optimisations.md`.
 
-Phase 2 initiation is captured in `docs/MGE Process Polish - Phase 2 Initiation Statement.md`.
+The historical Phase 2 initiation record is retained at
+`docs/task_packs/archive/MGE Process Polish - Phase 2 Initiation Statement.md`.
 
 ### Phase 1 Validation
 

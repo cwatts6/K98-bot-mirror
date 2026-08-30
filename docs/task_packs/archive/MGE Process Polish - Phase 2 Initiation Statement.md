@@ -1,8 +1,14 @@
 # MGE Process Polish — Phase 2 Initiation Statement
 
-## Purpose
+> **Archived status — 2026-08-29:** Phase 2 is complete. This initiation statement is retained
+> only as a historical delivery record; do not execute or continue its audit, implementation,
+> testing, acceptance, SQL, Discord, permission, or deployment instructions. Any new MGE work
+> requires a current, separately approved scope.
 
-Continue the MGE process polish after Phase 1 production promotion and smoke testing.
+## Historical Purpose — Do Not Execute
+
+This statement initiated the MGE process polish after Phase 1 production promotion and smoke
+testing.
 
 Phase 1 delivered the operational admin controls:
 
@@ -11,7 +17,8 @@ Phase 1 delivered the operational admin controls:
 * reminder message/channel ID persistence
 * focused reminder refresh and commander management tests
 
-Phase 2 should address the MGE architecture debt that was intentionally deferred from Phase 1 because it was broader than the two production-facing admin features.
+At initiation, Phase 2 was intended to address the MGE architecture debt that had been deferred
+from Phase 1 because it was broader than the two production-facing admin features.
 
 ## Required Reading
 
