@@ -193,7 +193,7 @@ Legend:
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
-| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated before every cache, state or data access | Private/ephemeral only | Standard | Canonical leadership player route; Phase 8 complete and accepted; Phase 8.1 implementation in validation | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, primary Scan Presence ratio/percentage, bounded Last Active evidence, Activity Index v1, uncapped weighted latest-three completed-KVK Index and kingdom rank, latest-three finalized-KVK performance, linked-governor context/navigation, selected-governor-only paged aliases and alliances, Overview-only location/shield, exact numeric-ID existence rejection before full payload loading, unchanged governor-name ambiguity selection, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
+| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated before every cache, state or data access | Private/ephemeral only | Standard | Canonical leadership player route; Phases 8 and 8.1 complete and accepted; Phase 8.1 records archived; delivered-path performance evidence separately deferred | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, primary Scan Presence ratio/percentage, bounded Last Active evidence, Activity Index v1, uncapped weighted latest-three completed-KVK Index and kingdom rank, latest-three finalized-KVK performance, linked-governor context/navigation, selected-governor-only paged aliases and alliances, Overview-only location/shield, exact numeric-ID existence rejection before full payload loading, unchanged governor-name ambiguity selection, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
@@ -253,13 +253,13 @@ deployed and commands are resynced.
   - admin in Leadership and Notify channel/threads;
   - no role-name-only, Ark Setup, DM, or other-channel authorization.
 
-### Phase 8.1
+### Phase 8.1 — Complete and archived
 
-- Refine the accepted `/stats player` visual hierarchy, Presence/Last Active signal, KVK/record
-  readability and measured performance.
-- No command, option or permission change; no resync expected.
-- Preserve `36 / 100 / 8 / 1 / 2`.
-- The approved SQL additions are the bounded Last Active procedure, finalized-KVK KP/Deads and
+- Completed and operator accepted on 2026-07-23 after refining the accepted `/stats player` visual
+  hierarchy, Presence/Last Active signal and KVK/record readability.
+- No command, option or permission change was made; no resync was required.
+- The accepted surface remained `36 / 100 / 8 / 1 / 2`.
+- The delivered SQL additions are the bounded Last Active procedure, finalized-KVK KP/Deads and
   positive-Acclaim ranks, explicit legacy Healed availability, KVK Index kingdom rank, and the
   selected governor's stored latest-scan Power rank. These extensions reuse existing bounded
   result paths and add no table, index, refresh, or pre-aggregation object.
@@ -379,9 +379,10 @@ deployed and commands are resynced.
   maintained current target is 36 top-level, 100 grouped, eight `/me`, one `/stats`, and two
   `/inventory` commands. `/stats player` is the only private leadership player-review route;
   `/player_profile` is removed without redirect. Mirror PR #230 and production PR #537 carry the
-  bot result after SQL-first deployment. Phase 8.1 is a no-command-change visual hierarchy,
-  Presence/Last Active, record-readability and evidence-led performance refinement; no resync is
-  expected and SQL changes are not pre-approved.
+  bot result after SQL-first deployment. Phase 8.1 completed and was operator accepted on
+  2026-07-23 after its no-command-change visual hierarchy, Presence/Last Active and
+  record-readability delivery. Its records are archived; representative delivered-path
+  performance evidence remains separately deferred and does not reopen implementation.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and

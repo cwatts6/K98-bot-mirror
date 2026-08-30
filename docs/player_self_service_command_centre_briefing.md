@@ -77,11 +77,12 @@ Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
 - Phase 8 completed the existing private leadership `/stats player`, adopted one canonical
   higher-is-better Tanking Score across every KVK/Account/leadership surface, added the bounded
   leadership data/audit foundations, and removed `/player_profile` with no redirect.
-- Phase 8.1's audited bot scope and SQL contract are approved. The implementation refines the
-  accepted leadership hierarchy, adds privacy-safe stage timing and a latest-three completed-KVK
-  Index with kingdom rank, limits identity history to the selected Governor ID, and extends
+- Phase 8.1 completed and was operator accepted on 2026-07-23. The delivery refined the accepted
+  leadership hierarchy, added privacy-safe stage timing and a latest-three completed-KVK
+  Index with kingdom rank, limited identity history to the selected Governor ID, and extended
   finalized-KVK output with KP/Deads ranks plus explicit legacy Healed availability. Tables and
-  further indexes remain separately evidence- and approval-gated.
+  further indexes were not added; representative delivered-path performance evidence remains
+  separately deferred.
 - Phase 9 adds private `/stats kingdom` with current kingdom totals, twelve-month dynamic-roster
   trends, and the latest four completed KVKs. Participants are governors with final-event
   Acclaim greater than zero, and Acclaim per Participant is included.
@@ -89,10 +90,11 @@ Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
   candidate feature programme.
 
 Phase 8 completed SQL-first deployment, resync, restart, correction smoke and operator acceptance on
-2026-07-21. Its task pack/starter are archived. Phase 8.1 implementation is in validation; no
-command change or resync is expected. Its approved SQL change is one additive Last Active
-procedure plus the approved finalized-KVK ranking/availability contract; tables and further
-indexes remain measurement- and separately approval-gated.
+2026-07-21. Its task pack/starter are archived. Phase 8.1 completed and was operator accepted on
+2026-07-23; its task pack/starter are archived, and it made no command or permission change. The
+delivered SQL contract added one bounded Last Active procedure plus the finalized-KVK
+ranking/availability contract; no table or further index was added. Representative delivered-path
+performance evidence remains separately deferred and does not reopen implementation.
 Locked follow-on consistency:
 
 Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fallback. Core
@@ -284,12 +286,12 @@ Accepted and next phases:
   Activity Index v1, latest/last-three completed KVK, linked governors, aliases, alliance
   history, location/shield, dedicated 90-day audit; global Tanking correction; remove
   `/player_profile`; deploy SQL before bot; resync to 36 top-level.
-- Phase 8.1 implementation/validation: remove duplicated Overview activity cards; split Presence
-  and bounded Last Active, combine location/shield context, add the uncapped weighted latest-three
-  completed-KVK Index, enlarge Activity, and show latest three finalized KVKs in three columns.
-  Player Record retains linked navigation but limits Aliases/Alliances to the selected Governor ID.
-  The SQL contract adds finalized-KVK KP/Deads ranks and explicit legacy Healed availability; no
-  table or further index and no command/resync change is expected.
+- Phase 8.1 complete and archived: removed duplicated Overview activity cards; split Presence and
+  bounded Last Active, combined location/shield context, added the uncapped weighted latest-three
+  completed-KVK Index, enlarged Activity, and showed the latest three finalized KVKs in three
+  columns. Player Record retained linked navigation while limiting Aliases/Alliances to the
+  selected Governor ID. The delivered SQL contract added finalized-KVK KP/Deads ranks and explicit
+  legacy Healed availability; no table, further index, command or resync change was made.
 - Phase 9: add private `/stats kingdom`; dynamic-roster monthly final scans, current totals,
   Total Kingdom Acclaim as `SUM(HighestAcclaim)`, last four completed KVKs, KVK Acclaim as
   `SUM(Acclaim)`, participants as distinct governors with Acclaim > 0, Acclaim per Participant,
@@ -758,8 +760,9 @@ Current status:
 - Phase 8 completed and operator accepted the existing private `/stats player`, approved leadership
   data, permission, audit, source and canonical Tanking contracts, and `/player_profile` removal
   without a redirect. It did not create `/me inspect`.
-- Phase 8.1 is separately task-packed for visual hierarchy, Presence/Last Active, record formatting
-  and evidence-led performance refinement while preserving the Phase 8 command/privacy contract.
+- Phase 8.1 completed and was archived after delivering visual hierarchy, Presence/Last Active and
+  record-formatting refinements while preserving the Phase 8 command/privacy contract.
+  Representative delivered-path performance evidence remains separately deferred.
 - Phase 9 adds private `/stats kingdom` with dynamic-roster 12-month trends and the latest four
   completed KVK summaries, including Acclaim-based participants and Acclaim per Participant.
 - Phase 10 is the later usage-led migration review; Phase 11 sticky features remain a future programme
