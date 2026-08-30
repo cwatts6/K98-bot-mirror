@@ -1,9 +1,11 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy, Presence and Performance
 
-Status: active initiation starter. Phase 8 was smoke tested, operator accepted and closed on
-2026-07-21. Use with the matching Phase 8.1 task pack. One-pass execution is not approved.
+> **Archived status — 2026-07-23:** Phase 8.1 is complete and operator accepted. This starter is
+> preserved only as historical execution context; do not copy it to restart implementation.
+> Representative delivered-path SQL plan/read/time evidence remains separately deferred and does
+> not reopen Phase 8.1.
 
-## Copy/Paste Starter
+## Historical Copy/Paste Starter — Do Not Execute
 
 ```text
 Codex, begin Player Self-Service Command Centre v2 Phase 8.1: Leadership Player Review Visual
