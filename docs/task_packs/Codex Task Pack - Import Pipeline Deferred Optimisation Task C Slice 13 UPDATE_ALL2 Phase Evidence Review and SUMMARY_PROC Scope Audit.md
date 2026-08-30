@@ -141,7 +141,6 @@ Confirmed delivered baseline:
 - Historical production audit backfill.
 - Residual `stats_module.py` cleanup outside evidence-query support.
 - Legacy PreKvK SQL cleanup.
-- Weekly cumulative view cleanup.
 - Inventory view-orchestration extraction.
 
 ## 8. Evidence Queries To Prepare Or Run
