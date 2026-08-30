@@ -7,13 +7,15 @@
 - Date: `2026-07-21`
 - Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player
   Self-Service Command Centre programme completed in production PR #486. GovernorOS v2 is
-  complete and operator accepted through Phase 8 on 2026-07-21. Phase 7 closed the retained
+  complete and operator accepted through Phase 8.1 on 2026-07-23. Phase 7 closed the retained
   `/me` product with the accepted visual/content consistency contract; Phase 8 delivered the one
   leadership `/stats player` journey, aligned canonical combat metrics, and removed
-  `/player_profile`. Phase 8.1 now refines the accepted leadership visual hierarchy, Presence/Last
-  Active signal, identity-history presentation and measured performance; Phase 9 adds private
-  `/stats kingdom`. The former `/me history` proposal is closed with no build and
-  `/kvk history` remains canonical.
+  `/player_profile`; Phase 8.1 refined that existing journey without adding a command, delivering
+  the final visual hierarchy, Presence/Last Active, location/shield, KVK/record, Power/Acclaim-rank
+  and exact-ID existence refinements. Representative delivered-path performance evidence remains
+  separately deferred and does not make the implementation pack active. Phase 9 private
+  `/stats kingdom` remains proposed and approval-gated. The former `/me history` proposal is
+  closed with no build and `/kvk history` remains canonical.
 
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
@@ -345,9 +347,10 @@ Leadership/admin runs /stats player
 Phase 8 uses a dedicated stable-role-ID and channel gate. It does not reuse the self-view
 governor picker or create `/me inspect`.
 
-Phase 8 is complete and operator accepted. Phase 8.1 preserves this command, permission, privacy,
-data and lifecycle contract while refining page purpose, Presence/Last Active visibility, location
-context, KVK/record readability and measured load/query performance.
+Phase 8 is complete and operator accepted. Phase 8.1 completed and was operator accepted on
+2026-07-23; it preserved this command, permission, privacy, data and lifecycle contract while
+refining page purpose, Presence/Last Active visibility, location context, KVK/record readability
+and exact-ID/rank handling. Representative performance evidence remains separately deferred.
 
 ## 9. Governor Dashboard Product Model
 
@@ -847,6 +850,12 @@ fallback, off-loop rendering, bounded avatar/chart/data work, latest-request-win
 180-second preserve-and-disable timeout, and complete attachment/stream cleanup are mandatory.
 
 ## 12. Programme Phases
+
+| Phase | Current status |
+|---|---|
+| Phase 8 | Complete and archived; operator accepted on 2026-07-21 |
+| Phase 8.1 | Complete and archived; operator accepted on 2026-07-23 |
+| Phase 9 | Proposed and approval-gated; not implementation-ready |
 
 ### Phase 1 — Governor Dashboard Product Blueprint and Audit
 
@@ -1912,8 +1921,11 @@ restart-safe interaction behavior. The resynced command surface is
 
 ### Phase 8.1 - Leadership Player Review Visual Hierarchy, Presence and Performance
 
-Status: `audited scope approved on 2026-07-21; operator scorecard/SQL follow-up approved on
-2026-07-22; implementation and validation in progress`.
+Status: `complete and archived; operator accepted on 2026-07-23`.
+
+Current-status note: this section preserves the approved Phase 8.1 design and delivery contract.
+The implementation is closed. The remaining leadership-player-review performance item is an
+evidence-only deferred item and does not reopen this phase.
 
 Goal: refine the accepted Phase 8 product without changing its command, permission, privacy or
 metric ownership, and measure then correct avoidable first-load/period-change latency.
@@ -1963,7 +1975,8 @@ visual/performance acceptance.
 
 ### Phase 9 — Leadership `/stats kingdom`
 
-Status: `proposed; programme scope and task pack/chat starter prepared`.
+Status: `proposed and approval-gated; programme scope and task pack/chat starter prepared; not
+implementation-ready`.
 
 Goal: provide authorized leadership one private kingdom-level view of current strength,
 twelve-month dynamic-roster movement, and the latest four completed KVKs.
@@ -2063,8 +2076,8 @@ validated source per feature, then create a new task pack or successor programme
   integrated RSS/Fort charts, `/my_stats` retirement, command resync, and rollback.
 - Phase 7 `/me` visual consistency, content audit, and programme closeout.
 - Phase 8 leadership `/stats player` modernisation, global Tanking Score alignment, and `/player_profile` retirement.
-- Phase 8.1 leadership page-purpose, Presence/Last Active, location/KVK/record visual hierarchy and
-  evidence-led load/query performance refinement.
+- Completed Phase 8.1 leadership page-purpose, Presence/Last Active, location/KVK/record visual
+  hierarchy and exact-ID/rank refinements; representative performance evidence remains deferred.
 - Phase 9 private `/stats kingdom` current-strength, twelve-month, and completed-KVK reporting.
 - Phase 10 usage-based migration planning for remaining redirect/compatibility commands.
 - Documentation, tests, command reference updates, command-cache governance, and deferred
@@ -2278,10 +2291,10 @@ The programme is complete when:
 - [x] The KVK history placement review is closed: `/kvk history` remains canonical and `/me history` will not be implemented.
 - [x] Phase 7 aligns the retained `/me` visual/content system without command, data, permission, or product changes.
 - [x] Phase 8 modernises private `/stats player`, aligns canonical Tanking Score globally, removes `/player_profile` with no redirect, and passes production smoke/operator acceptance on 2026-07-21.
-- [ ] Phase 8.1 refines leadership visual hierarchy, Presence/Last Active, record readability and measured performance without changing the accepted command/permission contract.
+- [x] Phase 8.1 refined leadership visual hierarchy, Presence/Last Active, record readability and exact-ID/rank handling without changing the accepted command/permission contract; representative performance evidence remains separately deferred.
 - [ ] Phase 9 adds private `/stats kingdom` with dynamic-roster monthly trends and the latest four completed KVKs.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F, Phase 5G, Phase 6, and the approved future Phase 8 removal each have route-specific decisions.
-- [x] Documentation reflects GovernorOS v2 completion through Phase 8 and the approved Phase 8.1-11 roadmap.
+- [x] Documentation reflects GovernorOS v2 completion through Phase 8.1 and the proposed/gated Phase 9-11 roadmap.
 - [x] Canonical command references and validators show the accepted Phase 8 baseline at 36 top-level commands, 100 grouped subcommands, 8 `/me`, 1 `/stats`, and 2 `/inventory` subcommands.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
@@ -2306,19 +2319,15 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-Phase 8 is complete, production smoke tested, operator accepted and archived. Complete the approved
-Phase 8.1 scorecard/SQL follow-up, focused/full/visual/performance validation, separate bot and SQL
-Changes reviews, SQL-first deployment and final operator smoke. Any further SQL object remains
-separately evidence- and approval-gated. Phase 9 must not absorb Phase 8.1 work.
+Phases 8 and 8.1 are complete, operator accepted and archived. The representative Phase 8.1
+performance-evidence work remains separately deferred and does not reopen either implementation
+pack. Phase 9 may follow the accepted Phase 8/8.1 data, permission and visual foundations only
+after its product, audit, SQL, visual, performance, security and scheduling gates are approved.
+Phase 10 is usage-led compatibility review, and Phase 11 remains an uncommitted future feature
+candidate.
 
-Phase 9 may follow the accepted Phase 8 data/permission foundation, but scheduling relative to the
-active Phase 8.1 refinement remains an operator decision. Phase 10 is usage-led compatibility
-review, and Phase 11 remains an uncommitted future feature candidate.
+Proposed/gated task pack and starter:
 
-Active task packs and starters:
-
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 - `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 
@@ -2379,3 +2388,4 @@ explicit historical corrections.
 | 2026-07-22 | Phase 8.1 visual consistency and KVK Index rank follow-up approved | Standardise Overview scorecards and three-column page grids, enlarge bounded typography, simplify controls without Refresh, and add a SQL-backed kingdom competition rank for the uncapped KVK Index. The SQL extension reuses the bounded finalized-KVK temp cohort and adds no table, index or refresh object. |
 | 2026-07-23 | Phase 8.1 final KVK and Power-rank visual follow-up approved | Replace the static KD98 circle with stored latest-scan Power rank; reduce each KVK card to the leadership comparison essentials; and add positive-Acclaim competition rank through the existing bounded KVK calculation set. The additive procedure-result changes add no table, index, refresh, or pre-aggregation object. |
 | 2026-07-23 | Phase 8.1 final input and control simplification approved | Fail fast on a directly entered numeric Governor ID with no authoritative Stats observation before starting the full payload, without changing governor-name matching; remove the Last Active `UTC calendar date` helper and redundant disabled Current button. The bounded exact-ID SQL check reuses an existing GovernorID-leading index and adds no table or index. |
+| 2026-07-23 | Phase 8.1 completed, operator accepted and archived | Mirror PR #231 and production PR #538 carry the accepted bot delivery; SQL PRs #58/#59 supplied the additive rank and exact-ID existence support. The implementation pack/starter are archived. Representative delivered-path performance evidence remains a separate deferred item, and Phase 9 remains proposed/gated. |

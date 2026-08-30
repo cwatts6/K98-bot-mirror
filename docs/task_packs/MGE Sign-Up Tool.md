@@ -1,5 +1,11 @@
 # MGE Sign-Up Tool — Task Pack (v2)
 
+> **Status — 2026-08-29:** Tasks A-M are delivered. Task N is not an untouched implementation
+> phase: command registration, startup cache refresh, lifecycle scheduling, SQL-backed message
+> persistence, permission coverage and restart/rehydration regression tests already exist. The
+> remaining action is a bounded closure audit. Do not continue broad MGE implementation from this
+> pack unless that audit identifies a separately approved gap.
+
 ## Context
 
 We are building a new Mightiest Governor Event (MGE) sign-up and allocation system for the Discord bot, modelled similarly to the completed Ark tool but adapted for MGE workflows.

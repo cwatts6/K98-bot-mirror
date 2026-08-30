@@ -3,7 +3,21 @@
 Active deferred optimisation items are staged here before they are grouped, scored, or promoted
 to GitHub issues/task packs.
 
-Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
+Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
+
+## Status model
+
+- `implementation-ready`: the current defect or hardening opportunity is confirmed and bounded.
+- `operator policy decision required` / `operator-gated`: no implementation starts without an explicit owner decision.
+- `promoted task pack — refresh required before execution`: a task pack exists, but its evidence or object map must be refreshed.
+- `evidence required` / `re-audit required`: collect current measurements before proposing implementation.
+- `blocked`: a named prerequisite or source contract is missing.
+- `later refactor`: valid architectural debt with no immediate correctness requirement.
+- `proposed design programme`: product/design discovery is required before implementation.
+- `watchlist` / `conditional watchlist`: retain for observation; do not treat as approved executable work.
+
+`Last verified` records the most recent documentation/repository review date. It does not by itself
+prove current Production behaviour; Production evidence remains an explicit dependency where required.
 
 ### Deferred Optimisation
 - Area: `event_calendar/reminder_state.py`, `player_self_service/service.py`, `event_calendar/reminder_candidates.py`
@@ -13,6 +27,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: high
 - Dependencies: Phase 5D.1 deployed baseline; production `event_calendar_reminder_state.json` size evidence; operator-approved controlled concurrency test; no persistence or sent-key contract change without a separate task pack.
+- Status: evidence required
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
@@ -22,42 +38,53 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Task C Slice 8 inventory generic audit adoption delivered and smoke tested on 2026-06-30; existing inventory route/view/service/DAL tests; no command UX or SQL schema changes without a separate approved slice.
+- Status: later refactor
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
-- Area: SQL repo `dbo.vAllianceActivity_WeeklyCumulative`
-- Type: cleanup
-- Description: Weekly activity SQL validation during Task C Slice 6 found that `dbo.vAllianceActivity_WeeklyCumulative` appears to reference columns not exposed by `dbo.vAllianceActivity_WeeklyDelta`. Current bot searches did not find active usage, so fixing or dropping the view is outside the weekly activity audit-adoption slice.
-- Suggested Fix: Run a later SQL cleanup audit to confirm whether any reports, manual queries, or downstream exports still use `dbo.vAllianceActivity_WeeklyCumulative`. If unused, retire or correct the view through the SQL repo migration process with validation and rollback notes.
-- Impact: low
-- Risk: medium
-- Dependencies: SQL repo validation in `C:\K98-bot-SQL-Server`; operator approval before changing reporting view semantics or retiring the view.
-
-### Deferred Optimisation
-- Area: SQL repo `dbo.IMPORT_STAGING_PROC`, raw fallback staging, `dbo.IMPORT_STAGING_CSV`, `dbo.IMPORT_STAGING`
+- Area: SQL repo `dbo.IMPORT_STAGING_PROC_CORE`, `dbo.IMPORT_STAGING_CSV_RAW`, `dbo.IMPORT_STAGING_CSV`, and `dbo.IMPORT_STAGING`
 - Type: refactor
-- Description: `dbo.IMPORT_STAGING_PROC` owns multiple responsibilities around fallback staging, raw text conversion, typed conversion, metadata-sensitive partial fallback behavior, and final staging/output handoff. Task B intentionally preserved procedure shape to reduce risk while fixing Unicode preservation.
-- Suggested Fix: After durable audit hooks are deployed and fallback audit evidence is stable, split `dbo.IMPORT_STAGING_PROC` responsibilities into smaller phase procedures or clearly bounded internal sections with audit markers, preserving existing input/output contracts and rollback scripts. Keep data-contract changes out of the split unless separately approved.
+- Description: `dbo.IMPORT_STAGING_PROC` is now a narrow public wrapper that claims the immutable file and delegates to `dbo.IMPORT_STAGING_PROC_CORE`. The remaining mixed responsibilities live in the core procedure: digest-bound raw-file loading, raw-to-typed conversion, canonical staging mapping, cleanup/delta work, scan allocation, and committed receipt handoff. The earlier description that assigned all of this ownership to the public wrapper is no longer accurate.
+- Suggested Fix: Audit the current `dbo.IMPORT_STAGING_PROC_CORE` phase boundaries after the KingdomScanData4 Phase 5/5.2 stabilisation work. Extract only proven stable internal phases or add clearly bounded internal sections and audit markers while preserving the public wrapper signature, claim/digest checks, database mutex, transaction ownership, staging tables, scan allocation, receipt/archive contract, return shape, and rollback posture. Keep data-contract changes out of the refactor unless separately approved.
 - Impact: high
 - Risk: high
-- Dependencies: Task B raw staging path deployed; Task C Slice 2 generic batch audit and SQL validation available; production smoke baseline for full and partial fallback imports.
+- Dependencies: KingdomScanData4 Phase 5 immutable handoff and Phase 5.2 stabilisation/cleanup complete; durable import audit available; current wrapper/core SQL source and production smoke baseline; separate SQL task pack and owner approval before decomposition.
+- Status: active — remapped after KingdomScanData4 Phase 5
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, SQL repo `dbo.SUMMARY_PROC`, and downstream stats/dashboard rebuild procedures
 - Type: performance
-- Description: Task C Slice 12 delivered durable `update_all2_*` phase audit evidence for fallback imports. The first production smoke sample showed `update_all2_summary_proc` dominating visible subphase runtime at about 78 seconds, with additional coarse-to-subphase time still outside the emitted phase rows. There are not yet enough production samples to justify decomposing `dbo.UPDATE_ALL2` or `dbo.SUMMARY_PROC`.
-- Suggested Fix: Run Task C Slice 13 to collect and analyze a short production baseline of recent fallback `ImportAuditBatch`/`ImportAuditPhase` rows. Quantify per-phase duration, failures/skips, coarse `fallback_update_all2` duration, missing timing gaps, and whether `dbo.SUMMARY_PROC` consistently dominates. Only after that evidence review should a SQL-specific `SUMMARY_PROC` or `UPDATE_ALL2` performance/decomposition task pack be prepared.
+- Description: Task C Slice 12 delivered durable `update_all2_*` phase audit evidence for fallback imports. A July production smoke sample showed `update_all2_summary_proc` dominating the visible subphase runtime at about 78 seconds, with additional coarse-to-subphase time outside the emitted phase rows. That single sample is historical evidence, not a current performance conclusion: the August KingdomScanData4 import, locking, immutable-handoff, delta-serialization, and stats-provenance changes require the procedure map and timing baseline to be revalidated.
+- Suggested Fix: Refresh Task C Slice 13 before execution, then collect a short baseline from post-stabilisation fallback `ImportAuditBatch`/`ImportAuditPhase` rows. Reconfirm the current `UPDATE_ALL2`, `SUMMARY_PROC`, and helper-procedure boundaries; quantify per-phase duration, failures/skips, coarse `fallback_update_all2` duration, missing timing gaps, and sample representativeness. Do not assume `SUMMARY_PROC` still dominates. Prepare a SQL-specific tuning or decomposition pack only if the refreshed evidence supports one.
 - Impact: high
 - Risk: high
-- Dependencies: Task C Slice 12 UPDATE_ALL2 wrapper/audit outputs deployed and smoke tested; several post-rollout fallback imports with `update_all2_*` phase rows; SQL owner approval before phase procedure design, tuning, or migration work.
+- Dependencies: Task C Slice 12 deployed; KingdomScanData4 Phase 5/5.2 and August follow-up migrations complete; several representative post-stabilisation fallback imports with `update_all2_*` rows; SQL owner approval before plan collection, procedure design, tuning, or migration work.
+- Status: promoted task pack — refresh required before execution
+- Last verified: 2026-08-29
+- Promoted task pack: `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+
+### Deferred Optimisation
+- Area: MINI_AMD SQL Agent transaction-log backup job schedules and SQL backup-policy documentation
+- Type: operations
+- Description: The KingdomScanData4 Phase 5.2 cleanup found that the production transaction-log backup job has both 15-minute and 5-minute schedules enabled. The current backup chain was healthy at cleanup, but the intended steady-state cadence and whether both schedules are deliberate have not been confirmed. Overlapping schedules are not automatically a defect, but leaving the policy ambiguous creates avoidable operational and recovery uncertainty.
+- Suggested Fix: Inventory the job and schedule IDs, enabled state, ownership, next-run times, and 7-14 days of execution history. Record average, p95, and maximum job duration plus overlaps, skips, failures, log growth, backup size, recovery-point objective, and off-machine copy cadence. Approve one documented policy, then disable only a confirmed redundant schedule through a separate operator change. Verify the log chain and backup health after the change and document the exact rollback.
+- Impact: high
+- Risk: medium
+- Dependencies: Operator backup-policy decision; current SQL Agent and `msdb` evidence; confirmed healthy Production full/differential/log chain; no schedule mutation in the documentation-only reconciliation task.
+- Status: operator policy decision required
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `stats_module.py`, import service modules, import DAL modules
 - Type: refactor
-- Description: Task C Slice 1 extracted fallback import file orchestration and DAL helpers, and Task C Slice 12 added UPDATE_ALL2 audit-output projection, but `stats_module.py` still remains the compatibility entry point for the current worker/route/command flow and still owns mixed step sequencing around Excel processing, secondary archive, SQL execution, audit phase projection, and result aggregation.
-- Suggested Fix: After Slice 13 completes the UPDATE_ALL2 evidence review and confirms the SQL instrumentation boundary is stable, continue extracting residual import orchestration from `stats_module.py` into import-specific services while keeping the module as a thin compatibility shim until route or command callers are explicitly migrated. Preserve all current caller behavior and tests during each slice.
+- Description: Task C Slice 1 extracted fallback import file orchestration and DAL helpers, and Task C Slice 12 added UPDATE_ALL2 audit-output projection, but `stats_module.py` remains the compatibility entry point for the current worker/route/command flow and still owns mixed sequencing around Excel processing, secondary archive, SQL execution, audit phase projection, and result aggregation. The safe extraction boundary must be rechecked against the August KingdomScanData4 import changes.
+- Suggested Fix: After the refreshed Slice 13 evidence review confirms the current SQL instrumentation and import ownership boundary, continue extracting residual orchestration from `stats_module.py` into import-specific services. Keep `stats_module.py` as a thin compatibility shim until each route or command caller is explicitly migrated, and preserve current result, audit, archive, retry, failure, and user-message contracts in every slice.
 - Impact: medium
 - Risk: medium
-- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation complete; Task C Slice 12 UPDATE_ALL2 audit-output projection deployed; Task C Slice 13 evidence review should confirm no further tiny audit integration is needed before service extraction resumes.
+- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation and Slice 12 projection deployed; KingdomScanData4 Phase 5/5.2 stabilised; refreshed Task C Slice 13 evidence review complete before service extraction resumes.
+- Status: blocked by Task C Slice 13
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/prekvk_cmds.py`, `scripts/validate_command_registration.py`, `docs/reference/canonical_command_reference.md`
@@ -67,15 +94,19 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 7 redirect PR merged and deployed; player briefing posted; no actionable player feedback during the monitoring window; operator approval for final removal.
+- Status: operator-gated
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
 - Type: performance
-- Description: After PR 107 resolved the original slow pytest offenders, the new duration audit `C:\Users\cwatt\Downloads\.codex_pytest_audit-new.log` shows the remaining full-suite outliers are concentrated in Ark preference/ban negative paths, lock-timeout coverage, calendar failure-path retries, live queue persistence, maintenance subprocess timeout/success coverage, and one inventory vision import case. The slowest current timings are `tests/test_ark_preference_service.py::test_set_preference_rejects_unknown_governor` at 7.33s, `tests/test_ark_bans_enforcement.py::test_admin_add_allows_when_override_on` at 5.23s, `tests/test_lock_timeout.py::test_remove_view_tracker_entry_returns_false_when_locked` at 5.06s, `tests/test_lock_timeout.py::test_save_view_tracker_raises_on_lock` at 5.06s, `tests/test_calendar_service.py::test_refresh_full_stops_on_sync_failure` at 3.02s, and `tests/test_calendar_pipeline.py::test_pipeline_stops_on_sync_failure` at 3.01s.
-- Suggested Fix: Start a fresh audit from `.codex_pytest_audit-new.log` and classify each remaining slow path as intentional timeout coverage, missing test boundary, live dependency leakage, retry/backoff, or genuine defect. Preserve lock-timeout and subprocess timeout coverage, but replace real multi-second waits with patched timeout constants, fake clocks, controlled retry policies, or explicit service/DAL boundary fakes where safe. Keep the scope separate from PR 107 and validate with `pytest -vv tests --durations=30 --durations-min=1.0`, focused subsystem tests, `scripts/analyse_pytest_log_noise.py`, and `python -m pytest -q tests`.
+- Description: The July duration audit and its named slow-test timings are no longer a current prioritisation baseline. Since then the suite has expanded materially; the latest known full regression result records `2999 passed, 2 skipped`, but that total-suite result does not include a fresh `--durations` profile. The former 1450-test baseline and listed timings must therefore be treated as historical evidence until reproduced on current `main`.
+- Suggested Fix: Run a fresh current-branch duration audit with `pytest -vv tests --durations=30 --durations-min=1.0` and save the artifact. Classify each current outlier as intentional timeout coverage, missing test boundary, live dependency leakage, retry/backoff, or genuine defect. Preserve real lock/subprocess/negative-path coverage, but replace unnecessary multi-second waits with patched constants, fake clocks, controlled retry policies, or explicit service/DAL boundary fakes where safe. Re-run focused subsystem tests, log-noise analysis, and the full suite after any optimisation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Use the post-PR-107 audit baseline (`1450 passed, 2 skipped, 19 warnings in 54.86s`); preserve genuine timeout, subprocess, lock, negative-path, and log-noise coverage.
+- Dependencies: Use current `main` after documentation reconciliation; capture a new durations artifact rather than reusing `.codex_pytest_audit-new.log`; preserve genuine timeout, subprocess, lock, negative-path, and log-noise coverage.
+- Status: re-audit required
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `commands/ark_cmds.py`, `ark/registration_flow.py`, `ark/confirmation_flow.py`, `ark/reminders.py`, `ark/dal/ark_dal.py`
@@ -85,15 +116,19 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 4 Ark command grouping is complete and smoke tested; validate service boundaries against existing Ark registration, confirmation, reminder, cancel, and audit tests.
+- Status: later refactor
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: remaining redirect-only account/reminder/KVK compatibility paths, `/mykvkcrystaltech`, command governance, and migration communications
 - Type: cleanup
 - Description: Completed Phases 5F, 5G, 6, and 8 removed their explicitly approved Inventory, export, `/my_stats`, and `/player_profile` routes. Phase 8 also established `/stats player` as the one canonical leadership player-review location, while `/me history` remains closed and `/kvk history` canonical. Those decisions are no longer part of this generic deferred item. Remaining redirected account/reminder/KVK paths and `/mykvkcrystaltech` still require route-specific usage, feedback, caller, and replacement evidence.
-- Suggested Fix: Use future Phase 10 for fresh qualified usage and no-feedback review. Change one remaining route at a time only after explicit operator approval, communication, command-governance updates, resync, smoke, and rollback. Do not reopen the accepted Phase 8 `/stats player`/`/player_profile` decision, the Phase 8.1 no-command-change boundary, or canonical `/kvk history` placement through this generic item.
+- Suggested Fix: Open a fresh Phase 10 qualified-usage and no-feedback review. Change one remaining route at a time only after explicit operator approval, communication, command-governance updates, resync, smoke, and rollback. Do not reopen the accepted `/stats player`/`/player_profile` decision, the completed Phase 8.1 no-command-change boundary, or canonical `/kvk history` placement through this generic item.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 8 operator accepted on 2026-07-21; Phase 8.1 and Phase 9 have dedicated task packs; future Phase 10 evidence review.
+- Dependencies: Phase 8 and Phase 8.1 operator accepted and archived; Phase 9 has its own proposed task pack; fresh route usage/caller/feedback evidence; explicit operator approval for each retirement.
+- Status: evidence and operator-gated
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -103,33 +138,41 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: low
 - Risk: medium
 - Dependencies: Phase 5F operator smoke accepted on 2026-07-16; confirmed zero runtime reads/writes; an agreed post-release observation window; fresh SQL repository and production dependency checks; explicit destructive SQL approval.
+- Status: destructive SQL audit-gated
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_dal.py`, SQL repo `dbo.KingdomScanData4` dashboard-read indexes, optional dashboard read view
 - Type: performance
-- Description: Phase 3 reads one latest `KingdomScanData4` row per selected governor and joins primary-key lookup tables. The smoke review identified that the original `TRY_CONVERT` around `GovernorID` could inhibit the existing `(GovernorID, SCANORDER DESC, AsOfDate DESC, ScanDate DESC)` access path; the bot query now converts the parameter instead. The source table is approximately 387k rows and growing, but there is no representative execution-plan, logical-read, duration, or concurrency baseline demonstrating that a new view, covering index, or maintained snapshot table is required.
-- Suggested Fix: Run a SQL performance evidence slice using representative early/middle/recent Governor IDs with actual execution plans plus `SET STATISTICS IO, TIME ON`. Confirm an index seek on the GovernorID/scan-order index, one-row lookup behavior, and the clustered `PlayerLocation`/`Civilization_Mapping` joins. Record warm/cold logical reads and duration under expected dashboard concurrency. Introduce a canonical view only for contract reuse, add covering includes only if key-lookup cost is evidenced, and consider a snapshot table only if measured demand justifies explicit refresh, staleness, failure, deployment, and rollback contracts.
+- Description: Phase 3 reads one latest `KingdomScanData4` row per selected governor and joins primary-key lookup tables. The bot-side predicate was corrected to convert the parameter rather than wrap `GovernorID` in `TRY_CONVERT`. The earlier approximate table cardinality and index context predate the July/August KingdomScanData4 modernisation programme, so they are no longer a reliable basis for proposing a view, covering index, or maintained snapshot table.
+- Suggested Fix: Recollect the current table cardinality, index definitions/usage, statistics state, and exact dashboard query shape. Then run representative early/middle/recent Governor IDs with actual plans and `SET STATISTICS IO, TIME ON`, including warm/cold reads and expected dashboard concurrency. Introduce a canonical view only for proven contract reuse, add the narrowest includes only when key-lookup cost is evidenced, and consider maintained state only when measured demand justifies explicit refresh, staleness, failure, deployment, and rollback contracts.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 3 smoke correction deployed for representative measurement; production SQL execution-plan access; observed dashboard usage/concurrency; SQL owner approval before index, view, or maintained-table changes.
+- Dependencies: Current post-KingdomScanData4-Phase-5 SQL schema and production statistics; representative Governor IDs; observed dashboard usage/concurrency; SQL owner-approved plan collection window; separate SQL review for any object change.
+- Status: evidence required — rebaseline
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
 - Type: performance
-- Description: Phase 6 deployed one bounded set-based procedure for up to 26 deduplicated governors and 180 Stats-anchor days plus `StatsSourceRefreshedAtUtc`, calculated as the latest `KingdomScanData4.ScanDate` on the global Stats anchor. Existing indexes cover the principal Governor/date access patterns, while the bot adds a 9-second data timeout, bounded concurrency, TTL/LRU caching, and inflight deduplication. Functional production smoke passed, but no recorded representative execution plan, logical-read, duration, memory-grant, or concurrent 26-account baseline proves that a new covering index is warranted. In particular, the existing AsOfDate-leading index does not currently include `ScanDate`, so the new global freshness aggregate should be measured rather than assumed free or prematurely indexed.
-- Suggested Fix: Execute the deployed procedure for single, multi, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Isolate the header freshness aggregate from the daily payload cost. Add the narrowest covering include/index or procedure refinement only when the measured hotspot is identified; repeat correctness/performance tests and retain an independent rollback migration.
+- Description: Phase 6 deployed one bounded set-based `dbo.usp_GetPersonalStatsDaily` contract for up to 26 deduplicated governors and 180 Stats-anchor days, with source-refresh provenance and bot-side timeouts, bounded concurrency, caching, and inflight deduplication. Functional smoke passed, but the earlier index/cardinality assumptions predate subsequent KingdomScanData4 migrations and no current actual-plan, logical-read, duration, memory-grant, or concurrent 26-account baseline proves that a new covering index is warranted.
+- Suggested Fix: Reconfirm the current procedure and index definitions, then execute single-, multi-, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Isolate the header freshness aggregate from daily payload cost. Add only the narrowest procedure refinement or supporting index demonstrated by the current hotspot, and retain independent correctness, performance, migration, and rollback evidence.
 - Impact: high
 - Risk: medium
-- Dependencies: SQL PRs #43/#44 deployed and Phase 6 functional smoke accepted on 2026-07-18; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
+- Dependencies: Phase 6 functional contract deployed; current post-August SQL schema/statistics; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
+- Status: evidence required — rebaseline
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `leadership_player_review` DAL/service/cache/render path and SQL leadership procedures
 - Type: performance
-- Description: Phase 8.1 adds stage-level bot diagnostics, a sequential cold/warm application harness and a read-only SQL evidence harness. No representative production actual plan, logical-read, CPU/elapsed, memory-grant, row/result-size, statistics-quality or operational wait evidence has yet shown that a new table/index is safer than query refinement, cache granularity or page-specific loading. Existing source tables also contain overlapping indexes, so adding from a missing-index DMV hint alone could increase import/write cost and fragmentation.
-- Suggested Fix: Run the approved harness for recent/long-tenure, sparse/dense, one/three-KVK and high-history governors in a production-safe measurement window. Save actual plans and per-statement IO/time; compare estimated versus actual rows, spills, scans/lookups, residual predicates, memory grants, statistics sampling/age and index usage/operational counters. First correct cardinality/query-shape defects, then assess consolidation or the narrowest supporting index against the full existing-index set and source write workload. Require an isolated before/after replay, no more than 10% unexplained logical-read regression, stable result contracts, concurrency evidence and an independent migration/rollback before a new SQL proposal.
+- Description: Phase 8.1 was completed and operator accepted on 2026-07-23. It delivered stage-level diagnostics, a sequential cold/warm application harness, and a read-only SQL evidence harness without introducing a speculative table or index. The implementation pack is closed; the remaining item is evidence-only because no representative production actual plan, logical-read, CPU/elapsed, memory-grant, result-size, statistics-quality, or operational-wait record has yet justified a new SQL object.
+- Suggested Fix: Run the delivered harness for recent/long-tenure, sparse/dense, one/three-KVK, and high-history governors in an approved production-safe window. Save actual plans and per-statement IO/time; compare estimated versus actual rows, spills, scans/lookups, residual predicates, memory grants, statistics sampling/age, and index usage/operational counters. Correct query/cardinality defects first, then assess consolidation or the narrowest supporting index against the full existing-index set and source write workload.
 - Impact: high
 - Risk: medium
-- Dependencies: approved additive `dbo.usp_GetLeadershipPlayerLastActive`; representative Governor IDs; SQL owner-approved plan collection window; no live load test without explicit approval; separate design approval, SQL PR, Changes review and SQL-first deployment for any follow-up object.
+- Dependencies: Phase 8.1 implementation deployed and archived; representative Governor IDs; SQL owner-approved plan collection window; no live load test without explicit approval; separate design approval, SQL PR, Changes review, and SQL-first deployment for any follow-up object.
+- Status: evidence required
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_dal.py`, `player_self_service/governor_dashboard_renderer.py`, SQL repo `dbo.KingdomScanData4`
@@ -139,15 +182,19 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Operator approval of the Phase 4 placeholder; authoritative `KingdomScanData4` SQL migration and source-population contract; `k98-sql-validation` before implementation.
+- Status: blocked by source contract
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: broad cross-page renderer/view framework beyond Phase 7's narrow `/me` visual contract
 - Type: architecture
-- Description: Phase 7 completed the retained `/me` visual/content consistency pass and extracted only bounded, proven common primitives into `core/visual_contract.py`. Phase 8 then delivered a separate leadership-specific renderer/payload/view contract. Dashboard, Inventory, core summary payloads, selectors, data ownership, dimensions, and page-specific renderers remain deliberately independent. Phase 8.1 is an approved refinement inside the leadership renderer; it still does not prove that one universal renderer/grid/payload/view framework would be safer or clearer.
-- Suggested Fix: Observe the accepted Phase 8.1 and future Phase 9 leadership renderers after delivery. Reconsider any broader framework only with quantified identical duplication across at least two accepted consumers, a migration matrix, visual and fallback parity tests, Discord component-limit proof, lifecycle/timeout evidence, and a separately approved task pack. Do not use Phase 8.1 or 9 to consolidate self-view and leadership selectors or to introduce a universal grid.
+- Description: Phase 7 completed the retained `/me` visual/content consistency pass and extracted only bounded, proven common primitives into `core/visual_contract.py`. Phase 8 and the completed Phase 8.1 refinement retain a separate leadership-specific renderer/payload/view contract. Dashboard, Inventory, summary payloads, selectors, data ownership, dimensions, and page-specific renderers remain deliberately independent. The delivered evidence still does not prove that one universal renderer/grid/payload/view framework would be safer.
+- Suggested Fix: Observe the accepted Phase 8.1 renderer and the proposed Phase 9 leadership renderer after delivery. Reconsider a broader framework only with quantified identical duplication across at least two accepted consumers, a migration matrix, visual/fallback parity tests, Discord component-limit proof, lifecycle/timeout evidence, and a separately approved task pack. Do not consolidate self-view and leadership selectors or introduce a universal grid through Phase 9.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 7 operator accepted on 2026-07-19; Phase 8 operator accepted on 2026-07-21; accepted `core/visual_contract.py` and leadership-renderer boundaries; Phase 8.1/9 observation evidence; no broad framework without a later explicit task pack.
+- Dependencies: Accepted Phase 7/8/8.1 boundaries; proposed Phase 9 delivery evidence when available; no broad framework without quantified duplication and explicit approval.
+- Status: watchlist
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `player_self_service/accounts_export.py`, Inventory exports, SQL export views/tables, export docs/tests
@@ -157,6 +204,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: high
 - Risk: high
 - Dependencies: Phase 5G operator accepted after output-shape and Discord smoke on 2026-07-17; operator approval for any future cross-domain programme.
+- Status: watchlist
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests
@@ -166,24 +215,19 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval for public visibility changes and a fresh task pack. Phase 5A moved calendar admin/operator commands under existing `/ops calendar_*` paths so the flat public `/calendar` command remains untouched until this redesign.
+- Status: proposed design programme
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
-- Area: SQL repo legacy PreKvK phase object retirement
+- Area: SQL repo `dbo.PreKvk_Phases` and compatibility-only PreKvK phase objects
 - Type: cleanup
-- Description: After Phase 2B compatibility wrappers remove active scan-window logic, `dbo.PreKvk_Phases` and any compatibility-only phase objects may remain as unused legacy SQL surface.
-- Suggested Fix: Run a later Option C retirement audit after at least one production cycle, re-check live SQL dependencies and manual/report usage, then prepare a SQL-repo-only drop plan with rollback scripts if no consumers remain.
+- Description: The legacy `dbo.PreKvk_Phases` table and any compatibility-only phase objects may remain after the active scan-window logic moved behind newer compatibility wrappers. Their exact current Production presence, dependencies, manual/report consumers, and rollback value have not been freshly verified, so destructive retirement is not yet justified.
+- Suggested Fix: Run a current SQL-repository and live-Production object/dependency audit, including stored modules, jobs, reports, exports, manual scripts, permissions, extended properties, and rollback references. If all consumers are absent after an agreed observation period, prepare a SQL-repo-only retirement migration with backup, pre/post validation, schema export, and an explicit forward-fix or rollback decision.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 2B compatibility wrapper deployment completed and smoke tested; live dependency checks confirm no references beyond the objects being retired; production owner approves destructive SQL cleanup.
-
-### Deferred Optimisation
-- Area: `C:\K98-bot-SQL-Server` SQL development and deployment workflow
-- Type: architecture
-- Description: SQL schema changes can now be developed through Git PRs, but the existing production export routine can still overwrite Git-driven SQL changes because it syncs production schema back to the repository as the main routine.
-- Suggested Fix: Use `C:\Users\cwatt\Downloads\sql_deploy_route_task_pack.md` to create a PR-based SQL promotion workflow with guarded deploy scripts, migration history, a safe production schema export branch, `migrations/` conventions, and `docs/SQL_PROMOTION_GUIDE.md`.
-- Impact: high
-- Risk: medium
-- Dependencies: DL_bot upload-routing and Phase 6 lifecycle work are complete; preserve current production schema export as a drift/safety mechanism while preventing direct overwrite of `main`.
+- Dependencies: Current Production object inventory and dependency evidence; at least one completed production cycle after the compatibility-wrapper deployment; production owner approval for destructive SQL cleanup.
+- Status: SQL object revalidation required
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `bot_helpers.py`, `utils.py`, `core/queue_lifecycle.py`, `upload_routes/fallback_queue_route.py`, queue runtime state
@@ -193,6 +237,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 6K live queue persistence hardening and Phase 6L lifecycle closure are complete; coordinate as a separate post-Phase 6 programme.
+- Status: watchlist
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: queue persistence model, SQL repo `C:\K98-bot-SQL-Server`
@@ -202,6 +248,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: high
 - Dependencies: Requires explicit approval, `k98-sql-validation`, SQL repo changes, and production migration planning.
+- Status: conditional watchlist
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `event_calendar/pinned_embed.py`
@@ -211,6 +259,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: low
 - Dependencies: Keep this separate from Phase 6F unless a later pinned-calendar persistence task is approved.
+- Status: implementation-ready
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `decoraters.py`, `commands/admin_cmds.py`, `/ops usage`, `/ops usage_detail`, leadership-role configuration and permission tests
@@ -220,6 +270,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 8 dedicated authorization is deployed and operator accepted, but generic decorator consumers still need their own compatibility audit. Preserve intended admin/leadership access outside `/stats player`; run focused permission/telemetry tests, command registration, full pytest, and operator smoke before changing the shared decorator.
+- Status: policy-gated
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` fast-path attachment handlers, `upload_routes/`, `file_utils.py`, import worker admission and operational telemetry
@@ -229,6 +281,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: high
 - Dependencies: Production upload-channel ACL review; measured host/process/SQL capacity and acceptable queue depth; coordinate with the existing queue-domain deferred item without broad redesign; no live load test without explicit operator approval.
+- Status: evidence and design-gated
+- Last verified: 2026-08-29
 
 ### Deferred Optimisation
 - Area: `DL_bot.py::_offload_callable`, `file_utils.py` callable offload backends, `upload_routes/mge_results_route.py`, importer failure tests
@@ -238,3 +292,5 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Preserve current offload preference and route-level error messaging; define once-only versus explicitly retryable callable contracts; run MGE upload, offload, failure/audit, pre-commit, and full regression tests.
+- Status: implementation-ready — highest priority
+- Last verified: 2026-08-29

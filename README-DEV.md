@@ -242,21 +242,17 @@ private leadership player-review journey, `/player_profile` is absent with no re
 Tanking Score is aligned globally, and the accepted command surface is 36 top-level, 100 grouped,
 eight `/me`, one `/stats`, and two `/inventory`.
 
-Phase 8.1 is the active audit-first refinement for `/stats player`: remove duplicated Overview
-activity cards, promote Presence and bounded Last Active, enlarge location/shield context, improve
-Activity/KVK/Record readability, align `Data refreshed`/Generated footer placement, and measure cold
-and warm 30/90/180/360 load paths before approving any bot or SQL optimisation. It preserves the
-accepted `1702x924` visual family, dedicated role-ID/channel authorization, private output,
-same-payload fallback, latest-transition-wins, preserve-and-disable timeout, cleanup and exact
-Governor-ID navigation. No command change or resync is expected; new SQL objects remain evidence-
-and approval-gated. Phase 9 remains a separate leadership `/stats kingdom` product.
+Phase 8.1 completed and was operator accepted on 2026-07-23. It retained `/stats player`, the
+dedicated role-ID/channel permission boundary, private output and the existing command surface,
+while delivering the final visual hierarchy, distinct Presence and bounded Last Active signals,
+combined location/shield context, clearer KVK and Player Record presentation, latest-scan Power
+rank, positive-Acclaim rank, and bounded exact-Governor-ID existence handling. No command resync,
+permission, privacy, table, index, refresh or pre-aggregation contract was added.
 
-The 2026-07-23 final visual follow-up replaces the static KD98 circle with stored latest-scan Power
-rank and reduces KVK cards to the essential leadership comparison lines. Positive-Acclaim rank is
-added through the existing bounded KVK calculation set; no table, index, refresh or
-pre-aggregation object is introduced. Direct numeric Governor IDs now receive a bounded
-authoritative existence check before the full review payload starts; an unknown ID returns a
-private retry message, while governor-name matching and its ambiguity selector remain unchanged.
+The Phase 8.1 task pack and chat starter are archived. Representative SQL plan/read/time evidence
+for the delivered path remains separately deferred and does not make the implementation pack
+active. Phase 9 `/stats kingdom` remains proposed and approval-gated across product, SQL, visual,
+performance, security and scheduling decisions.
 
 ## Quality Automation
 

@@ -2,6 +2,21 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup completed through mirror PR #246 without a
+runtime or SQL behaviour change. Its task pack and chat starter are archived here. The separate
+MINI_AMD transaction-log backup cadence policy question remains active in the deferred register;
+it is not unfinished Phase 5.2 work.
+
+GovernorOS Phase 8.1 Leadership Player Review Visual Hierarchy, Presence and Performance completed
+and was operator accepted on 2026-07-23. Mirror PR #231 and production PR #538 carry the bot
+delivery; SQL PRs #58 and #59 supplied the additive rank and exact-ID existence support. Its task
+pack and chat starter are archived here, while representative delivered-path performance evidence
+remains separately deferred.
+
+MGE Process Polish Phase 2 completed, was production deployed and smoke tested through PR #75. Its
+initiation/delivery record is archived here as historical service-boundary evidence; it is not an
+active MGE implementation pack.
+
 King of All Britain KVK Card Background completed implementation, review, and operator visual smoke
 on 2026-08-28 through mirror PR #244 and production PR #551, pending manual merge. Both KVK Stats
 and Targets renderers select the pinned `1180 × 640` RGB production backdrop through the existing
@@ -107,8 +122,9 @@ mirror PR #229 and production PR #536. Phase 8 completed the one private `/stats
 journey, global canonical combat alignment, bounded source/audit/history contracts and
 `/player_profile` retirement on 2026-07-21 through mirror PR #230 and production PR #537 after the
 SQL migration series and merged follow-up SQL PR #53 deployed. Its archived records preserve the
-accepted `36 / 100 / 8 / 1 / 2` command surface and production smoke evidence. The active v2
-programme pack and Phase 8.1 refinement records remain in `docs/task_packs/`.
+accepted `36 / 100 / 8 / 1 / 2` command surface and production smoke evidence. The living v2
+programme pack remains in `docs/task_packs/`; Phase 8.1 is complete and its execution records are
+archived here. Phase 9 `/stats kingdom` remains separately proposed and gated.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,
@@ -193,8 +209,11 @@ correlation, SQL import behavior, user-facing behavior, and historical rows. Pro
 testing on 2026-07-01 confirmed new fallback batch 27 and player-location batch 28 phase rows no
 longer show `CompletedAtUtc < StartedAtUtc`.
 
-The active import follow-up is Task C Slice 12 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 12 UPDATE_ALL2 Wrapper Audit Outputs.md`.
+Task C Slice 12 is complete and archived. The active import follow-up is Task C Slice 13, whose
+July evidence/object map must be refreshed against the post-August KingdomScanData4 tree before
+execution:
+
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

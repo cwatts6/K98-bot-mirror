@@ -1,8 +1,23 @@
 # Task Packs
 
-Active task packs live in this folder. Completed DL_bot upload-routing, startup/lifecycle, and
-completed command-platform programme packs were moved to `archive/` to keep the active task-pack
-list focused.
+This folder contains active execution packs, proposed/gated work, living programme records,
+retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
+itself mean that the document is approved for execution.
+
+## Current execution set — 2026-08-29
+
+| Classification | Files / programme | Status |
+|---|---|---|
+| Active execution pack | Task C Slice 13 task pack and chat starter | Evidence pack exists; refresh the July object/timing baseline against the post-August tree before execution |
+| Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
+| Closure-audit records | `MGE Sign-Up Tool.md`, `mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
+| Living programme record | `Player Self-Service Command Centre v2 - Programme Pack.md` | GovernorOS complete through Phase 8.1; Phase 9 proposed/gated |
+| Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
+| Index/reference | `README.md`; historical `me_dashboard_screenshot.jpg` visual reference | Documentation index; the operator-owned asset removal is preserved and the former path is not active work |
+
+Recently archived: KingdomScanData4 Phase 5.2 task pack/starter, GovernorOS Phase 8.1 task
+pack/starter, and the MGE Process Polish Phase 2 initiation statement. These are completed records,
+not current execution packs.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user
@@ -57,8 +72,9 @@ KVK_ALL Schema Modernisation status:
   - `archive/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md`
   - `archive/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md`
   - `archive/KVK_ALL Schema Modernisation - Phase 11 Initiation Statement.md`
-- The Phase 4 metric source rules and Phase 10 metric source correction docs also remain mirrored
-  at their active `docs/task_packs/` paths because SQL contract tests assert those references.
+- The Phase 4 metric source rules and Phase 10 metric source correction docs also remain at their
+  top-level `docs/task_packs/` paths because SQL contract tests assert those references. They are
+  retained test-contract fixtures, not active work.
 - Future KVK_ALL work should start from a fresh task pack rather than continuing the schema
   modernisation programme as Phase 12.
 
@@ -187,14 +203,13 @@ Import pipeline status:
 - Active Task C Slice 13 files:
   - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
   - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
-- Task C Slice 13 is the next import architecture cleanup slice. It starts with audit/scope and
-  evidence review over the new `update_all2_*` phase rows, quantifies whether
-  `update_all2_summary_proc` consistently dominates runtime, identifies any coarse-to-subphase
-  timing gap, validates `dbo.SUMMARY_PROC` and helper-procedure boundaries, and recommends the
-  next implementation slice. `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2`
-  decomposition, `dbo.SUMMARY_PROC` tuning/decomposition, residual `stats_module.py` cleanup,
-  legacy PreKvK SQL cleanup, weekly cumulative view cleanup, and inventory view-orchestration
-  extraction remain separate later slices unless explicitly approved.
+- Task C Slice 13 remains the next import architecture evidence slice, but its July object map and
+  timing sample must be refreshed against the post-August KingdomScanData4 import, locking,
+  immutable-handoff, delta and provenance changes before execution. It must not assume that
+  `update_all2_summary_proc` still dominates. Later work remains separately gated for
+  `dbo.IMPORT_STAGING_PROC_CORE`, `dbo.UPDATE_ALL2`, `dbo.SUMMARY_PROC`, residual
+  `stats_module.py`, legacy PreKvK SQL and inventory view orchestration; the retired weekly
+  cumulative view is no longer active backlog.
 
 Discord Voting Post Framework status:
 
@@ -479,17 +494,16 @@ Player Self-Service Command Centre status:
 - Completed Phase 6 records are archived under `archive/`.
 - The former proposed `/me history` Phase 7 is closed with no build; `/kvk history` remains
   canonical.
-- Active GovernorOS v2 task packs:
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
+- Proposed/gated GovernorOS v2 task packs:
   - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 - Phase 8 completed SQL-first deployment, resync, correction smoke and operator acceptance on
   2026-07-21 through mirror PR #230 and production PR #537; merged SQL follow-up PR #53 carries the
-  final source-data correction. Its task pack/starter are archived. Phase 8.1's audited bot scope
-  and additive Last Active procedure were approved on 2026-07-21; implementation is in validation
-  with representative production performance evidence still pending. Use
-  `../stats_player_phase81_smoke_guide.md` for the bounded smoke and measurement contract.
+  final source-data correction. Its task pack/starter are archived. Phase 8.1 completed and was
+  operator accepted on 2026-07-23 through mirror PR #231, production PR #538 and SQL PRs #58/#59;
+  its task pack/starter are archived. Representative production performance evidence remains a
+  separate deferred item and does not make the implementation pack active. Phase 9 remains
+  proposed and approval-gated.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -573,19 +587,21 @@ Latest completed starter:
 Next active work:
 
 Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and
-SUMMARY_PROC Scope Audit is the next prepared import pipeline slice. It starts with audit/scope
-and evidence review over recent fallback `ImportAuditBatch`/`ImportAuditPhase` rows now that Slice
-12 has delivered durable `update_all2_*` phase markers. The slice should quantify
-`SUMMARY_PROC`/downstream timing evidence before any later SQL tuning or decomposition work.
+SUMMARY_PROC Scope Audit remains the next prepared import pipeline slice, but its July evidence,
+object map and timing baseline must be refreshed before execution. The refreshed slice should use
+post-August fallback `ImportAuditBatch`/`ImportAuditPhase` rows and reconfirm current procedure
+boundaries before drawing any `SUMMARY_PROC` or downstream tuning conclusion.
 Fallback, player-location, Honor, PreKvK, weekly activity, MGE, inventory, KVK_ALL, and Rally Forts
 durable audit adoption is complete, Slice 11 normalized generic `ImportAuditPhase` timestamps, and
 Slice 12 delivered UPDATE_ALL2 audit-output observability. Route UX changes, queue embed changes,
-`dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2` decomposition, `dbo.SUMMARY_PROC`
-tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL cleanup, weekly
-cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
-unless explicitly approved.
+`dbo.IMPORT_STAGING_PROC_CORE` decomposition, `dbo.UPDATE_ALL2` decomposition,
+`dbo.SUMMARY_PROC` tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL
+cleanup, and inventory view-orchestration extraction remain separate later slices unless
+explicitly approved. `dbo.vAllianceActivity_WeeklyCumulative` is resolved history, not a later
+cleanup slice.
 
-Player Self-Service Command Centre v2 GovernorOS is complete and operator accepted through Phase 8.
+Player Self-Service Command Centre v2 GovernorOS is complete and operator accepted through Phase
+8.1 on 2026-07-23. Phase 9 `/stats kingdom` remains proposed and approval-gated.
 Phase 5F delivered in mirror PR #225 and production-branch commit `89f7da16`; Phase 5G
 completed final Discord smoke on 2026-07-17 through mirror PR #227 and production PR #534. The
 Phase 6 result in mirror PR #228 and production PR #535 passed final smoke on 2026-07-18 and has
@@ -618,18 +634,16 @@ The active programme pack now records:
   inheritance contract;
 - completed Phase 8 leadership `/stats player` modernisation, global canonical Tanking Score
   alignment, dedicated leadership audit/source foundations, and `/player_profile` retirement;
-- Phase 8.1 leadership page-purpose, Presence/Last Active, location/KVK/record visual hierarchy and
-  evidence-led query/load performance refinement;
+- completed Phase 8.1 leadership page-purpose, Presence/Last Active, location/KVK/record visual
+  hierarchy and exact-ID/rank refinements, with performance evidence separately deferred;
 - Phase 9 private `/stats kingdom` with dynamic-roster twelve-month trends and the latest four
   completed KVKs;
 - Phase 10 usage-led migration review and Phase 11 future-candidate boundaries.
 
-Phase 8.1 and Phase 9 task packs/starters are active in this folder. One-pass execution is not
-approved. Phase 8 is complete and archived; Phase 8.1 has approved implementation scope and one
-additive Last Active procedure, but no command, resync, table or index change. Both active
-packs/starters carry forward Phase
-7/8's accepted visual family, centred state pill, row-0 navigation,
-governor-control safety, content semantics, fallback, transition, timeout, and cleanup rules.
+Phase 8.1 is complete and archived. Phase 9's task pack/starter remain proposed and gated; one-pass
+runtime execution is not approved. Any Phase 9 implementation must carry forward Phase 7/8/8.1's
+accepted visual family, centred state pill, row-0 navigation, governor-control safety, content
+semantics, fallback, transition, timeout and cleanup rules.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

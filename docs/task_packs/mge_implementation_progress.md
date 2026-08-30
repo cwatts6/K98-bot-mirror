@@ -3,6 +3,9 @@
 > **Living document** — updated after each task completion.
 > Include this file in every new Codex/Copilot chat session for MGE work.
 > Companion to: `MGE Sign-Up Tool.md` (task pack), `docs/mge_reference_model.md` (data model)
+>
+> **Current status — 2026-08-29:** Tasks A-M are delivered. Task N is a bounded closure and
+> cross-module regression audit over existing wiring, not a broad implementation phase.
 
 ---
 
@@ -16,7 +19,8 @@ When starting a new chat session for MGE tasks, provide these files in order:
 4. `docs/task_packs/mge_implementation_progress.md` — **this file** (confirmed state)
 5. `docs/reference/mge_reference_model.md` — data model reference
 
-Then state: *"Continue with Task [X]. All prior tasks are complete and validated."*
+For the remaining programme action, state: *"Run the bounded Task N closure audit. Tasks A-M are
+complete; record any proved gap as a separately approved follow-on."*
 
 ---
 
@@ -35,9 +39,22 @@ Then state: *"Continue with Task [X]. All prior tasks are complete and validated
 | K | Rule editing | ✅ Complete | Bot | Delivered end-to-end: leadership/admin rules editor, per-event rule overrides, audited edits/resets, embed refresh, and service-level max-length guard |
 | L | Completion/freeze/report | ✅ Complete | Bot | Scheduler-driven completion at StartUtc+6d, admin-only reopen to `reopened`, internal summary (ephemeral + leadership channel) |
 | M | Results import scaffold | ✅ Completed | SQL + Bot | Phase 2, non-blocking |
-| N | Wiring & regression | 🔲 Pending | Bot | Include startup/rehydration integration and final cross-module regression pass |
+| N | Wiring & regression | 🟨 Closure audit pending | Bot | Existing command/startup/cache/scheduler/permission/rehydration wiring is present. Run one bounded closure and cross-module regression audit; document any proved gap as a separate follow-on rather than silently expanding Task N. |
 
+### Task N closure audit
 
+- [ ] Confirm `/mge` command registration and required decorators.
+- [ ] Confirm startup commander/variant cache refresh.
+- [ ] Confirm lifecycle scheduler registration occurs after readiness.
+- [ ] Confirm SQL-backed event and message identity remain authoritative.
+- [ ] Confirm persistent-view reattachment and restart behaviour.
+- [ ] Confirm permission checks are revalidated at interaction/action boundaries.
+- [ ] Confirm shutdown and background-task cancellation behavior.
+- [ ] Confirm automatic and manual results-import route wiring.
+- [ ] Confirm Ark, Calendar and Registry regression boundaries remain intact.
+- [ ] Run the focused MGE/startup/permission/rehydration/results tests selected by the current tree
+  and the current command-registration validator; record exact evidence before marking Task N
+  complete.
 
 ---
 
