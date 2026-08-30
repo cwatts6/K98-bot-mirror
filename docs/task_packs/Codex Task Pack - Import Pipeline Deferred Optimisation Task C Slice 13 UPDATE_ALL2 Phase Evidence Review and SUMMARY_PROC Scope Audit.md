@@ -262,9 +262,7 @@ Do not lose these later slices:
    - Continue shrinking `stats_module.py` once audit and SQL instrumentation are stable.
 6. **Later SQL Cleanup - Legacy PreKvK Phase Object Retirement**
    - Keep separate after live dependency review.
-7. **Later SQL Cleanup - `dbo.vAllianceActivity_WeeklyCumulative` Review**
-   - Confirm downstream/manual usage before correcting or retiring the view.
-8. **Later Python Slice - Inventory View Orchestration Extraction**
+7. **Later Python Slice - Inventory View Orchestration Extraction**
    - Keep separate from fallback SQL evidence work.
 
 ## 10. Codex Skills To Use

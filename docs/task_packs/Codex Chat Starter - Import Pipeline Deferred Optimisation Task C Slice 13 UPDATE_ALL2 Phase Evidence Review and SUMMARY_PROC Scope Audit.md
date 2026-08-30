@@ -95,7 +95,6 @@ Explicitly out of scope unless separately approved:
 - Historical production audit backfill.
 - Residual stats_module.py cleanup outside evidence-query support.
 - Legacy PreKvK SQL cleanup.
-- Weekly cumulative view cleanup.
 - Inventory view-orchestration extraction.
 
 Audit these before proposing implementation:
@@ -111,7 +110,7 @@ Required first response:
 - Current evidence state, contrasting the historical 2026-07-09 smoke with a post-August sample.
 - SQL position and whether any SQL repo change appears necessary now.
 - Implementation-boundary proposal: audit/query-only, helper script/report, SQL view/procedure, or later decomposition task.
-- Remaining slice map for SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC_CORE split, stats_module cleanup, PreKvK cleanup, weekly view cleanup, and inventory orchestration.
+- Remaining slice map for SUMMARY_PROC audit/decomposition, UPDATE_ALL2 decomposition, IMPORT_STAGING_PROC_CORE split, stats_module cleanup, PreKvK cleanup, and inventory orchestration.
 - Validation plan including SQL evidence queries, focused docs/tests if changed, smoke expectations, and Codex Security decision.
 - Open questions or approval needed.
 
