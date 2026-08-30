@@ -49,7 +49,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: high
 - Risk: high
 - Dependencies: KingdomScanData4 Phase 5 immutable handoff and Phase 5.2 stabilisation/cleanup complete; durable import audit available; current wrapper/core SQL source and production smoke baseline; separate SQL task pack and owner approval before decomposition.
-- Status: active — remapped after KingdomScanData4 Phase 5
+- Status: operator-gated
 - Last verified: 2026-08-29
 
 ### Deferred Optimisation
