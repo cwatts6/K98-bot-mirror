@@ -1,5 +1,8 @@
 # Codex Task Pack - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy, Presence and Performance
 
+> **Archived status — 2026-07-23:** Phase 8.1 is complete and operator accepted. The task header
+> below preserves the execution-time approval state as historical delivery context.
+
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy, Presence and Performance`

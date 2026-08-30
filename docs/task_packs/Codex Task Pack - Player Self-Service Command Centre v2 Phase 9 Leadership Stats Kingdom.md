@@ -814,7 +814,7 @@ No standard/deep codebase scan without explicit request.
 
 ## 28. Deployment
 
-1. Confirm the archived Phase 8 acceptance baseline and do not absorb the active Phase 8.1 scope.
+1. Confirm the archived Phase 8 and Phase 8.1 acceptance baselines and do not reopen their scope.
 2. Audit/approve Phase 9.
 3. Develop SQL contract.
 4. Deploy/verify SQL.

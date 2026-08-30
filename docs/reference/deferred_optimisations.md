@@ -66,7 +66,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 
 ### Deferred Optimisation
 - Area: MINI_AMD SQL Agent transaction-log backup job schedules and SQL backup-policy documentation
-- Type: operations
+- Type: consistency
 - Description: The KingdomScanData4 Phase 5.2 cleanup found that the production transaction-log backup job has both 15-minute and 5-minute schedules enabled. The current backup chain was healthy at cleanup, but the intended steady-state cadence and whether both schedules are deliberate have not been confirmed. Overlapping schedules are not automatically a defect, but leaving the policy ambiguous creates avoidable operational and recovery uncertainty.
 - Suggested Fix: Inventory the job and schedule IDs, enabled state, ownership, next-run times, and 7-14 days of execution history. Record average, p95, and maximum job duration plus overlaps, skips, failures, log growth, backup size, recovery-point objective, and off-machine copy cadence. Approve one documented policy, then disable only a confirmed redundant schedule through a separate operator change. Verify the log chain and backup health after the change and document the exact rollback.
 - Impact: high

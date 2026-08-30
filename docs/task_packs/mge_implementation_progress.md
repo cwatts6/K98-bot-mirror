@@ -2,7 +2,7 @@
 
 > **Living document** — updated after each task completion.
 > Include this file in every new Codex/Copilot chat session for MGE work.
-> Companion to: `MGE Sign-Up Tool.md` (task pack), `docs/mge_reference_model.md` (data model)
+> Companion to: `MGE Sign-Up Tool.md` (task pack), `docs/reference/mge_reference_model.md` (data model)
 >
 > **Current status — 2026-08-29:** Tasks A-M are delivered. Task N is a bounded closure and
 > cross-module regression audit over existing wiring, not a broad implementation phase.
