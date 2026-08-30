@@ -1,8 +1,15 @@
 # Codex Chat Starter - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup
 
-Use the task pack at:
+> **Archived status — 2026-08-29:** Phase 5.2 cleanup is complete. This starter is preserved only
+> as historical operator context; do not execute it or reuse its former access and cleanup
+> approvals. The MINI_AMD backup-cadence question is a separate deferred policy decision and does
+> not reopen Phase 5.2.
 
-`C:\discord_file_downloader\docs\task_packs\Codex Task Pack - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
+Historical task pack (archived at):
+
+`C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup.md`
+
+## Historical Starter — Do Not Execute
 
 Begin KingdomScanData4 Phase 5.2 post-stabilisation cleanup.
 
