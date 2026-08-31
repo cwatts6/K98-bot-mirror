@@ -91,9 +91,7 @@ async def test_four_argument_mge_failure_enters_callable_once(monkeypatch):
         )
 
     assert exc_info.value is sentinel
-    assert invocations == [
-        (b"xlsx", "mge_rankings_kd1198_20260311.xlsx", 123456789, context)
-    ]
+    assert invocations == [(b"xlsx", "mge_rankings_kd1198_20260311.xlsx", 123456789, context)]
     assert len(runner_calls) == 1
     _func, runner_args, runner_kwargs = runner_calls[0]
     assert runner_args == ()

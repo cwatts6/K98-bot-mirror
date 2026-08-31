@@ -367,6 +367,11 @@ async def _offload_callable(
     helper is unavailable, coroutine functions are awaited directly and blocking
     callables use ``asyncio.to_thread``. No execution failure is treated as a
     reason to submit the callable through another backend.
+
+    ``prefer_process`` is retained as a compatibility-only control so existing
+    direct and injected call shapes remain stable. The current process helpers do
+    not preserve this adapter's arbitrary result and exception contract, so the
+    flag does not select a process backend here.
     """
     backend_unavailable_reason = "missing_symbol"
     try:
@@ -405,7 +410,7 @@ async def _offload_callable(
 async def ensure_sql_headroom_or_notify(notify_ch) -> bool:
     """
     Returns True if it's OK to proceed, False if the import should be skipped because of log headroom.
-    This runs the blocking pyodbc check in an isolated process if helper available.
+    This runs the blocking pyodbc check through the once-only offload adapter.
     """
     server = SQL_SERVER
     database = SQL_DATABASE
@@ -417,7 +422,7 @@ async def ensure_sql_headroom_or_notify(notify_ch) -> bool:
         return True
 
     try:
-        # Offload to isolated process when possible
+        # Keep blocking SQL preflight work off the event loop.
         await _offload_callable(
             preflight_from_env_sync,
             server,
@@ -452,7 +457,7 @@ async def ensure_sql_headroom_or_notify(notify_ch) -> bool:
 
 
 async def trigger_log_backup_background():
-    """Schedule the synchronous trigger in an isolated process when possible, else a thread."""
+    """Schedule the synchronous trigger through the once-only offload adapter."""
     try:
         res = await _offload_callable(
             trigger_log_backup_sync, name="trigger_log_backup", prefer_process=True
