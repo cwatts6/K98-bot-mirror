@@ -285,12 +285,23 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-08-29
 
 ### Deferred Optimisation
-- Area: `DL_bot.py::_offload_callable`, `file_utils.py` callable offload backends, `upload_routes/mge_results_route.py`, importer failure tests
-- Type: reliability
-- Description: The same security scan reproduced a bounded correctness defect: for the production four-argument MGE importer shape, the first compatible thread backend can execute a side-effecting callable and propagate its exception, after which `_offload_callable` treats that callable exception as a backend-start failure and invokes the callable once more through `asyncio.to_thread`. The demonstrated consequence is repeated failed-import audit/parsing/database work, not a reportable security impact after policy calibration.
-- Suggested Fix: Separate backend-start/transport failures from exceptions raised after callable entry, and never retry a non-idempotent callable merely because it failed. Add a focused regression test asserting one invocation when the callable raises after entry, retain coverage for genuine backend-unavailable fallback, and audit other helper call shapes before claiming they share the same behavior.
+- Area: `stats_module.py::_offload_callable_py` and its current callers
+- Type: consistency
+- Description: Static review proves that `_offload_callable_py` catches an ordinary exception from `run_step`, then invokes the same callable through `run_blocking_in_thread`, catches again, and finally invokes it through `asyncio.to_thread`. A callable exception after entry can therefore cause up to three executions. The current call sites include SQL- and cache-related operations, but their exact production argument shapes, idempotence, and side-effect boundaries have not been audited to the standard completed for `DL_bot.py`.
+- Suggested Fix: Scope a separate once-only audit for every `_offload_callable_py` caller. Reproduce the highest-risk real call shape deterministically, establish which executor contracts preserve its arguments/results/exceptions, then remove post-entry fallback and add cancellation/timeout coverage without changing SQL or cache behavior.
 - Impact: medium
 - Risk: medium
-- Dependencies: Preserve current offload preference and route-level error messaging; define once-only versus explicitly retryable callable contracts; run MGE upload, offload, failure/audit, pre-commit, and full regression tests.
-- Status: implementation-ready — highest priority
-- Last verified: 2026-08-29
+- Dependencies: Separate operator-approved task; complete caller/side-effect inventory; preserve Stats result normalization, SQL failure handling, cache behavior, and existing telemetry.
+- Status: evidence required
+- Last verified: 2026-08-31
+
+### Deferred Optimisation
+- Area: `ui/views/kvk_history_view.py::_offload_callable` and KVK History payload/export callers
+- Type: consistency
+- Description: Static review proves that `_offload_callable` catches an ordinary exception from `run_blocking_in_thread` and then invokes the same callable again through `asyncio.to_thread`. This has the same unsafe post-entry fallback shape as the corrected `DL_bot.py` helper, but the KVK History callers' read, rendering, export, timeout, and user-visible failure contracts have not been independently reproduced or calibrated.
+- Suggested Fix: Scope a separate KVK History offload audit. Inventory each payload/export call shape, reproduce one post-entry failure with an invocation counter, then adopt a once-only executor-selection contract while preserving result extraction, interaction behavior, and existing error presentation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate operator-approved task; focused KVK History offload, payload, export, timeout, and interaction tests.
+- Status: evidence required
+- Last verified: 2026-08-31

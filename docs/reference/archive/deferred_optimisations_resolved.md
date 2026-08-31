@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### DL_bot Offload Callable Once-Only Failure Semantics Completed Item
+
+- Area: `DL_bot.py::_offload_callable`, `file_utils.py` callable offload contracts, `upload_routes/`, and offload/import failure tests
+- Type: reliability
+- Description: The production four-positional-argument MGE path reached `run_blocking_in_thread`, entered its side-effecting importer, swallowed an importer exception as though the backend had failed to start, and invoked the same importer again through `asyncio.to_thread`. A deterministic pre-fix harness recorded two entries with the same `MgeResultsImportAuditContext` before the original sentinel failure propagated.
+- Resolution: `_offload_callable` now selects a contract-compatible executor before invocation, binds callable arguments separately from offload controls, uses `run_blocking_in_thread` when available, and falls back only when that helper is unavailable before submission. Once work may have entered, exact results, exceptions, cancellation, timeout, and indeterminate outcomes propagate without another backend invocation. The incompatible maintenance runner and synchronous process launcher are no longer treated as arbitrary-callable executors. All direct and injected call shapes, route embeds, import/audit/DAL behavior, SQL contracts, configuration, commands, permissions, caches, schedulers, and live schedules remain unchanged.
+- Validation: The post-fix contract module passed 14 tests; combined MGE/offload/maintenance/shutdown coverage passed 53 tests; affected upload-route coverage passed 87 tests; and the full suite passed with `3016 passed, 2 skipped`. The guarded log-noise suite repeated `3016 passed, 2 skipped` with production operational logs unchanged. Architecture, deferred-item, test-selection, security-routing, import-smoke, command-registration, full pre-commit, pyright, and `git diff --check` gates passed. No live Discord upload, production SQL, backup trigger, shutdown-marker write, restart, resync, process cancellation, deployment, or load test was performed.
+
 ### KVK Targets Quality Phase 2 Completed Programme
 
 - Area: `kvk/models/kvk_target_row.py`, target DAL/services/cache, `kvk_state.py`, `kvk/dal/kvk_lifecycle_dal.py`, `account_picker.py`, `ui/views/kvk_targets_views.py`, and `/kvk history` rank retrieval

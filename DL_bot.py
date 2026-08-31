@@ -1,5 +1,6 @@
 # DL_bot.py
 # Note: minimal edit to use centralized logging_setup (UTC timestamps, rotation, console handling).
+from functools import partial
 import io
 import os
 from pathlib import Path
@@ -348,9 +349,9 @@ if _duplicates:
 MAIN_LOOP = getattr(bot, "loop", None)
 
 
-# Centralized offload helper used throughout DL_bot to prefer process isolation,
-# then callable offload, then thread, then asyncio.to_thread. This keeps call-sites
-# concise and ensures consistent telemetry/meta usage.
+# Centralized once-only offload helper used throughout DL_bot. Backend capability is
+# selected before invocation; once work may have entered a callable, its outcome is
+# always propagated without attempting the callable through another backend.
 async def _offload_callable(
     fn,
     *args,
@@ -360,78 +361,44 @@ async def _offload_callable(
     **kwargs,
 ):
     """
-    Attempt to run `fn(*args, **kwargs)` in (in order):
-      - run_maintenance_with_isolation(..., prefer_process=prefer_process)
-      - start_callable_offload(..., prefer_process=prefer_process)
-      - run_blocking_in_thread(...)
-      - asyncio.to_thread(...)
+    Run ``fn(*args, **kwargs)`` at most once and preserve its exact outcome.
 
-    Returns the callable result (or raises).
+    The project thread runner is selected before callable invocation. If that
+    helper is unavailable, coroutine functions are awaited directly and blocking
+    callables use ``asyncio.to_thread``. No execution failure is treated as a
+    reason to submit the callable through another backend.
     """
-    # Local imports & resolution
-    try:
-        from file_utils import run_maintenance_with_isolation  # type: ignore
-    except Exception:
-        run_maintenance_with_isolation = None  # type: ignore
-
-    try:
-        from file_utils import start_callable_offload  # type: ignore
-    except Exception:
-        start_callable_offload = None  # type: ignore
-
+    backend_unavailable_reason = "missing_symbol"
     try:
         from file_utils import run_blocking_in_thread  # type: ignore
-    except Exception:
+    except Exception as exc:
         run_blocking_in_thread = None  # type: ignore
+        backend_unavailable_reason = f"import_error:{type(exc).__name__}"
 
     meta = meta or {}
-    # Try maintenance isolation (preferred for DB/long-running)
-    if run_maintenance_with_isolation is not None:
-        try:
-            res = await run_maintenance_with_isolation(
-                fn,
-                *args,
-                **kwargs,
-                name=name or getattr(fn, "__name__", None),
-                prefer_process=prefer_process,
-                meta=meta,
-            )
-            # Support helpers that may return (value, meta)
-            if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-                return res[0]
-            return res
-        except Exception:
-            # fallback to next option
-            pass
+    operation_name = name or getattr(fn, "__name__", type(fn).__name__)
+    bound_call = partial(fn, *args, **kwargs)
 
-    # Try callable offload (lighter-weight process/thread spawn)
-    if start_callable_offload is not None:
-        try:
-            res = await start_callable_offload(
-                fn,
-                *args,
-                **kwargs,
-                name=name or getattr(fn, "__name__", None),
-                prefer_process=prefer_process,
-                meta=meta,
-            )
-            if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-                return res[0]
-            return res
-        except Exception:
-            pass
+    if callable(run_blocking_in_thread):
+        logger.debug(
+            "offload_backend_selected backend=run_blocking_in_thread "
+            "prefer_process_requested=%s process_contract_available=false",
+            bool(prefer_process),
+        )
+        return await run_blocking_in_thread(bound_call, name=operation_name, meta=meta)
 
-    # Try thread helper
-    if run_blocking_in_thread is not None:
-        try:
-            return await run_blocking_in_thread(
-                fn, *args, **kwargs, name=name or getattr(fn, "__name__", None), meta=meta
-            )
-        except Exception:
-            pass
+    logger.warning(
+        "offload_backend_unavailable backend=run_blocking_in_thread reason=%s "
+        "prefer_process_requested=%s",
+        backend_unavailable_reason,
+        bool(prefer_process),
+    )
+    if inspect.iscoroutinefunction(bound_call):
+        logger.debug("offload_backend_selected backend=direct_async")
+        return await bound_call()
 
-    # Last resort: asyncio.to_thread
-    return await asyncio.to_thread(fn, *args, **kwargs)
+    logger.debug("offload_backend_selected backend=asyncio.to_thread")
+    return await asyncio.to_thread(bound_call)
 
 
 # NEW: helper to run preflight using environment credentials in a thread and notify user if it fails
