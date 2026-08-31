@@ -4,10 +4,11 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-08-29
+## Current execution set — 2026-08-30
 
 | Classification | Files / programme | Status |
 |---|---|---|
+| Active implementation pack | `DL_bot` offload-callable once-only task pack and chat starter | Highest-priority implementation-ready reliability fix; audit, deterministic reproduction, and architecture approval required before code |
 | Active execution pack | Task C Slice 13 task pack and chat starter | Evidence pack exists; refresh the July object/timing baseline against the post-August tree before execution |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
 | Closure-audit records | `MGE Sign-Up Tool.md`, `mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
@@ -586,11 +587,19 @@ Latest completed starter:
 
 Next active work:
 
+`DL_bot.py::_offload_callable` once-only failure semantics is the highest-priority
+implementation-ready engineering task. Its prepared task pack and chat starter require a
+deterministic four-argument MGE reproduction, full backend-contract and consumer call-shape audit,
+and architecture approval before runtime edits:
+
+- `Codex Task Pack - DL_bot Offload Callable Once-Only Failure Semantics.md`
+- `Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
+
 Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and
-SUMMARY_PROC Scope Audit remains the next prepared import pipeline slice, but its July evidence,
-object map and timing baseline must be refreshed before execution. The refreshed slice should use
-post-August fallback `ImportAuditBatch`/`ImportAuditPhase` rows and reconfirm current procedure
-boundaries before drawing any `SUMMARY_PROC` or downstream tuning conclusion.
+SUMMARY_PROC Scope Audit remains an active prepared import pipeline evidence slice, but its July
+evidence, object map and timing baseline must be refreshed before execution. The refreshed slice
+should use post-August fallback `ImportAuditBatch`/`ImportAuditPhase` rows and reconfirm current
+procedure boundaries before drawing any `SUMMARY_PROC` or downstream tuning conclusion.
 Fallback, player-location, Honor, PreKvK, weekly activity, MGE, inventory, KVK_ALL, and Rally Forts
 durable audit adoption is complete, Slice 11 normalized generic `ImportAuditPhase` timestamps, and
 Slice 12 delivered UPDATE_ALL2 audit-output observability. Route UX changes, queue embed changes,
