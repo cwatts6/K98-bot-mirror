@@ -18,11 +18,21 @@ def _load_modules(monkeypatch):
 
 
 def _install_exact_runner(monkeypatch, file_utils, calls):
-    async def run_blocking_in_thread(func, *args, **kwargs):
-        calls.append((func, args, kwargs))
+    async def run_blocking_in_thread(func, *args, name=None, meta=None, timeout=None, **kwargs):
+        runner_kwargs = dict(kwargs)
+        if name is not None:
+            runner_kwargs["name"] = name
+        if meta is not None:
+            runner_kwargs["meta"] = meta
+        if timeout is not None:
+            runner_kwargs["timeout"] = timeout
+        calls.append((func, args, runner_kwargs))
         if inspect.iscoroutinefunction(func):
-            return await func()
-        return func()
+            result = func(*args, **kwargs)
+            if timeout is not None:
+                return await asyncio.wait_for(result, timeout=timeout)
+            return await result
+        return func(*args, **kwargs)
 
     monkeypatch.setattr(file_utils, "run_blocking_in_thread", run_blocking_in_thread)
 
@@ -207,6 +217,29 @@ async def test_missing_thread_runner_awaits_async_callable_once(monkeypatch):
 
     assert result == {"value": 3, "flag": False}
     assert invocations == [(3, False)]
+
+
+@pytest.mark.asyncio
+async def test_selected_thread_runner_awaits_bound_async_callable_once(monkeypatch):
+    dl_bot, file_utils = _load_modules(monkeypatch)
+    runner_calls = []
+    invocations = []
+    _install_exact_runner(monkeypatch, file_utils, runner_calls)
+    _forbid_later_backend(monkeypatch, dl_bot)
+
+    async def async_callable(value, *, flag):
+        invocations.append((value, flag))
+        return {"value": value, "flag": flag}
+
+    result = await dl_bot._offload_callable(async_callable, 3, flag=False)
+
+    assert result == {"value": 3, "flag": False}
+    assert invocations == [(3, False)]
+    assert len(runner_calls) == 1
+    submitted_func, runner_args, runner_kwargs = runner_calls[0]
+    assert inspect.iscoroutinefunction(submitted_func)
+    assert runner_args == ()
+    assert runner_kwargs == {"name": "async_callable", "meta": {}}
 
 
 @pytest.mark.asyncio
