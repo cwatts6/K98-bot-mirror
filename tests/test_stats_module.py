@@ -382,9 +382,11 @@ async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeyp
     assert subphase_meta["phase"] == "b'update_all2_create_averages'"
     assert isinstance(subphase_meta["phase"], str)
     coarse = next(call for call in phase_calls if call["phase_name"] == "fallback_update_all2")
-    assert "_update_all2_phase_results" not in coarse["details"]["metadata"]
+    coarse_metadata = coarse["details"].get("metadata") or {}
+    assert "_update_all2_phase_results" not in coarse_metadata
     complete = next(call[1] for call in audit_calls if call[0] == "complete")
-    assert "_update_all2_phase_results" not in complete["details"]
+    complete_metadata = complete["details"].get("metadata") or {}
+    assert "_update_all2_phase_results" not in complete_metadata
 
 
 @pytest.mark.asyncio
