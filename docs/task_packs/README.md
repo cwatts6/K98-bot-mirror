@@ -8,7 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active execution pack | Task C Slice 13 task pack and chat starter | Evidence pack exists; refresh the July object/timing baseline against the post-August tree before execution |
+| Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
+| Prepared implementation pack | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Independent low-risk reliability slice; first implementation chat must audit scope and stop for approval before code changes |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
 | Closure-audit records | `MGE Sign-Up Tool.md`, `archive/mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
 | Living programme record | `Player Self-Service Command Centre v2 - Programme Pack.md` | GovernorOS complete through Phase 8.1; Phase 9 proposed/gated |
@@ -43,9 +44,10 @@ The final follow-up review closed the last target-specific deferred item and fou
 requirement. The broader deprecated-command retirement programme remains separately active and is
 not unfinished target architecture.
 
-Do not continue the completed DL_bot programme as Phase 6M. Open a fresh task pack for the
-queue-domain redesign, optional SQL-backed queue persistence, SQL deployment workflow, or pinned
-calendar tracker atomic-write hardening when one of those programmes is approved.
+Do not continue the completed DL_bot programme as Phase 6M. The pinned calendar tracker atomic
+persistence work now has its own prepared task pack. Open a separate fresh task pack for the
+queue-domain redesign, optional SQL-backed queue persistence, or SQL deployment workflow when one
+of those programmes is approved.
 
 The Command Platform Audit & Optimisation Programme is complete. Its programme pack, phase packs,
 and chat starters are archived under `archive/`.
@@ -202,13 +204,19 @@ Import pipeline status:
 - Task C Slice 12 records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 12 UPDATE_ALL2 Wrapper Audit Outputs.md`
   - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 12 UPDATE_ALL2 Wrapper Audit Outputs.md`
-- Active Task C Slice 13 files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
-- Task C Slice 13 remains the next import architecture evidence slice, but its July object map and
-  timing sample must be refreshed against the post-August KingdomScanData4 import, locking,
-  immutable-handoff, delta and provenance changes before execution. It must not assume that
-  `update_all2_summary_proc` still dominates. Later work remains separately gated for
+- Task C Slice 13 is complete, merged, deployed, and archived. Its post-August refresh established
+  `update_all2_summary_proc` as the dominant emitted subphase and production PR #556 smoke batch
+  `346` confirmed a completed `406/406` fallback batch, 13 completed `update_all2_*` rows, no
+  internal payload leakage, an 83.846-second summary subphase, and a 124.359-second coarse phase.
+- Task C Slice 13 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+- Active Task C Slice 14 evidence-collection files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md`
+- Slice 14 must use naturally occurring fallback evidence covering at least 10 days and at least
+  30 completed batches, whichever is later; the target formal audit date is `2026-09-15` unless an
+  alert condition in the pack justifies earlier review. Later work remains separately gated for
   `dbo.IMPORT_STAGING_PROC_CORE`, `dbo.UPDATE_ALL2`, `dbo.SUMMARY_PROC`, residual
   `stats_module.py`, legacy PreKvK SQL and inventory view orchestration; the retired weekly
   cumulative view is no longer active backlog.
@@ -584,14 +592,19 @@ The Phase 4B task pack remains as the history delivery record in the archive:
 
 Latest completed starter:
 
-`archive/Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
+`archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
 
 Recently completed engineering work:
 
-`DL_bot.py::_offload_callable` once-only failure semantics has been implemented and fully
-validated, reviewed, and operator smoke accepted. The 2026-09-01 Discord smoke confirmed that a
-duplicate MGE import failed as expected and a standard scan import completed successfully. Its
-task pack and chat starter are archived execution records, with the completed outcome captured in
+Task C Slice 13 is merged, deployed, smoke accepted, and archived. Production batch `346` completed
+with `RowsInSource=406`, `RowsWritten=406`, all 13 expected `update_all2_*` rows completed, and no
+internal parser payload persisted. Slice 14 now owns the time-gated `SUMMARY_PROC` responsibility
+and performance evidence collection.
+
+`DL_bot.py::_offload_callable` once-only failure semantics is also implemented, fully validated,
+reviewed, and operator smoke accepted. The 2026-09-01 Discord smoke confirmed that a duplicate MGE
+import failed as expected and a standard scan import completed successfully. Its task pack and
+chat starter are archived execution records, with the completed outcome captured in
 `docs/reference/archive/deferred_optimisations_resolved.md`:
 
 - `archive/Codex Task Pack - DL_bot Offload Callable Once-Only Failure Semantics.md`
@@ -599,15 +612,18 @@ task pack and chat starter are archived execution records, with the completed ou
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and
-SUMMARY_PROC Scope Audit is the next prepared import pipeline evidence slice, but its July
-evidence, object map and timing baseline must be refreshed before execution. The refreshed slice
-should use post-August fallback `ImportAuditBatch`/`ImportAuditPhase` rows and reconfirm current
-procedure boundaries before drawing any `SUMMARY_PROC` or downstream tuning conclusion.
-Its active execution records are:
+Pinned Calendar Tracker Atomic Persistence is the next prepared independent development slice.
+It replaces only the direct tracker JSON write with the established atomic helper, preserves the
+tracker schema, restart recovery, scheduler ordering and user-facing behavior, and requires an
+audit/scope approval response before implementation. Its prepared records are:
 
-- `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
-- `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+- `Codex Task Pack - Pinned Calendar Tracker Atomic Persistence.md`
+- `Codex Chat Starter - Pinned Calendar Tracker Atomic Persistence.md`
+
+In parallel, Import Pipeline Task C Slice 14 remains evidence collection only until the
+`2026-09-15` target and at least 30 completed fallback batches are available, unless its alert
+conditions trigger an earlier audit. Slice 14 must not tune or decompose `dbo.SUMMARY_PROC` while
+the sample accrues.
 
 Fallback, player-location, Honor, PreKvK, weekly activity, MGE, inventory, KVK_ALL, and Rally Forts
 durable audit adoption is complete, Slice 11 normalized generic `ImportAuditPhase` timestamps, and
