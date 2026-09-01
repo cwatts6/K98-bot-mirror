@@ -55,14 +55,14 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, SQL repo `dbo.SUMMARY_PROC`, and downstream stats/dashboard rebuild procedures
 - Type: performance
-- Description: Task C Slice 12 delivered durable `update_all2_*` phase audit evidence for fallback imports. A July production smoke sample showed `update_all2_summary_proc` dominating the visible subphase runtime at about 78 seconds, with additional coarse-to-subphase time outside the emitted phase rows. That single sample is historical evidence, not a current performance conclusion: the August KingdomScanData4 import, locking, immutable-handoff, delta-serialization, and stats-provenance changes require the procedure map and timing baseline to be revalidated.
-- Suggested Fix: Refresh Task C Slice 13 before execution, then collect a short baseline from post-stabilisation fallback `ImportAuditBatch`/`ImportAuditPhase` rows. Reconfirm the current `UPDATE_ALL2`, `SUMMARY_PROC`, and helper-procedure boundaries; quantify per-phase duration, failures/skips, coarse `fallback_update_all2` duration, missing timing gaps, and sample representativeness. Do not assume `SUMMARY_PROC` still dominates. Prepare a SQL-specific tuning or decomposition pack only if the refreshed evidence supports one.
+- Description: Task C Slice 13 refreshed the authoritative SQL map and reviewed nine completed post-August fallback batches (IDs 306–345). Every batch recorded 13 completed `update_all2_*` rows. `update_all2_summary_proc` dominated 9/9 batches at 62.1–75.8 seconds and averaged 93.8% of measured subphase time, while the coarse phase still exceeded emitted subphases by 35.9–62.2 seconds. This confirms the outer audit target but does not identify which `SUMMARY_PROC` helper or shared-state responsibility is expensive.
+- Suggested Fix: Collect naturally occurring evidence for 10–14 days and at least 30 completed fallback batches, then run Task C Slice 14 as a read-only `SUMMARY_PROC` responsibility/performance audit. Use existing Query Store/DMV evidence only where helper attribution is reliable. If attribution remains inconclusive, prepare a separate non-invasive instrumentation proposal; do not tune or decompose from the outer duration alone.
 - Impact: high
 - Risk: high
-- Dependencies: Task C Slice 12 deployed; KingdomScanData4 Phase 5/5.2 and August follow-up migrations complete; several representative post-stabilisation fallback imports with `update_all2_*` rows; SQL owner approval before plan collection, procedure design, tuning, or migration work.
-- Status: promoted task pack — refresh required before execution
-- Last verified: 2026-08-29
-- Promoted task pack: `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+- Dependencies: Task C Slice 13 complete; KingdomScanData4 Phase 5/5.2 and August follow-up migrations complete; at least 10 days and 30 completed fallback batches for the formal audit; SQL owner approval before state-changing instrumentation, plan experiments that execute stateful work, procedure design, tuning, or migration work.
+- Status: promoted task pack — evidence collection active; target audit 2026-09-15
+- Last verified: 2026-09-01
+- Promoted task pack: `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md`
 
 ### Deferred Optimisation
 - Area: MINI_AMD SQL Agent transaction-log backup job schedules and SQL backup-policy documentation
@@ -79,12 +79,12 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Area: `stats_module.py`, import service modules, import DAL modules
 - Type: refactor
 - Description: Task C Slice 1 extracted fallback import file orchestration and DAL helpers, and Task C Slice 12 added UPDATE_ALL2 audit-output projection, but `stats_module.py` remains the compatibility entry point for the current worker/route/command flow and still owns mixed sequencing around Excel processing, secondary archive, SQL execution, audit phase projection, and result aggregation. The safe extraction boundary must be rechecked against the August KingdomScanData4 import changes.
-- Suggested Fix: After the refreshed Slice 13 evidence review confirms the current SQL instrumentation and import ownership boundary, continue extracting residual orchestration from `stats_module.py` into import-specific services. Keep `stats_module.py` as a thin compatibility shim until each route or command caller is explicitly migrated, and preserve current result, audit, archive, retry, failure, and user-message contracts in every slice.
+- Suggested Fix: After the Slice 14 `SUMMARY_PROC` responsibility audit settles whether any additional instrumentation must pass through the fallback orchestration boundary, continue extracting residual orchestration from `stats_module.py` into import-specific services. Keep `stats_module.py` as a thin compatibility shim until each route or command caller is explicitly migrated, and preserve current result, audit, archive, retry, failure, and user-message contracts in every slice.
 - Impact: medium
 - Risk: medium
-- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation and Slice 12 projection deployed; KingdomScanData4 Phase 5/5.2 stabilised; refreshed Task C Slice 13 evidence review complete before service extraction resumes.
-- Status: blocked by Task C Slice 13
-- Last verified: 2026-08-29
+- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation and Slice 12 projection deployed; KingdomScanData4 Phase 5/5.2 stabilised; Task C Slice 13 complete; avoid overlapping any Slice 14 instrumentation decision.
+- Status: later refactor — sequence after Task C Slice 14 audit decision
+- Last verified: 2026-09-01
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/prekvk_cmds.py`, `scripts/validate_command_registration.py`, `docs/reference/canonical_command_reference.md`

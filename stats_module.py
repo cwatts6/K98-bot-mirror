@@ -586,10 +586,9 @@ async def _run_stats_copy_archive_unlocked(
             meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "phase": phase_name},
         )
 
-    async def _record_update_all2_subphases() -> None:
+    async def _record_update_all2_subphases(phase_rows) -> None:
         if not audit_ref:
             return
-        phase_rows = current_import_metadata.get("_update_all2_phase_results") or []
         if not isinstance(phase_rows, list):
             return
 
@@ -745,6 +744,12 @@ async def _run_stats_copy_archive_unlocked(
                         current_import_metadata["seed"] = seed
                         _write_import_metadata(current_import_metadata)
 
+            update_all2_phase_rows = None
+            if key == "sql":
+                update_all2_phase_rows = current_import_metadata.pop(
+                    "_update_all2_phase_results", []
+                )
+
             await _record_audit_phase(
                 key=key,
                 title=title,
@@ -756,10 +761,7 @@ async def _run_stats_copy_archive_unlocked(
                 duration_ms=duration_ms,
             )
             if key == "sql":
-                try:
-                    await _record_update_all2_subphases()
-                finally:
-                    current_import_metadata.pop("_update_all2_phase_results", None)
+                await _record_update_all2_subphases(update_all2_phase_rows)
 
             status_icon = "✅" if success else "❌"
             message = _step_display_message(success, stdout, stderr)

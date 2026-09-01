@@ -1,9 +1,8 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit
 
-> **Execution gate refreshed — 2026-08-30:** This remains an active evidence pack, but the July
-> object map and batch `67` timing sample are historical. Before running its evidence queries or
-> recommending implementation, refresh the post-August production sample and revalidate the
-> authoritative SQL definitions. The current repository map is:
+> **Completed — 2026-09-01:** The mandatory post-August gate was satisfied against the
+> authoritative SQL repository and a read-only Production sample. The July object map and batch
+> `67` timing sample remain historical only. The refreshed repository map is:
 >
 > - `dbo.IMPORT_STAGING_PROC` is the public no-caller-transaction entry point; it calls
 >   `dbo.CLAIM_KS4_IMPORT_FILE` and delegates staging/receipt work to
@@ -14,7 +13,9 @@
 > - the refresh must account for the immutable handoff, claim ACL hardening, serialized delta
 >   preprocessing, and stats-publication provenance migrations delivered after the July sample.
 >
-> No current Production dominance conclusion is asserted by this refresh.
+> The refreshed nine-batch sample confirms `update_all2_summary_proc` as the consistent visible
+> hotspot. It does not yet justify SQL tuning or decomposition; the next boundary is a longer,
+> read-only `SUMMARY_PROC` responsibility/performance audit.
 
 ## 1. Task Header
 
@@ -23,8 +24,8 @@
 - Owner/context: `Chris Watts / K98 bot import architecture`
 - Task type: `deferred optimisation batch | SQL observability analysis | performance scope audit`
 - One-pass approved: `no`
-- Status: `active evidence pack — post-August object/timing refresh required before execution`
-- Object map last verified: `2026-08-30 against C:\K98-bot-SQL-Server`
+- Status: `complete — evidence gate satisfied; no SQL implementation approved`
+- Object map last verified: `2026-09-01 against C:\K98-bot-SQL-Server`
 
 ## 2. Required Reading
 
@@ -68,8 +69,11 @@ Task C Slice 12 delivered non-invasive `dbo.UPDATE_ALL2` phase audit outputs:
   subphase rows. It must not be used as the current baseline.
 - That historical sample showed `update_all2_summary_proc` at about 78 seconds, making it the
   visible dominant phase in that run only; current dominance is unverified.
-- A review-follow-up fix removed `_update_all2_phase_results` from coarse phase/batch details;
-  post-restart smoke confirmed zero rows still containing the internal payload.
+- The July review-follow-up intended to remove `_update_all2_phase_results` from coarse phase and
+  batch details. The refreshed Production sample found the internal payload absent from batch-level
+  details but still present in all nine coarse `fallback_update_all2` rows. Slice 13 therefore
+  includes a bounded bot-only hygiene fix that removes the key before the coarse audit write while
+  retaining the local rows for durable subphase projection.
 
 The remaining deferred optimisation question is no longer "can we observe UPDATE_ALL2?" It is now
 "what does the evidence say is worth changing, and what boundary should be changed first?"
@@ -337,11 +341,67 @@ Smoke expectations:
 
 ## 13. Acceptance Criteria
 
-- [ ] Recent fallback phase evidence is gathered from production or supplied operator extracts.
-- [ ] Evidence includes at least several Slice 12-era batches where possible.
-- [ ] `update_all2_summary_proc` dominance is confirmed, rejected, or marked inconclusive.
-- [ ] Coarse-to-subphase timing gaps are quantified.
-- [ ] SQL source definitions for `dbo.SUMMARY_PROC` and relevant helper procedures are reviewed before recommending implementation.
-- [ ] No procedure decomposition or runtime SQL change is made without a later approved slice.
-- [ ] Remaining deferred optimisation slices remain documented and ordered.
-- [ ] Any new follow-up work is captured using the Deferred Optimisation Framework.
+- [x] Recent fallback phase evidence is gathered from production or supplied operator extracts.
+- [x] Evidence includes at least several Slice 12-era batches where possible.
+- [x] `update_all2_summary_proc` dominance is confirmed, rejected, or marked inconclusive.
+- [x] Coarse-to-subphase timing gaps are quantified.
+- [x] SQL source definitions for `dbo.SUMMARY_PROC` and relevant helper procedures are reviewed before recommending implementation.
+- [x] No procedure decomposition or runtime SQL change is made without a later approved slice.
+- [x] Remaining deferred optimisation slices remain documented and ordered.
+- [x] Any new follow-up work is captured using the Deferred Optimisation Framework.
+
+## 14. Completion Evidence — 2026-09-01
+
+### Production Sample
+
+The authorised read-only Production review covered nine completed fallback batches, IDs `306`
+through `345`, from `2026-08-30T08:12:12.571Z` through `2026-09-01T06:29:56.390Z`.
+
+- Every batch recorded the expected 13 `update_all2_*` rows: 117 subphase rows in total.
+- All sampled batches and subphases completed; no failure or skip was present.
+- No null/reversed timestamp, negative duration, duration mismatch greater than 5 ms, duplicate
+  subphase name, missing coarse row, or missing `update_all2_summary_proc` row was found.
+- `RowsInSource` and `RowsWritten` both ranged from 405 to 422.
+
+| Measure | Minimum | Average | Maximum |
+|---|---:|---:|---:|
+| Fallback batch duration | 103.4 s | 121.6 s | 139.2 s |
+| Coarse `fallback_update_all2` | 100.0 s | 118.0 s | 136.5 s |
+| Sum of emitted subphases | 64.9 s | 73.6 s | 82.3 s |
+| Coarse minus emitted subphases | 35.9 s | 45.2 s | 62.2 s |
+| Coarse start to first subphase | 11.4 s | 12.2 s | 12.9 s |
+| Last subphase to coarse completion | 24.1 s | 32.5 s | 49.2 s |
+| `update_all2_summary_proc` | 62.1 s | 69.0 s | 75.8 s |
+
+`update_all2_summary_proc` was the longest emitted subphase in all nine batches and represented
+91.5% to 95.6% of measured subphase time (93.8% on average). On average it represented about 58%
+of the coarse SQL phase, so the uninstrumented coarse-to-subphase gap remains material and must not
+be attributed to `SUMMARY_PROC` without further evidence.
+
+### SQL Repository Position
+
+The current definitions in `C:\K98-bot-SQL-Server` confirm:
+
+- `dbo.IMPORT_STAGING_PROC` is the public no-caller-transaction claim wrapper and delegates to
+  `dbo.IMPORT_STAGING_PROC_CORE`;
+- Python invokes `dbo.UPDATE_ALL2` separately through `update_all2_log_manager.py`;
+- `dbo.UPDATE_ALL2` emits 13 `update_all2_*` phase rows, calls `dbo.SUMMARY_PROC`, preserves its
+  final result shape, and preserves `SP_TaskStatus` polling behavior;
+- `dbo.SUMMARY_PROC` sequentially calls the current Deads, Power, combined Kills, T4, T5,
+  KillPoints, Healed, and Ranged summary helpers over shared procedure state.
+
+The review accounted for the post-July immutable-handoff, claim-ACL, delta-serialization, and
+stats-provenance migrations. SQL repository validation passed. No SQL repository change is
+necessary or justified in Slice 13.
+
+### Decision And Handoff
+
+- Close Slice 13 after the bounded bot-only coarse-detail hygiene fix and focused validation.
+- Collect naturally occurring fallback evidence for 10–14 days and at least 30 completed batches,
+  whichever is later. Target the next formal audit for `2026-09-15`.
+- Advance early if any batch has a missing/failed/skipped subphase, a phase count other than 13, a
+  timestamp anomaly, `update_all2_summary_proc` above 90 seconds, or an unexplained coarse gap above
+  75 seconds.
+- Run the next slice as a read-only `SUMMARY_PROC` responsibility/performance audit. If helper-level
+  attribution is unavailable from existing Query Store or DMV evidence, prepare a separate
+  non-invasive instrumentation proposal rather than tuning or decomposing the procedure.
