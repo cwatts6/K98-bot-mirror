@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / highest-priority implementation-ready deferred optimisation`
 - Task type: `bug fix | deferred optimisation`
 - One-pass approved: `no`
-- Status: `prepared for audit and architecture approval`
+- Status: `completed, reviewed, and operator smoke accepted on 2026-09-01; PRs pending merge`
 - Repository baseline reviewed: `C:\discord_file_downloader` at
   `5ca25bc9cdeb857b079d5157e20f367469d124a4` (`main`, equal to `origin/main` on 2026-08-30)
 
@@ -128,8 +128,8 @@ rewrite the source during planning.
 - Impact: medium
 - Risk: medium
 - Dependencies: Preserve current offload preference and route-level error messaging; define once-only versus explicitly retryable callable contracts; run MGE upload, offload, failure/audit, pre-commit, and full regression tests.
-- Status: implementation-ready — highest priority
-- Last verified: 2026-08-29
+- Status: resolved — implemented, validated, and operator smoke accepted
+- Last verified: 2026-09-01
 
 ## 7. Codex Skills To Use
 
@@ -413,35 +413,36 @@ full suite solely because focused tests pass: this is a shared helper with multi
 filesystem-writing consumers. Fix task-related failures only; document unrelated failures without
 expanding scope.
 
-Manual/live validation is deferred to promotion. No production attachment upload, SQL write,
-backup trigger, shutdown-marker write, restart, resync, process cancellation, or concurrent load
-test is authorised during local implementation.
+Manual/live validation was deferred during local implementation. Promotion-stage Discord smoke
+completed successfully on 2026-09-01: the operator confirmed that a duplicate MGE import failed as
+expected and that a standard scan import completed successfully with its route unaffected. No
+live cancellation, timeout, shutdown, resync, or concurrent load test was required.
 
 ## 15. Acceptance Criteria
 
-- [ ] The pre-fix four-argument MGE reproduction proves the duplicate invocation deterministically.
-- [ ] The final once-only contract distinguishes pre-entry rejection from post-entry or
+- [x] The pre-fix four-argument MGE reproduction proves the duplicate invocation deterministically.
+- [x] The final once-only contract distinguishes pre-entry rejection from post-entry or
       indeterminate outcomes.
-- [ ] A callable that begins and raises is invoked exactly once and its original exception reaches
+- [x] A callable that begins and raises is invoked exactly once and its original exception reaches
       the route/caller.
-- [ ] Cancellation, timeout, and indeterminate post-dispatch failure cannot start duplicate work.
-- [ ] Genuine missing/pre-entry-unavailable backend fallback still works and invokes the callable
+- [x] Cancellation, timeout, and indeterminate post-dispatch failure cannot start duplicate work.
+- [x] Genuine missing/pre-entry-unavailable backend fallback still works and invokes the callable
       exactly once.
-- [ ] The current helper signatures, awaitability, and result contracts are used accurately.
-- [ ] Successful callable result shapes and every affected current call shape are preserved.
-- [ ] MGE success behavior, failure embed, audit context, and backup scheduling behavior are
+- [x] The current helper signatures, awaitability, and result contracts are used accurately.
+- [x] Successful callable result shapes and every affected current call shape are preserved.
+- [x] MGE success behavior, failure embed, audit context, and backup scheduling behavior are
       preserved except that failed importer work cannot repeat.
-- [ ] No secrets, file contents, or SQL credentials are added to logs or telemetry.
-- [ ] No command, permission, SQL, config, dependency, asset, cache, scheduler, or live schedule
+- [x] No secrets, file contents, or SQL credentials are added to logs or telemetry.
+- [x] No command, permission, SQL, config, dependency, asset, cache, scheduler, or live schedule
       change is mixed in.
-- [ ] Focused tests, full pytest, log-noise analysis, smoke imports, command registration, required
+- [x] Focused tests, full pytest, log-noise analysis, smoke imports, command registration, required
       validators, full pre-commit, and `git diff --check` pass or have precise unrelated failures.
-- [ ] `k98-pr-review` finds no unresolved merge blocker.
-- [ ] The final bot diff receives a Changes security review with the intended base/head and
+- [x] `k98-pr-review` finds no unresolved merge blocker.
+- [x] The final bot diff receives a Changes security review with the intended base/head and
       `Deep: Off`; no routine standard or deep codebase audit is started.
-- [ ] Equivalent adjacent helper debt is fixed only with approval or captured structurally with
+- [x] Equivalent adjacent helper debt is fixed only with approval or captured structurally with
       evidence.
-- [ ] After validated completion, the active deferred item is removed and an exact resolved-history
+- [x] After validated completion, the active deferred item is removed and an exact resolved-history
       entry records the implementation and validation.
 
 ## 16. Required Delivery Output
@@ -501,3 +502,25 @@ Return:
 - Roll back the bot commit through the normal reviewed production process; no SQL/config/data
   rollback is required because this PR changes none of those surfaces.
 ```
+
+## 18. Completion And Live Smoke Outcome
+
+- Mirror PR #248 and production PR #555 carry the once-only implementation, focused regression
+  coverage, review follow-ups, and completion records.
+- The final focused contract module passed `15` tests and the full suite passed with
+  `3017 passed, 2 skipped`. Architecture, deferred-item, test-selection, security-routing,
+  import-smoke, command-registration, full pre-commit, pyright, and `git diff --check` gates passed.
+- Production Changes review `900bcec0-0ba0-4307-93b3-e6ab2444eea2` covered
+  `b37b84465e987dcfb35a8134225a041f87bb3853..a0ccb6f3280195faed0076183b445f78e05d8c05`
+  with Deep off, complete coverage, and zero reportable findings. The later closure update changes
+  documentation only and introduces no executable, SQL, config, dependency, permission, input,
+  deployment, filesystem, cache, scheduler, or persistence behavior.
+- Operator Discord smoke completed successfully on 2026-09-01: a duplicate MGE import failed as
+  expected, exercising the corrected failure route, and a standard scan import completed
+  successfully, confirming that normal import routing remained operational and unaffected.
+- No SQL, config, dependency, command, permission, cache, scheduler, or live schedule change was
+  delivered. The separately captured upload-admission/backpressure item and the once-only audits
+  for `stats_module.py` and `ui/views/kvk_history_view.py` remain active, approval-gated debt.
+- The next active prepared task is Import Pipeline Deferred Optimisation Task C Slice 13. It begins
+  with a post-August production evidence and SQL object-map refresh; it does not begin with a SQL
+  implementation or assume that `dbo.SUMMARY_PROC` remains the dominant phase.

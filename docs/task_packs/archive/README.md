@@ -2,6 +2,14 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+DL_bot Offload Callable Once-Only Failure Semantics completed implementation, production review,
+automated validation, and operator Discord smoke on 2026-09-01 through mirror PR #248 and
+production PR #555, pending manual merge. The smoke confirmed that a duplicate MGE import failed
+as expected and that a standard scan import completed successfully with its route unaffected. Its
+task pack and chat starter are archived here; upload admission/backpressure and the separate
+once-only audits for `stats_module.py` and `ui/views/kvk_history_view.py` remain active deferred
+items.
+
 KingdomScanData4 Phase 5.2 Post-Stabilisation Cleanup completed through mirror PR #246 without a
 runtime or SQL behaviour change. Its task pack and chat starter are archived here. The separate
 MINI_AMD transaction-log backup cadence policy question remains active in the deferred register;

@@ -4,21 +4,22 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-08-30
+## Current execution set — 2026-09-01
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Completed reliability record | `DL_bot` offload-callable once-only task pack and chat starter | Implementation and validation complete; retained as execution evidence with closure recorded in `docs/reference/archive/deferred_optimisations_resolved.md` |
 | Active execution pack | Task C Slice 13 task pack and chat starter | Evidence pack exists; refresh the July object/timing baseline against the post-August tree before execution |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
-| Closure-audit records | `MGE Sign-Up Tool.md`, `mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
+| Closure-audit records | `MGE Sign-Up Tool.md`, `archive/mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
 | Living programme record | `Player Self-Service Command Centre v2 - Programme Pack.md` | GovernorOS complete through Phase 8.1; Phase 9 proposed/gated |
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: KingdomScanData4 Phase 5.2 task pack/starter, GovernorOS Phase 8.1 task
-pack/starter, and the MGE Process Polish Phase 2 initiation statement. These are completed records,
-not current execution packs.
+Recently archived: the `DL_bot` offload-callable once-only task pack/starter, KingdomScanData4
+Phase 5.2 task pack/starter, GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish
+Phase 2 initiation statement. These are completed records, not current execution packs. The
+offload fix completed operator Discord smoke on 2026-09-01: a duplicate MGE import failed as
+expected and a standard scan import succeeded with its route unaffected.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user
@@ -583,16 +584,18 @@ The Phase 4B task pack remains as the history delivery record in the archive:
 
 Latest completed starter:
 
-`archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
+`archive/Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
 
 Recently completed engineering work:
 
 `DL_bot.py::_offload_callable` once-only failure semantics has been implemented and fully
-validated. Its task pack and chat starter remain as execution records, with the completed outcome
-captured in `docs/reference/archive/deferred_optimisations_resolved.md`:
+validated, reviewed, and operator smoke accepted. The 2026-09-01 Discord smoke confirmed that a
+duplicate MGE import failed as expected and a standard scan import completed successfully. Its
+task pack and chat starter are archived execution records, with the completed outcome captured in
+`docs/reference/archive/deferred_optimisations_resolved.md`:
 
-- `Codex Task Pack - DL_bot Offload Callable Once-Only Failure Semantics.md`
-- `Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
+- `archive/Codex Task Pack - DL_bot Offload Callable Once-Only Failure Semantics.md`
+- `archive/Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
 
 Next active work:
 
@@ -601,6 +604,11 @@ SUMMARY_PROC Scope Audit is the next prepared import pipeline evidence slice, bu
 evidence, object map and timing baseline must be refreshed before execution. The refreshed slice
 should use post-August fallback `ImportAuditBatch`/`ImportAuditPhase` rows and reconfirm current
 procedure boundaries before drawing any `SUMMARY_PROC` or downstream tuning conclusion.
+Its active execution records are:
+
+- `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+- `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 13 UPDATE_ALL2 Phase Evidence Review and SUMMARY_PROC Scope Audit.md`
+
 Fallback, player-location, Honor, PreKvK, weekly activity, MGE, inventory, KVK_ALL, and Rally Forts
 durable audit adoption is complete, Slice 11 normalized generic `ImportAuditPhase` timestamps, and
 Slice 12 delivered UPDATE_ALL2 audit-output observability. Route UX changes, queue embed changes,

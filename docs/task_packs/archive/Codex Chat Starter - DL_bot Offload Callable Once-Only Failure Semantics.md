@@ -1,5 +1,10 @@
 # Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics
 
+> **Completed record — 2026-09-01:** This starter launched the delivered once-only fix. Automated
+> validation, PR review, a Changes security review with Deep off, and operator Discord smoke all
+> completed successfully. The duplicate MGE import failed as expected and a standard scan import
+> succeeded. This archived file is retained as execution history, not active work.
+
 ```markdown
 # Files mentioned by the user:
 
