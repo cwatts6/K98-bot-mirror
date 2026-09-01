@@ -10,7 +10,7 @@ import discord
 
 from constants import DATA_DIR
 from event_calendar.runtime_cache import filter_events, load_runtime_cache, stale_banner
-from file_utils import emit_telemetry_event
+from file_utils import atomic_write_json, emit_telemetry_event
 from ui.views.calendar import (
     CalendarLocalTimeToggleView,
     build_pinned_calendar_embed,
@@ -37,8 +37,7 @@ def now_utc() -> datetime:
 
 def _save_tracker(data: dict[str, Any]) -> None:
     try:
-        _TRACKER_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _TRACKER_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        atomic_write_json(_TRACKER_PATH, data, ensure_parent_dir=True)
     except Exception:
         logger.exception("[CALENDAR][PINNED] tracker save failed")
 
