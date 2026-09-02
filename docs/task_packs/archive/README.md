@@ -2,6 +2,18 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening completed implementation,
+validation, Changes-only security review, production-candidate promotion, and operator candidate
+smoke on 2026-09-02. Mirror PR #253 and production PR #560 remain open for the operator's manual
+merge and final production-main verification. The full suite passed `3090 passed, 2 skipped`; scan
+`79603f53-69f8-4586-9296-760385dd9420` ran over the exact approved bot runtime range with Deep off,
+complete coverage, and zero reportable findings; SQL was a no-diff skip. Smoke built a four-field,
+346-character registration payload with no compaction/omission, retained `should_announce=False`,
+and edited the existing message reference without state/identity change, duplication, or `50035`.
+Phase 2C rankings/history is prepared as the next review-first slice. Diagnostics, Ark persistence
+and delivery observability, active-reminder atomicity, and atomic Pre-KVK reservation are assigned
+to Phases 2D through 2G rather than left unowned.
+
 Discord Embed Payload Safety Phase 2A Event and Calendar Convergence completed implementation,
 review, promotion preparation, and representative production smoke on 2026-09-02 through mirror
 PR #252 and production PR #559, pending the operator's manual merges. Final automated validation
@@ -11,7 +23,7 @@ daily-refresh tasks, and edited message `1488086669876920341` in place for 27 ev
 metrics were `fields=15`, `chars=4789`, `max_field_value=533`, `compacted_events=0`, and
 `omitted_events=0`, with no duplicate or Discord `50035`. Public/DM reminders and an omission marker
 were not naturally forced during smoke; their unchanged behavior and boundary cases retain
-automated coverage. Phase 2B is separately proposed as an evidence-led, review-first Ark slice.
+automated coverage. Phase 2B is now archived above as delivered and candidate-smoke accepted.
 
 Discord Embed Payload Safety Phase 1 completed implementation, review, promotion preparation, and
 operator edit-path smoke on 2026-09-02 through mirror PR #251 and production PR #558, pending the
@@ -22,8 +34,9 @@ passed `3059 passed, 2 skipped`; two Changes-only reviews ran with Deep off and 
 findings. Live smoke validated 13 fields, 1,847 aggregate characters, a 530-character largest
 field, and an in-place edit of message `1544617668999381044` with matching persisted state and no
 duplicate or `50035`. The archived task pack, starter, and findings record preserve the delivery.
-Phase 2A event/calendar convergence is now archived as delivered. Ark has its own proposed Phase 2B
-audit/scope pack; rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
+Phase 2A event/calendar convergence and Phase 2B Ark hardening are archived as delivered.
+Rankings/history, diagnostics, Ark persistence/observability, active-reminder atomicity, and atomic
+Pre-KVK reservation retain the named Phase 2C-2G follow-up sequence.
 
 Pinned Calendar Tracker Atomic Persistence completed implementation, validation, Changes-only
 security review, production deployment, and operator restart smoke on 2026-09-01 through mirror

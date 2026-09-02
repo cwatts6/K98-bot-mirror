@@ -303,7 +303,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
-- Status: evidence and design-gated
+- Status: assigned to Discord Embed Payload Safety Phase 2F; evidence and design-gated
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -314,9 +314,10 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
-- Status: implementation complete on Phase 2B branch — Changes review and PR handoff pending
+- Status: delivered and operator candidate-smoke accepted in Phase 2B; PR merges and final
+  production-main verification pending
 - Last verified: 2026-09-02
-- Promoted task pack: `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
+- Archived task pack: `docs/task_packs/archive/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
 
 ### Deferred Optimisation
 - Area: `ark/state/ark_state.py`, `ark/confirmation_flow.py`, and persisted `confirmation_updates`
@@ -326,7 +327,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
-- Status: evidence and product-policy gated
+- Status: assigned to Discord Embed Payload Safety Phase 2E; evidence and product-policy gated
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -337,7 +338,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused team-builder action, permission, audit, failure, and webhook/ephemeral interaction tests.
-- Status: captured from Phase 2B architecture validation
+- Status: assigned to Discord Embed Payload Safety Phase 2E from Phase 2B architecture validation
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -348,7 +349,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 canonical primitive; separate product/output review; coordinate with the existing KVK History offload deferred item without combining unrelated executor work.
-- Status: later Phase 2 candidate
+- Status: assigned to Discord Embed Payload Safety Phase 2C; review/scope approval required
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -359,7 +360,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
-- Status: later independent batch candidate
+- Status: assigned to Discord Embed Payload Safety Phase 2D; review/scope approval required
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -370,5 +371,16 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: high
 - Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
-- Status: evidence and design-gated
+- Status: assigned to Discord Embed Payload Safety Phase 2G; evidence and design-gated
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `ark/registration_flow.py`, `ark/registration_messages.py`, and registration upsert outcome logging
+- Type: consistency
+- Description: Phase 2B candidate smoke confirmed a successful in-place registration edit while `ensure_message_result` logged `delivered=False`. The first returned value is the existing move/repost outcome, not overall delivery success, and the same boolean pair can also accompany a caught edit failure. The nearby exception log distinguishes failure operationally, but the field name alone is ambiguous for dashboards and incident review.
+- Suggested Fix: In the Phase 2E Ark observability slice, define an explicit outcome value or narrowly rename the tuple and structured log fields to distinguish edited-in-place, moved/reposted, recreated, and failed outcomes. Preserve the existing send/edit/recreate calls, exception boundary, message references, state writes, announcement decision, and return behavior; add focused log-contract tests.
+- Impact: medium
+- Risk: low
+- Dependencies: Delivered Phase 2B baseline; operator approval of the Phase 2E outcome vocabulary; focused successful-edit, move/repost, missing-message recreation, and failure-path tests.
+- Status: assigned to Discord Embed Payload Safety Phase 2E; semantics-only planning, no Phase 2B runtime change
 - Last verified: 2026-09-02

@@ -1,11 +1,14 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening
 
-Status: consumed on 2026-09-02. The operator approved the review-first audit proposal and the
-Phase 2B implementation and its Changes-only security review are complete on the branch and mirror
-PR #253 carries the result. Scan `79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
+Status: consumed and archived on 2026-09-02. The operator approved the review-first audit proposal;
+Phase 2B implementation, validation, Changes-only security review, production-candidate promotion,
+and candidate smoke are complete. Mirror PR #253 and production PR #560 carry the result and await
+manual merge and final production-main verification. Scan `79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
 `4290b0fc..fccde886` bot range with Deep off and found zero reportable issues; SQL is a documented
 no-diff skip. The later PR-reference delta is documentation-only and receives a precise incremental
-security skip. The copy/paste starter below is retained as the initiating record.
+security skip. Candidate smoke built `fields=4`, `chars=346`, reused the existing registration
+message reference with `should_announce=False`, and produced no state/identity change or Discord
+`50035`. The copy/paste starter below is retained as the initiating record.
 
 ## Copy/Paste Starter
 

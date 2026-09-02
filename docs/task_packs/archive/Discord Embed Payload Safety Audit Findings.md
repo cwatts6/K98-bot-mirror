@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phase 1 and Phase 2A merged; Phase 2B Ark audit approved and implementation validated, pending Changes review and PR handoff
+Status: Phases 1 and 2A merged; Phase 2B delivered and operator candidate-smoke accepted in mirror PR #253 and production PR #560, pending manual merges and final production-main verification
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -440,11 +440,19 @@ The agreed follow-up sequence is:
 
 1. **Phase 2A — completed:** event/calendar payload convergence without command, visibility,
    selection, reminder-state, or restart-semantics changes;
-2. **Phase 2B — proposed/gated:** evidence-led Ark payload hardening after
-   realistic/pathological measurement and approval of the review-first findings;
-3. **Later Phase 2 slices:** player-facing rankings/history and operator diagnostics as separate
-   product-policy batches;
-4. **Separate reliability task:** atomic Pre-KVK reservation only after evidence and an approved
+2. **Phase 2B — delivered:** evidence-led Ark payload hardening, validation, Changes-only review,
+   production-candidate promotion, and successful candidate smoke; manual merges and final
+   production-main verification remain operator-owned;
+3. **Phase 2C — next review-first slice:** player-facing rankings/history payload convergence,
+   preserving command placement, visibility, interaction ownership, files, and existing executor
+   behavior;
+4. **Phase 2D:** operator diagnostics payload convergence with privacy/redaction, attachment, and
+   fallback policies kept separate from player outputs;
+5. **Phase 2E:** Ark persistence/orchestration policy and delivery observability: confirmation-update
+   retention, team-builder audit-service extraction, and unambiguous registration outcome logging;
+6. **Phase 2F:** active public-reminder tracker atomic replacement with unchanged identity,
+   scheduling, mention, and rehydration contracts;
+7. **Phase 2G:** atomic Pre-KVK dispatch reservation only after evidence and an approved
    reserve/commit/release persistence design.
 
 These items are staged in `docs/reference/deferred_optimisations.md` using the required structured
@@ -471,9 +479,9 @@ checks and performs no claim. In normal production, the guard controls a fresh-s
 when no editable current message exists. A scheduled fresh-send ping and post-success claim remain
 a natural operational observation; they were not independently exercised by this test command.
 
-Phase 1 and Phase 2A are archived as delivered. Phase 2B Ark payload hardening now has a separate
-review-first task pack and chat starter. The other audit deferrals remain separate as recorded
-above.
+Phase 1, Phase 2A, and Phase 2B are archived as delivered records. Phase 2C rankings/history now
+has the next review-first task pack and chat starter. The other audit deferrals retain the named
+Phase 2D-2G ownership above.
 
 ## 16. Phase 2A delivery and operator acceptance
 
@@ -501,8 +509,7 @@ This is representative acceptance of restart/rehydration, persistent message ide
 pinned edit path. It did not independently exercise a public reminder, a DM reminder, fallback, or
 an omission marker because none was safely forced in production. Those unchanged paths, state and
 mention boundaries, and exact-boundary/pathological payload behavior retain deterministic automated
-coverage. The next coherent slice is the separately approval-gated Phase 2B Ark audit and payload
-hardening pack; it does not reopen Phase 1 or Phase 2A behavior.
+coverage. Phase 2B subsequently delivered without reopening Phase 1 or Phase 2A behavior.
 
 ## 17. Phase 2B approval and implementation evidence
 
@@ -532,9 +539,8 @@ documented no-diff security skip. Bot Changes scan
 `4290b0fcc3d2568fca3a7fb7715f8baa06477f95..fccde886db2589382d279e6e0ef361dba16369af`
 with Deep off, complete coverage of all 11 runtime review items, and zero reportable findings. Its
 sealed manifest, coverage, findings, Markdown, and SARIF records were retained by the scan
-workbench. Mirror PR #253 carries the result. The later PR-reference update is documentation-only
-and receives a precise incremental security skip; any separately approved production smoke remains
-to be appended.
+workbench. Mirror PR #253 and production PR #560 carry the result. The later delivery-record
+updates are documentation-only and receive a precise incremental security skip.
 
 Phase 2B does not change command registration, permissions, public/ephemeral/DM visibility,
 selection/order/status/lifecycle, caps, roster or team assignment, reminder eligibility/preferences/
@@ -542,3 +548,30 @@ timing/deduplication, message IDs, tracker or state formats, scheduler names/cad
 fallback boundaries, startup, or rehydration. Rankings/history, diagnostics, active-reminder atomic
 persistence, atomic Pre-KVK reservation, confirmation-update retention, and team-builder audit
 service extraction remain separate deferred work.
+
+## 18. Phase 2B operator candidate-smoke acceptance and follow-up ownership
+
+On 2026-09-02 the operator successfully exercised match `52` using its existing registration
+message reference. The builder and delivery logs recorded `fields=4`, `chars=346`,
+`compacted_units=0`, `omitted_units=0`, `announcement_already_sent=True`,
+`should_announce=False`, `force_repost=False`, `has_existing_ref=True`, and
+`state_changed=False`. No duplicate, exception, or Discord `50035` occurred.
+
+This accepts the candidate registration edit path and confirms that the first-publication-only ping,
+existing message identity, and state boundary remained unchanged. The log field
+`delivered=False` reflects the pre-existing move/repost return value on an in-place edit rather
+than a failed delivery; its ambiguity is captured for Phase 2E with explicit success/failure and
+edit/move/recreate outcome tests. It is not a reason to reopen the accepted Phase 2B payload diff.
+
+Every Phase 2B deferral now has named ownership:
+
+- Phase 2C: rankings and history payload convergence;
+- Phase 2D: operator diagnostics payload convergence;
+- Phase 2E: confirmation-update retention policy, team-builder audit-service extraction, and Ark
+  registration outcome observability;
+- Phase 2F: atomic `active_reminders` persistence;
+- Phase 2G: evidence/design-gated atomic Pre-KVK dispatch reservation.
+
+The existing KVK History once-only offload audit remains a coordinated but separate task: Phase 2C
+must preserve its current executor behavior and must not silently absorb that reliability change.
+Mirror and production PR merges and final production-main verification remain operator-owned.

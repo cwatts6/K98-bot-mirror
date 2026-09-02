@@ -8,7 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active implementation | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Implementation and `3090 passed, 2 skipped` validation complete; Changes scan `79603f53-69f8-4586-9296-760385dd9420` closed with complete coverage and zero findings; mirror PR #253 open |
+| Next approval-gated slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Review/scope first; Phase 2B prerequisite delivered and candidate-smoke accepted; no runtime or test edits before approval |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Mirror PR #253 and production PR #560 open for manual merge; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
@@ -19,7 +20,7 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: Discord Embed Payload Safety Phases 1 and 2A, the Pinned Calendar Tracker Atomic
+Recently archived: Discord Embed Payload Safety Phases 1, 2A, and 2B, the Pinned Calendar Tracker Atomic
 Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
@@ -40,12 +41,19 @@ exact omission markers through merged mirror PR #252 and production PR #559. Its
 place for 27 events with `fields=15`, `chars=4789`, `max_field_value=533`, and no compaction,
 omission, duplicate, or `50035`. Public/DM reminders were not manually forced; unchanged delivery,
 state, and exact-boundary behavior remain covered by deterministic tests. Phase 2B Ark hardening
-was audit-approved and is implemented on its branch with the unchanged canonical helper,
+is delivered and candidate-smoke accepted with the unchanged canonical helper,
 complete-unit packing, safe pages/chunks, exact omission markers, and final delivery validation.
 The full suite passes with `3090 passed, 2 skipped`; the exact bot Changes review ran with Deep off,
-complete coverage, and zero findings. SQL is a no-diff skip; mirror PR #253 carries the result.
-Rankings/history, diagnostics, atomic Pre-KVK reservation, active-reminder tracker atomicity,
-confirmation-update retention, and team-builder audit-write extraction remain separate.
+complete coverage, and zero findings. SQL is a no-diff skip; mirror PR #253 and production PR #560
+carry the result and await manual merge. Candidate smoke produced a valid four-field,
+346-character registration payload, edited the existing message without announcing or changing
+state/identity, and produced no `50035`.
+
+Phase 2C rankings/history is the next review-first slice. Phase 2D owns diagnostics; Phase 2E owns
+confirmation-update retention policy, team-builder audit-service extraction, and registration
+delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
+evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit
+remains coordinated with, but outside, Phase 2C payload implementation.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

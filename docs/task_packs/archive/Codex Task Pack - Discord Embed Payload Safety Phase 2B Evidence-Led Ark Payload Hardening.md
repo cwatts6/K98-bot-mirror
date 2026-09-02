@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #252 and production PR #559`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `implementation, validation, and Changes security review complete; mirror PR #253 open`
+- Status: `delivered and operator candidate-smoke accepted; mirror PR #253 and production PR #560 await manual merge and final production-main verification`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -308,7 +308,8 @@ the proposed Phase 2B implementation scope.
       explicitly documented.
 - [x] The bot diff receives a Changes-only security review with Deep off; SQL has a precise no-diff
       skip if applicable.
-- [ ] Production smoke is separately approved and recorded.
+- [x] Operator-approved production-candidate smoke is recorded; final post-merge production-main
+      verification remains operator-owned.
 - [x] Phase 1, Phase 2A, rankings/history, diagnostics, and unrelated reliability work remain
       outside the slice.
 
@@ -339,7 +340,34 @@ production operational logs unchanged. Changes-only scan
 bot range with Deep off, complete coverage of all 11 runtime review items, and zero reportable
 findings. Its sealed manifest, coverage, findings, Markdown report, and SARIF artifacts are retained
 under the scan record. The SQL repository remained clean and is a documented no-diff security
-skip. Mirror PR #253 carries the result. The later PR-reference delta changes only these delivery
+skip. Mirror PR #253 and production PR #560 carry the result. The later PR-reference delta changes only these delivery
 records and receives a precise incremental security skip: no runtime, test, configuration, SQL,
 permission, interaction, persistence, or deployment behavior changed. Separately approved
-production smoke remains to be recorded.
+production-candidate smoke is recorded below; the operator retains the manual merges and final
+production-main verification.
+
+## 18. Operator Candidate-Smoke Evidence And Closure
+
+On 2026-09-02 the operator successfully exercised match `52` through the existing registration
+message reference. The relevant production-candidate logs were:
+
+```text
+ark_payload_built route=registration fields=4 chars=346 compacted_units=0 omitted_units=0
+[ARK_REGISTRATION] ensure_message match_id=52 announce_requested=False force_announce=False
+announcement_already_sent=True should_announce=False force_repost=False has_existing_ref=True
+ark_payload_delivery route=registration_upsert fields=4 chars=346
+[ARK_REGISTRATION] ensure_message_result match_id=52 delivered=False state_changed=False
+has_registration_ref=True announce_requested=False
+```
+
+Together with the operator's successful Discord observation and absence of an exception or
+`50035`, this accepts the candidate registration edit path: the payload was valid, the existing
+reference was reused, no first-publication announcement was requested, and neither state nor
+message identity changed. The legacy `delivered` log field actually represents the
+move/repost outcome, so `False` is expected for an in-place edit; clarifying that outcome contract
+is assigned to Phase 2E rather than changing delivered behavior in Phase 2B.
+
+This pack is archived as the completed Phase 2B delivery record. Phase 2C player-facing
+rankings/history is the next review-first task. All remaining Phase 2B deferrals are assigned to
+Phases 2D-2G in the audit findings and deferred backlog. Mirror and production PR merges and the
+final production-main verification remain operator-owned.

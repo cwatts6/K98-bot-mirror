@@ -40,7 +40,7 @@ events. No duplicate or Discord `50035` rejection occurred. This representative 
 naturally exercise public/DM reminder delivery or an omission marker; those unchanged paths and
 exact-boundary behavior retain deterministic automated coverage.
 
-Phase 2B Ark payload hardening was audit-approved and implemented on
+Phase 2B Ark payload hardening is delivered and operator candidate-smoke accepted on
 `codex/discord-embed-payload-safety-phase-2b` from base `4290b0fc`. Ark registration,
 confirmation/result, reminder, cancellation-DM, team-publication, first-publication mention,
 fuzzy-selection, team-builder, and player-report outputs now reuse the unchanged canonical contract
@@ -48,11 +48,21 @@ with complete-unit packing, visible compaction, character-budgeted pages/chunks,
 markers, and final send/edit validation. The full suite passes with `3090 passed, 2 skipped`.
 Changes-only security scan `79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
 `4290b0fc..fccde886` bot range with Deep off, complete coverage of all 11 runtime files, and zero
-reportable findings; SQL is a documented no-diff skip. Mirror PR #253 carries the result.
-Separately approved production smoke remains pending.
-Rankings/history, diagnostics, atomic Pre-KVK dispatch reservation, active-reminder tracker
-atomicity, confirmation-update retention, and the legacy team-builder audit-write extraction remain
-separately gated.
+reportable findings; SQL is a documented no-diff skip. Mirror PR #253 and production PR #560 carry
+the result and await manual merge.
+
+Operator candidate smoke on 2026-09-02 exercised match `52` through the existing registration
+message reference. The builder produced `fields=4`, `chars=346`, `compacted_units=0`, and
+`omitted_units=0`; `should_announce=False` preserved the first-publication-only ping boundary, and
+the message was edited in place with no state or identity change and no Discord `50035`. Final
+post-merge production-main verification remains operator-owned.
+
+The next approved planning slice is Phase 2C player-facing rankings/history convergence. Phase 2D
+owns operator diagnostics; Phase 2E owns Ark confirmation-update retention policy, team-builder
+audit-service extraction, and explicit registration-delivery outcome observability; Phase 2F owns
+active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic Pre-KVK dispatch
+reservation. These assignments retain every Phase 2B deferred item without reopening delivered Ark
+payload behavior.
 
 ## KVK Target Publication And Quality Delivery
 
