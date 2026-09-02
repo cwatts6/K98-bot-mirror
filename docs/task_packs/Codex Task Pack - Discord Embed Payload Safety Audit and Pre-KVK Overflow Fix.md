@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / 2026-08-24 Pre-KVK stats-alert incident and follow-up reliability review`
 - Task type: `bug fix`
 - One-pass approved: `no`
-- Status: `focused Phase 1 implementation and validation complete in mirror PR #251 — awaiting review/merge`
+- Status: `focused Phase 1 implementation complete in mirror PR #251 — review feedback addressed; awaiting merge`
 - Approved Phase 1: canonical dependency-light embed contract, Pre-KVK complete-event chunking and
   omission marker, repaired shared sender, and sole module-owned `prekvk_daily` claim
 - Approved follow-up direction: separate Phase 2 programme beginning with event/calendar payload
@@ -234,7 +234,7 @@ migration boundaries first.
 
 | Repository | Decision | Target | Expected setup / execution | Evidence |
 |---|---|---|---|---|
-| Bot | `Changes review` | Final approved bot working-tree diff based on `cca6d9cdb0dd15ba99403b89f03d1fede69f0e68`, including the shared embed primitive, Pre-KVK renderer/orchestrator, tests, and approved audit-found fixes | `Changes + Deep Off` using `$codex-security:security-diff-scan` | Completed 2026-09-02 as scan `dada5066-00ba-4c84-bec9-cd70b5e2d213`: full coverage, no reportable findings. |
+| Bot | `Changes review` | Final approved bot working-tree diff based on `cca6d9cdb0dd15ba99403b89f03d1fede69f0e68`, plus PR-review follow-up range `4509b600..ac5c5e01` | `Changes + Deep Off` using `$codex-security:security-diff-scan` | Initial scan `dada5066-00ba-4c84-bec9-cd70b5e2d213` and follow-up scan `59865dd8-4628-4aa2-baba-3192ad5f5563` both completed with full coverage and no reportable findings. |
 | SQL | `documented skip` | `C:\K98-bot-SQL-Server` — no task files | `Not applicable` | The DB prerequisite is complete. This task changes no schema, procedure, view, index, role, data access, migration, deployment, or persistence contract. Confirm no SQL working-tree diff before handoff. |
 
 The functional all-embed inventory is part of normal engineering audit. It does not change the

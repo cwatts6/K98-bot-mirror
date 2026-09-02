@@ -413,21 +413,29 @@ Phase 1 now contains:
 - same-root shared-helper protection for local-time, event/fight, processing-history, and failure
   field names/values with explicit omission behavior where aggregate budget is exhausted.
 
-Final focused validation is `37 passed`. The full suite passed with `3056 passed, 2 skipped`;
+Final focused validation after PR review is `40 passed`. The full suite passed with
+`3059 passed, 2 skipped`;
 pre-commit, architecture-boundary validation, deferred-item validation, test selection, import
 smoke, command-registration validation, security-routing validation, and `git diff --check` also
-passed. The log-noise gate also passed after the final fallback-boundary test (`3056 passed,
+passed. The log-noise gate also passed after the review fixes (`3059 passed,
 2 skipped`; production operational logs unchanged).
 
 The final bot security gate used scan type **Changes** against the working-tree snapshot based on
 `cca6d9cdb0dd15ba99403b89f03d1fede69f0e68`, with Deep off. Scan
 `dada5066-00ba-4c84-bec9-cd70b5e2d213` completed with full coverage and no reportable findings.
+The accepted PR-review fixes received a second Changes-only review for the exact range
+`4509b600..ac5c5e01`; scan `59865dd8-4628-4aa2-baba-3192ad5f5563` also completed with full
+coverage and no reportable findings.
 The SQL gate is a documented no-diff skip. No standard or deep codebase scan was run. Final K98 PR
 review found no blocking or non-blocking code findings after bounding the shared sender's
 Forbidden/HTTP fallback description with the already-safe title.
 
-Mirror PR #251 carries commit `a7034a49`. Production promotion and deployment remain outside this
-task and require the normal separate approval workflow.
+Mirror PR #251 carries the implementation and status commits `a7034a49` and `4509b600`, followed
+by review-fix commit `ac5c5e01`. All five inline review comments were accepted and addressed:
+defensive log-limit parsing, one-shot iterable materialisation, the ten-attachment cap, singular
+omission-marker copy, and correction of the task-pack filename from `.md.md` to `.md`. Production
+promotion and deployment remain outside this task and require the normal separate approval
+workflow.
 
 The agreed follow-up sequence is:
 
