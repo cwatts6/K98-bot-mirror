@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #252 and production PR #559`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `implementation, automated validation, and Changes security review complete; PR handoff pending`
+- Status: `implementation, validation, and Changes security review complete; mirror PR #253 open`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -339,4 +339,7 @@ production operational logs unchanged. Changes-only scan
 bot range with Deep off, complete coverage of all 11 runtime review items, and zero reportable
 findings. Its sealed manifest, coverage, findings, Markdown report, and SARIF artifacts are retained
 under the scan record. The SQL repository remained clean and is a documented no-diff security
-skip. PR handoff and separately approved production smoke remain to be recorded.
+skip. Mirror PR #253 carries the result. The later PR-reference delta changes only these delivery
+records and receives a precise incremental security skip: no runtime, test, configuration, SQL,
+permission, interaction, persistence, or deployment behavior changed. Separately approved
+production smoke remains to be recorded.
