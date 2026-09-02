@@ -169,4 +169,7 @@ def test_pinned_embed_reserves_aggregate_budget_for_omission_marker():
     assert len(embed.description) == 4096
     assert len(embed.fields) == 1
     assert embed.fields[0].name == "… More calendar events"
-    assert embed.fields[0].value.startswith("1 additional calendar event")
+    assert (
+        embed.fields[0].value
+        == "1 additional calendar event omitted to fit Discord limits — use /calendar."
+    )

@@ -153,9 +153,10 @@ def group_events_by_date(events: list[dict[str, Any]]) -> OrderedDict[str, list[
 
 
 def _calendar_omission_field(omitted: int) -> tuple[str, str]:
+    event_label = "event" if omitted == 1 else "events"
     return (
         "… More calendar events",
-        f"{omitted} additional calendar events omitted to fit Discord limits — use /calendar.",
+        f"{omitted} additional calendar {event_label} omitted to fit Discord limits — use /calendar.",
     )
 
 
