@@ -152,23 +152,40 @@ def group_events_by_date(events: list[dict[str, Any]]) -> OrderedDict[str, list[
     return grouped
 
 
+def _calendar_omission_field(omitted: int) -> tuple[str, str]:
+    return (
+        "… More calendar events",
+        f"{omitted} additional calendar events omitted to fit Discord limits — use /calendar.",
+    )
+
+
 def build_pinned_calendar_embed(
     *, events: list[dict[str, Any]], footer: str, description: str | None = None
 ) -> discord.Embed:
-    embed = discord.Embed(
-        title="📌 30-Day Calendar",
-        description=truncate_text(description, MAX_DESCRIPTION_CHARACTERS) if description else None,
-        color=discord.Color.blurple(),
-    )
-    base_characters = len(embed.title or "") + len(embed.description or "")
-    footer_limit = min(MAX_FOOTER_CHARACTERS, MAX_TOTAL_CHARACTERS - base_characters)
-    embed.set_footer(text=truncate_text(footer, footer_limit))
-
     candidates = [
         (day, event)
         for day, day_events in group_events_by_date(events).items()
         for event in day_events
     ]
+    title = "📌 30-Day Calendar"
+    marker_name, marker_value = _calendar_omission_field(len(candidates))
+    reserved_marker_characters = len(marker_name) + len(marker_value) if candidates else 0
+    description_limit = min(
+        MAX_DESCRIPTION_CHARACTERS,
+        max(0, MAX_TOTAL_CHARACTERS - len(title) - reserved_marker_characters),
+    )
+    bounded_description = truncate_text(description, description_limit) if description else None
+    embed = discord.Embed(
+        title=title,
+        description=bounded_description,
+        color=discord.Color.blurple(),
+    )
+    base_characters = len(embed.title or "") + len(embed.description or "")
+    footer_limit = min(
+        MAX_FOOTER_CHARACTERS,
+        max(0, MAX_TOTAL_CHARACTERS - base_characters - reserved_marker_characters),
+    )
+    embed.set_footer(text=truncate_text(footer, footer_limit))
 
     def build_fields(accepted: list[tuple[str, dict[str, Any]]], omitted: int):
         fields: list[tuple[str, str]] = []
@@ -184,12 +201,7 @@ def build_pinned_calendar_embed(
             name = f"{base_name} (continued)" if continued else base_name
             fields.append((truncate_text(name, MAX_FIELD_NAME_CHARACTERS), line))
         if omitted:
-            fields.append(
-                (
-                    "… More calendar events",
-                    f"{omitted} additional calendar events omitted to fit Discord limits — use /calendar.",
-                )
-            )
+            fields.append(_calendar_omission_field(omitted))
         return fields
 
     accepted: list[tuple[str, dict[str, Any]]] = []

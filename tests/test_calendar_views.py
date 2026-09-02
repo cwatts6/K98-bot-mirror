@@ -147,3 +147,26 @@ def test_pinned_field_slot_exhaustion_reserves_exact_marker():
     assert len(embed.fields) == 25
     assert f"{30 - shown} additional calendar events omitted" in values
     assert not validate_embed_payload(embed)
+
+
+def test_pinned_embed_reserves_aggregate_budget_for_omission_marker():
+    events = [
+        {
+            "title": "Pathological event",
+            "start_utc": "2026-03-10T00:00:00+00:00",
+            "end_utc": "2026-03-10T01:00:00+00:00",
+        }
+    ]
+
+    embed = cv.build_pinned_calendar_embed(
+        events=events,
+        description="d" * 4096,
+        footer="f" * 2048,
+    )
+
+    assert not validate_embed_payload(embed)
+    assert len(embed.footer.text) < 2048
+    assert len(embed.description) == 4096
+    assert len(embed.fields) == 1
+    assert embed.fields[0].name == "… More calendar events"
+    assert embed.fields[0].value.startswith("1 additional calendar event")
