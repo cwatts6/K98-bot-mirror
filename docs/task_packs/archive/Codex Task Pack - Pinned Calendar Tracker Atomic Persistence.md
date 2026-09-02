@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / K98 event calendar reliability`
 - Task type: `deferred optimisation execution task | restart-sensitive persistence hardening`
 - One-pass approved: `no`
-- Status: `implementation-ready task pack — audit/scope approval required before code changes`
+- Status: `completed, production deployed, and operator smoke accepted on 2026-09-01`
 
 ## 2. Objective
 
@@ -21,9 +21,10 @@ collection and can proceed while naturally occurring fallback evidence accrues.
 
 ## 3. Deferred Item And Priority
 
-The active deferred item records that `_save_tracker()` currently uses direct
-`Path.write_text()` JSON persistence even though the file is consumed during restart rehydration.
-The item is implementation-ready with medium impact and low implementation risk.
+The original deferred item recorded that `_save_tracker()` used direct `Path.write_text()` JSON
+persistence even though the file is consumed during restart rehydration. The approved delivery
+resolved that item with the existing atomic helper while retaining the scored medium-impact,
+low-risk boundary below.
 
 | Impact | Frequency | Risk reduction | Effort | Score | Recommendation |
 |---|---:|---:|---:|---:|---|
@@ -32,7 +33,7 @@ The item is implementation-ready with medium impact and low implementation risk.
 The score reflects daily/startup use, the operational cost of a damaged tracker, and the small
 surface of the proposed change. It does not broaden the task into calendar or lifecycle redesign.
 
-## 4. Current Architecture And Contract
+## 4. Pre-Change Architecture And Preserved Contract
 
 `event_calendar/pinned_embed.py` currently owns the tracker boundary:
 
@@ -54,9 +55,9 @@ The startup lifecycle schedules pinned-calendar rehydration through
 tasks. This ordering, the eight-second background scheduling boundary, and task names are inherited
 contracts.
 
-## 5. Approved Implementation Boundary
+## 5. Delivered Implementation Boundary
 
-The proposed PR-sized change is:
+The delivered PR-sized change is:
 
 1. Import `atomic_write_json` from `file_utils` in `event_calendar/pinned_embed.py`.
 2. Inside the existing `_save_tracker()` `try` block, call
@@ -200,20 +201,49 @@ No data migration or SQL rollback is required.
 
 ## 13. Acceptance Criteria
 
-- [ ] Scope review confirms `event_calendar/pinned_embed.py` is still the tracker owner.
-- [ ] The existing `atomic_write_json()` contract is still suitable and no shared-helper change is
+- [x] Scope review confirms `event_calendar/pinned_embed.py` is still the tracker owner.
+- [x] The existing `atomic_write_json()` contract is still suitable and no shared-helper change is
   needed.
-- [ ] `_save_tracker()` no longer uses direct `Path.write_text()` persistence.
-- [ ] Tracker schema, caller payloads, failure logging, and non-raising behavior are preserved.
-- [ ] A simulated failed write leaves a prior valid tracker intact.
-- [ ] Missing, malformed, create, edit, clear, and rehydration paths have focused coverage.
-- [ ] Selected validators and focused tests pass; skips and unrelated failures are documented.
-- [ ] The implementation diff receives the required Changes-only security review.
-- [ ] Production smoke confirms restart rehydration and in-place refresh without duplicates.
-- [ ] No SQL, command, UX, scheduler, cache, reminder, or shared-helper change is included.
+- [x] `_save_tracker()` no longer uses direct `Path.write_text()` persistence.
+- [x] Tracker schema, caller payloads, failure logging, and non-raising behavior are preserved.
+- [x] A simulated failed write leaves a prior valid tracker intact.
+- [x] Missing, malformed, create, edit, clear, and rehydration paths have focused coverage.
+- [x] Selected validators and focused tests pass; skips and unrelated failures are documented.
+- [x] The implementation diff receives the required Changes-only security review.
+- [x] Production smoke confirms restart rehydration and in-place refresh without duplicates.
+- [x] No SQL, command, UX, scheduler, cache, reminder, or shared-helper change is included.
 
-## 14. Approval Gate
+## 14. Historical Approval Gate
 
-Begin the implementation chat with repository and scope audit only. Report the current writer,
+The implementation chat began with repository and scope audit only, reported the current writer,
 helper contract, call/restart map, exact intended diff, validation selection, security routing, and
-open questions. Stop for operator approval before changing code or tests.
+open questions, and stopped for operator approval before changing code or tests. The operator then
+approved the bounded implementation and inclusion of the task pack and starter.
+
+## 15. Completion And Live Smoke Outcome
+
+- Mirror PR #250 and production PR #557 delivered the atomic tracker persistence change. The
+  production merge is represented on scrubbed mirror `main` by commit `cca6d9cd`, mirrored from
+  production merge commit `0ad875f2`.
+- `_save_tracker()` now calls
+  `atomic_write_json(_TRACKER_PATH, data, ensure_parent_dir=True)` inside the existing non-raising
+  logging boundary. No shared helper, tracker schema, SQL, config, dependency, command, permission,
+  embed, button, scheduler, reminder, cache, or user-facing behavior changed.
+- Focused tracker coverage passed `11` tests; the calendar subsystem passed `114`; pinned-calendar
+  rehydration/startup lifecycle coverage passed `25`; shared atomic-helper retry coverage passed
+  `2`; and the full suite passed with `3027 passed, 2 skipped`. Architecture, deferred-item,
+  security-routing, test-selection, smoke-import, command-registration, log-noise, pre-commit, and
+  `git diff --check` gates passed.
+- Changes-only Codex Security review `43628893-300e-44ae-970d-e406bb39ac11` covered
+  `040e71766788da8403880e20a7d751d8c799719a...9b0b1660c85db789f6b12afa5d01ce3d90629221`
+  with Deep off, complete coverage, and zero findings.
+- Production restart smoke on 2026-09-01 completed
+  `rehydrate_pinned_calendar_view`, then refreshed the tracked message with `ok=True`,
+  `status=edited`, and `events=25`. Channel `1480584179073683576` and message
+  `1488086669876920341` were unchanged, while `updated_at_utc` advanced from
+  `2026-09-01T10:59:15.045797+00:00` to `2026-09-01T14:02:27.030049+00:00`. The message remained
+  pinned with no duplicate, the tracker remained valid JSON, no stale tracker temporary file or
+  tracker load/save error remained, and the next daily refresh scheduled normally for
+  `2026-09-02T08:05:00+00:00`.
+- The operator confirmed all automated and production smoke checks passed. No rollback, SQL
+  deployment, data migration, Discord command resync, or follow-up implementation is required.

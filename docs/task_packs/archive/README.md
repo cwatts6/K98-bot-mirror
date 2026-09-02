@@ -2,6 +2,15 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Pinned Calendar Tracker Atomic Persistence completed implementation, validation, Changes-only
+security review, production deployment, and operator restart smoke on 2026-09-01 through mirror
+PR #250 and production PR #557. The existing pinned message was rehydrated and edited in place
+with unchanged channel/message identity, the tracker remained valid JSON with an advanced
+`updated_at_utc`, no duplicate or stale temporary file remained, and the daily refresh scheduled
+normally. Its task pack and chat starter are archived here as the completed execution record. No
+SQL, config, dependency, command, permission, cache, reminder, scheduler, or user-facing behavior
+change was delivered.
+
 DL_bot Offload Callable Once-Only Failure Semantics completed implementation, production review,
 automated validation, and operator Discord smoke on 2026-09-01 through mirror PR #248 and
 production PR #555, pending manual merge. The smoke confirmed that a duplicate MGE import failed
@@ -233,5 +242,5 @@ Phase 6L:
 
 Remaining related work is tracked in `docs/reference/deferred_optimisations.md` as separate future
 programmes, including command-surface migration, queue-domain redesign, optional SQL-backed queue
-persistence, disabled secondary command-surface cleanup, and pinned calendar tracker atomic-write
-hardening.
+persistence, and disabled secondary command-surface cleanup. Pinned calendar tracker atomic-write
+hardening is complete and recorded in `docs/reference/archive/deferred_optimisations_resolved.md`.

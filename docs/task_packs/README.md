@@ -8,18 +8,22 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
+| PR preparation | Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix task pack, chat starter and findings record | Focused bot-only Phase 1 implementation, validation and Changes-only security review complete on `2026-09-02`; Phase 2 remains separate, beginning with event/calendar payload convergence |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
-| Prepared implementation pack | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Independent low-risk reliability slice; first implementation chat must audit scope and stop for approval before code changes |
+| Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
 | Closure-audit records | `MGE Sign-Up Tool.md`, `archive/mge_implementation_progress.md` | Tasks A-M complete; Task N bounded closure audit pending |
 | Living programme record | `Player Self-Service Command Centre v2 - Programme Pack.md` | GovernorOS complete through Phase 8.1; Phase 9 proposed/gated |
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: the `DL_bot` offload-callable once-only task pack/starter, KingdomScanData4
-Phase 5.2 task pack/starter, GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish
-Phase 2 initiation statement. These are completed records, not current execution packs. The
-offload fix completed operator Discord smoke on 2026-09-01: a duplicate MGE import failed as
+Recently archived: the Pinned Calendar Tracker Atomic Persistence task pack/starter, the `DL_bot`
+offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
+GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
+These are completed records, not current execution packs. The pinned-calendar delivery completed
+operator production restart smoke on 2026-09-01 with successful rehydration, an in-place edit of
+the existing message, valid tracker JSON, no duplicate, and normal daily refresh scheduling. The
+offload fix completed operator Discord smoke the same day: a duplicate MGE import failed as
 expected and a standard scan import succeeded with its route unaffected.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
@@ -44,8 +48,8 @@ The final follow-up review closed the last target-specific deferred item and fou
 requirement. The broader deprecated-command retirement programme remains separately active and is
 not unfinished target architecture.
 
-Do not continue the completed DL_bot programme as Phase 6M. The pinned calendar tracker atomic
-persistence work now has its own prepared task pack. Open a separate fresh task pack for the
+Do not continue the completed DL_bot programme as Phase 6M. The independent pinned calendar tracker
+atomic persistence work is also complete and archived. Open a separate fresh task pack for the
 queue-domain redesign, optional SQL-backed queue persistence, or SQL deployment workflow when one
 of those programmes is approved.
 
@@ -610,17 +614,18 @@ chat starter are archived execution records, with the completed outcome captured
 - `archive/Codex Task Pack - DL_bot Offload Callable Once-Only Failure Semantics.md`
 - `archive/Codex Chat Starter - DL_bot Offload Callable Once-Only Failure Semantics.md`
 
-Next active work:
+Recently completed independent reliability work:
 
-Pinned Calendar Tracker Atomic Persistence is the next prepared independent development slice.
-It replaces only the direct tracker JSON write with the established atomic helper, preserves the
-tracker schema, restart recovery, scheduler ordering and user-facing behavior, and requires an
-audit/scope approval response before implementation. Its prepared records are:
+Pinned Calendar Tracker Atomic Persistence is implemented, production deployed, smoke accepted,
+and archived. Mirror PR #250 and production PR #557 replaced only the direct tracker JSON write
+with the established atomic helper while preserving tracker schema, restart recovery, scheduler
+ordering, telemetry/status behavior, and user-facing output. Its historical records are:
 
-- `Codex Task Pack - Pinned Calendar Tracker Atomic Persistence.md`
-- `Codex Chat Starter - Pinned Calendar Tracker Atomic Persistence.md`
+- `archive/Codex Task Pack - Pinned Calendar Tracker Atomic Persistence.md`
+- `archive/Codex Chat Starter - Pinned Calendar Tracker Atomic Persistence.md`
 
-In parallel, Import Pipeline Task C Slice 14 remains evidence collection only until the
+The current active execution item is Import Pipeline Task C Slice 14, which remains evidence
+collection only until the
 `2026-09-15` target and at least 30 completed fallback batches are available, unless its alert
 conditions trigger an earlier audit. Slice 14 must not tune or decompose `dbo.SUMMARY_PROC` while
 the sample accrues.

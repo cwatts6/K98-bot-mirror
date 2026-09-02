@@ -27,6 +27,17 @@ from constants import (
     VIEW_PRUNE_ON_FORBIDDEN,
     VIEW_TRACKING_FILE,
 )
+from core.discord_embed_limits import (
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_FIELDS_PER_EMBED,
+    MAX_TITLE_CHARACTERS,
+    MAX_TOTAL_CHARACTERS,
+    measure_embed_payload,
+    require_valid_embed_payload,
+    truncate_text,
+    validate_embed_payload,
+)
 from file_utils import (
     emit_telemetry_event,
     read_summary_log_rows,
@@ -50,10 +61,9 @@ AUTO_REGENERATE = False  # Optional toggle to regenerate expired embeds
 # Config: warn when embed building takes longer than this (seconds)
 EMBED_BUILD_SLOW_THRESHOLD = 1.0
 
-# Safe limits for Discord embed fields
-_EMBED_FIELD_MAX = 1024
-# Conservative total embed content size cap (title + fields). Discord has ~6000 characters cap overall.
-_EMBED_TOTAL_CAP = 6000
+# Backward-compatible aliases; canonical ownership lives in core.discord_embed_limits.
+_EMBED_FIELD_MAX = MAX_FIELD_VALUE_CHARACTERS
+_EMBED_TOTAL_CAP = MAX_TOTAL_CHARACTERS
 # Fallback when a large "log-like" field should be attached instead of embedded
 _LOG_FIELD_NAMES = ("log", "combined_log", "out", "output", "details")
 
@@ -368,13 +378,36 @@ class LocalTimeButton(discord.ui.Button):
             )
 
 
-def _truncate_embed_title(title: str | None, max_len: int = 256) -> str:
-    text = title or ""
-    if len(text) <= max_len:
-        return text
-    if max_len <= 1:
-        return text[:max_len]
-    return f"{text[: max_len - 1]}…"
+def _truncate_embed_title(title: str | None, max_len: int = MAX_TITLE_CHARACTERS) -> str:
+    return truncate_text(title, min(max_len, MAX_TITLE_CHARACTERS))
+
+
+def _embed_field_would_fit(embed: discord.Embed, name: str, value: str) -> bool:
+    payload = embed.to_dict()
+    projected = {
+        **payload,
+        "fields": [
+            *payload.get("fields", []),
+            {"name": name, "value": value, "inline": False},
+        ],
+    }
+    return not validate_embed_payload(projected)
+
+
+def _add_embed_omission_marker(embed: discord.Embed, count: int, noun: str) -> None:
+    """Add an explicit marker, removing complete trailing fields if needed to make it fit."""
+
+    omitted = max(1, int(count))
+    name = truncate_text(f"… More {noun}", MAX_FIELD_NAME_CHARACTERS)
+    while True:
+        value = f"{omitted} additional {noun} omitted to stay within Discord's embed limits."
+        if _embed_field_would_fit(embed, name, value):
+            embed.add_field(name=name, value=value, inline=False)
+            return
+        if not embed.fields:
+            return
+        embed.remove_field(len(embed.fields) - 1)
+        omitted += 1
 
 
 class LocalTimeToggleView(View):
@@ -428,7 +461,10 @@ class LocalTimeToggleView(View):
         if is_single_event:
             # Just show the single event directly
             e = self.events[0]
-            label = e.get("name") or e.get("title")
+            label = truncate_text(
+                e.get("name") or e.get("title") or "Event",
+                MAX_FIELD_NAME_CHARACTERS,
+            )
             time_str = format_dt(e["start_time"], style="F")
             embed.add_field(name=label, value=time_str, inline=False)
         else:
@@ -474,6 +510,7 @@ class LocalTimeToggleView(View):
                 embed.add_field(name=key.capitalize(), value=value, inline=False)
 
         embed.set_footer(text="K98 Bot \u2013 Local Time View")
+        require_valid_embed_payload(embed)
         logger.info(
             f"[LOCAL TIME EMBED] Built embed for prefix '{self.prefix}' with {len(self.events)} event(s)."
         )
@@ -662,7 +699,13 @@ async def send_status_embed(
         logger.exception("[STATUS_EMBED] failed to build/send status embed")
 
 
-# New robust send helper
+def _safe_embed_attachment_name(title: str, field_name: str, index: int) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{title}_{field_name}_{index}").strip("._")
+    stem = stem or f"embed_field_{index}"
+    return f"{stem[:100]}.txt"
+
+
+# Backward-compatible sender using the canonical payload contract.
 async def send_embed_safe(
     destination,
     title: str,
@@ -676,154 +719,154 @@ async def send_embed_safe(
     total_cap: int = _EMBED_TOTAL_CAP,
     max_log_embed_chars: int | None = None,
 ) -> bool:
-    """
-    Safely send an embed to `destination` (Member/User/Channel). Returns True on success.
+    """Send one bounded embed while preserving attachment/fallback and boolean semantics."""
 
-    Behavior:
-    - Truncates non-log fields longer than max_field_length.
-    - If a "log-like" field or the total embed content is too large, attach the large content
-      as a file and replace the embed field text with a short note.
-    - Catches discord.Forbidden and discord.HTTPException and attempts fallback behavior.
-    - Honors constants.VIEW_PRUNE_ON_FORBIDDEN to treat Forbidden as prunable when configured.
+    try:
+        effective_field_limit = min(MAX_FIELD_VALUE_CHARACTERS, max(1, int(max_field_length)))
+        effective_total_cap = min(MAX_TOTAL_CHARACTERS, max(1, int(total_cap)))
+    except (TypeError, ValueError):
+        effective_field_limit = MAX_FIELD_VALUE_CHARACTERS
+        effective_total_cap = MAX_TOTAL_CHARACTERS
 
-    New:
-    - max_log_embed_chars: explicit cap for how many characters of a log-like field are
-                           left inside the embed. If omitted, uses environment/default.
-    """
-    embed = discord.Embed(title=title, color=color)
-    # Prepare attachments if needed
+    safe_title = truncate_text(title, min(MAX_TITLE_CHARACTERS, effective_total_cap))
+    field_items = list((fields or {}).items())
     files: list[discord.File] = []
-    # Work on a copy so we can mutate
-    field_items = list(fields.items() or [])
+    max_log_chars = (
+        _DEFAULT_MAX_LOG_EMBED_CHARS
+        if max_log_embed_chars is None
+        else max(1, int(max_log_embed_chars))
+    )
 
-    if max_log_embed_chars is None:
-        max_log_embed_chars = _DEFAULT_MAX_LOG_EMBED_CHARS
+    prepared: list[dict[str, Any]] = []
+    for index, (raw_name, raw_value) in enumerate(field_items, start=1):
+        original_name = str(raw_name or f"Field {index}")
+        original_value = "—" if raw_value is None or str(raw_value) == "" else str(raw_value)
+        prepared.append(
+            {
+                "name": truncate_text(original_name, MAX_FIELD_NAME_CHARACTERS),
+                "value": truncate_text(original_value, effective_field_limit),
+                "original_name": original_name,
+                "original_value": original_value,
+                "log_like": any(token in original_name.lower() for token in _LOG_FIELD_NAMES),
+                "attached": False,
+                "index": index,
+            }
+        )
 
-    # Helper to decide log-like fields
-    def _is_log_field(k: str) -> bool:
+    def _attach_text(content: str, filename: str, *, context: str) -> bool:
         try:
-            return any(tok in k.lower() for tok in _LOG_FIELD_NAMES)
-        except Exception:
-            return False
-
-    # First pass: handle log-like fields specially (attach full content if too large)
-    remaining_fields: list[tuple[str, str]] = []
-    for name, value in field_items:
-        sval = "" if value is None else str(value)
-        if _is_log_field(name):
-            # If the log is large, attach it as a file and add a note in the embed
-            if len(sval) > int(max_log_embed_chars):
-                try:
-                    fname = f"{title.replace(' ', '_')}_{name.replace(' ', '_')}.txt"
-                except Exception:
-                    fname = f"{uuid.uuid4().hex[:8]}_log.txt"
-                try:
-                    bio = io.BytesIO(sval.encode("utf-8"))
-                    # Create a discord.File from the bytesIO
-                    files.append(discord.File(bio, filename=fname))
-                    note = f"(log attached as {fname})"
-                    embed.add_field(name=name, value=note, inline=False)
-                except Exception:
-                    logger.exception("[EMBED] Failed to attach large log field %s", name)
-                    # fallback to truncated content
-                    if len(sval) > max_field_length:
-                        sval = sval[: max_field_length - 3] + "..."
-                    embed.add_field(name=name, value=sval, inline=False)
-            else:
-                # Small enough to include in embed (but still respect max_field_length)
-                if len(sval) > max_field_length:
-                    sval = sval[: max_field_length - 3] + "..."
-                embed.add_field(name=name, value=sval, inline=False)
-        else:
-            remaining_fields.append((name, sval))
-
-    # Second pass: add non-log fields, truncating as needed
-    total_chars = len(title or "")
-    for name, sval in remaining_fields:
-        total_chars += len(name) + len(sval)
-        if len(sval) > max_field_length:
-            sval = sval[: max_field_length - 3] + "..."
-        embed.add_field(name=name, value=sval, inline=False)
-
-    # If total_chars already within cap, we're done
-    if total_chars <= total_cap:
-        try:
-            if files:
-                await destination.send(
-                    content=mention if mention else None, embed=embed, files=files
-                )
-            else:
-                await destination.send(content=mention if mention else None, embed=embed)
-            try:
-                await log_embed_to_file(embed)
-            except Exception:
-                logger.exception("[EMBED] log_embed_to_file failed")
+            files.append(discord.File(io.BytesIO(content.encode("utf-8")), filename=filename))
             return True
-        except discord.Forbidden as e:
-            logger.warning(f"[EMBED] Forbidden sending to destination: {e}")
-            if VIEW_PRUNE_ON_FORBIDDEN:
-                logger.info("[EMBED] VIEW_PRUNE_ON_FORBIDDEN set: treating Forbidden as prunable.")
-                return False
-            # try fallback
-            try:
-                if fallback_channel is not None and bot is not None:
-                    fallback_msg = discord.Embed(
-                        title="Embed Delivery Failed (Forbidden)",
-                        description=f"Failed to deliver embed titled: {title}",
-                        color=0xE67E22,
-                    )
-                    await fallback_channel.send(embed=fallback_msg)
-            except Exception:
-                logger.exception("[EMBED] Failed to send fallback for Forbidden")
-            return False
-        except discord.HTTPException as e:
-            logger.warning(f"[EMBED] HTTPException sending embed: {e}")
-            # try fallback channel if provided
-            try:
-                if fallback_channel is not None and bot is not None:
-                    fallback_msg = discord.Embed(
-                        title="Embed Delivery Failed (HTTPException)",
-                        description=f"Failed to deliver embed titled: {title}",
-                        color=0xE67E22,
-                    )
-                    await fallback_channel.send(embed=fallback_msg)
-            except Exception:
-                logger.exception("[EMBED] Failed to send fallback for HTTPException")
-            return False
         except Exception:
-            logger.exception("[EMBED] Unexpected error sending embed")
+            logger.exception("[EMBED] Failed to attach %s", context)
             return False
 
-    # If we reach here, total_chars exceeded total_cap — try to attach largest remaining fields
-    # Build list of remaining (name, value, len)
-    extra_candidates = []
-    for name, sval in remaining_fields:
-        try:
-            size = len(sval)
-        except Exception:
-            size = 0
-        extra_candidates.append((size, name, sval))
-    extra_candidates.sort(reverse=True)
+    if len(prepared) > MAX_FIELDS_PER_EMBED:
+        overflow = prepared[MAX_FIELDS_PER_EMBED - 1 :]
+        overflow_text = "\n\n".join(
+            f"{item['original_name']}\n{item['original_value']}" for item in overflow
+        )
+        filename = _safe_embed_attachment_name(safe_title, "additional_fields", 0)
+        attached = _attach_text(overflow_text, filename, context="additional embed fields")
+        note = (
+            f"{len(overflow)} additional fields attached as {filename}."
+            if attached
+            else f"… {len(overflow)} additional fields omitted; attachment creation failed."
+        )
+        prepared = prepared[: MAX_FIELDS_PER_EMBED - 1]
+        prepared.append(
+            {
+                "name": "Additional fields",
+                "value": note,
+                "original_name": "Additional fields",
+                "original_value": overflow_text,
+                "log_like": False,
+                "attached": attached,
+                "index": 0,
+            }
+        )
 
-    for _, name, sval in extra_candidates:
-        if total_chars <= total_cap:
-            break
-        try:
-            fname = f"{title.replace(' ', '_')}_{name.replace(' ', '_')}.txt"
-        except Exception:
-            fname = f"{uuid.uuid4().hex[:8]}_field.txt"
-        try:
-            bio = io.BytesIO(sval.encode("utf-8"))
-            files.append(discord.File(bio, filename=fname))
-            note = f"(attached as {fname})"
-            embed.add_field(name=name, value=note, inline=False)
-            total_chars -= len(sval)
-        except Exception:
-            # If attachment fails, add truncated field
-            embed.add_field(name=name, value=(sval[: max_field_length - 3] + "..."), inline=False)
-            total_chars -= max_field_length
+    for item in prepared:
+        if item["attached"] or not item["log_like"]:
+            continue
+        if len(item["original_value"]) <= max_log_chars:
+            continue
+        filename = _safe_embed_attachment_name(safe_title, item["original_name"], item["index"])
+        if _attach_text(item["original_value"], filename, context="large log field"):
+            item["value"] = truncate_text(f"(log attached as {filename})", effective_field_limit)
+            item["attached"] = True
 
-    # Final send attempt
+    def _payload_dict() -> dict[str, Any]:
+        return {
+            "title": safe_title,
+            "fields": [
+                {"name": item["name"], "value": item["value"], "inline": False} for item in prepared
+            ],
+        }
+
+    # Replace large fields in place; never append a second note field for the same content.
+    while (
+        prepared and measure_embed_payload(_payload_dict()).total_characters > effective_total_cap
+    ):
+        usage = measure_embed_payload(_payload_dict())
+        candidates = [item for item in prepared if not item["attached"]]
+        candidate = max(
+            candidates,
+            key=lambda item: len(item["name"]) + len(item["value"]),
+            default=None,
+        )
+        if candidate is not None:
+            filename = _safe_embed_attachment_name(
+                safe_title, candidate["original_name"], candidate["index"]
+            )
+            attachment_text = f"{candidate['original_name']}\n\n{candidate['original_value']}"
+            if _attach_text(attachment_text, filename, context="aggregate overflow field"):
+                candidate["name"] = truncate_text(
+                    f"Attached field {candidate['index']}", MAX_FIELD_NAME_CHARACTERS
+                )
+                candidate["value"] = truncate_text(
+                    f"(attached as {filename})", effective_field_limit
+                )
+                candidate["attached"] = True
+                continue
+
+        # Attachment creation failed or every field is already attached. Compact visibly.
+        excess = usage.total_characters - effective_total_cap
+        compact_target = max(
+            prepared,
+            key=lambda item: len(item["name"]) + len(item["value"]),
+        )
+        if len(compact_target["value"]) > 1:
+            compact_target["value"] = truncate_text(
+                compact_target["value"], max(1, len(compact_target["value"]) - excess)
+            )
+        elif len(compact_target["name"]) > 1:
+            compact_target["name"] = truncate_text(
+                compact_target["name"], max(1, len(compact_target["name"]) - excess)
+            )
+        else:
+            logger.error(
+                "[EMBED] Unable to satisfy requested aggregate cap=%s", effective_total_cap
+            )
+            return False
+
+    embed = discord.Embed(title=safe_title, color=color)
+    for item in prepared:
+        embed.add_field(name=item["name"], value=item["value"], inline=False)
+
+    try:
+        usage = require_valid_embed_payload(embed)
+    except Exception:
+        logger.exception("[EMBED] Refusing invalid final embed payload")
+        return False
+    if usage.total_characters > effective_total_cap:
+        logger.error(
+            "[EMBED] Refusing embed above requested aggregate cap actual=%s cap=%s",
+            usage.total_characters,
+            effective_total_cap,
+        )
+        return False
+
     try:
         if files:
             await destination.send(content=mention if mention else None, embed=embed, files=files)
@@ -834,8 +877,8 @@ async def send_embed_safe(
         except Exception:
             logger.exception("[EMBED] log_embed_to_file failed")
         return True
-    except discord.Forbidden as e:
-        logger.warning(f"[EMBED] Forbidden sending to destination: {e}")
+    except discord.Forbidden as exc:
+        logger.warning("[EMBED] Forbidden sending to destination: %s", exc)
         if VIEW_PRUNE_ON_FORBIDDEN:
             logger.info("[EMBED] VIEW_PRUNE_ON_FORBIDDEN set: treating Forbidden as prunable.")
             return False
@@ -844,20 +887,20 @@ async def send_embed_safe(
             if fallback_channel is not None and bot is not None:
                 fallback_msg = discord.Embed(
                     title="Embed Delivery Failed (Forbidden)",
-                    description=f"Failed to deliver embed titled: {title}",
+                    description=f"Failed to deliver embed titled: {safe_title}",
                     color=0xE67E22,
                 )
                 await fallback_channel.send(embed=fallback_msg)
         except Exception:
             logger.exception("[EMBED] Failed to send fallback for Forbidden")
         return False
-    except discord.HTTPException as e:
-        logger.warning(f"[EMBED] HTTPException sending embed: {e}")
+    except discord.HTTPException as exc:
+        logger.warning("[EMBED] HTTPException sending embed: %s", exc)
         try:
             if fallback_channel is not None and bot is not None:
                 fallback_msg = discord.Embed(
                     title="Embed Delivery Failed (HTTPException)",
-                    description=f"Failed to deliver embed titled: {title}",
+                    description=f"Failed to deliver embed titled: {safe_title}",
                     color=0xE67E22,
                 )
                 await fallback_channel.send(embed=fallback_msg)
@@ -1024,18 +1067,23 @@ class HistoryView(discord.ui.View):
             title=f"📜 File Processing History (Page {self.page}/{self.total_pages})",
             color=INFO_COLOR,
         )
-        for row in page_rows:
-            embed.add_field(
-                name=f"📄 {row.get('Filename', 'Unknown')}",
-                value=(
+        for index, row in enumerate(page_rows):
+            name = truncate_text(f"📄 {row.get('Filename', 'Unknown')}", MAX_FIELD_NAME_CHARACTERS)
+            value = truncate_text(
+                (
                     f"👤 Uploaded by: `{row.get('Author', 'Unknown')}`\n"
                     f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
                     f"#️⃣ Channel: `{row.get('Channel', 'Unknown')}`\n"
                     f"📂 Path: `{row.get('SavedPath', 'Unknown')}`"
                 ),
-                inline=False,
+                MAX_FIELD_VALUE_CHARACTERS,
             )
+            if not _embed_field_would_fit(embed, name, value):
+                _add_embed_omission_marker(embed, len(page_rows) - index, "history entries")
+                break
+            embed.add_field(name=name, value=value, inline=False)
         embed.timestamp = discord.utils.utcnow()
+        require_valid_embed_payload(embed)
         return embed
 
     @discord.ui.button(label="◀ Previous", style=discord.ButtonStyle.secondary)
@@ -1129,10 +1177,10 @@ class FailuresView(discord.ui.View):
         embed = discord.Embed(
             title=f"❌ Failed Jobs (Page {self.page}/{self.total_pages})", color=DANGER_COLOR
         )
-        for row in page_rows:
-            embed.add_field(
-                name=f"📄 {row.get('Filename', 'Unknown')}",
-                value=(
+        for index, row in enumerate(page_rows):
+            name = truncate_text(f"📄 {row.get('Filename', 'Unknown')}", MAX_FIELD_NAME_CHARACTERS)
+            value = truncate_text(
+                (
                     f"👤 Author: `{row.get('User', 'Unknown')}`\n"
                     f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
                     f"📊 Rank/Seed: `{row.get('Rank', '?')}` / `{row.get('Seed', '?')}`\n"
@@ -1140,9 +1188,14 @@ class FailuresView(discord.ui.View):
                     f"🧠 SQL: `{row.get('SQL Success', '?')}` | 📤 Export: `{row.get('Export Success', '?')}`\n"
                     f"⏱ Duration: `{row.get('Duration (sec)', '?')}`"
                 ),
-                inline=False,
+                MAX_FIELD_VALUE_CHARACTERS,
             )
+            if not _embed_field_would_fit(embed, name, value):
+                _add_embed_omission_marker(embed, len(page_rows) - index, "failed jobs")
+                break
+            embed.add_field(name=name, value=value, inline=False)
         embed.timestamp = discord.utils.utcnow()
+        require_valid_embed_payload(embed)
         return embed
 
     @discord.ui.button(label="◀ Previous", style=discord.ButtonStyle.secondary)
@@ -1230,38 +1283,50 @@ def build_target_embed(data):
 
 
 def format_fight_embed(fights):
+    fight_items = list(fights or [])
     embed = discord.Embed(
         title="🔥 Upcoming Fights",
         color=DANGER_COLOR,
     )
     embed.set_thumbnail(url="https://i.ibb.co/FLPsD22x/FIGHTS.jpg")
+    embed.set_footer(
+        text="Times shown in UTC — use the button to view in your local time & switch between 1 or 3 upcoming fights."
+    )
 
-    for event in fights:
-        name = md_escape(event.get("name", "(Unnamed Event)"))
+    for index, event in enumerate(fight_items):
+        name = truncate_text(
+            f"⚔️ {md_escape(event.get('name', '(Unnamed Event)'))}",
+            MAX_FIELD_NAME_CHARACTERS,
+        )
         start = event.get("start_time")
         if not start:
             continue
         countdown = format_countdown(start, short=True)
         value = f"{format_event_time(start)}  ({countdown})"  # UTC
-        if len(value) > 1024:
-            value = value[:1021] + "…"
-        embed.add_field(name=f"⚔️ {name}", value=value, inline=False)
+        value = truncate_text(value, MAX_FIELD_VALUE_CHARACTERS)
+        if not _embed_field_would_fit(embed, name, value):
+            _add_embed_omission_marker(embed, len(fight_items) - index, "fights")
+            break
+        embed.add_field(name=name, value=value, inline=False)
 
-    embed.set_footer(
-        text="Times shown in UTC — use the button to view in your local time & switch between 1 or 3 upcoming fights."
-    )
     embed.timestamp = discord.utils.utcnow()
+    require_valid_embed_payload(embed)
     return embed
 
 
 def format_event_embed(events):
+    event_items = list(events or [])
     embed = discord.Embed(
         title="📅 Upcoming Event(s)",
         color=INFO_COLOR,
     )
+    embed.set_footer(text="Times shown in UTC — use the local-time button to convert.")
 
-    for event in events:
-        name = md_escape(event.get("name", "(Unnamed Event)"))
+    for index, event in enumerate(event_items):
+        name = truncate_text(
+            md_escape(event.get("name", "(Unnamed Event)")),
+            MAX_FIELD_NAME_CHARACTERS,
+        )
         start = event.get("start_time")
         if not start:
             continue
@@ -1270,12 +1335,14 @@ def format_event_embed(events):
         description = event.get("description")
         if description:
             value += f"\n\n📖 {md_escape(description)}"
-        if len(value) > 1024:
-            value = value[:1021] + "…"
+        value = truncate_text(value, MAX_FIELD_VALUE_CHARACTERS)
+        if not _embed_field_would_fit(embed, name, value):
+            _add_embed_omission_marker(embed, len(event_items) - index, "events")
+            break
         embed.add_field(name=name, value=value, inline=False)
 
-    embed.set_footer(text="Times shown in UTC — use the local-time button to convert.")
     embed.timestamp = discord.utils.utcnow()
+    require_valid_embed_payload(embed)
     return embed
 
 

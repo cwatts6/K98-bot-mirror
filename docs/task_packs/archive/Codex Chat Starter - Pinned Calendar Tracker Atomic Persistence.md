@@ -1,5 +1,12 @@
 # Codex Chat Starter - Pinned Calendar Tracker Atomic Persistence
 
+> **Completed record — 2026-09-01:** This starter launched the delivered atomic persistence fix.
+> Mirror PR #250 and production PR #557 completed implementation and deployment. Automated
+> validation, a Changes-only security review with Deep off and zero findings, and operator
+> production restart smoke all passed. The existing pinned message was rehydrated and edited in
+> place with unchanged channel/message identity and valid tracker JSON. This archived file is
+> retained as execution history, not active work.
+
 Use this starter to begin the implementation task. One-pass execution is not approved: the first
 response is audit/scope only and must stop for approval before code or test changes.
 

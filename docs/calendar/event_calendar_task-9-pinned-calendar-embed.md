@@ -1,7 +1,9 @@
 # Task 9 — Pinned Calendar Embed (Final Implementation)
 
 ## Status
-✅ Completed and smoke-tested locally on **2026-03-09**.
+✅ Completed and smoke-tested locally on **2026-03-09**. Tracker atomic-persistence hardening was
+production deployed and operator smoke accepted on **2026-09-01** through mirror PR #250 and
+production PR #557.
 
 ## Implemented Scope
 
@@ -29,6 +31,12 @@
   - Handles deleted/missing channel/message
   - Clears invalid tracker state safely
   - Does not crash startup
+- Tracker persistence:
+  - Retains `data/calendar_pinned_tracker.json` and its existing dictionary shape
+  - Writes through `file_utils.atomic_write_json()` with parent creation, flush/`fsync`, atomic
+    replacement, transient Windows sharing-violation retries, and failed-temp cleanup
+  - Preserves the prior valid tracker when replacement fails while retaining the existing logged,
+    non-raising caller boundary
 
 ### 3) Local-time toggle for user commands
 - `/calendar` and `/calendar_next_event` now include local-time button
@@ -85,6 +93,19 @@
 - `/calendar_next_event` local-time button works
 - `/calendar` pagination + local-time works (fixed unified view issue)
 - Daily sequencing and failure-preserve behavior verified in logs
+
+### Atomic persistence follow-up — 2026-09-01
+- Focused tracker coverage passed `11` tests, calendar coverage passed `114`, lifecycle coverage
+  passed `25`, shared atomic-helper retry coverage passed `2`, and the full suite passed with
+  `3027 passed, 2 skipped`.
+- Changes-only security review `43628893-300e-44ae-970d-e406bb39ac11` ran with Deep off, complete
+  coverage, and zero findings.
+- Production restart completed pinned-calendar rehydration and edited the existing message in
+  place with `status=edited` and `events=25`; channel/message identity remained unchanged,
+  `updated_at_utc` advanced, tracker JSON remained valid, no duplicate or stale temporary file
+  remained, and the next daily refresh scheduled normally.
+- No SQL, config, dependency, command, permission, reminder, scheduler, cache, embed, button, or
+  user-facing output change was required.
 
 ---
 

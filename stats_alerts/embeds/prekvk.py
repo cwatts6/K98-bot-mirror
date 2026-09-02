@@ -14,6 +14,13 @@ from typing import Any
 import discord
 
 from constants import CUSTOM_AVATAR_URL, KVK_BANNER_MAP, TARGETS_SHEET_ID, TIMELINE_SHEET_ID
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_TITLE_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+)
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
 from prekvk import report_service
@@ -26,9 +33,117 @@ from utils import date_to_utc_start, ensure_aware_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
+_VISIBLE_EVENT_LIMIT = 12
+_UPCOMING_FIELD_NAME = "🗓️ Next 7 days:"
+_UPCOMING_CONTINUATION_NAME = "🗓️ Next 7 days (continued):"
+_UPCOMING_OMISSION_TEMPLATE = "… {count} more events — see Timeline"
+_PREKVK_FOOTER = "KD98 Discord Bot"
+
 
 class PreKvkSkip(Exception):
     """Raised to indicate the embed wasn't sent due to mutual exclusivity / limits."""
+
+
+def _normalise_event_name(event: dict[str, Any]) -> str:
+    raw_name = event.get("name") or event.get("title") or "Event"
+    return " ".join(str(raw_name).split()) or "Event"
+
+
+def _format_event_block(event: dict[str, Any]) -> tuple[str, bool]:
+    """Render one complete event block, compacting only a pathological event name."""
+
+    name = _normalise_event_name(event)
+    ts = int(event["start_time"].timestamp())
+    prefix = "• **"
+    suffix = f"** — starts <t:{ts}:R>\n  {format_event_time(event['start_time'])}"
+    name_budget = MAX_FIELD_VALUE_CHARACTERS - len(prefix) - len(suffix)
+    safe_name = truncate_text(name, max(1, name_budget))
+    return f"{prefix}{safe_name}{suffix}", safe_name != name
+
+
+def _event_field_name(index: int) -> str:
+    return _UPCOMING_FIELD_NAME if index == 0 else _UPCOMING_CONTINUATION_NAME
+
+
+def _event_groups_cost(groups: list[list[tuple[str, bool]]]) -> int:
+    return sum(
+        len(_event_field_name(index)) + len("\n".join(block for block, _ in group))
+        for index, group in enumerate(groups)
+    )
+
+
+def _build_upcoming_event_fields(
+    events: list[dict[str, Any]],
+    *,
+    available_fields: int,
+    available_characters: int,
+) -> tuple[list[tuple[str, str]], int, int]:
+    """Pack complete visible events and return fields, omitted count, compacted count."""
+
+    visible = list(events[:_VISIBLE_EVENT_LIMIT])
+    groups: list[list[tuple[str, bool]]] = []
+    compacted_count = 0
+    omitted_count = 0
+
+    for index, event in enumerate(visible):
+        block, compacted = _format_event_block(event)
+
+        if groups:
+            candidate_value = "\n".join([*(item[0] for item in groups[-1]), block])
+            projected_cost = _event_groups_cost(groups) + len(block) + 1
+            if (
+                len(candidate_value) <= MAX_FIELD_VALUE_CHARACTERS
+                and projected_cost <= available_characters
+            ):
+                groups[-1].append((block, compacted))
+                compacted_count += int(compacted)
+                continue
+
+        if len(groups) < max(0, available_fields):
+            projected = (
+                _event_groups_cost(groups) + len(_event_field_name(len(groups))) + len(block)
+            )
+            if projected <= available_characters:
+                groups.append([(block, compacted)])
+                compacted_count += int(compacted)
+                continue
+
+        omitted_count = len(visible) - index
+        break
+
+    while omitted_count:
+        marker = _UPCOMING_OMISSION_TEMPLATE.format(count=omitted_count)
+        if groups:
+            candidate_value = "\n".join([*(item[0] for item in groups[-1]), marker])
+            projected_cost = _event_groups_cost(groups) + len(marker) + 1
+            if (
+                len(candidate_value) <= MAX_FIELD_VALUE_CHARACTERS
+                and projected_cost <= available_characters
+            ):
+                groups[-1].append((marker, False))
+                break
+        elif available_fields > 0:
+            marker_cost = len(_event_field_name(0)) + len(marker)
+            if marker_cost <= available_characters:
+                groups.append([(marker, False)])
+                break
+
+        if not groups:
+            break
+        _removed_block, removed_compacted = groups[-1].pop()
+        compacted_count -= int(removed_compacted)
+        omitted_count += 1
+        if not groups[-1]:
+            groups.pop()
+
+    return (
+        [
+            (_event_field_name(index), "\n".join(block for block, _ in group))
+            for index, group in enumerate(groups)
+        ],
+        omitted_count,
+        compacted_count,
+    )
 
 
 async def send_prekvk_embed(
@@ -98,11 +213,12 @@ async def send_prekvk_embed(
         return f"in {n}d"
 
     # Build embed skeleton
+    description = (f"**{kvk_date_range}**\n" if kvk_date_range else "") + (
+        f"Prep update **{timestamp}**\n\n" "Fighting hasn’t started yet. Here’s what’s ahead 👇"
+    )
     embed = discord.Embed(
-        title=f"🧭 Pre-KVK — {kvk_name} (KVK {kvk_no})",
-        description=(f"**{kvk_date_range}**\n" if kvk_date_range else "")
-        + f"Prep update **{timestamp}**\n\n"
-        "Fighting hasn’t started yet. Here’s what’s ahead 👇",
+        title=truncate_text(f"🧭 Pre-KVK — {kvk_name} (KVK {kvk_no})", MAX_TITLE_CHARACTERS),
+        description=truncate_text(description, MAX_DESCRIPTION_CHARACTERS),
         color=discord.Color.blurple(),
     )
 
@@ -136,7 +252,9 @@ async def send_prekvk_embed(
             tl_lines.append(f"⚔️ Fighting starts: **{fight_start}** ({_fmt_dd(df)})")
 
     embed.add_field(
-        name="Season timeline", value="\n".join(tl_lines) if tl_lines else "—", inline=False
+        name="Season timeline",
+        value=truncate_text("\n".join(tl_lines) if tl_lines else "—", MAX_FIELD_VALUE_CHARACTERS),
+        inline=False,
     )
 
     # Load Pre-KVK scheduled summary from the report service architecture.
@@ -188,7 +306,9 @@ async def send_prekvk_embed(
     # Add fields for overall and phases.
     embed.add_field(
         name="🏆 Overall Pre-KVK Rankings:",
-        value=_fmt_top_simple(tops.overall, "pts", limit=3),
+        value=truncate_text(
+            _fmt_top_simple(tops.overall, "pts", limit=3), MAX_FIELD_VALUE_CHARACTERS
+        ),
         inline=False,
     )
 
@@ -197,7 +317,10 @@ async def send_prekvk_embed(
         if prev_tops and prev_tops.overall:
             embed.add_field(
                 name="🏆 Overall - last kvk",
-                value=_fmt_top_simple(prev_tops.overall, "pts", limit=1),
+                value=truncate_text(
+                    _fmt_top_simple(prev_tops.overall, "pts", limit=1),
+                    MAX_FIELD_VALUE_CHARACTERS,
+                ),
                 inline=False,
             )
     except Exception:
@@ -206,17 +329,17 @@ async def send_prekvk_embed(
     # Phases: current (top-3)
     embed.add_field(
         name="🗡️ Phase 1 — Marauders",
-        value=_fmt_top_simple(tops.p1, "pts", limit=3),
+        value=truncate_text(_fmt_top_simple(tops.p1, "pts", limit=3), MAX_FIELD_VALUE_CHARACTERS),
         inline=True,
     )
     embed.add_field(
         name="🏕️ Phase 2 — Marauder Forts",
-        value=_fmt_top_simple(tops.p2, "pts", limit=3),
+        value=truncate_text(_fmt_top_simple(tops.p2, "pts", limit=3), MAX_FIELD_VALUE_CHARACTERS),
         inline=True,
     )
     embed.add_field(
         name="🏗️ Phase 3 — Training",
-        value=_fmt_top_simple(tops.p3, "pts", limit=3),
+        value=truncate_text(_fmt_top_simple(tops.p3, "pts", limit=3), MAX_FIELD_VALUE_CHARACTERS),
         inline=True,
     )
 
@@ -225,17 +348,26 @@ async def send_prekvk_embed(
         if prev_tops and any((prev_tops.p1, prev_tops.p2, prev_tops.p3)):
             embed.add_field(
                 name="Marauders - last kvk:",
-                value=_fmt_top_simple(prev_tops.p1, "pts", limit=1),
+                value=truncate_text(
+                    _fmt_top_simple(prev_tops.p1, "pts", limit=1),
+                    MAX_FIELD_VALUE_CHARACTERS,
+                ),
                 inline=True,
             )
             embed.add_field(
                 name="Marauder Forts - last kvk:",
-                value=_fmt_top_simple(prev_tops.p2, "pts", limit=1),
+                value=truncate_text(
+                    _fmt_top_simple(prev_tops.p2, "pts", limit=1),
+                    MAX_FIELD_VALUE_CHARACTERS,
+                ),
                 inline=True,
             )
             embed.add_field(
                 name="Training - last kvk:",
-                value=_fmt_top_simple(prev_tops.p3, "pts", limit=1),
+                value=truncate_text(
+                    _fmt_top_simple(prev_tops.p3, "pts", limit=1),
+                    MAX_FIELD_VALUE_CHARACTERS,
+                ),
                 inline=True,
             )
     except Exception:
@@ -249,7 +381,11 @@ async def send_prekvk_embed(
         honor_top = []
 
     if honor_top:
-        embed.add_field(name="🏅 Honor Rankings (Top 3):", value=fmt_honor(honor_top), inline=False)
+        embed.add_field(
+            name="🏅 Honor Rankings (Top 3):",
+            value=truncate_text(fmt_honor(honor_top), MAX_FIELD_VALUE_CHARACTERS),
+            inline=False,
+        )
     else:
         next_lines = []
         if isinstance(pass4_scan, int):
@@ -296,25 +432,6 @@ async def send_prekvk_embed(
                 week_events.append({**e, "start_time": st})
     week_events = sorted(week_events, key=lambda ev: ev["start_time"])
 
-    if week_events:
-
-        def _event_line(e):
-            name = (e.get("name") or e.get("title") or "Event").strip()
-            ts = int(e["start_time"].timestamp())
-            return f"• **{name}** — starts <t:{ts}:R>\n  {format_event_time(e['start_time'])}"
-
-        embed.add_field(
-            name="🗓️ Next 7 days:",
-            value="\n".join(_event_line(e) for e in week_events[:12]),
-            inline=False,
-        )
-
-    embed.add_field(
-        name="📎 Get ready",
-        value="Use **/mykvktargets** (targets are now LIVE) • **/subscribe** receive event reminders",
-        inline=False,
-    )
-
     tl_link = (
         f"https://docs.google.com/spreadsheets/d/{TIMELINE_SHEET_ID}" if TIMELINE_SHEET_ID else None
     )
@@ -326,10 +443,56 @@ async def send_prekvk_embed(
         link_parts.append(f"[Timeline]({tl_link})")
     if targets_link:
         link_parts.append(f"[Targets]({targets_link})")
-    if link_parts:
-        embed.add_field(name="🔗 Links", value=" • ".join(link_parts), inline=False)
 
-    embed.set_footer(text="KD98 Discord Bot")
+    trailing_fields = [
+        (
+            "📎 Get ready",
+            "Use **/mykvktargets** (targets are now LIVE) • **/subscribe** receive event reminders",
+        )
+    ]
+    if link_parts:
+        trailing_fields.append(("🔗 Links", " • ".join(link_parts)))
+
+    reserved_payload = embed.to_dict()
+    reserved_payload["fields"] = [
+        *reserved_payload.get("fields", []),
+        *[{"name": name, "value": value, "inline": False} for name, value in trailing_fields],
+    ]
+    reserved_payload["footer"] = {"text": _PREKVK_FOOTER}
+    reserved_usage = require_valid_embed_payload(reserved_payload)
+    available_fields = reserved_usage.remaining_fields()
+    available_characters = reserved_usage.remaining_characters
+
+    event_fields, omitted_events, compacted_events = _build_upcoming_event_fields(
+        week_events,
+        available_fields=available_fields,
+        available_characters=available_characters,
+    )
+    for name, value in event_fields:
+        embed.add_field(name=name, value=value, inline=False)
+    for name, value in trailing_fields:
+        embed.add_field(name=name, value=value, inline=False)
+    embed.set_footer(text=_PREKVK_FOOTER)
+
+    usage = require_valid_embed_payload(embed)
+    if len(event_fields) > 1 or compacted_events or omitted_events:
+        logger.warning(
+            "[PREKVK] Event payload adjusted event_fields=%s compacted_events=%s "
+            "omitted_events=%s",
+            len(event_fields),
+            compacted_events,
+            omitted_events,
+        )
+    logger.info(
+        "[PREKVK] Embed payload validated fields=%s chars=%s max_field_value=%s "
+        "event_fields=%s compacted_events=%s omitted_events=%s",
+        usage.field_counts[0],
+        usage.total_characters,
+        max((len(field.value) for field in embed.fields), default=0),
+        len(event_fields),
+        compacted_events,
+        omitted_events,
+    )
 
     view = (
         LocalTimeToggleView(week_events, prefix="prekvk_week", timeout=None)
@@ -437,7 +600,7 @@ async def send_prekvk_embed(
     except Exception:
         logger.exception("[PREKVK] Failed to persist message id")
 
-    # Log to CSV claim_send (file IO) — do via run_blocking_in_thread when available
+    # The module owns the one post-success daily claim for a fresh production send.
     if not is_test:
         try:
             try:
@@ -446,26 +609,22 @@ async def send_prekvk_embed(
                 run_blocking_in_thread = None
 
             if run_blocking_in_thread is not None:
-                await run_blocking_in_thread(
+                claimed = await run_blocking_in_thread(
                     claim_send,
                     "prekvk_daily",
-                    {"max_per_day": 1} if False else (),
+                    max_per_day=1,
                     name="claim_send_prekvk",
                     meta={"key": "prekvk_daily"},
                 )
-                # Note: claim_send signature expected (name, max_per_day=1) — above wrapper meta used; fallback below uses to_thread instead
             else:
-                # plain to_thread call (original behavior)
                 logger.debug(
                     "[PREKVK] run_blocking_in_thread not available; using asyncio.to_thread fallback for claim_send (consider converting to run_blocking_in_thread)"
                 )
-                await asyncio.to_thread(claim_send, "prekvk_daily", max_per_day=1)
-        except TypeError:
-            # If we incorrectly passed args for the run_blocking call above, fallback to safe to_thread call
-            try:
-                await asyncio.to_thread(claim_send, "prekvk_daily", max_per_day=1)
-            except Exception:
-                logger.exception("[PREKVK] claim_send failed")
+                claimed = await asyncio.to_thread(claim_send, "prekvk_daily", max_per_day=1)
+            if not claimed:
+                logger.warning(
+                    "[PREKVK] Fresh send succeeded but prekvk_daily claim was not recorded."
+                )
         except Exception:
             logger.exception("[PREKVK] claim_send failed")
 

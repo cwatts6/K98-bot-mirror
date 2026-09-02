@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Pinned Calendar Tracker Atomic Persistence Completed Item
+
+- Area: `event_calendar/pinned_embed.py`, `tests/test_calendar_pinned_embed.py`, and pinned-calendar restart/refresh lifecycle
+- Type: refactor
+- Description: The restart-consumed pinned calendar tracker used direct `Path.write_text()` JSON persistence in `_save_tracker()`, unlike established restart-sensitive tracker paths using atomic replacement and explicit failure preservation.
+- Resolution: Mirror PR #250 and production PR #557 changed only `_save_tracker()` to call the existing `file_utils.atomic_write_json(_TRACKER_PATH, data, ensure_parent_dir=True)` helper inside its existing non-raising exception boundary. The tracker path and shape, missing/malformed fallback, edit/create payload differences, `updated_at_utc` behavior, missing-target clearing, Discord message/pin behavior, caller results, telemetry, startup ordering, scheduler timing/task names, and all user-facing output were preserved. No shared helper, SQL, config, dependency, command, permission, cache, reminder, scheduler, or lifecycle redesign was included.
+- Validation: Focused tracker coverage passed `11` tests, the calendar subsystem passed `114`, rehydration/startup lifecycle coverage passed `25`, shared helper retry coverage passed `2`, and the full suite passed with `3027 passed, 2 skipped`. All architecture, deferred-item, security-routing, test-selection, smoke-import, command-registration, log-noise, pre-commit, and diff-check gates passed. Changes-only security review `43628893-300e-44ae-970d-e406bb39ac11` ran with Deep off, complete coverage, and zero findings. Production restart smoke on 2026-09-01 completed pinned-calendar rehydration and edited message `1488086669876920341` in channel `1480584179073683576` without duplication; `updated_at_utc` advanced to `2026-09-01T14:02:27.030049+00:00`, tracker JSON and temp-file cleanup remained healthy, `25` events rendered, and the next daily refresh scheduled normally.
+
 ### DL_bot Offload Callable Once-Only Failure Semantics Completed Item
 
 - Area: `DL_bot.py::_offload_callable`, `file_utils.py` callable offload contracts, `upload_routes/`, and offload/import failure tests

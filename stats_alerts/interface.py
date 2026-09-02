@@ -107,10 +107,7 @@ async def send_stats_update_embed(
     if is_kvk:
         # If a Pre-KVK msg id exists, do silent edit path in module
         try:
-            action = await prekvk_mod.send_prekvk_embed(bot, channel, timestamp, is_test=is_test)
-            # If fresh send happened, log
-            if action == "sent" and not is_test:
-                claim_send("prekvk_daily", max_per_day=1)
+            await prekvk_mod.send_prekvk_embed(bot, channel, timestamp, is_test=is_test)
             return
         except prekvk_mod.PreKvkSkip:
             # The module signals it skipped due to mutual exclusivity or limits

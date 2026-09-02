@@ -252,17 +252,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-08-29
 
 ### Deferred Optimisation
-- Area: `event_calendar/pinned_embed.py`
-- Type: refactor
-- Description: Pinned calendar tracker persistence currently uses direct `Path.write_text()` JSON writes in `_save_tracker()`, unlike other restart-sensitive tracker files that use atomic JSON helpers and clearer failure boundaries.
-- Suggested Fix: Move pinned calendar tracker persistence to the established atomic JSON helper pattern, preserve tracker shape and missing-message recovery behavior, and add focused tests for successful save, failed/partial write protection, missing tracker, and rehydration after restart.
-- Impact: medium
-- Risk: low
-- Dependencies: Keep this separate from Phase 6F unless a later pinned-calendar persistence task is approved.
-- Status: implementation-ready
-- Last verified: 2026-08-29
-
-### Deferred Optimisation
 - Area: `decoraters.py`, `commands/admin_cmds.py`, `/ops usage`, `/ops usage_detail`, leadership-role configuration and permission tests
 - Type: security
 - Description: The Phase 5C Codex Security repository scan validated that the shared `is_admin_or_leadership` path treats an exact configured leadership role name as an independent authorization grant when no configured stable role ID matches. Both private SQL-backed usage commands inherit that decision. Accepted Phase 8 did not reuse this broad gate for `/stats player`; it delivered a dedicated stable-role-ID and Leadership/Notify channel matrix. The generic decorator and other commands remain a separate low/P3 hardening item.
@@ -305,3 +294,58 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate operator-approved task; focused KVK History offload, payload, export, timeout, and interaction tests.
 - Status: evidence required
 - Last verified: 2026-08-31
+
+### Deferred Optimisation
+- Area: `event_embed_manager.py`, `event_scheduler.py`, `event_calendar/reminders.py`, `daily_KVK_overview_embed.py`, `ui/views/calendar.py`, and focused event/calendar payload tests
+- Type: consistency
+- Description: Event and calendar outputs use several local title, description, field-value, field-count, footer, and soft-aggregate policies. Sheet-controlled names and descriptions can reach public reminders, DMs, persistent calendar edits, and interaction pages without one complete final Discord payload check. This is separate from the deferred public calendar command/visibility redesign.
+- Suggested Fix: Deliver the approved payload-safety Phase 2A using `core/discord_embed_limits.py` as the hard-limit owner. Preserve event selection, reminder eligibility, pings, visibility, persistence, commands, and view cardinality while defining complete-event chunking or explicit omission markers at each renderer boundary. Add pathological Sheet-value, DM, public-reminder, pinned-edit, pagination, and restart/deduplication regression coverage.
+- Impact: high
+- Risk: medium
+- Dependencies: Discord Embed Payload Safety Phase 1 merged and accepted; separate Phase 2A scope approval; no command or public/ephemeral redesign.
+- Status: approved follow-up direction; task pack required
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests
+- Type: consistency
+- Description: Ark roster fields are locally split to the field-value limit, but dynamic alliance titles, notes, updates, result notes, team descriptions, field count, and aggregate payload size are not modeled together across scheduled posts, DMs, registration messages, and team publication edits.
+- Suggested Fix: First add payload measurements and deterministic pathological tests, then use the canonical embed contract to fix only proven failing builders. Approve product-specific choices for large rosters and notes, including pagination, additional embeds, attachments, or explicit omission markers, while preserving the existing first-publication mention and SQL-backed publication/message-ID behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
+- Status: evidence-led Phase 2B candidate
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests
+- Type: architecture
+- Description: Player-facing rankings and history outputs use bounded page counts and local clipping but do not uniformly prove title, field, footer, embed-count, and combined-character limits across charts, tables, multiple embeds, files, and interaction edits.
+- Suggested Fix: Scope a player-facing payload slice that measures realistic and pathological rows, applies the canonical final validator, and chooses pagination or existing export paths rather than silent list truncation. Preserve canonical `/kvk history` placement, visibility, interaction ownership, chart/table meaning, files, and existing offload contracts.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 canonical primitive; separate product/output review; coordinate with the existing KVK History offload deferred item without combining unrelated executor work.
+- Status: later Phase 2 candidate
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `commands/admin_cmds.py`, processing history/failure views in `embed_utils.py`, bot-health, queue, maintenance, and log-oriented diagnostic output
+- Type: consistency
+- Description: Operator diagnostics use mixed description slicing, field clipping, pagination, and log attachment behavior. Long paths, filenames, errors, or log summaries can still require output-specific handling beyond the same-root shared-helper corrections delivered in Phase 1.
+- Suggested Fix: Audit live diagnostic routes separately from player-facing rankings. Use attachments plus short bounded summaries for log/export-like content, canonical final validation for every send/edit path, explicit omission markers for non-file lists, and focused privacy/redaction and fallback tests.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
+- Status: later independent batch candidate
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests
+- Type: architecture
+- Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. Concurrent dispatches can theoretically pass the read before either claim is recorded, although normal singleton-process controls reduce the known frequency and no production duplicate from this race has been established.
+- Suggested Fix: Treat this as a separate reliability design, not embed Phase 2. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
+- Impact: medium
+- Risk: high
+- Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
+- Status: evidence and design-gated
+- Last verified: 2026-09-02

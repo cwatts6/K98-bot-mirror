@@ -7,6 +7,19 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
+## Current Discord Embed Payload Safety Work
+
+The bot-only Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix entered focused Phase 1
+implementation on 2026-09-02 after audit/scope approval. Phase 1 owns the dependency-light Discord
+embed contract, the exact Pre-KVK launch-week overflow regression, complete-event chunking, the
+shared sender correction, and sole module-owned `prekvk_daily` claim behavior. No SQL, command,
+permission, visibility, event-selection, KVK-state, source-data, cache-schema, promotion, or
+deployment change is included.
+
+Broader payload convergence remains a separate Phase 2 programme: event/calendar renderers first,
+then evidence-led Ark and ranking/diagnostic slices. Atomic Pre-KVK dispatch reservation is a
+separate reliability design rather than part of payload Phase 2.
+
 ## KVK Target Publication And Quality Delivery
 
 KVK Target Publication State Separation Phase 1 was deployed and operator accepted on

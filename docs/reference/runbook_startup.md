@@ -160,10 +160,12 @@ the embed refresh runs, and cleanup/watchdog tasks start after the best-effort r
 ## Phase 6 Closure
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete after Phase 6L.
-Historical task packs and chat starters live under `docs/task_packs/archive/`. The current
-post-Phase 6 programmes are the wider command-surface migration, queue-domain redesign, optional
-SQL-backed queue persistence, disabled secondary command-surface cleanup, SQL deployment workflow,
-and pinned calendar tracker atomic-write hardening; each needs its own scope and validation plan.
+Historical task packs and chat starters live under `docs/task_packs/archive/`. Pinned calendar
+tracker atomic-write hardening was delivered independently through mirror PR #250 and production
+PR #557 and passed production restart smoke on 2026-09-01. The remaining post-Phase 6 programmes
+are the wider command-surface migration, queue-domain redesign, optional SQL-backed queue
+persistence, disabled secondary command-surface cleanup, and SQL deployment workflow; each needs
+its own scope and validation plan.
 
 ## Common Startup Failures
 
