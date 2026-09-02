@@ -2,6 +2,18 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Discord Embed Payload Safety Phase 1 completed implementation, review, promotion preparation, and
+operator edit-path smoke on 2026-09-02 through mirror PR #251 and production PR #558, pending the
+operator's manual merges. It delivered `core/discord_embed_limits.py`, the exact 1,029-character
+Pre-KVK regression and complete-event packing, shared-sender overflow repair, and sole Pre-KVK
+ownership of `prekvk_daily`. Focused validation passed `40` tests and the full/log-noise suites
+passed `3059 passed, 2 skipped`; two Changes-only reviews ran with Deep off and zero reportable
+findings. Live smoke validated 13 fields, 1,847 aggregate characters, a 530-character largest
+field, and an in-place edit of message `1544617668999381044` with matching persisted state and no
+duplicate or `50035`. The archived task pack, starter, and findings record preserve the delivery.
+Phase 2A event/calendar convergence now has its own active audit/scope pack; Ark, rankings/history,
+diagnostics, and atomic Pre-KVK reservation remain separate.
+
 Pinned Calendar Tracker Atomic Persistence completed implementation, validation, Changes-only
 security review, production deployment, and operator restart smoke on 2026-09-01 through mirror
 PR #250 and production PR #557. The existing pinned message was rehydrated and edited in place

@@ -1,5 +1,9 @@
 # Codex Chat Starter - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix
 
+> Archived completion record. Phase 1 was delivered through mirror PR #251 and production PR #558
+> and passed operator edit-path smoke on 2026-09-02. Do not use this starter for new work; use the
+> active Phase 2A event/calendar convergence starter instead.
+
 Use this starter to begin the task. One-pass execution is not approved: the first response must be
 audit/scope and architecture planning only, then stop for operator approval before changing runtime
 code or tests.
@@ -10,7 +14,7 @@ code or tests.
 # Files mentioned by the user:
 
 ## Codex Task Pack - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix.md:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix.md
 
 ## My request for Codex:
 
@@ -18,7 +22,7 @@ Begin the Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix task.
 
 Use the task pack:
 
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix.md
 
 The KingdomScanData4/KS4 database work that previously blocked this fix is complete. This is
 expected to be a bot-only task. Start with audit/scope and architecture planning only. Do not
@@ -132,7 +136,7 @@ Important boundaries:
 - Keep additional `fix now` work limited to confirmed same-root-cause, behavior-preserving,
   PR-sized defects.
 - Create the durable audit artifact at:
-  `docs/task_packs/Discord Embed Payload Safety Audit Findings.md`.
+  `docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`.
 
 Stop for approval after the first response. Do not edit code or tests yet.
 

@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / 2026-08-24 Pre-KVK stats-alert incident and follow-up reliability review`
 - Task type: `bug fix`
 - One-pass approved: `no`
-- Status: `focused Phase 1 implementation complete in mirror PR #251 — review feedback addressed; awaiting merge`
+- Status: `delivered in mirror PR #251 and production PR #558; operator edit-path smoke accepted on 2026-09-02; awaiting manual merges`
 - Approved Phase 1: canonical dependency-light embed contract, Pre-KVK complete-event chunking and
   omission marker, repaired shared sender, and sole module-owned `prekvk_daily` claim
 - Approved follow-up direction: separate Phase 2 programme beginning with event/calendar payload
@@ -194,7 +194,7 @@ migration boundaries first.
   fit within the operator-approved implementation set.
 - Add focused tests for every changed runtime path and shared primitive.
 - Produce a durable audit record:
-  `docs/task_packs/Discord Embed Payload Safety Audit Findings.md`.
+  `docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`.
 - Update `docs/task_packs/README.md`, `README-DEV.md`, and
   `docs/reference/deferred_optimisations.md` only as required by the approved delivery and findings.
 - Complete a bot Changes-only security review against the final implementation diff.
@@ -352,7 +352,7 @@ The first audit response must explicitly confirm or revise:
 Create:
 
 ```text
-docs/task_packs/Discord Embed Payload Safety Audit Findings.md
+docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md
 ```
 
 The document must contain:
@@ -436,7 +436,7 @@ The first response must revalidate and narrow this list.
 
 ### Create — expected
 
-- `docs/task_packs/Discord Embed Payload Safety Audit Findings.md`
+- `docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`
 - `tests/test_discord_embed_limits.py` if a distinct shared primitive is approved
 - `core/discord_embed_limits.py` only if the architecture review selects it as the canonical
   extraction rather than retaining ownership in `embed_utils.py`
@@ -735,6 +735,19 @@ After reviewed production promotion and bot restart:
 
 No SQL deployment or command resync is expected.
 
+#### Completed operator smoke — 2026-09-02
+
+The operator ran `/ops test_embed` against KVK 16 in `DRAFT`. Discord accepted a final Pre-KVK
+payload with `fields=13`, `chars=1847`, `max_field_value=530`, `event_fields=1`,
+`compacted_events=0`, and `omitted_events=0`. The bot edited existing message
+`1544617668999381044` in channel `1209532242506813540`; the persisted `prekvk_msg_id` matched,
+the observed guard count was `1`, and no duplicate or `50035` rejection occurred.
+
+This was an edit-path smoke. `/ops test_embed` runs with `is_test=True`, bypasses the daily guards,
+does not ping, and does not claim. The valid same-day message ID selected the edit before guard
+evaluation. Therefore the evidence does not independently prove a scheduled fresh-send ping or
+post-success claim; those remain covered automatically and are a natural operational observation.
+
 ### 14.8 Rollback
 
 Revert the bot implementation commit/PR and redeploy through the normal production workflow.
@@ -772,7 +785,10 @@ Revert the bot implementation commit/PR and redeploy through the normal producti
 - [x] No SQL, Google Sheet, command registration, permission or visibility contract changed.
 - [x] Focused tests, selectors, validators, pre-commit and full pytest passed or documented.
 - [x] The final bot diff received a Changes-only security review with Deep off.
-- [ ] Production smoke confirmed valid output, one guard claim, same-day edit and no duplicate post.
+- [x] Operator smoke confirmed a valid payload, same-day edit, matching message state, and no
+      duplicate post.
+- [ ] A scheduled fresh-send ping and post-success claim remain a natural operational observation;
+      `/ops test_embed` bypasses daily guards and did not independently exercise that path.
 
 ## 16. Required Delivery Output
 
@@ -793,7 +809,7 @@ Use this delivery shape:
 13. Deferred Optimisations
 
 Include the final audit matrix or link to
-`docs/task_packs/Discord Embed Payload Safety Audit Findings.md`.
+`docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`.
 
 ## 17. PR Summary Template
 

@@ -4,11 +4,12 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-09-01
+## Current execution set — 2026-09-02
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Awaiting mirror merge | Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix task pack, chat starter and findings record | Phase 1 is in mirror PR #251; all five review comments are addressed and the follow-up validation and Changes-only security review passed; Phase 2 remains separate |
+| Audit/scope next | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Phase 1 prerequisite is delivered and operator edit-path smoke accepted; Phase 2A requires a review-first response and approval before runtime/test edits |
+| Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 carry the delivery; automated validation and operator edit-path smoke passed; both PRs await manual merge |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
@@ -17,7 +18,8 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: the Pinned Calendar Tracker Atomic Persistence task pack/starter, the `DL_bot`
+Recently archived: Discord Embed Payload Safety Phase 1, the Pinned Calendar Tracker Atomic
+Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
 These are completed records, not current execution packs. The pinned-calendar delivery completed
@@ -25,6 +27,14 @@ operator production restart smoke on 2026-09-01 with successful rehydration, an 
 the existing message, valid tracker JSON, no duplicate, and normal daily refresh scheduling. The
 offload fix completed operator Discord smoke the same day: a duplicate MGE import failed as
 expected and a standard scan import succeeded with its route unaffected.
+
+Discord Embed Payload Safety Phase 1 is complete and archived as a delivery record. Mirror PR #251
+and production PR #558 add the canonical embed-limit model, the exact Pre-KVK overflow correction,
+shared-sender hardening, and sole module-owned daily claim. The 2026-09-02 operator smoke validated
+the final payload and edited the existing message in place without duplication or `50035`. That
+test did not independently exercise a scheduled fresh-send ping/claim because test mode bypasses
+daily guards. The active Phase 2A pack covers only event/calendar payload convergence; Ark,
+rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

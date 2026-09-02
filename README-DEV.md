@@ -9,16 +9,24 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
-The bot-only Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix entered focused Phase 1
-implementation on 2026-09-02 after audit/scope approval. Phase 1 owns the dependency-light Discord
-embed contract, the exact Pre-KVK launch-week overflow regression, complete-event chunking, the
-shared sender correction, and sole module-owned `prekvk_daily` claim behavior. No SQL, command,
-permission, visibility, event-selection, KVK-state, source-data, cache-schema, promotion, or
-deployment change is included.
+Discord Embed Payload Safety Phase 1 is delivered through mirror PR #251 and production PR #558,
+pending the operator's manual merges. It establishes dependency-light canonical ownership in
+`core/discord_embed_limits.py`, fixes the exact Pre-KVK launch-week overflow through complete-event
+packing, repairs the shared sender, and makes the Pre-KVK module the sole post-success
+`prekvk_daily` claim owner. Focused validation passed `40` tests; the full and log-noise suites each
+passed `3059 passed, 2 skipped`; both Changes-only security reviews ran with Deep off and found no
+reportable issues.
 
-Broader payload convergence remains a separate Phase 2 programme: event/calendar renderers first,
-then evidence-led Ark and ranking/diagnostic slices. Atomic Pre-KVK dispatch reservation is a
-separate reliability design rather than part of payload Phase 2.
+Operator smoke on 2026-09-02 validated a 13-field, 1,847-character payload whose largest field was
+530 characters, then edited existing message `1544617668999381044` in place with matching persisted
+state and no duplicate or Discord `50035` rejection. `/ops test_embed` bypasses daily guards, so the
+valid same-day message ID selected the edit path; a scheduled fresh-send ping and post-success claim
+remain a natural operational observation rather than evidence from that test command.
+
+The completed Phase 1 task pack, starter, and audit record are archived. Phase 2A event/calendar
+payload convergence is the next audit/scope pack and is not one-pass approved. Ark, rankings/history,
+and diagnostics remain separate later slices. Atomic Pre-KVK dispatch reservation remains a distinct
+evidence- and design-gated reliability task.
 
 ## KVK Target Publication And Quality Delivery
 

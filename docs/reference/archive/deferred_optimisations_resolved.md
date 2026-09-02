@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Embed Payload Safety Phase 1 Completed Item
+
+- Area: `core/discord_embed_limits.py`, `stats_alerts/embeds/prekvk.py`, `stats_alerts/interface.py`, `embed_utils.py`, and focused payload tests
+- Type: consistency
+- Description: The 2026-08-24 scheduled Pre-KVK alert exceeded Discord's 1,024-character field-value limit, while the shared sender and local renderer policies did not provide one complete hard-limit contract. The same flow also had duplicate `prekvk_daily` claim ownership and a malformed offload invocation.
+- Resolution: Mirror PR #251 and production PR #558 establish dependency-light canonical embed-limit ownership, preserve complete Pre-KVK event blocks across valid continuation fields, handle pathological names and budget exhaustion explicitly, validate before send/edit, repair shared-sender aggregate/attachment planning, and make the Pre-KVK module the sole correctly offloaded post-success claim owner. No SQL, command, permission, visibility, event-selection, KVK-state, source-data, cache-schema, tracker, or Sheet contract changed.
+- Validation: Focused tests passed `40`; full pytest and the log-noise gate each passed `3059 passed, 2 skipped`; pre-commit and all architecture/deferred/routing/selector/import/registration/diff gates passed. Changes-only scans `dada5066-00ba-4c84-bec9-cd70b5e2d213` and `59865dd8-4628-4aa2-baba-3192ad5f5563` ran with Deep off, full coverage, and no reportable findings. On 2026-09-02 operator smoke validated 13 fields, 1,847 aggregate characters, a 530-character largest field, and an in-place edit of message `1544617668999381044` with matching persisted state, guard count `1`, no duplicate, and no Discord `50035`. Because `/ops test_embed` bypasses daily guards, this proves the edit path; the scheduled fresh-send ping/post-success claim remains a natural observation rather than evidence from that command.
+
 ### Pinned Calendar Tracker Atomic Persistence Completed Item
 
 - Area: `event_calendar/pinned_embed.py`, `tests/test_calendar_pinned_embed.py`, and pinned-calendar restart/refresh lifecycle

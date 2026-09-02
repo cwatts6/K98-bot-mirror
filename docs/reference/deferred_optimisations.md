@@ -302,9 +302,10 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Suggested Fix: Deliver the approved payload-safety Phase 2A using `core/discord_embed_limits.py` as the hard-limit owner. Preserve event selection, reminder eligibility, pings, visibility, persistence, commands, and view cardinality while defining complete-event chunking or explicit omission markers at each renderer boundary. Add pathological Sheet-value, DM, public-reminder, pinned-edit, pagination, and restart/deduplication regression coverage.
 - Impact: high
 - Risk: medium
-- Dependencies: Discord Embed Payload Safety Phase 1 merged and accepted; separate Phase 2A scope approval; no command or public/ephemeral redesign.
-- Status: approved follow-up direction; task pack required
+- Dependencies: Discord Embed Payload Safety Phase 1 delivered in mirror PR #251 and production PR #558 with automated validation and operator edit-path smoke accepted; separate Phase 2A audit/scope approval; no command or public/ephemeral redesign.
+- Status: promoted task pack — audit/scope approval required before implementation
 - Last verified: 2026-09-02
+- Promoted task pack: `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2A Event and Calendar Convergence.md`
 
 ### Deferred Optimisation
 - Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests

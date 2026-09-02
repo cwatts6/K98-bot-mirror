@@ -1,7 +1,7 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: focused Phase 1 implementation complete in mirror PR #251; awaiting review/merge
-Audit date: 2026-09-01; implementation update 2026-09-02
+Status: Phase 1 delivered in mirror PR #251 and production PR #558; operator edit-path smoke accepted; awaiting manual merges
+Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
@@ -434,8 +434,7 @@ Mirror PR #251 carries the implementation and status commits `a7034a49` and `450
 by review-fix commit `ac5c5e01`. All five inline review comments were accepted and addressed:
 defensive log-limit parsing, one-shot iterable materialisation, the ten-attachment cap, singular
 omission-marker copy, and correction of the task-pack filename from `.md.md` to `.md`. Production
-promotion and deployment remain outside this task and require the normal separate approval
-workflow.
+PR #558 carries the production promotion patch; both PRs await the operator's manual merge.
 
 The agreed follow-up sequence is:
 
@@ -449,3 +448,27 @@ The agreed follow-up sequence is:
 
 These items are staged in `docs/reference/deferred_optimisations.md` using the required structured
 format. They are not part of the Phase 1 runtime diff.
+
+## 15. Operator smoke evidence and final interpretation
+
+On 2026-09-02 KVK state resolution selected KVK 16 `DRAFT`, and `/ops test_embed` produced:
+
+```text
+[PREKVK] Embed payload validated fields=13 chars=1847 max_field_value=530
+         event_fields=1 compacted_events=0 omitted_events=0
+[PREKVK] Edited existing message id=1544617668999381044
+         in channel=1209532242506813540
+[/ops test_embed] success (kvk=True, dur=1.33s)
+```
+
+The persisted `prekvk_msg_id` was `1544617668999381044`, matching the edited Discord message. The
+observed `prekvk_daily` count was `1`. No new Pre-KVK message or Discord `50035` response appeared.
+
+This accepts the canonical validation and same-day edit path. The reason no new message was sent
+was the valid same-day message ID, not the daily guard: test mode bypasses off-season/daily guard
+checks and performs no claim. In normal production, the guard controls a fresh-send fallback only
+when no editable current message exists. A scheduled fresh-send ping and post-success claim remain
+a natural operational observation; they were not independently exercised by this test command.
+
+Phase 1 is archived as delivered. Its active follow-up is the separately approval-gated Phase 2A
+event/calendar convergence task pack. The other audit deferrals remain separate as recorded above.
