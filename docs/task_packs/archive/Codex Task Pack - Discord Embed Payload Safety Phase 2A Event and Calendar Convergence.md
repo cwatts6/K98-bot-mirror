@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #251 and production PR #558`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `approved implementation and automated validation complete; production promotion/smoke pending`
+- Status: `delivered and operator accepted through mirror PR #252 and production PR #559; manual merges pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Required Reading
@@ -343,20 +343,19 @@ Fix only task-related failures. Document unrelated failures without widening sco
 - [x] Message IDs, tracker/state formats, sent-state semantics, deduplication, and rehydration remain
       compatible.
 - [x] No SQL, command, permission, config, source-data, cache-schema, or scheduler contract changes.
-- [ ] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
+- [x] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
       explicitly documented.
-- [ ] Final bot diff receives a Changes-only security review with Deep off; SQL has a documented
+- [x] Final bot diff receives a Changes-only security review with Deep off; SQL has a documented
       no-diff skip.
-- [ ] Production smoke is separately approved and recorded before final acceptance.
-- [ ] Ark, rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
+- [x] Production smoke is separately approved and recorded before final acceptance.
+- [x] Ark, rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
 
 ## 16. Production Smoke And Rollback
 
-Production promotion/deployment requires the normal separate workflow. Smoke should begin with
-non-pinging/admin-safe paths and must avoid generating duplicate public reminders or unsolicited
-DMs.
+Production promotion/deployment used the normal separate workflow. Smoke began with the restart and
+existing-message edit path so it did not generate duplicate public reminders or unsolicited DMs.
 
-After approval, verify representative examples of:
+The broader smoke plan retained these representative examples:
 
 - an existing live event or pinned calendar message edited in place;
 - calendar pagination/local-time interaction;
@@ -369,6 +368,19 @@ After approval, verify representative examples of:
 Rollback is to revert the Phase 2A bot PR and redeploy the prior bot revision. There is no SQL,
 Sheet, data, cache-schema, or state migration rollback. Existing tracker/message IDs should remain
 usable by the prior revision.
+
+Operator acceptance on 2026-09-02 used a production smoke deployment from production PR #559. Bot
+restart completed `ready_pinned_calendar_rehydration`, armed `daily_pinned_calendar_refresh` and
+`calendar_reminder_loop`, and completed the pinned-calendar rehydration task. The existing pinned
+message `1488086669876920341` was edited in place for 27 events. The final payload metrics were
+`fields=15`, `chars=4789`, `max_field_value=533`, `compacted_events=0`, and `omitted_events=0`; the
+next daily refresh was scheduled normally. No duplicate or Discord `50035` rejection occurred.
+
+This smoke accepts the restart, rehydration, persistent message-identity, and representative
+calendar edit path. It did not naturally force public or DM reminder delivery, fallback, or an
+omission marker. Those flows were intentionally not manufactured in production; their unchanged
+eligibility, mention, state, deduplication, fallback, and exact-boundary behavior retain automated
+coverage.
 
 ## 17. Required Delivery Output
 
@@ -402,6 +414,18 @@ The implementation changes no command, permission, visibility, mention, event se
 reminder eligibility, source contract, SQL, cache/state schema, tracker format, scheduler timing/task
 name, startup order, message identity, pinning, deduplication, sent-state boundary, fallback, or
 rehydration semantics. Focused Phase 2A and lifecycle coverage passed `74`; the calendar selector
-equivalent passed `157`; the full suite passed `3077 passed, 2 skipped`. The isolated
-`tests/test_ui_imports.py` selector command still exposes an unrelated pre-existing test-stub gap for
-`constants.PLAYER_STATS_LAST_CACHE`; the full suite passes that test under normal collection order.
+equivalent passed `157`. After the final singular/plural omission-marker review correction, the full
+and log-noise suites each passed `3078 passed, 2 skipped`; pre-commit and the architecture,
+deferred, security-routing, selector, import-smoke, and command-registration gates passed. The
+isolated `tests/test_ui_imports.py` selector command still exposes an unrelated pre-existing
+test-stub gap for `constants.PLAYER_STATS_LAST_CACHE`; the full suite passes that test under normal
+collection order.
+
+Changes-only security reviews `5accb59e-3e97-4b4e-aa54-647e9b396700` and
+`8ce35934-d12f-4e21-bd7e-b2f9940b8dea` ran with Deep off and found zero reportable issues. The final
+copy-only singular/plural correction received a precise incremental security skip; SQL was a
+documented no-diff skip. Mirror PR #252 and production PR #559 carry the delivered bot changes and
+this closeout record, pending the operator's manual merges. Phase 2B Ark payload hardening is a new,
+separately gated task pack; no Phase 2B runtime or test implementation is authorized by this record.
+This closeout delta changes only Markdown documentation and archive locations, so it receives a
+precise no-new-scan security skip and does not alter the accepted runtime review boundary.

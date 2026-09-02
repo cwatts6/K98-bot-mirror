@@ -23,13 +23,24 @@ state and no duplicate or Discord `50035` rejection. `/ops test_embed` bypasses 
 valid same-day message ID selected the edit path; a scheduled fresh-send ping and post-success claim
 remain a natural operational observation rather than evidence from that test command.
 
-The completed Phase 1 task pack, starter, and audit record are archived. Phase 2A event/calendar
-payload convergence is implemented on `codex/discord-embed-payload-safety-phase-2a`: changed
-renderers validate against the canonical contract, retain complete event blocks, and use exact
-count-bearing omission markers under field or aggregate exhaustion. Commands, selection/order/caps,
-mentions, visibility, SQL, cache/state schemas, tracker formats, timing, and rehydration semantics
-remain unchanged. Production promotion and smoke remain separate. Ark, rankings/history, diagnostics,
-atomic Pre-KVK dispatch reservation, and active-reminder tracker atomicity remain separately gated.
+The completed Phase 1 and Phase 2A task packs and starters are archived. Phase 2A event/calendar
+payload convergence was delivered through mirror PR #252 and production PR #559, pending the
+operator's manual merges. Changed renderers validate against the canonical contract, retain
+complete event blocks, and use exact count-bearing omission markers under field or aggregate
+exhaustion. Commands, selection/order/caps, mentions, visibility, SQL, cache/state schemas, tracker
+formats, timing, and rehydration semantics remain unchanged. Final automated validation passed
+`3078 passed, 2 skipped`; the applicable Changes-only reviews ran with Deep off and found no
+reportable issues.
+
+Operator production smoke on 2026-09-02 accepted the restart and persistent pinned-calendar edit
+path: rehydration completed, the reminder and daily-refresh tasks armed normally, and message
+`1488086669876920341` was edited in place for 27 events. The final payload contained 15 fields and
+4,789 aggregate characters, with a 533-character largest field and zero compacted or omitted
+events. No duplicate or Discord `50035` rejection occurred. This representative smoke did not
+naturally exercise public/DM reminder delivery or an omission marker; those unchanged paths and
+exact-boundary behavior retain deterministic automated coverage. Phase 2B is now a proposed,
+review-first Ark payload-hardening slice. Rankings/history, diagnostics, atomic Pre-KVK dispatch
+reservation, and active-reminder tracker atomicity remain separately gated.
 
 ## KVK Target Publication And Quality Delivery
 

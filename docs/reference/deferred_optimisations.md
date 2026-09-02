@@ -314,8 +314,9 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
-- Status: evidence-led Phase 2B candidate
+- Status: promoted task pack — review/scope approval required
 - Last verified: 2026-09-02
+- Promoted task pack: `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
 
 ### Deferred Optimisation
 - Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests

@@ -1,9 +1,10 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2A Event and Calendar Convergence
 
-Status: consumed for the approved 2026-09-02 implementation; retained as the initiation record.
+Status: consumed and archived after delivery and operator acceptance through mirror PR #252 and
+production PR #559; manual merges remain pending.
 
-Use this starter for the next phase. The first response is audit/scope and architecture planning
-only. Do not change runtime code or tests until the operator approves that response.
+This is the retained initiation record for Phase 2A. Use the separate Phase 2B Ark starter for the
+next phase; this archived text does not authorize further runtime or test changes.
 
 ## Copy/Paste Starter
 

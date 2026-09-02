@@ -2,6 +2,17 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Discord Embed Payload Safety Phase 2A Event and Calendar Convergence completed implementation,
+review, promotion preparation, and representative production smoke on 2026-09-02 through mirror
+PR #252 and production PR #559, pending the operator's manual merges. Final automated validation
+passed `3078 passed, 2 skipped`; the applicable Changes-only reviews ran with Deep off and found no
+reportable issues. Restart smoke rehydrated the persistent pinned view, armed the reminder and
+daily-refresh tasks, and edited message `1488086669876920341` in place for 27 events. Payload
+metrics were `fields=15`, `chars=4789`, `max_field_value=533`, `compacted_events=0`, and
+`omitted_events=0`, with no duplicate or Discord `50035`. Public/DM reminders and an omission marker
+were not naturally forced during smoke; their unchanged behavior and boundary cases retain
+automated coverage. Phase 2B is separately proposed as an evidence-led, review-first Ark slice.
+
 Discord Embed Payload Safety Phase 1 completed implementation, review, promotion preparation, and
 operator edit-path smoke on 2026-09-02 through mirror PR #251 and production PR #558, pending the
 operator's manual merges. It delivered `core/discord_embed_limits.py`, the exact 1,029-character
@@ -11,8 +22,8 @@ passed `3059 passed, 2 skipped`; two Changes-only reviews ran with Deep off and 
 findings. Live smoke validated 13 fields, 1,847 aggregate characters, a 530-character largest
 field, and an in-place edit of message `1544617668999381044` with matching persisted state and no
 duplicate or `50035`. The archived task pack, starter, and findings record preserve the delivery.
-Phase 2A event/calendar convergence now has its own active audit/scope pack; Ark, rankings/history,
-diagnostics, and atomic Pre-KVK reservation remain separate.
+Phase 2A event/calendar convergence is now archived as delivered. Ark has its own proposed Phase 2B
+audit/scope pack; rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
 
 Pinned Calendar Tracker Atomic Persistence completed implementation, validation, Changes-only
 security review, production deployment, and operator restart smoke on 2026-09-01 through mirror

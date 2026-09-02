@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phase 1 merged through mirror PR #251 and production PR #558; operator edit-path smoke accepted; Phase 2A event/calendar convergence implemented with promotion smoke pending
+Status: Phase 1 merged; Phase 2A delivered and operator accepted through mirror PR #252 and production PR #559, pending manual merges; Phase 2B Ark audit/scope prepared
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -167,7 +167,7 @@ channel/message/interaction/follow-up/DM/webhook-style send and edit routes. It 
 | `embed_utils.py::LocalTimeToggleView`, `format_event_embed`, `format_fight_embed`, history/failure views | Interaction edits and caller-owned sends | Sheet names, filenames, paths/errors; bounded page/event counts | Title and grouped value checks; incomplete name/final checks | Dynamic field name >256; pathological page aggregate | **fix now** for same-file name/final-boundary defects; redesign deferred |
 | `stats_alerts/embeds/kvk.py` and off-season renderers | Scheduled/admin public channel sends; KVK can use multiple fixed embeds | SQL/cache summaries and ranking blocks; fixed renderer layout | Local value truncator; renderer tests | Pathological source text could exceed aggregate/name limits | **safe** for current contract; canonical adoption later |
 | `ui/views/calendar.py` pinned embed and pages | Persistent public message edits and ephemeral/public interaction pages | Sheet events, cache metadata, configurable window | Canonical final validation, complete-item packing, continuation fields, and exact omission markers | Public calendar UX redesign remains separate | **safe** after Phase 2A |
-| `event_embed_manager.py`, `event_scheduler.py`, `event_calendar/reminders.py`, daily KVK overview | Scheduled channel posts, edits, reminder DMs/channels | Sheet-controlled event names/descriptions; bounded event counts in some routes | Canonical final validation, bounded pathological free text, complete-event packing, and fallback/state regressions | Production smoke remains pending promotion | **safe** after Phase 2A |
+| `event_embed_manager.py`, `event_scheduler.py`, `event_calendar/reminders.py`, daily KVK overview | Scheduled channel posts, edits, reminder DMs/channels | Sheet-controlled event names/descriptions; bounded event counts in some routes | Canonical final validation, bounded pathological free text, complete-event packing, and fallback/state regressions | Representative restart/pinned-edit production smoke passed; public/DM reminders were not manually forced and retain deterministic coverage | **safe** after Phase 2A |
 | `mge/mge_content_renderer.py` and live MGE views/services | Public/ephemeral interaction sends and edits | Configured rules, brackets, awards; service-bounded content | 256/1,024/25 local policy with focused tests | Only pathological combined aggregate remains | **safe** current contract; canonical final check deferred |
 | `mge` standalone `build_mge_main_embed` | No live caller found; tests only | Test content | Focused tests | No current delivery failure | **not runtime** |
 | `ark/embeds.py`, scheduler, team publish/views | Scheduled/public and ephemeral team output | Alliance/player rosters, notes, results; potentially high cardinality | Roster chunks only; focused tests | >25 fields/6,000 aggregate or long notes/title | **defer** product-aware compaction/export policy |
@@ -438,9 +438,10 @@ PR #558 carries the production promotion patch; both PRs await the operator's ma
 
 The agreed follow-up sequence is:
 
-1. **Phase 2A:** event/calendar payload convergence without command, visibility, selection,
-   reminder-state, or restart-semantics changes;
-2. **Phase 2B:** evidence-led Ark payload hardening after realistic/pathological measurement;
+1. **Phase 2A — completed:** event/calendar payload convergence without command, visibility,
+   selection, reminder-state, or restart-semantics changes;
+2. **Phase 2B — proposed/gated:** evidence-led Ark payload hardening after
+   realistic/pathological measurement and approval of the review-first findings;
 3. **Later Phase 2 slices:** player-facing rankings/history and operator diagnostics as separate
    product-policy batches;
 4. **Separate reliability task:** atomic Pre-KVK reservation only after evidence and an approved
@@ -470,5 +471,35 @@ checks and performs no claim. In normal production, the guard controls a fresh-s
 when no editable current message exists. A scheduled fresh-send ping and post-success claim remain
 a natural operational observation; they were not independently exercised by this test command.
 
-Phase 1 is archived as delivered. Its active follow-up is the separately approval-gated Phase 2A
-event/calendar convergence task pack. The other audit deferrals remain separate as recorded above.
+Phase 1 and Phase 2A are archived as delivered. Phase 2B Ark payload hardening now has a separate
+review-first task pack and chat starter. The other audit deferrals remain separate as recorded
+above.
+
+## 16. Phase 2A delivery and operator acceptance
+
+Phase 2A was delivered through mirror PR #252 and production PR #559, pending the operator's manual
+merges. It reused the unchanged canonical helper, added final-contract validation to the approved
+event/calendar renderers, retained complete logical items, and added exact count-bearing omission
+markers. The final review correction made the one-event omission marker grammatically singular and
+retained an exact full-marker assertion.
+
+Focused Phase 2A and lifecycle coverage passed `74`, the calendar selector equivalent passed `157`,
+and the final full and log-noise suites each passed `3078 passed, 2 skipped`. Architecture,
+deferred, security-routing, selector, import-smoke, command-registration, and pre-commit gates
+passed. Changes-only reviews `5accb59e-3e97-4b4e-aa54-647e9b396700` and
+`8ce35934-d12f-4e21-bd7e-b2f9940b8dea` ran with Deep off and found zero reportable issues. The final
+copy-only grammar correction received a precise incremental security skip, and SQL was a no-diff
+skip.
+
+Production restart smoke on 2026-09-02 completed pinned-calendar rehydration, armed the daily
+refresh and reminder-loop tasks, and edited existing message `1488086669876920341` in place for 27
+events. Payload metrics were `fields=15`, `chars=4789`, `max_field_value=533`,
+`compacted_events=0`, and `omitted_events=0`. The next daily refresh scheduled normally, with no
+duplicate or Discord `50035` rejection.
+
+This is representative acceptance of restart/rehydration, persistent message identity, and the
+pinned edit path. It did not independently exercise a public reminder, a DM reminder, fallback, or
+an omission marker because none was safely forced in production. Those unchanged paths, state and
+mention boundaries, and exact-boundary/pathological payload behavior retain deterministic automated
+coverage. The next coherent slice is the separately approval-gated Phase 2B Ark audit and payload
+hardening pack; it does not reopen Phase 1 or Phase 2A behavior.
