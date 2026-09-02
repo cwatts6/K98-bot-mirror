@@ -31,6 +31,7 @@ from ark.dal.ark_dal import (
 from ark.embeds import build_ark_registration_embed_from_match, resolve_ark_match_datetime
 from ark.registration_messages import upsert_registration_message
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
+from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from decoraters import _has_leadership_role, _is_admin
 from profile_cache import get_profile_cached
 from registry.registry_service import get_discord_user_for_governor
@@ -89,16 +90,22 @@ def _resolve_admin_add_discord_user_id(
 
 def _build_fuzzy_embed(query: str, matches: list[dict]) -> discord.Embed:
     MAX_LINES = 15
-    lines = [f"• **{m['GovernorName']}** — `{m['GovernorID']}`" for m in matches[:MAX_LINES]]
+    lines = [
+        f"• **{truncate_text(m['GovernorName'], 75)}** — `{m['GovernorID']}`"
+        for m in matches[:MAX_LINES]
+    ]
     more = len(matches) - MAX_LINES
-    desc = f"OPTIONS MATCHING **{query.upper()}**\n\n" + "\n".join(lines)
+    safe_query = truncate_text(query.upper(), 256)
+    desc = f"OPTIONS MATCHING **{safe_query}**\n\n" + "\n".join(lines)
     if more > 0:
         desc += f"\n…and **{more}** more."
-    return discord.Embed(
+    embed = discord.Embed(
         title="Governor Name Search Results",
         description=desc,
         color=discord.Color.blue(),
     )
+    require_valid_embed_payload(embed)
+    return embed
 
 
 def _find_user_signup(roster: list[dict], user_id: int) -> dict[str, Any] | None:

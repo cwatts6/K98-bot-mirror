@@ -24,8 +24,8 @@ valid same-day message ID selected the edit path; a scheduled fresh-send ping an
 remain a natural operational observation rather than evidence from that test command.
 
 The completed Phase 1 and Phase 2A task packs and starters are archived. Phase 2A event/calendar
-payload convergence was delivered through mirror PR #252 and production PR #559, pending the
-operator's manual merges. Changed renderers validate against the canonical contract, retain
+payload convergence is merged through mirror PR #252 and production PR #559. Changed renderers
+validate against the canonical contract, retain
 complete event blocks, and use exact count-bearing omission markers under field or aggregate
 exhaustion. Commands, selection/order/caps, mentions, visibility, SQL, cache/state schemas, tracker
 formats, timing, and rehydration semantics remain unchanged. Final automated validation passed
@@ -38,9 +38,18 @@ path: rehydration completed, the reminder and daily-refresh tasks armed normally
 4,789 aggregate characters, with a 533-character largest field and zero compacted or omitted
 events. No duplicate or Discord `50035` rejection occurred. This representative smoke did not
 naturally exercise public/DM reminder delivery or an omission marker; those unchanged paths and
-exact-boundary behavior retain deterministic automated coverage. Phase 2B is now a proposed,
-review-first Ark payload-hardening slice. Rankings/history, diagnostics, atomic Pre-KVK dispatch
-reservation, and active-reminder tracker atomicity remain separately gated.
+exact-boundary behavior retain deterministic automated coverage.
+
+Phase 2B Ark payload hardening was audit-approved and implemented on
+`codex/discord-embed-payload-safety-phase-2b` from base `4290b0fc`. Ark registration,
+confirmation/result, reminder, cancellation-DM, team-publication, first-publication mention,
+fuzzy-selection, team-builder, and player-report outputs now reuse the unchanged canonical contract
+with complete-unit packing, visible compaction, character-budgeted pages/chunks, exact omission
+markers, and final send/edit validation. The full suite passes with `3090 passed, 2 skipped`; final
+Changes-only security review, PR handoff, and separately approved production smoke remain pending.
+Rankings/history, diagnostics, atomic Pre-KVK dispatch reservation, active-reminder tracker
+atomicity, confirmation-update retention, and the legacy team-builder audit-write extraction remain
+separately gated.
 
 ## KVK Target Publication And Quality Delivery
 

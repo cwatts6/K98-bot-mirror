@@ -52,7 +52,7 @@ def _make_match() -> dict:
 
 
 def _make_embed_mock():
-    return MagicMock(spec=discord.Embed)
+    return discord.Embed(title="Test")
 
 
 def _make_channel():
@@ -358,3 +358,37 @@ async def test_mention_message_chunked_for_large_roster() -> None:
             assert (
                 len(content) <= 2000
             ), f"Message exceeds 2000 chars ({len(content)}): {content[:100]!r}…"
+
+
+@pytest.mark.asyncio
+async def test_all_no_discord_names_include_header_and_fit_soft_limit() -> None:
+    from ark.team_publish import MENTION_CHUNK_LIMIT, _send_mention_message
+
+    names = [f"{index:03}-" + ("N" * 124) for index in range(45)]
+    roster = {
+        1000 + index: _make_roster_row(1000 + index, name, None) for index, name in enumerate(names)
+    }
+    assignment = _make_assignment(
+        published_at_utc=None,
+        team1_ids=list(roster)[:30],
+        team2_ids=list(roster)[30:],
+    )
+    channel = _make_channel()
+
+    await _send_mention_message(
+        channel=channel,
+        match=_make_match(),
+        assignment=assignment,
+        rows_by_gid=roster,
+        match_id=MATCH_ID,
+    )
+
+    contents = [call.kwargs["content"] for call in channel.send.call_args_list]
+    assert len(contents) > 1
+    assert all(content.startswith("🏆 **Ark teams have been published") for content in contents)
+    assert all(len(content) <= MENTION_CHUNK_LIMIT for content in contents)
+    combined = "\n".join(contents)
+    assert all(name in combined for name in names)
+    for call in channel.send.call_args_list:
+        allowed_mentions = call.kwargs["allowed_mentions"]
+        assert allowed_mentions.users is True

@@ -61,6 +61,11 @@ from ark.reminders import (
 )
 from ark.state.ark_state import ArkJsonState
 from bot_config import ARK_SETUP_CHANNEL_ID, GUILD_ID
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+)
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, is_admin_or_leadership_only, track_usage
 from ui.views.ark_reminder_prefs_view import ArkReminderPrefsView  # NEW
@@ -77,6 +82,47 @@ from versioning import versioned
 logger = logging.getLogger(__name__)
 
 _DAY_TO_SHORT = {"Saturday": "Sat", "Sunday": "Sun"}
+
+
+def build_ark_player_report_pages(rows: list[dict]) -> list[discord.Embed]:
+    """Build ordered, character-budgeted report pages with at most 25 rows each."""
+
+    def format_row(index: int, row: dict) -> str:
+        win_pct = float(row.get("WinPct") or 0) * 100.0
+        governor_name = truncate_text(row.get("GovernorName") or "Unknown", 128)
+        return (
+            f"`{index:>2}.` {governor_name} (`{row.get('GovernorId')}`) "
+            f"• Played: {row.get('MatchesPlayed', 0)} "
+            f"• Win%: {win_pct:.1f}% "
+            f"• Emergency: {row.get('EmergencyWithdraws', 0)} "
+            f"• No Show: {row.get('NoShows', 0)}"
+        )
+
+    page_lines: list[list[str]] = []
+    current: list[str] = []
+    for index, row in enumerate(rows, start=1):
+        line = format_row(index, row)
+        candidate = "\n".join([*current, line])
+        if current and (len(current) >= 25 or len(candidate) > MAX_DESCRIPTION_CHARACTERS):
+            page_lines.append(current)
+            current = [line]
+        else:
+            current.append(line)
+    if current:
+        page_lines.append(current)
+
+    pages: list[discord.Embed] = []
+    total_pages = len(page_lines)
+    for page_number, lines in enumerate(page_lines, start=1):
+        embed = discord.Embed(
+            title="Ark Player Report",
+            description="\n".join(lines),
+            color=discord.Color.blurple(),
+        )
+        embed.set_footer(text=f"Page {page_number} of {total_pages}")
+        require_valid_embed_payload(embed)
+        pages.append(embed)
+    return pages
 
 
 def _parse_time(val: str) -> time:
@@ -1118,32 +1164,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             await ctx.followup.send("ℹ️ No report data available.")
             return
 
-        def _format_row(idx: int, row: dict) -> str:
-            win_pct = float(row.get("WinPct") or 0) * 100.0
-            return (
-                f"`{idx:>2}.` {row.get('GovernorName')} (`{row.get('GovernorId')}`) "
-                f"• Played: {row.get('MatchesPlayed', 0)} "
-                f"• Win%: {win_pct:.1f}% "
-                f"• Emergency: {row.get('EmergencyWithdraws', 0)} "
-                f"• No Show: {row.get('NoShows', 0)}"
-            )
-
-        page_size = 25
-        pages: list[discord.Embed] = []
-
-        for page_idx in range(0, len(rows), page_size):
-            chunk = rows[page_idx : page_idx + page_size]
-            lines = [_format_row(i + 1 + page_idx, row) for i, row in enumerate(chunk)]
-            embed = discord.Embed(
-                title="Ark Player Report",
-                description="\n".join(lines),
-                color=discord.Color.blurple(),
-            )
-            total_pages = (len(rows) + page_size - 1) // page_size
-            embed.set_footer(text=f"Page {page_idx // page_size + 1} of {total_pages}")
-            pages.append(embed)
-
+        pages = build_ark_player_report_pages(rows)
         view = ArkReportPlayersView(author_id=ctx.user.id, pages=pages)
+        require_valid_embed_payload(pages[0])
         await ctx.interaction.edit_original_response(embed=pages[0], view=view)
 
     @ark_group.command(

@@ -4,6 +4,8 @@ from collections.abc import Sequence
 
 import discord
 
+from core.discord_embed_limits import require_valid_embed_payload
+
 
 class ArkReportPlayersView(discord.ui.View):
     def __init__(self, *, author_id: int, pages: Sequence[discord.Embed], timeout: float = 600.0):
@@ -40,9 +42,13 @@ class ArkReportPlayersView(discord.ui.View):
     async def _on_prev(self, interaction: discord.Interaction):
         self.page_index = max(0, self.page_index - 1)
         self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.page_index], view=self)
+        embed = self.pages[self.page_index]
+        require_valid_embed_payload(embed)
+        await interaction.response.edit_message(embed=embed, view=self)
 
     async def _on_next(self, interaction: discord.Interaction):
         self.page_index = min(len(self.pages) - 1, self.page_index + 1)
         self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.page_index], view=self)
+        embed = self.pages[self.page_index]
+        require_valid_embed_payload(embed)
+        await interaction.response.edit_message(embed=embed, view=self)

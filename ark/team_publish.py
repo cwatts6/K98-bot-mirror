@@ -13,13 +13,15 @@ from ark.dal.ark_dal import (
     list_match_team_rows,
     mark_teams_first_published,
 )
-from ark.embeds import resolve_ark_match_datetime
+from ark.embeds import compact_ark_title, resolve_ark_match_datetime
 from ark.team_state import ArkTeamAssignment, ArkTeamStateStore
+from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from utils import ensure_aware_utc
 
 logger = logging.getLogger(__name__)
 
 MENTION_CHUNK_LIMIT = 1800
+DISCORD_CONTENT_LIMIT = 2000
 
 
 async def _assignment_from_sql(match_id: int) -> ArkTeamAssignment | None:
@@ -76,8 +78,10 @@ def _header_embed(
     match_dt_aware = ensure_aware_utc(match_dt) if match_dt else None
     alliance = str(match.get("Alliance") or "Unknown").strip()
 
-    title = f"⚔️ Ark Teams — {alliance}"
+    title, alliance_compacted = compact_ark_title("⚔️ Ark Teams — ", alliance)
     description_lines: list[str] = []
+    if alliance_compacted:
+        description_lines.append(f"🏰 Alliance: {alliance}")
     if match_dt_aware:
         ts = int(match_dt_aware.timestamp())
         description_lines.append(f"🕐 Match time: <t:{ts}:F>")
@@ -150,42 +154,45 @@ async def _send_mention_message(
     alliance = str(match.get("Alliance") or "").strip()
     header_line = f"🏆 **Ark teams have been published — {alliance}!**"
 
-    # CR6: build full candidate message first to measure length before sending.
-    # Chunk mention tokens so no single message exceeds MENTION_CHUNK_LIMIT
-    # (measured against the full composed string: header + mentions).
-    chunks: list[list[str]] = []
-    current_chunk: list[str] = []
-    # Reserve space for header line + newline + trailing no_discord line
-    no_discord_suffix = (
-        f"\n*(No Discord link: {', '.join(no_discord_names)})*" if no_discord_names else ""
-    )
-    header_cost = len(header_line) + 1  # +1 for the newline before mention block
-    suffix_cost = len(no_discord_suffix)
+    content_limit = min(int(MENTION_CHUNK_LIMIT), DISCORD_CONTENT_LIMIT)
+    body_limit = content_limit - len(header_line) - 1
+    if body_limit <= 0:
+        raise ValueError("Ark mention header leaves no room for mention content")
 
+    bodies: list[str] = []
+    current_mentions: list[str] = []
     for token in mention_parts:
-        candidate = " ".join(current_chunk + [token])
-        full_msg_len = header_cost + len(candidate) + (suffix_cost if not chunks else 0)
-        if current_chunk and full_msg_len > MENTION_CHUNK_LIMIT:
-            chunks.append(current_chunk)
-            current_chunk = [token]
+        candidate = " ".join([*current_mentions, token])
+        if current_mentions and len(candidate) > body_limit:
+            bodies.append(" ".join(current_mentions))
+            current_mentions = [token]
         else:
-            current_chunk.append(token)
-    if current_chunk:
-        chunks.append(current_chunk)
+            current_mentions.append(token)
+    if current_mentions:
+        bodies.append(" ".join(current_mentions))
 
-    if not chunks:
-        # Only no_discord names — send a single message
-        chunks = [[]]
+    suffix_prefix = "*(No Discord link: "
+    suffix_end = ")*"
+    current_names: list[str] = []
+    for raw_name in no_discord_names:
+        name = truncate_text(raw_name, 128)
+        candidate = f"{suffix_prefix}{', '.join([*current_names, name])}{suffix_end}"
+        if current_names and len(candidate) > body_limit:
+            bodies.append(f"{suffix_prefix}{', '.join(current_names)}{suffix_end}")
+            current_names = [name]
+        else:
+            current_names.append(name)
+    if current_names:
+        bodies.append(f"{suffix_prefix}{', '.join(current_names)}{suffix_end}")
 
-    for i, chunk in enumerate(chunks):
-        content_lines = [header_line]
-        if chunk:
-            content_lines.append(" ".join(chunk))
-        # Append no_discord names to the last chunk only
-        if i == len(chunks) - 1 and no_discord_names:
-            content_lines.append(f"*(No Discord link: {', '.join(no_discord_names)})*")
+    for body in bodies:
+        content = f"{header_line}\n{body}"
+        if len(content) > content_limit:
+            raise ValueError(
+                f"Ark mention chunk exceeds content budget: {len(content)}/{content_limit}"
+            )
         await channel.send(
-            content="\n".join(content_lines),
+            content=content,
             allowed_mentions=discord.AllowedMentions(users=True),
         )
 
@@ -194,7 +201,7 @@ async def _send_mention_message(
         match_id,
         len(mention_parts),
         len(no_discord_names),
-        len(chunks),
+        len(bodies),
     )
 
 
@@ -258,6 +265,12 @@ async def publish_ark_teams(
     t2 = _team_embed("Ark Team 2", assignment.team2_player_ids, rows_by_gid)
 
     async def _send_or_edit(message_id: int | None, embed: discord.Embed) -> int:
+        usage = require_valid_embed_payload(embed)
+        logger.info(
+            "ark_team_payload_delivery fields=%s chars=%s",
+            usage.field_counts[0],
+            usage.total_characters,
+        )
         if message_id:
             try:
                 msg = await channel.fetch_message(int(message_id))

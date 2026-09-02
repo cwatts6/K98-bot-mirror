@@ -17,7 +17,11 @@ from ark.confirm_publish_service import (
     publish_reviewed_teams,
     unpublish_final_teams,
 )
+
+# architecture-check: allow — legacy audit write; service extraction is separately deferred.
 from ark.dal.ark_dal import insert_audit_log
+from ark.embeds import add_bounded_sections, roster_field_candidates
+from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from decoraters import _has_leadership_role, _is_admin
 
 logger = logging.getLogger(__name__)
@@ -28,16 +32,6 @@ def _name_from_row(row: dict) -> str:
         str(row.get("GovernorNameSnapshot") or row.get("GovernorName") or "Unknown").strip()
         or "Unknown"
     )
-
-
-def _format_name_list(names: list[str], *, limit: int = 20) -> str:
-    if not names:
-        return "—"
-    shown = names[:limit]
-    lines = [f"{i+1}. {n}" for i, n in enumerate(shown)]
-    if len(names) > limit:
-        lines.append(f"… +{len(names) - limit} more")
-    return "\n".join(lines)
 
 
 def _is_admin_or_leadership(interaction: discord.Interaction) -> bool:
@@ -73,23 +67,44 @@ def _build_embed(match: dict, assignment: _Assignment, player_rows: list[dict]) 
         _name_from_row(roster_by_id[g]) for g in unassigned_ids if g in roster_by_id
     ]
 
-    embed.add_field(
-        name=f"Team 1 ({len(team1_names)})",
-        value=_format_name_list(team1_names, limit=25),
-        inline=False,
-    )
-    embed.add_field(
-        name=f"Team 2 ({len(team2_names)})",
-        value=_format_name_list(team2_names, limit=25),
-        inline=False,
-    )
-    embed.add_field(
-        name=f"Unassigned ({len(unassigned_names)})",
-        value=_format_name_list(unassigned_names, limit=25),
-        inline=False,
-    )
+    all_names = [*team1_names, *team2_names, *unassigned_names]
+    compacted = sum(len(name) > 75 for name in all_names)
+    team1_display = [truncate_text(name, 75) for name in team1_names]
+    team2_display = [truncate_text(name, 75) for name in team2_names]
+    unassigned_display = [truncate_text(name, 75) for name in unassigned_names]
 
-    return embed
+    team1_fields, _ = roster_field_candidates(
+        "Team 1",
+        team1_display,
+        len(team1_display),
+        omission_key="Team 1 players",
+        label=f"Team 1 ({len(team1_display)})",
+    )
+    team2_fields, _ = roster_field_candidates(
+        "Team 2",
+        team2_display,
+        len(team2_display),
+        omission_key="Team 2 players",
+        label=f"Team 2 ({len(team2_display)})",
+    )
+    unassigned_fields, _ = roster_field_candidates(
+        "Unassigned",
+        unassigned_display,
+        len(unassigned_display),
+        omission_key="unassigned players",
+        label=f"Unassigned ({len(unassigned_display)})",
+    )
+    return add_bounded_sections(
+        embed,
+        sections={
+            "team1": team1_fields,
+            "team2": team2_fields,
+            "unassigned": unassigned_fields,
+        },
+        display_order=("team1", "team2", "unassigned"),
+        route="team_builder",
+        compacted_units=compacted,
+    )
 
 
 class _GovSelect(discord.ui.Select):
@@ -175,6 +190,7 @@ class ArkTeamBuilderView(discord.ui.View):
         if embed is None:
             await interaction.response.send_message("❌ Match not found.", ephemeral=True)
             return
+        require_valid_embed_payload(embed)
 
         key = (int(match_id), int(actor_discord_id))
         existing_webhook = cls._active_webhooks.get(key)
@@ -275,6 +291,7 @@ class ArkTeamBuilderView(discord.ui.View):
 
         content = notice or "Ark Team Review"
         try:
+            require_valid_embed_payload(embed)
             await webhook.edit_message("@original", content=content, embed=embed, view=self)
             logger.info(
                 "[ARK_TEAM_BUILDER] refreshed_via_webhook match_id=%s user_id=%s",
@@ -311,6 +328,7 @@ class ArkTeamBuilderView(discord.ui.View):
             await interaction.response.send_message("❌ Match not found.", ephemeral=True)
             return
         content = notice or "Ark Team Review"
+        require_valid_embed_payload(embed)
         await interaction.response.edit_message(content=content, embed=embed, view=self)
 
     # ------------------------------------------------------------------

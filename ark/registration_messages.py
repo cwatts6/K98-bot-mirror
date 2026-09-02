@@ -1,17 +1,35 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 
 import discord
 
 from ark.dal.ark_dal import get_match
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
+from core.discord_embed_limits import require_valid_embed_payload
 
 logger = logging.getLogger(__name__)
 
 
 def _allowed_mentions(announce: bool) -> discord.AllowedMentions:
     return discord.AllowedMentions(everyone=True) if announce else discord.AllowedMentions.none()
+
+
+def _validate_delivery_embed(embed, *, route: str) -> None:
+    if embed is None:
+        return
+    # Non-payload sentinels have no embed contract to measure. Runtime Ark
+    # builders always provide Embed/to_dict payloads and are validated here.
+    if not isinstance(embed, Mapping) and not callable(getattr(embed, "to_dict", None)):
+        return
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "ark_payload_delivery route=%s fields=%s chars=%s",
+        route,
+        usage.field_counts[0],
+        usage.total_characters,
+    )
 
 
 async def _resolve_registration_ref_sql(match_id: int) -> ArkMessageRef | None:
@@ -57,6 +75,7 @@ async def upsert_registration_message(
       - moved_or_reposted=False when edited in-place
       - state_changed=True if message ref changed
     """
+    _validate_delivery_embed(embed, route="registration_upsert")
     msg_state = state.messages.get(match_id)
     current_ref = msg_state.registration if msg_state and msg_state.registration else None
     if current_ref is None:
@@ -155,6 +174,7 @@ async def disable_registration_message(
     match_id: int,
     embed=None,
 ) -> bool:
+    _validate_delivery_embed(embed, route="registration_disable")
     ref = await _resolve_registration_ref_sql(match_id)
     if not ref:
         logger.warning("[ARK] No SQL registration message ref for match %s.", match_id)
@@ -203,6 +223,7 @@ async def upsert_confirmation_message(
       - delivered=True if message was edited/sent/recreated
       - state_changed=True if message ref changed
     """
+    _validate_delivery_embed(embed, route="confirmation_upsert")
     msg_state = state.messages.get(match_id)
     current_ref = msg_state.confirmation if msg_state and msg_state.confirmation else None
     if current_ref is None:
@@ -274,6 +295,7 @@ async def disable_confirmation_message(
     match_id: int,
     embed=None,
 ) -> bool:
+    _validate_delivery_embed(embed, route="confirmation_disable")
     ref = await _resolve_confirmation_ref_sql(match_id)
     if not ref:
         logger.warning("[ARK] No SQL confirmation message ref for match %s.", match_id)

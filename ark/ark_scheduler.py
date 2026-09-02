@@ -26,7 +26,12 @@ from ark.dal.ark_dal import (
     mark_match_completed,
     mark_match_completion_posted,
 )
-from ark.embeds import build_ark_locked_embed_from_match, resolve_ark_match_datetime
+from ark.embeds import (
+    add_bounded_sections,
+    build_ark_locked_embed_from_match,
+    resolve_ark_match_datetime,
+    roster_field_candidates,
+)
 from ark.registration_flow import ArkRegistrationController
 from ark.registration_messages import disable_registration_message
 from ark.reminder_prefs import is_dm_allowed
@@ -45,6 +50,7 @@ from ark.reminder_types import (
     REMINDER_START,
 )
 from ark.state.ark_state import ArkJsonState
+from core.discord_embed_limits import require_valid_embed_payload
 from utils import ensure_aware_utc, utcnow
 
 logger = logging.getLogger(__name__)
@@ -53,10 +59,10 @@ REMINDER_GRACE = timedelta(minutes=15)
 DAILY_REMINDER_TIME_UTC = dt_time(20, 0, tzinfo=UTC)
 
 
-async def _build_team_name_fields(
+async def _build_team_name_lists(
     match_id: int,
     roster: list[dict[str, Any]] | None = None,
-) -> tuple[str, str] | None:
+) -> tuple[list[str], list[str]] | None:
     """
     Return (team1_names_str, team2_names_str) from finalised SQL team rows,
     or None if no finalised teams exist.
@@ -94,12 +100,25 @@ async def _build_team_name_fields(
             elif int(team_no) == 2:
                 team2_names.append(name)
 
-        return (", ".join(team1_names), ", ".join(team2_names))
+        return team1_names, team2_names
     except Exception:
         logger.exception(
             "[ARK_REMINDER] Failed building team name fields for match_id=%s", match_id
         )
         return None
+
+
+async def _build_team_name_fields(
+    match_id: int,
+    roster: list[dict[str, Any]] | None = None,
+) -> tuple[str, str] | None:
+    """Compatibility formatter for callers that consume comma-separated names."""
+
+    names = await _build_team_name_lists(match_id, roster=roster)
+    if names is None:
+        return None
+    team1_names, team2_names = names
+    return ", ".join(team1_names), ", ".join(team2_names)
 
 
 async def _build_channel_reminder_embed(
@@ -115,13 +134,36 @@ async def _build_channel_reminder_embed(
     embed.add_field(name="Alliance", value=alliance, inline=False)
     embed.add_field(name="Message", value=text, inline=False)
 
-    team_fields = await _build_team_name_fields(int(match["MatchId"]), roster=roster)
-    if team_fields:
-        t1_names, t2_names = team_fields
-        embed.add_field(name="Team 1", value=t1_names or "—", inline=False)
-        embed.add_field(name="Team 2", value=t2_names or "—", inline=False)
+    team_names = await _build_team_name_lists(int(match["MatchId"]), roster=roster)
+    sections = {}
+    if team_names:
+        t1_names, t2_names = team_names
+        team1_fields, team1_compacted = roster_field_candidates(
+            "Team 1",
+            t1_names,
+            len(t1_names),
+            omission_key="Team 1 players",
+            label="Team 1",
+        )
+        team2_fields, team2_compacted = roster_field_candidates(
+            "Team 2",
+            t2_names,
+            len(t2_names),
+            omission_key="Team 2 players",
+            label="Team 2",
+        )
+        sections = {"team1": team1_fields, "team2": team2_fields}
+        compacted = team1_compacted + team2_compacted
+    else:
+        compacted = 0
 
-    return embed
+    return add_bounded_sections(
+        embed,
+        sections=sections,
+        display_order=("team1", "team2"),
+        route="channel_reminder",
+        compacted_units=compacted,
+    )
 
 
 async def _build_dm_reminder_embed(
@@ -140,13 +182,36 @@ async def _build_dm_reminder_embed(
     if include_checkin_line:
         embed.add_field(name="Check-in", value="Check-in is now available.", inline=False)
 
-    team_fields = await _build_team_name_fields(int(match["MatchId"]), roster=roster)
-    if team_fields:
-        t1_names, t2_names = team_fields
-        embed.add_field(name="Team 1", value=t1_names or "—", inline=False)
-        embed.add_field(name="Team 2", value=t2_names or "—", inline=False)
+    team_names = await _build_team_name_lists(int(match["MatchId"]), roster=roster)
+    sections = {}
+    if team_names:
+        t1_names, t2_names = team_names
+        team1_fields, team1_compacted = roster_field_candidates(
+            "Team 1",
+            t1_names,
+            len(t1_names),
+            omission_key="Team 1 players",
+            label="Team 1",
+        )
+        team2_fields, team2_compacted = roster_field_candidates(
+            "Team 2",
+            t2_names,
+            len(t2_names),
+            omission_key="Team 2 players",
+            label="Team 2",
+        )
+        sections = {"team1": team1_fields, "team2": team2_fields}
+        compacted = team1_compacted + team2_compacted
+    else:
+        compacted = 0
 
-    return embed
+    return add_bounded_sections(
+        embed,
+        sections=sections,
+        display_order=("team1", "team2"),
+        route="dm_reminder",
+        compacted_units=compacted,
+    )
 
 
 @dataclass
@@ -338,6 +403,7 @@ async def _send_channel_reminder(
     embed = await _build_channel_reminder_embed(  # ← now awaited
         match=match, reminder_type=reminder_type, text=text
     )
+    require_valid_embed_payload(embed)
     await channel.send(
         content=text,
         embed=embed,
@@ -414,6 +480,7 @@ async def _dispatch_dm_reminders_for_match(
 
         counters["attempted"] += 1
         try:
+            require_valid_embed_payload(embed)
             await user.send(embed=embed)
             counters["sent"] += 1
             state.reminder_state.mark_sent(dkey, sent_at=now)

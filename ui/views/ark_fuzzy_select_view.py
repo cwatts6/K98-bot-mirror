@@ -6,6 +6,8 @@ import logging
 
 import discord
 
+from core.discord_embed_limits import require_valid_embed_payload, truncate_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +51,7 @@ class ArkFuzzySelectView(discord.ui.View):
 
         options = []
         for m in matches[:25]:
-            name = str(m.get("GovernorName") or "")[:75]
+            name = truncate_text(m.get("GovernorName") or "", 75)
             gid = str(m.get("GovernorID") or "")
             desc = f"ID: {gid}"
             options.append(discord.SelectOption(label=name, description=desc, value=gid))
@@ -97,6 +99,7 @@ class ArkFuzzySelectView(discord.ui.View):
                 await interaction.response.send_message("⚠️ Something went wrong.", ephemeral=True)
 
     async def send_followup(self, interaction: discord.Interaction, embed: discord.Embed):
+        require_valid_embed_payload(embed)
         if interaction.response.is_done():
             self.message = await interaction.followup.send(embed=embed, view=self, ephemeral=True)
         else:

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ark.reminders import cancel_match_reminders, dispatch_cancel_dms
+from core.discord_embed_limits import require_valid_embed_payload
 
 
 def _make_match() -> dict:
@@ -238,3 +239,29 @@ def test_cancel_match_reminders_uses_reminder_state() -> None:
     assert "99|1001|24h" in reminder_state.reminders
     reminder_state.save.assert_called_once()
     assert inspect.iscoroutinefunction(cancel_match_reminders) is False
+
+
+@pytest.mark.asyncio
+async def test_cancel_dm_compacts_schema_maximum_alliance_title() -> None:
+    match = _make_match()
+    match["Alliance"] = "A" * 255
+    match["ArkWeekendDate"] = "2026-03-28"
+    match["MatchTimeUtc"] = "11:00"
+    user = MagicMock()
+    user.send = AsyncMock()
+    client = _make_client_for_users({1001: user})
+    reminder_state = MagicMock()
+    reminder_state.was_sent.return_value = False
+
+    with patch("ark.reminders.ArkReminderState.load", return_value=reminder_state):
+        await dispatch_cancel_dms(
+            client=client,
+            match_id=42,
+            match=match,
+            roster=[_make_row(discord_user_id=1001)],
+        )
+
+    embed = user.send.await_args.kwargs["embed"]
+    require_valid_embed_payload(embed)
+    assert embed.title.endswith("…")
+    assert any(field.name == "Alliance" and len(field.value) == 255 for field in embed.fields)

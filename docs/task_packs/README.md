@@ -8,8 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Proposed/gated follow-up | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Audit/scope approval is required; runtime or test implementation is not yet authorized |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Delivered through mirror PR #252 and production PR #559, pending manual merges; automated validation and representative production restart/pinned-edit smoke passed |
+| Active implementation | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Audit/scope approved; implementation and `3090 passed, 2 skipped` validation complete on the Phase 2B branch; Changes review and PR handoff pending |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
@@ -35,13 +35,16 @@ shared-sender hardening, and sole module-owned daily claim. The 2026-09-02 opera
 the final payload and edited the existing message in place without duplication or `50035`. That
 test did not independently exercise a scheduled fresh-send ping/claim because test mode bypasses
 daily guards. Phase 2A delivered canonical event/calendar validation, complete-item packing, and
-exact omission markers through mirror PR #252 and production PR #559, pending manual merges. Its
+exact omission markers through merged mirror PR #252 and production PR #559. Its
 2026-09-02 restart smoke rehydrated the pinned view and edited message `1488086669876920341` in
 place for 27 events with `fields=15`, `chars=4789`, `max_field_value=533`, and no compaction,
 omission, duplicate, or `50035`. Public/DM reminders were not manually forced; unchanged delivery,
-state, and exact-boundary behavior remain covered by deterministic tests. Phase 2B Ark hardening is
-now proposed and review-first. Rankings/history, diagnostics, atomic Pre-KVK reservation, and
-active-reminder tracker atomicity remain separate.
+state, and exact-boundary behavior remain covered by deterministic tests. Phase 2B Ark hardening
+was audit-approved and is implemented on its branch with the unchanged canonical helper,
+complete-unit packing, safe pages/chunks, exact omission markers, and final delivery validation.
+The full suite passes with `3090 passed, 2 skipped`; Changes review and PR handoff remain pending.
+Rankings/history, diagnostics, atomic Pre-KVK reservation, active-reminder tracker atomicity,
+confirmation-update retention, and team-builder audit-write extraction remain separate.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

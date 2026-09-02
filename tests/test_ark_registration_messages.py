@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import discord
 import pytest
 
 from ark.registration_messages import upsert_registration_message
 from ark.state.ark_state import ArkJsonState
+from core.discord_embed_limits import EmbedPayloadLimitError
 
 
 class _Msg:
@@ -78,3 +80,22 @@ async def test_upsert_registration_with_announce_sets_everyone(monkeypatch):
     assert moved is True
     assert changed is True
     assert channel.last_kwargs["content"] == "@everyone"
+
+
+@pytest.mark.asyncio
+async def test_upsert_registration_validates_before_discord_delivery(monkeypatch):
+    async def _get_match(_match_id):
+        return None
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+    invalid = discord.Embed(title="X" * 257)
+
+    with pytest.raises(EmbedPayloadLimitError):
+        await upsert_registration_message(
+            client=_Client(),
+            state=ArkJsonState(),
+            match_id=3,
+            embed=invalid,
+            view=None,
+            target_channel_id=10,
+        )

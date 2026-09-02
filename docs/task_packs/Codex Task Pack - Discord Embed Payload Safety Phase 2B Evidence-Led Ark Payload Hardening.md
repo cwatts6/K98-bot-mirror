@@ -7,14 +7,14 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #252 and production PR #559`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `proposed; audit/scope approval required before runtime or test edits`
+- Status: `audit/scope approved; implementation and automated validation complete; security review and PR handoff pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
 
 Phase 1 owns the unchanged canonical contract in `core/discord_embed_limits.py`. Phase 2A event and
-calendar convergence was delivered and operator accepted through mirror PR #252 and production PR
-#559, pending manual merges. Before starting, fetch both remotes and revalidate branch/head,
+calendar convergence is merged through mirror PR #252 and production PR #559. Before starting,
+fetch both remotes and revalidate branch/head,
 working-tree state, both PR merge states, and that the Phase 1 and Phase 2A commits are present in
 the intended base. If either prerequisite is absent from the working base, stop before runtime or
 test implementation and report the exact state.
@@ -296,18 +296,42 @@ the proposed Phase 2B implementation scope.
 
 ## 16. Acceptance Criteria
 
-- [ ] Audit/scope first response is complete and explicitly approved.
-- [ ] Current base contains the accepted Phase 1 and Phase 2A prerequisites.
-- [ ] Every live Ark payload boundary has a measured, evidence-backed disposition.
-- [ ] Only proven unsafe builders enter the approved runtime diff.
-- [ ] Meaningful rosters/teams/updates/results retain complete units or truthful explicit markers.
-- [ ] Every changed final payload satisfies the canonical full-message contract.
-- [ ] Visibility, mentions, permissions, selection, lifecycle, reminders, state, SQL, message IDs,
+- [x] Audit/scope first response is complete and explicitly approved.
+- [x] Current base contains the accepted Phase 1 and Phase 2A prerequisites.
+- [x] Every live Ark payload boundary has a measured, evidence-backed disposition.
+- [x] Only proven unsafe builders enter the approved runtime diff.
+- [x] Meaningful rosters/teams/updates/results retain complete units or truthful explicit markers.
+- [x] Every changed final payload satisfies the canonical full-message contract.
+- [x] Visibility, mentions, permissions, selection, lifecycle, reminders, state, SQL, message IDs,
       deduplication, fallback, and rehydration semantics remain unchanged.
-- [ ] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
+- [x] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
       explicitly documented.
 - [ ] The bot diff receives a Changes-only security review with Deep off; SQL has a precise no-diff
       skip if applicable.
 - [ ] Production smoke is separately approved and recorded.
-- [ ] Phase 1, Phase 2A, rankings/history, diagnostics, and unrelated reliability work remain
+- [x] Phase 1, Phase 2A, rankings/history, diagnostics, and unrelated reliability work remain
       outside the slice.
+
+## 17. Approved Implementation Progress
+
+The operator approved the complete first-response proposal on 2026-09-02. Implementation uses
+branch `codex/discord-embed-payload-safety-phase-2b` from revalidated base `4290b0fc`. Phase 1 and
+Phase 2A are both present in that base, mirror PRs #251/#252 and production PRs #558/#559 are
+merged, and the SQL repository remains clean with no SQL-facing change.
+
+The implementation reuses the unchanged canonical helper and hardens only the approved Ark
+boundaries. It packs complete roster/team/update units, reserves result and status information,
+uses visible compaction for over-contract display values, creates character-budgeted report pages
+and first-publication mention chunks, emits exact count-bearing omission markers, and validates at
+changed send/edit/DM boundaries. Commands, permissions, visibility, `AllowedMentions`, lifecycle,
+caps, assignment, reminder timing/preferences/deduplication, message IDs, SQL-backed first
+publication, state formats, fallback, startup, and rehydration remain unchanged.
+
+Focused pathological coverage includes 255-character alliances, 45-by-128-character rosters,
+1,024/1,025 field boundaries, oversized confirmation update/result combinations, maximum credible
+reminder teams, all-unlinked first-publication names, ephemeral team-builder rendering, and
+character-budgeted public reports. The Ark family passes `188`; the complete suite passes
+`3090 passed, 2 skipped`; UI imports, architecture, deferred-item, security-routing, import-smoke,
+command-registration, Ruff, Black, Pyright, full pre-commit, and the log-noise gate pass, with
+production operational logs unchanged. Changes-only security review with Deep off, PR handoff, and
+separately approved production smoke remain to be recorded.

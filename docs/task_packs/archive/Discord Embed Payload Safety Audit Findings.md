@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phase 1 merged; Phase 2A delivered and operator accepted through mirror PR #252 and production PR #559, pending manual merges; Phase 2B Ark audit/scope prepared
+Status: Phase 1 and Phase 2A merged; Phase 2B Ark audit approved and implementation validated, pending Changes review and PR handoff
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -503,3 +503,36 @@ an omission marker because none was safely forced in production. Those unchanged
 mention boundaries, and exact-boundary/pathological payload behavior retain deterministic automated
 coverage. The next coherent slice is the separately approval-gated Phase 2B Ark audit and payload
 hardening pack; it does not reopen Phase 1 or Phase 2A behavior.
+
+## 17. Phase 2B approval and implementation evidence
+
+On 2026-09-02 the operator approved the evidence-led Ark findings matrix, 45-member registration
+and 30-member maximum credible team assumptions, result-priority policy, complete-unit packing,
+visible compaction, count-bearing omission markers, attachment-free delivery, header-bearing
+first-publication chunks, exact modification manifest, Changes-only security routing, SQL no-diff
+skip, smoke boundary, and rollback.
+
+Implementation is on `codex/discord-embed-payload-safety-phase-2b` from base `4290b0fc`. It changes
+only the approved Ark render/delivery and interaction presentation paths plus focused tests and
+records. The unchanged canonical helper validates registration, locked/cancelled, confirmation,
+completed result, public/DM reminder, cancellation DM, team header/body, fuzzy selector,
+team-builder, and report payloads. First-publication text accounts for the full header and splits
+mention and no-Discord-name units below the 1,800-character soft limit while retaining SQL-backed
+first-publication-only behavior and `AllowedMentions(users=True)`.
+
+Deterministic evidence covers 255-character alliances, 45 schema-maximum governor snapshots,
+1,024/1,025 values, aggregate/field exhaustion, pathological confirmation updates and result
+notes, maximum credible teams, all-no-Discord-name suffixes, and character-budgeted report pages.
+The Ark family passes `188`; the complete suite and log-noise run each pass
+`3090 passed, 2 skipped`, with production operational logs unchanged. UI imports, architecture,
+deferred-item, security-routing, test selection, import smoke, command registration, full
+pre-commit, Ruff, Black, and Pyright pass. The SQL repository remains clean and receives a
+documented no-diff security skip. Bot Changes review with Deep off, PR references, and any
+separately approved production smoke remain to be appended.
+
+Phase 2B does not change command registration, permissions, public/ephemeral/DM visibility,
+selection/order/status/lifecycle, caps, roster or team assignment, reminder eligibility/preferences/
+timing/deduplication, message IDs, tracker or state formats, scheduler names/cadence, SQL/DAL,
+fallback boundaries, startup, or rehydration. Rankings/history, diagnostics, active-reminder atomic
+persistence, atomic Pre-KVK reservation, confirmation-update retention, and team-builder audit
+service extraction remain separate deferred work.

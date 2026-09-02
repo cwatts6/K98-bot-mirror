@@ -144,15 +144,8 @@ class ArkConfirmationController:
                     match["MatchId"],
                 )
 
-        embed = build_ark_confirmation_embed_from_match(
-            match,
-            players_cap=int(self.config["PlayersCap"]),
-            subs_cap=int(self.config["SubsCap"]),
-            roster=roster,
-            updates=updates,
-        )
-
         # Team assignment help text — only shown when team actions are visible.
+        team_help = None
         if show_team_actions:
             if teams_published:
                 team_help = (
@@ -161,7 +154,15 @@ class ArkConfirmationController:
                 )
             else:
                 team_help = "Click **Confirm Teams** to assign and publish match teams."
-            embed.add_field(name="Team Assignment", value=team_help, inline=False)
+
+        embed = build_ark_confirmation_embed_from_match(
+            match,
+            players_cap=int(self.config["PlayersCap"]),
+            subs_cap=int(self.config["SubsCap"]),
+            roster=roster,
+            updates=updates,
+            team_assignment=team_help,
+        )
 
         view = ArkConfirmationView(
             match_id=int(match["MatchId"]),

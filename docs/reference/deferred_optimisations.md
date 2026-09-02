@@ -314,9 +314,31 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
-- Status: promoted task pack — review/scope approval required
+- Status: implementation complete on Phase 2B branch — Changes review and PR handoff pending
 - Last verified: 2026-09-02
 - Promoted task pack: `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
+
+### Deferred Optimisation
+- Area: `ark/state/ark_state.py`, `ark/confirmation_flow.py`, and persisted `confirmation_updates`
+- Type: architecture
+- Description: Phase 2B proves that persisted confirmation update history is not render-bounded and can grow to high cardinality. Phase 2B safely packs or explicitly marks omitted render units, but changing retention or storage would alter restart-sensitive state and historical visibility.
+- Suggested Fix: Gather production cardinality and operator-use evidence, define retention/archive and historical-visibility semantics, then decide whether updates remain in the current JSON shape or need a separately approved durable SQL contract. Include migration, restart compatibility, failure recovery, and rollback before changing persistence.
+- Impact: medium
+- Risk: medium
+- Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
+- Status: evidence and product-policy gated
+- Last verified: 2026-09-02
+
+### Deferred Optimisation
+- Area: `ui/views/team_builder_views.py`, Ark team-review orchestration, and audit logging
+- Type: architecture
+- Description: The pre-existing team-builder view imports `insert_audit_log` directly from `ark.dal.ark_dal`. Phase 2B touches only its embed rendering and retains a narrow architecture-validator exception; extracting audit orchestration would expand the approved payload slice and risk changing interaction sequencing.
+- Suggested Fix: In a separate Ark architecture slice, inventory assign/remove/reset/auto-balance audit ownership, move the audit coordination behind an Ark service boundary, and preserve actor IDs, action names, detail JSON, error behavior, permissions, webhook refresh, and interaction acknowledgement order.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate operator approval; focused team-builder action, permission, audit, failure, and webhook/ephemeral interaction tests.
+- Status: captured from Phase 2B architecture validation
+- Last verified: 2026-09-02
 
 ### Deferred Optimisation
 - Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests

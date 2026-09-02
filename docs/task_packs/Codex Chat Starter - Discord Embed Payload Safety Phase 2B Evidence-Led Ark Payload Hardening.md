@@ -1,7 +1,8 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening
 
-Status: prepared on 2026-09-02 for a separately approval-gated, review-first Phase 2B audit. This
-starter does not authorize runtime or test edits.
+Status: consumed on 2026-09-02. The operator approved the review-first audit proposal and the
+Phase 2B implementation is complete on its branch, pending security review and PR handoff. The
+copy/paste starter below is retained as the initiating record.
 
 ## Copy/Paste Starter
 

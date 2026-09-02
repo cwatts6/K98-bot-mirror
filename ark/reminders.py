@@ -6,8 +6,10 @@ from typing import Any
 
 import discord
 
+from ark.embeds import compact_ark_title
 from ark.reminder_state import ArkReminderState
 from ark.reminder_types import ALL_DM_REMINDER_TYPES
+from core.discord_embed_limits import require_valid_embed_payload
 
 logger = logging.getLogger(__name__)
 
@@ -176,16 +178,20 @@ async def dispatch_cancel_dms(
 
         match_dt_str = str(match.get("MatchTimeUtc") or "")
         weekend_date = str(match.get("ArkWeekendDate") or "")
+        title, alliance_compacted = compact_ark_title("Ark Match Cancelled — ", alliance)
         embed = discord.Embed(
-            title=f"Ark Match Cancelled — {alliance}",
+            title=title,
             description=(
                 f"The Ark match scheduled for **{weekend_date}** ({match_dt_str} UTC) "
                 f"has been cancelled."
             ),
             color=discord.Color.red(),
         )
+        if alliance_compacted:
+            embed.add_field(name="Alliance", value=alliance, inline=False)
 
         try:
+            require_valid_embed_payload(embed)
             await user.send(embed=embed)
             counters["sent"] += 1
 
