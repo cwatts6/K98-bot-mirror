@@ -64,6 +64,7 @@ EMBED_BUILD_SLOW_THRESHOLD = 1.0
 # Backward-compatible aliases; canonical ownership lives in core.discord_embed_limits.
 _EMBED_FIELD_MAX = MAX_FIELD_VALUE_CHARACTERS
 _EMBED_TOTAL_CAP = MAX_TOTAL_CHARACTERS
+_MAX_FILES_PER_MESSAGE = 10
 # Fallback when a large "log-like" field should be attached instead of embedded
 _LOG_FIELD_NAMES = ("log", "combined_log", "out", "output", "details")
 
@@ -731,11 +732,14 @@ async def send_embed_safe(
     safe_title = truncate_text(title, min(MAX_TITLE_CHARACTERS, effective_total_cap))
     field_items = list((fields or {}).items())
     files: list[discord.File] = []
-    max_log_chars = (
-        _DEFAULT_MAX_LOG_EMBED_CHARS
-        if max_log_embed_chars is None
-        else max(1, int(max_log_embed_chars))
-    )
+    try:
+        max_log_chars = (
+            _DEFAULT_MAX_LOG_EMBED_CHARS
+            if max_log_embed_chars is None
+            else max(1, int(max_log_embed_chars))
+        )
+    except (TypeError, ValueError):
+        max_log_chars = _DEFAULT_MAX_LOG_EMBED_CHARS
 
     prepared: list[dict[str, Any]] = []
     for index, (raw_name, raw_value) in enumerate(field_items, start=1):
@@ -753,7 +757,17 @@ async def send_embed_safe(
             }
         )
 
+    attachment_limit_reported = False
+
     def _attach_text(content: str, filename: str, *, context: str) -> bool:
+        nonlocal attachment_limit_reported
+        if len(files) >= _MAX_FILES_PER_MESSAGE:
+            if not attachment_limit_reported:
+                logger.warning(
+                    "[EMBED] Attachment limit reached; compacting remaining content inline"
+                )
+                attachment_limit_reported = True
+            return False
         try:
             files.append(discord.File(io.BytesIO(content.encode("utf-8")), filename=filename))
             return True

@@ -129,6 +129,27 @@ async def test_send_embed_safe_keeps_small_log_inline(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_embed_safe_falls_back_for_invalid_log_limit():
+    import embed_utils
+
+    class Dest:
+        async def send(self, **kwargs):
+            self.kwargs = kwargs
+            return types.SimpleNamespace(id=1)
+
+    dest = Dest()
+
+    assert await embed_utils.send_embed_safe(
+        dest,
+        "Invalid log limit",
+        {"Status": "ok"},
+        color=0x123456,
+        max_log_embed_chars="not-an-integer",
+    )
+    require_valid_embed_payload(dest.kwargs["embed"])
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("extra", [0, 1])
 async def test_send_embed_safe_enforces_exact_and_one_over_component_boundaries(extra):
     import embed_utils
@@ -223,6 +244,38 @@ async def test_send_embed_safe_attaches_fields_over_field_count_limit(monkeypatc
     assert embed.fields[-1].name == "Additional fields"
     assert "6 additional fields attached" in embed.fields[-1].value
     assert len(dest.kwargs["files"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_send_embed_safe_never_exceeds_ten_attachments(monkeypatch):
+    import embed_utils
+
+    class FakeFile:
+        def __init__(self, bio, filename):
+            bio.seek(0)
+            self.filename = filename
+            self.content = bio.read()
+
+    class Dest:
+        async def send(self, **kwargs):
+            self.kwargs = kwargs
+            return types.SimpleNamespace(id=1)
+
+    monkeypatch.setattr(embed_utils.discord, "File", FakeFile)
+    dest = Dest()
+    fields = {f"Log {index}": "X" * 2000 for index in range(25)}
+
+    assert await embed_utils.send_embed_safe(
+        dest,
+        "Attachment cap",
+        fields,
+        color=0x123456,
+        max_log_embed_chars=10,
+    )
+
+    require_valid_embed_payload(dest.kwargs["embed"])
+    assert len(dest.kwargs["files"]) == 10
+    assert any(field.value.endswith("…") for field in dest.kwargs["embed"].fields)
 
 
 @pytest.mark.asyncio

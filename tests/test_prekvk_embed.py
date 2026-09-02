@@ -331,7 +331,7 @@ def test_event_block_exact_boundary_and_one_over_preserve_complete_suffix():
 def test_event_budget_exhaustion_uses_truthful_marker():
     events = _kvk16_launch_events()[:2]
     first_block, _ = prekvk_embed._format_event_block(events[0])
-    marker = "… 1 more events — see Timeline"
+    marker = "… 1 more event — see Timeline"
     budget = len("🗓️ Next 7 days:") + len(first_block) + 1 + len(marker)
 
     fields, omitted, _compacted = prekvk_embed._build_upcoming_event_fields(

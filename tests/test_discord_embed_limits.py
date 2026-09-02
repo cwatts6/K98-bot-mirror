@@ -137,6 +137,16 @@ def test_measurement_and_remaining_budgets_accept_to_dict_object():
     assert usage.remaining_characters == MAX_TOTAL_CHARACTERS - usage.total_characters
 
 
+def test_require_valid_embed_payload_materializes_generator_once():
+    payloads = ({"title": f"Embed {index}"} for index in range(2))
+
+    usage = require_valid_embed_payload(payloads)
+
+    assert usage.embed_count == 2
+    assert usage.total_characters == len("Embed 0") + len("Embed 1")
+    assert usage.field_counts == (0, 0)
+
+
 def test_require_valid_payload_reports_all_component_paths():
     payload = _valid_payload()
     payload["title"] = "x" * (MAX_TITLE_CHARACTERS + 1)

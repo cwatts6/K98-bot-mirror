@@ -220,7 +220,10 @@ def validate_embed_payload(embeds: Any) -> tuple[EmbedLimitViolation, ...]:
 def require_valid_embed_payload(embeds: Any) -> EmbedPayloadUsage:
     """Return measured usage or raise with every hard-limit violation."""
 
-    violations = validate_embed_payload(embeds)
+    # Materialize one-shot iterables once so validation and measurement inspect
+    # the same payload rather than consuming a generator twice.
+    payloads = _normalise_embeds(embeds)
+    violations = validate_embed_payload(payloads)
     if violations:
         raise EmbedPayloadLimitError(violations)
-    return measure_embed_payload(embeds)
+    return measure_embed_payload(payloads)

@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 _VISIBLE_EVENT_LIMIT = 12
 _UPCOMING_FIELD_NAME = "🗓️ Next 7 days:"
 _UPCOMING_CONTINUATION_NAME = "🗓️ Next 7 days (continued):"
-_UPCOMING_OMISSION_TEMPLATE = "… {count} more events — see Timeline"
 _PREKVK_FOOTER = "KD98 Discord Bot"
 
 
@@ -63,6 +62,11 @@ def _format_event_block(event: dict[str, Any]) -> tuple[str, bool]:
 
 def _event_field_name(index: int) -> str:
     return _UPCOMING_FIELD_NAME if index == 0 else _UPCOMING_CONTINUATION_NAME
+
+
+def _event_omission_marker(count: int) -> str:
+    noun = "event" if count == 1 else "events"
+    return f"… {count} more {noun} — see Timeline"
 
 
 def _event_groups_cost(groups: list[list[tuple[str, bool]]]) -> int:
@@ -112,7 +116,7 @@ def _build_upcoming_event_fields(
         break
 
     while omitted_count:
-        marker = _UPCOMING_OMISSION_TEMPLATE.format(count=omitted_count)
+        marker = _event_omission_marker(omitted_count)
         if groups:
             candidate_value = "\n".join([*(item[0] for item in groups[-1]), marker])
             projected_cost = _event_groups_cost(groups) + len(marker) + 1
