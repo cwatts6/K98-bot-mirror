@@ -11,6 +11,12 @@ import os
 import discord
 
 from constants import EMBED_TRACKING_FILE
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    MAX_TITLE_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+)
 from embed_utils import LocalTimeToggleView, format_event_time, sanitize_view_prefix
 from event_cache import get_all_upcoming_events
 
@@ -74,7 +80,11 @@ async def rehydrate_live_event_views(bot, event_channel_id):
 
         try:
             _msg = await channel.fetch_message(msg_id)
-            bot.add_view(LocalTimeToggleView([event], prefix=safe_prefix, timeout=None))
+            bot.add_view(
+                LocalTimeToggleView(
+                    [event], prefix=safe_prefix, timeout=None, complete_event_packing=True
+                )
+            )
             logger.info(
                 "[REHYDRATE] Re-registered view for event_id=%s with prefix=%s",
                 event_id,
@@ -221,7 +231,12 @@ async def update_live_event_embeds(bot, event_channel_id):
                         logger.debug("[EMBED] Embed unchanged, refreshing view.")
                         await msg.edit(
                             embed=embed,
-                            view=LocalTimeToggleView([event], prefix=safe_prefix, timeout=None),
+                            view=LocalTimeToggleView(
+                                [event],
+                                prefix=safe_prefix,
+                                timeout=None,
+                                complete_event_packing=True,
+                            ),
                         )
                         await asyncio.sleep(0)
                         continue
@@ -231,7 +246,12 @@ async def update_live_event_embeds(bot, event_channel_id):
                     )
                     await msg.edit(
                         embed=embed,
-                        view=LocalTimeToggleView([event], prefix=safe_prefix, timeout=None),
+                        view=LocalTimeToggleView(
+                            [event],
+                            prefix=safe_prefix,
+                            timeout=None,
+                            complete_event_packing=True,
+                        ),
                     )
                     logger.info(
                         "[EMBED] Updated embed for event: %s",
@@ -244,13 +264,24 @@ async def update_live_event_embeds(bot, event_channel_id):
                     )
                     msg = await channel.send(
                         embed=embed,
-                        view=LocalTimeToggleView([event], prefix=safe_prefix, timeout=None),
+                        view=LocalTimeToggleView(
+                            [event],
+                            prefix=safe_prefix,
+                            timeout=None,
+                            complete_event_packing=True,
+                        ),
                     )
                     embed_tracker[event_id] = msg.id
 
             else:
                 msg = await channel.send(
-                    embed=embed, view=LocalTimeToggleView([event], prefix=safe_prefix, timeout=None)
+                    embed=embed,
+                    view=LocalTimeToggleView(
+                        [event],
+                        prefix=safe_prefix,
+                        timeout=None,
+                        complete_event_packing=True,
+                    ),
                 )
                 embed_tracker[event_id] = msg.id
 
@@ -318,15 +349,34 @@ def build_event_embed(event):
 
     # Build event timing strings
     utc_text = format_event_time(event["start_time"])
+    raw_description = " ".join(str(event.get("description") or "").split())
+    fixed_description = f"**Starts <t:{timestamp}:R>**\nOn: {utc_text}\n\u200b"
+    available_description = (
+        MAX_DESCRIPTION_CHARACTERS - len(fixed_description) - len("\ud83d\udcd6 \n\n")
+    )
     extra_description = (
-        f"\ud83d\udcd6 {event.get('description')}\n\n" if event.get("description") else ""
+        f"\ud83d\udcd6 {truncate_text(raw_description, available_description)}\n\n"
+        if raw_description
+        else ""
     )
 
     # Description with invisible character to force visual update
-    description = f"{extra_description}" f"**Starts <t:{timestamp}:R>**\n" f"On: {utc_text}\n\u200b"
+    description = f"{extra_description}{fixed_description}"
 
-    title = f"\ud83d\udcc5 {event.get('name') or event.get('title') or 'Unnamed Event'}"
+    raw_name = " ".join(str(event.get("name") or event.get("title") or "Unnamed Event").split())
+    compact_name = truncate_text(raw_name, MAX_TITLE_CHARACTERS - len("\ud83d\udcc5 "))
+    title = f"\ud83d\udcc5 {compact_name}"
     embed = discord.Embed(title=title, description=description, color=color)
     embed.set_thumbnail(url=get_event_thumbnail(event["type"]))
     embed.set_footer(text="This event will automatically update and expire")
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=live_event fields=%d chars=%d max_field_value=0 compacted_events=%d omitted_events=0",
+        usage.field_counts[0],
+        usage.total_characters,
+        int(
+            compact_name != raw_name
+            or truncate_text(raw_description, available_description) != raw_description
+        ),
+    )
     return embed

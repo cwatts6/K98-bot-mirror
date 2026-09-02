@@ -173,7 +173,16 @@ def _build_rehydrated_view(key: str, normalized_entry: dict[str, Any]):
             safe_prefix,
         )
 
-    return LocalTimeToggleView(events, prefix=safe_prefix, timeout=None), safe_prefix
+    complete_event_packing = key == "daily_kvk_overview" or safe_prefix == "daily_kvk_overview"
+    return (
+        LocalTimeToggleView(
+            events,
+            prefix=safe_prefix,
+            timeout=None,
+            complete_event_packing=complete_event_packing,
+        ),
+        safe_prefix,
+    )
 
 
 def _validate_tracker_shape(raw: Any) -> dict[str, Any]:

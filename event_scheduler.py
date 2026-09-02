@@ -24,6 +24,12 @@ from constants import (
     REMINDER_WINDOWS,
     TEST_REMINDER_WINDOWS,
 )
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    MAX_TITLE_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+)
 from embed_utils import LocalTimeToggleView, fmt_short
 from event_cache import get_all_upcoming_events
 from file_utils import atomic_write_json, read_json_safe, run_blocking_in_thread
@@ -583,7 +589,9 @@ async def load_active_reminders(bot):
                 prefix = f"reminder_{raw_type}"
 
                 try:
-                    view = LocalTimeToggleView(events=[matched_event], prefix=prefix)
+                    view = LocalTimeToggleView(
+                        events=[matched_event], prefix=prefix, complete_event_packing=True
+                    )
                     await msg.edit(view=view)
                     logger.info(
                         f"[REMINDER_CACHE_REHYDRATE] Re-attached reminder view for {eid} with prefix {prefix}"
@@ -621,6 +629,37 @@ def get_embed_color(delta):
         return 0xE74C3C  # Red
 
 
+def build_public_reminder_embed(event, time_remaining, *, starts_now, add_public_quote):
+    event_start = ensure_aware_utc(event["start_time"])
+    description = (
+        "**Starts NOW**" if starts_now else f"**Starts <t:{int(event_start.timestamp())}:R>**"
+    )
+    if add_public_quote:
+        event_type = (event.get("type") or "").lower().strip()
+        candidates = PUBLIC_QUOTES.get(event_type) or PUBLIC_QUOTES["_default"]
+        description = f"{description}\n\n💬 *{random.choice(candidates)}*"
+
+    raw_name = " ".join(str(event.get("name") or "Unnamed Event").split())
+    name = truncate_text(raw_name, MAX_TITLE_CHARACTERS - len("📣 "))
+    embed = discord.Embed(
+        title=f"📣 {name}",
+        description=truncate_text(description, MAX_DESCRIPTION_CHARACTERS),
+        color=get_embed_color(time_remaining),
+    )
+    try:
+        embed.set_footer(text=f"Event starts: {fmt_short(event_start)}")
+    except Exception:
+        embed.set_footer(text=f"Event starts: {event_start.strftime('%A, %d %B %Y at %H:%M UTC')}")
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=public_event_reminder fields=%d chars=%d max_field_value=0 compacted_events=%d omitted_events=0",
+        usage.field_counts[0],
+        usage.total_characters,
+        int(name != raw_name),
+    )
+    return embed
+
+
 async def cleanup_orphaned_reminders(loaded_ids: set):
     upcoming_events = get_all_upcoming_events()
 
@@ -653,7 +692,6 @@ async def send_reminder_at(bot, channel_id, event, delta):
         now = utcnow()
         time_remaining = ensure_aware_utc(event["start_time"]) - now
         is_now = abs(time_remaining.total_seconds()) < 60
-        embed_color = get_embed_color(time_remaining)
 
         # 🚫 Skip false T-0s
         if delta == timedelta(0) and not is_now:
@@ -662,33 +700,14 @@ async def send_reminder_at(bot, channel_id, event, delta):
             )
             return
 
-        description = (
-            "**Starts NOW**"
-            if delta == timedelta(0) and is_now
-            else f"**Starts <t:{int(ensure_aware_utc(event['start_time']).timestamp())}:R>**"
-        )
-
         # Add a non-personalized hype quote at T-1h and T-0
         add_public_quote = delta in (timedelta(hours=1), timedelta(seconds=0))
-        if add_public_quote:
-            etype = (event.get("type") or "").lower().strip()
-            pub_candidates = PUBLIC_QUOTES.get(etype) or PUBLIC_QUOTES["_default"]
-            pub_quote = random.choice(pub_candidates)
-            description = f"{description}\n\n💬 *{pub_quote}*"
-
-        embed = discord.Embed(
-            title=f"📣 {event['name']}", description=description, color=embed_color
+        embed = build_public_reminder_embed(
+            event,
+            time_remaining,
+            starts_now=delta == timedelta(0) and is_now,
+            add_public_quote=add_public_quote,
         )
-        # Use centralized short-time formatter for consistency
-        try:
-            embed.set_footer(
-                text=f"Event starts: {fmt_short(ensure_aware_utc(event['start_time']))}"
-            )
-        except Exception:
-            # Fallback to previous formatting in case fmt_short fails
-            embed.set_footer(
-                text=f"Event starts: {ensure_aware_utc(event['start_time']).strftime('%A, %d %B %Y at %H:%M UTC')}"
-            )
 
         mention = "@everyone" if delta in [timedelta(hours=1), timedelta(minutes=0)] else None
 
@@ -709,7 +728,7 @@ async def send_reminder_at(bot, channel_id, event, delta):
             return
 
         prefix = f"reminder_{event['type'].replace(' ', '_')}"
-        view = LocalTimeToggleView(events=[event], prefix=prefix)
+        view = LocalTimeToggleView(events=[event], prefix=prefix, complete_event_packing=True)
         msg = await channel.send(content=mention, embed=embed, view=view)
         active_reminders[event_id] = msg
         save_active_reminders()
@@ -972,6 +991,43 @@ async def delayed_user_dm(bot, user, event, delta, seconds_until):
             await save_dm_scheduled_tracker_async()
 
 
+def build_user_reminder_embed(*, event, discord_name, main_governor, quote):
+    raw_name = " ".join(str(event.get("name") or "Unnamed Event").split())
+    name = truncate_text(raw_name, MAX_TITLE_CHARACTERS - len("📬  – Reminder"))
+    safe_discord_name = truncate_text(" ".join(str(discord_name).split()), 128)
+    safe_governor = truncate_text(" ".join(str(main_governor).split()), 128)
+    starts_at = int(ensure_aware_utc(event["start_time"]).timestamp())
+    fixed = f"Hey **** (())!\n⏰ Starts <t:{starts_at}:R>\n\n💬 **"
+    quote_limit = (
+        MAX_DESCRIPTION_CHARACTERS - len(fixed) - len(safe_discord_name) - len(safe_governor)
+    )
+    safe_quote = truncate_text(" ".join(str(quote).split()), quote_limit)
+    description = (
+        f"Hey **{safe_discord_name}** ({safe_governor})!\n"
+        f"⏰ Starts <t:{starts_at}:R>\n\n"
+        f"💬 *{safe_quote}*"
+    )
+    embed = discord.Embed(
+        title=f"📬 {name} – Reminder",
+        description=description,
+        color=discord.Color.green(),
+    )
+    embed.set_footer(text="Manage with /modify_subscription or /unsubscribe")
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=legacy_reminder_dm fields=%d chars=%d max_field_value=0 compacted_events=%d omitted_events=0",
+        usage.field_counts[0],
+        usage.total_characters,
+        int(
+            name != raw_name
+            or safe_discord_name != str(discord_name)
+            or safe_governor != str(main_governor)
+            or safe_quote != str(quote)
+        ),
+    )
+    return embed
+
+
 async def send_user_reminder(user, event, delta):
     event_id = make_event_id(event)
     uid = str(user.id)
@@ -998,24 +1054,12 @@ async def send_user_reminder(user, event, delta):
         quote_tpl = random.choice(candidates)
         quote = quote_tpl.format(name=discord_name, gov=main_gov)
 
-        starts_at = int(ensure_aware_utc(event["start_time"]).timestamp())
-        t0 = timedelta(0)
-        is_now = delta == t0
-
-        # Build DM embed
-        _title_suffix = (
-            "NOW"
-            if is_now
-            else f"in {((ensure_aware_utc(event['start_time']) - utcnow()).total_seconds() // 60):.0f} min"
+        embed = build_user_reminder_embed(
+            event=event,
+            discord_name=discord_name,
+            main_governor=main_gov,
+            quote=quote,
         )
-        title = f"📬 {event['name']} – Reminder"
-
-        # Friendly line at top + quote below
-        greeting = f"Hey **{discord_name}** ({main_gov})!"
-        description = f"{greeting}\n" f"⏰ Starts <t:{starts_at}:R>\n\n" f"💬 *{quote}*"
-
-        embed = discord.Embed(title=title, description=description, color=discord.Color.green())
-        embed.set_footer(text="Manage with /modify_subscription or /unsubscribe")
 
         await user.send(embed=embed)
 
@@ -1272,31 +1316,12 @@ async def refresh_reminder_format(bot, notify_channel_id):
             time_remaining = ensure_aware_utc(event["start_time"]) - now
             is_now = abs(time_remaining.total_seconds()) < 60
 
-            # Build description same as send_reminder_at
-            description = (
-                "**Starts NOW**"
-                if is_now
-                else f"**Starts <t:{int(ensure_aware_utc(event['start_time']).timestamp())}:R>**"
+            embed = build_public_reminder_embed(
+                event,
+                time_remaining,
+                starts_now=is_now,
+                add_public_quote=time_remaining <= timedelta(hours=1),
             )
-
-            # Add non-personalized quote at T-1h or NOW
-            if time_remaining <= timedelta(hours=1):
-                pub_candidates = PUBLIC_QUOTES.get(etype) or PUBLIC_QUOTES["_default"]
-                pub_quote = random.choice(pub_candidates)
-                description = f"{description}\n\n💬 *{pub_quote}*"
-
-            embed_color = get_embed_color(time_remaining)
-            embed = discord.Embed(
-                title=f"📣 {event['name']}", description=description, color=embed_color
-            )
-            try:
-                embed.set_footer(
-                    text=f"Event starts: {fmt_short(ensure_aware_utc(event['start_time']))}"
-                )
-            except Exception:
-                embed.set_footer(
-                    text=f"Event starts: {ensure_aware_utc(event['start_time']).strftime('%A, %d %B %Y at %H:%M UTC')}"
-                )
 
             try:
                 await msg.edit(embed=embed)  # keep existing view

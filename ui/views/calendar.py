@@ -8,6 +8,17 @@ from typing import Any
 
 import discord
 
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_FOOTER_CHARACTERS,
+    MAX_TITLE_CHARACTERS,
+    MAX_TOTAL_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+    validate_embed_payload,
+)
 from embed_utils import LocalTimeToggleView
 from event_calendar.datetime_utils import parse_iso_utc_nullable
 from event_calendar.runtime_cache import (
@@ -23,9 +34,7 @@ logger = logging.getLogger(__name__)
 _PAGE_SIZE = 8
 _ALLOWED_DAYS = {1, 3, 7, 30, 90, 180, 365}
 
-_EMBED_MAX_FIELDS = 25
-_FIELD_VALUE_MAX = 1024
-_EMBED_TOTAL_SOFT_MAX = 5800  # conservative under discord hard cap
+_SOURCE_LINK_MAX = 500
 
 
 def discord_ts(iso_utc: str) -> str:
@@ -36,7 +45,7 @@ def discord_ts(iso_utc: str) -> str:
         epoch = int(dt.timestamp())
         return f"<t:{epoch}:f> • <t:{epoch}:R>"
     except Exception:
-        return iso_utc
+        return truncate_text(iso_utc, 64)
 
 
 def fmt_abs_utc(iso_utc: str) -> str:
@@ -47,7 +56,7 @@ def fmt_abs_utc(iso_utc: str) -> str:
         dt = dt.astimezone(UTC)
         return dt.strftime("%d %B %Y %H:%M")
     except Exception:
-        return iso_utc
+        return truncate_text(iso_utc, 64)
 
 
 def cache_footer(cache_state: dict) -> str:
@@ -73,8 +82,10 @@ def line_meta_links(e: dict) -> str:
     link_url = str(e.get("link_url") or "").strip()
     channel_id = str(e.get("channel_id") or "").strip()
 
-    if link_url:
+    if link_url and len(link_url) <= _SOURCE_LINK_MAX:
         parts.append(f"[link]({link_url})")
+    elif link_url:
+        parts.append("link omitted: source URL exceeds the supported length")
     if channel_id and channel_id.isdigit():
         parts.append(f"<#{channel_id}>")
 
@@ -87,8 +98,8 @@ def title_with_variant(e: dict) -> str:
     return f"{title} [{variant}]" if variant else title
 
 
-def event_line(e: dict) -> str:
-    emoji = str(e.get("emoji") or "").strip()
+def event_line(e: dict, *, max_length: int = MAX_FIELD_VALUE_CHARACTERS) -> str:
+    emoji = truncate_text(str(e.get("emoji") or "").strip(), 16)
     title_text = title_with_variant(e)
 
     start_iso = str(e.get("start_utc") or "")
@@ -103,7 +114,16 @@ def event_line(e: dict) -> str:
     meta_line = f"\n{meta}" if meta else ""
     emoji_prefix = f"{emoji} " if emoji else ""
 
-    return f"• {emoji_prefix}**{title_text}**\nstarts: {start_abs} • {start_rel} → ends: {end_abs}{meta_line}"
+    fixed = f"• {emoji_prefix}****\nstarts: {start_abs} • {start_rel} → ends: {end_abs}{meta_line}"
+    compact_title = truncate_text(title_text, max(1, max_length - len(fixed)))
+    return f"• {emoji_prefix}**{compact_title}**\nstarts: {start_abs} • {start_rel} → ends: {end_abs}{meta_line}"
+
+
+def _payload_with_fields(embed: discord.Embed, fields: list[tuple[str, str]]) -> dict[str, Any]:
+    return {
+        **embed.to_dict(),
+        "fields": [{"name": name, "value": value, "inline": False} for name, value in fields],
+    }
 
 
 def paginate(items: list[dict], page: int) -> tuple[list[dict], int, int]:
@@ -132,42 +152,77 @@ def group_events_by_date(events: list[dict[str, Any]]) -> OrderedDict[str, list[
     return grouped
 
 
-def build_pinned_calendar_embed(*, events: list[dict[str, Any]], footer: str) -> discord.Embed:
-    embed = discord.Embed(title="📌 30-Day Calendar", color=discord.Color.blurple())
-    grouped = group_events_by_date(events)
+def build_pinned_calendar_embed(
+    *, events: list[dict[str, Any]], footer: str, description: str | None = None
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="📌 30-Day Calendar",
+        description=truncate_text(description, MAX_DESCRIPTION_CHARACTERS) if description else None,
+        color=discord.Color.blurple(),
+    )
+    base_characters = len(embed.title or "") + len(embed.description or "")
+    footer_limit = min(MAX_FOOTER_CHARACTERS, MAX_TOTAL_CHARACTERS - base_characters)
+    embed.set_footer(text=truncate_text(footer, footer_limit))
 
-    total_chars = len(embed.title or "")
-    fields_used = 0
+    candidates = [
+        (day, event)
+        for day, day_events in group_events_by_date(events).items()
+        for event in day_events
+    ]
 
-    for day, day_events in grouped.items():
-        if fields_used >= _EMBED_MAX_FIELDS:
+    def build_fields(accepted: list[tuple[str, dict[str, Any]]], omitted: int):
+        fields: list[tuple[str, str]] = []
+        for day, event in accepted:
+            line = event_line(event)
+            base_name = truncate_text(day, MAX_FIELD_NAME_CHARACTERS)
+            if fields and fields[-1][0] in {base_name, f"{base_name} (continued)"}:
+                combined = f"{fields[-1][1]}\n\n{line}"
+                if len(combined) <= MAX_FIELD_VALUE_CHARACTERS:
+                    fields[-1] = (fields[-1][0], combined)
+                    continue
+            continued = any(name.startswith(base_name) for name, _ in fields)
+            name = f"{base_name} (continued)" if continued else base_name
+            fields.append((truncate_text(name, MAX_FIELD_NAME_CHARACTERS), line))
+        if omitted:
+            fields.append(
+                (
+                    "… More calendar events",
+                    f"{omitted} additional calendar events omitted to fit Discord limits — use /calendar.",
+                )
+            )
+        return fields
+
+    accepted: list[tuple[str, dict[str, Any]]] = []
+    for index, candidate in enumerate(candidates):
+        projected = [*accepted, candidate]
+        fields = build_fields(projected, len(candidates) - index - 1)
+        if validate_embed_payload(_payload_with_fields(embed, fields)):
             break
-        lines = [event_line(e) for e in day_events]
-        value = "\n\n".join(lines)
+        accepted = projected
 
-        if len(value) > _FIELD_VALUE_MAX:
-            out: list[str] = []
-            running = 0
-            for ln in lines:
-                need = len(ln) + 2
-                if running + need > (_FIELD_VALUE_MAX - 4):
-                    break
-                out.append(ln)
-                running += need
-            value = "\n\n".join(out) + "\n…"
+    omitted = len(candidates) - len(accepted)
+    fields = build_fields(accepted, omitted)
+    while accepted and validate_embed_payload(_payload_with_fields(embed, fields)):
+        accepted.pop()
+        omitted = len(candidates) - len(accepted)
+        fields = build_fields(accepted, omitted)
+    for name, value in fields:
+        embed.add_field(name=name, value=value or "—", inline=False)
 
-        projected = total_chars + len(day) + len(value)
-        if projected > _EMBED_TOTAL_SOFT_MAX:
-            if fields_used == 0:
-                value = value[: (_FIELD_VALUE_MAX - 1)] + "…"
-            else:
-                break
-
-        embed.add_field(name=day, value=value or "—", inline=False)
-        total_chars += len(day) + len(value)
-        fields_used += 1
-
-    embed.set_footer(text=footer)
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=calendar_pinned fields=%d chars=%d max_field_value=%d compacted_events=%d omitted_events=%d",
+        usage.field_counts[0],
+        usage.total_characters,
+        max((len(field.value or "") for field in embed.fields), default=0),
+        int(
+            any(
+                len(event_line(event, max_length=100_000)) > MAX_FIELD_VALUE_CHARACTERS
+                for _, event in accepted
+            )
+        ),
+        omitted,
+    )
     return embed
 
 
@@ -186,13 +241,28 @@ def build_next_event_embed(*, event: dict[str, Any], footer: str) -> discord.Emb
     ts = discord_ts(start_iso)
     start_rel = ts.split(" • ")[1] if " • " in ts else ts
 
+    fixed = f"****\nstarts: {start_abs} • {start_rel} → ends: {end_abs}"
+    title_display = truncate_text(title_display, MAX_DESCRIPTION_CHARACTERS - len(fixed))
     embed.description = f"**{title_display}**\nstarts: {start_abs} • {start_rel} → ends: {end_abs}"
 
     meta = line_meta_links(event)
     if meta:
         embed.add_field(name="Details", value=meta, inline=False)
 
-    embed.set_footer(text=footer)
+    payload_without_footer = require_valid_embed_payload(embed)
+    footer_limit = min(
+        MAX_FOOTER_CHARACTERS,
+        MAX_TOTAL_CHARACTERS - payload_without_footer.total_characters,
+    )
+    embed.set_footer(text=truncate_text(footer, footer_limit))
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=calendar_next fields=%d chars=%d max_field_value=%d compacted_events=%d omitted_events=0",
+        usage.field_counts[0],
+        usage.total_characters,
+        max((len(field.value or "") for field in embed.fields), default=0),
+        int(title_display != f"{emoji} {title_text}".strip()),
+    )
     return embed
 
 
@@ -212,7 +282,12 @@ class CalendarLocalTimeToggleView(LocalTimeToggleView):
                     "start_time": dt,
                 }
             )
-        super().__init__(events=converted, prefix=prefix, timeout=timeout)
+        super().__init__(
+            events=converted,
+            prefix=prefix,
+            timeout=timeout,
+            complete_event_packing=True,
+        )
 
 
 class CalendarPaginationView(CalendarLocalTimeToggleView):
@@ -262,18 +337,6 @@ class CalendarPaginationView(CalendarLocalTimeToggleView):
         self._total_pages = total
         self._sync_button_state()
 
-        embed = discord.Embed(
-            title=self._title,
-            description="\n\n".join(event_line(e) for e in page_items),
-            color=self._color,
-        )
-        if p == 1 and self._summary_field_name and self._summary_field_value:
-            embed.add_field(
-                name=self._summary_field_name,
-                value=self._summary_field_value,
-                inline=False,
-            )
-
         total_items = len(self._all_items)
         if total_items > 0:
             start_idx = ((p - 1) * _PAGE_SIZE) + 1
@@ -282,7 +345,63 @@ class CalendarPaginationView(CalendarLocalTimeToggleView):
         else:
             range_text = "0 of 0"
 
-        embed.set_footer(text=f"{range_text} • page {p}/{total} • {self._cache_footer}")
+        footer = truncate_text(
+            f"{range_text} • page {p}/{total} • {self._cache_footer}",
+            MAX_FOOTER_CHARACTERS,
+        )
+        embed = discord.Embed(
+            title=truncate_text(self._title, MAX_TITLE_CHARACTERS),
+            color=self._color,
+        )
+        if p == 1 and self._summary_field_name and self._summary_field_value:
+            embed.add_field(
+                name=truncate_text(self._summary_field_name, MAX_FIELD_NAME_CHARACTERS),
+                value=truncate_text(self._summary_field_value, MAX_FIELD_VALUE_CHARACTERS),
+                inline=False,
+            )
+        embed.set_footer(text=footer)
+
+        accepted: list[str] = []
+        for index, item in enumerate(page_items):
+            line = event_line(item)
+            remaining = len(page_items) - index - 1
+            parts = [*accepted, line]
+            if remaining:
+                parts.append(
+                    f"… {remaining} more events on this page omitted to fit Discord limits"
+                )
+            embed.description = "\n\n".join(parts)
+            if validate_embed_payload(embed):
+                break
+            accepted.append(line)
+
+        omitted = len(page_items) - len(accepted)
+        parts = list(accepted)
+        if omitted:
+            parts.append(f"… {omitted} more events on this page omitted to fit Discord limits")
+        embed.description = "\n\n".join(parts)
+        while accepted and validate_embed_payload(embed):
+            accepted.pop()
+            omitted = len(page_items) - len(accepted)
+            embed.description = "\n\n".join(
+                [
+                    *accepted,
+                    f"… {omitted} more events on this page omitted to fit Discord limits",
+                ]
+            )
+
+        usage = require_valid_embed_payload(embed)
+        logger.info(
+            "[EMBED_PAYLOAD] renderer=calendar_page fields=%d chars=%d max_field_value=%d compacted_events=%d omitted_events=%d",
+            usage.field_counts[0],
+            usage.total_characters,
+            max((len(field.value or "") for field in embed.fields), default=0),
+            sum(
+                len(event_line(item, max_length=100_000)) > MAX_FIELD_VALUE_CHARACTERS
+                for item in page_items[: len(accepted)]
+            ),
+            omitted,
+        )
         return embed
 
     async def _guard_owner(self, interaction: discord.Interaction) -> bool:

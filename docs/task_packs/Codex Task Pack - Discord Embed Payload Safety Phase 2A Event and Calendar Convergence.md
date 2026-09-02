@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #251 and production PR #558`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `prepared for audit/scope; runtime implementation requires approval after the first response`
+- Status: `approved implementation and automated validation complete; production promotion/smoke pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Required Reading
@@ -332,17 +332,17 @@ Fix only task-related failures. Document unrelated failures without widening sco
 
 ## 15. Acceptance Criteria
 
-- [ ] Audit/scope first response is approved before runtime/test edits.
-- [ ] Current main, Phase 1 prerequisite, and actual runtime flows are revalidated.
-- [ ] Each changed event/calendar payload satisfies the full canonical contract.
-- [ ] Meaningful event lists retain complete items or a truthful count-bearing marker.
-- [ ] Pathological single items retain valid Markdown/timestamps/links and explicit compaction.
-- [ ] Final validation occurs before every changed send/edit/DM boundary.
-- [ ] Event selection, ordering, caps, reminder eligibility, pings, visibility, and fallback behavior
+- [x] Audit/scope first response is approved before runtime/test edits.
+- [x] Current main, Phase 1 prerequisite, and actual runtime flows are revalidated.
+- [x] Each changed event/calendar payload satisfies the full canonical contract.
+- [x] Meaningful event lists retain complete items or a truthful count-bearing marker.
+- [x] Pathological single items retain valid Markdown/timestamps/links and explicit compaction.
+- [x] Final validation occurs before every changed send/edit/DM boundary.
+- [x] Event selection, ordering, caps, reminder eligibility, pings, visibility, and fallback behavior
       are preserved.
-- [ ] Message IDs, tracker/state formats, sent-state semantics, deduplication, and rehydration remain
+- [x] Message IDs, tracker/state formats, sent-state semantics, deduplication, and rehydration remain
       compatible.
-- [ ] No SQL, command, permission, config, source-data, cache-schema, or scheduler contract changes.
+- [x] No SQL, command, permission, config, source-data, cache-schema, or scheduler contract changes.
 - [ ] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
       explicitly documented.
 - [ ] Final bot diff receives a Changes-only security review with Deep off; SQL has a documented
@@ -383,3 +383,25 @@ Provide:
 7. Changes-only security evidence and SQL skip.
 8. Production smoke evidence or precise pending items.
 9. Rollback and the next separately gated phase.
+
+## 18. Implementation Record
+
+The operator approved the review-first scope on 2026-09-02. The implementation uses
+`core/discord_embed_limits.py` without changing it, adds a narrowly opt-in complete-event mode to
+`LocalTimeToggleView`, and enables that mode only for Phase 2A live-event, reminder, daily-overview,
+and calendar consumers. Pre-KVK keeps the default compatibility mode.
+
+Daily overview and local-time fields split only between events. Pinned calendar output uses date
+continuations and a count-bearing `/calendar` marker. Calendar command pages retain eight logical
+source items per page and omit only whole trailing items with an exact page-local marker when the
+canonical aggregate cannot fit all eight. Valid source links up to the SQL/cache contract of 500
+characters remain intact; over-contract links receive an explicit link-omitted marker rather than a
+broken truncated URL.
+
+The implementation changes no command, permission, visibility, mention, event selection/order/cap,
+reminder eligibility, source contract, SQL, cache/state schema, tracker format, scheduler timing/task
+name, startup order, message identity, pinning, deduplication, sent-state boundary, fallback, or
+rehydration semantics. Focused Phase 2A and lifecycle coverage passed `74`; the calendar selector
+equivalent passed `157`; the full suite passed `3077 passed, 2 skipped`. The isolated
+`tests/test_ui_imports.py` selector command still exposes an unrelated pre-existing test-stub gap for
+`constants.PLAYER_STATS_LAST_CACHE`; the full suite passes that test under normal collection order.

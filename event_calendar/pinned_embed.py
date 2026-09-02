@@ -86,9 +86,7 @@ async def update_calendar_embed(
         importance="all",
     )
     footer = cache_footer(cache_state)
-    embed = build_pinned_calendar_embed(events=events, footer=footer)
-    if banner:
-        embed.description = banner
+    embed = build_pinned_calendar_embed(events=events, footer=footer, description=banner)
 
     view = _build_view(cache_state)
     tracker = _load_tracker()

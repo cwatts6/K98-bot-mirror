@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from core.discord_embed_limits import validate_embed_payload
+from event_calendar import reminders as reminder_dispatch
 from event_calendar.reminder_prefs import (
     default_prefs,
     is_dm_allowed,
@@ -141,3 +143,24 @@ def test_normalize_prefs_invalid_shape():
     p = normalize_prefs({"enabled": "yes", "by_event_type": "bad"})
     assert p["enabled"] is True
     assert p["by_event_type"] == {}
+
+
+def test_calendar_dm_payload_keeps_contract_link_and_marks_out_of_contract_link():
+    event = {
+        "title": "T" * 2000,
+        "emoji": "📅",
+        "start_utc": datetime.now(UTC).isoformat(),
+        "link_url": "https://example.invalid/" + ("a" * 476),
+        "description": "D" * 1000,
+    }
+    exact = reminder_dispatch.build_reminder_dm_embed(event=event, reminder_type="24h")
+    assert exact.fields[2].value == event["link_url"]
+    assert (
+        len(reminder_dispatch.build_reminder_dm_content(event=event, reminder_type="24h")) <= 2000
+    )
+    assert not validate_embed_payload(exact)
+
+    event["link_url"] += "x"
+    one_over = reminder_dispatch.build_reminder_dm_embed(event=event, reminder_type="24h")
+    assert one_over.fields[2].value.startswith("Link omitted:")
+    assert not validate_embed_payload(one_over)

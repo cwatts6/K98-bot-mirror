@@ -25,3 +25,39 @@ async def test_local_time_embed_title_truncates():
     assert len(embed.fields[0].name) == 256
     assert embed.fields[0].name.endswith("…")
     require_valid_embed_payload(embed)
+
+
+@pytest.mark.asyncio
+async def test_complete_event_packing_uses_exact_omission_marker_without_partial_events():
+    events = [
+        {
+            "name": f"{index}-" + ("N" * 2000),
+            "type": "ruins",
+            "start_time": datetime.now(UTC),
+        }
+        for index in range(12)
+    ]
+    view = LocalTimeToggleView(
+        events=events,
+        prefix="phase2a",
+        timeout=None,
+        complete_event_packing=True,
+    )
+    embed = await view.build_local_time_embed()
+    values = "\n".join(field.value for field in embed.fields)
+    shown = values.count("• **")
+
+    assert f"{len(events) - shown} additional events omitted" in values
+    assert not values.rstrip().endswith("\n…")
+    require_valid_embed_payload(embed)
+
+
+@pytest.mark.asyncio
+async def test_complete_event_packing_is_opt_in():
+    default_view = LocalTimeToggleView(events=[], prefix="prekvk", timeout=None)
+    opted_in = LocalTimeToggleView(
+        events=[], prefix="daily_kvk_overview", timeout=None, complete_event_packing=True
+    )
+
+    assert default_view.complete_event_packing is False
+    assert opted_in.complete_event_packing is True

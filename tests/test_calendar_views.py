@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from core.discord_embed_limits import validate_embed_payload
 from event_calendar import reminder_config_service
 from ui.views import calendar as cv
 from ui.views.reminder_config import ReminderConfigView
@@ -96,3 +97,53 @@ def test_grouped_embed_build_smoke():
     emb = cv.build_pinned_calendar_embed(events=events, footer="f")
     assert emb.fields
     assert emb.footer.text == "f"
+
+
+def test_pinned_embed_has_exact_marker_and_only_complete_pathological_events():
+    events = [
+        {
+            "title": f"{index}-" + ("T" * 2000),
+            "variant": "V" * 500,
+            "start_utc": "2026-03-10T00:00:00+00:00",
+            "end_utc": "2026-03-10T01:00:00+00:00",
+            "link_url": "https://example.invalid/" + ("a" * 476),
+        }
+        for index in range(20)
+    ]
+    embed = cv.build_pinned_calendar_embed(events=events, footer="f")
+    values = "\n".join(field.value for field in embed.fields)
+    shown = values.count("starts:")
+
+    assert f"{len(events) - shown} additional calendar events omitted" in values
+    assert values.count("[link](") == shown
+    assert not validate_embed_payload(embed)
+
+
+def test_calendar_link_is_never_truncated_into_a_broken_url():
+    event = {
+        "title": "Event",
+        "start_utc": "2026-03-10T00:00:00+00:00",
+        "end_utc": "2026-03-10T01:00:00+00:00",
+        "link_url": "https://example.invalid/" + ("a" * 477),
+    }
+    line = cv.event_line(event)
+    assert "link omitted: source URL exceeds the supported length" in line
+    assert "[link](" not in line
+
+
+def test_pinned_field_slot_exhaustion_reserves_exact_marker():
+    events = [
+        {
+            "title": f"Event {index}",
+            "start_utc": f"2026-03-{index + 1:02d}T00:00:00+00:00",
+            "end_utc": f"2026-03-{index + 1:02d}T01:00:00+00:00",
+        }
+        for index in range(30)
+    ]
+    embed = cv.build_pinned_calendar_embed(events=events, footer="f")
+    values = "\n".join(field.value for field in embed.fields)
+    shown = values.count("starts:")
+
+    assert len(embed.fields) == 25
+    assert f"{30 - shown} additional calendar events omitted" in values
+    assert not validate_embed_payload(embed)

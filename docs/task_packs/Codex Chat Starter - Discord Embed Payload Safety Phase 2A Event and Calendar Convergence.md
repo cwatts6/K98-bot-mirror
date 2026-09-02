@@ -1,5 +1,7 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2A Event and Calendar Convergence
 
+Status: consumed for the approved 2026-09-02 implementation; retained as the initiation record.
+
 Use this starter for the next phase. The first response is audit/scope and architecture planning
 only. Do not change runtime code or tests until the operator approves that response.
 

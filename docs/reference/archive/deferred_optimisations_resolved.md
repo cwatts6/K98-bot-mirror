@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Embed Payload Safety Phase 2A Event And Calendar Convergence Completed Item
+
+- Area: `event_embed_manager.py`, `event_scheduler.py`, `event_calendar/reminders.py`, `event_calendar/pinned_embed.py`, `daily_KVK_overview_embed.py`, `ui/views/calendar.py`, `embed_utils.py`, `rehydrate_views.py`, and focused payload tests
+- Type: consistency
+- Description: Event and calendar outputs had fragmented title, description, field, footer, and aggregate policies. Pathological Sheet/cache values could reject public sends/edits, DMs, persistent calendar output, or interaction pages, while list clipping did not always expose exact omissions.
+- Resolution: Phase 2A reuses the unchanged canonical `core/discord_embed_limits.py`, validates final changed payloads, compacts only approved free text, packs complete event blocks, adds exact count-bearing omission markers, preserves valid links through the 500-character source contract, and marks over-contract links explicitly. The local-time packing change is opt-in so Pre-KVK and unrelated consumers retain compatibility behavior. Commands, permissions, visibility, mentions, selection/order/caps, reminder eligibility, SQL, source data, cache/state schemas, tracker formats, scheduler timing/task names, startup order, message IDs, sent-state/deduplication, fallback, and rehydration semantics are unchanged.
+- Validation: Focused Phase 2A and lifecycle coverage passed `74`; the calendar selector equivalent passed `157`; the full suite passed `3077 passed, 2 skipped`; architecture, deferred, security-routing, selector, import-smoke, and command-registration gates passed. The isolated UI-import selector has an unrelated test-stub gap for `constants.PLAYER_STATS_LAST_CACHE`, while the same test passes in the full suite. Production smoke remains pending separate promotion approval.
+
 ### Discord Embed Payload Safety Phase 1 Completed Item
 
 - Area: `core/discord_embed_limits.py`, `stats_alerts/embeds/prekvk.py`, `stats_alerts/interface.py`, `embed_utils.py`, and focused payload tests

@@ -8,8 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Audit/scope next | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Phase 1 prerequisite is delivered and operator edit-path smoke accepted; Phase 2A requires a review-first response and approval before runtime/test edits |
-| Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 carry the delivery; automated validation and operator edit-path smoke passed; both PRs await manual merge |
+| Implementation complete / promotion pending | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Review-first scope was approved; bot-only implementation and automated validation are complete; production promotion and smoke remain separate |
+| Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
@@ -33,8 +33,9 @@ and production PR #558 add the canonical embed-limit model, the exact Pre-KVK ov
 shared-sender hardening, and sole module-owned daily claim. The 2026-09-02 operator smoke validated
 the final payload and edited the existing message in place without duplication or `50035`. That
 test did not independently exercise a scheduled fresh-send ping/claim because test mode bypasses
-daily guards. The active Phase 2A pack covers only event/calendar payload convergence; Ark,
-rankings/history, diagnostics, and atomic Pre-KVK reservation remain separate.
+daily guards. Phase 2A now covers only the implemented event/calendar payload convergence; Ark,
+rankings/history, diagnostics, atomic Pre-KVK reservation, and active-reminder tracker atomicity
+remain separate.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

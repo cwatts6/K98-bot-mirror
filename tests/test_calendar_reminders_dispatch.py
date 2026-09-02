@@ -135,6 +135,46 @@ async def test_dispatch_sends_and_dedupes(monkeypatch, fixed_now, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_dispatch_embed_http_failure_uses_text_fallback_and_marks_sent(
+    monkeypatch, fixed_now, tmp_path
+):
+    class DummyHTTPException(Exception):
+        pass
+
+    class FallbackUser:
+        def __init__(self):
+            self.calls = []
+
+        async def send(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+            if kwargs.get("embed") is not None:
+                raise DummyHTTPException("embed rejected")
+
+    start = fixed_now + timedelta(hours=24)
+    event = _event("evt-fallback", "raid", start)
+    monkeypatch.setattr(mod.discord, "HTTPException", DummyHTTPException)
+    monkeypatch.setattr(mod, "load_runtime_cache", lambda: {"ok": True, "events": [event]})
+    monkeypatch.setattr(mod, "filter_events", lambda events, **_k: events)
+    monkeypatch.setattr(mod, "list_event_types", lambda _c: ["raid"])
+    monkeypatch.setattr(
+        mod,
+        "load_all_user_prefs",
+        lambda: {"123": {"enabled": True, "by_event_type": {"raid": ["24h"]}}},
+    )
+    from event_calendar import reminder_state as rs_mod
+
+    monkeypatch.setattr(rs_mod, "DEFAULT_REMINDER_STATE_PATH", tmp_path / "state.json")
+    user = FallbackUser()
+
+    result = await mod.dispatch_due_calendar_reminders(_FakeBot(user=user))
+
+    assert result.sent == 1
+    assert result.failures == 0
+    assert len(user.calls) == 2
+    assert user.calls[1][0] and not user.calls[1][1]
+
+
+@pytest.mark.asyncio
 async def test_dispatch_dry_run_marks_sent(monkeypatch, fixed_now, tmp_path):
     start = fixed_now + timedelta(hours=24)
     cache_state = {"ok": True, "events": [_event("evt-2", "raid", start)]}
@@ -184,3 +224,7 @@ async def test_dispatch_failure_reason_buckets(monkeypatch, fixed_now, tmp_path)
     out = await mod.dispatch_due_calendar_reminders(bot)
     assert out.failures == 1
     assert out.failed_not_found == 1
+
+    retried = await mod.dispatch_due_calendar_reminders(bot)
+    assert retried.attempted == 1
+    assert retried.skipped_already_sent == 0

@@ -61,6 +61,20 @@ def read_tracker_file():
 
 
 @pytest.mark.asyncio
+async def test_daily_overview_rehydration_enables_complete_event_packing_only_for_daily_key():
+    event = rehydrate_views.serialize_event(make_event())
+    daily, _ = rehydrate_views._build_rehydrated_view(
+        "daily_kvk_overview", {"events": [event], "prefix": "daily_kvk_overview"}
+    )
+    generic, _ = rehydrate_views._build_rehydrated_view(
+        "generic", {"events": [event], "prefix": "generic"}
+    )
+
+    assert daily.complete_event_packing is True
+    assert generic.complete_event_packing is False
+
+
+@pytest.mark.asyncio
 async def test_serialize_and_save_and_load_roundtrip():
     """
     - Verify serialize_event converts datetimes to ISO strings with timezone info.

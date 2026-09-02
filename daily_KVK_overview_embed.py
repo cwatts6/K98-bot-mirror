@@ -1,6 +1,6 @@
 # daily_KVK_overview_embed.py
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 import json
 import logging
 
@@ -11,6 +11,12 @@ import os
 import discord
 
 from constants import DAILY_KVK_OVERVIEW_TRACKER
+from core.discord_embed_limits import (
+    MAX_FIELD_VALUE_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+    validate_embed_payload,
+)
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
 from event_utils import serialize_event
@@ -53,7 +59,12 @@ async def post_or_update_daily_KVK_overview(bot, event_channel_id):
                 prefix = "daily_kvk_overview"
                 await msg.edit(
                     embed=embed,
-                    view=LocalTimeToggleView(events=upcoming, prefix=prefix, timeout=None),
+                    view=LocalTimeToggleView(
+                        events=upcoming,
+                        prefix=prefix,
+                        timeout=None,
+                        complete_event_packing=True,
+                    ),
                 )
 
                 # Save view for rehydration (use centralized retrying helper)
@@ -78,7 +89,13 @@ async def post_or_update_daily_KVK_overview(bot, event_channel_id):
         # Create new message if not found
         prefix = "daily_kvk_overview"
         new_msg = await channel.send(
-            embed=embed, view=LocalTimeToggleView(events=upcoming, prefix=prefix, timeout=None)
+            embed=embed,
+            view=LocalTimeToggleView(
+                events=upcoming,
+                prefix=prefix,
+                timeout=None,
+                complete_event_packing=True,
+            ),
         )
         await new_msg.pin()
         save_daily_KVK_overview_id(new_msg.id)
@@ -126,48 +143,28 @@ async def remove_daily_KVK_overview_embed(bot, event_channel_id):
 
 # ---- Embed Generator ----
 def build_daily_KVK_overview_embed(events):
-    logger.info("[INFO] Building daily KVK overview embed...")
-
-    TYPE_MAP = {
+    type_map = {
         "ruins": "ruins",
         "next ruins": "ruins",
-        "altar": "altars",  # loader emits 'altar'
+        "altar": "altars",
         "altars": "altars",
         "next altar fight": "altars",
         "chronicle": "chronicle",
         "major": "major",
     }
-
     grouped = {"ruins": [], "altars": [], "chronicle": [], "major": []}
-
-    for e in events:
-        raw_type = (e.get("type") or "").lower()
-        normalized_type = TYPE_MAP.get(raw_type)
+    for event in events:
+        raw_type = (event.get("type") or "").lower()
+        normalized_type = type_map.get(raw_type)
         if normalized_type in grouped:
-            grouped[normalized_type].append(e)
+            grouped[normalized_type].append(event)
         else:
-            logger.warning(f"[DAILY_KVK_OVERVIEW] Skipping unknown event type: {e}")
+            logger.warning("[DAILY_KVK_OVERVIEW] Skipping unknown event type")
 
-    logger.info(f"[INFO] Grouped results: {[ (k, len(v)) for k,v in grouped.items() ]}")
-
-    # ----- Window description helpers -----
-    def _fmt_day(d: datetime) -> str:
-        return d.strftime("%a %d %b")
-
-    # Compute the window shown in this overview (now → now+4d)
     now = utcnow()
-    window_start = now
     window_end = now + timedelta(days=4)
-
-    # You can also derive from the passed events if you prefer the *actual* min/max:
-    # if events:
-    #     window_start = min(e["start_time"] for e in events)
-    #     window_end   = max(e["start_time"] for e in events)
-
-    # Total events shown across all types within the window
     total_in_window = len(events)
-
-    window_str = f"**{_fmt_day(window_start)} → {_fmt_day(window_end)} (UTC)**"
+    window_str = f"**{now.strftime('%a %d %b')} → {window_end.strftime('%a %d %b')} (UTC)**"
     desc = (
         f"{window_str}\n"
         f"{total_in_window} upcoming event{'s' if total_in_window != 1 else ''} in the next 4 days.\n\n"
@@ -180,78 +177,98 @@ def build_daily_KVK_overview_embed(events):
         color=discord.Color.teal(),
         timestamp=utcnow(),
     )
-
-    # Helper to format a date header like "Wed 01 Oct"
-    def _date_hdr(dt):
-        return dt.strftime("%a %d %b")
-
-    # Build each field with date headers and a cap of 6 entries per type
-    CAP_PER_TYPE = 6
-    for event_type, entries in grouped.items():
-        if not entries:
-            continue
-
-        entries.sort(key=lambda x: x["start_time"])
-        field_name = f"{event_type.capitalize()} • {len(entries)}"
-
-        # Group by calendar date (UTC)
-        by_date = {}
-        for e in entries:
-            dkey = e["start_time"].date()
-            by_date.setdefault(dkey, []).append(e)
-
-        # Compose lines with date headers, respecting the cap
-        lines = []
-        added = 0
-        remaining = max(0, len(entries) - CAP_PER_TYPE)
-
-        for dkey in sorted(by_date.keys()):
-            if added >= CAP_PER_TYPE:
-                break
-            day_block = by_date[dkey]
-            day_block.sort(key=lambda x: x["start_time"])
-
-            # How many we can still add from this day
-            can_take = CAP_PER_TYPE - added
-            to_show = day_block[:can_take]
-
-            # Date header
-            lines.append(f"**{_date_hdr(to_show[0]['start_time'])}**")
-
-            for e in to_show:
-                start_time_str = format_event_time(e["start_time"])
-                title = e.get("title") or e.get("name", "(Unnamed Event)")
-                lines.append(f"• **{title}**\n{start_time_str}")
-                added += 1
-                if added >= CAP_PER_TYPE:
-                    break
-
-        if remaining > 0:
-            lines.append(f"… +{remaining} more in next 4 days")
-
-        value = "\n".join(lines)
-
-        # Discord hard cap safety (1024 chars per field)
-        if len(value) > 1024:
-            trimmed = []
-            total = 0
-            for line in lines:
-                ln = len(line) + 1
-                if total + ln > 1010:
-                    break
-                trimmed.append(line)
-                total += ln
-            value = "\n".join(trimmed) + "\n…"
-
-        embed.add_field(name=field_name, value=value, inline=False)
-
-    # Legend footer
     embed.set_footer(
         text="K98 Bot – Daily Schedule • Times shown in UTC — tap ‘Show in my local time’ to convert.",
         icon_url=None,
     )
 
-    logger.info("[INFO] Finished building embed successfully.")
+    for entries in grouped.values():
+        entries.sort(key=lambda item: item["start_time"])
+    shown = {key: min(6, len(entries)) for key, entries in grouped.items()}
+
+    def event_block(event):
+        start_text = format_event_time(event["start_time"])
+        date_header = event["start_time"].strftime("%a %d %b")
+        raw_title = " ".join(
+            str(event.get("title") or event.get("name") or "(Unnamed Event)").split()
+        )
+        fixed_length = len(f"**{date_header}**\n• ****\n{start_text}")
+        title = truncate_text(raw_title, MAX_FIELD_VALUE_CHARACTERS - fixed_length)
+        return f"**{date_header}**\n• **{title}**\n{start_text}"
+
+    def event_was_compacted(event):
+        start_text = format_event_time(event["start_time"])
+        date_header = event["start_time"].strftime("%a %d %b")
+        raw_title = " ".join(
+            str(event.get("title") or event.get("name") or "(Unnamed Event)").split()
+        )
+        fixed_length = len(f"**{date_header}**\n• ****\n{start_text}")
+        return len(raw_title) > MAX_FIELD_VALUE_CHARACTERS - fixed_length
+
+    def build_fields():
+        fields = []
+        for event_type, entries in grouped.items():
+            if not entries:
+                continue
+            base_name = f"{event_type.capitalize()} • {len(entries)}"
+            type_fields = []
+            for event in entries[: shown[event_type]]:
+                block = event_block(event)
+                if (
+                    type_fields
+                    and len(f"{type_fields[-1][1]}\n\n{block}") <= MAX_FIELD_VALUE_CHARACTERS
+                ):
+                    name, value = type_fields[-1]
+                    type_fields[-1] = (name, f"{value}\n\n{block}")
+                else:
+                    suffix = " (continued)" if type_fields else ""
+                    type_fields.append((f"{base_name}{suffix}", block))
+
+            omitted = len(entries) - shown[event_type]
+            if omitted:
+                marker = f"… {omitted} more {event_type} events in the next 4 days — use Local Time"
+                if (
+                    type_fields
+                    and len(f"{type_fields[-1][1]}\n{marker}") <= MAX_FIELD_VALUE_CHARACTERS
+                ):
+                    name, value = type_fields[-1]
+                    type_fields[-1] = (name, f"{value}\n{marker}")
+                else:
+                    type_fields.append((f"{base_name} (continued)", marker))
+            fields.extend(type_fields)
+        return fields
+
+    fields = build_fields()
+    while validate_embed_payload(
+        {
+            **embed.to_dict(),
+            "fields": [{"name": name, "value": value, "inline": False} for name, value in fields],
+        }
+    ):
+        removable = next((key for key in reversed(tuple(grouped)) if shown[key] > 0), None)
+        if removable is None:
+            break
+        shown[removable] -= 1
+        fields = build_fields()
+
+    for name, value in fields:
+        embed.add_field(name=name, value=value, inline=False)
+
+    usage = require_valid_embed_payload(embed)
+    compacted = sum(
+        event_was_compacted(event)
+        for key, entries in grouped.items()
+        for event in entries[: shown[key]]
+    )
+    omitted = sum(len(entries) - shown[key] for key, entries in grouped.items())
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=daily_kvk fields=%d chars=%d max_field_value=%d compacted_events=%d omitted_events=%d",
+        usage.field_counts[0],
+        usage.total_characters,
+        max((len(field.value or "") for field in embed.fields), default=0),
+        compacted,
+        omitted,
+    )
     return embed
 
 

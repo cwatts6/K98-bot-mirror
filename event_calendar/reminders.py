@@ -13,6 +13,12 @@ from constants import (
     EVENT_CALENDAR_REMINDER_LOOP_SECONDS,
     EVENT_CALENDAR_REMINDERS_DRY_RUN,
 )
+from core.discord_embed_limits import (
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_TITLE_CHARACTERS,
+    require_valid_embed_payload,
+    truncate_text,
+)
 from core.interaction_safety import get_operation_lock
 from event_calendar.reminder_candidates import (
     CalendarEligibility,
@@ -29,6 +35,18 @@ from event_calendar.runtime_cache import filter_events, list_event_types, load_r
 from file_utils import emit_telemetry_event
 
 logger = logging.getLogger(__name__)
+
+_MESSAGE_CONTENT_MAX = 2000
+_SOURCE_LINK_MAX = 500
+
+
+def _safe_link(value: Any) -> str:
+    link = str(value or "").strip()
+    if not link:
+        return ""
+    if len(link) <= _SOURCE_LINK_MAX:
+        return link
+    return "Link omitted: source URL exceeds the supported length."
 
 
 @dataclass
@@ -57,8 +75,9 @@ def _discord_ts(dt: datetime, style: str = "F") -> str:
 
 
 def build_reminder_dm_content(*, event: dict[str, Any], reminder_type: str) -> str:
-    emoji = str(event.get("emoji") or event.get("Emoji") or "📅").strip()
-    name = event_display_name(event)
+    emoji = truncate_text(str(event.get("emoji") or event.get("Emoji") or "📅").strip(), 16)
+    name = truncate_text(" ".join(event_display_name(event).split()), 1000)
+    reminder_label = truncate_text(str(reminder_type), 64)
 
     raw_start = event.get("start_utc") or event.get("StartUTC")
     if isinstance(raw_start, datetime):
@@ -69,21 +88,22 @@ def build_reminder_dm_content(*, event: dict[str, Any], reminder_type: str) -> s
         start_dt = start_dt.replace(tzinfo=UTC)
     start_dt = start_dt.astimezone(UTC)
 
-    link = str(event.get("link_url") or event.get("LinkURL") or "").strip()
+    link = _safe_link(event.get("link_url") or event.get("LinkURL"))
 
     lines = [
-        f"{emoji} **Calendar reminder ({reminder_type})**",
+        f"{emoji} **Calendar reminder ({reminder_label})**",
         f"**Event:** {name}",
         f"**When:** {_discord_ts(start_dt, 'F')} ({_discord_ts(start_dt, 'R')})",
     ]
     if link:
         lines.append(f"**Link:** {link}")
-    return "\n".join(lines)
+    return truncate_text("\n".join(lines), _MESSAGE_CONTENT_MAX)
 
 
 def build_reminder_dm_embed(*, event: dict[str, Any], reminder_type: str) -> discord.Embed:
-    emoji = str(event.get("emoji") or event.get("Emoji") or "📅").strip()
-    name = event_display_name(event)
+    emoji = truncate_text(str(event.get("emoji") or event.get("Emoji") or "📅").strip(), 16)
+    name = truncate_text(" ".join(event_display_name(event).split()), MAX_FIELD_VALUE_CHARACTERS)
+    reminder_label = truncate_text(str(reminder_type), 64)
 
     raw_start = event.get("start_utc") or event.get("StartUTC")
     if isinstance(raw_start, datetime):
@@ -94,11 +114,11 @@ def build_reminder_dm_embed(*, event: dict[str, Any], reminder_type: str) -> dis
         start_dt = start_dt.replace(tzinfo=UTC)
     start_dt = start_dt.astimezone(UTC)
 
-    link = str(event.get("link_url") or event.get("LinkURL") or "").strip()
+    link = _safe_link(event.get("link_url") or event.get("LinkURL"))
     description = str(event.get("description") or event.get("Description") or "").strip()
 
     embed = discord.Embed(
-        title=f"{emoji} Calendar reminder ({reminder_type})",
+        title=truncate_text(f"{emoji} Calendar reminder ({reminder_label})", MAX_TITLE_CHARACTERS),
         color=discord.Color.blurple(),
     )
     embed.add_field(name="Event", value=name, inline=False)
@@ -108,11 +128,21 @@ def build_reminder_dm_embed(*, event: dict[str, Any], reminder_type: str) -> dis
         inline=False,
     )
     if link:
-        embed.add_field(name="Link", value=link, inline=False)
+        embed.add_field(
+            name="Link", value=truncate_text(link, MAX_FIELD_VALUE_CHARACTERS), inline=False
+        )
     if description:
-        short = description if len(description) <= 300 else (description[:297] + "...")
+        short = truncate_text(description, 300, marker="...")
         embed.add_field(name="Details", value=short, inline=False)
 
+    usage = require_valid_embed_payload(embed)
+    logger.info(
+        "[EMBED_PAYLOAD] renderer=calendar_reminder_dm fields=%d chars=%d max_field_value=%d compacted_events=%d omitted_events=0",
+        usage.field_counts[0],
+        usage.total_characters,
+        max((len(field.value or "") for field in embed.fields), default=0),
+        int(name != event_display_name(event) or bool(link and link.startswith("Link omitted:"))),
+    )
     return embed
 
 

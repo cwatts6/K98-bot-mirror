@@ -395,6 +395,48 @@ def _embed_field_would_fit(embed: discord.Embed, name: str, value: str) -> bool:
     return not validate_embed_payload(projected)
 
 
+def _embed_fields_would_fit(embed: discord.Embed, fields: list[tuple[str, str]]) -> bool:
+    payload = embed.to_dict()
+    projected = {
+        **payload,
+        "fields": [{"name": name, "value": value, "inline": False} for name, value in fields],
+    }
+    return not validate_embed_payload(projected)
+
+
+def _local_time_event_line(event: dict[str, Any]) -> str:
+    time_str = format_dt(event["start_time"], style="F")
+    raw_name = " ".join(str(event.get("name") or event.get("title") or "Event").split())
+    fixed_length = len(f"• ****\n{time_str}")
+    name = truncate_text(raw_name, MAX_FIELD_VALUE_CHARACTERS - fixed_length)
+    return f"• **{name}**\n{time_str}"
+
+
+def _build_local_time_fields(
+    entries: list[tuple[str, dict[str, Any]]], omitted: int
+) -> list[tuple[str, str]]:
+    fields: list[tuple[str, str]] = []
+    for key, event in entries:
+        line = _local_time_event_line(event)
+        base_name = key.capitalize()
+        if fields and fields[-1][0] in {base_name, f"{base_name} (continued)"}:
+            combined = f"{fields[-1][1]}\n{line}"
+            if len(combined) <= MAX_FIELD_VALUE_CHARACTERS:
+                fields[-1] = (fields[-1][0], combined)
+                continue
+        continued = any(name.startswith(base_name) for name, _ in fields)
+        fields.append((f"{base_name} (continued)" if continued else base_name, line))
+
+    if omitted:
+        fields.append(
+            (
+                "… More events",
+                f"{omitted} additional events omitted to stay within Discord's embed limits.",
+            )
+        )
+    return fields
+
+
 def _add_embed_omission_marker(embed: discord.Embed, count: int, noun: str) -> None:
     """Add an explicit marker, removing complete trailing fields if needed to make it fit."""
 
@@ -412,7 +454,14 @@ def _add_embed_omission_marker(embed: discord.Embed, count: int, noun: str) -> N
 
 
 class LocalTimeToggleView(View):
-    def __init__(self, events, prefix="default", timeout=None):
+    def __init__(
+        self,
+        events,
+        prefix="default",
+        timeout=None,
+        *,
+        complete_event_packing: bool = False,
+    ):
         """
         LocalTimeToggleView builds a single-button view that, when clicked,
         shows the same event(s) in the user's local time.
@@ -420,6 +469,7 @@ class LocalTimeToggleView(View):
         super().__init__(timeout=timeout)
         self.events = events
         self.prefix = prefix
+        self.complete_event_packing = complete_event_packing
 
         safe_prefix = sanitize_view_prefix(self.prefix, max_len=64)
         custom_id = f"{safe_prefix}_local_time_toggle"
@@ -458,6 +508,9 @@ class LocalTimeToggleView(View):
             color=discord.Color.orange(),
             timestamp=utcnow(),
         )
+        embed.set_footer(text="K98 Bot \u2013 Local Time View")
+        compacted_events = 0
+        omitted_events = 0
 
         if is_single_event:
             # Just show the single event directly
@@ -466,8 +519,52 @@ class LocalTimeToggleView(View):
                 e.get("name") or e.get("title") or "Event",
                 MAX_FIELD_NAME_CHARACTERS,
             )
+            compacted_events = int(label != (e.get("name") or e.get("title") or "Event"))
             time_str = format_dt(e["start_time"], style="F")
             embed.add_field(name=label, value=time_str, inline=False)
+        elif self.complete_event_packing:
+            type_map = {
+                "ruins": "ruins",
+                "next ruins": "ruins",
+                "altar": "altars",
+                "altars": "altars",
+                "next altar fight": "altars",
+                "chronicle": "chronicle",
+                "major": "major",
+            }
+            grouped = {"ruins": [], "altars": [], "chronicle": [], "major": []}
+            for event in self.events:
+                raw_type = str(event.get("type") or "").lower()
+                normalized = type_map.get(raw_type, raw_type)
+                if normalized in grouped:
+                    grouped[normalized].append(event)
+
+            candidates: list[tuple[str, dict[str, Any]]] = []
+            for key, items in grouped.items():
+                items.sort(key=lambda event: event["start_time"])
+                candidates.extend((key, event) for event in items)
+
+            accepted: list[tuple[str, dict[str, Any]]] = []
+            for index, candidate in enumerate(candidates):
+                projected = [*accepted, candidate]
+                remaining = len(candidates) - index - 1
+                fields = _build_local_time_fields(projected, remaining)
+                if not _embed_fields_would_fit(embed, fields):
+                    break
+                accepted = projected
+
+            omitted = len(candidates) - len(accepted)
+            fields = _build_local_time_fields(accepted, omitted)
+            while accepted and not _embed_fields_would_fit(embed, fields):
+                accepted.pop()
+                omitted = len(candidates) - len(accepted)
+                fields = _build_local_time_fields(accepted, omitted)
+            for name, value in fields:
+                embed.add_field(name=name, value=value, inline=False)
+            compacted_events = sum(
+                "…**\n" in _local_time_event_line(event) for _, event in accepted
+            )
+            omitted_events = omitted
         else:
             # Group by type
             TYPE_MAP = {
@@ -510,10 +607,16 @@ class LocalTimeToggleView(View):
                     value = "\n".join(trimmed) + "\n…"
                 embed.add_field(name=key.capitalize(), value=value, inline=False)
 
-        embed.set_footer(text="K98 Bot \u2013 Local Time View")
-        require_valid_embed_payload(embed)
+        usage = require_valid_embed_payload(embed)
         logger.info(
-            f"[LOCAL TIME EMBED] Built embed for prefix '{self.prefix}' with {len(self.events)} event(s)."
+            "[LOCAL TIME EMBED] Built payload events=%d fields=%d chars=%d max_field_value=%d complete_packing=%s compacted_events=%d omitted_events=%d.",
+            len(self.events),
+            usage.field_counts[0],
+            usage.total_characters,
+            max((len(field.value or "") for field in embed.fields), default=0),
+            self.complete_event_packing,
+            compacted_events,
+            omitted_events,
         )
         return embed
 

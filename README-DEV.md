@@ -9,8 +9,8 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
-Discord Embed Payload Safety Phase 1 is delivered through mirror PR #251 and production PR #558,
-pending the operator's manual merges. It establishes dependency-light canonical ownership in
+Discord Embed Payload Safety Phase 1 is merged through mirror PR #251 and production PR #558. It
+establishes dependency-light canonical ownership in
 `core/discord_embed_limits.py`, fixes the exact Pre-KVK launch-week overflow through complete-event
 packing, repairs the shared sender, and makes the Pre-KVK module the sole post-success
 `prekvk_daily` claim owner. Focused validation passed `40` tests; the full and log-noise suites each
@@ -24,9 +24,12 @@ valid same-day message ID selected the edit path; a scheduled fresh-send ping an
 remain a natural operational observation rather than evidence from that test command.
 
 The completed Phase 1 task pack, starter, and audit record are archived. Phase 2A event/calendar
-payload convergence is the next audit/scope pack and is not one-pass approved. Ark, rankings/history,
-and diagnostics remain separate later slices. Atomic Pre-KVK dispatch reservation remains a distinct
-evidence- and design-gated reliability task.
+payload convergence is implemented on `codex/discord-embed-payload-safety-phase-2a`: changed
+renderers validate against the canonical contract, retain complete event blocks, and use exact
+count-bearing omission markers under field or aggregate exhaustion. Commands, selection/order/caps,
+mentions, visibility, SQL, cache/state schemas, tracker formats, timing, and rehydration semantics
+remain unchanged. Production promotion and smoke remain separate. Ark, rankings/history, diagnostics,
+atomic Pre-KVK dispatch reservation, and active-reminder tracker atomicity remain separately gated.
 
 ## KVK Target Publication And Quality Delivery
 

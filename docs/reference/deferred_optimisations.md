@@ -296,16 +296,15 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-08-31
 
 ### Deferred Optimisation
-- Area: `event_embed_manager.py`, `event_scheduler.py`, `event_calendar/reminders.py`, `daily_KVK_overview_embed.py`, `ui/views/calendar.py`, and focused event/calendar payload tests
+- Area: `event_scheduler.py::save_active_reminders`, `REMINDER_TRACKING_FILE`, and active public-reminder restart restoration
 - Type: consistency
-- Description: Event and calendar outputs use several local title, description, field-value, field-count, footer, and soft-aggregate policies. Sheet-controlled names and descriptions can reach public reminders, DMs, persistent calendar edits, and interaction pages without one complete final Discord payload check. This is separate from the deferred public calendar command/visibility redesign.
-- Suggested Fix: Deliver the approved payload-safety Phase 2A using `core/discord_embed_limits.py` as the hard-limit owner. Preserve event selection, reminder eligibility, pings, visibility, persistence, commands, and view cardinality while defining complete-event chunking or explicit omission markers at each renderer boundary. Add pathological Sheet-value, DM, public-reminder, pinned-edit, pagination, and restart/deduplication regression coverage.
-- Impact: high
+- Description: Phase 2A preserved the existing `active_reminders` tracker contract, but `save_active_reminders()` still writes JSON directly rather than using the repository's atomic replacement helper. A process interruption during the write could leave restart-sensitive public-reminder message identity unavailable or malformed.
+- Suggested Fix: Scope a separate restart/persistence slice that reproduces interrupted-write and save-failure behavior, then adopts atomic replacement while preserving the exact tracker path/shape, message IDs, event fallback metadata, cleanup, rehydration, scheduler timing, mention behavior, and non-raising failure boundary.
+- Impact: medium
 - Risk: medium
-- Dependencies: Discord Embed Payload Safety Phase 1 delivered in mirror PR #251 and production PR #558 with automated validation and operator edit-path smoke accepted; separate Phase 2A audit/scope approval; no command or public/ephemeral redesign.
-- Status: promoted task pack — audit/scope approval required before implementation
+- Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
+- Status: evidence and design-gated
 - Last verified: 2026-09-02
-- Promoted task pack: `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2A Event and Calendar Convergence.md`
 
 ### Deferred Optimisation
 - Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests
