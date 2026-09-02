@@ -157,8 +157,7 @@ def test_confirmation_pathological_payload_retains_result_and_is_valid() -> None
 
 def test_fuzzy_maximum_display_names_are_compacted_and_valid() -> None:
     matches = [
-        {"GovernorName": "G" * 255, "GovernorID": str(10_000_000 + index)}
-        for index in range(15)
+        {"GovernorName": "G" * 255, "GovernorID": str(10_000_000 + index)} for index in range(15)
     ]
     embed = _build_fuzzy_embed("Q" * 256, matches)
 
@@ -203,9 +202,7 @@ def test_team_publication_embeds_are_valid_at_schema_maximum() -> None:
     assignment = ArkTeamAssignment(match_id=42)
     assignment.status = "published"
     assignment.team1_player_ids = list(range(1, 31))
-    rows_by_gid = {
-        index: {"GovernorNameSnapshot": _name(index)} for index in range(1, 31)
-    }
+    rows_by_gid = {index: {"GovernorNameSnapshot": _name(index)} for index in range(1, 31)}
 
     header = _header_embed(_match(alliance="A" * 255), assignment)
     team = _team_embed("Ark Team 1", assignment.team1_player_ids, rows_by_gid)
