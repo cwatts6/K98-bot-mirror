@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to mirror PR #252 and production PR #559`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `audit/scope approved; implementation and automated validation complete; security review and PR handoff pending`
+- Status: `implementation, automated validation, and Changes security review complete; PR handoff pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -306,7 +306,7 @@ the proposed Phase 2B implementation scope.
       deduplication, fallback, and rehydration semantics remain unchanged.
 - [x] Focused, selector, validator, pre-commit, full pytest, and log-noise gates pass or are
       explicitly documented.
-- [ ] The bot diff receives a Changes-only security review with Deep off; SQL has a precise no-diff
+- [x] The bot diff receives a Changes-only security review with Deep off; SQL has a precise no-diff
       skip if applicable.
 - [ ] Production smoke is separately approved and recorded.
 - [x] Phase 1, Phase 2A, rankings/history, diagnostics, and unrelated reliability work remain
@@ -333,5 +333,10 @@ reminder teams, all-unlinked first-publication names, ephemeral team-builder ren
 character-budgeted public reports. The Ark family passes `188`; the complete suite passes
 `3090 passed, 2 skipped`; UI imports, architecture, deferred-item, security-routing, import-smoke,
 command-registration, Ruff, Black, Pyright, full pre-commit, and the log-noise gate pass, with
-production operational logs unchanged. Changes-only security review with Deep off, PR handoff, and
-separately approved production smoke remain to be recorded.
+production operational logs unchanged. Changes-only scan
+`79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
+`4290b0fcc3d2568fca3a7fb7715f8baa06477f95..fccde886db2589382d279e6e0ef361dba16369af`
+bot range with Deep off, complete coverage of all 11 runtime review items, and zero reportable
+findings. Its sealed manifest, coverage, findings, Markdown report, and SARIF artifacts are retained
+under the scan record. The SQL repository remained clean and is a documented no-diff security
+skip. PR handoff and separately approved production smoke remain to be recorded.

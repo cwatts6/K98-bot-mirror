@@ -8,7 +8,7 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active implementation | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Audit/scope approved; implementation and `3090 passed, 2 skipped` validation complete on the Phase 2B branch; Changes review and PR handoff pending |
+| Active implementation | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Implementation and `3090 passed, 2 skipped` validation complete; Changes scan `79603f53-69f8-4586-9296-760385dd9420` closed with complete coverage and zero findings; PR handoff pending |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
@@ -42,7 +42,8 @@ omission, duplicate, or `50035`. Public/DM reminders were not manually forced; u
 state, and exact-boundary behavior remain covered by deterministic tests. Phase 2B Ark hardening
 was audit-approved and is implemented on its branch with the unchanged canonical helper,
 complete-unit packing, safe pages/chunks, exact omission markers, and final delivery validation.
-The full suite passes with `3090 passed, 2 skipped`; Changes review and PR handoff remain pending.
+The full suite passes with `3090 passed, 2 skipped`; the exact bot Changes review ran with Deep off,
+complete coverage, and zero findings. SQL is a no-diff skip; PR handoff remains pending.
 Rankings/history, diagnostics, atomic Pre-KVK reservation, active-reminder tracker atomicity,
 confirmation-update retention, and team-builder audit-write extraction remain separate.
 

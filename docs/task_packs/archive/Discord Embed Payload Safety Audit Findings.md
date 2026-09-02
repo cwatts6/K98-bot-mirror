@@ -527,8 +527,12 @@ The Ark family passes `188`; the complete suite and log-noise run each pass
 `3090 passed, 2 skipped`, with production operational logs unchanged. UI imports, architecture,
 deferred-item, security-routing, test selection, import smoke, command registration, full
 pre-commit, Ruff, Black, and Pyright pass. The SQL repository remains clean and receives a
-documented no-diff security skip. Bot Changes review with Deep off, PR references, and any
-separately approved production smoke remain to be appended.
+documented no-diff security skip. Bot Changes scan
+`79603f53-69f8-4586-9296-760385dd9420` reviewed
+`4290b0fcc3d2568fca3a7fb7715f8baa06477f95..fccde886db2589382d279e6e0ef361dba16369af`
+with Deep off, complete coverage of all 11 runtime review items, and zero reportable findings. Its
+sealed manifest, coverage, findings, Markdown, and SARIF records were retained by the scan
+workbench. PR references and any separately approved production smoke remain to be appended.
 
 Phase 2B does not change command registration, permissions, public/ephemeral/DM visibility,
 selection/order/status/lifecycle, caps, roster or team assignment, reminder eligibility/preferences/

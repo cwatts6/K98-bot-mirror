@@ -45,8 +45,11 @@ Phase 2B Ark payload hardening was audit-approved and implemented on
 confirmation/result, reminder, cancellation-DM, team-publication, first-publication mention,
 fuzzy-selection, team-builder, and player-report outputs now reuse the unchanged canonical contract
 with complete-unit packing, visible compaction, character-budgeted pages/chunks, exact omission
-markers, and final send/edit validation. The full suite passes with `3090 passed, 2 skipped`; final
-Changes-only security review, PR handoff, and separately approved production smoke remain pending.
+markers, and final send/edit validation. The full suite passes with `3090 passed, 2 skipped`.
+Changes-only security scan `79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
+`4290b0fc..fccde886` bot range with Deep off, complete coverage of all 11 runtime files, and zero
+reportable findings; SQL is a documented no-diff skip. PR handoff and separately approved
+production smoke remain pending.
 Rankings/history, diagnostics, atomic Pre-KVK dispatch reservation, active-reminder tracker
 atomicity, confirmation-update retention, and the legacy team-builder audit-write extraction remain
 separately gated.
