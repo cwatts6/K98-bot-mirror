@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / 2026-08-24 Pre-KVK stats-alert incident and follow-up reliability review`
 - Task type: `bug fix`
 - One-pass approved: `no`
-- Status: `focused Phase 1 implementation and validation complete — mirror PR preparation in progress`
+- Status: `focused Phase 1 implementation and validation complete in mirror PR #251 — awaiting review/merge`
 - Approved Phase 1: canonical dependency-light embed contract, Pre-KVK complete-event chunking and
   omission marker, repaired shared sender, and sole module-owned `prekvk_daily` claim
 - Approved follow-up direction: separate Phase 2 programme beginning with event/calendar payload

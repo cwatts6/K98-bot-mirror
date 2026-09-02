@@ -8,7 +8,7 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| PR preparation | Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix task pack, chat starter and findings record | Focused bot-only Phase 1 implementation, validation and Changes-only security review complete on `2026-09-02`; Phase 2 remains separate, beginning with event/calendar payload convergence |
+| Awaiting mirror review | Discord Embed Payload Safety Audit and Pre-KVK Overflow Fix task pack, chat starter and findings record | Phase 1 is in mirror PR #251 with implementation, validation and Changes-only security review complete; Phase 2 remains separate, beginning with event/calendar payload convergence |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |

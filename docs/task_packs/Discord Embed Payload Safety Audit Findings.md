@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: focused Phase 1 implementation complete; mirror PR preparation in progress
+Status: focused Phase 1 implementation complete in mirror PR #251; awaiting review/merge
 Audit date: 2026-09-01; implementation update 2026-09-02
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -425,6 +425,9 @@ The final bot security gate used scan type **Changes** against the working-tree 
 The SQL gate is a documented no-diff skip. No standard or deep codebase scan was run. Final K98 PR
 review found no blocking or non-blocking code findings after bounding the shared sender's
 Forbidden/HTTP fallback description with the already-safe title.
+
+Mirror PR #251 carries commit `a7034a49`. Production promotion and deployment remain outside this
+task and require the normal separate approval workflow.
 
 The agreed follow-up sequence is:
 
