@@ -12,7 +12,7 @@ complete coverage, and zero reportable findings; SQL was a no-diff skip. Smoke b
 and edited the existing message reference without state/identity change, duplication, or `50035`.
 Phase 2C rankings/history completed its approved evidence-led implementation on 2026-09-03 with
 tests and delivery records only. No live runtime payload required correction. Changes-only scan
-`ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` covered all nine changed files with Deep off and zero
+`25a90732-3ad2-4ee0-9138-d1f4f11bbf36` covered all nine changed files with Deep off and zero
 findings. Diagnostics, Ark persistence and delivery observability, active-reminder atomicity, and
 atomic Pre-KVK reservation remain assigned to Phases 2D through 2G rather than left unowned.
 

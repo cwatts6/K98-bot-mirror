@@ -592,8 +592,8 @@ Focused validation passed `79`, and the full suite passed `3104 passed, 2 skippe
 deferred-item, security-routing, import-smoke, command-registration, pre-commit, and independent
 production-log-noise gates passed.
 
-Changes-only security scan `ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed the exact bot range
-`e525fb355b5b831bcc84c349df944ee7725776f9..6176cda960cd536bf21b9c9ad1c0f2b473d90499`
+Changes-only security scan `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed the exact bot range
+`e525fb355b5b831bcc84c349df944ee7725776f9..fa67d842dfc8858e2edd844313c74e1686cf830e`
 with Deep off, complete coverage of all nine changed files, and zero findings. SQL is a documented
 no-diff skip. The later scan-result wording is documentation-only and receives a precise incremental
 security skip.

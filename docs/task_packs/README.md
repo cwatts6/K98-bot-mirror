@@ -53,7 +53,7 @@ Phase 2C rankings/history completed its approved evidence-led implementation wit
 Canonical regression tests now prove all current Top limits at source maxima, the maximum Hall of
 Fame contract and pathological one-over rejection, grouped-message aggregate enforcement, and the
 complete maximum-contract history text fallback. Changes-only scan
-`ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed `e525fb35..6176cda9` with Deep off, complete
+`25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed `e525fb35..fa67d842` with Deep off, complete
 coverage, and zero findings. Phase 2D owns diagnostics; Phase 2E owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns

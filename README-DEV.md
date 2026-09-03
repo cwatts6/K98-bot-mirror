@@ -65,8 +65,8 @@ maxima, the 4,030-character maximum Hall of Fame description, an out-of-contract
 single-unit rejection, grouped-message aggregate rejection, and complete maximum-contract history
 fallback. The focused suite passed `79`; the full suite passed `3104 passed, 2 skipped`.
 The independent log-noise run passed the same suite with production operational logs unchanged.
-Changes-only security scan `ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed the exact
-`e525fb35..6176cda9` bot range with Deep off, complete coverage of all nine changed files, and zero
+Changes-only security scan `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed the exact
+`e525fb35..fa67d842` bot range with Deep off, complete coverage of all nine changed files, and zero
 findings. SQL remains a documented no-diff skip.
 
 Phase 2D owns operator diagnostics; Phase 2E owns Ark confirmation-update retention policy,

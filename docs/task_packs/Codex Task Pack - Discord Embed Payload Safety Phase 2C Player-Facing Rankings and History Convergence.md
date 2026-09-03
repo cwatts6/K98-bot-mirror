@@ -226,8 +226,8 @@ passed. Runtime, SQL/DAL, config/cache/state, commands, permissions, visibility,
 attachments, exports, message/view identity, timeouts, restart behavior, fallback behavior, and
 `_offload_callable` are unchanged.
 
-Bot Changes-only security scan `ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed the exact
-`e525fb355b5b831bcc84c349df944ee7725776f9..6176cda960cd536bf21b9c9ad1c0f2b473d90499`
+Bot Changes-only security scan `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed the exact
+`e525fb355b5b831bcc84c349df944ee7725776f9..fa67d842dfc8858e2edd844313c74e1686cf830e`
 range with Deep off. It recorded complete coverage of all nine changed files and zero findings.
 SQL is a documented no-diff skip. This scan-result record is documentation-only and receives a
 precise incremental no-runtime security skip.
