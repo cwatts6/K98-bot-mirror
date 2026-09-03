@@ -348,3 +348,18 @@ digest is
 `codex-security-snapshot/v1:sha256:28354102fe83e56e982f156768dc1bd388c6566c4ebc1726b75e243aced3026f`.
 SQL remains an unchanged, documented no-diff skip. This task-record-only update receives the
 corresponding precise incremental security skip.
+
+A current-head Copilot re-review on 2026-09-03 produced zero new mirror comments at `f215c40d`
+and one valid production comment at `79448b0a`: `LogTailView.render()` redundantly applied the
+stateful line redactor after `_tail_filtered()` had already redacted chronologically and returned a
+reverse-ordered page. An unterminated quoted value could therefore over-redact the following
+legitimate line in display order. The fix removes only that second pass and its unused import while
+retaining chronological redaction, raw-line filter matching, newest-first order, fence safety,
+pagination, preview, attachment, and delivery behavior. Regression coverage reproduces the
+reverse-order case and keeps the legitimate line visible. The fix is `6a86c814` on mirror and
+`08d4c408` on production; focused verification passes `64` tests, complete pytest passes
+`3172 passed, 2 skipped`, and pre-commit passes. Final bot Changes-only security scan
+`984d93ff-29b1-4dd3-b681-a9830d01a1c4` reviewed the exact production range
+`f03b2c8a78a29ab389b65b22d3cec50a34af8faf..08d4c408574b97e6350b80fb142023bd94a6c548`
+with Deep off, complete coverage of all 11 runtime files, and zero findings. SQL remains a no-diff
+skip; this appended task-record-only change receives a precise no-runtime-diff security skip.
