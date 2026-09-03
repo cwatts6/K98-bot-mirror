@@ -8,7 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led tests/docs implementation and zero-finding Changes review complete; no live payload required a runtime correction; `79` focused and `3104 passed, 2 skipped` full-suite evidence |
+| Next approval-gated slice | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Review/scope first; Phase 2C review, candidate deployment, and smoke passed; no runtime or test edits before separate approval |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Mirror PR #254 and production PR #561 await manual merge and final production-main verification; review and candidate smoke passed; no runtime correction was required |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
@@ -20,7 +21,7 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: Discord Embed Payload Safety Phases 1, 2A, and 2B, the Pinned Calendar Tracker Atomic
+Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, and 2C, the Pinned Calendar Tracker Atomic
 Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
@@ -54,7 +55,10 @@ Canonical regression tests now prove all current Top limits at source maxima, th
 Fame contract and pathological one-over rejection, grouped-message aggregate enforcement, and the
 complete maximum-contract history text fallback. Changes-only scan
 `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed `e525fb35..fa67d842` with Deep off, complete
-coverage, and zero findings. Phase 2D owns diagnostics; Phase 2E owns
+coverage, and zero findings. Review, candidate deployment, and smoke testing passed through mirror
+PR #254 and production PR #561; both await manual merge and final production-main verification.
+Phase 2C's pack and starter are archived. Phase 2D diagnostics is the next review-first slice;
+Phase 2E owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
 evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit

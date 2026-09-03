@@ -349,8 +349,8 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 canonical primitive; separate product/output review; coordinate with the existing KVK History offload deferred item without combining unrelated executor work.
-- Status: assigned to Discord Embed Payload Safety Phase 2C; review/scope approval required
-- Last verified: 2026-09-02
+- Status: delivered and operator smoke accepted in Discord Embed Payload Safety Phase 2C; no runtime correction was required; mirror PR #254 and production PR #561 await manual merge and final production-main verification
+- Last verified: 2026-09-03
 
 ### Deferred Optimisation
 - Area: `commands/admin_cmds.py`, processing history/failure views in `embed_utils.py`, bot-health, queue, maintenance, and log-oriented diagnostic output
@@ -361,7 +361,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Risk: medium
 - Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
 - Status: assigned to Discord Embed Payload Safety Phase 2D; review/scope approval required
-- Last verified: 2026-09-02
+- Last verified: 2026-09-03
 
 ### Deferred Optimisation
 - Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests

@@ -440,12 +440,13 @@ The agreed follow-up sequence is:
 
 1. **Phase 2A — completed:** event/calendar payload convergence without command, visibility,
    selection, reminder-state, or restart-semantics changes;
-2. **Phase 2B — delivered:** evidence-led Ark payload hardening, validation, Changes-only review,
-   production-candidate promotion, and successful candidate smoke; manual merges and final
-   production-main verification remain operator-owned;
-3. **Phase 2C — implementation complete, review pending:** authoritative contracts proved live
+2. **Phase 2B — completed:** evidence-led Ark payload hardening, validation, Changes-only review,
+   production-candidate promotion, successful candidate smoke, manual merges, and final
+   production-main verification are complete;
+3. **Phase 2C — delivered and operator smoke accepted:** authoritative contracts proved live
    player-facing rankings/history payloads safe; regression and delivery records changed without a
-   runtime diff;
+   runtime diff; review, candidate deployment, and smoke passed through mirror PR #254 and
+   production PR #561; manual merges and final production-main verification remain operator-owned;
 4. **Phase 2D:** operator diagnostics payload convergence with privacy/redaction, attachment, and
    fallback policies kept separate from player outputs;
 5. **Phase 2E:** Ark persistence/orchestration policy and delivery observability: confirmation-update
@@ -602,3 +603,17 @@ No command, runtime builder, view, service, DAL, SQL, config, cache, state, perm
 owner, visibility, mention, attachment, export, fallback, identity, timeout, startup, restart, or
 executor behavior changed. Phase 2D-2G and the separate KVK History once-only executor audit retain
 their existing ownership.
+
+## 20. Phase 2C review, promotion, and operator smoke acceptance
+
+Mirror PR #254 completed review at commit
+`b78da1deacc4cb84ce727a99f179706469ed8b5d`. The review found the test and documentation change
+low risk and correct; its request for human confirmation of external delivery evidence is satisfied
+by the operator's 2026-09-03 attestation. Production PR #561 carries the patch-based candidate at
+`e243f878972d523ccbfa29a7a2564ad84d2f091a` from production base
+`6da1c083ef0c5fb4555e852b1c886a55928a63cb`.
+
+The operator confirmed that candidate deployment and smoke testing passed. No additional
+command-specific or payload-metric detail was supplied, so none is inferred here. Both PRs await
+manual merge and final production-main verification. Phase 2C is archived as complete; Phase 2D
+Operator Diagnostics Convergence is the next review-first payload-safety slice.

@@ -1,8 +1,10 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence
 
-Status: used on 2026-09-03. The operator approved an evidence-led tests/documentation-only
-implementation after the review proved every live rankings/history payload safe under current
-source and cardinality contracts.
+Status: completed and archived on 2026-09-03. The operator approved an evidence-led
+tests/documentation-only implementation after the audit proved every live rankings/history payload
+safe under current source and cardinality contracts. Review, candidate deployment, and smoke
+testing passed through mirror PR #254 and production PR #561; manual merges and final
+production-main verification remain operator-owned.
 
 ## Copy/Paste Starter
 

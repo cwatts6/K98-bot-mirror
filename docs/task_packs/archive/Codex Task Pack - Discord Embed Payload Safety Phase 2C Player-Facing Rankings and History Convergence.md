@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to delivered Phase 2B`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `approved evidence-led implementation and Changes review complete; PR pending`
+- Status: `delivered, reviewed, candidate-deployed, and smoke accepted; manual PR merges and final production-main verification pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -233,3 +233,20 @@ SQL is a documented no-diff skip. This scan-result record is documentation-only 
 precise incremental no-runtime security skip.
 
 No Phase 2B deferred item is unassigned.
+
+## 14. Review, Promotion, And Operator Smoke Acceptance
+
+Review completed against mirror PR #254 at commit
+`b78da1deacc4cb84ce727a99f179706469ed8b5d`. The review confirmed that the test and documentation
+changes are low risk and correct; the operator supplied the required human confirmation for the
+external merge, SQL, scan, deployment, and smoke evidence recorded in this archive.
+
+The patch-based production candidate is production PR #561 at commit
+`e243f878972d523ccbfa29a7a2564ad84d2f091a`, based on production `main` commit
+`6da1c083ef0c5fb4555e852b1c886a55928a63cb`. On 2026-09-03 the operator confirmed that candidate
+deployment and smoke testing passed. No command-specific or payload-metric detail was supplied, so
+this record does not infer additional observations.
+
+Mirror PR #254 and production PR #561 await the operator's manual merges and final verification
+from production `main`. Phase 2C is complete and archived; Phase 2D Operator Diagnostics
+Convergence is prepared as the next review-first slice.

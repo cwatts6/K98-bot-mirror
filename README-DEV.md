@@ -67,9 +67,12 @@ fallback. The focused suite passed `79`; the full suite passed `3104 passed, 2 s
 The independent log-noise run passed the same suite with production operational logs unchanged.
 Changes-only security scan `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed the exact
 `e525fb35..fa67d842` bot range with Deep off, complete coverage of all nine changed files, and zero
-findings. SQL remains a documented no-diff skip.
+findings. SQL remains a documented no-diff skip. Review is complete, and the operator confirmed on
+2026-09-03 that candidate deployment and smoke testing passed for mirror PR #254 and production PR
+#561. Both PRs await the operator's manual merge and final production-main verification.
 
-Phase 2D owns operator diagnostics; Phase 2E owns Ark confirmation-update retention policy,
+Phase 2C's task pack and chat starter are archived. Phase 2D operator diagnostics convergence is
+the next review-first slice; Phase 2E owns Ark confirmation-update retention policy,
 team-builder audit-service extraction, and explicit registration-delivery outcome observability;
 Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic
 Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item without

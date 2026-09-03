@@ -2,6 +2,15 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence completed its
+evidence-led tests/documentation-only implementation, review, candidate deployment, and operator
+smoke on 2026-09-03 through mirror PR #254 and production PR #561. Authoritative contracts proved
+every live rankings/history payload safe, so no runtime correction was required. Focused validation
+passed `79`; the full suite passed `3104 passed, 2 skipped`; Changes-only scan
+`25a90732-3ad2-4ee0-9138-d1f4f11bbf36` covered all nine changed files with Deep off and zero
+findings; SQL was a no-diff skip. Both PRs await manual merge and final production-main
+verification. Phase 2D Operator Diagnostics Convergence is prepared as the next review-first slice.
+
 Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening completed implementation,
 validation, Changes-only security review, production-candidate promotion, and operator candidate
 smoke on 2026-09-02. Mirror PR #253's delivered tree is present on mirror `main`; production PR
@@ -10,11 +19,9 @@ smoke on 2026-09-02. Mirror PR #253's delivered tree is present on mirror `main`
 complete coverage, and zero reportable findings; SQL was a no-diff skip. Smoke built a four-field,
 346-character registration payload with no compaction/omission, retained `should_announce=False`,
 and edited the existing message reference without state/identity change, duplication, or `50035`.
-Phase 2C rankings/history completed its approved evidence-led implementation on 2026-09-03 with
-tests and delivery records only. No live runtime payload required correction. Changes-only scan
-`25a90732-3ad2-4ee0-9138-d1f4f11bbf36` covered all nine changed files with Deep off and zero
-findings. Diagnostics, Ark persistence and delivery observability, active-reminder atomicity, and
-atomic Pre-KVK reservation remain assigned to Phases 2D through 2G rather than left unowned.
+Phase 2C rankings/history is archived above as delivered and operator smoke accepted. Diagnostics,
+Ark persistence and delivery observability, active-reminder atomicity, and atomic Pre-KVK
+reservation remain assigned to Phases 2D through 2G rather than left unowned.
 
 Discord Embed Payload Safety Phase 2A Event and Calendar Convergence completed implementation,
 review, promotion preparation, and representative production smoke on 2026-09-02 through mirror
