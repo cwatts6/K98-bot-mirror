@@ -592,6 +592,12 @@ Focused validation passed `78`, and the full suite passed `3103 passed, 2 skippe
 deferred-item, security-routing, import-smoke, command-registration, pre-commit, and independent
 production-log-noise gates passed.
 
+Changes-only security scan `ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed the exact bot range
+`e525fb355b5b831bcc84c349df944ee7725776f9..6176cda960cd536bf21b9c9ad1c0f2b473d90499`
+with Deep off, complete coverage of all nine changed files, and zero findings. SQL is a documented
+no-diff skip. The later scan-result wording is documentation-only and receives a precise incremental
+security skip.
+
 No command, runtime builder, view, service, DAL, SQL, config, cache, state, permission, channel,
 owner, visibility, mention, attachment, export, fallback, identity, timeout, startup, restart, or
 executor behavior changed. Phase 2D-2G and the separate KVK History once-only executor audit retain

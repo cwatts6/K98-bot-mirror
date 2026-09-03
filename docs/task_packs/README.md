@@ -8,7 +8,7 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led implementation complete with tests/docs only; no live payload required a runtime correction; `78` focused and `3103 passed, 2 skipped` full-suite evidence |
+| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led tests/docs implementation and zero-finding Changes review complete; no live payload required a runtime correction; `78` focused and `3103 passed, 2 skipped` full-suite evidence |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
@@ -52,7 +52,9 @@ state/identity, and produced no `50035`.
 Phase 2C rankings/history completed its approved evidence-led implementation with no runtime diff.
 Canonical regression tests now prove all current Top limits at source maxima, the maximum Hall of
 Fame contract and pathological one-over rejection, grouped-message aggregate enforcement, and the
-complete maximum-contract history text fallback. Phase 2D owns diagnostics; Phase 2E owns
+complete maximum-contract history text fallback. Changes-only scan
+`ba783eb5-12bb-4123-b2cd-1dd2f04b28ec` reviewed `e525fb35..6176cda9` with Deep off, complete
+coverage, and zero findings. Phase 2D owns diagnostics; Phase 2E owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
 evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit
