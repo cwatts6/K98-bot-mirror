@@ -89,6 +89,18 @@ def test_redaction_consumes_quoted_keys_and_complete_quoted_values() -> None:
         ("Authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
         ("HTTP_AUTHORIZATION=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
         ("PROXY_AUTHORIZATION=Bearer proxy-token", "proxy-token"),
+        ("Authorization: Bot discord-production-token", "discord-production-token"),
+        (
+            'Authorization: Digest username="operator", response="digest-secret"',
+            "digest-secret",
+        ),
+        (
+            "Authorization: AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE,Signature=abc123",
+            "abc123",
+        ),
+        ("AWS_SECRET_ACCESS_KEY=aws-secret-value", "aws-secret-value"),
+        ("AWS_ACCESS_KEY_ID=AKIAEXAMPLE", "AKIAEXAMPLE"),
+        ("SIGNING_PRIVATE_KEY=private-key-value", "private-key-value"),
         ("authorization : basic dXNlcjpwYXNz==; next=ok", "dXNlcjpwYXNz=="),
         ('token="unterminated spaced secret', "unterminated spaced secret"),
         ('{"client_secret": "unterminated json secret', "unterminated json secret"),
@@ -117,7 +129,7 @@ def test_unterminated_quoted_redaction_is_line_bounded() -> None:
 def test_basic_authorization_redaction_preserves_following_diagnostic_unit() -> None:
     source = "authorization : basic dXNlcjpwYXNz==; next=ok"
 
-    assert redact_diagnostic_text(source) == "authorization : basic [REDACTED]; next=ok"
+    assert redact_diagnostic_text(source) == "authorization : [REDACTED]; next=ok"
 
 
 def test_complete_multiline_quoted_redaction_preserves_physical_lines() -> None:

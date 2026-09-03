@@ -574,8 +574,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
         else:
             raw_text = (log or "").strip()
 
-        attachments: list[discord.File] = []
-        # Present complete redacted lines and attach the complete redacted report when needed.
+        # This command has an established non-ephemeral response. Keep the bounded,
+        # count-bearing preview in that audience rather than attaching the complete log.
         if raw_text:
             redacted_lines = [
                 redact_diagnostic_text(line).replace("```", "`\u200b``")
@@ -589,18 +589,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 suffix="\n```",
             )
             desc = preview.text
-            if preview.omitted:
-                complete = "\n".join(redacted_lines).encode("utf-8", "replace")
-                upload_limit = resolve_attachment_size_limit(ctx.interaction)
-                if len(complete) <= upload_limit:
-                    attachments.append(
-                        discord.File(io.BytesIO(complete), filename="gsheets_export_log.txt")
-                    )
-                else:
-                    desc = (
-                        f"{desc}\n\n… complete redacted log is {len(complete)} bytes and "
-                        f"exceeds the {upload_limit}-byte destination limit."
-                    )
         else:
             if success:
                 desc = (
@@ -628,7 +616,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         await ctx.interaction.edit_original_response(
             content=None,
             embed=_validated_operator_embed(embed),
-            attachments=attachments,
+            attachments=[],
         )
 
     @ops_group.command(

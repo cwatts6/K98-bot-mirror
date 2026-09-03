@@ -17,8 +17,9 @@ MAX_ATTACHMENTS_PER_MESSAGE = 10
 DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES = 10 * 1024 * 1024
 
 _SENSITIVE_KEY_PATTERN = (
-    r"(?:[a-z0-9]+[_-]+)*(?:token|secret|password|passwd|pwd|api[_-]?key|"
-    r"client[_-]?secret|connection[_-]?string)"
+    r"(?:[a-z0-9]+[_-]+)*(?:secret[_-]?access[_-]?key|access[_-]?key[_-]?id|"
+    r"private[_-]?key|api[_-]?key|client[_-]?secret|connection[_-]?string|"
+    r"token|secret|password|passwd|pwd)"
 )
 _AUTHORIZATION_KEY_PATTERN = r"(?:[a-z0-9]+[_-]+)*authorization"
 _DIAGNOSTIC_SENSITIVE_KEY_PATTERN = rf"(?:{_SENSITIVE_KEY_PATTERN}|{_AUTHORIZATION_KEY_PATTERN})"
@@ -38,10 +39,10 @@ _SENSITIVE_ASSIGNMENT_RE = re.compile(
     r"(?P=key_quote)(?P<separator>\s*[:=]\s*)"
     r"(?P<value>(?![\"']|\[REDACTED\])[^\s,;}\]\"']+)"
 )
-_AUTHORIZATION_SCHEME_RE = re.compile(
+_AUTHORIZATION_ASSIGNMENT_RE = re.compile(
     rf"(?i)(?P<key>\b{_AUTHORIZATION_KEY_PATTERN}\b)"
-    r"(?P<separator>\s*[:=]\s*)(?P<scheme>bearer|basic)"
-    r"(?P<spacing>\s+)(?P<credential>(?!\[REDACTED\])[^\s,;]+)"
+    r"(?P<separator>\s*[:=]\s*)"
+    r"(?P<value>(?![\"']|\s*\[REDACTED\])[^\r\n;]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _SIGNED_QUERY_RE = re.compile(
@@ -81,11 +82,8 @@ def redact_diagnostic_text(value: Any) -> str:
         ),
         text,
     )
-    text = _AUTHORIZATION_SCHEME_RE.sub(
-        lambda match: (
-            f"{match.group('key')}{match.group('separator')}{match.group('scheme')}"
-            f"{match.group('spacing')}[REDACTED]"
-        ),
+    text = _AUTHORIZATION_ASSIGNMENT_RE.sub(
+        lambda match: (f"{match.group('key')}{match.group('separator')}[REDACTED]"),
         text,
     )
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)

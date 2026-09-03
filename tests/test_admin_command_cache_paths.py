@@ -94,3 +94,19 @@ def test_phase3_ops_command_logs_use_grouped_paths():
     ]
     for marker in stale_log_markers:
         assert marker not in source
+
+
+def test_public_gsheets_export_result_does_not_attach_complete_log():
+    source = Path("commands/admin_cmds.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    function = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "run_gsheets_export_command"
+    )
+    function_source = ast.get_source_segment(source, function) or ""
+
+    assert "pack_complete_units(" in function_source
+    assert 'label="export log lines"' in function_source
+    assert "gsheets_export_log.txt" not in function_source
+    assert "attachments=[]" in function_source
