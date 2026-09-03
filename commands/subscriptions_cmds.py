@@ -21,11 +21,10 @@ from core.discord_embed_limits import (
 from core.interaction_safety import safe_command, safe_defer
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
-    neutralize_discord_mentions,
     omission_marker,
-    pack_complete_units,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
+    safe_diagnostic_content as _safe_diagnostic_error,
 )
 from decoraters import is_admin_and_notify_channel, track_usage
 from event_scheduler import dm_scheduled_tracker, dm_sent_tracker
@@ -37,14 +36,6 @@ from subscription_tracker import (
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
-
-
-def _safe_diagnostic_error(prefix: str, error: object) -> str:
-    return pack_complete_units(
-        [prefix, neutralize_discord_mentions(redact_diagnostic_text(error))],
-        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
-        label="diagnostic lines",
-    ).text
 
 
 def register_subscriptions(bot: ext_commands.Bot) -> None:

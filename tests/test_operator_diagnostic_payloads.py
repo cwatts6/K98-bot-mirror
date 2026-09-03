@@ -5,14 +5,13 @@ import pytest
 from core.discord_embed_limits import require_valid_embed_payload
 from core.operator_diagnostic_payloads import (
     DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES,
-    MAX_MESSAGE_CONTENT_CHARACTERS,
-    content_pages,
     neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
     safe_attachment_filename,
+    safe_diagnostic_content,
     utf8_size,
 )
 
@@ -93,10 +92,8 @@ def test_diagnostic_mentions_are_neutralized_without_hiding_identity() -> None:
     )
 
 
-def test_public_operator_error_content_is_mention_neutral() -> None:
-    from commands.admin_cmds import _safe_operator_content
-
-    content = _safe_operator_content(
+def test_safe_diagnostic_content_redacts_and_neutralizes_mentions() -> None:
+    content = safe_diagnostic_content(
         "Failed:", "sheet @everyone from <@123> role <@&456> token=secret"
     )
 
@@ -105,6 +102,14 @@ def test_public_operator_error_content_is_mention_neutral() -> None:
     assert "<@&456>" not in content
     assert "secret" not in content
     assert "[REDACTED]" in content
+
+
+def test_command_modules_reuse_canonical_diagnostic_content_helper() -> None:
+    from commands import admin_cmds, stats_cmds, subscriptions_cmds
+
+    assert admin_cmds._safe_operator_content is safe_diagnostic_content
+    assert stats_cmds._safe_diagnostic_error is safe_diagnostic_content
+    assert subscriptions_cmds._safe_diagnostic_error is safe_diagnostic_content
 
 
 def test_utf8_size_measures_encoded_bytes() -> None:
@@ -128,14 +133,6 @@ def test_attachment_limit_resolution_prefers_interaction_then_guild() -> None:
     assert resolve_attachment_size_limit(interaction) == 1234
     assert resolve_attachment_size_limit(channel) == 5678
     assert resolve_attachment_size_limit(object()) == DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
-
-
-def test_content_pages_preserve_normal_units_and_mark_pathological_unit() -> None:
-    pages = content_pages(["first", "second", "X" * 2100], limit=80)
-
-    assert pages[0] == "first\nsecond"
-    assert pages[1] == "… 1 complete item not shown; see attached diagnostic."
-    assert all(len(page) <= MAX_MESSAGE_CONTENT_CHARACTERS for page in pages)
 
 
 def test_omission_marker_supports_explicit_singular_label() -> None:

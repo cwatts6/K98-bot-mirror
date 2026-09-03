@@ -17,10 +17,7 @@ from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERV
 from core.discord_embed_limits import require_valid_embed_payload
 from core.interaction_safety import safe_command, safe_defer
 from core.operator_diagnostic_payloads import (
-    MAX_MESSAGE_CONTENT_CHARACTERS,
-    neutralize_discord_mentions,
-    pack_complete_units,
-    redact_diagnostic_text,
+    safe_diagnostic_content as _safe_diagnostic_error,
 )
 from decoraters import (
     channel_only,
@@ -38,14 +35,6 @@ from versioning import versioned
 
 logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
-
-
-def _safe_diagnostic_error(prefix: str, error: object) -> str:
-    return pack_complete_units(
-        [prefix, neutralize_discord_mentions(redact_diagnostic_text(error))],
-        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
-        label="diagnostic lines",
-    ).text
 
 
 def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:

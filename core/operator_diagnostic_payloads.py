@@ -182,28 +182,11 @@ def pack_complete_units(
     return PackedUnits(f"{prefix}{body}{suffix}", len(selected), len(values) - len(selected))
 
 
-def content_pages(units: Iterable[Any], *, limit: int = 1900) -> list[str]:
-    """Pack complete units into ordered Discord content pages.
+def safe_diagnostic_content(prefix: str, detail: Any) -> str:
+    """Build bounded diagnostic content with centralized redaction and mention safety."""
 
-    A pathological single unit is represented by an exact omission marker; callers
-    can attach its complete redacted form without pretending the preview is complete.
-    """
-
-    values = ["" if item is None else str(item) for item in units]
-    pages: list[str] = []
-    current: list[str] = []
-    for value in values:
-        candidate = "\n".join([*current, value])
-        if len(candidate) <= limit:
-            current.append(value)
-            continue
-        if current:
-            pages.append("\n".join(current))
-            current = []
-        if len(value) <= limit:
-            current = [value]
-        else:
-            pages.append("… 1 complete item not shown; see attached diagnostic.")
-    if current:
-        pages.append("\n".join(current))
-    return pages or [""]
+    return pack_complete_units(
+        [prefix, neutralize_discord_mentions(redact_diagnostic_text(detail))],
+        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
+        label="diagnostic lines",
+    ).text

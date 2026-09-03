@@ -35,12 +35,11 @@ from core.discord_embed_limits import (
     require_valid_embed_payload,
 )
 from core.operator_diagnostic_payloads import (
-    MAX_MESSAGE_CONTENT_CHARACTERS,
-    neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
+    safe_diagnostic_content as _safe_operator_content,
 )
 from discord.ext import commands as ext_commands
 from commands.crystaltech_flow import run_crystaltech_flow
@@ -90,16 +89,6 @@ from constants import (
 UTC = getattr(datetime, "UTC", timezone.utc)
 
 logger = logging.getLogger(__name__)
-
-
-def _safe_operator_content(prefix: str, detail: object) -> str:
-    """Build a bounded operator message without slicing its diagnostic detail."""
-
-    return pack_complete_units(
-        [prefix, neutralize_discord_mentions(redact_diagnostic_text(detail))],
-        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
-        label="diagnostic lines",
-    ).text
 
 
 def _safe_operator_field(detail: object, *, label: str = "diagnostic values") -> str:
