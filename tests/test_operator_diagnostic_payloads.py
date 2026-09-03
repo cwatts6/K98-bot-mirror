@@ -76,6 +76,80 @@ def test_redaction_consumes_quoted_keys_and_complete_quoted_values() -> None:
     assert '"Authorization": "[REDACTED]"' in redacted
 
 
+@pytest.mark.parametrize(
+    ("source", "secret"),
+    [
+        ("OPENAI_API_KEY=sk-test_dummy", "sk-test_dummy"),
+        ("SQL_PASSWORD: db-pass_dummy", "db-pass_dummy"),
+        ("ARTIFACT_UPLOAD_TOKEN = upload_dummy", "upload_dummy"),
+        ("SERVICE__ACCESS_TOKEN=access_dummy", "access_dummy"),
+        ('"OPENAI_API_KEY": "sk-test_dummy"', "sk-test_dummy"),
+        ("'SQL_PASSWORD'='db pass dummy'", "db pass dummy"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("Authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("HTTP_AUTHORIZATION=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("PROXY_AUTHORIZATION=Bearer proxy-token", "proxy-token"),
+        ("authorization : basic dXNlcjpwYXNz==; next=ok", "dXNlcjpwYXNz=="),
+        ('token="unterminated spaced secret', "unterminated spaced secret"),
+        ('{"client_secret": "unterminated json secret', "unterminated json secret"),
+        ('"Authorization": "unterminated auth secret', "unterminated auth secret"),
+        ('OPENAI_API_KEY="escaped \\" quote still secret', "quote still secret"),
+    ],
+)
+def test_redaction_covers_prefixed_keys_basic_auth_and_unterminated_quotes(
+    source: str, secret: str
+) -> None:
+    redacted = redact_diagnostic_text(source)
+
+    assert secret not in redacted
+    assert redacted.count("[REDACTED]") == 1
+    assert redact_diagnostic_text(redacted) == redacted
+
+
+def test_unterminated_quoted_redaction_is_line_bounded() -> None:
+    source = "SQL_PASSWORD='unterminated secret\r\nSQL_SERVER=db.internal"
+
+    redacted = redact_diagnostic_text(source)
+
+    assert redacted == "SQL_PASSWORD='[REDACTED]\r\nSQL_SERVER=db.internal"
+
+
+def test_basic_authorization_redaction_preserves_following_diagnostic_unit() -> None:
+    source = "authorization : basic dXNlcjpwYXNz==; next=ok"
+
+    assert redact_diagnostic_text(source) == "authorization : basic [REDACTED]; next=ok"
+
+
+def test_complete_multiline_quoted_redaction_preserves_physical_lines() -> None:
+    source = 'token="first\r\nsecond"\nstatus=healthy'
+
+    redacted = redact_diagnostic_text(source)
+
+    assert redacted == 'token="[REDACTED]\r\n[REDACTED]"\nstatus=healthy'
+    assert redacted.count("\n") == source.count("\n")
+    assert redact_diagnostic_text(redacted) == redacted
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "SQL_SERVER=db.internal",
+        "SQL_DATABASE=K98",
+        "SQL_USERNAME=bot",
+        "OPENAI_VISION_MODEL=gpt-4.1-mini",
+        "TOKENIZER=enabled",
+        "token_count=3",
+        "password_hint=required",
+        "api_key rotation required",
+        "Authorization status: Basic unavailable",
+        "mode=basic",
+        "ordinary user@example.com text",
+    ],
+)
+def test_redaction_preserves_non_secret_diagnostic_text(source: str) -> None:
+    assert redact_diagnostic_text(source) == source
+
+
 def test_diagnostic_mentions_are_neutralized_without_hiding_identity() -> None:
     source = "@everyone @here <@123> <@!456> <@&789>"
 

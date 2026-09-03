@@ -17,19 +17,32 @@ MAX_ATTACHMENTS_PER_MESSAGE = 10
 DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES = 10 * 1024 * 1024
 
 _SENSITIVE_KEY_PATTERN = (
-    r"token|secret|password|passwd|pwd|api[_-]?key|client[_-]?secret|" r"connection[_-]?string"
+    r"(?:[a-z0-9]+[_-]+)*(?:token|secret|password|passwd|pwd|api[_-]?key|"
+    r"client[_-]?secret|connection[_-]?string)"
 )
+_AUTHORIZATION_KEY_PATTERN = r"(?:[a-z0-9]+[_-]+)*authorization"
+_DIAGNOSTIC_SENSITIVE_KEY_PATTERN = rf"(?:{_SENSITIVE_KEY_PATTERN}|{_AUTHORIZATION_KEY_PATTERN})"
 _QUOTED_SENSITIVE_ASSIGNMENT_RE = re.compile(
-    rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b(?:{_SENSITIVE_KEY_PATTERN}|authorization)\b)"
+    rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b{_DIAGNOSTIC_SENSITIVE_KEY_PATTERN}\b)"
     r"(?P=key_quote)(?P<separator>\s*[:=]\s*)(?P<value_quote>[\"'])"
-    r"(?:\\.|(?!(?P=value_quote)).)*(?P=value_quote)"
+    r"(?P<value>(?:\\[\s\S]|(?!(?P=value_quote)|\\)[\s\S])*)(?P=value_quote)"
+)
+_UNTERMINATED_QUOTED_SENSITIVE_ASSIGNMENT_RE = re.compile(
+    rf"(?im)(?P<key_quote>[\"']?)(?P<key>\b{_DIAGNOSTIC_SENSITIVE_KEY_PATTERN}\b)"
+    r"(?P=key_quote)(?P<separator>[^\S\r\n]*[:=][^\S\r\n]*)"
+    r"(?P<value_quote>[\"'])(?:\\[^\r\n]|\\(?=\r?$)|"
+    r"(?!(?P=value_quote)|\\)[^\r\n])*(?=\r?$)"
 )
 _SENSITIVE_ASSIGNMENT_RE = re.compile(
     rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b(?:{_SENSITIVE_KEY_PATTERN})\b)"
     r"(?P=key_quote)(?P<separator>\s*[:=]\s*)"
-    r"(?P<value>(?![\"'])[^\s,;}\]\"']+)"
+    r"(?P<value>(?![\"']|\[REDACTED\])[^\s,;}\]\"']+)"
 )
-_AUTH_BEARER_RE = re.compile(r"(?i)\bauthorization\s*:\s*bearer\s+[^\s,;]+")
+_AUTHORIZATION_SCHEME_RE = re.compile(
+    rf"(?i)(?P<key>\b{_AUTHORIZATION_KEY_PATTERN}\b)"
+    r"(?P<separator>\s*[:=]\s*)(?P<scheme>bearer|basic)"
+    r"(?P<spacing>\s+)(?P<credential>(?!\[REDACTED\])[^\s,;]+)"
+)
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:sig|signature|token|key|secret|x-amz-signature)=)[^&#\s]+"
@@ -46,19 +59,35 @@ class PackedUnits:
     omitted: int
 
 
+def _redact_quoted_assignment(match: re.Match[str]) -> str:
+    line_breaks = re.findall(r"\r\n|\r|\n", match.group("value"))
+    redacted_value = "[REDACTED]" + "".join(f"{line_break}[REDACTED]" for line_break in line_breaks)
+    return (
+        f"{match.group('key_quote')}{match.group('key')}{match.group('key_quote')}"
+        f"{match.group('separator')}{match.group('value_quote')}"
+        f"{redacted_value}{match.group('value_quote')}"
+    )
+
+
 def redact_diagnostic_text(value: Any) -> str:
     """Redact common credential-bearing forms without changing line ordering."""
 
     text = "" if value is None else str(value)
-    text = _QUOTED_SENSITIVE_ASSIGNMENT_RE.sub(
+    text = _QUOTED_SENSITIVE_ASSIGNMENT_RE.sub(_redact_quoted_assignment, text)
+    text = _UNTERMINATED_QUOTED_SENSITIVE_ASSIGNMENT_RE.sub(
         lambda match: (
             f"{match.group('key_quote')}{match.group('key')}{match.group('key_quote')}"
-            f"{match.group('separator')}{match.group('value_quote')}"
-            f"[REDACTED]{match.group('value_quote')}"
+            f"{match.group('separator')}{match.group('value_quote')}[REDACTED]"
         ),
         text,
     )
-    text = _AUTH_BEARER_RE.sub("Authorization: Bearer [REDACTED]", text)
+    text = _AUTHORIZATION_SCHEME_RE.sub(
+        lambda match: (
+            f"{match.group('key')}{match.group('separator')}{match.group('scheme')}"
+            f"{match.group('spacing')}[REDACTED]"
+        ),
+        text,
+    )
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
     text = _SENSITIVE_ASSIGNMENT_RE.sub(
         lambda match: (
