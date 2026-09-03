@@ -17,7 +17,6 @@ from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
     iter_redacted_diagnostic_line_pairs,
     pack_complete_units,
-    redact_diagnostic_lines,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
 )
@@ -87,9 +86,9 @@ class LogTailView(discord.ui.View):
     async def render(self, interaction: discord.Interaction):
         # 1) Compute page slice
         lines, total_lines, total_matches, total_pages = self._tail_filtered()
-        redacted_lines = [
-            line.replace("```", "`\u200b``") for line in redact_diagnostic_lines(lines)
-        ] or ["(no matching lines)"]
+        redacted_lines = [line.replace("```", "`\u200b``") for line in lines] or [
+            "(no matching lines)"
+        ]
 
         # 2) Budget + description
         preview = pack_complete_units(

@@ -114,3 +114,32 @@ async def test_log_tail_view_reports_destination_limit_without_partial_file(tmp_
     embed = interaction.kwargs["embed"]
     assert any("above this destination" in field.value for field in embed.fields)
     require_valid_embed_payload(embed)
+
+
+@pytest.mark.asyncio
+async def test_log_tail_view_does_not_redact_again_after_reversing_page(tmp_path):
+    m = _load_admin_views(None)
+    path = tmp_path / "operator.log"
+    path.write_text(
+        'status=healthy\ntoken="unterminated secret',
+        encoding="utf-8",
+    )
+
+    class Interaction:
+        def __init__(self):
+            self.response = types.SimpleNamespace(is_done=lambda: True)
+            self.kwargs = None
+
+        async def edit_original_response(self, **kwargs):
+            self.kwargs = kwargs
+
+    interaction = Interaction()
+    view = m.LogTailView(None, str(path), "Operator Log")
+
+    await view.render(interaction)
+
+    description = interaction.kwargs["embed"].description
+    assert "unterminated secret" not in description
+    assert 'token="[REDACTED]' in description
+    assert "status=healthy" in description
+    require_valid_embed_payload(interaction.kwargs["embed"])
