@@ -80,7 +80,8 @@ PreKvK/KVK, inventory, subscriptions, shared-sender, and queue outputs now use f
 visible exact-count compaction, and complete redacted private attachments where supported. The full
 suite passed `3118 passed, 2 skipped`; Changes-only scan
 `848b6f62-9da7-4306-bf4d-45661db7c6be` ran with Deep off, covered all 11 runtime files, and found
-zero issues. SQL is unchanged. Review, promotion, deployment, and production smoke remain pending.
+zero issues. SQL is unchanged. Mirror PR #255 is ready for review; promotion, deployment, and
+production smoke remain pending.
 
 Phase 2E owns Ark confirmation-update retention policy,
 team-builder audit-service extraction, and explicit registration-delivery outcome observability;

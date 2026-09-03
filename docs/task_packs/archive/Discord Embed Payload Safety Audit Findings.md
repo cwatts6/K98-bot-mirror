@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1-2C delivered; Phase 2D implementation and local validation complete, mirror PR review pending
+Status: Phases 1-2C delivered; Phase 2D implementation and local validation complete, mirror PR #255 ready for review
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C and Phase 2D updates 2026-09-03
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -650,6 +650,8 @@ from base `25525c5512ee929f1092f3575a140ae2bbf625fe` with Deep off, complete cov
 runtime files, and zero findings. SQL is a documented no-diff skip, and these later evidence-record
 edits are a precise documentation-only incremental skip.
 
-Mirror review, patch-based production promotion, candidate deployment, and representative operator
-smoke remain pending. Smoke must preserve audience/channel enforcement, redaction, attachment and
-message identity, produce no unexpected mentions or duplicate, and show no Discord `50035`.
+Mirror PR #255 is open, non-draft, and mergeable. Its runtime implementation commit is
+`cf450215c1e8080fb9df0f6c009049875894bebf`; the later PR-number record is documentation-only.
+Patch-based production promotion, candidate deployment, and representative operator smoke remain
+pending. Smoke must preserve audience/channel enforcement, redaction, attachment and message
+identity, produce no unexpected mentions or duplicate, and show no Discord `50035`.

@@ -8,7 +8,7 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active review handoff | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Approved implementation and local validation complete on `codex/discord-embed-payload-safety-phase-2d`; zero-finding Changes review complete; mirror PR review pending |
+| Active review handoff | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Approved implementation and local validation complete on `codex/discord-embed-payload-safety-phase-2d`; zero-finding Changes review complete; mirror PR #255 ready for review |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Mirror PR #254 and production PR #561 await manual merge and final production-main verification; review and candidate smoke passed; no runtime correction was required |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
@@ -60,8 +60,8 @@ PR #254 and production PR #561; both await manual merge and final production-mai
 Phase 2C's pack and starter are archived. Phase 2D diagnostics is implemented and locally
 validated from mirror base `25525c55`: the full suite passed `3118 passed, 2 skipped`, and
 Changes-only scan `848b6f62-9da7-4306-bf4d-45661db7c6be` covered all 11 runtime files with Deep
-off and zero findings. SQL is unchanged; mirror PR review, promotion, deployment, and production
-smoke remain pending. Phase 2E owns
+off and zero findings. SQL is unchanged; mirror PR #255 is ready for review, while promotion,
+deployment, and production smoke remain pending. Phase 2E owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
 evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit

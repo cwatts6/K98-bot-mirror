@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to delivered Phase 2C`
 - Task type: `deferred optimisation batch / diagnostic payload reliability`
 - One-pass approved: `no`
-- Status: `implementation and local validation complete; mirror PR handoff in progress`
+- Status: `implementation and local validation complete; mirror PR #255 ready for review`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -288,7 +288,9 @@ digest `codex-security-snapshot/v1:sha256:cc42cf88aab852775835865caf5017a1e5f541
 Subsequent task-record changes are documentation-only and receive a precise incremental security
 skip.
 
-Production smoke and promotion remain separate approval-gated work after review. The planned smoke
+Mirror PR #255 carries commit `cf450215c1e8080fb9df0f6c009049875894bebf` and was opened
+non-draft against `K98-bot-mirror/main`. Production smoke and promotion remain separate
+approval-gated work after review. The planned smoke
 uses representative authorised summary/history, log preview/attachment, health/status, usage, and
 natural queue edit/rehydration paths without injecting secrets or manufacturing failures. Rollback
 remains a bot-PR revert and redeploy of the previous production-main revision; no SQL, config,

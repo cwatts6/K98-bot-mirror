@@ -360,7 +360,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
-- Status: Phase 2D implementation and local validation complete; mirror PR review, promotion, and production smoke pending
+- Status: Phase 2D implementation and local validation complete; mirror PR #255 ready for review; promotion and production smoke pending
 - Last verified: 2026-09-03
 
 ### Deferred Optimisation
