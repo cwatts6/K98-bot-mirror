@@ -81,10 +81,9 @@ async def test_log_tail_view_replaces_attachment_and_redacts_complete_page(tmp_p
 
     await view.render(interaction)
 
-    assert "attachments" in interaction.kwargs
-    assert "files" not in interaction.kwargs
-    assert len(interaction.kwargs["attachments"]) == 1
-    attachment_text = interaction.kwargs["attachments"][0].content.decode("utf-8")
+    assert interaction.kwargs["attachments"] == []
+    assert len(interaction.kwargs["files"]) == 1
+    attachment_text = interaction.kwargs["files"][0].content.decode("utf-8")
     assert "secret-token" not in attachment_text
     assert "[REDACTED]" in attachment_text
     require_valid_embed_payload(interaction.kwargs["embed"])

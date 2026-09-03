@@ -145,7 +145,8 @@ class LogTailView(discord.ui.View):
                 buf.seek(0)
                 file = discord.File(buf, filename=f"log_page_{self.page}.txt")
                 # Edit replacement semantics: never retain an older page attachment.
-                kwargs["attachments"] = [file]
+                kwargs["attachments"] = []
+                kwargs["files"] = [file]
             else:
                 embed.add_field(
                     name="Complete page attachment",

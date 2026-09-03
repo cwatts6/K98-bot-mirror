@@ -307,3 +307,16 @@ with production operational logs unchanged. Final bot Changes-only scan
 `25525c5512ee929f1092f3575a140ae2bbf625fe..03dddb60478eab2f759c205573c494d8dd0723a9`
 range with Deep off, complete coverage of all 11 runtime files, and zero findings. SQL remains a
 documented no-diff skip; these record-only updates receive a precise incremental security skip.
+
+Production-candidate smoke on 2026-09-03 confirmed graceful shutdown, queue-state persistence,
+successful startup, command-cache no-diff handling, live-queue message rehydration, and successful
+representative summary, history, restart-log, status, usage, show-log, and crash-log routes. The
+interactive `/ops logs` route exposed one Pycord edit-contract defect when a complete redacted page
+attachment was needed: a new `discord.File` was passed as an existing `attachments` item, causing
+Pycord to call the unavailable `File.to_dict()`. The narrow correction clears retained attachments
+with `attachments=[]` and uploads the replacement through `files=[file]`; no permission, audience,
+filter, ordering, timeout, filename, content, view identity, or restart behavior changes. Focused
+diagnostic/view tests pass `16`, the full suite passes `3123 passed, 2 skipped`, and focused pytest
+log-noise validation confirms production operational logs remain unchanged. Final `/ops logs`
+initial-render, filter, attachment, and page-navigation smoke remains required on the corrected
+candidate.
