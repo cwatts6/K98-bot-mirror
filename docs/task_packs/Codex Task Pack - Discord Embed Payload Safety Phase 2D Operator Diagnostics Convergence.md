@@ -317,6 +317,8 @@ Pycord to call the unavailable `File.to_dict()`. The narrow correction clears re
 with `attachments=[]` and uploads the replacement through `files=[file]`; no permission, audience,
 filter, ordering, timeout, filename, content, view identity, or restart behavior changes. Focused
 diagnostic/view tests pass `16`, the full suite passes `3123 passed, 2 skipped`, and focused pytest
-log-noise validation confirms production operational logs remain unchanged. Final `/ops logs`
-initial-render, filter, attachment, and page-navigation smoke remains required on the corrected
-candidate.
+log-noise validation confirms production operational logs remain unchanged. The corrected candidate
+was restarted and smoke tested again on 2026-09-03. Graceful shutdown, startup, live-queue message
+rehydration, `/ops logs`, its component interactions, and all other representative commands passed;
+the supplied evidence contains no `CMD ERROR`, traceback, `File.to_dict`, Discord `50035`, or
+error/critical entry. Production-candidate smoke is complete.
