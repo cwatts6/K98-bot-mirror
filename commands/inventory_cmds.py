@@ -6,7 +6,15 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
+from core.discord_embed_limits import (
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_TOTAL_CHARACTERS,
+    measure_embed_payload,
+    require_valid_embed_payload,
+)
 from core.interaction_safety import safe_command, safe_defer
+from core.operator_diagnostic_payloads import omission_marker, redact_diagnostic_text
 from decoraters import admin_only, channel_only, track_usage
 from inventory import audit_service
 from inventory.models import InventoryAuditRecord
@@ -155,20 +163,51 @@ def _build_inventory_audit_embed(
         embed.add_field(name="Results", value="No matching inventory import batches.", inline=False)
         return embed
 
-    for record in records[:25]:
+    record_limit = 24 if len(records) > 25 else 25
+    shown_records = records[:record_limit]
+    rendered = 0
+    for index, record in enumerate(shown_records):
         confidence = (
             f"{record.confidence_score:.2f}" if record.confidence_score is not None else "n/a"
         )
         json_parts = audit_service.summarize_json_comparison(record)
-        value = (
+        value = redact_diagnostic_text(
             f"Governor `{record.governor_id}` | User `{record.discord_user_id}`\n"
             f"type `{record.import_type or 'unknown'}` | flow `{record.flow_type}` | "
             f"confidence `{confidence}`\n"
             f"debug {record.debug_reference} | json `{json_parts}`"
         )
+        name = f"Batch {record.import_batch_id} - {record.status}"
+        candidate_total = measure_embed_payload(embed).total_characters + len(name) + len(value)
+        if (
+            len(name) > MAX_FIELD_NAME_CHARACTERS
+            or len(value) > MAX_FIELD_VALUE_CHARACTERS
+            or candidate_total > MAX_TOTAL_CHARACTERS
+        ):
+            break
         embed.add_field(
-            name=f"Batch {record.import_batch_id} - {record.status}",
-            value=value[:1024],
+            name=name,
+            value=value,
             inline=False,
         )
+        rendered += 1
+
+    omitted = len(records) - rendered
+    if omitted:
+        marker_name = "Audit display compacted"
+        marker_value = omission_marker(omitted, "audit batches")
+        while embed.fields and (
+            measure_embed_payload(embed).total_characters + len(marker_name) + len(marker_value)
+            > MAX_TOTAL_CHARACTERS
+        ):
+            embed.remove_field(len(embed.fields) - 1)
+            rendered -= 1
+            omitted += 1
+            marker_value = omission_marker(omitted, "audit batches")
+        embed.add_field(
+            name=marker_name,
+            value=marker_value,
+            inline=False,
+        )
+    require_valid_embed_payload(embed)
     return embed

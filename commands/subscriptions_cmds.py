@@ -10,7 +10,21 @@ from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
+from core.discord_embed_limits import (
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_TOTAL_CHARACTERS,
+    measure_embed_payload,
+    require_valid_embed_payload,
+)
 from core.interaction_safety import safe_command, safe_defer
+from core.operator_diagnostic_payloads import (
+    MAX_MESSAGE_CONTENT_CHARACTERS,
+    omission_marker,
+    pack_complete_units,
+    redact_diagnostic_text,
+    resolve_attachment_size_limit,
+)
 from decoraters import is_admin_and_notify_channel, track_usage
 from event_scheduler import dm_scheduled_tracker, dm_sent_tracker
 from reminder_task_registry import active_task_count
@@ -21,6 +35,14 @@ from subscription_tracker import (
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_diagnostic_error(prefix: str, error: object) -> str:
+    return pack_complete_units(
+        [prefix, redact_diagnostic_text(error)],
+        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
+        label="diagnostic lines",
+    ).text
 
 
 def register_subscriptions(bot: ext_commands.Bot) -> None:
@@ -112,7 +134,9 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/list_subscribers] get_all_subscribers failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to fetch subscribers: `{type(e).__name__}: {e}`"
+                content=_safe_diagnostic_error(
+                    "❌ Failed to fetch subscribers:", f"{type(e).__name__}: {e}"
+                )
             )
             return
 
@@ -152,44 +176,90 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
 
         MAX_FIELDS = 25  # Discord embed field limit
         shown = items[:MAX_FIELDS]
+        rendered = 0
         for username, uid_str, types, times, scheduled, sent, tasks in shown:
             mention = f"<@{uid_str}>" if uid_str.isdigit() else uid_str
-            embed.add_field(
-                name=f"{username} • {mention}",
-                value=(
-                    f"**Types:** {types}\n"
-                    f"**Times:** {times}\n"
-                    f"**Queues:** {scheduled} scheduled • {tasks} task(s) • {sent} sent"
-                ),
-                inline=False,
+            name = redact_diagnostic_text(f"{username} • {mention}")
+            value = redact_diagnostic_text(
+                f"**Types:** {types}\n"
+                f"**Times:** {times}\n"
+                f"**Queues:** {scheduled} scheduled • {tasks} task(s) • {sent} sent"
             )
+            candidate_total = measure_embed_payload(embed).total_characters + len(name) + len(value)
+            if (
+                len(name) > MAX_FIELD_NAME_CHARACTERS
+                or len(value) > MAX_FIELD_VALUE_CHARACTERS
+                or candidate_total > MAX_TOTAL_CHARACTERS
+            ):
+                break
+            embed.add_field(name=name, value=value, inline=False)
+            rendered += 1
 
         attachments = []
-        if len(items) > MAX_FIELDS:
+        omitted = len(items) - rendered
+        if omitted:
+            marker_name = "Subscriber display compacted"
+            marker_value = omission_marker(omitted, "subscribers")
+            while embed.fields and (
+                measure_embed_payload(embed).total_characters + len(marker_name) + len(marker_value)
+                > MAX_TOTAL_CHARACTERS
+            ):
+                embed.remove_field(len(embed.fields) - 1)
+                rendered -= 1
+                omitted += 1
+                marker_value = omission_marker(omitted, "subscribers")
+            embed.add_field(
+                name=marker_name,
+                value=marker_value,
+                inline=False,
+            )
             # Attach the full list as CSV (includes live stats)
             buf = io.StringIO()
             buf.write("username,user_id,types,times,scheduled_sent,history_sent,active_tasks\n")
             for username, uid_str, types, times, scheduled, sent, tasks in items:
-                buf.write(f"{username},{uid_str},{types},{times},{scheduled},{sent},{tasks}\n")
-            data = io.BytesIO(buf.getvalue().encode("utf-8", "replace"))
-            data.seek(0)
-            attachments = [discord.File(data, filename="subscribers_full.csv")]
-            embed.set_footer(text=f"Showing first {MAX_FIELDS}. Full list attached.")
+                buf.write(
+                    redact_diagnostic_text(
+                        f"{username},{uid_str},{types},{times},{scheduled},{sent},{tasks}\n"
+                    )
+                )
+            encoded = buf.getvalue().encode("utf-8", "replace")
+            upload_limit = resolve_attachment_size_limit(ctx.interaction)
+            if len(encoded) <= upload_limit:
+                data = io.BytesIO(encoded)
+                data.seek(0)
+                attachments = [discord.File(data, filename="subscribers_full.csv")]
+                embed.set_footer(text=f"Showing {rendered} of {len(items)}. Full list attached.")
+            else:
+                embed.set_footer(
+                    text=(
+                        f"Showing {rendered} of {len(items)}. Full list is {len(encoded)} bytes "
+                        f"and exceeds the {upload_limit}-byte destination limit."
+                    )
+                )
 
+        require_valid_embed_payload(embed)
         await ctx.interaction.edit_original_response(embed=embed, attachments=attachments)
 
     def _send_report_text_or_file(interaction: discord.Interaction, title: str, summary: str):
         """
         Edits the original interaction with a short message and (if needed) a full report file.
         """
-        MAX_DISCORD = 1900  # be safe under 2000 incl. code fences etc.
         ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        if len(summary) <= MAX_DISCORD:
-            return interaction.edit_original_response(
-                content=f"**{title}**\n```text\n{summary}\n```"
-            )
+        redacted_summary = redact_diagnostic_text(summary)
+        inline_content = f"**{title}**\n```text\n{redacted_summary}\n```"
+        if len(inline_content) <= MAX_MESSAGE_CONTENT_CHARACTERS:
+            return interaction.edit_original_response(content=inline_content)
         # attach as file
-        buf = io.BytesIO(summary.encode("utf-8", "replace"))
+        encoded = redacted_summary.encode("utf-8", "replace")
+        upload_limit = resolve_attachment_size_limit(interaction)
+        if len(encoded) > upload_limit:
+            return interaction.edit_original_response(
+                content=(
+                    f"**{title}**\n… complete report not shown; the redacted report is "
+                    f"{len(encoded)} bytes and exceeds the {upload_limit}-byte destination limit."
+                )
+            )
+        buf = io.BytesIO(encoded)
         file = discord.File(buf, filename=f"subscription_migration_report_{ts}.txt")
         return interaction.edit_original_response(
             content=f"**{title}**\nReport was long; attached full details.", attachments=[file]
@@ -213,7 +283,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             )
         except Exception as e:
             await ctx.interaction.edit_original_response(
-                content=f"❌ Dry run failed: `{type(e).__name__}: {e}`"
+                content=_safe_diagnostic_error("❌ Dry run failed:", f"{type(e).__name__}: {e}")
             )
 
     @subscriptions_group.command(
@@ -234,7 +304,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             )
         except Exception as e:
             await ctx.interaction.edit_original_response(
-                content=f"❌ Migration failed: `{type(e).__name__}: {e}`"
+                content=_safe_diagnostic_error("❌ Migration failed:", f"{type(e).__name__}: {e}")
             )
 
     bot.add_application_command(subscriptions_group)

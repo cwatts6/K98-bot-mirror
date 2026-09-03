@@ -4,6 +4,10 @@ import importlib
 import sys
 import types
 
+import pytest
+
+from core.discord_embed_limits import require_valid_embed_payload
+
 
 def _load_admin_views(monkeypatch):
     if "ui.views.admin_views" in sys.modules:
@@ -44,3 +48,70 @@ def test_confirm_views_instantiate_and_callbacks_exist(monkeypatch):
         assert bad is False
 
     asyncio.run(_run())
+
+
+@pytest.mark.asyncio
+async def test_log_tail_view_replaces_attachment_and_redacts_complete_page(tmp_path, monkeypatch):
+    m = _load_admin_views(monkeypatch)
+    path = tmp_path / "operator.log"
+    path.write_text(
+        "\n".join(["normal line " + ("X" * 100)] * 400 + ["Authorization: Bearer secret-token"]),
+        encoding="utf-8",
+    )
+
+    class FakeFile:
+        def __init__(self, fp, filename):
+            fp.seek(0)
+            self.filename = filename
+            self.content = fp.read()
+
+    class Interaction:
+        attachment_size_limit = 1_000_000
+
+        def __init__(self):
+            self.response = types.SimpleNamespace(is_done=lambda: True)
+            self.kwargs = None
+
+        async def edit_original_response(self, **kwargs):
+            self.kwargs = kwargs
+
+    monkeypatch.setattr(m.discord, "File", FakeFile)
+    interaction = Interaction()
+    view = m.LogTailView(None, str(path), "Operator Log", page_size=200)
+
+    await view.render(interaction)
+
+    assert "attachments" in interaction.kwargs
+    assert "files" not in interaction.kwargs
+    assert len(interaction.kwargs["attachments"]) == 1
+    attachment_text = interaction.kwargs["attachments"][0].content.decode("utf-8")
+    assert "secret-token" not in attachment_text
+    assert "[REDACTED]" in attachment_text
+    require_valid_embed_payload(interaction.kwargs["embed"])
+
+
+@pytest.mark.asyncio
+async def test_log_tail_view_reports_destination_limit_without_partial_file(tmp_path):
+    m = _load_admin_views(None)
+    path = tmp_path / "operator.log"
+    path.write_text("\n".join("X" * 100 for _ in range(200)), encoding="utf-8")
+
+    class Interaction:
+        attachment_size_limit = 50
+
+        def __init__(self):
+            self.response = types.SimpleNamespace(is_done=lambda: True)
+            self.kwargs = None
+
+        async def edit_original_response(self, **kwargs):
+            self.kwargs = kwargs
+
+    interaction = Interaction()
+    view = m.LogTailView(None, str(path), "Operator Log", page_size=200)
+
+    await view.render(interaction)
+
+    assert interaction.kwargs["attachments"] == []
+    embed = interaction.kwargs["embed"]
+    assert any("above this destination" in field.value for field in embed.fields)
+    require_valid_embed_payload(embed)

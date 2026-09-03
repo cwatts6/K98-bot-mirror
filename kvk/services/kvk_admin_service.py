@@ -9,10 +9,12 @@ import logging
 import time
 from typing import Any
 
+from core.discord_embed_limits import MAX_FIELD_VALUE_CHARACTERS
+from core.operator_diagnostic_payloads import pack_complete_units, redact_diagnostic_text
 from kvk.dal import kvk_admin_dal
 
 logger = logging.getLogger(__name__)
-DISCORD_EMBED_FIELD_VALUE_LIMIT = 1024
+DISCORD_EMBED_FIELD_VALUE_LIMIT = MAX_FIELD_VALUE_CHARACTERS
 
 
 @dataclass(frozen=True)
@@ -397,7 +399,7 @@ def format_recent_scans_message(result: KvkRecentScansResult) -> str:
             f"{str(row.get('ScanTimestampUTC'))[:19]:19}  "
             f"{row.get('Row_Count', ''):>6}  "
             f"{str(row.get('ImportedAtUTC'))[:19]:19}  "
-            f"{str(row.get('SourceFileName'))[:50]}"
+            f"{redact_diagnostic_text(row.get('SourceFileName'))}"
         )
     lines.append("```")
     return f"**KVK {result.kvk_no} — Recent Scans (Top {result.limit})**\n" + "\n".join(lines)
@@ -407,22 +409,22 @@ def format_window_preview_table(result: KvkWindowPreviewResult) -> str:
     header = f"{'Window':20} {'Start':>8} {'End':>8} {'#Scans':>7} {'Rows':>7}"
     lines = [header, "-" * len(header)]
     for row in result.rows:
-        name = (row.get("WindowName") or "")[:20]
+        name = str(row.get("WindowName") or "")
         start = str(row.get("StartScanID")) if row.get("StartScanID") is not None else "—"
         end = str(row.get("EndScanID")) if row.get("EndScanID") is not None else "open"
         scans = str(row.get("NumScans")) if row.get("NumScans") is not None else "—"
         row_count = str(row.get("RowCount") or 0)
-        lines.append(f"{name:20} {start:>8} {end:>8} {scans:>7} {row_count:>7}")
+        lines.append(f"{name} | start {start} | end {end} | scans {scans} | rows {row_count}")
 
     lines.append("")
     lines.append("Timestamps (UTC):")
     lines.append(f"{'Window':20} {'StartTS':>16} {'EndTS':>16}")
     lines.append("-" * 56)
     for row in result.rows:
-        name = (row.get("WindowName") or "")[:20]
+        name = str(row.get("WindowName") or "")
         start = _format_timestamp(row.get("StartTS"))
         end = _format_timestamp(row.get("EndTS"))
-        lines.append(f"{name:20} {start:>16} {end:>16}")
+        lines.append(f"{name} | start {start} | end {end}")
 
     return _bounded_code_block(lines, max_chars=DISCORD_EMBED_FIELD_VALUE_LIMIT)
 
@@ -439,29 +441,13 @@ def _format_timestamp(value: Any) -> str:
 def _bounded_code_block(lines: list[str], *, max_chars: int) -> str:
     prefix = "```\n"
     suffix = "\n```"
-    truncation_line = "... truncated ..."
     overhead = len(prefix) + len(suffix)
     if max_chars < overhead:
         raise ValueError(f"max_chars must be at least {overhead} to fit the code block fences")
-    body_limit = max_chars - overhead
-
-    body = "\n".join(lines)
-    if len(body) <= body_limit:
-        return prefix + body + suffix
-
-    selected: list[str] = []
-    for index, line in enumerate(lines):
-        has_more = index < len(lines) - 1
-        candidate_lines = [*selected, line]
-        if has_more:
-            candidate_lines.append(truncation_line)
-        if len("\n".join(candidate_lines)) > body_limit:
-            break
-        selected.append(line)
-
-    if not selected:
-        selected = [truncation_line[:body_limit]]
-    elif len(selected) < len(lines):
-        selected.append(truncation_line)
-
-    return prefix + "\n".join(selected) + suffix
+    return pack_complete_units(
+        [redact_diagnostic_text(line) for line in lines],
+        limit=max_chars,
+        label="table lines",
+        prefix=prefix,
+        suffix=suffix,
+    ).text

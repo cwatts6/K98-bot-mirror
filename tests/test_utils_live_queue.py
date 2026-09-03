@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from core.discord_embed_limits import require_valid_embed_payload
 import utils
 
 pytestmark = pytest.mark.asyncio
@@ -234,3 +235,46 @@ async def test_update_live_queue_embed_rehydrate(monkeypatch):
         assert utils.live_queue["message"] is fake_msg
         assert utils.live_queue["message_meta"]["channel_id"] == 123
         assert utils.live_queue["message_meta"]["message_id"] == 999
+
+
+async def test_update_live_queue_embed_omits_pathological_job_as_complete_unit(monkeypatch):
+    class FakeMessage:
+        id = 999
+        created_at = None
+
+        async def edit(self, *, embed=None):
+            self.embed = embed
+            return self
+
+    class FakeChannel:
+        id = 123
+
+        async def send(self, embed=None):
+            raise AssertionError("existing queue message should be edited")
+
+    class FakeBot:
+        def get_channel(self, cid):
+            return FakeChannel() if cid == 123 else None
+
+    message = FakeMessage()
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = [
+            {
+                "filename": "F" * 400,
+                "user": "operator",
+                "channel": "notify",
+                "status": "🕐 queued",
+                "uploaded": "2026-09-03T12:00:00",
+            }
+        ]
+        utils.live_queue["message"] = message
+        utils.live_queue["message_meta"] = {"channel_id": 123, "message_id": 999}
+
+    monkeypatch.setattr(utils, "save_live_queue", lambda: True)
+    await utils.update_live_queue_embed(FakeBot(), notify_channel_id=123)
+
+    require_valid_embed_payload(message.embed)
+    assert len(message.embed.fields) == 1
+    assert message.embed.fields[0].name == "Queue display compacted"
+    assert "1 queue job not shown" in message.embed.fields[0].value
+    assert "F" * 400 not in message.embed.fields[0].value

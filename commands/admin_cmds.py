@@ -25,6 +25,22 @@ from bot_config import (
     OFFSEASON_STATS_CHANNEL_ID,
 )
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
+from core.discord_embed_limits import (
+    MAX_DESCRIPTION_CHARACTERS,
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_FIELDS_PER_EMBED,
+    MAX_TOTAL_CHARACTERS,
+    measure_embed_payload,
+    require_valid_embed_payload,
+)
+from core.operator_diagnostic_payloads import (
+    MAX_MESSAGE_CONTENT_CHARACTERS,
+    omission_marker,
+    pack_complete_units,
+    redact_diagnostic_text,
+    resolve_attachment_size_limit,
+)
 from discord.ext import commands as ext_commands
 from commands.crystaltech_flow import run_crystaltech_flow
 from commands.telemetry_cmds import (
@@ -75,6 +91,114 @@ UTC = getattr(datetime, "UTC", timezone.utc)
 logger = logging.getLogger(__name__)
 
 
+def _safe_operator_content(prefix: str, detail: object) -> str:
+    """Build a bounded operator message without slicing its diagnostic detail."""
+
+    return pack_complete_units(
+        [prefix, redact_diagnostic_text(detail)],
+        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
+        label="diagnostic lines",
+    ).text
+
+
+def _safe_operator_field(detail: object, *, label: str = "diagnostic values") -> str:
+    return pack_complete_units(
+        [redact_diagnostic_text(detail)],
+        limit=MAX_FIELD_VALUE_CHARACTERS,
+        label=label,
+    ).text
+
+
+def _validated_operator_embed(embed: discord.Embed) -> discord.Embed:
+    """Keep complete fields in order and visibly omit any exhausted tail."""
+
+    if embed.description and len(embed.description) > MAX_DESCRIPTION_CHARACTERS:
+        embed.description = omission_marker(1, "complete descriptions")
+
+    original_fields = list(embed.fields)
+    embed.clear_fields()
+    omitted = 0
+    for index, field in enumerate(original_fields):
+        name = redact_diagnostic_text(field.name)
+        value = redact_diagnostic_text(field.value)
+        candidate_total = measure_embed_payload(embed).total_characters + len(name) + len(value)
+        if (
+            len(name) > MAX_FIELD_NAME_CHARACTERS
+            or len(value) > MAX_FIELD_VALUE_CHARACTERS
+            or len(embed.fields) >= MAX_FIELDS_PER_EMBED
+            or candidate_total > MAX_TOTAL_CHARACTERS
+        ):
+            omitted = len(original_fields) - index
+            break
+        embed.add_field(name=name, value=value, inline=field.inline)
+
+    if omitted:
+        marker_name = "Diagnostic display compacted"
+        marker_value = omission_marker(omitted, "complete fields")
+        while embed.fields and (
+            measure_embed_payload(embed).total_characters + len(marker_name) + len(marker_value)
+            > MAX_TOTAL_CHARACTERS
+        ):
+            embed.remove_field(len(embed.fields) - 1)
+            omitted += 1
+            marker_value = omission_marker(omitted, "complete fields")
+        embed.add_field(name=marker_name, value=marker_value, inline=False)
+
+    require_valid_embed_payload(embed)
+    return embed
+
+
+def _log_tail_delivery(
+    interaction: discord.Interaction,
+    *,
+    title: str,
+    color: int,
+    source_path: str,
+    raw_lines: list[str],
+) -> tuple[discord.Embed, list[discord.File]]:
+    """Build one redacted complete-line log preview and optional complete file."""
+
+    redacted_lines = [
+        redact_diagnostic_text(line).replace("```", "`\u200b``") for line in raw_lines
+    ] or ["(log is empty)"]
+    preview = pack_complete_units(
+        redacted_lines,
+        limit=3800,
+        label="log lines",
+        prefix="```\n",
+        suffix="\n```",
+    )
+    embed = discord.Embed(title=title, description=preview.text, color=color)
+    embed.add_field(name="Lines", value=str(len(raw_lines)), inline=True)
+    embed.add_field(name="File", value=os.path.basename(source_path), inline=True)
+    mtime = datetime.fromtimestamp(os.path.getmtime(source_path))
+    embed.set_footer(text=f"Modified {mtime:%Y-%m-%d %H:%M:%S}")
+
+    attachments: list[discord.File] = []
+    if preview.omitted:
+        complete_text = "\n".join(redacted_lines)
+        complete_bytes = complete_text.encode("utf-8", "replace")
+        upload_limit = resolve_attachment_size_limit(interaction)
+        if len(complete_bytes) <= upload_limit:
+            attachments.append(
+                discord.File(
+                    io.BytesIO(complete_bytes),
+                    filename=f"{os.path.splitext(os.path.basename(source_path))[0]}_tail.txt",
+                )
+            )
+        else:
+            embed.add_field(
+                name="Complete tail attachment",
+                value=(
+                    f"… {preview.omitted} log lines not shown; redacted attachment is "
+                    f"{len(complete_bytes)} bytes, above this destination's "
+                    f"{upload_limit}-byte limit. Use the diagnostics runbook locally."
+                ),
+                inline=False,
+            )
+    return _validated_operator_embed(embed), attachments
+
+
 def _format_validate_embed(report) -> discord.Embed:
     embed = discord.Embed(
         title="CrystalTech Validation",
@@ -96,11 +220,11 @@ def _format_validate_embed(report) -> discord.Embed:
         where = f" ({', ' .join(loc)})" if loc else ""
         embed.add_field(
             name=f"[{issue.level}] {issue.code}{where}",
-            value=(issue.message[:512] + ("…" if len(issue.message) > 512 else "")) or "—",
+            value=redact_diagnostic_text(issue.message) or "—",
             inline=False,
         )
         shown += 1
-    return embed
+    return _validated_operator_embed(embed)
 
 
 def register_admin(bot: ext_commands.Bot) -> None:
@@ -141,7 +265,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /ops summary failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to build summary: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to build summary:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -170,7 +296,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /ops weeksummary failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to build weekly summary: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to build weekly summary:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -199,7 +327,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /ops history read_summary_log_rows failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content("❌ Failed to read log:", f"{type(e).__name__}: {e}")
             )
             return
 
@@ -266,7 +394,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /ops failures read_summary_log_rows failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content("❌ Failed to read log:", f"{type(e).__name__}: {e}")
             )
             return
 
@@ -334,7 +462,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /run_sql_proc prompt_admin_inputs failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Could not collect inputs: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Could not collect inputs:", f"{type(e).__name__}: {e}"
+                )
             )
             return
 
@@ -348,7 +478,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /run_sql_proc run_stats_copy_archive crashed")
             await ctx.interaction.edit_original_response(
-                content=f"💥 SQL run crashed: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content("💥 SQL run crashed:", f"{type(e).__name__}: {e}")
             )
             return
 
@@ -438,7 +568,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /run_gsheets_export crashed")
             await ctx.interaction.edit_original_response(
-                content=f"💥 Export failed unexpectedly: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "💥 Export failed unexpectedly:", f"{type(e).__name__}: {e}"
+                )
             )
             return
 
@@ -452,13 +584,33 @@ def register_admin(bot: ext_commands.Bot) -> None:
         else:
             raw_text = (log or "").strip()
 
-        # Present logs in a code block if present; mark when truncated
+        attachments: list[discord.File] = []
+        # Present complete redacted lines and attach the complete redacted report when needed.
         if raw_text:
-            max_len = 3900  # leave room for code fences
-            clipped = raw_text[:max_len]
-            if len(raw_text) > max_len:
-                clipped += "\n…(truncated)"
-            desc = f"```{clipped}```"
+            redacted_lines = [
+                redact_diagnostic_text(line).replace("```", "`\u200b``")
+                for line in raw_text.splitlines()
+            ]
+            preview = pack_complete_units(
+                redacted_lines,
+                limit=3500,
+                label="export log lines",
+                prefix="```\n",
+                suffix="\n```",
+            )
+            desc = preview.text
+            if preview.omitted:
+                complete = "\n".join(redacted_lines).encode("utf-8", "replace")
+                upload_limit = resolve_attachment_size_limit(ctx.interaction)
+                if len(complete) <= upload_limit:
+                    attachments.append(
+                        discord.File(io.BytesIO(complete), filename="gsheets_export_log.txt")
+                    )
+                else:
+                    desc = (
+                        f"{desc}\n\n… complete redacted log is {len(complete)} bytes and "
+                        f"exceeds the {upload_limit}-byte destination limit."
+                    )
         else:
             if success:
                 desc = (
@@ -483,7 +635,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.set_footer(text=f"{SERVER} · {DATABASE}")
         embed.timestamp = datetime.utcnow()
 
-        await ctx.interaction.edit_original_response(content=None, embed=embed)
+        await ctx.interaction.edit_original_response(
+            content=None,
+            embed=_validated_operator_embed(embed),
+            attachments=attachments,
+        )
 
     @ops_group.command(
         name="graceful_restart",
@@ -653,22 +809,18 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     cache_file=COMMAND_CACHE_FILE,
                 )
 
-                summary = (
-                    "\n".join(update_result.updated_lines)
-                    if update_result.updated_lines
-                    else "✅ No changes to cached versions."
-                )
-                # Keep under embed description limit
-                if len(summary) > 4000:
-                    summary = summary[:3990] + "…"
+                summary = pack_complete_units(
+                    update_result.updated_lines or ["✅ No changes to cached versions."],
+                    limit=MAX_DESCRIPTION_CHARACTERS,
+                    label="command cache rows",
+                ).text
 
-                await ctx.interaction.edit_original_response(
-                    embed=discord.Embed(
-                        title="✅ Slash Commands Resynced & Cache Updated",
-                        description=summary,
-                        color=0x2ECC71,
-                    )
+                embed = discord.Embed(
+                    title="✅ Slash Commands Resynced & Cache Updated",
+                    description=summary,
+                    color=0x2ECC71,
                 )
+                await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
             except Exception as e:
                 logger.exception("[COMMAND SYNC] Unexpected failure building/writing cache")
@@ -714,20 +866,23 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     )
             else:
                 lines = command_version_lines(list(bot.application_commands))
-                text = "\n".join(lines)
-                # Keep under embed description limits (~4096 chars)
-                if len(text) > 3900:
-                    text = text[:3890] + "…"
+                text = pack_complete_units(
+                    lines,
+                    limit=3900,
+                    label="command version rows",
+                ).text
                 embed.description = (
                     f"Showing all commands and their current version tags.\n\n{text}"
                 )
 
-            await ctx.interaction.edit_original_response(embed=embed)
+            await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
         except Exception as e:
             logger.exception("[COMMAND] /show_command_versions failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to build command version list: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to build command version list:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -765,17 +920,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
         # Build response
         if issues:
             # Keep under embed description limit (~4096)
-            full = "\n".join(issues)
-            if len(full) > 3900:
-                clipped = []
-                total = 0
-                for line in issues:
-                    if total + len(line) + 1 > 3900:
-                        break
-                    clipped.append(line)
-                    total += len(line) + 1
-                remaining = len(issues) - len(clipped)
-                full = "\n".join(clipped) + (f"\n…and {remaining} more." if remaining > 0 else "")
+            full = pack_complete_units(
+                issues,
+                limit=3900,
+                label="command cache issues",
+            ).text
             embed = discord.Embed(
                 title="🧩 Command Cache Validation", description=full, color=0xF1C40F
             )
@@ -786,7 +935,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 color=0x2ECC71,
             )
 
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     @ops_group.command(
         name="view_restart_log",
@@ -859,12 +1008,16 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 embed.add_field(name=f"🕒 {ts}", value=desc, inline=False)
 
             embed.set_footer(text=f"Showing last {len(selected)} restarts")
-            await ctx.interaction.edit_original_response(content=None, embed=embed)
+            await ctx.interaction.edit_original_response(
+                content=None, embed=_validated_operator_embed(embed)
+            )
 
         except Exception as e:
             logger.exception("[RESTART_LOG] Failed to read or parse restart log.")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to load restart log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to load restart log:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -996,7 +1149,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
             db_status = "🟢 SQL connected"
         except Exception as e:
             db_ok = False
-            db_status = f"🔴 SQL ERROR: `{type(e).__name__}: {str(e)[:150]}`"
+            db_status = _safe_operator_field(
+                f"🔴 SQL ERROR: {type(e).__name__}: {e}", label="database errors"
+            )
 
         # --- Check Google Sheets
         try:
@@ -1005,7 +1160,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
             gsheets_status = f"🟢 {message}" if success else f"🟠 {message}"
         except Exception as e:
             gsheets_ok = False
-            gsheets_status = f"🔴 ERROR: {type(e).__name__}: {str(e)[:120]}"
+            gsheets_status = _safe_operator_field(
+                f"🔴 ERROR: {type(e).__name__}: {e}", label="Google Sheets errors"
+            )
 
         # --- Uptime + latency
         now = datetime.now(UTC)
@@ -1036,7 +1193,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.set_footer(text=f"Checked by {ctx.user.name} • {SERVER}/{DATABASE}")
         embed.timestamp = now
 
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     @ops_group.command(
         name="logs",
@@ -1108,43 +1265,19 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 for ln in f:
                     dq.append(ln.rstrip("\n"))
 
-            message = "\n".join(dq).strip()
-            if not message:
-                message = "(log is empty)"
-
-            # Neutralize accidental code fence endings inside the log
-            safe_text = message.replace("```", "`\u200b``")
-
-            # Embed description budget (Discord ~4096 chars; leave margin for fences)
-            BUDGET = 3800
-            needs_file = len(safe_text) > BUDGET
-
-            desc_body = safe_text[:BUDGET]
-            if needs_file:
-                desc_body += "\n…(truncated)"
-
-            desc = f"```{desc_body}```"
-
-            # Build embed
-            mtime = datetime.fromtimestamp(os.path.getmtime(FULL_LOG_PATH))
-            embed = discord.Embed(title="📄 Last Log Entries", description=desc, color=0x3498DB)
-            embed.add_field(name="Lines", value=str(min(lines, len(dq))), inline=True)
-            embed.add_field(name="File", value=os.path.basename(FULL_LOG_PATH), inline=True)
-            embed.set_footer(text=f"Modified {mtime:%Y-%m-%d %H:%M:%S}")
-
-            if needs_file:
-                # Attach full tail as a file to avoid embed limits
-                buf = io.BytesIO(message.encode("utf-8", "replace"))
-                buf.seek(0)
-                file = discord.File(buf, filename=f"log_tail_{lines}.txt")
-                await ctx.interaction.edit_original_response(embed=embed, attachments=[file])
-            else:
-                await ctx.interaction.edit_original_response(embed=embed)
+            embed, attachments = _log_tail_delivery(
+                ctx.interaction,
+                title="📄 Last Log Entries",
+                color=0x3498DB,
+                source_path=FULL_LOG_PATH,
+                raw_lines=list(dq),
+            )
+            await ctx.interaction.edit_original_response(embed=embed, attachments=attachments)
 
         except Exception as e:
             logger.exception("[COMMAND] /show_logs failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content("❌ Failed to read log:", f"{type(e).__name__}: {e}")
             )
 
     @ops_group.command(
@@ -1175,39 +1308,22 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 for ln in f:
                     dq.append(ln.rstrip("\n"))
 
-            message = "\n".join(dq).strip() or "(no errors logged)"
-
-            # Neutralise accidental code-fence closures
-            safe_text = message.replace("```", "`\u200b``")
-
-            # Embed budget & attachment fallback
-            BUDGET = 3800
-            needs_file = len(safe_text) > BUDGET
-            desc_body = safe_text[:BUDGET]
-            if needs_file:
-                desc_body += "\n…(truncated)"
-
-            desc = f"```{desc_body}```"
-
-            mtime = datetime.fromtimestamp(os.path.getmtime(ERROR_LOG_PATH))
-            embed = discord.Embed(title="🚨 Last Error Entries", description=desc, color=0xE74C3C)
-            embed.add_field(name="Lines", value=str(min(lines, len(dq))), inline=True)
-            embed.add_field(name="File", value=os.path.basename(ERROR_LOG_PATH), inline=True)
-            embed.set_footer(text=f"Modified {mtime:%Y-%m-%d %H:%M:%S}")
+            embed, attachments = _log_tail_delivery(
+                ctx.interaction,
+                title="🚨 Last Error Entries",
+                color=0xE74C3C,
+                source_path=ERROR_LOG_PATH,
+                raw_lines=list(dq),
+            )
             embed.timestamp = datetime.utcnow()
-
-            if needs_file:
-                buf = io.BytesIO("\n".join(dq).encode("utf-8", "replace"))
-                buf.seek(0)
-                file = discord.File(buf, filename=f"error_tail_{lines}.txt")
-                await ctx.interaction.edit_original_response(embed=embed, attachments=[file])
-            else:
-                await ctx.interaction.edit_original_response(embed=embed)
+            await ctx.interaction.edit_original_response(embed=embed, attachments=attachments)
 
         except Exception as e:
             logger.exception("[COMMAND] /last_errors failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to read error log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to read error log:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -1238,44 +1354,22 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 for ln in f:
                     dq.append(ln.rstrip("\n"))
 
-            message = "\n".join(dq).strip() or "(no crash logs found)"
-
-            # Neutralize accidental ``` inside the log
-            safe_text = message.replace("```", "`\u200b``")
-
-            # Embed budget + optional attachment
-            BUDGET = 3800
-            needs_file = len(safe_text) > BUDGET
-
-            desc_body = safe_text[:BUDGET]
-            if needs_file:
-                desc_body += "\n…(truncated)"
-
-            desc = f"```{desc_body}```"
-
-            mtime = datetime.fromtimestamp(os.path.getmtime(CRASH_LOG_PATH))
-            embed = discord.Embed(
+            embed, attachments = _log_tail_delivery(
+                ctx.interaction,
                 title="💥 Last Crash Log Entries",
-                description=desc,
-                color=0xFF6347,  # tomato; keep your original
+                color=0xFF6347,
+                source_path=CRASH_LOG_PATH,
+                raw_lines=list(dq),
             )
-            embed.add_field(name="Lines", value=str(min(lines, len(dq))), inline=True)
-            embed.add_field(name="File", value=os.path.basename(CRASH_LOG_PATH), inline=True)
-            embed.set_footer(text=f"Modified {mtime:%Y-%m-%d %H:%M:%S}")
             embed.timestamp = datetime.utcnow()
-
-            if needs_file:
-                buf = io.BytesIO("\n".join(dq).encode("utf-8", "replace"))
-                buf.seek(0)
-                file = discord.File(buf, filename=f"crash_tail_{lines}.txt")
-                await ctx.interaction.edit_original_response(embed=embed, attachments=[file])
-            else:
-                await ctx.interaction.edit_original_response(embed=embed)
+            await ctx.interaction.edit_original_response(embed=embed, attachments=attachments)
 
         except Exception as e:
             logger.exception("[COMMAND] /crash_log failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to read crash log: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "❌ Failed to read crash log:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -1381,14 +1475,20 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
             embed = discord.Embed(
                 title=title,
-                description=("\n".join(lines) or "_No data_"),
+                description=pack_complete_units(
+                    lines or ["_No data_"],
+                    limit=MAX_DESCRIPTION_CHARACTERS,
+                    label="usage rows",
+                ).text,
                 colour=discord.Colour.blurple(),
             )
-            await ctx.interaction.edit_original_response(embed=embed)
+            await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
         except Exception as e:
             logger.exception("[/ops usage] failed")
             await ctx.interaction.edit_original_response(
-                content=f"Sorry, I couldn't load usage stats: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "Sorry, I couldn't load usage stats:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @ops_group.command(
@@ -1448,7 +1548,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     description=desc,
                     colour=discord.Colour.blurple(),
                 )
-                await ctx.interaction.edit_original_response(embed=embed)
+                await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
             else:
                 # dimension == user
@@ -1465,12 +1565,14 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     description="\n".join(lines),
                     colour=discord.Colour.blurple(),
                 )
-                await ctx.interaction.edit_original_response(embed=embed)
+                await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
         except Exception as e:
             logger.exception("[/ops usage_detail] failed")
             await ctx.interaction.edit_original_response(
-                content=f"Sorry, I couldn't load usage detail: `{type(e).__name__}: {e}`"
+                content=_safe_operator_content(
+                    "Sorry, I couldn't load usage detail:", f"{type(e).__name__}: {e}"
+                )
             )
 
     @crystaltech_group.command(
@@ -1639,10 +1741,14 @@ def register_admin(bot: ext_commands.Bot) -> None:
         )
 
         if errors:
-            embed.add_field(name="Latest Error", value=f"`{str(errors[0])[:900]}`", inline=False)
+            embed.add_field(
+                name="Latest Error",
+                value=f"`{redact_diagnostic_text(errors[0])}`",
+                inline=False,
+            )
 
         embed.timestamp = datetime.utcnow()
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     @ops_group.command(
         name="calendar_generate",
@@ -1694,7 +1800,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         )
         embed.add_field(name="Horizon Days", value=str(horizon_days), inline=True)
 
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     @ops_group.command(
         name="calendar_publish_cache",
@@ -1747,7 +1853,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.add_field(name="Cache Path", value=str(result.get("cache_path", "")), inline=False)
         embed.add_field(name="Force Empty", value=str(force_empty), inline=True)
 
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     @ops_group.command(
         name="calendar_status",
@@ -1863,14 +1969,14 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 value=(
                     f"stage: `{latest_error.get('stage', 'unknown')}`\n"
                     f"type: `{latest_error.get('error_type', 'unknown')}`\n"
-                    f"detail: `{str(latest_error.get('message', 'n/a'))[:700]}`\n"
+                    f"detail: `{redact_diagnostic_text(latest_error.get('message', 'n/a'))}`\n"
                     f"at: `{latest_error.get('at_utc', 'unknown')}`"
                 ),
                 inline=False,
             )
 
         embed.timestamp = datetime.utcnow()
-        await ctx.interaction.edit_original_response(embed=embed)
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
 
     bot.add_application_command(ops_group)
     bot.add_application_command(crystaltech_group)

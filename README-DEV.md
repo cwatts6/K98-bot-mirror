@@ -72,7 +72,17 @@ findings. SQL remains a documented no-diff skip. Review is complete, and the ope
 #561. Both PRs await the operator's manual merge and final production-main verification.
 
 Phase 2C's task pack and chat starter are archived. Phase 2D operator diagnostics convergence is
-the next review-first slice; Phase 2E owns Ark confirmation-update retention policy,
+implemented on `codex/discord-embed-payload-safety-phase-2d` from mirror base `25525c55`. It adds a
+diagnostic-only policy layer for 2,000-character content, complete-unit packing, credential-shaped
+text redaction, conservative attachment filenames, and destination upload bytes while keeping
+`core/discord_embed_limits.py` canonical for embeds. Live admin, log-view, history/failure,
+PreKvK/KVK, inventory, subscriptions, shared-sender, and queue outputs now use final validation,
+visible exact-count compaction, and complete redacted private attachments where supported. The full
+suite passed `3118 passed, 2 skipped`; Changes-only scan
+`848b6f62-9da7-4306-bf4d-45661db7c6be` ran with Deep off, covered all 11 runtime files, and found
+zero issues. SQL is unchanged. Review, promotion, deployment, and production smoke remain pending.
+
+Phase 2E owns Ark confirmation-update retention policy,
 team-builder audit-service extraction, and explicit registration-delivery outcome observability;
 Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic
 Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item without

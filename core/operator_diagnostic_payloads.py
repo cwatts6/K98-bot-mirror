@@ -1,0 +1,172 @@
+"""Pure helpers for safe, truthful operator diagnostic Discord payloads.
+
+This module complements, rather than replaces, :mod:`core.discord_embed_limits`.
+It owns message-content, complete-unit preview, redaction, attachment-name, and
+destination upload-budget policy used by operator diagnostic routes.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from dataclasses import dataclass
+import re
+from typing import Any
+
+MAX_MESSAGE_CONTENT_CHARACTERS = 2000
+MAX_ATTACHMENTS_PER_MESSAGE = 10
+DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES = 10 * 1024 * 1024
+
+_SENSITIVE_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(token|secret|password|passwd|pwd|api[_-]?key|client[_-]?secret|"
+    r"connection[_-]?string)\b(\s*[:=]\s*)([^\s,;]+)"
+)
+_AUTH_BEARER_RE = re.compile(r"(?i)\bauthorization\s*:\s*bearer\s+[^\s,;]+")
+_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_SIGNED_QUERY_RE = re.compile(
+    r"(?i)([?&](?:sig|signature|token|key|secret|x-amz-signature)=)[^&#\s]+"
+)
+_CONNECTION_PASSWORD_RE = re.compile(r"(?i)(\b(?:pwd|password)\s*=\s*)[^;\r\n]+")
+
+
+@dataclass(frozen=True, slots=True)
+class PackedUnits:
+    """A bounded preview containing only complete units and a truthful count."""
+
+    text: str
+    shown: int
+    omitted: int
+
+
+def redact_diagnostic_text(value: Any) -> str:
+    """Redact common credential-bearing forms without changing line ordering."""
+
+    text = "" if value is None else str(value)
+    text = _AUTH_BEARER_RE.sub("Authorization: Bearer [REDACTED]", text)
+    text = _BEARER_RE.sub("Bearer [REDACTED]", text)
+    text = _SENSITIVE_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
+    text = _SIGNED_QUERY_RE.sub(r"\1[REDACTED]", text)
+    return _CONNECTION_PASSWORD_RE.sub(r"\1[REDACTED]", text)
+
+
+def utf8_size(value: Any) -> int:
+    """Return the encoded byte size used by Discord multipart uploads."""
+
+    return len(("" if value is None else str(value)).encode("utf-8"))
+
+
+def safe_attachment_filename(value: Any, *, default: str = "diagnostic.txt") -> str:
+    """Return a conservative transport name; source names remain in file content."""
+
+    raw = str(value or default).strip()
+    stem, dot, suffix = raw.rpartition(".")
+    if not dot:
+        stem, suffix = raw, "txt"
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "diagnostic"
+    suffix = re.sub(r"[^A-Za-z0-9]+", "", suffix)[:12] or "txt"
+    return f"{stem[:100]}.{suffix}"
+
+
+def resolve_attachment_size_limit(destination: Any) -> int:
+    """Resolve the current interaction/guild upload entitlement conservatively."""
+
+    candidates = (
+        getattr(destination, "attachment_size_limit", None),
+        getattr(getattr(destination, "guild", None), "filesize_limit", None),
+        getattr(getattr(destination, "channel", None), "guild", None),
+    )
+    for candidate in candidates:
+        if candidate is not None and not isinstance(candidate, (int, float)):
+            candidate = getattr(candidate, "filesize_limit", None)
+        try:
+            parsed = int(candidate)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            return parsed
+    return DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
+
+
+def omission_marker(omitted: int, label: str) -> str:
+    """Return the canonical exact count-bearing exhaustion marker."""
+
+    noun = label if omitted != 1 else label.rstrip("s")
+    return f"… {omitted} {noun} not shown."
+
+
+def pack_complete_units(
+    units: Iterable[Any],
+    *,
+    limit: int,
+    label: str,
+    separator: str = "\n",
+    prefix: str = "",
+    suffix: str = "",
+) -> PackedUnits:
+    """Pack whole units within ``limit`` and reserve room for an omission marker.
+
+    Units that cannot fit are omitted as whole units. Later units are not promoted
+    ahead of an earlier oversized unit, preserving source ordering.
+    """
+
+    values = ["" if item is None else str(item) for item in units]
+    if limit < len(prefix) + len(suffix):
+        raise ValueError("limit is too small for prefix and suffix")
+    if not values:
+        return PackedUnits(f"{prefix}{suffix}", 0, 0)
+
+    selected: list[str] = []
+    for index, value in enumerate(values):
+        candidate = separator.join([*selected, value])
+        omitted = len(values) - index - 1
+        marker = omission_marker(omitted, label) if omitted else ""
+        candidate_body = separator.join(part for part in (candidate, marker) if part)
+        if len(prefix) + len(candidate_body) + len(suffix) <= limit:
+            selected.append(value)
+            continue
+        break
+
+    shown = len(selected)
+    omitted = len(values) - shown
+    marker = omission_marker(omitted, label) if omitted else ""
+    body = separator.join([*selected, *([marker] if marker else [])])
+
+    # A very long label could make even the marker too large. Keep the exact count.
+    if len(prefix) + len(body) + len(suffix) > limit:
+        marker = f"… {omitted} item(s) not shown."
+        while selected:
+            selected.pop()
+            omitted = len(values) - len(selected)
+            marker = f"… {omitted} item(s) not shown."
+            body = separator.join([*selected, marker])
+            if len(prefix) + len(body) + len(suffix) <= limit:
+                break
+        if not selected:
+            body = marker[: max(0, limit - len(prefix) - len(suffix))]
+    return PackedUnits(f"{prefix}{body}{suffix}", len(selected), len(values) - len(selected))
+
+
+def content_pages(units: Iterable[Any], *, limit: int = 1900) -> list[str]:
+    """Pack complete units into ordered Discord content pages.
+
+    A pathological single unit is represented by an exact omission marker; callers
+    can attach its complete redacted form without pretending the preview is complete.
+    """
+
+    values = ["" if item is None else str(item) for item in units]
+    pages: list[str] = []
+    current: list[str] = []
+    for value in values:
+        candidate = "\n".join([*current, value])
+        if len(candidate) <= limit:
+            current.append(value)
+            continue
+        if current:
+            pages.append("\n".join(current))
+            current = []
+        if len(value) <= limit:
+            current = [value]
+        else:
+            pages.append("… 1 complete item not shown; see attached diagnostic.")
+    if current:
+        pages.append("\n".join(current))
+    return pages or [""]

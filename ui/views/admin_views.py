@@ -12,6 +12,14 @@ import re
 
 import discord
 
+from core.discord_embed_limits import MAX_DESCRIPTION_CHARACTERS, require_valid_embed_payload
+from core.operator_diagnostic_payloads import (
+    MAX_MESSAGE_CONTENT_CHARACTERS,
+    pack_complete_units,
+    redact_diagnostic_text,
+    resolve_attachment_size_limit,
+)
+
 
 class LogTailView(discord.ui.View):
     def __init__(self, ctx, src_path, title, level=None, contains=None, page=1, page_size=50):
@@ -77,16 +85,20 @@ class LogTailView(discord.ui.View):
     async def render(self, interaction: discord.Interaction):
         # 1) Compute page slice
         lines, total_lines, total_matches, total_pages = self._tail_filtered()
-        body = "\n".join(lines).strip() or "(no matching lines)"
-        body = body.replace("```", "`\u200b``")  # fence safety
+        redacted_lines = [
+            redact_diagnostic_text(line).replace("```", "`\u200b``") for line in lines
+        ] or ["(no matching lines)"]
 
         # 2) Budget + description
-        BUDGET = 3800
-        needs_file = len(body) > BUDGET
-        desc_body = body[:BUDGET]
-        if needs_file:
-            desc_body += "\n…(truncated)"
-        desc = f"```{desc_body}```"
+        preview = pack_complete_units(
+            redacted_lines,
+            limit=min(3800, MAX_DESCRIPTION_CHARACTERS),
+            label="log lines",
+            prefix="```\n",
+            suffix="\n```",
+        )
+        needs_file = preview.omitted > 0
+        desc = preview.text
 
         # 3) File stats for footer
         try:
@@ -102,7 +114,9 @@ class LogTailView(discord.ui.View):
             filters.append(f"level={self.level}")
         if self.contains:
             filters.append(f"contains=/{self.contains}/")
-        filter_text = " • ".join(filters) if filters else "none"
+        filter_text = redact_diagnostic_text(" • ".join(filters) if filters else "none")
+        if len(filter_text) > 1800:
+            filter_text = "compacted; use Toggle Filter for the current values"
 
         embed = discord.Embed(
             title=self.title,
@@ -123,14 +137,31 @@ class LogTailView(discord.ui.View):
         kwargs = {"embed": embed, "view": self}
 
         if needs_file:
-            # Upload a fresh file for this page
-            buf = io.BytesIO(("\n".join(lines)).encode("utf-8", "replace"))
-            buf.seek(0)
-            file = discord.File(buf, filename=f"log_page_{self.page}.txt")
-            kwargs["files"] = [file]
+            complete_text = "\n".join(redacted_lines)
+            complete_bytes = complete_text.encode("utf-8", "replace")
+            upload_limit = resolve_attachment_size_limit(interaction)
+            if len(complete_bytes) <= upload_limit:
+                buf = io.BytesIO(complete_bytes)
+                buf.seek(0)
+                file = discord.File(buf, filename=f"log_page_{self.page}.txt")
+                # Edit replacement semantics: never retain an older page attachment.
+                kwargs["attachments"] = [file]
+            else:
+                embed.add_field(
+                    name="Complete page attachment",
+                    value=(
+                        f"… {preview.omitted} log lines not shown; redacted attachment "
+                        f"is {len(complete_bytes)} bytes, above this destination's "
+                        f"{upload_limit}-byte limit. Use the diagnostics runbook locally."
+                    ),
+                    inline=False,
+                )
+                kwargs["attachments"] = []
         else:
             # If a previous page attached a file, clear it now
             kwargs["attachments"] = []
+
+        require_valid_embed_payload(embed)
 
         # 6) Edit depending on interaction state
         if interaction.response.is_done():
@@ -153,14 +184,19 @@ class LogTailView(discord.ui.View):
 
     @discord.ui.button(label="🔎 Toggle Filter", style=discord.ButtonStyle.primary)
     async def show_filters(self, _, interaction: discord.Interaction):
-        txt = (
-            f"**Current filters**\n"
-            f"- level: `{self.level or 'none'}`\n"
-            f"- contains: `{self.contains or 'none'}`\n"
-            f"- page_size: `{self.page_size}`\n\n"
-            f"Tip: Use command options to set filters, e.g.:\n"
-            f'`/logs source:error level:ERROR contains:"sql" page_size:100`'
+        units = (
+            "**Current filters**",
+            f"- level: `{redact_diagnostic_text(self.level or 'none')}`",
+            f"- contains: `{redact_diagnostic_text(self.contains or 'none')}`",
+            f"- page_size: `{self.page_size}`",
+            "Tip: Use command options to set filters, for example:",
+            '`/logs source:error level:ERROR contains:"sql" page_size:100`',
         )
+        txt = pack_complete_units(
+            units,
+            limit=MAX_MESSAGE_CONTENT_CHARACTERS,
+            label="filter lines",
+        ).text
         await interaction.response.send_message(txt, ephemeral=True)
 
 

@@ -60,6 +60,19 @@ Upload options are available through:
 Keep upload tokens private. The diagnostics script redacts sensitive environment values in the
 archive.
 
+## Discord Operator Diagnostic Output
+
+Operator commands use the canonical embed limits plus the diagnostic payload policy in
+`core/operator_diagnostic_payloads.py`. Long previews keep complete rows or log lines in source
+order and show an exact count-bearing omission marker. When a complete private attachment is
+available, its content is redacted before upload and its UTF-8 byte size is checked against the
+current Discord destination limit. Page edits replace or clear older attachments.
+
+If the complete redacted attachment exceeds the destination limit, use this runbook and the local
+log paths instead of copying raw logs into a broader channel or DM. Do not work around the guard by
+renaming, splitting, or posting an unredacted archive. `scripts/collect_diagnostics.py` remains a
+separate operator-only CLI path; no Discord command invokes it.
+
 ## Telemetry
 
 Telemetry is written through the `telemetry` logger to `TELEMETRY_LOG_PATH`.

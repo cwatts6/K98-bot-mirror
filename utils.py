@@ -18,6 +18,14 @@ import aiohttp
 import discord
 
 from constants import CSV_LOG, INPUT_CACHE_FILE, PLAYER_STATS_CACHE, QUEUE_CACHE_FILE
+from core.discord_embed_limits import (
+    MAX_FIELD_NAME_CHARACTERS,
+    MAX_FIELD_VALUE_CHARACTERS,
+    MAX_TOTAL_CHARACTERS,
+    measure_embed_payload,
+    require_valid_embed_payload,
+)
+from core.operator_diagnostic_payloads import omission_marker, redact_diagnostic_text
 from event_cache import get_all_upcoming_events
 
 # Use timezone.utc for broader compatibility across Python versions
@@ -423,20 +431,49 @@ async def update_live_queue_embed(bot, notify_channel_id):
 
         sorted_jobs = sorted(jobs_to_show, key=sort_key)
 
-        for job in sorted_jobs:
+        for index, job in enumerate(sorted_jobs):
             upload_time = str(job.get("uploaded", ""))[:16].replace("T", " ")
-            job_channel = job.get("channel", "unknown")
-            filename = job.get("filename", "unknown")
-            user = job.get("user", "unknown")
-            status = job.get("status", "")
+            job_channel = redact_diagnostic_text(job.get("channel", "unknown"))
+            filename = redact_diagnostic_text(job.get("filename", "unknown"))
+            user = redact_diagnostic_text(job.get("user", "unknown"))
+            status = redact_diagnostic_text(job.get("status", ""))
+            field_name = f"📄 {filename}"
+            field_value = f"👤 {user}\n📅 {upload_time} UTC\n📣 #{job_channel}\n{status}"
+            candidate_total = (
+                measure_embed_payload(embed).total_characters + len(field_name) + len(field_value)
+            )
+            if (
+                len(field_name) > MAX_FIELD_NAME_CHARACTERS
+                or len(field_value) > MAX_FIELD_VALUE_CHARACTERS
+                or candidate_total > MAX_TOTAL_CHARACTERS
+            ):
+                omitted = len(sorted_jobs) - index
+                marker_name = "Queue display compacted"
+                marker_value = omission_marker(omitted, "queue jobs")
+                while embed.fields and (
+                    measure_embed_payload(embed).total_characters
+                    + len(marker_name)
+                    + len(marker_value)
+                    > MAX_TOTAL_CHARACTERS
+                ):
+                    embed.remove_field(len(embed.fields) - 1)
+                    omitted += 1
+                    marker_value = omission_marker(omitted, "queue jobs")
+                embed.add_field(
+                    name=marker_name,
+                    value=marker_value,
+                    inline=False,
+                )
+                break
             embed.add_field(
-                name=f"📄 {filename}",
-                value=f"👤 {user}\n📅 {upload_time} UTC\n📣 #{job_channel}\n{status}",
+                name=field_name,
+                value=field_value,
                 inline=False,
             )
 
     embed.set_footer(text="Tracking latest 5 jobs")
     embed.timestamp = utcnow()  # aware UTC
+    require_valid_embed_payload(embed)
 
     try:
         # Now perform network ops; update live_queue['message'] if we create a new message.

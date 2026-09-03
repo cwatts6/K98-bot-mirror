@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 
 import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
+from core.discord_embed_limits import require_valid_embed_payload
 from core.interaction_safety import safe_command, safe_defer
+from core.operator_diagnostic_payloads import resolve_attachment_size_limit
 from decoraters import is_admin_and_notify_channel, track_usage
-from prekvk.diagnostics_service import format_history_rows, get_recent_import_history
+from prekvk.diagnostics_service import (
+    format_history_rows,
+    format_history_units,
+    get_recent_import_history,
+)
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -89,7 +96,26 @@ def attach_prekvk_import_history(command_group: discord.SlashCommandGroup) -> No
         embed.add_field(name="Status", value=str(status_filter or "all"), inline=True)
         embed.add_field(name="Rows", value=str(len(rows)), inline=True)
 
-        await ctx.followup.send(embed=embed, ephemeral=True)
+        require_valid_embed_payload(embed)
+        units = format_history_units(rows)
+        complete_text = "\n".join(units)
+        files = []
+        if embed.description != complete_text:
+            data = complete_text.encode("utf-8", "replace")
+            upload_limit = resolve_attachment_size_limit(ctx.interaction)
+            if len(data) <= upload_limit:
+                files.append(discord.File(io.BytesIO(data), filename="prekvk_import_history.txt"))
+                embed.set_footer(text="Complete redacted history attached.")
+            else:
+                embed.set_footer(
+                    text=(
+                        f"Complete redacted history is {len(data)} bytes; attachment exceeds "
+                        f"the destination limit of {upload_limit} bytes."
+                    )
+                )
+            require_valid_embed_payload(embed)
+
+        await ctx.followup.send(embed=embed, files=files or None, ephemeral=True)
 
 
 def register_prekvk_admin(bot: ext_commands.Bot) -> None:

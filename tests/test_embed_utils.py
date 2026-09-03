@@ -1,3 +1,4 @@
+import asyncio
 import types
 
 import pytest
@@ -129,6 +130,51 @@ async def test_send_embed_safe_keeps_small_log_inline(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_embed_safe_redacts_attachment_and_honours_destination_limit(monkeypatch):
+    import embed_utils
+
+    class FakeFile:
+        def __init__(self, bio, filename):
+            bio.seek(0)
+            self.filename = filename
+            self.content = bio.read()
+
+    class Dest:
+        attachment_size_limit = 100
+
+        async def send(self, **kwargs):
+            self.kwargs = kwargs
+            return types.SimpleNamespace(id=1)
+
+    monkeypatch.setattr(embed_utils.discord, "File", FakeFile)
+    dest = Dest()
+    secret_log = "Authorization: Bearer active-token\n" + ("X" * 200)
+
+    assert await embed_utils.send_embed_safe(
+        dest,
+        "Attachment budget",
+        {"Log": secret_log},
+        color=0x123456,
+        max_log_embed_chars=10,
+    )
+
+    assert "files" not in dest.kwargs
+    assert "active-token" not in dest.kwargs["embed"].fields[0].value
+    assert "complete log omitted" in dest.kwargs["embed"].fields[0].value
+
+    dest.attachment_size_limit = 1000
+    assert await embed_utils.send_embed_safe(
+        dest,
+        "Attachment redaction",
+        {"Log": secret_log},
+        color=0x123456,
+        max_log_embed_chars=10,
+    )
+    assert b"active-token" not in dest.kwargs["files"][0].content
+    assert b"[REDACTED]" in dest.kwargs["files"][0].content
+
+
+@pytest.mark.asyncio
 async def test_send_embed_safe_falls_back_for_invalid_log_limit():
     import embed_utils
 
@@ -177,13 +223,77 @@ async def test_send_embed_safe_enforces_exact_and_one_over_component_boundaries(
     embed = dest.kwargs["embed"]
     require_valid_embed_payload(embed)
     assert len(embed.title) == 256
-    assert len(embed.fields[0].name) == 256
-    assert len(embed.fields[0].value) == 1024
     assert dest.kwargs["content"] == "@ops"
     if extra:
         assert embed.title.endswith("…")
-        assert embed.fields[0].name.endswith("…")
-        assert embed.fields[0].value.endswith("…")
+        assert embed.fields[0].name.startswith("Attached field")
+        assert "complete field attached" in embed.fields[0].value
+        assert dest.kwargs.get("files")
+    else:
+        assert len(embed.fields[0].name) == 256
+        assert len(embed.fields[0].value) == 1024
+
+
+@pytest.mark.asyncio
+async def test_send_embed_safe_attaches_complete_oversized_non_log_field(monkeypatch):
+    import embed_utils
+
+    class FakeFile:
+        def __init__(self, bio, filename):
+            bio.seek(0)
+            self.filename = filename
+            self.content = bio.read()
+
+    class Dest:
+        attachment_size_limit = 100_000
+
+        async def send(self, **kwargs):
+            self.kwargs = kwargs
+            return types.SimpleNamespace(id=1)
+
+    monkeypatch.setattr(embed_utils.discord, "File", FakeFile)
+    dest = Dest()
+    complete_value = "V" * 1025
+
+    assert await embed_utils.send_embed_safe(
+        dest,
+        "Oversized field",
+        {"Database result": complete_value},
+        color=0x123456,
+        max_field_length=5000,
+    )
+
+    assert dest.kwargs["files"][0].content.endswith(complete_value.encode())
+    assert "complete field attached" in dest.kwargs["embed"].fields[0].value
+
+
+@pytest.mark.asyncio
+async def test_send_embed_safe_tight_total_cap_terminates_when_attachment_unavailable():
+    import embed_utils
+
+    class Dest:
+        attachment_size_limit = 1
+
+        def __init__(self):
+            self.called = False
+
+        async def send(self, **_kwargs):
+            self.called = True
+
+    dest = Dest()
+    result = await asyncio.wait_for(
+        embed_utils.send_embed_safe(
+            dest,
+            "T",
+            {"Status": "a value that cannot fit"},
+            color=0x123456,
+            total_cap=1,
+        ),
+        timeout=1,
+    )
+
+    assert result is False
+    assert dest.called is False
 
 
 @pytest.mark.asyncio
@@ -275,7 +385,7 @@ async def test_send_embed_safe_never_exceeds_ten_attachments(monkeypatch):
 
     require_valid_embed_payload(dest.kwargs["embed"])
     assert len(dest.kwargs["files"]) == 10
-    assert any(field.value.endswith("…") for field in dest.kwargs["embed"].fields)
+    assert any("complete log omitted" in field.value for field in dest.kwargs["embed"].fields)
 
 
 @pytest.mark.asyncio
@@ -298,7 +408,7 @@ async def test_send_embed_safe_compacts_with_marker_if_attachment_creation_fails
 
     embed = dest.kwargs["embed"]
     require_valid_embed_payload(embed)
-    assert any(field.value.endswith("…") for field in embed.fields)
+    assert any("complete field omitted" in field.value for field in embed.fields)
     assert "files" not in dest.kwargs
 
 
@@ -406,7 +516,7 @@ async def test_history_and_failure_views_bound_dynamic_names_and_values():
 
     require_valid_embed_payload(history)
     require_valid_embed_payload(failures)
-    assert history.fields[0].name.endswith("…")
-    assert history.fields[0].value.endswith("…")
-    assert failures.fields[0].name.endswith("…")
-    assert failures.fields[0].value.endswith("…")
+    assert "history entries" in history.fields[0].name
+    assert "1 additional history entries omitted" in history.fields[0].value
+    assert "failed jobs" in failures.fields[0].name
+    assert "1 additional failed jobs omitted" in failures.fields[0].value

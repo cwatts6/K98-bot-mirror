@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from core.operator_diagnostic_payloads import pack_complete_units, redact_diagnostic_text
 from prekvk.dal.import_history_dal import fetch_recent_import_history, record_import_history
 
 logger = logging.getLogger(__name__)
@@ -51,20 +52,22 @@ def get_recent_import_history(
     return fetch_recent_import_history(kvk_no=kvk_no, status=status, limit=limit)
 
 
-def format_history_rows(rows: list[dict[str, Any]]) -> str:
+def format_history_units(rows: list[dict[str, Any]]) -> list[str]:
+    """Return complete, mention-neutral diagnostic rows in source order."""
+
     if not rows:
-        return "No PreKvK import history found."
+        return ["No PreKvK import history found."]
 
     lines = []
     for row in rows:
         created = _sanitize_for_discord_inline(row.get("CreatedUTC") or "unknown", max_len=64)
         status = _sanitize_for_discord_inline(row.get("ImportStatus") or "unknown", max_len=32)
         kvk_no = _sanitize_for_discord_inline(row.get("KVK_NO") or "?", max_len=32)
-        filename = _sanitize_for_discord_inline(row.get("Filename") or "unknown file", max_len=255)
+        filename = _sanitize_for_discord_inline(row.get("Filename") or "unknown file")
         row_count = row.get("RowCount")
         scan_id = row.get("ScanID")
         phase = _sanitize_for_discord_inline(row.get("Phase"), max_len=64)
-        err = _sanitize_for_discord_inline(row.get("ErrorType") or row.get("ErrorText"), max_len=80)
+        err = _sanitize_for_discord_inline(row.get("ErrorType") or row.get("ErrorText"))
 
         bits = [f"`{created}`", f"KVK `{kvk_no}`", f"**{status}**", f"`{filename}`"]
         if row_count is not None:
@@ -75,7 +78,16 @@ def format_history_rows(rows: list[dict[str, Any]]) -> str:
             bits.append(f"phase `{phase}`")
         if err:
             bits.append(f"error `{err}`")
-        lines.append(" - ".join(bits))
+        lines.append(redact_diagnostic_text(" - ".join(bits)))
 
-    body = "\n".join(lines)
-    return body[:3900]
+    return lines
+
+
+def format_history_rows(rows: list[dict[str, Any]]) -> str:
+    """Return a Discord description containing only complete history rows."""
+
+    return pack_complete_units(
+        format_history_units(rows),
+        limit=3900,
+        label="history rows",
+    ).text

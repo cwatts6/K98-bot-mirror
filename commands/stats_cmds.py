@@ -14,7 +14,13 @@ from bot_config import (
 )
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
+from core.discord_embed_limits import require_valid_embed_payload
 from core.interaction_safety import safe_command, safe_defer
+from core.operator_diagnostic_payloads import (
+    MAX_MESSAGE_CONTENT_CHARACTERS,
+    pack_complete_units,
+    redact_diagnostic_text,
+)
 from decoraters import (
     channel_only,
     is_admin_and_notify_channel,
@@ -33,8 +39,16 @@ logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
 
 
+def _safe_diagnostic_error(prefix: str, error: object) -> str:
+    return pack_complete_units(
+        [prefix, redact_diagnostic_text(error)],
+        limit=MAX_MESSAGE_CONTENT_CHARACTERS,
+        label="diagnostic lines",
+    ).text
+
+
 def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
-    """Split command output into Discord-safe content chunks."""
+    """Split command output into Discord-safe complete-line chunks."""
     if len(content) <= max_chars:
         return [content]
 
@@ -50,10 +64,10 @@ def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
             chunks.append(current)
             current = ""
 
-        while len(line) > max_chars:
-            chunks.append(line[:max_chars])
-            line = line[max_chars:]
-        current = line
+        if len(line) > max_chars:
+            chunks.append("… 1 complete diagnostic row not shown.")
+        else:
+            current = line
 
     if current:
         chunks.append(current)
@@ -143,7 +157,10 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             except Exception as e:
                 logger.exception("[COMMAND] /kvk_admin test_export could not resolve KVK")
                 await ctx.interaction.edit_original_response(
-                    content=f"❌ Could not resolve the current KVK window: `{type(e).__name__}: {e}`"
+                    content=_safe_diagnostic_error(
+                        "❌ Could not resolve the current KVK window:",
+                        f"{type(e).__name__}: {e}",
+                    )
                 )
                 return
 
@@ -177,7 +194,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[COMMAND] /kvk_admin test_export crashed")
             await ctx.interaction.edit_original_response(
-                content=f"💥 Test export failed unexpectedly: `{type(e).__name__}: {e}`"
+                content=_safe_diagnostic_error(
+                    "💥 Test export failed unexpectedly:", f"{type(e).__name__}: {e}"
+                )
             )
             return
 
@@ -307,12 +326,17 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             logger.exception("[/kvk_admin refresh_stats_cache] failed")
             try:
                 await ctx.interaction.edit_original_response(
-                    content=f"Failed to refresh cache: `{type(e).__name__}: {e}`"
+                    content=_safe_diagnostic_error(
+                        "Failed to refresh cache:", f"{type(e).__name__}: {e}"
+                    )
                 )
             except Exception:
                 try:
                     await ctx.followup.send(
-                        f"Failed to refresh cache: `{type(e).__name__}: {e}`", ephemeral=True
+                        _safe_diagnostic_error(
+                            "Failed to refresh cache:", f"{type(e).__name__}: {e}"
+                        ),
+                        ephemeral=True,
                     )
                 except Exception:
                     logger.exception(
@@ -423,7 +447,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/kvk_admin export_all] could not resolve KVK")
             await ctx.followup.send(
-                f"Could not resolve KVK `{kvk_no}`: `{type(e).__name__}: {e}`",
+                _safe_diagnostic_error(
+                    f"Could not resolve KVK `{kvk_no}`:", f"{type(e).__name__}: {e}"
+                ),
                 ephemeral=True,
             )
             return
@@ -449,7 +475,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/kvk_admin export_all] export failed")
             await ctx.followup.send(
-                f"💥 Export failed for KVK `{kvk_no}`: `{type(e).__name__}: {e}`",
+                _safe_diagnostic_error(
+                    f"💥 Export failed for KVK `{kvk_no}`:", f"{type(e).__name__}: {e}"
+                ),
                 ephemeral=True,
             )
             return
@@ -484,7 +512,10 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 ephemeral=True,
             )
         except Exception as e:
-            await ctx.followup.send(f"💥 {type(e).__name__}: {e}", ephemeral=True)
+            await ctx.followup.send(
+                _safe_diagnostic_error("💥 Recompute failed:", f"{type(e).__name__}: {e}"),
+                ephemeral=True,
+            )
 
     @kvk_admin_group.command(
         name="list_scans",
@@ -513,7 +544,10 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             for chunk in chunks:
                 await ctx.followup.send(content=chunk, ephemeral=True)
         except Exception as e:
-            await ctx.followup.send(f"❌ {type(e).__name__}: {e}", ephemeral=True)
+            await ctx.followup.send(
+                _safe_diagnostic_error("❌ Failed to list scans:", f"{type(e).__name__}: {e}"),
+                ephemeral=True,
+            )
 
     @kvk_admin_group.command(
         name="test_embed",
@@ -562,7 +596,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/kvk_admin test_embed] failed")
             await ctx.followup.send(
-                f"❌ Failed to send test embed:\n`{type(e).__name__}: {e}`", ephemeral=True
+                _safe_diagnostic_error("❌ Failed to send test embed:", f"{type(e).__name__}: {e}"),
+                ephemeral=True,
             )
 
     @kvk_admin_group.command(
@@ -595,6 +630,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         )
         embed.add_field(name="Windows", value=body, inline=False)
 
+        require_valid_embed_payload(embed)
         await ctx.followup.send(embed=embed, ephemeral=True)
 
     def _format_validate_embed(report) -> discord.Embed:

@@ -38,6 +38,14 @@ from core.discord_embed_limits import (
     truncate_text,
     validate_embed_payload,
 )
+from core.operator_diagnostic_payloads import (
+    MAX_ATTACHMENTS_PER_MESSAGE,
+    pack_complete_units,
+    redact_diagnostic_text,
+    resolve_attachment_size_limit,
+    safe_attachment_filename,
+    utf8_size,
+)
 from file_utils import (
     emit_telemetry_event,
     read_summary_log_rows,
@@ -64,7 +72,7 @@ EMBED_BUILD_SLOW_THRESHOLD = 1.0
 # Backward-compatible aliases; canonical ownership lives in core.discord_embed_limits.
 _EMBED_FIELD_MAX = MAX_FIELD_VALUE_CHARACTERS
 _EMBED_TOTAL_CAP = MAX_TOTAL_CHARACTERS
-_MAX_FILES_PER_MESSAGE = 10
+_MAX_FILES_PER_MESSAGE = MAX_ATTACHMENTS_PER_MESSAGE
 # Fallback when a large "log-like" field should be attached instead of embedded
 _LOG_FIELD_NAMES = ("log", "combined_log", "out", "output", "details")
 
@@ -804,9 +812,7 @@ async def send_status_embed(
 
 
 def _safe_embed_attachment_name(title: str, field_name: str, index: int) -> str:
-    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{title}_{field_name}_{index}").strip("._")
-    stem = stem or f"embed_field_{index}"
-    return f"{stem[:100]}.txt"
+    return safe_attachment_filename(f"{title}_{field_name}_{index}.txt")
 
 
 # Backward-compatible sender using the canonical payload contract.
@@ -846,14 +852,20 @@ async def send_embed_safe(
 
     prepared: list[dict[str, Any]] = []
     for index, (raw_name, raw_value) in enumerate(field_items, start=1):
-        original_name = str(raw_name or f"Field {index}")
-        original_value = "—" if raw_value is None or str(raw_value) == "" else str(raw_value)
+        original_name = redact_diagnostic_text(raw_name or f"Field {index}")
+        original_value = (
+            "—" if raw_value is None or str(raw_value) == "" else redact_diagnostic_text(raw_value)
+        )
         prepared.append(
             {
                 "name": truncate_text(original_name, MAX_FIELD_NAME_CHARACTERS),
                 "value": truncate_text(original_value, effective_field_limit),
                 "original_name": original_name,
                 "original_value": original_value,
+                "component_oversized": (
+                    len(original_name) > MAX_FIELD_NAME_CHARACTERS
+                    or len(original_value) > effective_field_limit
+                ),
                 "log_like": any(token in original_name.lower() for token in _LOG_FIELD_NAMES),
                 "attached": False,
                 "index": index,
@@ -861,9 +873,12 @@ async def send_embed_safe(
         )
 
     attachment_limit_reported = False
+    upload_limit = resolve_attachment_size_limit(destination)
 
     def _attach_text(content: str, filename: str, *, context: str) -> bool:
         nonlocal attachment_limit_reported
+        redacted_content = redact_diagnostic_text(content)
+        content_size = utf8_size(redacted_content)
         if len(files) >= _MAX_FILES_PER_MESSAGE:
             if not attachment_limit_reported:
                 logger.warning(
@@ -871,12 +886,48 @@ async def send_embed_safe(
                 )
                 attachment_limit_reported = True
             return False
+        if content_size > upload_limit:
+            logger.warning(
+                "[EMBED] Refusing oversized %s attachment bytes=%s destination_limit=%s",
+                context,
+                content_size,
+                upload_limit,
+            )
+            return False
         try:
-            files.append(discord.File(io.BytesIO(content.encode("utf-8")), filename=filename))
+            files.append(
+                discord.File(io.BytesIO(redacted_content.encode("utf-8")), filename=filename)
+            )
             return True
         except Exception:
             logger.exception("[EMBED] Failed to attach %s", context)
             return False
+
+    for item in prepared:
+        if not item["component_oversized"]:
+            continue
+        filename = _safe_embed_attachment_name(safe_title, item["original_name"], item["index"])
+        attachment_text = f"{item['original_name']}\n\n{item['original_value']}"
+        if _attach_text(attachment_text, filename, context="oversized complete field"):
+            if len(item["original_name"]) > MAX_FIELD_NAME_CHARACTERS:
+                item["name"] = truncate_text(
+                    f"Attached field {item['index']}", MAX_FIELD_NAME_CHARACTERS
+                )
+            item["value"] = truncate_text(
+                f"(complete field attached as {filename})", effective_field_limit
+            )
+            item["attached"] = True
+        else:
+            item["name"] = truncate_text(
+                f"Omitted field {item['index']}", MAX_FIELD_NAME_CHARACTERS
+            )
+            item["value"] = truncate_text(
+                (
+                    "… 1 complete field not shown; attachment unavailable "
+                    f"({utf8_size(attachment_text)} bytes)."
+                ),
+                effective_field_limit,
+            )
 
     if len(prepared) > MAX_FIELDS_PER_EMBED:
         overflow = prepared[MAX_FIELDS_PER_EMBED - 1 :]
@@ -912,6 +963,14 @@ async def send_embed_safe(
         if _attach_text(item["original_value"], filename, context="large log field"):
             item["value"] = truncate_text(f"(log attached as {filename})", effective_field_limit)
             item["attached"] = True
+        else:
+            item["value"] = truncate_text(
+                (
+                    "… complete log omitted; attachment unavailable "
+                    f"({utf8_size(item['original_value'])} bytes)."
+                ),
+                effective_field_limit,
+            )
 
     def _payload_dict() -> dict[str, Any]:
         return {
@@ -947,20 +1006,20 @@ async def send_embed_safe(
                 candidate["attached"] = True
                 continue
 
-        # Attachment creation failed or every field is already attached. Compact visibly.
-        excess = usage.total_characters - effective_total_cap
+        # Attachment creation failed or every field is already attached. Omit the
+        # complete value visibly instead of slicing a meaningful diagnostic unit.
         compact_target = max(
             prepared,
             key=lambda item: len(item["name"]) + len(item["value"]),
         )
-        if len(compact_target["value"]) > 1:
-            compact_target["value"] = truncate_text(
-                compact_target["value"], max(1, len(compact_target["value"]) - excess)
-            )
-        elif len(compact_target["name"]) > 1:
-            compact_target["name"] = truncate_text(
-                compact_target["name"], max(1, len(compact_target["name"]) - excess)
-            )
+        marker = (
+            "… complete field omitted; attachment unavailable "
+            f"({utf8_size(compact_target['original_value'])} bytes)."
+        )
+        if compact_target["value"] != marker:
+            compact_target["value"] = truncate_text(marker, effective_field_limit)
+        elif compact_target["name"] != "Omitted field":
+            compact_target["name"] = "Omitted field"
         else:
             logger.error(
                 "[EMBED] Unable to satisfy requested aggregate cap=%s", effective_total_cap
@@ -1099,11 +1158,15 @@ async def generate_summary_embed(days=1, summary_log_path="summary_log.csv"):
     embed.add_field(name="Files Processed", value=fmt_short(total), inline=True)
     embed.add_field(name="Failures", value=str(failures), inline=True)
     embed.add_field(name="Average Duration", value=avg_duration_str, inline=True)
-    details_text = "\n".join(rows_to_show[-10:]) or "No recent files"
-    if len(details_text) > 1024:
-        details_text = details_text[:1021] + "…"
-    embed.add_field(name="File Details", value=details_text, inline=False)
+    detail_rows = rows_to_show[-10:]
+    details = pack_complete_units(
+        detail_rows or ["No recent files"],
+        limit=MAX_FIELD_VALUE_CHARACTERS,
+        label="file rows",
+    )
+    embed.add_field(name="File Details", value=details.text, inline=False)
     embed.timestamp = discord.utils.utcnow()
+    require_valid_embed_payload(embed)
     return embed
 
 
@@ -1185,17 +1248,18 @@ class HistoryView(discord.ui.View):
             color=INFO_COLOR,
         )
         for index, row in enumerate(page_rows):
-            name = truncate_text(f"📄 {row.get('Filename', 'Unknown')}", MAX_FIELD_NAME_CHARACTERS)
-            value = truncate_text(
-                (
-                    f"👤 Uploaded by: `{row.get('Author', 'Unknown')}`\n"
-                    f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
-                    f"#️⃣ Channel: `{row.get('Channel', 'Unknown')}`\n"
-                    f"📂 Path: `{row.get('SavedPath', 'Unknown')}`"
-                ),
-                MAX_FIELD_VALUE_CHARACTERS,
+            name = f"📄 {row.get('Filename', 'Unknown')}"
+            value = (
+                f"👤 Uploaded by: `{row.get('Author', 'Unknown')}`\n"
+                f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
+                f"#️⃣ Channel: `{row.get('Channel', 'Unknown')}`\n"
+                f"📂 Path: `{row.get('SavedPath', 'Unknown')}`"
             )
-            if not _embed_field_would_fit(embed, name, value):
+            if (
+                len(name) > MAX_FIELD_NAME_CHARACTERS
+                or len(value) > MAX_FIELD_VALUE_CHARACTERS
+                or not _embed_field_would_fit(embed, name, value)
+            ):
                 _add_embed_omission_marker(embed, len(page_rows) - index, "history entries")
                 break
             embed.add_field(name=name, value=value, inline=False)
@@ -1295,19 +1359,20 @@ class FailuresView(discord.ui.View):
             title=f"❌ Failed Jobs (Page {self.page}/{self.total_pages})", color=DANGER_COLOR
         )
         for index, row in enumerate(page_rows):
-            name = truncate_text(f"📄 {row.get('Filename', 'Unknown')}", MAX_FIELD_NAME_CHARACTERS)
-            value = truncate_text(
-                (
-                    f"👤 Author: `{row.get('User', 'Unknown')}`\n"
-                    f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
-                    f"📊 Rank/Seed: `{row.get('Rank', '?')}` / `{row.get('Seed', '?')}`\n"
-                    f"**Excel:** `{row.get('Excel Success', '?')}`, Archive: `{row.get('Archive Success', '?')}`\n"
-                    f"🧠 SQL: `{row.get('SQL Success', '?')}` | 📤 Export: `{row.get('Export Success', '?')}`\n"
-                    f"⏱ Duration: `{row.get('Duration (sec)', '?')}`"
-                ),
-                MAX_FIELD_VALUE_CHARACTERS,
+            name = f"📄 {row.get('Filename', 'Unknown')}"
+            value = (
+                f"👤 Author: `{row.get('User', 'Unknown')}`\n"
+                f"🕒 Time: `{row.get('Timestamp', 'Unknown')}`\n"
+                f"📊 Rank/Seed: `{row.get('Rank', '?')}` / `{row.get('Seed', '?')}`\n"
+                f"**Excel:** `{row.get('Excel Success', '?')}`, Archive: `{row.get('Archive Success', '?')}`\n"
+                f"🧠 SQL: `{row.get('SQL Success', '?')}` | 📤 Export: `{row.get('Export Success', '?')}`\n"
+                f"⏱ Duration: `{row.get('Duration (sec)', '?')}`"
             )
-            if not _embed_field_would_fit(embed, name, value):
+            if (
+                len(name) > MAX_FIELD_NAME_CHARACTERS
+                or len(value) > MAX_FIELD_VALUE_CHARACTERS
+                or not _embed_field_would_fit(embed, name, value)
+            ):
                 _add_embed_omission_marker(embed, len(page_rows) - index, "failed jobs")
                 break
             embed.add_field(name=name, value=value, inline=False)

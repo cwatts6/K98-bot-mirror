@@ -1,8 +1,8 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence
 
-Status: ready for use after the operator merges mirror PR #254 and production PR #561 and completes
-final production-main verification, or explicitly approves an equivalent Phase 2C-containing base.
-This starts review/scope only.
+Status: used on 2026-09-03. The operator approved the audited implementation scope; local
+implementation, validation, and the Changes-only security review are complete. Mirror PR review,
+promotion, deployment, and production smoke remain pending.
 
 ## Copy/Paste Starter
 

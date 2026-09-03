@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to delivered Phase 2C`
 - Task type: `deferred optimisation batch / diagnostic payload reliability`
 - One-pass approved: `no`
-- Status: `prepared for review/scope approval; no runtime or test work started`
+- Status: `implementation and local validation complete; mirror PR handoff in progress`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -257,3 +257,39 @@ persistence, orchestration, scheduling, or unrelated player-facing product behav
 - separate coordinated tasks: Stats and KVK History once-only executor audits.
 
 No prior deferred item is made ownerless by this preparation.
+
+## 15. Approved Implementation And Validation Evidence
+
+On 2026-09-03 the operator approved the audited `fix now` scope and asked Codex to prepare the
+mirror pull request as ready for review. Phase 2C prerequisites were revalidated before editing:
+mirror `main` is `25525c5512ee929f1092f3575a140ae2bbf625fe`, mirrored from production
+`f03b2c8a78a29ab389b65b22d3cec50a34af8faf`, whose merge message records production PR #561.
+The implementation branch is `codex/discord-embed-payload-safety-phase-2d`. The SQL repository is
+unchanged at `fc0e94ebd2e0a98286069c8a8b71365dd5178657` and remains a documented no-diff skip.
+
+The approved implementation adds `core/operator_diagnostic_payloads.py` for message-content,
+complete-unit, redaction, attachment-name, attachment-count, UTF-8 byte, and destination upload
+policy while retaining `core/discord_embed_limits.py` as the sole canonical embed contract. Live
+operator routes now use complete rows/lines/jobs, exact count-bearing omission markers, canonical
+final embed validation, and complete redacted private attachments when the current destination can
+accept them. Attachment edits replace or clear the previous file. No command, option, permission,
+guild/channel restriction, public/ephemeral/DM audience, requester ownership, mention behavior,
+source ordering, status/filter meaning, SQL/DAL, config, cache/state schema, message/view identity,
+timeout, startup, restart/rehydration, scheduler, watchdog, maintenance, or executor behavior
+changes.
+
+Focused suites passed `149` before formatting and `90` after the formatter-only changes. The full
+suite passed `3118 passed, 2 skipped`. Architecture, deferred-item, security-routing, selector,
+import-smoke, command-registration, Ruff, Black, Pyright, secrets, and complete pre-commit gates
+passed. Bot Changes-only security scan `848b6f62-9da7-4306-bf4d-45661db7c6be` reviewed the exact
+approved working-tree snapshot from base `25525c5512ee929f1092f3575a140ae2bbf625fe`, with Deep off,
+complete coverage of all 11 changed runtime files, and zero findings. The scan was sealed with
+digest `codex-security-snapshot/v1:sha256:cc42cf88aab852775835865caf5017a1e5f541b91a2177aa709e1a19aaeeac37`.
+Subsequent task-record changes are documentation-only and receive a precise incremental security
+skip.
+
+Production smoke and promotion remain separate approval-gated work after review. The planned smoke
+uses representative authorised summary/history, log preview/attachment, health/status, usage, and
+natural queue edit/rehydration paths without injecting secrets or manufacturing failures. Rollback
+remains a bot-PR revert and redeploy of the previous production-main revision; no SQL, config,
+cache/state, command, or data rollback is required.

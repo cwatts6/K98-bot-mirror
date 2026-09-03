@@ -1,7 +1,7 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1 and 2A merged; Phase 2B delivered and production-merged; Phase 2C evidence-led tests/documentation implementation complete with no runtime correction required
-Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C update 2026-09-03
+Status: Phases 1-2C delivered; Phase 2D implementation and local validation complete, mirror PR review pending
+Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C and Phase 2D updates 2026-09-03
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
@@ -617,3 +617,39 @@ The operator confirmed that candidate deployment and smoke testing passed. No ad
 command-specific or payload-metric detail was supplied, so none is inferred here. Both PRs await
 manual merge and final production-main verification. Phase 2C is archived as complete; Phase 2D
 Operator Diagnostics Convergence is the next review-first payload-safety slice.
+
+## 21. Phase 2D approval, implementation, and local validation
+
+The operator approved the Phase 2D findings matrix on 2026-09-03 and requested a ready-for-review
+mirror PR. Prerequisites were revalidated rather than assumed: mirror `main` is
+`25525c5512ee929f1092f3575a140ae2bbf625fe`, mirrored from production
+`f03b2c8a78a29ab389b65b22d3cec50a34af8faf`, which contains merged production PR #561. The bot
+implementation branch is `codex/discord-embed-payload-safety-phase-2d`. SQL remains unchanged at
+`fc0e94ebd2e0a98286069c8a8b71365dd5178657`.
+
+The implementation converges proved-live operator content, embeds, log views, history/failure
+views, PreKvK/KVK diagnostic rows, inventory audits, subscriber reports, shared-sender attachments,
+and the public notification-channel queue. It retains complete logical units, uses exact
+count-bearing omission markers, redacts credential-shaped preview and attachment content, checks
+UTF-8 bytes against the actual destination upload limit, replaces or clears page attachments, and
+applies the unchanged canonical embed validator at final send/edit boundaries. The diagnostics
+collector remains script-only; fixed watchdog posts and administrator DMs remain safe and
+unchanged; no dead/test-only builder was moved into runtime.
+
+Commands, options, permission decorators, guild and notification-channel restrictions,
+public/ephemeral/DM audiences, requester ownership, mentions and `AllowedMentions`, filters,
+ordering, status meaning, source files, SQL/DAL, config, cache/state formats, queue message IDs,
+timeouts, startup, restart/rehydration, deleted-message recreation, scheduler, watchdog,
+maintenance, offload, and executor semantics are unchanged.
+
+Focused suites passed `149` before formatting and `90` after formatting; the full suite passed
+`3118 passed, 2 skipped`. Architecture, deferred-item, security-routing, selector, import-smoke,
+command-registration, pre-commit, Ruff, Black, Pyright, and secrets gates passed. Changes-only
+security scan `848b6f62-9da7-4306-bf4d-45661db7c6be` reviewed the immutable working-tree snapshot
+from base `25525c5512ee929f1092f3575a140ae2bbf625fe` with Deep off, complete coverage of all 11
+runtime files, and zero findings. SQL is a documented no-diff skip, and these later evidence-record
+edits are a precise documentation-only incremental skip.
+
+Mirror review, patch-based production promotion, candidate deployment, and representative operator
+smoke remain pending. Smoke must preserve audience/channel enforcement, redaction, attachment and
+message identity, produce no unexpected mentions or duplicate, and show no Discord `50035`.
