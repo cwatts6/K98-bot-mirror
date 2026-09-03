@@ -8,6 +8,7 @@ from core.operator_diagnostic_payloads import (
     neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
+    redact_diagnostic_lines,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
     safe_attachment_filename,
@@ -140,6 +141,20 @@ def test_complete_multiline_quoted_redaction_preserves_physical_lines() -> None:
     assert redacted == 'token="[REDACTED]\r\n[REDACTED]"\nstatus=healthy'
     assert redacted.count("\n") == source.count("\n")
     assert redact_diagnostic_text(redacted) == redacted
+
+
+def test_line_oriented_redaction_joins_before_multiline_secret_matching() -> None:
+    source = ['SIGNING_PRIVATE_KEY="first-secret', 'second-secret"', "status=healthy"]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        'SIGNING_PRIVATE_KEY="[REDACTED]',
+        '[REDACTED]"',
+        "status=healthy",
+    ]
+    assert "first-secret" not in "\n".join(redacted)
+    assert "second-secret" not in "\n".join(redacted)
 
 
 @pytest.mark.parametrize(

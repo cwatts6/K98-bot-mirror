@@ -16,6 +16,7 @@ from core.discord_embed_limits import MAX_DESCRIPTION_CHARACTERS, require_valid_
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
     pack_complete_units,
+    redact_diagnostic_lines,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
 )
@@ -86,7 +87,7 @@ class LogTailView(discord.ui.View):
         # 1) Compute page slice
         lines, total_lines, total_matches, total_pages = self._tail_filtered()
         redacted_lines = [
-            redact_diagnostic_text(line).replace("```", "`\u200b``") for line in lines
+            line.replace("```", "`\u200b``") for line in redact_diagnostic_lines(lines)
         ] or ["(no matching lines)"]
 
         # 2) Budget + description

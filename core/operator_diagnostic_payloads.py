@@ -98,6 +98,17 @@ def redact_diagnostic_text(value: Any) -> str:
     return _CONNECTION_PASSWORD_RE.sub(r"\1[REDACTED]", text)
 
 
+def redact_diagnostic_lines(values: Iterable[Any]) -> list[str]:
+    """Redact joined diagnostic units before restoring their physical lines.
+
+    Joining first lets multiline quoted assignments be recognized even when the
+    caller originally obtained the input as separate log lines.
+    """
+
+    text = "\n".join("" if value is None else str(value) for value in values)
+    return redact_diagnostic_text(text).splitlines()
+
+
 def neutralize_discord_mentions(value: Any) -> str:
     """Keep diagnostic content readable without creating Discord notifications."""
 

@@ -37,6 +37,7 @@ from core.discord_embed_limits import (
 from core.operator_diagnostic_payloads import (
     omission_marker,
     pack_complete_units,
+    redact_diagnostic_lines,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
     safe_diagnostic_content as _safe_operator_content,
@@ -149,7 +150,7 @@ def _log_tail_delivery(
     """Build one redacted complete-line log preview and optional complete file."""
 
     redacted_lines = [
-        redact_diagnostic_text(line).replace("```", "`\u200b``") for line in raw_lines
+        line.replace("```", "`\u200b``") for line in redact_diagnostic_lines(raw_lines)
     ] or ["(log is empty)"]
     preview = pack_complete_units(
         redacted_lines,
@@ -578,8 +579,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
         # count-bearing preview in that audience rather than attaching the complete log.
         if raw_text:
             redacted_lines = [
-                redact_diagnostic_text(line).replace("```", "`\u200b``")
-                for line in raw_text.splitlines()
+                line.replace("```", "`\u200b``")
+                for line in redact_diagnostic_lines(raw_text.splitlines())
             ]
             preview = pack_complete_units(
                 redacted_lines,
