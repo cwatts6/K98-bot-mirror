@@ -220,7 +220,7 @@ content limit. Legacy ranking pagination and multi-embed history builders are te
 Regression coverage now asserts all current mode/Top combinations at source maxima, the Hall of
 Fame maximum, its deliberately out-of-contract 4,097-character single-unit rejection, grouped
 multi-embed aggregate rejection, and complete maximum-contract history fallback. Focused validation
-passed `78`; the full suite passed `3103 passed, 2 skipped`. Architecture, deferred-item,
+passed `79`; the full suite passed `3104 passed, 2 skipped`. Architecture, deferred-item,
 security-routing, import-smoke, command-registration, pre-commit, and production-log-noise validators
 passed. Runtime, SQL/DAL, config/cache/state, commands, permissions, visibility, mentions,
 attachments, exports, message/view identity, timeouts, restart behavior, fallback behavior, and

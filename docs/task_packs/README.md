@@ -8,7 +8,7 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led tests/docs implementation and zero-finding Changes review complete; no live payload required a runtime correction; `78` focused and `3103 passed, 2 skipped` full-suite evidence |
+| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led tests/docs implementation and zero-finding Changes review complete; no live payload required a runtime correction; `79` focused and `3104 passed, 2 skipped` full-suite evidence |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |

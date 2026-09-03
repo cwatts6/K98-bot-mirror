@@ -588,7 +588,7 @@ The test-only implementation covers KVK, Honor, and Pre-KVK Top 10/25/50 payload
 the Hall of Fame maximum of 4,030 description and 4,187 aggregate characters; an out-of-contract
 single-unit 4,097-character description rejection; grouped-message aggregate rejection; and a
 complete maximum-contract three-row history fallback below the 2,000-character content limit.
-Focused validation passed `78`, and the full suite passed `3103 passed, 2 skipped`. Architecture,
+Focused validation passed `79`, and the full suite passed `3104 passed, 2 skipped`. Architecture,
 deferred-item, security-routing, import-smoke, command-registration, pre-commit, and independent
 production-log-noise gates passed.
 

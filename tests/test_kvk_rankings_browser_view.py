@@ -1177,6 +1177,39 @@ def test_my_rank_embed_normalizes_governor_names():
     assert "<@456>" not in embed.fields[1].value
 
 
+def test_my_rank_embed_is_valid_at_source_contract_maximum():
+    maximum = 9_223_372_036_854_775_807
+    payload = RankingPayload(
+        mode="kvk",
+        mode_label="KVK",
+        metric="kills",
+        metric_label="Kills",
+        limit=50,
+        source_note="S" * 255,
+        rows=[],
+    )
+    result = MyRankLookupResult(
+        status="found",
+        mode="kvk",
+        metric="kills",
+        metric_label="Kills",
+        mode_label="KVK",
+        message="found",
+        payload=payload,
+        row=RankingRow(25, maximum, "G" * 255, maximum),
+        row_above=RankingRow(24, maximum - 1, "A" * 255, maximum),
+        row_below=RankingRow(26, maximum - 2, "B" * 255, maximum),
+        total_rows=50,
+        gap_to_next_value=maximum,
+    )
+
+    usage = require_valid_embed_payload(build_my_rank_embed(result))
+
+    assert usage.embed_count == 1
+    assert usage.field_counts == (4,)
+    assert usage.total_characters <= 6_000
+
+
 @pytest.mark.parametrize("mode", ["kvk", "honor", "prekvk"])
 @pytest.mark.parametrize("limit", [10, 25, 50])
 def test_current_rankings_embed_is_valid_at_sql_contract_and_top_limits(mode, limit):
