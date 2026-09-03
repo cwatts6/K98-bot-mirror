@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / follow-up to delivered Phase 2C`
 - Task type: `deferred optimisation batch / diagnostic payload reliability`
 - One-pass approved: `no`
-- Status: `implementation and local validation complete; mirror PR #255 ready for review`
+- Status: `delivered and operator-smoke accepted; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
@@ -363,3 +363,26 @@ reverse-order case and keeps the legitimate line visible. The fix is `6a86c814` 
 `f03b2c8a78a29ab389b65b22d3cec50a34af8faf..08d4c408574b97e6350b80fb142023bd94a6c548`
 with Deep off, complete coverage of all 11 runtime files, and zero findings. SQL remains a no-diff
 skip; this appended task-record-only change receives a precise no-runtime-diff security skip.
+
+## 16. Final Operator Smoke And Archive Closure
+
+On 2026-09-03 the operator accepted the corrected production candidate after a clean graceful
+restart and successful command smoke. The supplied runtime record shows queue draining and live
+queue-state persistence before shutdown; lock acquisition, command audit with no duplicates,
+`commands_changed=False` and the intended command-sync skip after restart; completion of the normal
+startup sequence; and successful `/ops logs` invocation plus repeated component interactions.
+`/ops show_logs`, `/ops view_restart_log`, `/ops last_errors`, and the wider representative command
+set were also reported successful.
+
+The accepted record contains no `File.to_dict`, Discord `50035`, traceback, `CMD ERROR`, unhandled
+exception, or error/critical entry. A tracked-view rehydration warning reached the pre-existing
+10-second budget at `arkmatch_49` and explicitly deferred remaining work; startup and pinned-calendar
+initialisation continued. That unrelated, non-blocking warning is not a Phase 2D regression and is
+not silently reclassified as delivered work.
+
+Mirror PR #255 and production PR #562 are ready for the operator's manual merges. The runtime fixes,
+focused `64`-test verification, complete `3172 passed, 2 skipped` suite, pre-commit result, final
+zero-finding Changes-only review, resolved review threads, and operator candidate smoke are accepted.
+Final verification of the merged production-main revision remains operator-owned and must not be
+inferred from this pre-merge archive record. Phase 2D is archived; Phase 2E owns the prepared Ark
+persistence/orchestration/delivery-observability audit.

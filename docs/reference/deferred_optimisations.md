@@ -327,8 +327,8 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
-- Status: assigned to Discord Embed Payload Safety Phase 2E; evidence and product-policy gated
-- Last verified: 2026-09-02
+- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; evidence and product-policy gated; implementation not approved
+- Last verified: 2026-09-03
 
 ### Deferred Optimisation
 - Area: `ui/views/team_builder_views.py`, Ark team-review orchestration, and audit logging
@@ -338,8 +338,8 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused team-builder action, permission, audit, failure, and webhook/ephemeral interaction tests.
-- Status: assigned to Discord Embed Payload Safety Phase 2E from Phase 2B architecture validation
-- Last verified: 2026-09-02
+- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; implementation not approved
+- Last verified: 2026-09-03
 
 ### Deferred Optimisation
 - Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests
@@ -360,7 +360,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
-- Status: Phase 2D implementation and local validation complete; mirror PR #255 ready for review; promotion and production smoke pending
+- Status: delivered and operator-smoke accepted in Discord Embed Payload Safety Phase 2D; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
 - Last verified: 2026-09-03
 
 ### Deferred Optimisation
@@ -382,5 +382,5 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: low
 - Dependencies: Delivered Phase 2B baseline; operator approval of the Phase 2E outcome vocabulary; focused successful-edit, move/repost, missing-message recreation, and failure-path tests.
-- Status: assigned to Discord Embed Payload Safety Phase 2E; semantics-only planning, no Phase 2B runtime change
-- Last verified: 2026-09-02
+- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; outcome vocabulary and implementation not approved
+- Last verified: 2026-09-03

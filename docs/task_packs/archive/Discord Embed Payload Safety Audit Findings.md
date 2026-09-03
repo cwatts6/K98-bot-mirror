@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1-2C delivered; Phase 2D implementation and local validation complete, mirror PR #255 ready for review
+Status: Phases 1-2D delivered and operator-smoke accepted; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C and Phase 2D updates 2026-09-03
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -655,3 +655,27 @@ Mirror PR #255 is open, non-draft, and mergeable. Its runtime implementation com
 Patch-based production promotion, candidate deployment, and representative operator smoke remain
 pending. Smoke must preserve audience/channel enforcement, redaction, attachment and message
 identity, produce no unexpected mentions or duplicate, and show no Discord `50035`.
+
+## 22. Phase 2D delivery closure and Phase 2E handoff
+
+Phase 2D operator diagnostics convergence completed implementation, review remediation, automated
+validation, final Changes-only/Deep-off security review, candidate deployment, and operator smoke
+on 2026-09-03. The final focused review set passed `64`, the full suite passed
+`3172 passed, 2 skipped`, pre-commit passed, and scan
+`984d93ff-29b1-4dd3-b681-a9830d01a1c4` covered the exact production runtime range through
+`08d4c408` with all 11 runtime files reviewed and zero findings. SQL remained unchanged.
+
+The accepted smoke record covers graceful restart, queue draining and persisted live-queue state,
+startup and command-cache no-diff handling, queue-message rehydration, `/ops logs` and repeated
+component interactions, `/ops show_logs`, `/ops view_restart_log`, `/ops last_errors`, and the
+representative command set. It contains no `File.to_dict`, Discord `50035`, traceback, command
+error, or error/critical entry. A pre-existing tracked-view rehydration budget warning deferred
+remaining Ark view work after ten seconds without blocking the completed startup; it is unrelated
+to the Phase 2D payload change.
+
+Mirror PR #255 and production PR #562 are ready for manual merge. Final production-main
+verification remains operator-owned. The Phase 2D pack/starter are archived, and the prepared
+Phase 2E pack/starter now own confirmation-update retention policy, team-builder audit-service
+extraction, and explicit registration delivery outcomes. Phase 2F active-reminder atomicity,
+Phase 2G atomic Pre-KVK reservation, and separate Stats/KVK History executor audits remain outside
+Phase 2E.

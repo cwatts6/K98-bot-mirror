@@ -1,8 +1,10 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence
 
-Status: used on 2026-09-03. The operator approved the audited implementation scope; local
-implementation, validation, and the Changes-only security review are complete. Mirror PR #255 is
-ready for review; promotion, deployment, and production smoke remain pending.
+Status: consumed and archived on 2026-09-03. Implementation, review remediation, deterministic
+validation, final Changes-only/Deep-off security review, candidate deployment, and operator smoke
+are accepted. Mirror PR #255 and production PR #562 are ready for manual merge; final verification
+of the merged production-main revision remains operator-owned. The starter below is retained only
+as the historical initiation record and must not be reused as an active task.
 
 ## Copy/Paste Starter
 
@@ -10,7 +12,7 @@ ready for review; promotion, deployment, and production smoke remain pending.
 # Files mentioned by the user:
 
 ## Codex Task Pack - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.md:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.md
 
 ## Discord Embed Payload Safety Audit Findings.md:
 C:\discord_file_downloader\docs\task_packs\archive\Discord Embed Payload Safety Audit Findings.md
@@ -21,7 +23,7 @@ Begin Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.
 
 Use the task pack:
 
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence.md
 
 Phase 1 established the canonical `core/discord_embed_limits.py` contract. Phase 2A
 event/calendar convergence, Phase 2B Ark hardening, and Phase 2C player-facing rankings/history

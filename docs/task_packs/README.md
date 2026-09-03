@@ -8,7 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active review handoff | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Approved implementation and local validation complete on `codex/discord-embed-payload-safety-phase-2d`; zero-finding Changes review complete; mirror PR #255 ready for review |
+| Active audit preparation | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Prepared for audit/scope only; implementation requires separate approval after Phase 2D merge/final-verification revalidation |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Mirror PR #255 and production PR #562 are review-clean and ready for manual merge; automated validation, Changes-only review, candidate deployment, and operator smoke passed; final production-main verification remains pending |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Mirror PR #254 and production PR #561 await manual merge and final production-main verification; review and candidate smoke passed; no runtime correction was required |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
@@ -21,7 +22,7 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, and 2C, the Pinned Calendar Tracker Atomic
+Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, 2C, and 2D, the Pinned Calendar Tracker Atomic
 Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
@@ -57,11 +58,15 @@ complete maximum-contract history text fallback. Changes-only scan
 `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed `e525fb35..fa67d842` with Deep off, complete
 coverage, and zero findings. Review, candidate deployment, and smoke testing passed through mirror
 PR #254 and production PR #561; both await manual merge and final production-main verification.
-Phase 2C's pack and starter are archived. Phase 2D diagnostics is implemented and locally
-validated from mirror base `25525c55`: the full suite passed `3118 passed, 2 skipped`, and
-Changes-only scan `848b6f62-9da7-4306-bf4d-45661db7c6be` covered all 11 runtime files with Deep
-off and zero findings. SQL is unchanged; mirror PR #255 is ready for review, while promotion,
-deployment, and production smoke remain pending. Phase 2E owns
+Phase 2C's pack and starter are archived. Phase 2D diagnostics is delivered and operator-smoke
+accepted: focused review verification passed `64`, the full suite passed `3172 passed, 2 skipped`,
+pre-commit passed, and Changes-only scan `984d93ff-29b1-4dd3-b681-a9830d01a1c4` reviewed the final
+production runtime range with Deep off, complete coverage of all 11 runtime files, and zero
+findings. SQL is unchanged. Restart, queue-state persistence/rehydration, `/ops logs` and component
+interactions, show/restart/error log routes, and the representative command set passed without
+`File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
+and production PR #562 are ready for manual merge; final production-main verification remains
+operator-owned. Phase 2D's pack and starter are archived. Phase 2E's new audit-first pack owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
 evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit

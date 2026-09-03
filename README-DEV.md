@@ -72,7 +72,8 @@ findings. SQL remains a documented no-diff skip. Review is complete, and the ope
 #561. Both PRs await the operator's manual merge and final production-main verification.
 
 Phase 2C's task pack and chat starter are archived. Phase 2D operator diagnostics convergence is
-implemented on `codex/discord-embed-payload-safety-phase-2d` from mirror base `25525c55`. It adds a
+delivered and operator-smoke accepted on `codex/discord-embed-payload-safety-phase-2d` from mirror
+base `25525c55`. It adds a
 diagnostic-only policy layer for 2,000-character content, complete-unit packing, credential-shaped
 text redaction, conservative attachment filenames, and destination upload bytes while keeping
 `core/discord_embed_limits.py` canonical for embeds. Live admin, log-view, history/failure,
@@ -80,17 +81,22 @@ PreKvK/KVK, inventory, subscriptions, shared-sender, and queue outputs now use f
 visible exact-count compaction, and complete redacted private attachments where supported. PR
 review follow-up fixed quoted credential redaction, mention-neutral diagnostic errors, subscriber
 marker field reservation, and singular omission labels. The full and log-hygiene suites now pass
-`3123 passed, 2 skipped`; final Changes-only scan `5f4f7072-8a27-4b6f-826b-338b9b08a5c5` ran
-with Deep off over the complete PR range, covered all 11 runtime files, and found zero issues. SQL
-is unchanged. Mirror PR #255 is ready for review; promotion, deployment, and production smoke
-remain pending.
+`3172 passed, 2 skipped`; pre-commit and the focused `64`-test review suite pass. Final Changes-only
+scan `984d93ff-29b1-4dd3-b681-a9830d01a1c4` reviewed production
+`f03b2c8a..08d4c408` with Deep off, covered all 11 runtime files, and found zero issues. SQL is
+unchanged. Operator smoke on 2026-09-03 confirmed clean graceful restart/startup, queue-state
+persistence and rehydration, `/ops logs` plus component interactions, `/ops show_logs`,
+`/ops view_restart_log`, `/ops last_errors`, and the representative command set without
+`File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
+and production PR #562 are ready for manual merge; final production-main verification remains
+operator-owned. The Phase 2D pack and starter are archived.
 
-Phase 2E owns Ark confirmation-update retention policy,
-team-builder audit-service extraction, and explicit registration-delivery outcome observability;
-Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic
-Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item without
-reopening delivered Ark payload behavior. The separate KVK History once-only executor audit also
-remains unchanged and outside Phase 2C.
+Phase 2E is prepared as the next audit-first task pack. It owns Ark confirmation-update retention
+policy, team-builder audit-service extraction, and explicit registration-delivery outcome
+observability; Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-
+gated atomic Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item
+without reopening delivered Ark payload behavior. The separate KVK History once-only executor
+audit also remains unchanged and outside Phase 2C.
 
 ## KVK Target Publication And Quality Delivery
 
