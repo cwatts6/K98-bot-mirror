@@ -5,6 +5,7 @@ import pytest
 from core.discord_embed_limits import require_valid_embed_payload
 from core.operator_diagnostic_payloads import (
     DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES,
+    iter_redacted_diagnostic_line_pairs,
     neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
@@ -99,6 +100,10 @@ def test_redaction_consumes_quoted_keys_and_complete_quoted_values() -> None:
             "Authorization: AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE,Signature=abc123",
             "abc123",
         ),
+        (
+            '"Authorization": AWS4-HMAC-SHA256 Credential=AKIAQUOTED,Signature=quoted-signature',
+            "quoted-signature",
+        ),
         ("AWS_SECRET_ACCESS_KEY=aws-secret-value", "aws-secret-value"),
         ("AWS_ACCESS_KEY_ID=AKIAEXAMPLE", "AKIAEXAMPLE"),
         ("SIGNING_PRIVATE_KEY=private-key-value", "private-key-value"),
@@ -155,6 +160,118 @@ def test_line_oriented_redaction_joins_before_multiline_secret_matching() -> Non
     ]
     assert "first-secret" not in "\n".join(redacted)
     assert "second-secret" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_covers_folded_authorization_values() -> None:
+    source = [
+        "Authorization: AWS4-HMAC-SHA256",
+        " Credential=AKIAFOLDED,",
+        " Signature=folded-signature",
+        "status=healthy",
+    ]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        "Authorization: [REDACTED]",
+        " [REDACTED]",
+        " [REDACTED]",
+        "status=healthy",
+    ]
+    assert "AKIAFOLDED" not in "\n".join(redacted)
+    assert "folded-signature" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_covers_unterminated_private_key_blocks() -> None:
+    source = [
+        "SIGNING_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----",
+        "private-key-body",
+        "still-private-at-eof",
+    ]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        "SIGNING_PRIVATE_KEY=[REDACTED]",
+        "[REDACTED]",
+        "[REDACTED]",
+    ]
+    assert "private-key-body" not in "\n".join(redacted)
+    assert "still-private-at-eof" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_preserves_trailing_empty_physical_lines() -> None:
+    assert redact_diagnostic_lines(["first", ""]) == ["first", ""]
+
+
+def test_streaming_redaction_retains_context_before_tail_or_reverse() -> None:
+    source = [
+        "Authorization: AWS4-HMAC-SHA256\n",
+        " Credential=AKIASTREAM,\n",
+        " Signature=stream-signature\n",
+        "status=healthy\n",
+    ]
+
+    pairs = list(iter_redacted_diagnostic_line_pairs(source))
+
+    assert [raw for raw, _ in pairs] == [line.rstrip("\n") for line in source]
+    assert [redacted for _, redacted in pairs] == [
+        "Authorization: [REDACTED]",
+        " [REDACTED]",
+        " [REDACTED]",
+        "status=healthy",
+    ]
+
+
+def test_streaming_redaction_fails_closed_when_private_key_opener_leaves_tail() -> None:
+    source = [
+        "SIGNING_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n",
+        "private-body\n",
+        "-----END PRIVATE KEY-----\n",
+        "status=healthy\n",
+    ]
+
+    redacted_tail = [redacted for _, redacted in iter_redacted_diagnostic_line_pairs(source)][-3:]
+
+    assert redacted_tail == ["[REDACTED]", "[REDACTED]", "status=healthy"]
+    assert "private-body" not in "\n".join(redacted_tail)
+
+
+def test_streaming_redaction_covers_quoted_key_pem_and_indented_values() -> None:
+    source = [
+        '"SIGNING_PRIVATE_KEY": -----BEGIN PRIVATE KEY-----\n',
+        "quoted-key-private-body\n",
+        "-----END PRIVATE KEY-----\n",
+        '"Authorization":\n',
+        '  "Bearer pretty-json-secret"\n',
+        "password: |\n",
+        "  yaml-block-secret\n",
+        "status=healthy\n",
+    ]
+
+    redacted = [redacted for _, redacted in iter_redacted_diagnostic_line_pairs(source)]
+
+    assert "quoted-key-private-body" not in "\n".join(redacted)
+    assert "pretty-json-secret" not in "\n".join(redacted)
+    assert "yaml-block-secret" not in "\n".join(redacted)
+    assert redacted[-1] == "status=healthy"
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "password: |2-",
+        "password: |-2",
+        "client_secret: >- # folded secret",
+        '"Authorization": |+2 # authorization block',
+    ],
+)
+def test_streaming_redaction_covers_yaml_block_scalar_modifiers(header: str) -> None:
+    redacted = redact_diagnostic_lines([header, "  yaml-modifier-secret", "status=healthy"])
+
+    assert "yaml-modifier-secret" not in "\n".join(redacted)
+    assert redacted[1] == "  [REDACTED]"
+    assert redacted[2] == "status=healthy"
 
 
 @pytest.mark.parametrize(

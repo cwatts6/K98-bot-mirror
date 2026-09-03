@@ -35,6 +35,7 @@ from core.discord_embed_limits import (
     require_valid_embed_payload,
 )
 from core.operator_diagnostic_payloads import (
+    iter_redacted_diagnostic_line_pairs,
     omission_marker,
     pack_complete_units,
     redact_diagnostic_lines,
@@ -1241,8 +1242,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
             # Tail efficiently without loading the whole file
             dq = deque(maxlen=lines)
             with open(FULL_LOG_PATH, encoding="utf-8", errors="replace", newline="") as f:
-                for ln in f:
-                    dq.append(ln.rstrip("\n"))
+                for _, redacted_line in iter_redacted_diagnostic_line_pairs(f):
+                    dq.append(redacted_line)
 
             embed, attachments = _log_tail_delivery(
                 ctx.interaction,
@@ -1284,8 +1285,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
             # Efficient tail
             dq = deque(maxlen=lines)
             with open(ERROR_LOG_PATH, encoding="utf-8", errors="replace", newline="") as f:
-                for ln in f:
-                    dq.append(ln.rstrip("\n"))
+                for _, redacted_line in iter_redacted_diagnostic_line_pairs(f):
+                    dq.append(redacted_line)
 
             embed, attachments = _log_tail_delivery(
                 ctx.interaction,
@@ -1330,8 +1331,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
             # Efficient tail without loading whole file
             dq = deque(maxlen=lines)
             with open(CRASH_LOG_PATH, encoding="utf-8", errors="replace", newline="") as f:
-                for ln in f:
-                    dq.append(ln.rstrip("\n"))
+                for _, redacted_line in iter_redacted_diagnostic_line_pairs(f):
+                    dq.append(redacted_line)
 
             embed, attachments = _log_tail_delivery(
                 ctx.interaction,

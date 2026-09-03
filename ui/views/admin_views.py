@@ -15,6 +15,7 @@ import discord
 from core.discord_embed_limits import MAX_DESCRIPTION_CHARACTERS, require_valid_embed_payload
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
+    iter_redacted_diagnostic_line_pairs,
     pack_complete_units,
     redact_diagnostic_lines,
     redact_diagnostic_text,
@@ -57,15 +58,15 @@ class LogTailView(discord.ui.View):
         total_lines = 0
         dq = deque(maxlen=50000)
         with open(self.src_path, encoding="utf-8", errors="replace", newline="") as f:
-            for ln in f:
+            for raw_line, redacted_line in iter_redacted_diagnostic_line_pairs(f):
                 total_lines += 1
-                dq.append(ln.rstrip("\n"))
+                dq.append((raw_line, redacted_line))
 
         # NEW: newest-first by iterating reversed(dq)
         matched = []
-        for ln in reversed(dq):
-            if self._match(ln):
-                matched.append(ln)
+        for raw_line, redacted_line in reversed(dq):
+            if self._match(raw_line):
+                matched.append(redacted_line)
 
         total_matches = len(matched)
         total_pages = max(1, (total_matches + self.page_size - 1) // self.page_size)

@@ -7,7 +7,7 @@ destination upload-budget policy used by operator diagnostic routes.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -23,6 +23,23 @@ _SENSITIVE_KEY_PATTERN = (
 )
 _AUTHORIZATION_KEY_PATTERN = r"(?:[a-z0-9]+[_-]+)*authorization"
 _DIAGNOSTIC_SENSITIVE_KEY_PATTERN = rf"(?:{_SENSITIVE_KEY_PATTERN}|{_AUTHORIZATION_KEY_PATTERN})"
+_AUTHORIZATION_LINE_START_RE = re.compile(
+    rf"(?i)(?P<key_quote>[\"']?)\b{_AUTHORIZATION_KEY_PATTERN}\b" r"(?P=key_quote)\s*[:=]"
+)
+_PRIVATE_KEY_PEM_START_RE = re.compile(
+    rf"(?i)(?P<prefix>(?P<key_quote>[\"']?)\b{_SENSITIVE_KEY_PATTERN}\b"
+    r"(?P=key_quote)\s*[:=]\s*[\"']?)"
+    r"-----BEGIN [^-\r\n]*PRIVATE KEY-----"
+)
+_PRIVATE_KEY_PEM_END_RE = re.compile(r"(?i)-----END [^-\r\n]*PRIVATE KEY-----")
+_SENSITIVE_INDENTED_VALUE_START_RE = re.compile(
+    rf"(?i)(?:[\"']?\b{_DIAGNOSTIC_SENSITIVE_KEY_PATTERN}\b[\"']?)"
+    r"\s*[:=]\s*(?:[|>](?:[1-9][+-]?|[+-][1-9]?)?)?"
+    r"(?:[^\S\r\n]+#.*)?[^\S\r\n]*$"
+)
+_QUOTED_SENSITIVE_LINE_START_RE = re.compile(
+    rf"(?i)(?:[\"']?\b{_DIAGNOSTIC_SENSITIVE_KEY_PATTERN}\b[\"']?)" r"\s*[:=]\s*(?P<quote>[\"'])"
+)
 _QUOTED_SENSITIVE_ASSIGNMENT_RE = re.compile(
     rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b{_DIAGNOSTIC_SENSITIVE_KEY_PATTERN}\b)"
     r"(?P=key_quote)(?P<separator>\s*[:=]\s*)(?P<value_quote>[\"'])"
@@ -37,12 +54,13 @@ _UNTERMINATED_QUOTED_SENSITIVE_ASSIGNMENT_RE = re.compile(
 _SENSITIVE_ASSIGNMENT_RE = re.compile(
     rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b(?:{_SENSITIVE_KEY_PATTERN})\b)"
     r"(?P=key_quote)(?P<separator>\s*[:=]\s*)"
-    r"(?P<value>(?![\"']|\[REDACTED\])[^\s,;}\]\"']+)"
+    r"(?P<value>(?!\s*[\"']|\s*\[REDACTED\])[^\s,;}\]\"']+)"
 )
 _AUTHORIZATION_ASSIGNMENT_RE = re.compile(
-    rf"(?i)(?P<key>\b{_AUTHORIZATION_KEY_PATTERN}\b)"
+    rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b{_AUTHORIZATION_KEY_PATTERN}\b)"
+    r"(?P=key_quote)"
     r"(?P<separator>\s*[:=]\s*)"
-    r"(?P<value>(?![\"']|\s*\[REDACTED\])[^\r\n;]+)"
+    r"(?P<value>(?!\s*[\"']|\s*\[REDACTED\])[^\r\n;]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _SIGNED_QUERY_RE = re.compile(
@@ -83,7 +101,10 @@ def redact_diagnostic_text(value: Any) -> str:
         text,
     )
     text = _AUTHORIZATION_ASSIGNMENT_RE.sub(
-        lambda match: (f"{match.group('key')}{match.group('separator')}[REDACTED]"),
+        lambda match: (
+            f"{match.group('key_quote')}{match.group('key')}{match.group('key_quote')}"
+            f"{match.group('separator')}[REDACTED]"
+        ),
         text,
     )
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
@@ -98,15 +119,95 @@ def redact_diagnostic_text(value: Any) -> str:
     return _CONNECTION_PASSWORD_RE.sub(r"\1[REDACTED]", text)
 
 
+def _physical_lines(value: Any) -> list[str]:
+    text = "" if value is None else str(value)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if text.endswith("\n"):
+        text = text[:-1]
+    return text.split("\n")
+
+
+def _unescaped_quote_index(value: str, quote: str, *, start: int = 0) -> int:
+    escaped = False
+    for index in range(start, len(value)):
+        character = value[index]
+        if character == "\\" and not escaped:
+            escaped = True
+            continue
+        if character == quote and not escaped:
+            return index
+        escaped = False
+    return -1
+
+
+def iter_redacted_diagnostic_line_pairs(
+    values: Iterable[Any],
+) -> Iterator[tuple[str, str]]:
+    """Yield raw/redacted physical lines while retaining chronological context."""
+
+    authorization_continuation = False
+    sensitive_indented_value = False
+    private_key_block = False
+    quoted_continuation: str | None = None
+
+    for value in values:
+        for line in _physical_lines(value):
+            if private_key_block:
+                pem_end = _PRIVATE_KEY_PEM_END_RE.search(line)
+                suffix = line[pem_end.end() :] if pem_end else ""
+                yield line, f"[REDACTED]{redact_diagnostic_text(suffix)}"
+                if pem_end:
+                    private_key_block = False
+                continue
+
+            if quoted_continuation is not None:
+                closing_index = _unescaped_quote_index(line, quoted_continuation)
+                if closing_index < 0:
+                    yield line, "[REDACTED]"
+                    continue
+                suffix = line[closing_index + 1 :]
+                yield line, f"[REDACTED]{quoted_continuation}{redact_diagnostic_text(suffix)}"
+                quoted_continuation = None
+                continue
+
+            if authorization_continuation and line[:1].isspace():
+                indentation = line[: len(line) - len(line.lstrip())]
+                yield line, f"{indentation}[REDACTED]"
+                continue
+            authorization_continuation = False
+
+            if sensitive_indented_value and line[:1].isspace():
+                indentation = line[: len(line) - len(line.lstrip())]
+                yield line, f"{indentation}[REDACTED]"
+                continue
+            sensitive_indented_value = False
+
+            pem_start = _PRIVATE_KEY_PEM_START_RE.search(line)
+            if pem_start:
+                pem_end = _PRIVATE_KEY_PEM_END_RE.search(line, pem_start.end())
+                suffix = line[pem_end.end() :] if pem_end else ""
+                yield line, (
+                    f"{line[: pem_start.start()]}{pem_start.group('prefix')}[REDACTED]"
+                    f"{redact_diagnostic_text(suffix)}"
+                )
+                private_key_block = pem_end is None
+                continue
+
+            quoted_start = _QUOTED_SENSITIVE_LINE_START_RE.search(line)
+            if quoted_start:
+                quote = quoted_start.group("quote")
+                if _unescaped_quote_index(line, quote, start=quoted_start.end()) < 0:
+                    quoted_continuation = quote
+
+            yield line, redact_diagnostic_text(line)
+            authorization_continuation = bool(_AUTHORIZATION_LINE_START_RE.search(line))
+            sensitive_indented_value = bool(_SENSITIVE_INDENTED_VALUE_START_RE.search(line))
+
+
 def redact_diagnostic_lines(values: Iterable[Any]) -> list[str]:
-    """Redact joined diagnostic units before restoring their physical lines.
+    """Return redacted physical lines without losing multiline secret context."""
 
-    Joining first lets multiline quoted assignments be recognized even when the
-    caller originally obtained the input as separate log lines.
-    """
-
-    text = "\n".join("" if value is None else str(value) for value in values)
-    return redact_diagnostic_text(text).splitlines()
+    return [redacted for _, redacted in iter_redacted_diagnostic_line_pairs(values)]
 
 
 def neutralize_discord_mentions(value: Any) -> str:
