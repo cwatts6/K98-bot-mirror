@@ -322,3 +322,29 @@ was restarted and smoke tested again on 2026-09-03. Graceful shutdown, startup, 
 rehydration, `/ops logs`, its component interactions, and all other representative commands passed;
 the supplied evidence contains no `CMD ERROR`, traceback, `File.to_dict`, Discord `50035`, or
 error/critical entry. Production-candidate smoke is complete.
+
+Production PR #562 review follow-up then removed the duplicated diagnostic-content wrapper and the
+unused `content_pages` surface in `e106a0c858e967d0877b99b83aafde049f288c94`. The production
+`/ops logs` attachment correction is `fa499b74`, and the successful restart/command smoke record is
+`8149abac`. Subsequent Changes-only review found credential-redaction gaps in prefixed keys,
+authorization values, multiline quoted values, folded authorization headers, PEM private-key
+blocks, quoted-key structured values, and YAML block scalars. The remediation chain ends at
+`0e344f1ff8482a4295b6f6ce59b483a2c1fa4822`: diagnostic files are redacted as chronological
+raw/redacted line pairs before tailing, filtering, reversal, or pagination; filter matching still
+uses the original raw line while only the redacted pair is displayed or attached. The established
+non-ephemeral `/ops run_gsheets_export` response now retains its exact count-bearing bounded preview
+without adding a complete log attachment, so its audience is unchanged.
+
+Final focused diagnostic, view, and embed tests pass `83`; the complete suite passes
+`3171 passed, 2 skipped`. Pre-commit (Ruff, Black, Pyright, secrets, registration), architecture,
+deferred-item, security-routing, import-smoke, and command-registration gates pass. Independent
+actual-caller harnesses verified the prior credential forms and tail/filter/reverse/page boundary
+cases, including opener-outside-tail and YAML indentation/chomping/comment variants, with no
+remaining candidate in the bounded root-cause family. Final bot Changes-only security scan
+`4344cd49-942f-46a8-a90a-f3302e5a2a25` reviewed the exact production range
+`f03b2c8a78a29ab389b65b22d3cec50a34af8faf..0e344f1ff8482a4295b6f6ce59b483a2c1fa4822`
+with Deep off, complete coverage of all 11 runtime files, and zero findings. Its sealed snapshot
+digest is
+`codex-security-snapshot/v1:sha256:28354102fe83e56e982f156768dc1bd388c6566c4ebc1726b75e243aced3026f`.
+SQL remains an unchanged, documented no-diff skip. This task-record-only update receives the
+corresponding precise incremental security skip.
