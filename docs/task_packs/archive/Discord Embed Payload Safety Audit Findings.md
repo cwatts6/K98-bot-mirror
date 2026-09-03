@@ -1,6 +1,6 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1-2D delivered and operator-smoke accepted; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
+Status: Phases 1-2D delivered and operator-smoke accepted; mirror PR #255 and production PR #562 merged and final production-main source verification passed; Phase 2E local implementation active
 Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C and Phase 2D updates 2026-09-03
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -673,9 +673,37 @@ error, or error/critical entry. A pre-existing tracked-view rehydration budget w
 remaining Ark view work after ten seconds without blocking the completed startup; it is unrelated
 to the Phase 2D payload change.
 
-Mirror PR #255 and production PR #562 are ready for manual merge. Final production-main
-verification remains operator-owned. The Phase 2D pack/starter are archived, and the prepared
-Phase 2E pack/starter now own confirmation-update retention policy, team-builder audit-service
+Mirror PR #255 and production PR #562 are merged, and final production-main source verification
+passed. The Phase 2D pack/starter are archived, and the approved Phase 2E pack/starter now own
+confirmation-update retention policy, team-builder audit-service
 extraction, and explicit registration delivery outcomes. Phase 2F active-reminder atomicity,
 Phase 2G atomic Pre-KVK reservation, and separate Stats/KVK History executor audits remain outside
 Phase 2E.
+
+## 23. Phase 2E audit decision and local implementation
+
+On 2026-09-03 the operator approved a keep-all/defer decision for confirmation history and a
+bot-only implementation for team-builder orchestration and registration outcomes. The local ignored
+Ark message-state copy contained 1,502 updates but was proved to consist entirely of repeated
+confirmation-flow test fixtures; it is not current production evidence. Tests now isolate that state
+to temporary files, with the local copy hash unchanged through focused and Ark-wide validation.
+
+Registration upsert now distinguishes `created`, `edited`, `moved`, `reposted`, `recreated`, and
+`failed` while retaining its legacy tuple adapter and every delivery/state/mention decision.
+Team-builder assign/remove/reset/auto-balance persistence and exact audit coordination moved from
+the view into a Discord-independent service without changing permissions, acknowledgements,
+webhook fallback, audit shapes/counts, or order. The single-operator model makes simultaneous
+builder races and the existing duplicate publish audit accepted low-risk behavior rather than new
+deferred tasks. Silent DAL persistence false-success remains separately captured as low-priority
+reliability debt. SQL is unchanged.
+
+The post-review-correction focused suite passed `48`, Ark-plus-UI regression passed `204`, and the
+complete suite passed `3186 passed, 2 skipped`. Architecture, deferred-item, security-routing,
+selector, import-smoke, command-registration, pre-commit, and operational log-noise validation also
+passed. An interim Changes-only scan of the earlier worktree snapshot found no issues but is not
+used as the final gate because its authoritative digest predates the final log correction.
+
+Final Changes-only scan `927226f8-742a-41e8-ad37-22c16d50f0ad` then reviewed frozen digest
+`1fefe4c3b58f` with Deep off. It covered all four changed runtime files, returned no target warnings,
+and found zero reportable issues. SQL remains a clean no-diff skip. Adding this scan identifier to
+the delivery documents is a non-runtime documentation-only delta.

@@ -6,8 +6,8 @@
 - Date: `2026-09-03`
 - Owner/context: `Chris Watts / next planning slice after Phase 2D candidate acceptance`
 - Task type: `deferred optimisation batch / architecture and observability`
-- One-pass approved: `no`
-- Status: `prepared for audit/scope; implementation not approved`
+- One-pass approved: `no; audit-first stop gate completed and implementation separately approved`
+- Status: `local implementation, automated validation, independent review, and final Changes security review complete; ready for mirror PR; candidate deployment and operator smoke pending`
 - Repository: `K98-bot-mirror` bot repository first; SQL is evidence-only unless separately approved
 
 ## 2. Required Reading And Prerequisites
@@ -297,3 +297,44 @@ verification. Do not claim delivery, merge, or production verification before it
 - Separate tasks: Stats and KVK History once-only executor audits.
 
 No deferred item is made ownerless by this preparation.
+
+## 16. Phase 2E Audit Decision And Local Delivery Record
+
+The audit-first stop gate completed on 2026-09-03 against clean bot base `06e34776` and clean SQL
+base `fc0e94eb`. Mirror PR #255 and production PR #562 were revalidated as merged; the Phase 1-2D
+production merge chain and current mirror content were verified before implementation. The work is
+bot-only on `codex/discord-embed-payload-safety-phase-2e`; SQL has no diff.
+
+Privacy-safe inspection found 1,502 `confirmation_updates` across two matches in the local ignored
+state copy, but both match IDs and every update matched confirmation-flow test fixtures. The file is
+a stale/disposable local copy, not current production state, and is excluded from retention-policy
+evidence. The operator approved keeping all persisted history and deferring any bound, archive, JSON
+shape, cleanup, or SQL migration. The implementation isolates confirmation-flow tests to temporary
+state paths; the local copy's SHA-256 remained
+`452531F6BF12EC9A04FE95AE3F78BECFD56EDC1097C2B7D2E7ADA0614AF7D059` through focused and
+Ark-wide tests.
+
+The approved runtime correction adds explicit `created`, `edited`, `moved`, `reposted`,
+`recreated`, and `failed` registration delivery outcomes. A compatibility adapter retains the
+historical boolean tuple; controller decisions, state-write order, announcement behavior, mentions,
+and exception propagation remain unchanged. Send and post-delivery persistence failures add
+structured failure-stage logs without new private content or identifiers.
+
+Team-builder assign/remove/reset/auto-balance persistence-plus-audit orchestration now lives in
+`ark/team_builder_service.py`. The view retains permission/ownership checks, deferrals, direct or
+webhook editing, fallback acknowledgements, and timeouts. Existing action names, detail JSON,
+sources, audit counts, and persistence-before-audit ordering are unchanged. Publish/unpublish remain
+in their existing service. Under the one-operator operating model, theoretical simultaneous-builder
+races and the existing duplicate publish audit are recorded as low-risk accepted behavior with no
+new deferred work. The independent possibility of a swallowed DAL write returning a successful UI
+acknowledgement remains a low-priority deferred reliability item.
+
+Local validation includes `48` focused outcome/service/view/isolation tests, `204` Ark-plus-UI
+regression tests, and `3186 passed, 2 skipped` for the complete suite. Architecture, deferred-item,
+security-routing, selector, import-smoke, command-registration, Ruff, Black, Pyright, secrets,
+logging, pre-commit, diff, and operational log-noise gates passed. An interim Changes-only scan of
+the pre-review-correction snapshot found zero issues but correctly warned that the worktree changed;
+it is not the final security gate. Final Changes-only/Deep-off scan
+`927226f8-742a-41e8-ad37-22c16d50f0ad` reviewed frozen working-tree digest `1fefe4c3b58f` with
+complete coverage of all four runtime files, no target warnings, and zero findings. This scan-record
+addition is documentation-only and does not change the reviewed runtime snapshot.

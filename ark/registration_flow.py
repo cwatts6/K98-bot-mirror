@@ -29,7 +29,7 @@ from ark.dal.ark_dal import (
     update_match_registration_message,
 )
 from ark.embeds import build_ark_registration_embed_from_match, resolve_ark_match_datetime
-from ark.registration_messages import upsert_registration_message
+from ark.registration_messages import upsert_registration_message_result
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
 from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from decoraters import _has_leadership_role, _is_admin
@@ -303,7 +303,15 @@ class ArkRegistrationController:
             alliance_row = await get_alliance((match.get("Alliance") or "").strip())
             resolved_target_channel_id = (alliance_row or {}).get("RegistrationChannelId")
         if not resolved_target_channel_id:
-            logger.warning("[ARK] No registration channel resolved for match_id=%s", self.match_id)
+            logger.warning(
+                "[ARK_REGISTRATION] ensure_message_result match_id=%s "
+                "delivery_outcome=failed delivery_succeeded=False "
+                "moved_or_reposted=False state_changed=False "
+                "failure_reason=missing_destination has_registration_ref=False "
+                "announce_requested=%s",
+                self.match_id,
+                announce,
+            )
             return None
 
         state = ArkJsonState()
@@ -342,7 +350,7 @@ class ArkRegistrationController:
             force_repost,
             bool(effective_current_ref),
         )
-        delivered, state_changed = await upsert_registration_message(
+        delivery_result = await upsert_registration_message_result(
             client=client,
             state=state,
             match_id=self.match_id,
@@ -356,10 +364,15 @@ class ArkRegistrationController:
         final_state = state.messages.get(self.match_id)
         registration_ref = final_state.registration if final_state else None
         logger.info(
-            "[ARK_REGISTRATION] ensure_message_result match_id=%s delivered=%s state_changed=%s has_registration_ref=%s announce_requested=%s",
+            "[ARK_REGISTRATION] ensure_message_result match_id=%s delivery_outcome=%s "
+            "delivery_succeeded=%s moved_or_reposted=%s state_changed=%s "
+            "failure_reason=%s has_registration_ref=%s announce_requested=%s",
             self.match_id,
-            delivered,
-            state_changed,
+            delivery_result.outcome,
+            delivery_result.succeeded,
+            delivery_result.legacy_moved_or_reposted,
+            delivery_result.state_changed,
+            delivery_result.failure_reason,
             bool(registration_ref),
             should_announce,
         )
@@ -367,21 +380,31 @@ class ArkRegistrationController:
             return effective_current_ref
 
         touched_refresh_at = datetime.now(UTC) if update_refresh_timestamp else None
-        if state_changed or had_json_ref or force_repost:
-            await self._persist_registration_state(
-                match_id=self.match_id,
-                registration_ref=registration_ref,
-                announce_sent=should_announce,
-                touched_refresh_at=touched_refresh_at,
+        try:
+            if delivery_result.state_changed or had_json_ref or force_repost:
+                await self._persist_registration_state(
+                    match_id=self.match_id,
+                    registration_ref=registration_ref,
+                    announce_sent=should_announce,
+                    touched_refresh_at=touched_refresh_at,
+                )
+                await self._save_registration_tracker(
+                    match_id=self.match_id,
+                    channel_id=registration_ref.channel_id,
+                    message_id=registration_ref.message_id,
+                    match=match,
+                )
+            elif touched_refresh_at is not None:
+                await touch_registration_refresh(self.match_id, touched_refresh_at)
+        except Exception:
+            logger.exception(
+                "[ARK_REGISTRATION] ensure_message_persistence_failed match_id=%s "
+                "delivery_outcome=%s failure_reason=persistence_failed state_changed=%s",
+                self.match_id,
+                delivery_result.outcome,
+                delivery_result.state_changed,
             )
-            await self._save_registration_tracker(
-                match_id=self.match_id,
-                channel_id=registration_ref.channel_id,
-                message_id=registration_ref.message_id,
-                match=match,
-            )
-        elif touched_refresh_at is not None:
-            await touch_registration_refresh(self.match_id, touched_refresh_at)
+            raise
 
         return registration_ref
 

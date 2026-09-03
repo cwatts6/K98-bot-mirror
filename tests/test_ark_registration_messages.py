@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import discord
 import pytest
 
-from ark.registration_messages import upsert_registration_message
+from ark.registration_messages import (
+    upsert_registration_message,
+    upsert_registration_message_result,
+)
 from ark.state.ark_state import ArkJsonState
 from core.discord_embed_limits import EmbedPayloadLimitError
 
@@ -99,3 +104,80 @@ async def test_upsert_registration_validates_before_discord_delivery(monkeypatch
             view=None,
             target_channel_id=10,
         )
+
+
+@pytest.mark.asyncio
+async def test_upsert_registration_reports_missing_destination(monkeypatch):
+    async def _get_match(_match_id):
+        return None
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+
+    result = await upsert_registration_message_result(
+        client=_Client(),
+        state=ArkJsonState(),
+        match_id=4,
+        embed=None,
+        view=None,
+    )
+
+    assert result.outcome == "failed"
+    assert result.failure_reason == "missing_destination"
+    assert result.state_changed is False
+
+
+@pytest.mark.asyncio
+async def test_upsert_registration_reports_unavailable_channel(monkeypatch):
+    async def _get_match(_match_id):
+        return None
+
+    class _MissingChannelClient:
+        def get_channel(self, _channel_id):
+            return None
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+
+    result = await upsert_registration_message_result(
+        client=_MissingChannelClient(),
+        state=ArkJsonState(),
+        match_id=5,
+        embed=None,
+        view=None,
+        target_channel_id=10,
+    )
+
+    assert result.outcome == "failed"
+    assert result.failure_reason == "channel_unavailable"
+    assert result.state_changed is False
+
+
+@pytest.mark.asyncio
+async def test_upsert_registration_logs_send_failure_and_preserves_exception(monkeypatch, caplog):
+    async def _get_match(_match_id):
+        return None
+
+    class _FailingChannel:
+        id = 10
+
+        async def send(self, **_kwargs):
+            raise RuntimeError("send failed")
+
+    class _FailingClient:
+        def get_channel(self, _channel_id):
+            return _FailingChannel()
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+    caplog.set_level(logging.ERROR, logger="ark.registration_messages")
+
+    with pytest.raises(RuntimeError, match="send failed"):
+        await upsert_registration_message_result(
+            client=_FailingClient(),
+            state=ArkJsonState(),
+            match_id=6,
+            embed=None,
+            view=None,
+            target_channel_id=10,
+        )
+
+    assert "delivery_outcome=failed" in caplog.text
+    assert "failure_reason=send_failed" in caplog.text
