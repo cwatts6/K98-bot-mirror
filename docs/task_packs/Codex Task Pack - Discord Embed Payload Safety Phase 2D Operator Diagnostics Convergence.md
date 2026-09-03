@@ -295,3 +295,15 @@ uses representative authorised summary/history, log preview/attachment, health/s
 natural queue edit/rehydration paths without injecting secrets or manufacturing failures. Rollback
 remains a bot-PR revert and redeploy of the previous production-main revision; no SQL, config,
 cache/state, command, or data rollback is required.
+
+PR review then identified four actionable issues across five inline comments: incomplete redaction
+of quoted credential forms, a possible ping from public diagnostic error content, a 26-field
+subscriber payload when the omission marker followed 25 entries, and incorrect singular wording
+for one omitted audit batch. Commit `03dddb60478eab2f759c205573c494d8dd0723a9` fixes all four at
+their narrow runtime boundaries and adds adversarial and exact-boundary regressions. Focused review
+tests passed `40`; the full and independent log-hygiene suites each passed `3123 passed, 2 skipped`,
+with production operational logs unchanged. Final bot Changes-only scan
+`5f4f7072-8a27-4b6f-826b-338b9b08a5c5` reviewed the complete
+`25525c5512ee929f1092f3575a140ae2bbf625fe..03dddb60478eab2f759c205573c494d8dd0723a9`
+range with Deep off, complete coverage of all 11 runtime files, and zero findings. SQL remains a
+documented no-diff skip; these record-only updates receive a precise incremental security skip.

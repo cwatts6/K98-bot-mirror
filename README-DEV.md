@@ -77,11 +77,13 @@ diagnostic-only policy layer for 2,000-character content, complete-unit packing,
 text redaction, conservative attachment filenames, and destination upload bytes while keeping
 `core/discord_embed_limits.py` canonical for embeds. Live admin, log-view, history/failure,
 PreKvK/KVK, inventory, subscriptions, shared-sender, and queue outputs now use final validation,
-visible exact-count compaction, and complete redacted private attachments where supported. The full
-suite passed `3118 passed, 2 skipped`; Changes-only scan
-`848b6f62-9da7-4306-bf4d-45661db7c6be` ran with Deep off, covered all 11 runtime files, and found
-zero issues. SQL is unchanged. Mirror PR #255 is ready for review; promotion, deployment, and
-production smoke remain pending.
+visible exact-count compaction, and complete redacted private attachments where supported. PR
+review follow-up fixed quoted credential redaction, mention-neutral diagnostic errors, subscriber
+marker field reservation, and singular omission labels. The full and log-hygiene suites now pass
+`3123 passed, 2 skipped`; final Changes-only scan `5f4f7072-8a27-4b6f-826b-338b9b08a5c5` ran
+with Deep off over the complete PR range, covered all 11 runtime files, and found zero issues. SQL
+is unchanged. Mirror PR #255 is ready for review; promotion, deployment, and production smoke
+remain pending.
 
 Phase 2E owns Ark confirmation-update retention policy,
 team-builder audit-service extraction, and explicit registration-delivery outcome observability;
