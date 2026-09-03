@@ -1,5 +1,6 @@
 import pytest
 
+from core.discord_embed_limits import require_valid_embed_payload, validate_embed_payload
 from kvk.models.kvk_rankings import HallOfFameMetric, RankingPayload, RankingRow
 from kvk.rendering.kvk_rankings_embed import build_hall_of_fame_embed
 from ui.views import kvk_rankings_views
@@ -30,6 +31,48 @@ def test_build_hall_of_fame_embed_mentions_record_rules():
     assert "Alice" in (embed.description or "")
     assert "KVK 17 - Light vs Dark" in (embed.description or "")
     assert "Single-KVK performances only" in embed.footer.text
+
+
+def _maximum_contract_hall_of_fame_payload(*, first_name_length: int = 255) -> RankingPayload:
+    return RankingPayload(
+        mode="records",
+        metric="kills",
+        metric_label="Kills",
+        limit=10,
+        source_note="S" * 52,
+        rows=[
+            RankingRow(
+                rank=rank,
+                governor_id=9_223_372_036_854_775_807 - rank,
+                governor_name="G" * (first_name_length if rank == 1 else 255),
+                value=9_223_372_036_854_775_807,
+                kvk_no=2_147_483_647,
+                kvk_name="K" * 100,
+            )
+            for rank in range(1, 11)
+        ],
+    )
+
+
+def test_hall_of_fame_embed_is_valid_at_sql_contract_maximum():
+    embed = build_hall_of_fame_embed(_maximum_contract_hall_of_fame_payload())
+
+    usage = require_valid_embed_payload(embed)
+
+    assert len(embed.description) == 4_030
+    assert usage.total_characters == 4_187
+    assert len(embed.description.splitlines()) == 20
+
+
+def test_hall_of_fame_pathological_single_unit_one_over_is_detected():
+    embed = build_hall_of_fame_embed(_maximum_contract_hall_of_fame_payload(first_name_length=322))
+
+    violations = validate_embed_payload(embed)
+
+    assert len(embed.description) == 4_097
+    assert [violation.path for violation in violations] == ["embeds[0].description"]
+    assert violations[0].actual == 4_097
+    assert violations[0].limit == 4_096
 
 
 @pytest.mark.asyncio

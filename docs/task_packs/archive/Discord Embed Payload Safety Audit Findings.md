@@ -1,7 +1,7 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1 and 2A merged; Phase 2B delivered and operator candidate-smoke accepted in mirror PR #253 and production PR #560, pending manual merges and final production-main verification
-Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02
+Status: Phases 1 and 2A merged; Phase 2B delivered and production-merged; Phase 2C evidence-led tests/documentation implementation complete with no runtime correction required
+Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C update 2026-09-03
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
@@ -443,9 +443,9 @@ The agreed follow-up sequence is:
 2. **Phase 2B — delivered:** evidence-led Ark payload hardening, validation, Changes-only review,
    production-candidate promotion, and successful candidate smoke; manual merges and final
    production-main verification remain operator-owned;
-3. **Phase 2C — next review-first slice:** player-facing rankings/history payload convergence,
-   preserving command placement, visibility, interaction ownership, files, and existing executor
-   behavior;
+3. **Phase 2C — implementation complete, review pending:** authoritative contracts proved live
+   player-facing rankings/history payloads safe; regression and delivery records changed without a
+   runtime diff;
 4. **Phase 2D:** operator diagnostics payload convergence with privacy/redaction, attachment, and
    fallback policies kept separate from player outputs;
 5. **Phase 2E:** Ark persistence/orchestration policy and delivery observability: confirmation-update
@@ -479,9 +479,9 @@ checks and performs no claim. In normal production, the guard controls a fresh-s
 when no editable current message exists. A scheduled fresh-send ping and post-success claim remain
 a natural operational observation; they were not independently exercised by this test command.
 
-Phase 1, Phase 2A, and Phase 2B are archived as delivered records. Phase 2C rankings/history now
-has the next review-first task pack and chat starter. The other audit deferrals retain the named
-Phase 2D-2G ownership above.
+Phase 1, Phase 2A, and Phase 2B are archived as delivered records. Phase 2C rankings/history has
+completed its approved tests/documentation-only implementation. The other audit deferrals retain
+the named Phase 2D-2G ownership above.
 
 ## 16. Phase 2A delivery and operator acceptance
 
@@ -573,5 +573,26 @@ Every Phase 2B deferral now has named ownership:
 - Phase 2G: evidence/design-gated atomic Pre-KVK dispatch reservation.
 
 The existing KVK History once-only offload audit remains a coordinated but separate task: Phase 2C
-must preserve its current executor behavior and must not silently absorb that reliability change.
-Mirror and production PR merges and final production-main verification remain operator-owned.
+preserves its current executor behavior and does not absorb that reliability change. Mirror PR
+#253's tree is present on mirror `main`, and production PR #560 is merged.
+
+## 19. Phase 2C approval and evidence-led implementation
+
+On 2026-09-03 the operator approved the audit recommendation to make no runtime payload change.
+Review against mirror base `e525fb355b5b831bcc84c349df944ee7725776f9` and SQL source-of-truth
+commit `fc0e94ebd2e0a98286069c8a8b71365dd5178657` proved all live current-rankings,
+Hall-of-Fame, My Rank, history-card, history-fallback, and private-export boundaries safe under
+their authoritative source and maximum-cardinality contracts.
+
+The test-only implementation covers KVK, Honor, and Pre-KVK Top 10/25/50 payloads at source maxima;
+the Hall of Fame maximum of 4,030 description and 4,187 aggregate characters; an out-of-contract
+single-unit 4,097-character description rejection; grouped-message aggregate rejection; and a
+complete maximum-contract three-row history fallback below the 2,000-character content limit.
+Focused validation passed `78`, and the full suite passed `3103 passed, 2 skipped`. Architecture,
+deferred-item, security-routing, import-smoke, command-registration, pre-commit, and independent
+production-log-noise gates passed.
+
+No command, runtime builder, view, service, DAL, SQL, config, cache, state, permission, channel,
+owner, visibility, mention, attachment, export, fallback, identity, timeout, startup, restart, or
+executor behavior changed. Phase 2D-2G and the separate KVK History once-only executor audit retain
+their existing ownership.

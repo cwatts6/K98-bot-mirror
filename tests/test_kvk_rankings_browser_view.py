@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from core.discord_embed_limits import require_valid_embed_payload, validate_embed_payload
 from kvk.models.kvk_rankings import (
     MyRankLookupResult,
     RankingAccountChoice,
@@ -17,6 +18,62 @@ from kvk.rendering.kvk_rankings_embed import (
 )
 from ui.views import kvk_rankings_views
 from ui.views.kvk_rankings_views import CurrentRankingsBrowserView, _top10_card_file
+
+
+def _maximum_contract_current_payload(mode: str, limit: int) -> RankingPayload:
+    if mode == "honor":
+        metric = "honor"
+        metric_label = "Honor"
+        mode_label = "Honor"
+        name_length = 64
+        supporting_values = {"Honor": 9_223_372_036_854_775_807}
+        source_note = None
+    elif mode == "prekvk":
+        metric = "overall"
+        metric_label = "Overall"
+        mode_label = "PreKvK"
+        name_length = 64
+        supporting_values = {
+            "Power": 9_223_372_036_854_775_807,
+            "Stage 1": 9_223_372_036_854_775_807,
+            "Stage 2": 9_223_372_036_854_775_807,
+            "Stage 3": 9_223_372_036_854_775_807,
+            "Overall": 9_223_372_036_854_775_807,
+        }
+        source_note = "S" * 255
+    else:
+        metric = "power"
+        metric_label = "Power"
+        mode_label = "KVK"
+        name_length = 255
+        supporting_values = {
+            "Power": 9_223_372_036_854_775_807,
+            "Kills": 9_223_372_036_854_775_807,
+            "% K/T": 9_223_372_036_854_775_807,
+            "Deads": 9_223_372_036_854_775_807,
+            "DKP": 9_223_372_036_854_775_807,
+        }
+        source_note = None
+
+    return RankingPayload(
+        mode=mode,
+        mode_label=mode_label,
+        metric=metric,
+        metric_label=metric_label,
+        limit=limit,
+        total_rows=limit,
+        source_note=source_note,
+        rows=[
+            RankingRow(
+                rank=rank,
+                governor_id=9_223_372_036_854_775_807 - rank,
+                governor_name="G" * name_length,
+                value=9_223_372_036_854_775_807,
+                supporting_values=dict(supporting_values),
+            )
+            for rank in range(1, limit + 1)
+        ],
+    )
 
 
 def _labels(view):
@@ -1118,3 +1175,31 @@ def test_my_rank_embed_normalizes_governor_names():
     assert "Behind 'Name'" in embed.fields[2].value
     assert "@here" not in embed.fields[1].value
     assert "<@456>" not in embed.fields[1].value
+
+
+@pytest.mark.parametrize("mode", ["kvk", "honor", "prekvk"])
+@pytest.mark.parametrize("limit", [10, 25, 50])
+def test_current_rankings_embed_is_valid_at_sql_contract_and_top_limits(mode, limit):
+    payload = _maximum_contract_current_payload(mode, limit)
+
+    embed = build_current_rankings_embed(payload)
+    usage = require_valid_embed_payload(embed)
+    table_lines = embed.description.removeprefix("```\n").removesuffix("\n```").splitlines()
+
+    assert usage.embed_count == 1
+    assert usage.total_characters <= 6_000
+    assert len(table_lines) == limit + 2
+    assert table_lines[-1].lstrip().startswith(f"{limit}.")
+
+
+def test_maximum_current_ranking_embeds_must_not_be_grouped_without_message_validation():
+    first = build_current_rankings_embed(_maximum_contract_current_payload("prekvk", 50))
+    second = build_current_rankings_embed(_maximum_contract_current_payload("prekvk", 50))
+
+    require_valid_embed_payload(first)
+    require_valid_embed_payload(second)
+
+    violations = validate_embed_payload([first, second])
+
+    assert [violation.path for violation in violations] == ["message.embed_text_total"]
+    assert violations[0].actual > violations[0].limit == 6_000

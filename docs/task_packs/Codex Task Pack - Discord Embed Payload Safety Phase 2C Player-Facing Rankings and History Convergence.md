@@ -7,15 +7,15 @@
 - Owner/context: `Chris Watts / follow-up to delivered Phase 2B`
 - Task type: `deferred optimisation batch / payload reliability`
 - One-pass approved: `no`
-- Status: `prepared for review/scope approval; no runtime or test work started`
+- Status: `approved evidence-led implementation complete; tests/documentation only; review pending`
 - Repository: `K98-bot-mirror` bot repository only
 
 ## 2. Delivery Prerequisites
 
 Phase 1 owns the unchanged canonical contract in `core/discord_embed_limits.py`. Phase 2A
-event/calendar convergence and Phase 2B Ark hardening are delivered. Phase 2B is present in mirror
-PR #253 and production PR #560; both await the operator's manual merge and final production-main
-verification. Its 2026-09-02 candidate smoke produced a valid registration payload with
+event/calendar convergence and Phase 2B Ark hardening are delivered. Phase 2B's PR #253 tree is
+present on mirror `main`, and production PR #560 is merged in production commit `6da1c083`. Its
+2026-09-02 candidate smoke produced a valid registration payload with
 `fields=4`, `chars=346`, `compacted_units=0`, and `omitted_units=0`, reused the existing message
 reference with `should_announce=False`, and changed neither state nor message identity. No duplicate
 or Discord `50035` occurred.
@@ -202,5 +202,28 @@ file-schema, command, or data rollback should be required.
 - Phase 2F: atomic `active_reminders` persistence;
 - Phase 2G: evidence/design-gated atomic Pre-KVK dispatch reservation;
 - separate coordinated task: KVK History `_offload_callable` once-only executor audit.
+
+## 13. Approved Audit And Implementation Evidence
+
+On 2026-09-03 the operator approved the evidence-led recommendation to close Phase 2C without a
+runtime change. The bot base is mirror `main` commit `e525fb355b5b831bcc84c349df944ee7725776f9`;
+the implementation branch is `codex/discord-embed-payload-safety-phase-2c`. The SQL repository was
+clean at `fc0e94ebd2e0a98286069c8a8b71365dd5178657` and remains a no-diff boundary.
+
+Authoritative SQL, model, cache, cardinality, render, send/edit, attachment, export, permission,
+visibility, owner, timeout, restart, and fallback review found no live `fix now` payload. The largest
+reachable textual embed is the Hall of Fame maximum at 4,030 description characters and 4,187
+aggregate characters. Current KVK, Honor, and Pre-KVK rankings remain valid at Top 10, 25, and 50;
+the complete maximum-contract three-row history fallback remains below Discord's 2,000-character
+content limit. Legacy ranking pagination and multi-embed history builders are test-only.
+
+Regression coverage now asserts all current mode/Top combinations at source maxima, the Hall of
+Fame maximum, its deliberately out-of-contract 4,097-character single-unit rejection, grouped
+multi-embed aggregate rejection, and complete maximum-contract history fallback. Focused validation
+passed `78`; the full suite passed `3103 passed, 2 skipped`. Architecture, deferred-item,
+security-routing, import-smoke, command-registration, pre-commit, and production-log-noise validators
+passed. Runtime, SQL/DAL, config/cache/state, commands, permissions, visibility, mentions,
+attachments, exports, message/view identity, timeouts, restart behavior, fallback behavior, and
+`_offload_callable` are unchanged.
 
 No Phase 2B deferred item is unassigned.

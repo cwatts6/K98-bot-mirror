@@ -48,21 +48,30 @@ with complete-unit packing, visible compaction, character-budgeted pages/chunks,
 markers, and final send/edit validation. The full suite passes with `3090 passed, 2 skipped`.
 Changes-only security scan `79603f53-69f8-4586-9296-760385dd9420` reviewed the exact
 `4290b0fc..fccde886` bot range with Deep off, complete coverage of all 11 runtime files, and zero
-reportable findings; SQL is a documented no-diff skip. Mirror PR #253 and production PR #560 carry
-the result and await manual merge.
+reportable findings; SQL is a documented no-diff skip. Mirror PR #253's delivered tree is present
+on mirror `main`, and production PR #560 is merged in production commit `6da1c083`.
 
 Operator candidate smoke on 2026-09-02 exercised match `52` through the existing registration
 message reference. The builder produced `fields=4`, `chars=346`, `compacted_units=0`, and
 `omitted_units=0`; `should_announce=False` preserved the first-publication-only ping boundary, and
-the message was edited in place with no state or identity change and no Discord `50035`. Final
-post-merge production-main verification remains operator-owned.
+the message was edited in place with no state or identity change and no Discord `50035`. The
+production-main merge was verified on 2026-09-03.
 
-The next approved planning slice is Phase 2C player-facing rankings/history convergence. Phase 2D
-owns operator diagnostics; Phase 2E owns Ark confirmation-update retention policy, team-builder
-audit-service extraction, and explicit registration-delivery outcome observability; Phase 2F owns
-active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic Pre-KVK dispatch
-reservation. These assignments retain every Phase 2B deferred item without reopening delivered Ark
-payload behavior.
+Phase 2C player-facing rankings/history convergence completed its evidence-led implementation on
+2026-09-03. Authoritative SQL/model/cardinality measurements proved every live embed, text fallback,
+and existing attachment/export boundary safe, so the approved change adds regression coverage and
+delivery records only; runtime code is unchanged. Tests cover every current Top limit at source
+maxima, the 4,030-character maximum Hall of Fame description, an out-of-contract 4,097-character
+single-unit rejection, grouped-message aggregate rejection, and complete maximum-contract history
+fallback. The focused suite passed `78`; the full suite passed `3103 passed, 2 skipped`.
+The independent log-noise run passed the same suite with production operational logs unchanged.
+
+Phase 2D owns operator diagnostics; Phase 2E owns Ark confirmation-update retention policy,
+team-builder audit-service extraction, and explicit registration-delivery outcome observability;
+Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-gated atomic
+Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item without
+reopening delivered Ark payload behavior. The separate KVK History once-only executor audit also
+remains unchanged and outside Phase 2C.
 
 ## KVK Target Publication And Quality Delivery
 

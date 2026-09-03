@@ -4,15 +4,16 @@ This folder keeps completed task packs and chat starters for historical referenc
 
 Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening completed implementation,
 validation, Changes-only security review, production-candidate promotion, and operator candidate
-smoke on 2026-09-02. Mirror PR #253 and production PR #560 remain open for the operator's manual
-merge and final production-main verification. The full suite passed `3090 passed, 2 skipped`; scan
+smoke on 2026-09-02. Mirror PR #253's delivered tree is present on mirror `main`; production PR
+#560 is merged in production commit `6da1c083`. The full suite passed `3090 passed, 2 skipped`; scan
 `79603f53-69f8-4586-9296-760385dd9420` ran over the exact approved bot runtime range with Deep off,
 complete coverage, and zero reportable findings; SQL was a no-diff skip. Smoke built a four-field,
 346-character registration payload with no compaction/omission, retained `should_announce=False`,
 and edited the existing message reference without state/identity change, duplication, or `50035`.
-Phase 2C rankings/history is prepared as the next review-first slice. Diagnostics, Ark persistence
-and delivery observability, active-reminder atomicity, and atomic Pre-KVK reservation are assigned
-to Phases 2D through 2G rather than left unowned.
+Phase 2C rankings/history completed its approved evidence-led implementation on 2026-09-03 with
+tests and delivery records only. No live runtime payload required correction. Diagnostics, Ark
+persistence and delivery observability, active-reminder atomicity, and atomic Pre-KVK reservation
+remain assigned to Phases 2D through 2G rather than left unowned.
 
 Discord Embed Payload Safety Phase 2A Event and Calendar Convergence completed implementation,
 review, promotion preparation, and representative production smoke on 2026-09-02 through mirror

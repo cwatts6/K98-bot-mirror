@@ -4,12 +4,12 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-09-02
+## Current execution set — 2026-09-03
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Next approval-gated slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Review/scope first; Phase 2B prerequisite delivered and candidate-smoke accepted; no runtime or test edits before approval |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Mirror PR #253 and production PR #560 open for manual merge; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
+| Active approved slice | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Evidence-led implementation complete with tests/docs only; no live payload required a runtime correction; `78` focused and `3103 passed, 2 skipped` full-suite evidence |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
@@ -44,16 +44,19 @@ state, and exact-boundary behavior remain covered by deterministic tests. Phase 
 is delivered and candidate-smoke accepted with the unchanged canonical helper,
 complete-unit packing, safe pages/chunks, exact omission markers, and final delivery validation.
 The full suite passes with `3090 passed, 2 skipped`; the exact bot Changes review ran with Deep off,
-complete coverage, and zero findings. SQL is a no-diff skip; mirror PR #253 and production PR #560
-carry the result and await manual merge. Candidate smoke produced a valid four-field,
+complete coverage, and zero findings. SQL is a no-diff skip; mirror PR #253's delivered tree is on
+mirror `main`, and production PR #560 is merged. Candidate smoke produced a valid four-field,
 346-character registration payload, edited the existing message without announcing or changing
 state/identity, and produced no `50035`.
 
-Phase 2C rankings/history is the next review-first slice. Phase 2D owns diagnostics; Phase 2E owns
+Phase 2C rankings/history completed its approved evidence-led implementation with no runtime diff.
+Canonical regression tests now prove all current Top limits at source maxima, the maximum Hall of
+Fame contract and pathological one-over rejection, grouped-message aggregate enforcement, and the
+complete maximum-contract history text fallback. Phase 2D owns diagnostics; Phase 2E owns
 confirmation-update retention policy, team-builder audit-service extraction, and registration
 delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
 evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit
-remains coordinated with, but outside, Phase 2C payload implementation.
+remains coordinated with, but outside, Phase 2C.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

@@ -233,3 +233,37 @@ def test_last3_text_fallback_preserves_missing_acclaim():
 
     assert "KVK 14: no row found" in text
     assert "Acclaim Missing" in text
+
+
+def test_last3_text_fallback_is_complete_and_safe_at_sql_contract_maximum():
+    maximum = 9_223_372_036_854_775_807
+    rows = tuple(
+        KvkHistoryRow(
+            kvk_no=2_147_483_647 - offset,
+            row_present=True,
+            kvk_rank=2_147_483_647,
+            kills=maximum,
+            kill_target_percent=maximum,
+            deads=maximum,
+            dead_target_percent=maximum,
+            dkp=maximum,
+            dkp_target_percent=maximum,
+            acclaim=maximum,
+            heals=maximum,
+        )
+        for offset in range(3)
+    )
+    payload = KvkHistoryPayload(
+        governor_id=str(maximum),
+        governor_name="G" * 255,
+        started_kvks=tuple(row.kvk_no for row in rows),
+        last3_kvks=tuple(row.kvk_no for row in rows),
+        rows=rows,
+        last3_rows=rows,
+    )
+
+    text = build_last3_text_fallback(payload)
+
+    assert len(text) <= 2_000
+    assert len(text.splitlines()) == 4
+    assert all(f"KVK {row.kvk_no}" in text for row in rows)
