@@ -1,10 +1,14 @@
 from types import SimpleNamespace
 
+import pytest
+
 from core.discord_embed_limits import require_valid_embed_payload
 from core.operator_diagnostic_payloads import (
     DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES,
     MAX_MESSAGE_CONTENT_CHARACTERS,
     content_pages,
+    neutralize_discord_mentions,
+    omission_marker,
     pack_complete_units,
     redact_diagnostic_text,
     resolve_attachment_size_limit,
@@ -50,6 +54,59 @@ def test_redaction_is_consistent_for_preview_and_attachment_text() -> None:
     assert redacted.splitlines()[1].endswith(";server=db")
 
 
+def test_redaction_consumes_quoted_keys_and_complete_quoted_values() -> None:
+    source = (
+        '{"token": "live-secret", "Authorization": "Bearer auth secret"}\n'
+        'token="secret with spaces"\n'
+        "'client_secret': 'another spaced secret'\n"
+        'password="escaped \\" secret"'
+    )
+
+    redacted = redact_diagnostic_text(source)
+
+    for secret in (
+        "live-secret",
+        "auth secret",
+        "secret with spaces",
+        "another spaced secret",
+        "escaped",
+    ):
+        assert secret not in redacted
+    assert redacted.count("[REDACTED]") == 5
+    assert '{"token": "[REDACTED]"' in redacted
+    assert '"Authorization": "[REDACTED]"' in redacted
+
+
+def test_diagnostic_mentions_are_neutralized_without_hiding_identity() -> None:
+    source = "@everyone @here <@123> <@!456> <@&789>"
+
+    neutralized = neutralize_discord_mentions(source)
+
+    assert "@everyone" not in neutralized
+    assert "@here" not in neutralized
+    assert "<@123>" not in neutralized
+    assert "<@!456>" not in neutralized
+    assert "<@&789>" not in neutralized
+    assert neutralized.replace("\u200b", "") == source
+    assert neutralize_discord_mentions("ordinary user@example.com text") == (
+        "ordinary user@example.com text"
+    )
+
+
+def test_public_operator_error_content_is_mention_neutral() -> None:
+    from commands.admin_cmds import _safe_operator_content
+
+    content = _safe_operator_content(
+        "Failed:", "sheet @everyone from <@123> role <@&456> token=secret"
+    )
+
+    assert "@everyone" not in content
+    assert "<@123>" not in content
+    assert "<@&456>" not in content
+    assert "secret" not in content
+    assert "[REDACTED]" in content
+
+
 def test_utf8_size_measures_encoded_bytes() -> None:
     assert utf8_size("a") == 1
     assert utf8_size("🦊") == 4
@@ -81,6 +138,16 @@ def test_content_pages_preserve_normal_units_and_mark_pathological_unit() -> Non
     assert all(len(page) <= MAX_MESSAGE_CONTENT_CHARACTERS for page in pages)
 
 
+def test_omission_marker_supports_explicit_singular_label() -> None:
+    assert (
+        omission_marker(1, "audit batches", singular_label="audit batch")
+        == "… 1 audit batch not shown."
+    )
+    assert omission_marker(2, "audit batches", singular_label="audit batch") == (
+        "… 2 audit batches not shown."
+    )
+
+
 def test_inventory_audit_embed_marks_records_beyond_field_limit(monkeypatch) -> None:
     from commands import inventory_cmds
 
@@ -109,3 +176,74 @@ def test_inventory_audit_embed_marks_records_beyond_field_limit(monkeypatch) -> 
     assert len(embed.fields) == 25
     assert embed.fields[-1].name == "Audit display compacted"
     assert embed.fields[-1].value == "… 6 audit batches not shown."
+
+
+@pytest.mark.asyncio
+async def test_subscriber_list_reserves_field_for_omission_marker(monkeypatch) -> None:
+    from commands import subscriptions_cmds
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.application_commands = []
+
+        def slash_command(self, **_kwargs):
+            return lambda callback: callback
+
+        def add_application_command(self, command) -> None:
+            self.application_commands.append(command)
+
+    class FakeInteraction:
+        attachment_size_limit = DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
+
+        def __init__(self) -> None:
+            self.edits: list[dict] = []
+
+        async def edit_original_response(self, **kwargs):
+            self.edits.append(kwargs)
+
+    async def fake_defer(_ctx, *, ephemeral: bool) -> None:
+        assert ephemeral is True
+
+    subscribers = {
+        str(1000 + index): {
+            "username": f"User {index:02d}",
+            "subscriptions": ["fights"],
+            "reminder_times": ["5m"],
+        }
+        for index in range(26)
+    }
+    monkeypatch.setattr(subscriptions_cmds, "safe_defer", fake_defer)
+    monkeypatch.setattr(subscriptions_cmds, "get_all_subscribers", lambda: subscribers)
+    monkeypatch.setattr(subscriptions_cmds, "dm_scheduled_tracker", {})
+    monkeypatch.setattr(subscriptions_cmds, "dm_sent_tracker", {})
+    monkeypatch.setattr(subscriptions_cmds, "active_task_count", lambda _uid: 0)
+
+    bot = FakeBot()
+    subscriptions_cmds.register_subscriptions(bot)
+    group = bot.application_commands[0]
+    handler = next(command.callback for command in group.subcommands if command.name == "list")
+    while hasattr(handler, "__wrapped__"):
+        handler = handler.__wrapped__
+    interaction = FakeInteraction()
+
+    await handler(SimpleNamespace(interaction=interaction))
+
+    response = interaction.edits[-1]
+    embed = response["embed"]
+    require_valid_embed_payload(embed)
+    assert len(embed.fields) == 25
+    assert embed.fields[-1].name == "Subscriber display compacted"
+    assert embed.fields[-1].value == "… 2 subscribers not shown."
+    assert len(response["attachments"]) == 1
+
+    subscribers.pop("1025")
+    exact_interaction = FakeInteraction()
+
+    await handler(SimpleNamespace(interaction=exact_interaction))
+
+    exact_response = exact_interaction.edits[-1]
+    exact_embed = exact_response["embed"]
+    require_valid_embed_payload(exact_embed)
+    assert len(exact_embed.fields) == 25
+    assert exact_embed.fields[-1].name == "User 24 • <@1024>"
+    assert exact_response["attachments"] == []

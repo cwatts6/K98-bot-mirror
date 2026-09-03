@@ -16,9 +16,18 @@ MAX_MESSAGE_CONTENT_CHARACTERS = 2000
 MAX_ATTACHMENTS_PER_MESSAGE = 10
 DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES = 10 * 1024 * 1024
 
+_SENSITIVE_KEY_PATTERN = (
+    r"token|secret|password|passwd|pwd|api[_-]?key|client[_-]?secret|" r"connection[_-]?string"
+)
+_QUOTED_SENSITIVE_ASSIGNMENT_RE = re.compile(
+    rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b(?:{_SENSITIVE_KEY_PATTERN}|authorization)\b)"
+    r"(?P=key_quote)(?P<separator>\s*[:=]\s*)(?P<value_quote>[\"'])"
+    r"(?:\\.|(?!(?P=value_quote)).)*(?P=value_quote)"
+)
 _SENSITIVE_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(token|secret|password|passwd|pwd|api[_-]?key|client[_-]?secret|"
-    r"connection[_-]?string)\b(\s*[:=]\s*)([^\s,;]+)"
+    rf"(?i)(?P<key_quote>[\"']?)(?P<key>\b(?:{_SENSITIVE_KEY_PATTERN})\b)"
+    r"(?P=key_quote)(?P<separator>\s*[:=]\s*)"
+    r"(?P<value>(?![\"'])[^\s,;}\]\"']+)"
 )
 _AUTH_BEARER_RE = re.compile(r"(?i)\bauthorization\s*:\s*bearer\s+[^\s,;]+")
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
@@ -41,11 +50,37 @@ def redact_diagnostic_text(value: Any) -> str:
     """Redact common credential-bearing forms without changing line ordering."""
 
     text = "" if value is None else str(value)
+    text = _QUOTED_SENSITIVE_ASSIGNMENT_RE.sub(
+        lambda match: (
+            f"{match.group('key_quote')}{match.group('key')}{match.group('key_quote')}"
+            f"{match.group('separator')}{match.group('value_quote')}"
+            f"[REDACTED]{match.group('value_quote')}"
+        ),
+        text,
+    )
     text = _AUTH_BEARER_RE.sub("Authorization: Bearer [REDACTED]", text)
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
-    text = _SENSITIVE_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
+    text = _SENSITIVE_ASSIGNMENT_RE.sub(
+        lambda match: (
+            f"{match.group('key_quote')}{match.group('key')}{match.group('key_quote')}"
+            f"{match.group('separator')}[REDACTED]"
+        ),
+        text,
+    )
     text = _SIGNED_QUERY_RE.sub(r"\1[REDACTED]", text)
     return _CONNECTION_PASSWORD_RE.sub(r"\1[REDACTED]", text)
+
+
+def neutralize_discord_mentions(value: Any) -> str:
+    """Keep diagnostic content readable without creating Discord notifications."""
+
+    text = "" if value is None else str(value)
+    text = re.sub(
+        r"(?i)@(everyone|here)\b",
+        lambda match: f"@\u200b{match.group(1)}",
+        text,
+    )
+    return re.sub(r"<@(?=[!&]?\d+>)", "<@\u200b", text)
 
 
 def utf8_size(value: Any) -> int:
@@ -86,10 +121,12 @@ def resolve_attachment_size_limit(destination: Any) -> int:
     return DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
 
 
-def omission_marker(omitted: int, label: str) -> str:
+def omission_marker(omitted: int, label: str, *, singular_label: str | None = None) -> str:
     """Return the canonical exact count-bearing exhaustion marker."""
 
-    noun = label if omitted != 1 else label.rstrip("s")
+    noun = label
+    if omitted == 1:
+        noun = singular_label if singular_label is not None else label.removesuffix("s")
     return f"… {omitted} {noun} not shown."
 
 

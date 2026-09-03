@@ -13,6 +13,7 @@ from commands.deprecation_helpers import CommandRedirect, send_deprecated_comman
 from core.discord_embed_limits import (
     MAX_FIELD_NAME_CHARACTERS,
     MAX_FIELD_VALUE_CHARACTERS,
+    MAX_FIELDS_PER_EMBED,
     MAX_TOTAL_CHARACTERS,
     measure_embed_payload,
     require_valid_embed_payload,
@@ -20,6 +21,7 @@ from core.discord_embed_limits import (
 from core.interaction_safety import safe_command, safe_defer
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
+    neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
     redact_diagnostic_text,
@@ -39,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 def _safe_diagnostic_error(prefix: str, error: object) -> str:
     return pack_complete_units(
-        [prefix, redact_diagnostic_text(error)],
+        [prefix, neutralize_discord_mentions(redact_diagnostic_text(error))],
         limit=MAX_MESSAGE_CONTENT_CHARACTERS,
         label="diagnostic lines",
     ).text
@@ -174,8 +176,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             color=discord.Color.blurple(),
         )
 
-        MAX_FIELDS = 25  # Discord embed field limit
-        shown = items[:MAX_FIELDS]
+        field_limit = MAX_FIELDS_PER_EMBED - 1 if len(items) > MAX_FIELDS_PER_EMBED else len(items)
+        shown = items[:field_limit]
         rendered = 0
         for username, uid_str, types, times, scheduled, sent, tasks in shown:
             mention = f"<@{uid_str}>" if uid_str.isdigit() else uid_str
@@ -201,7 +203,10 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             marker_name = "Subscriber display compacted"
             marker_value = omission_marker(omitted, "subscribers")
             while embed.fields and (
-                measure_embed_payload(embed).total_characters + len(marker_name) + len(marker_value)
+                len(embed.fields) >= MAX_FIELDS_PER_EMBED
+                or measure_embed_payload(embed).total_characters
+                + len(marker_name)
+                + len(marker_value)
                 > MAX_TOTAL_CHARACTERS
             ):
                 embed.remove_field(len(embed.fields) - 1)

@@ -36,6 +36,7 @@ from core.discord_embed_limits import (
 )
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
+    neutralize_discord_mentions,
     omission_marker,
     pack_complete_units,
     redact_diagnostic_text,
@@ -95,7 +96,7 @@ def _safe_operator_content(prefix: str, detail: object) -> str:
     """Build a bounded operator message without slicing its diagnostic detail."""
 
     return pack_complete_units(
-        [prefix, redact_diagnostic_text(detail)],
+        [prefix, neutralize_discord_mentions(redact_diagnostic_text(detail))],
         limit=MAX_MESSAGE_CONTENT_CHARACTERS,
         label="diagnostic lines",
     ).text

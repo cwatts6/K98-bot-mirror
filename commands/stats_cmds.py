@@ -18,6 +18,7 @@ from core.discord_embed_limits import require_valid_embed_payload
 from core.interaction_safety import safe_command, safe_defer
 from core.operator_diagnostic_payloads import (
     MAX_MESSAGE_CONTENT_CHARACTERS,
+    neutralize_discord_mentions,
     pack_complete_units,
     redact_diagnostic_text,
 )
@@ -41,7 +42,7 @@ bot: ext_commands.Bot | None = None
 
 def _safe_diagnostic_error(prefix: str, error: object) -> str:
     return pack_complete_units(
-        [prefix, redact_diagnostic_text(error)],
+        [prefix, neutralize_discord_mentions(redact_diagnostic_text(error))],
         limit=MAX_MESSAGE_CONTENT_CHARACTERS,
         label="diagnostic lines",
     ).text

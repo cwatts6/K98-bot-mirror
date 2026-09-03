@@ -195,7 +195,7 @@ def _build_inventory_audit_embed(
     omitted = len(records) - rendered
     if omitted:
         marker_name = "Audit display compacted"
-        marker_value = omission_marker(omitted, "audit batches")
+        marker_value = omission_marker(omitted, "audit batches", singular_label="audit batch")
         while embed.fields and (
             measure_embed_payload(embed).total_characters + len(marker_name) + len(marker_value)
             > MAX_TOTAL_CHARACTERS
@@ -203,7 +203,7 @@ def _build_inventory_audit_embed(
             embed.remove_field(len(embed.fields) - 1)
             rendered -= 1
             omitted += 1
-            marker_value = omission_marker(omitted, "audit batches")
+            marker_value = omission_marker(omitted, "audit batches", singular_label="audit batch")
         embed.add_field(
             name=marker_name,
             value=marker_value,
