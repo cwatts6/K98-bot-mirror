@@ -307,8 +307,7 @@ class ArkRegistrationController:
                 "[ARK_REGISTRATION] ensure_message_result match_id=%s "
                 "delivery_outcome=failed delivery_succeeded=False "
                 "moved_or_reposted=False state_changed=False "
-                "failure_reason=missing_destination has_registration_ref=False "
-                "announce_requested=%s",
+                "failure_reason=missing_destination announce_requested=%s",
                 self.match_id,
                 announce,
             )

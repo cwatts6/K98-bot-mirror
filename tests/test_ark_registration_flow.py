@@ -229,6 +229,7 @@ async def test_ensure_registration_message_logs_missing_destination(monkeypatch,
     assert ref is None
     assert "delivery_outcome=failed" in caplog.text
     assert "failure_reason=missing_destination" in caplog.text
+    assert "has_registration_ref=" not in caplog.text
     assert "announce_requested=True" in caplog.text
 
 
