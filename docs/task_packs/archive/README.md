@@ -11,9 +11,9 @@ all 11 runtime files covered, and zero findings. SQL was a no-diff skip. Restart
 and rehydration, `/ops logs` and component interactions, `/ops show_logs`,
 `/ops view_restart_log`, `/ops last_errors`, and the representative command set passed without
 `File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
-and production PR #562 are ready for manual merge; final production-main verification remains
-operator-owned. Phase 2E Ark Persistence Orchestration and Delivery Observability is prepared as
-the next audit-first task.
+and production PR #562 are merged, and final production-main source verification passed. Phase 2E
+Ark Persistence Orchestration and Delivery Observability completed its audit-first gate and has an
+approved bot-only local implementation in progress.
 
 Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence completed its
 evidence-led tests/documentation-only implementation, review, candidate deployment, and operator

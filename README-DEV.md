@@ -69,7 +69,7 @@ Changes-only security scan `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed the e
 `e525fb35..fa67d842` bot range with Deep off, complete coverage of all nine changed files, and zero
 findings. SQL remains a documented no-diff skip. Review is complete, and the operator confirmed on
 2026-09-03 that candidate deployment and smoke testing passed for mirror PR #254 and production PR
-#561. Both PRs await the operator's manual merge and final production-main verification.
+#561. Both PRs are merged and their final production-main source state was verified on 2026-09-03.
 
 Phase 2C's task pack and chat starter are archived. Phase 2D operator diagnostics convergence is
 delivered and operator-smoke accepted on `codex/discord-embed-payload-safety-phase-2d` from mirror
@@ -88,15 +88,25 @@ unchanged. Operator smoke on 2026-09-03 confirmed clean graceful restart/startup
 persistence and rehydration, `/ops logs` plus component interactions, `/ops show_logs`,
 `/ops view_restart_log`, `/ops last_errors`, and the representative command set without
 `File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
-and production PR #562 are ready for manual merge; final production-main verification remains
-operator-owned. The Phase 2D pack and starter are archived.
+and production PR #562 are merged, and final production-main source verification passed on
+2026-09-03. The Phase 2D pack and starter are archived.
 
-Phase 2E is prepared as the next audit-first task pack. It owns Ark confirmation-update retention
-policy, team-builder audit-service extraction, and explicit registration-delivery outcome
-observability; Phase 2F owns active-reminder tracker atomicity; and Phase 2G owns evidence/design-
-gated atomic Pre-KVK dispatch reservation. These assignments retain every Phase 2B deferred item
-without reopening delivered Ark payload behavior. The separate KVK History once-only executor
-audit also remains unchanged and outside Phase 2C.
+Phase 2E completed its audit-first gate and has an approved bot-only implementation on
+`codex/discord-embed-payload-safety-phase-2e`. Confirmation history remains keep-all: the measured
+local state copy was proved to contain repeated test fixtures and is not production evidence, so no
+JSON shape, retention, cleanup, or SQL change is justified. Confirmation-flow tests now use
+temporary state paths. Registration delivery reports explicit `created`, `edited`, `moved`,
+`reposted`, `recreated`, or `failed` outcomes behind a legacy tuple adapter, and team-builder
+assign/remove/reset/auto-balance persistence-plus-audit coordination now belongs to
+`ark/team_builder_service.py`. Commands, permissions, visibility, mentions, interaction ordering,
+Ark meaning, message identity, timeouts, restart/scheduler behavior, and SQL remain unchanged.
+Focused validation passes `48`, Ark-plus-UI regression passes `204`, and the complete suite passes
+`3186 passed, 2 skipped`; deterministic validators, pre-commit, and log-noise checks also pass.
+Final Changes-only scan `927226f8-742a-41e8-ad37-22c16d50f0ad` reviewed frozen digest
+`1fefe4c3b58f` with Deep off, complete coverage of all four runtime files, no target warnings, and
+zero findings. SQL remains a documented clean no-diff skip.
+Phase 2F still owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
+Pre-KVK reservation; separate Stats/KVK History executor audits remain out of scope.
 
 ## KVK Target Publication And Quality Delivery
 

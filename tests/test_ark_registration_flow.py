@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import logging
 
 import pytest
 
 from ark.registration_flow import ArkRegistrationController
+from ark.registration_messages import RegistrationDeliveryResult
 from ark.state.ark_state import ArkMessageRef, ArkMessageState
 from services.governor_account_service import summarize_accounts
 
@@ -81,7 +83,7 @@ def _account_summary(accounts: dict[str, dict[str, str]]):
 
 
 @pytest.mark.asyncio
-async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch):
+async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch, caplog):
     controller = ArkRegistrationController(match_id=91, config={"PlayersCap": 30, "SubsCap": 15})
 
     async def _get_match(_match_id):
@@ -117,7 +119,7 @@ async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch):
 
     async def _upsert(**kwargs):
         calls["announce"] = kwargs["announce"]
-        return False, False
+        return RegistrationDeliveryResult(outcome="edited", state_changed=False)
 
     async def _persist(match_id, registration_ref, announce_sent, touched_refresh_at):
         calls["persist"] = (match_id, registration_ref.channel_id, registration_ref.message_id)
@@ -129,9 +131,10 @@ async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
     monkeypatch.setattr("ark.registration_flow.get_alliance", _get_alliance)
     monkeypatch.setattr("ark.registration_flow.ArkJsonState", _State)
-    monkeypatch.setattr("ark.registration_flow.upsert_registration_message", _upsert)
+    monkeypatch.setattr("ark.registration_flow.upsert_registration_message_result", _upsert)
     monkeypatch.setattr(controller, "_persist_registration_state", _persist)
     monkeypatch.setattr(controller, "_save_registration_tracker", _tracker)
+    caplog.set_level(logging.INFO, logger="ark.registration_flow")
 
     ref = await controller.ensure_registration_message(client=object(), announce=False)
 
@@ -139,6 +142,10 @@ async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch):
     assert ref.channel_id == 111
     assert ref.message_id == 222
     assert calls["persist"] == (91, 111, 222)
+    assert "delivery_outcome=edited" in caplog.text
+    assert "delivery_succeeded=True" in caplog.text
+    assert "moved_or_reposted=False" in caplog.text
+    assert "state_changed=False" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -175,17 +182,55 @@ async def test_ensure_registration_message_skips_repeat_announce(monkeypatch):
         calls["announce"] = kwargs["announce"]
         state = kwargs["state"]
         state.messages[92].registration = ArkMessageRef(channel_id=111, message_id=333)
-        return False, False
+        return RegistrationDeliveryResult(outcome="edited", state_changed=False)
 
     monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
     monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
     monkeypatch.setattr("ark.registration_flow.ArkJsonState", _State)
-    monkeypatch.setattr("ark.registration_flow.upsert_registration_message", _upsert)
+    monkeypatch.setattr("ark.registration_flow.upsert_registration_message_result", _upsert)
 
     ref = await controller.ensure_registration_message(client=object(), announce=True)
 
     assert ref is not None
     assert calls["announce"] is False
+
+
+@pytest.mark.asyncio
+async def test_ensure_registration_message_logs_missing_destination(monkeypatch, caplog):
+    controller = ArkRegistrationController(match_id=93, config={"PlayersCap": 30, "SubsCap": 15})
+
+    async def _get_match(_match_id):
+        return {
+            "MatchId": 93,
+            "Alliance": "K98",
+            "ArkWeekendDate": datetime(2026, 3, 7, tzinfo=UTC).date(),
+            "MatchDay": "Sat",
+            "MatchTimeUtc": datetime(2026, 3, 7, 11, 0, tzinfo=UTC).time(),
+            "SignupCloseUtc": _future_close(),
+            "Status": "Scheduled",
+            "RegistrationChannelId": None,
+            "RegistrationMessageId": None,
+            "AnnouncementSent": 0,
+        }
+
+    async def _get_roster(_match_id):
+        return []
+
+    async def _get_alliance(_alliance):
+        return None
+
+    monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
+    monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
+    monkeypatch.setattr("ark.registration_flow.get_alliance", _get_alliance)
+    caplog.set_level(logging.WARNING, logger="ark.registration_flow")
+
+    ref = await controller.ensure_registration_message(client=object(), announce=True)
+
+    assert ref is None
+    assert "delivery_outcome=failed" in caplog.text
+    assert "failure_reason=missing_destination" in caplog.text
+    assert "has_registration_ref=" not in caplog.text
+    assert "announce_requested=True" in caplog.text
 
 
 @pytest.mark.asyncio

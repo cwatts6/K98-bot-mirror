@@ -5,6 +5,20 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ark.confirmation_flow import ArkConfirmationController
+from ark.state.ark_state import ArkJsonState
+
+
+@pytest.fixture(autouse=True)
+def isolate_ark_json_state(monkeypatch, tmp_path):
+    """Prevent confirmation-flow tests from writing to the runtime data directory."""
+
+    def _state_factory():
+        return ArkJsonState(
+            message_state_path=str(tmp_path / "ark_message_state.json"),
+            reminder_state_path=str(tmp_path / "ark_reminder_state.json"),
+        )
+
+    monkeypatch.setattr("ark.confirmation_flow.ArkJsonState", _state_factory)
 
 
 @pytest.fixture

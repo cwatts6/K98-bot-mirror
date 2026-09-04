@@ -1,6 +1,8 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability
 
-Status: prepared on 2026-09-03 for the next audit-first slice. Implementation is not approved.
+Status: audit-first stop gate completed and implementation approved on 2026-09-03. Local delivery
+is active on `codex/discord-embed-payload-safety-phase-2e`; the original starter below is retained as
+the initiating request and must not be replayed as a new approval gate.
 Revalidate Phase 2D merges and final production-main verification before selecting an implementation
 base.
 

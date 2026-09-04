@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import logging
+from typing import Literal
 
 import discord
 
@@ -11,9 +13,68 @@ from core.discord_embed_limits import require_valid_embed_payload
 
 logger = logging.getLogger(__name__)
 
+RegistrationDeliveryOutcome = Literal[
+    "created",
+    "edited",
+    "moved",
+    "reposted",
+    "recreated",
+    "failed",
+]
+RegistrationDeliveryFailure = Literal[
+    "missing_destination",
+    "channel_unavailable",
+    "edit_failed",
+    "send_failed",
+]
+
+
+@dataclass(frozen=True)
+class RegistrationDeliveryResult:
+    """Observable registration delivery result without changing legacy caller semantics."""
+
+    outcome: RegistrationDeliveryOutcome
+    state_changed: bool
+    failure_reason: RegistrationDeliveryFailure | None = None
+
+    @property
+    def succeeded(self) -> bool:
+        return self.outcome != "failed"
+
+    @property
+    def legacy_moved_or_reposted(self) -> bool:
+        return self.outcome in {"created", "moved", "reposted", "recreated"}
+
+    def as_legacy_tuple(self) -> tuple[bool, bool]:
+        return self.legacy_moved_or_reposted, self.state_changed
+
 
 def _allowed_mentions(announce: bool) -> discord.AllowedMentions:
     return discord.AllowedMentions(everyone=True) if announce else discord.AllowedMentions.none()
+
+
+async def _send_registration_message(
+    *,
+    announce: bool,
+    channel,
+    embed,
+    match_id: int,
+    view,
+):
+    try:
+        return await channel.send(
+            content="@everyone" if announce else None,
+            embed=embed,
+            view=view,
+            allowed_mentions=_allowed_mentions(announce),
+        )
+    except Exception:
+        logger.exception(
+            "[ARK_REGISTRATION] delivery_result match_id=%s delivery_outcome=failed "
+            "failure_reason=send_failed",
+            match_id,
+        )
+        raise
 
 
 def _validate_delivery_embed(embed, *, route: str) -> None:
@@ -54,7 +115,7 @@ async def _resolve_confirmation_ref_sql(match_id: int) -> ArkMessageRef | None:
     return None
 
 
-async def upsert_registration_message(
+async def upsert_registration_message_result(
     *,
     announce: bool = False,
     client,
@@ -65,15 +126,11 @@ async def upsert_registration_message(
     target_channel_id: int | None = None,
     delete_old: bool = True,
     force_repost: bool = False,
-) -> tuple[bool, bool]:
+) -> RegistrationDeliveryResult:
     """
     Ensure a registration message exists and is updated.
 
-    Returns:
-        (moved_or_reposted, state_changed)
-      - moved_or_reposted=True when a new message is sent/recreated/reposted
-      - moved_or_reposted=False when edited in-place
-      - state_changed=True if message ref changed
+    Returns an explicit delivery outcome while preserving existing send/edit behavior.
     """
     _validate_delivery_embed(embed, route="registration_upsert")
     msg_state = state.messages.get(match_id)
@@ -85,12 +142,20 @@ async def upsert_registration_message(
 
     if not target_id:
         logger.warning("[ARK] No target registration channel for match %s.", match_id)
-        return False, False
+        return RegistrationDeliveryResult(
+            outcome="failed",
+            state_changed=False,
+            failure_reason="missing_destination",
+        )
 
     target_channel = client.get_channel(target_id)
     if not target_channel:
         logger.warning("[ARK] Registration channel %s not found.", target_id)
-        return False, False
+        return RegistrationDeliveryResult(
+            outcome="failed",
+            state_changed=False,
+            failure_reason="channel_unavailable",
+        )
 
     if current_ref:
         current_channel_id = int(current_ref.channel_id or 0)
@@ -110,11 +175,12 @@ async def upsert_registration_message(
                 except Exception:
                     logger.exception("[ARK] Failed to delete old registration message.")
 
-            new_msg = await target_channel.send(
-                content="@everyone" if announce else None,
+            new_msg = await _send_registration_message(
+                announce=announce,
+                channel=target_channel,
                 embed=embed,
+                match_id=match_id,
                 view=view,
-                allowed_mentions=_allowed_mentions(announce),
             )
 
             msg_state = state.messages.get(match_id) or ArkMessageState()
@@ -122,7 +188,10 @@ async def upsert_registration_message(
                 channel_id=int(new_msg.channel.id), message_id=int(new_msg.id)
             )
             state.messages[match_id] = msg_state
-            return True, True
+            return RegistrationDeliveryResult(
+                outcome="moved" if channel_changed else "reposted",
+                state_changed=True,
+            )
 
         try:
             old_msg = await target_channel.fetch_message(int(current_ref.message_id))
@@ -132,14 +201,15 @@ async def upsert_registration_message(
                 view=view,
                 allowed_mentions=_allowed_mentions(announce),
             )
-            return False, False
+            return RegistrationDeliveryResult(outcome="edited", state_changed=False)
         except discord.NotFound:
             logger.warning("[ARK] Registration message missing; recreating.")
-            new_msg = await target_channel.send(
-                content="@everyone" if announce else None,
+            new_msg = await _send_registration_message(
+                announce=announce,
+                channel=target_channel,
                 embed=embed,
+                match_id=match_id,
                 view=view,
-                allowed_mentions=_allowed_mentions(announce),
             )
 
             msg_state = state.messages.get(match_id) or ArkMessageState()
@@ -147,16 +217,21 @@ async def upsert_registration_message(
                 channel_id=int(new_msg.channel.id), message_id=int(new_msg.id)
             )
             state.messages[match_id] = msg_state
-            return True, True
+            return RegistrationDeliveryResult(outcome="recreated", state_changed=True)
         except Exception:
             logger.exception("[ARK] Failed to edit registration message.")
-            return False, False
+            return RegistrationDeliveryResult(
+                outcome="failed",
+                state_changed=False,
+                failure_reason="edit_failed",
+            )
 
-    new_msg = await target_channel.send(
-        content="@everyone" if announce else None,
+    new_msg = await _send_registration_message(
+        announce=announce,
+        channel=target_channel,
         embed=embed,
+        match_id=match_id,
         view=view,
-        allowed_mentions=_allowed_mentions(announce),
     )
 
     msg_state = state.messages.get(match_id) or ArkMessageState()
@@ -164,7 +239,34 @@ async def upsert_registration_message(
         channel_id=int(new_msg.channel.id), message_id=int(new_msg.id)
     )
     state.messages[match_id] = msg_state
-    return True, True
+    return RegistrationDeliveryResult(outcome="created", state_changed=True)
+
+
+async def upsert_registration_message(
+    *,
+    announce: bool = False,
+    client,
+    state: ArkJsonState,
+    match_id: int,
+    embed,
+    view,
+    target_channel_id: int | None = None,
+    delete_old: bool = True,
+    force_repost: bool = False,
+) -> tuple[bool, bool]:
+    """Compatibility adapter for callers expecting the historical boolean tuple."""
+    result = await upsert_registration_message_result(
+        announce=announce,
+        client=client,
+        state=state,
+        match_id=match_id,
+        embed=embed,
+        view=view,
+        target_channel_id=target_channel_id,
+        delete_old=delete_old,
+        force_repost=force_repost,
+    )
+    return result.as_legacy_tuple()
 
 
 async def disable_registration_message(

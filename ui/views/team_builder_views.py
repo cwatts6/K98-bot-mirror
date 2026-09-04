@@ -6,21 +6,20 @@ from typing import ClassVar
 
 import discord
 
-from ark.ark_draft_service import (
-    ArkDraftPreconditionError,
-    generate_draft_for_match,
-    sync_manual_draft,
-)
+from ark.ark_draft_service import ArkDraftPreconditionError
 from ark.confirm_publish_service import (
     ArkPublishPreconditionError,
     load_team_review_state,
     publish_reviewed_teams,
     unpublish_final_teams,
 )
-
-# architecture-check: allow — legacy audit write; service extraction is separately deferred.
-from ark.dal.ark_dal import insert_audit_log
 from ark.embeds import add_bounded_sections, roster_field_candidates
+from ark.team_builder_service import (
+    assign_player,
+    auto_balance_teams,
+    remove_player,
+    reset_teams,
+)
 from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from decoraters import _has_leadership_role, _is_admin
 
@@ -359,10 +358,9 @@ class ArkTeamBuilderView(discord.ui.View):
             return
         assignment = pair
         try:
-            result = await generate_draft_for_match(
-                self.match_id,
+            result = await auto_balance_teams(
+                match_id=self.match_id,
                 actor_discord_id=interaction.user.id,
-                source="team_builder_button",
                 roster_rows=player_rows,
             )
         except ArkDraftPreconditionError as exc:
@@ -379,20 +377,6 @@ class ArkTeamBuilderView(discord.ui.View):
         assignment.team2_player_ids = list(result.team2_ids)
         assignment.normalize()
 
-        await insert_audit_log(
-            action_type="ark_team_autobalance",
-            actor_discord_id=interaction.user.id,
-            match_id=self.match_id,
-            governor_id=None,
-            details_json={
-                "team1_count": len(result.team1_ids),
-                "team2_count": len(result.team2_ids),
-                "team1_power": result.team1_power,
-                "team2_power": result.team2_power,
-                "assigned_by_preference": result.assigned_by_preference,
-                "assigned_by_balancer": result.assigned_by_balancer,
-            },
-        )
         await self._refresh(interaction)
 
     @discord.ui.button(label="Reset Teams", style=discord.ButtonStyle.danger)
@@ -402,23 +386,13 @@ class ArkTeamBuilderView(discord.ui.View):
             await interaction.response.send_message("❌ Match not found.", ephemeral=True)
             return
         try:
-            await sync_manual_draft(
+            await reset_teams(
                 match_id=self.match_id,
-                team1_ids=[],
-                team2_ids=[],
                 actor_discord_id=interaction.user.id,
-                source="team_builder_reset",
             )
         except ArkDraftPreconditionError as exc:
             await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
             return
-        await insert_audit_log(
-            action_type="ark_team_reset",
-            actor_discord_id=interaction.user.id,
-            match_id=self.match_id,
-            governor_id=None,
-            details_json={},
-        )
         await self._refresh(interaction)
 
     @discord.ui.button(label="Publish Teams", style=discord.ButtonStyle.success, row=2)
@@ -518,12 +492,11 @@ class ArkTeamBuilderView(discord.ui.View):
                 assignment.team2_player_ids.append(gid)
             assignment.normalize()
             try:
-                await sync_manual_draft(
+                await assign_player(
                     match_id=self.match_id,
                     team1_ids=assignment.team1_player_ids,
                     team2_ids=assignment.team2_player_ids,
                     actor_discord_id=inter.user.id,
-                    source="team_builder_assign",
                 )
             except ArkDraftPreconditionError as exc:
                 await inter.followup.send(f"❌ {exc}", ephemeral=True)
@@ -583,24 +556,17 @@ class ArkTeamBuilderView(discord.ui.View):
             team_ids.remove(gid)
             assignment.normalize()
             try:
-                await sync_manual_draft(
+                await remove_player(
                     match_id=self.match_id,
                     team1_ids=assignment.team1_player_ids,
                     team2_ids=assignment.team2_player_ids,
                     actor_discord_id=inter.user.id,
-                    source="team_builder_remove",
+                    governor_id=gid,
+                    from_team=from_team,
                 )
             except ArkDraftPreconditionError as exc:
                 await inter.followup.send(f"❌ {exc}", ephemeral=True)
                 return
-
-            await insert_audit_log(
-                action_type="ark_team_remove",
-                actor_discord_id=inter.user.id,
-                match_id=self.match_id,
-                governor_id=gid,
-                details_json={"from_team": from_team},
-            )
 
             ok = await self._refresh_via_webhook()
             if not ok:

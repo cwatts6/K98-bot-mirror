@@ -327,7 +327,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
-- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; evidence and product-policy gated; implementation not approved
+- Status: operator-approved defer in Phase 2E; keep-all behavior retained because the measured local copy was test-generated and no current production cardinality or historical-visibility evidence justifies mutation
 - Last verified: 2026-09-03
 
 ### Deferred Optimisation
@@ -338,7 +338,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused team-builder action, permission, audit, failure, and webhook/ephemeral interaction tests.
-- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; implementation not approved
+- Status: delivered locally in Phase 2E through `ark/team_builder_service.py`; exact actions, details, counts, ordering, permissions, acknowledgements, webhook fallback, and timeouts retained; final review/security complete and ready for PR
 - Last verified: 2026-09-03
 
 ### Deferred Optimisation
@@ -382,5 +382,16 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: low
 - Dependencies: Delivered Phase 2B baseline; operator approval of the Phase 2E outcome vocabulary; focused successful-edit, move/repost, missing-message recreation, and failure-path tests.
-- Status: promoted into the prepared Discord Embed Payload Safety Phase 2E audit pack; outcome vocabulary and implementation not approved
+- Status: delivered locally in Phase 2E with explicit `created`/`edited`/`moved`/`reposted`/`recreated`/`failed` outcomes and a legacy tuple adapter; final review/security complete and ready for PR
+- Last verified: 2026-09-03
+
+### Deferred Optimisation
+- Area: `ark/dal/ark_dal.py::replace_match_draft_rows`, `ark/ark_draft_service.py`, and `ark/team_builder_service.py`
+- Type: architecture
+- Description: Draft replacement uses separate delete and insert statements through the non-strict `execute_async` helper, then reports success even when a write helper returns its failure sentinel. A database write failure can therefore leave partial or absent draft state while the existing builder proceeds to its normal acknowledgement. The one-operator workflow makes simultaneous-builder races low likelihood, but it does not mitigate a database or connection failure.
+- Suggested Fix: In a separately approved reliability slice, define one strict transactional draft-replacement contract that rolls back delete/insert together, returns or raises an unambiguous persistence result, and maps failure to an existing ephemeral builder error without changing permission, team, publish, or audit meaning. Add deterministic delete/insert failure, rollback, acknowledgement, and reopen-state tests.
+- Impact: low
+- Risk: medium
+- Dependencies: Separate SQL/DAL transaction design and operator approval; authoritative `dbo.ArkMatchTeams` revalidation; focused service/view tests and a bot Changes-only security review. SQL review is required only if the SQL repository changes.
+- Status: low-priority reliability debt; no production incident established
 - Last verified: 2026-09-03
