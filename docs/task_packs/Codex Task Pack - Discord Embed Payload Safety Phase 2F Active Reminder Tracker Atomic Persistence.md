@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / next audit-first slice after Phase 2E candidate delivery`
 - Task type: `restart-sensitive persistence reliability`
 - One-pass approved: `initial audit/scope stop completed; operator subsequently approved the exact approach and manifest`
-- Status: `implementation and local validation complete; security report retains stale partial-coverage checkpoint; draft mirror delivery pending`
+- Status: `implementation and local validation complete; draft mirror PR #257 open; security report retains stale partial-coverage checkpoint`
 - Repository: `K98-bot-mirror` bot repository first; SQL is no-diff unless separately approved
 
 ## 2. Prerequisites And Required Reading
@@ -391,3 +391,8 @@ SQL, migration, schema, procedure, or DAL change. The separate SQL security revi
 The active persistence deferred item stays in the active register until delivery/smoke acceptance;
 the resolved archive is intentionally unchanged. Production promotion, natural smoke, and final
 operator verification remain pending.
+
+Draft mirror delivery: [PR #257](https://github.com/cwatts6/K98-bot-mirror/pull/257), targeting
+`main` from `codex/discord-embed-payload-safety-phase-2f`. Implementation is `60a66c19`;
+subsequent commits only record review/delivery evidence and receive the same documented incremental
+security skip. No production branch was pushed and neither repository PR was merged by this task.
