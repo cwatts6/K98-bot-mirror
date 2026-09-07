@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / next audit-first slice after Phase 2E candidate delivery`
 - Task type: `restart-sensitive persistence reliability`
 - One-pass approved: `initial audit/scope stop completed; operator subsequently approved the exact approach and manifest`
-- Status: `implementation and local validation complete; draft mirror PR #257 open; security report retains stale partial-coverage checkpoint`
+- Status: `implementation, local validation, and complete Changes security review passed; mirror PR #257 ready for review; production promotion/smoke pending`
 - Repository: `K98-bot-mirror` bot repository first; SQL is no-diff unless separately approved
 
 ## 2. Prerequisites And Required Reading
@@ -226,7 +226,7 @@ expected.
 - [x] Save failure remains non-fatal and operationally visible through the preserved warning boundary.
 - [x] No unrelated JSON, DM tracker, Phase 2G, executor, SQL, config, or dependency work enters the diff.
 - [x] Focused and full validation pass.
-- [ ] Final bot Changes-only/Deep-off review covers the exact final base/head with zero unresolved findings.
+- [x] Final bot Changes-only/Deep-off review covers the exact reviewed base/head with zero unresolved findings; subsequent documentation-only evidence edits receive the recorded incremental skip.
 - [ ] Candidate smoke, rollback evidence, PR links, and operator-owned final verification are recorded.
 
 ## 15. Required Delivery Output
@@ -360,10 +360,10 @@ public write boundary and adds backward-compatible serializer options. Security 
 reporting limitation are recorded below.
 Bot review must be Changes-only against the exact approved base/final head, Deep off. SQL is a
 documented no-diff skip only if its revision/worktree and all SQL/DAL contracts remain unchanged.
-Mirror PR, production promotion, natural candidate smoke, and final deployment are pending; do not
+Mirror PR #257 is open. Production promotion, natural candidate smoke, and final deployment are pending; do not
 interpret local implementation or source prerequisite verification as deployment acceptance.
 
-### Security Review Evidence And Reporting Limitation
+### Original Security Review Evidence And Reporting Limitation (Historical)
 
 Changes-only scan `634c0cca-9c72-40e7-b349-e79976135178`, Deep off, reviewed immutable range
 `88de37a2c77f96fe91be98b2e3ed40c4b639e199..60a66c1979e9e70628cc15aed311e8b48bc4cdbc`.
@@ -377,9 +377,9 @@ The final semantic draft requested complete coverage with no deferred work. Seal
 however, retained the earlier `discovery-in-progress` placeholder and reports `partial` coverage.
 Its final surfaces record both runtime reviews as `no_issue_found` and tests/records as
 `not_applicable`; the leftover placeholder is not an unreviewed source path or vulnerability.
-The sealed artifact is preserved unchanged. Do not claim that the final complete-coverage gate
-passed: resolving this reporting discrepancy remains required before merge/promotion. Mirror
-delivery is a draft for review, not merge readiness.
+The sealed artifact is preserved unchanged and does not satisfy the complete-coverage gate.
+Mirror delivery initially remained draft. The operator-authorized replacement review below
+subsequently satisfied the gate without editing the original sealed evidence.
 
 Canonical report: the scan's `report.md` in the Codex Security workbench; scan ID above is the
 durable lookup key. This documentation-only evidence update receives an incremental security skip:
@@ -392,7 +392,35 @@ The active persistence deferred item stays in the active register until delivery
 the resolved archive is intentionally unchanged. Production promotion, natural smoke, and final
 operator verification remain pending.
 
-Draft mirror delivery: [PR #257](https://github.com/cwatts6/K98-bot-mirror/pull/257), targeting
+Mirror delivery: [PR #257](https://github.com/cwatts6/K98-bot-mirror/pull/257), targeting
 `main` from `codex/discord-embed-payload-safety-phase-2f`. Implementation is `60a66c19`;
 subsequent commits only record review/delivery evidence and receive the same documented incremental
 security skip. No production branch was pushed and neither repository PR was merged by this task.
+
+### Replacement Security Review: Complete Coverage Verified
+
+The operator authorized a replacement Changes-only review after diagnosis showed that an ordinary
+progress note had been incorrectly recorded as deferred coverage. The draft merger retained that
+note; submitting an empty list did not remove it. No bot defect or connector change was involved.
+
+Scan `5447bbc9-4d2a-4525-aca6-adff604149eb` reviewed PR #257's live immutable range
+`88de37a2c77f96fe91be98b2e3ed40c4b639e199..6bc6c98124ba8d261bfc2ceefb174ded853bd903`,
+Changes only, Deep off. Preflight passed; TAC was `granted` at `tac1`. The retained architecture
+model was source-revalidated, both runtime inventory entries and all seven test/documentation
+files were accounted for, and no security candidates were found. Runtime/test blobs remained
+identical to tested implementation `60a66c19`; no repeat full test run was needed.
+
+Before finalization, canonical readback verified `completeness=complete`, zero deferred items,
+three covered surfaces, zero findings, and no seal. Finalization succeeded once; sealed readback
+again verified complete coverage, an empty deferred list, and zero findings. The prior partial
+scan remains historical evidence; this replacement satisfies the final bot security review gate.
+Tool-measured usage: 1,247,349 total tokens, including 1,209,088 cached input tokens, across two
+recorded threads. The canonical report is available in the Codex Security workbench under the
+replacement scan ID.
+
+This closure modifies only this task pack and `docs/reference/deferred_optimisations.md`, plus PR
+metadata. Its incremental security skip is based on inspection of the exact documentation diff:
+no runtime, test, configuration, dependency, permission, input, network, SQL, or persistence change.
+Applicable documentation validators and pre-commit checks must pass before pushing the record.
+PR #257 can leave draft status; merges, production promotion/deployment, and natural smoke remain
+operator-owned pending steps.
