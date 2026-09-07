@@ -549,3 +549,12 @@ This file preserves resolved deferred-optimisation notes that used to live in
 - Description: Registration telemetry labelled the historical move/repost boolean as `delivered`, so a successful in-place edit could be logged as `delivered=False` and remain ambiguous beside a caught delivery failure.
 - Resolution: Phase 2E introduced explicit `created`, `edited`, `moved`, `reposted`, `recreated`, and `failed` outcomes while retaining the legacy boolean-tuple adapter. Existing callers, send/edit/move/repost/recreate decisions, message references, state-write and announcement ordering, mentions, and exception behavior remain unchanged.
 - Validation: Focused Phase 2E outcome/service/view/isolation tests passed `48`, Ark-plus-UI regression passed `204`, and the full suite passed `3186 passed, 2 skipped`. Review remediation is in mirror commit `cd973007`, and final Changes-only/Deep-off scan `e7f618aa-0ab4-4934-a2d0-2bfb398ebf80` reported zero findings over exact range `06e34776eacf3c49db4a0b93077d5067069ae88e..cd973007f4b88de33ae50f3c455a42e724ced118`. The operator reported successful smoke on 2026-09-07: messages posted and refreshed successfully. Mirror PR #256 and production PR #563 await manual merge plus final production-main verification.
+
+### Discord Embed Payload Safety Phase 2F Atomic Active Reminder Persistence Delivered Item
+
+- Area: event_scheduler.py::save_active_reminders, file_utils.py::atomic_json_write and focused tests
+- Type: consistency
+- Description: Direct tracker writes could truncate the previous restart snapshot before serialization completed.
+- Resolution: Unique same-directory temp publication with explicit legacy serialization; unchanged tracker path/schema, IDs, metadata, Discord ordering, mentions, lifecycle and non-raising caller.
+- Validation: 114 focused tests; full 3240 passed, 2 skipped; validators/pre-commit/log hygiene passed. Changes scan 5447bbc9-4d2a-4525-aca6-adff604149eb, Deep off, complete sealed coverage, zero findings. Operator accepted candidate delivery/restart smoke via mirror #257 and production #564 on 2026-09-07; identical tracker snapshots and successful reminder view restoration.
+- Remaining operator gates: Both PR merges and final production-main verification pending. A natural post-restart atomic save is not demonstrated by unchanged snapshots/embed refresh. See archived Phase 2F pack for evidence limits and rollback. Archiving records implementation/candidate smoke acceptance, not final deployment verification.

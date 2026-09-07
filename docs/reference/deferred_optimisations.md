@@ -296,21 +296,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-08-31
 
 ### Deferred Optimisation
-- Area: `event_scheduler.py::save_active_reminders`, `REMINDER_TRACKING_FILE`, and active public-reminder restart restoration
-- Type: consistency
-- Description: Phase 2A preserved the existing `active_reminders` tracker contract, but `save_active_reminders()` still writes JSON directly rather than using the repository's atomic replacement helper. A process interruption during the write could leave restart-sensitive public-reminder message identity unavailable or malformed.
-- Suggested Fix: Scope a separate restart/persistence slice that reproduces interrupted-write and save-failure behavior, then adopts atomic replacement while preserving the exact tracker path/shape, message IDs, event fallback metadata, cleanup, rehydration, scheduler timing, mention behavior, and non-raising failure boundary.
-- Impact: medium
-- Risk: medium
-- Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
-- Status: Phase 2F audit and implementation approved; unique-temp replacement implemented on
-  `codex/discord-embed-payload-safety-phase-2f`; 114 focused and 3240 full-suite tests passed.
-  Replacement Changes-only/Deep-off review `5447bbc9-4d2a-4525-aca6-adff604149eb` has verified
-  complete sealed coverage and zero findings; mirror PR #257 is ready for review.
-  Production promotion and natural smoke remain open; do not archive yet.
-- Last verified: 2026-09-07
-
-### Deferred Optimisation
 - Area: `singleton_lock.py::acquire_singleton_lock`, `release_singleton_lock`, and `DL_bot.py` process ownership
 - Type: consistency
 - Description: Phase 2F audit confirmed the singleton helper checks existing process metadata before writing a lock file; it does not exclusively acquire ownership. Simultaneous starts can both pass, and release unlinks without checking the owning PID. This is a process-lifecycle reliability observation, not a claim of an established production overlap or exploitable vulnerability.
@@ -318,7 +303,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator-approved startup/shutdown task; deterministic simultaneous-start, ownership, stale-lock, process-check failure, and restart tests. No change in Phase 2F.
-- Status: captured during approved Phase 2F audit
+- Status: separate reliability follow-up after Phase 2G unless its audit proves a hard dependency; owner Chris Watts; separate implementation approval required
 - Last verified: 2026-09-07
 
 ### Deferred Optimisation
@@ -329,7 +314,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator-approved lifecycle task; exact message identity, mentions, cancellation, timing, shutdown and restart tests. No DM redesign, Phase 2G reservation, or Stats/KVK History executor work in Phase 2F.
-- Status: captured during approved Phase 2F audit
+- Status: separate reliability follow-up after Phase 2G unless its audit proves a hard dependency; owner Chris Watts; separate implementation approval required
 - Last verified: 2026-09-07
 
 ### Deferred Optimisation
@@ -382,11 +367,11 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests
 - Type: architecture
 - Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. Concurrent dispatches can theoretically pass the read before either claim is recorded, although normal singleton-process controls reduce the known frequency and no production duplicate from this race has been established.
-- Suggested Fix: Treat this as a separate reliability design, not embed Phase 2. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
+- Suggested Fix: Treat this as the separately approved reliability extension Phase 2G, not a reopening of payload policy. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
 - Impact: medium
 - Risk: high
 - Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
-- Status: assigned to Discord Embed Payload Safety Phase 2G; evidence and design-gated
+- Status: active Phase 2G pack/starter prepared; audit first, evidence/design-gated; implementation not approved
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation

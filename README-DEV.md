@@ -115,7 +115,7 @@ messages posted and refreshed successfully. The Phase 2E pack and starter are ar
 Phase 2F now owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
 Pre-KVK reservation; separate Stats/KVK History executor audits remain out of scope.
 
-Phase 2F implementation is operator-approved on `codex/discord-embed-payload-safety-phase-2f`.
+Phase 2F candidate delivery and operator restart smoke are accepted through mirror #257 and production #564.
 The public tracker now uses the unique-temp `file_utils.atomic_json_write` helper, with explicit
 ASCII escaping, recursive key sorting, and strict unsupported-value rejection to preserve the
 previous UTF-8/indent-2 JSON contract. Existing helper callers retain their prior defaults. The
@@ -123,7 +123,10 @@ public save remains synchronous and non-raising; Discord ordering, in-memory tra
 fallback metadata, rehydration, mentions, timing, startup, scheduler, and executors are unchanged.
 Atomic replacement preserves the prior file on pre-replace failure; it does not merge snapshots
 from multiple bot processes or make Discord and disk transactional. Final validation/security,
-mirror delivery, promotion, and natural operator smoke are recorded in the active Phase 2F pack.
+mirror delivery, promotion, and natural operator smoke are recorded in the archived Phase 2F pack. Both PR merges and final production-main verification remain pending.
+The active Phase 2G pack/starter scopes Pre-KVK reservation audit/design; implementation is unapproved.
+Singleton ownership and public child-task lifecycle are separate follow-ups, normally after 2G
+unless its audit proves a hard dependency. The next natural atomic save remains an observation.
 
 ## KVK Target Publication And Quality Delivery
 

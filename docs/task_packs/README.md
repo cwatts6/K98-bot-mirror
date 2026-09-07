@@ -8,7 +8,8 @@ itself mean that the document is approved for execution.
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active review/scope | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Prepared audit-first slice; implementation is not approved and must wait for Phase 2E PR merges plus final production-main verification |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Candidate delivered/tested via mirror #257 and production #564; operator merges/final verification pending |
+| Active review/scope | Discord Embed Payload Safety Phase 2G Atomic Pre-KVK Reservation task pack and chat starter | Audit-first, implementation unapproved; revalidate Phase 2F PR merges/final verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
@@ -741,3 +742,6 @@ operator approval. Completed Phase 5F approval applies only to its four Inventor
 
 Discord Voting Post Framework is closed after Phase 22. Future voting enhancements should start in
 a new programme pack rather than continuing this programme as Phase 23.
+
+Phase 2F pack/starter are archived after candidate delivery and operator restart smoke through
+mirror #257 / production #564. Manual merges and final verification remain pending.

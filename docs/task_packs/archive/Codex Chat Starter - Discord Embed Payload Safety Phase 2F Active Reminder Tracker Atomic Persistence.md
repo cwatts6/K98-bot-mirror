@@ -1,6 +1,6 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence
 
-Status: prepared on 2026-09-07 for the next audit-first slice. Implementation is not approved.
+Status: archived after candidate delivery and operator restart smoke acceptance. Historical starter only; use Phase 2G. PR #257/#564 merges and final verification remain pending.
 
 ## Copy/Paste Starter
 

@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / next audit-first slice after Phase 2E candidate delivery`
 - Task type: `restart-sensitive persistence reliability`
 - One-pass approved: `initial audit/scope stop completed; operator subsequently approved the exact approach and manifest`
-- Status: `implementation, local validation, and complete Changes security review passed; mirror PR #257 ready for review; production promotion/smoke pending`
+- Status: candidate delivered and operator restart smoke accepted; archived record; PR #257/#564 merges and final production-main verification pending
 - Repository: `K98-bot-mirror` bot repository first; SQL is no-diff unless separately approved
 
 ## 2. Prerequisites And Required Reading
@@ -424,3 +424,31 @@ no runtime, test, configuration, dependency, permission, input, network, SQL, or
 Applicable documentation validators and pre-commit checks must pass before pushing the record.
 PR #257 can leave draft status; merges, production promotion/deployment, and natural smoke remain
 operator-owned pending steps.
+
+## 19. Candidate Delivery And Operator Smoke Acceptance
+
+On 2026-09-07 the operator confirmed successful candidate delivery/testing and no restart errors,
+then authorized documentation closure and Phase 2G preparation. Mirror PR #257 and production
+PR #564 remain OPEN. Production candidate head before documentation closure was
+91e0fb859e98ef91663e718dd9483a6bd2f77c40. Manual merges and final production-main/bot-machine
+verification remain operator-owned; this archive does not claim final deployment verification.
+
+Supplied before/after active_reminders JSON files are valid and byte-identical, SHA-256
+34c631390586b693d6dc3ef8e4902514d800730687ec712e50dcbc18fecb06c4. Both contain one Next Ruins event,
+the same channel/message identity, UTC start/end metadata, type and null zone.
+The supplied log records graceful restart at 2026-09-07 21:04:18, view reattachment and one active
+reminder loaded at 21:04:34.365, one reminder embed edited at 21:04:34.624, and successful full
+startup at 21:04:38.033 (timestamps as logged, no timezone inference).
+No ERROR/CRITICAL or public-tracker failure appears in the supplied excerpt.
+
+Evidence boundary: this proves compatibility and restart/view restoration. The unchanged snapshots
+and embed-only refresh do not demonstrate a new atomic save; next natural send/replacement/expiry
+remains an observation for final verification. Temporary-directory contents and exact bot-machine
+Git head were not supplied. Fault preservation retains deterministic test coverage.
+A separate generic rehydrate_tracked_views task timed out after 10 seconds; public reminder
+rehydration had already succeeded. This is a lifecycle-triage observation, not a proven 2F regression.
+
+Implementation, automated review and candidate restart smoke are accepted. Archive the pack/starter
+and implemented persistence debt; Phase 2G is the active audit-first handoff. No runtime/test/SQL/
+config change accompanies closure. Documentation-only security routing is a precise skip.
+Earlier pending delivery notes are historical; this section is the authoritative candidate status.

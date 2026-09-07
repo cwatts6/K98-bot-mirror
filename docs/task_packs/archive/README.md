@@ -314,3 +314,6 @@ Remaining related work is tracked in `docs/reference/deferred_optimisations.md` 
 programmes, including command-surface migration, queue-domain redesign, optional SQL-backed queue
 persistence, and disabled secondary command-surface cleanup. Pinned calendar tracker atomic-write
 hardening is complete and recorded in `docs/reference/archive/deferred_optimisations_resolved.md`.
+
+Phase 2F pack/starter: candidate delivered and restart smoke accepted via mirror #257 / production
+#564; archived with explicit pending operator merges and final production verification.

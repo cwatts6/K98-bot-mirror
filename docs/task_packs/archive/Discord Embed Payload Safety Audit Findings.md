@@ -758,3 +758,23 @@ Focused tests cover exact old-writer bytes, persistence failures/retries, hard e
 stale-temp isolation, restart/rehydration, cleanup, view identity, mention windows, and send/delete
 ordering. Delivery validation and the final bot Changes-only/Deep-off review are recorded in the
 Phase 2F task pack. SQL remains unchanged; no SQL deployment or data migration is part of this phase.
+
+## 26. Phase 2F Delivery Acceptance And Phase 2G Handoff
+
+Operator accepted Phase 2F candidate delivery and restart smoke on 2026-09-07 via mirror #257 and
+production #564. Both await manual merges and final production-main verification. Before/after
+tracker snapshots are valid and byte-identical; logs confirm one public reminder view restored and
+embed refreshed, with no public-tracker failures. A new atomic save is not proved by embed refresh;
+retain natural send/replacement/expiry observation for final verification. The separate generic
+tracked-view timeout is a lifecycle observation, not a demonstrated Phase 2F defect.
+
+Phase 2F pack/starter and implemented persistence debt are archived with these explicit limits.
+Phase 2G's active pack/starter require an audit stop, overlap evidence and explicit approval of
+reservation, uncertain-send recovery and persistence compatibility. Earlier wording excluding
+reservation from the programme is superseded by its named Phase 2G assignment.
+
+Singleton exclusive ownership/owner-checked release and public child-task supervision remain
+separate reliability follow-ups, normally after 2G; Chris Watts owns prioritisation. If 2G depends
+on a missing guarantee, scope a separate prerequisite rather than silently expanding its PR.
+No new phase letters or implementation approval are assigned. Stats/KVK History executor work,
+Ark transaction/retention policy and broad JSON/DM redesign remain independent.
