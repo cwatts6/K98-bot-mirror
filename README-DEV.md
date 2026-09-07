@@ -91,8 +91,10 @@ persistence and rehydration, `/ops logs` plus component interactions, `/ops show
 and production PR #562 are merged, and final production-main source verification passed on
 2026-09-03. The Phase 2D pack and starter are archived.
 
-Phase 2E completed its audit-first gate and has an approved bot-only implementation on
-`codex/discord-embed-payload-safety-phase-2e`. Confirmation history remains keep-all: the measured
+Phase 2E completed its audit-first gate, review remediation, automated validation, final security
+review, candidate delivery, and operator smoke on 2026-09-07 through mirror PR #256 and production
+PR #563. Both PRs remain open for the operator's manual merges and final production-main
+verification. Confirmation history remains keep-all: the measured
 local state copy was proved to contain repeated test fixtures and is not production evidence, so no
 JSON shape, retention, cleanup, or SQL change is justified. Confirmation-flow tests now use
 temporary state paths. Registration delivery reports explicit `created`, `edited`, `moved`,
@@ -102,10 +104,13 @@ assign/remove/reset/auto-balance persistence-plus-audit coordination now belongs
 Ark meaning, message identity, timeouts, restart/scheduler behavior, and SQL remain unchanged.
 Focused validation passes `48`, Ark-plus-UI regression passes `204`, and the complete suite passes
 `3186 passed, 2 skipped`; deterministic validators, pre-commit, and log-noise checks also pass.
-Final Changes-only scan `927226f8-742a-41e8-ad37-22c16d50f0ad` reviewed frozen digest
-`1fefe4c3b58f` with Deep off, complete coverage of all four runtime files, no target warnings, and
-zero findings. SQL remains a documented clean no-diff skip.
-Phase 2F still owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
+Review remediation is in mirror commit `cd973007`. Final Changes-only scan
+`e7f618aa-0ab4-4934-a2d0-2bfb398ebf80` reviewed exact range
+`06e34776eacf3c49db4a0b93077d5067069ae88e..cd973007f4b88de33ae50f3c455a42e724ced118`
+with Deep off, complete coverage of all four changed runtime files, and zero findings. SQL remains
+a documented clean no-diff skip. The operator reported that smoke testing completed successfully:
+messages posted and refreshed successfully. The Phase 2E pack and starter are archived.
+Phase 2F now owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
 Pre-KVK reservation; separate Stats/KVK History executor audits remain out of scope.
 
 ## KVK Target Publication And Quality Delivery

@@ -3,11 +3,11 @@
 ## 1. Task Header
 
 - Task name: `Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability`
-- Date: `2026-09-03`
+- Date: `2026-09-07`
 - Owner/context: `Chris Watts / next planning slice after Phase 2D candidate acceptance`
 - Task type: `deferred optimisation batch / architecture and observability`
 - One-pass approved: `no; audit-first stop gate completed and implementation separately approved`
-- Status: `local implementation, automated validation, independent review, and final Changes security review complete; ready for mirror PR; candidate deployment and operator smoke pending`
+- Status: `candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification`
 - Repository: `K98-bot-mirror` bot repository first; SQL is evidence-only unless separately approved
 
 ## 2. Required Reading And Prerequisites
@@ -270,17 +270,17 @@ separately approved SQL design and PR were added.
 
 ## 13. Acceptance Criteria
 
-- [ ] Audit evidence supports every `fix now`; unsupported retention mutation is deferred.
-- [ ] No command, permission, audience, ownership, mention, message identity, or Ark domain behavior changes.
-- [ ] The team-builder view no longer performs approved direct DAL audit orchestration, with no
+- [x] Audit evidence supports every `fix now`; unsupported retention mutation is deferred.
+- [x] No command, permission, audience, ownership, mention, message identity, or Ark domain behavior changes.
+- [x] The team-builder view no longer performs approved direct DAL audit orchestration, with no
       duplicate/missing audit and unchanged error/interaction order.
-- [ ] Registration logs unambiguously distinguish successful edit/move/repost/recreate from failure.
-- [ ] Existing caller and return behavior is preserved or migrated through an approved compatibility layer.
-- [ ] Existing Ark JSON loads unchanged; any approved retention policy is explicit, recoverable, and tested.
-- [ ] SQL remains unchanged or has separate approval, source-of-truth validation, and review evidence.
-- [ ] Selected and full validation gates pass or unrelated failures are precisely documented.
-- [ ] Bot Changes-only security review covers the final approved base..head with Deep off.
-- [ ] Phase 2F, Phase 2G, and executor audits remain separately owned.
+- [x] Registration logs unambiguously distinguish successful edit/move/repost/recreate from failure.
+- [x] Existing caller and return behavior is preserved through the approved compatibility layer.
+- [x] Existing Ark JSON loads unchanged; retention remains the approved keep-all/defer decision.
+- [x] SQL remains unchanged and is documented as a no-diff skip.
+- [x] Selected and full validation gates pass.
+- [x] Bot Changes-only security review covers the final approved base..head with Deep off.
+- [x] Phase 2F, Phase 2G, and executor audits remain separately owned.
 
 ## 14. Required Delivery Output
 
@@ -298,7 +298,7 @@ verification. Do not claim delivery, merge, or production verification before it
 
 No deferred item is made ownerless by this preparation.
 
-## 16. Phase 2E Audit Decision And Local Delivery Record
+## 16. Phase 2E Audit Decision And Candidate Delivery Record
 
 The audit-first stop gate completed on 2026-09-03 against clean bot base `06e34776` and clean SQL
 base `fc0e94eb`. Mirror PR #255 and production PR #562 were revalidated as merged; the Phase 1-2D
@@ -333,8 +333,22 @@ Local validation includes `48` focused outcome/service/view/isolation tests, `20
 regression tests, and `3186 passed, 2 skipped` for the complete suite. Architecture, deferred-item,
 security-routing, selector, import-smoke, command-registration, Ruff, Black, Pyright, secrets,
 logging, pre-commit, diff, and operational log-noise gates passed. An interim Changes-only scan of
-the pre-review-correction snapshot found zero issues but correctly warned that the worktree changed;
-it is not the final security gate. Final Changes-only/Deep-off scan
-`927226f8-742a-41e8-ad37-22c16d50f0ad` reviewed frozen working-tree digest `1fefe4c3b58f` with
-complete coverage of all four runtime files, no target warnings, and zero findings. This scan-record
-addition is documentation-only and does not change the reviewed runtime snapshot.
+the pre-review-correction snapshot found zero issues but is not the final security gate. Final
+Changes-only/Deep-off scan `e7f618aa-0ab4-4934-a2d0-2bfb398ebf80` reviewed exact range
+`06e34776eacf3c49db4a0b93077d5067069ae88e..cd973007f4b88de33ae50f3c455a42e724ced118`
+with complete coverage of all four changed runtime files and zero findings.
+
+## 17. Candidate Delivery And Operator Smoke Closure
+
+Review remediation completed in mirror commit `cd973007`. Mirror PR #256 and patch-promoted
+production PR #563 contain the same approved runtime change; the production candidate head before
+this documentation-only closure was `bcd968a3db5f052505f5ab6f87345b4e92b270ab`. On 2026-09-07
+the operator reported smoke testing complete and stated that messages posted and refreshed
+successfully. No message identifiers, route-by-route outcomes, or additional metrics were supplied,
+so none are inferred.
+
+Phase 2E is accepted as candidate-delivered and operator-smoke complete. Its two completed deferred
+items are archived in the resolved register. Confirmation-history retention remains keep-all and
+deferred. Both PRs remain open for the operator's manual merges and final production-main
+verification; this archive record does not claim merge or final verification. The prepared Phase 2F
+task pack and chat starter own the next audit-first slice.

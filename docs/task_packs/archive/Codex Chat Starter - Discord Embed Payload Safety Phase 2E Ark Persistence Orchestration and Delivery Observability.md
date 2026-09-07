@@ -1,10 +1,9 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability
 
-Status: audit-first stop gate completed and implementation approved on 2026-09-03. Local delivery
-is active on `codex/discord-embed-payload-safety-phase-2e`; the original starter below is retained as
-the initiating request and must not be replayed as a new approval gate.
-Revalidate Phase 2D merges and final production-main verification before selecting an implementation
-base.
+Status: consumed and archived on 2026-09-07 after candidate delivery and successful operator smoke
+through mirror PR #256 and production PR #563. Both PRs remain open for the operator's manual
+merges and final production-main verification. The original starter below is historical evidence
+and must not be replayed as a new approval gate.
 
 ## Copy/Paste Starter
 
@@ -12,7 +11,7 @@ base.
 # Files mentioned by the user:
 
 ## Codex Task Pack - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability.md:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability.md
 
 ## Discord Embed Payload Safety Audit Findings.md:
 C:\discord_file_downloader\docs\task_packs\archive\Discord Embed Payload Safety Audit Findings.md
@@ -23,7 +22,7 @@ Begin Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and De
 
 Use the task pack:
 
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability.md
 
 Phase 2D operator diagnostics delivery, review remediation, automated validation, final bot
 Changes-only/Deep-off security review, candidate deployment, and operator smoke were accepted

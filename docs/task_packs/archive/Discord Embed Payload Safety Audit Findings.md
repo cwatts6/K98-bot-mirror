@@ -1,7 +1,7 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1-2D delivered and operator-smoke accepted; mirror PR #255 and production PR #562 merged and final production-main source verification passed; Phase 2E local implementation active
-Audit date: 2026-09-01; implementation and operator-smoke update 2026-09-02; Phase 2C and Phase 2D updates 2026-09-03
+Status: Phases 1-2D delivered and final-verified; Phase 2E candidate-delivered and operator-smoke accepted through open mirror PR #256 and production PR #563; manual merges and final production-main verification pending
+Audit date: 2026-09-01; delivery updates through Phase 2E on 2026-09-07
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
@@ -680,7 +680,7 @@ extraction, and explicit registration delivery outcomes. Phase 2F active-reminde
 Phase 2G atomic Pre-KVK reservation, and separate Stats/KVK History executor audits remain outside
 Phase 2E.
 
-## 23. Phase 2E audit decision and local implementation
+## 23. Phase 2E audit decision and candidate implementation
 
 On 2026-09-03 the operator approved a keep-all/defer decision for confirmation history and a
 bot-only implementation for team-builder orchestration and registration outcomes. The local ignored
@@ -703,7 +703,29 @@ selector, import-smoke, command-registration, pre-commit, and operational log-no
 passed. An interim Changes-only scan of the earlier worktree snapshot found no issues but is not
 used as the final gate because its authoritative digest predates the final log correction.
 
-Final Changes-only scan `927226f8-742a-41e8-ad37-22c16d50f0ad` then reviewed frozen digest
-`1fefe4c3b58f` with Deep off. It covered all four changed runtime files, returned no target warnings,
-and found zero reportable issues. SQL remains a clean no-diff skip. Adding this scan identifier to
-the delivery documents is a non-runtime documentation-only delta.
+An earlier frozen-snapshot scan was superseded after review remediation. Final Changes-only scan
+`e7f618aa-0ab4-4934-a2d0-2bfb398ebf80` reviewed exact range
+`06e34776eacf3c49db4a0b93077d5067069ae88e..cd973007f4b88de33ae50f3c455a42e724ced118`
+with Deep off. It covered all four changed runtime files and found zero reportable issues. SQL
+remains a clean no-diff skip.
+
+## 24. Phase 2E candidate delivery, smoke acceptance, and Phase 2F handoff
+
+Review remediation completed in mirror commit `cd973007`, correcting missing-destination telemetry
+without changing registration delivery or state behavior. Mirror PR #256 and patch-promoted
+production PR #563 contain the final candidate. Both PRs remain open for the operator's manual
+merges and final production-main verification; this record does not claim either has occurred.
+
+On 2026-09-07 the operator reported smoke testing complete and stated that messages posted and
+refreshed successfully. No message identifiers, route-by-route outcome, log metrics, or additional
+behavior were supplied, so none are inferred here. Together with the focused, Ark-plus-UI, full
+suite, deterministic validator, pre-commit, log-noise, and final zero-finding security evidence,
+this accepts Phase 2E candidate delivery. The task pack and chat starter are archived.
+
+The completed team-builder service boundary and registration outcome observability items move to
+the resolved deferred register. Confirmation-history retention remains an operator-approved
+keep-all/defer decision: the local state file is a disposable test-derived copy and is not current
+production cardinality evidence. Phase 2F now owns only atomic active-public-reminder tracker
+persistence, beginning with a new audit/scope stop gate after Phase 2E merges and final production
+verification are revalidated. Phase 2G atomic Pre-KVK reservation and the separate Stats/KVK
+History executor audits remain outside Phase 2F.

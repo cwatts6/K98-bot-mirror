@@ -4,11 +4,12 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-09-03
+## Current execution set — 2026-09-07
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Active implementation | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Audit-first gate, implementation, review, `3186 passed, 2 skipped`, deterministic/pre-commit/log-noise gates, and zero-finding final Changes-only/Deep-off scan complete; ready for mirror PR; candidate deployment and smoke remain pending |
+| Active review/scope | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Prepared audit-first slice; implementation is not approved and must wait for Phase 2E PR merges plus final production-main verification |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
@@ -22,7 +23,7 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, 2C, and 2D, the Pinned Calendar Tracker Atomic
+Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, 2C, 2D, and 2E, the Pinned Calendar Tracker Atomic
 Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
@@ -56,8 +57,8 @@ Canonical regression tests now prove all current Top limits at source maxima, th
 Fame contract and pathological one-over rejection, grouped-message aggregate enforcement, and the
 complete maximum-contract history text fallback. Changes-only scan
 `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` reviewed `e525fb35..fa67d842` with Deep off, complete
-coverage, and zero findings. Review, candidate deployment, and smoke testing passed through mirror
-PR #254 and production PR #561; both await manual merge and final production-main verification.
+coverage, and zero findings. Review, candidate deployment, and smoke testing passed through merged
+mirror PR #254 and production PR #561; final production-main source verification passed.
 Phase 2C's pack and starter are archived. Phase 2D diagnostics is delivered and operator-smoke
 accepted: focused review verification passed `64`, the full suite passed `3172 passed, 2 skipped`,
 pre-commit passed, and Changes-only scan `984d93ff-29b1-4dd3-b681-a9830d01a1c4` reviewed the final
@@ -65,12 +66,16 @@ production runtime range with Deep off, complete coverage of all 11 runtime file
 findings. SQL is unchanged. Restart, queue-state persistence/rehydration, `/ops logs` and component
 interactions, show/restart/error log routes, and the representative command set passed without
 `File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
-and production PR #562 are ready for manual merge; final production-main verification remains
-operator-owned. Phase 2D's pack and starter are archived. Phase 2E's new audit-first pack owns
-confirmation-update retention policy, team-builder audit-service extraction, and registration
-delivery-outcome observability; Phase 2F owns active-reminder atomic persistence; and Phase 2G owns
-evidence/design-gated atomic Pre-KVK reservation. The separate KVK History once-only offload audit
-remains coordinated with, but outside, Phase 2C.
+and production PR #562 are merged, and final production-main source verification passed. Phase 2D's
+pack and starter are archived. Phase 2E then completed its audit-first gate, review remediation,
+automated validation, final Changes-only/Deep-off review, candidate delivery, and operator smoke
+through mirror PR #256 and production PR #563. The operator reported messages posted and refreshed
+successfully. Both Phase 2E PRs await manual merge and final production-main verification. Its
+pack/starter and completed team-builder/registration deferred items are archived;
+confirmation-update history remains keep-all/deferred. The new Phase 2F audit-first pack owns
+active-reminder atomic persistence, while Phase 2G owns evidence/design-gated atomic Pre-KVK
+reservation. The separate KVK History once-only offload audit remains coordinated with, but outside,
+this sequence.
 
 CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
 in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user

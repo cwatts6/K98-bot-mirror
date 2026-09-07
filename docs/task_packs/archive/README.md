@@ -2,6 +2,19 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability
+completed its audit-first gate, review remediation, automated validation, final
+Changes-only/Deep-off security review, candidate delivery, and operator smoke on 2026-09-07.
+Focused verification passed `48`, Ark-plus-UI regression passed `204`, and the full suite passed
+`3186 passed, 2 skipped`. Final scan `e7f618aa-0ab4-4934-a2d0-2bfb398ebf80` reviewed exact range
+`06e34776eacf3c49db4a0b93077d5067069ae88e..cd973007f4b88de33ae50f3c455a42e724ced118`
+with Deep off, all four changed runtime files covered, and zero findings. SQL was a no-diff skip.
+The operator reported that messages posted and refreshed successfully. Mirror PR #256 and
+production PR #563 contain the candidate and await manual merge plus final production-main
+verification. The Phase 2E pack/starter and its completed team-builder/registration deferred items
+are archived; confirmation-history remains keep-all/deferred. Phase 2F Active Reminder Tracker
+Atomic Persistence is prepared as the next audit-first slice, with implementation not approved.
+
 Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence completed implementation,
 review remediation, automated validation, final Changes-only security review, production-candidate
 deployment, and operator smoke on 2026-09-03. Focused review verification passed `64`, the complete
@@ -12,8 +25,7 @@ and rehydration, `/ops logs` and component interactions, `/ops show_logs`,
 `/ops view_restart_log`, `/ops last_errors`, and the representative command set passed without
 `File.to_dict`, Discord `50035`, traceback, command error, or error/critical entry. Mirror PR #255
 and production PR #562 are merged, and final production-main source verification passed. Phase 2E
-Ark Persistence Orchestration and Delivery Observability completed its audit-first gate and has an
-approved bot-only local implementation in progress.
+is archived above as candidate-delivered and operator-smoke accepted.
 
 Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence completed its
 evidence-led tests/documentation-only implementation, review, candidate deployment, and operator
@@ -21,8 +33,8 @@ smoke on 2026-09-03 through mirror PR #254 and production PR #561. Authoritative
 every live rankings/history payload safe, so no runtime correction was required. Focused validation
 passed `79`; the full suite passed `3104 passed, 2 skipped`; Changes-only scan
 `25a90732-3ad2-4ee0-9138-d1f4f11bbf36` covered all nine changed files with Deep off and zero
-findings; SQL was a no-diff skip. Both PRs await manual merge and final production-main
-verification. Phase 2D Operator Diagnostics Convergence is prepared as the next review-first slice.
+findings; SQL was a no-diff skip. Both PRs are merged, and final production-main source verification
+passed. Phase 2D is archived above as delivered.
 
 Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening completed implementation,
 validation, Changes-only security review, production-candidate promotion, and operator candidate

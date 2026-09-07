@@ -303,8 +303,10 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
-- Status: assigned to Discord Embed Payload Safety Phase 2F; evidence and design-gated
-- Last verified: 2026-09-02
+- Status: promoted to the prepared Discord Embed Payload Safety Phase 2F audit-first task pack;
+  implementation is not approved and must wait for Phase 2E PR merges plus final production-main
+  verification
+- Last verified: 2026-09-07
 
 ### Deferred Optimisation
 - Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests
@@ -328,17 +330,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Risk: medium
 - Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
 - Status: operator-approved defer in Phase 2E; keep-all behavior retained because the measured local copy was test-generated and no current production cardinality or historical-visibility evidence justifies mutation
-- Last verified: 2026-09-03
-
-### Deferred Optimisation
-- Area: `ui/views/team_builder_views.py`, Ark team-review orchestration, and audit logging
-- Type: architecture
-- Description: The pre-existing team-builder view imports `insert_audit_log` directly from `ark.dal.ark_dal`. Phase 2B touches only its embed rendering and retains a narrow architecture-validator exception; extracting audit orchestration would expand the approved payload slice and risk changing interaction sequencing.
-- Suggested Fix: In a separate Ark architecture slice, inventory assign/remove/reset/auto-balance audit ownership, move the audit coordination behind an Ark service boundary, and preserve actor IDs, action names, detail JSON, error behavior, permissions, webhook refresh, and interaction acknowledgement order.
-- Impact: medium
-- Risk: medium
-- Dependencies: Separate operator approval; focused team-builder action, permission, audit, failure, and webhook/ephemeral interaction tests.
-- Status: delivered locally in Phase 2E through `ark/team_builder_service.py`; exact actions, details, counts, ordering, permissions, acknowledgements, webhook fallback, and timeouts retained; final review/security complete and ready for PR
 - Last verified: 2026-09-03
 
 ### Deferred Optimisation
@@ -373,17 +364,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
 - Status: assigned to Discord Embed Payload Safety Phase 2G; evidence and design-gated
 - Last verified: 2026-09-02
-
-### Deferred Optimisation
-- Area: `ark/registration_flow.py`, `ark/registration_messages.py`, and registration upsert outcome logging
-- Type: consistency
-- Description: Phase 2B candidate smoke confirmed a successful in-place registration edit while `ensure_message_result` logged `delivered=False`. The first returned value is the existing move/repost outcome, not overall delivery success, and the same boolean pair can also accompany a caught edit failure. The nearby exception log distinguishes failure operationally, but the field name alone is ambiguous for dashboards and incident review.
-- Suggested Fix: In the Phase 2E Ark observability slice, define an explicit outcome value or narrowly rename the tuple and structured log fields to distinguish edited-in-place, moved/reposted, recreated, and failed outcomes. Preserve the existing send/edit/recreate calls, exception boundary, message references, state writes, announcement decision, and return behavior; add focused log-contract tests.
-- Impact: medium
-- Risk: low
-- Dependencies: Delivered Phase 2B baseline; operator approval of the Phase 2E outcome vocabulary; focused successful-edit, move/repost, missing-message recreation, and failure-path tests.
-- Status: delivered locally in Phase 2E with explicit `created`/`edited`/`moved`/`reposted`/`recreated`/`failed` outcomes and a legacy tuple adapter; final review/security complete and ready for PR
-- Last verified: 2026-09-03
 
 ### Deferred Optimisation
 - Area: `ark/dal/ark_dal.py::replace_match_draft_rows`, `ark/ark_draft_service.py`, and `ark/team_builder_service.py`
