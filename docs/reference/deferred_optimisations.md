@@ -303,9 +303,30 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
-- Status: promoted to the prepared Discord Embed Payload Safety Phase 2F audit-first task pack;
-  implementation is not approved and must wait for Phase 2E PR merges plus final production-main
-  verification
+- Status: Phase 2F audit and implementation approved; unique-temp replacement implemented on
+  `codex/discord-embed-payload-safety-phase-2f`, pending final validation, review, and delivery.
+- Last verified: 2026-09-07
+
+### Deferred Optimisation
+- Area: `singleton_lock.py::acquire_singleton_lock`, `release_singleton_lock`, and `DL_bot.py` process ownership
+- Type: consistency
+- Description: Phase 2F audit confirmed the singleton helper checks existing process metadata before writing a lock file; it does not exclusively acquire ownership. Simultaneous starts can both pass, and release unlinks without checking the owning PID. This is a process-lifecycle reliability observation, not a claim of an established production overlap or exploitable vulnerability.
+- Suggested Fix: Separately design exclusive process acquisition and owner-checked release, including stale-process/error handling and watchdog restart compatibility. Do not treat unique JSON temporary names as protection against cross-process last-writer-wins snapshots.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate operator-approved startup/shutdown task; deterministic simultaneous-start, ownership, stale-lock, process-check failure, and restart tests. No change in Phase 2F.
+- Status: captured during approved Phase 2F audit
+- Last verified: 2026-09-07
+
+### Deferred Optimisation
+- Area: `event_scheduler.py::schedule_event_reminders`, `send_reminder_at`, `expire_single_reminder`, `safe_delete_reminder`, and `bot_instance.py` teardown
+- Type: architecture
+- Description: Public send and expiry children use direct `asyncio.create_task`, outside individual TaskMonitor/DM registry supervision. Discord awaits also allow deletion, publication, and expiry workflows to overlap before synchronous tracker saves. Atomic replacement protects the file but does not make these workflows transactional or drain all public children during graceful teardown.
+- Suggested Fix: Scope public-task ownership and cancellation separately, with deterministic send/delete/expiry interleavings and restart evidence before selecting any identity or scheduling change. Preserve current behavior until that design is approved.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate operator-approved lifecycle task; exact message identity, mentions, cancellation, timing, shutdown and restart tests. No DM redesign, Phase 2G reservation, or Stats/KVK History executor work in Phase 2F.
+- Status: captured during approved Phase 2F audit
 - Last verified: 2026-09-07
 
 ### Deferred Optimisation

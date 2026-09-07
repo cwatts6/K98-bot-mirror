@@ -713,8 +713,8 @@ remains a clean no-diff skip.
 
 Review remediation completed in mirror commit `cd973007`, correcting missing-destination telemetry
 without changing registration delivery or state behavior. Mirror PR #256 and patch-promoted
-production PR #563 contain the final candidate. Both PRs remain open for the operator's manual
-merges and final production-main verification; this record does not claim either has occurred.
+production PR #563 contain the final candidate. At preparation both PRs awaited manual merge and
+final production-main verification; Phase 2F subsequently verified the source merge state below.
 
 On 2026-09-07 the operator reported smoke testing complete and stated that messages posted and
 refreshed successfully. No message identifiers, route-by-route outcome, log metrics, or additional
@@ -729,3 +729,32 @@ production cardinality evidence. Phase 2F now owns only atomic active-public-rem
 persistence, beginning with a new audit/scope stop gate after Phase 2E merges and final production
 verification are revalidated. Phase 2G atomic Pre-KVK reservation and the separate Stats/KVK
 History executor audits remain outside Phase 2F.
+
+## 25. Phase 2F approved atomic tracker boundary
+
+The operator approved the audit, exact file manifest, narrow shared-writer extension, existing
+retry/logging behavior, and separate process/lifecycle deferrals. Implementation starts from clean
+mirror `main` `88de37a2c77f96fe91be98b2e3ed40c4b639e199`. Mirror PR #256 merged at
+`2026-09-07T19:19:38Z`; production PR #563 merged at `2026-09-07T19:20:32Z` into
+`2888512cbb2b329c4c7f472449f005ae2dd07a4e`. Live CLI and connector reads verified #563,
+and the CLI verified that production-main head. Its Python source/tests match the current mirror;
+the four Phase 2E runtime files match accepted commit `cd973007` exactly. This is source verification,
+not fresh bot-machine deployment evidence. Phase 1-2E behavior remains prerequisite and unchanged.
+
+`save_active_reminders()` now reuses unique-temp `atomic_json_write` with explicit ASCII escaping,
+recursive key sorting, and strict serialization. The helper gains only optional serialization
+arguments whose defaults preserve its existing consumers. The public tracker path, semantic shape,
+datetime fallback, raw IDs, malformed-entry behavior, warning boundary, mutation/save sequencing,
+Discord ordering, mentions, expiry, view identity, startup and scheduler semantics are unchanged.
+
+Audit corrected the preparation assumption that orphan cleanup precedes scheduler activity:
+the actual startup order starts the event scheduler bundle before orphan cleanup. No runtime
+ordering correction is included. All public saves run synchronously on the loop; DM offloads do not
+write this tracker. Singleton check-then-write is not exclusive acquisition, and public child tasks
+are not individually supervised by the DM registry. Both observations remain separately captured
+reliability work. Unique temps do not imply multiprocess snapshot merging.
+
+Focused tests cover exact old-writer bytes, persistence failures/retries, hard exit before replace,
+stale-temp isolation, restart/rehydration, cleanup, view identity, mention windows, and send/delete
+ordering. Delivery validation and the final bot Changes-only/Deep-off review are recorded in the
+Phase 2F task pack. SQL remains unchanged; no SQL deployment or data migration is part of this phase.

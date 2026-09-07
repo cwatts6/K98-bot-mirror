@@ -67,6 +67,40 @@ Relevant tests include:
 - `tests/test_rehydrate_views.py`
 - `tests/test_rehydrate_sanitize_and_fileio.py`
 
+## Active Public-Reminder Tracker Persistence
+
+`event_scheduler.save_active_reminders()` writes the unchanged `REMINDER_TRACKING_FILE`
+(`DATA_DIR/active_reminders.json`) using `file_utils.atomic_json_write`, with `ensure_ascii=True`,
+`sort_keys=True`, and `default=None`. UTF-8 text, two-space indentation, recursive key order,
+Unicode escaping, no appended newline, numeric Discord IDs, and event fallback datetime semantics
+remain compatible with the previous direct writer. Invalid values still fail the save; they are
+not silently converted to strings. Existing shared-writer callers retain their previous defaults.
+
+Each invocation writes its own same-directory temp, flushes/fsyncs/closes it, then replaces the
+tracker. WinError 32 receives the existing bounded retries; other errors, including WinError 5,
+reach the existing non-raising `[REMINDER_CACHE] Failed to save:` warning. The last committed file
+survives unsuccessful replacement. Handled failures clean up that invocation's temp best-effort;
+a hard process exit can leave an ignored `.atomic.*.tmp`. Do not restore from or automatically
+delete such files: verify process ownership before any manual operational cleanup.
+
+All public saves currently execute synchronously on the bot loop after their existing mapping
+mutation. The DM tracker offloads/lock are separate. Unique temps prevent temp-name collisions,
+not cross-process lost updates. Singleton metadata checks reduce normal overlap but do not provide
+exclusive process acquisition. Public send/delete/expiry task ownership remains separate deferred
+work; Phase 2F changes neither that lifecycle nor the Discord-to-disk failure window.
+
+Startup loads public reminders before event-cache load/refresh, starts the readiness-gated event
+scheduler bundle, then performs orphan cleanup. Legacy periodic cleanup starts later. Rehydration
+edits the stored message with the existing view and hashed custom ID; refresh only edits its embed.
+Do not move these steps as part of persistence changes.
+
+Candidate smoke is natural only: restart with a valid tracker, observe the same message/view,
+then the next normal publication/replacement/expiry and valid JSON without save/load warnings.
+An embed-only refresh does not save the tracker. Do not force mentions, delete live messages,
+corrupt production state, or inject failures. Rollback is a bot commit revert/redeploy; prior code
+reads candidate JSON without migration. Atomic replacement does not guarantee universal power-loss
+durability or a transaction with Discord.
+
 ## Event Calendar Reminder State
 
 The newer calendar system lives under `event_calendar/`:

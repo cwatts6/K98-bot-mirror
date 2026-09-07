@@ -6,8 +6,8 @@
 - Date: `2026-09-07`
 - Owner/context: `Chris Watts / next audit-first slice after Phase 2E candidate delivery`
 - Task type: `restart-sensitive persistence reliability`
-- One-pass approved: `no; audit/scope and architecture planning first, then stop for approval`
-- Status: `prepared; implementation not approved`
+- One-pass approved: `initial audit/scope stop completed; operator subsequently approved the exact approach and manifest`
+- Status: `approved implementation and local validation complete; final security review and delivery pending`
 - Repository: `K98-bot-mirror` bot repository first; SQL is no-diff unless separately approved
 
 ## 2. Prerequisites And Required Reading
@@ -37,7 +37,7 @@ or whether a narrowly scoped writer adjustment is required. Do not assume that J
 key ordering, Unicode escaping, deterministic temporary naming, or concurrent-writer safety is
 irrelevant merely because the parsed object is equivalent.
 
-## 4. Current Evidence To Revalidate
+## 4. Preparation Evidence And Audit Corrections
 
 - `event_scheduler.py::save_active_reminders()` serializes each active message as `channel_id`,
   `message_id`, and optional event fallback metadata, but writes the live tracker directly with
@@ -47,8 +47,9 @@ irrelevant merely because the parsed object is equivalent.
 - `load_active_reminders(bot)` accepts legacy JSON, records raw IDs for later orphan cleanup,
   re-fetches channels/messages, uses live event data or stored fallback metadata, reattaches the
   existing `LocalTimeToggleView`, and rebuilds the in-memory `active_reminders` mapping.
-- Startup rehydration runs through `core/event_rehydration_lifecycle.py`; cleanup occurs before the
-  normal scheduler lifecycle proceeds.
+- Startup rehydration runs through `core/event_rehydration_lifecycle.py`. Audit corrected the
+  preparation's ordering assumption: the event scheduler bundle starts before orphan cleanup;
+  the legacy cleanup loop starts later. Preserve actual code order.
 - The repository already has `file_utils.atomic_write_json`, but it differs from the tracker writer
   in formatting defaults and uses a deterministic `.tmp` path. The single-process lock reduces
   cross-process overlap, but thread and coroutine callers still require proof before deciding that no
@@ -217,14 +218,14 @@ expected.
 
 ## 14. Acceptance Criteria
 
-- [ ] Phase 2E PR merges and final production-main source presence are revalidated before coding.
-- [ ] Audit proves the writer/concurrency/compatibility design and the operator approves it.
-- [ ] The prior valid tracker survives failed/interrupted replacement.
-- [ ] Existing JSON loads without migration or manual edits.
-- [ ] Message/view identity, timing, eligibility, mentions, cleanup, startup, and scheduler behavior remain unchanged.
-- [ ] Save failure remains non-fatal and operationally visible through the preserved warning boundary.
-- [ ] No unrelated JSON, DM tracker, Phase 2G, executor, SQL, config, or dependency work enters the diff.
-- [ ] Focused and full validation pass.
+- [x] Phase 2E PR merges and final production-main source presence are revalidated before coding.
+- [x] Audit proves the writer/concurrency/compatibility design and the operator approves it.
+- [x] The prior valid tracker survives failed/interrupted replacement.
+- [x] Existing JSON loads without migration or manual edits.
+- [x] Message/view identity, timing, eligibility, mentions, cleanup, startup, and scheduler behavior remain unchanged.
+- [x] Save failure remains non-fatal and operationally visible through the preserved warning boundary.
+- [x] No unrelated JSON, DM tracker, Phase 2G, executor, SQL, config, or dependency work enters the diff.
+- [x] Focused and full validation pass.
 - [ ] Final bot Changes-only/Deep-off review covers the exact final base/head with zero unresolved findings.
 - [ ] Candidate smoke, rollback evidence, PR links, and operator-owned final verification are recorded.
 
@@ -243,3 +244,121 @@ operator-owned merge/final verification. Do not claim delivery before it occurs.
   operator policy decision.
 
 No deferred item becomes ownerless through this preparation.
+
+## 17. Approved Audit And Architecture Decision
+
+The operator approved the findings matrix, exact runtime/test/documentation manifest, narrow
+`atomic_json_write` extension, existing bounded retries and contention logs, and two separately
+captured process/lifecycle reliability observations. No runtime/test files changed in the first
+audit response. Implementation branch: `codex/discord-embed-payload-safety-phase-2f`; base:
+`88de37a2c77f96fe91be98b2e3ed40c4b639e199`.
+
+Prerequisites were revalidated after access repair, rather than relying on preparation records:
+
+- Mirror PR #256: merged `2026-09-07T19:19:38Z`, merge `e5f5dacc1f89552380201bebfee659f5c2fdb9e9`.
+- Production PR #563: merged `2026-09-07T19:20:32Z`, merge/main `2888512cbb2b329c4c7f472449f005ae2dd07a4e`.
+- Live GitHub connector and CLI confirmed #563; live CLI confirmed production `main`; mirror API
+  confirmed local mirror HEAD. Sandboxed CLI could not read Windows credentials; elevated read-only
+  CLI succeeded. Connector repository access was separately repaired by the operator.
+- Production history includes #558-#563, and its Python source/tests match mirror HEAD. Phase 2E's
+  four runtime files match accepted `cd973007f4b88de33ae50f3c455a42e724ced118` exactly.
+- Initial bot worktree was clean and had one checkout. SQL `main` was clean at
+  `fc0e94ebd2e0a98286069c8a8b71365dd5178657`.
+- This verifies production-main repository source. Phase 2E candidate smoke remains operator
+  attestation; no fresh bot-machine deployment or Phase 2F smoke is inferred.
+
+### Writer Comparison
+
+| Boundary | Decision / evidence |
+|---|---|
+| Direct `open(..., "w")` | Fix now: truncates prior target before JSON serialization finishes; no fsync/replace. |
+| `atomic_write_json` | Not reused for this tracker: deterministic `.tmp`, unsorted/unescaped JSON, and serialization/fsync outside replace cleanup. Existing callers unchanged. |
+| `atomic_json_write` | Reused: unique same-directory temp, flush/fsync/close, replace, bounded WinError32 retry, and invocation-owned temp cleanup. |
+| New local writer | Rejected: duplicates proven helper machinery. |
+| Narrow helper extension | Add `ensure_ascii=False`, `sort_keys=False`, `default=str` keyword defaults; tracker passes `True`, `True`, `None`. Existing callers keep previous serialization. |
+
+Formatting is code-observed, not proved operationally irrelevant. Tests compare bytes with the old
+writer on the same platform, preserving UTF-8, indentation, recursive key ordering, escaped Unicode,
+strict unsupported-value rejection, platform text newlines, and no appended newline. The semantic
+payload and exact tracker path are unchanged. No data migration or version field is introduced.
+
+### Concurrency And Failure Boundaries
+
+The public mapping has only startup rehydration assignment, successful-send assignment, and
+safe-delete-finally removal. Saves occur after send assignment, delete-finally removal, and orphan
+cleanup. Repository searches found no thread/process offload of public save or mapping mutation;
+the nearby async tracker lock and offloads belong to DM trackers. Public snapshot/serialization/save
+is synchronous with no yield, so normal loop coroutines cannot interleave inside a save.
+
+Scheduler tasks are supervised coroutine factories; public send/expiry children use direct
+`asyncio.create_task`. Shutdown cancels supervised tasks and DM registry tasks, but adds no public
+flush or separate public child drain. Cancellation at Discord deletion still runs pop/save in
+`finally`. Forced termination can interrupt filesystem work. The singleton is metadata-based
+check-then-write, not exclusive acquisition; process-check errors can be treated as stale, and
+release is not owner-checked. Unique temps avoid temp collisions, not cross-process lost updates.
+These existing process/lifecycle observations are separately captured, not changed in Phase 2F.
+
+All pre-replace failures preserve the old target. Handled failures clean only this invocation's
+temp best-effort. Hard process exit can leave an ignored temp; tests verify a subsequent save uses
+its own file and leaves the abandoned one alone. No startup scavenging or recovery-from-temp is
+added. The helper retries only existing WinError32 cases (five attempts, up to 300 ms combined
+default jitter sleeps); WinError5 and other failures remain nonretryable. Fsync/IO latency is not
+bounded by the sleep budget. Existing tracker log templates and broad non-raising `Exception`
+boundary remain intact; existing helper contention warnings are additional on retries.
+
+### Preserved Runtime Contract
+
+Loading collects raw IDs before per-entry validation, prefers live events, otherwise parses stored
+start/end datetimes, and fetches the stored channel/message. Missing/malformed entries keep their
+existing skip behavior. View editing uses the same prefix and sanitizer-derived hashed custom ID;
+view-edit failure still restores the message mapping. Loading does not clear existing memory.
+Empty-cache orphan cleanup still skips; invalid/unrestored orphan IDs still trigger the final save.
+
+Publication still deletes the prior message before channel lookup/send, tolerates deletion errors,
+assigns the returned message only on successful send, saves afterward, and schedules T-0 expiry
+afterward. Failed sends retain the previous mapping, even after successful old-message deletion.
+Failed saves retain the new memory state and do not gate/resend Discord delivery. Refresh edits only
+the embed. T-1h/T-0 mentions, 48-hour horizon, five-minute scheduling window/cadence, end-plus-one-hour
+expiry, and the separate start-plus-15-minute cleanup threshold/600-second cadence are unchanged.
+
+Startup remains reminder load, event-cache load/refresh, readiness-gated event scheduler bundle,
+orphan cleanup, and later legacy cleanup. No command, permissions, visibility, ownership, view,
+event meaning, startup phase, scheduler, executor, DM state, SQL, config, or dependency change.
+
+### Exact Manifest
+
+- Runtime: `event_scheduler.py`, `file_utils.py`.
+- Tests: new `tests/test_event_scheduler_active_reminders.py`, extended
+  `tests/test_file_utils_atomic_write_retry.py`.
+- Records: this task pack, `README-DEV.md`,
+  `docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`,
+  `docs/reference/events_and_dm_reminders.md`, `docs/reference/deferred_optimisations.md`, and
+  `docs/reference/archive/deferred_optimisations_resolved.md` when resolution is earned.
+- SQL files: none. Stop for separate approval and SQL validation if that changes.
+
+## 18. Implementation Validation And Remaining Delivery Gates
+
+Selector output for the approved runtime/test paths recommends full pytest, smoke imports, and
+command-registration validation. Focused reminder/helper/lifecycle/live-queue tests passed `98`;
+target-cache helper consumer tests passed `16`. Initial test assumptions about unhashed view IDs
+and simultaneous Windows replace success were corrected to match existing behavior; runtime
+identity and retry policy did not change.
+
+The new tests cover old-writer byte equality, strict serialization, write/flush/fsync/replace
+failures, retry success/exhaustion/nonretryable failure, close-before-replace, unique temp isolation,
+same-loop accumulated state, hard exit before replace, restart round-trip, raw IDs and malformed
+entries, live/stored event preference, missing messages/channels, view-edit failure, deletion
+finally/cancellation, send ordering/failures, unchanged mention windows, cleanup threshold, expiry,
+and embed-only refresh. No live Discord/SQL state or production tracker is used.
+
+Full-suite/log-noise validation passed `3240 passed, 2 skipped` in 115.44 seconds, with all four
+production operational log files unchanged. Architecture, deferred-item, security-routing,
+selector, smoke imports, command-registration, Ruff, Black, and full pre-commit (including Pyright
+and secrets checks) passed. Focused coverage plus target-cache consumer coverage totals `114` tests.
+The implementation review found no blocking regression: the runtime diff only switches the
+public write boundary and adds backward-compatible serializer options. Final security evidence
+is pending.
+Bot review must be Changes-only against the exact approved base/final head, Deep off. SQL is a
+documented no-diff skip only if its revision/worktree and all SQL/DAL contracts remain unchanged.
+Mirror PR, production promotion, natural candidate smoke, and final deployment are pending; do not
+interpret local implementation or source prerequisite verification as deployment acceptance.

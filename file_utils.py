@@ -539,6 +539,9 @@ def atomic_json_write(
     *,
     mode: str = "w",
     encoding: str = "utf-8",
+    ensure_ascii: bool = False,
+    sort_keys: bool = False,
+    default: Any = str,
     replace_retries: int = 5,
     replace_backoff_base: float = 0.02,
     replace_backoff_max: float = 0.25,
@@ -550,8 +553,8 @@ def atomic_json_write(
     - Unique temp filename per call: concurrent writers to the same path
       cannot collide on the temp file.
     - mode and encoding are honoured.
-    - Uses ensure_ascii=False and default=str for datetime and similar
-      non-serialisable values (matches atomic_write_json behaviour).
+    - Defaults to unescaped Unicode, insertion-order keys, and default=str.
+      Callers preserving a strict legacy JSON contract can override these options.
     - Reuses _is_winerr32() and full-jitter exponential backoff for
       Windows file-locking edge cases (consistent with atomic_write_json).
     """
@@ -561,7 +564,9 @@ def atomic_json_write(
     consumed = False
     try:
         with os.fdopen(fd, mode, encoding=encoding) as f:
-            json.dump(data, f, indent=2, ensure_ascii=False, default=str)  # ✅ ensure_ascii=False
+            json.dump(
+                data, f, indent=2, ensure_ascii=ensure_ascii, sort_keys=sort_keys, default=default
+            )
             f.flush()
             os.fsync(f.fileno())
 

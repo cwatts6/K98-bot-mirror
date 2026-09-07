@@ -32,7 +32,7 @@ from core.discord_embed_limits import (
 )
 from embed_utils import LocalTimeToggleView, fmt_short
 from event_cache import get_all_upcoming_events
-from file_utils import atomic_write_json, read_json_safe, run_blocking_in_thread
+from file_utils import atomic_json_write, atomic_write_json, read_json_safe, run_blocking_in_thread
 from registry.governor_registry import load_registry
 from reminder_domain.kvk_candidates import (
     build_kvk_alert_projection,
@@ -508,8 +508,10 @@ def save_active_reminders():
 
             to_save[eid] = base
 
-        with open(REMINDER_TRACKING_FILE, "w", encoding="utf-8") as f:
-            json.dump(to_save, f, indent=2, sort_keys=True)
+        # Keep the legacy JSON format and strict serialization failure behavior.
+        atomic_json_write(
+            REMINDER_TRACKING_FILE, to_save, ensure_ascii=True, sort_keys=True, default=None
+        )
 
         logger.debug("[REMINDER_CACHE] Saved active reminders to disk.")
 

@@ -93,8 +93,10 @@ and production PR #562 are merged, and final production-main source verification
 
 Phase 2E completed its audit-first gate, review remediation, automated validation, final security
 review, candidate delivery, and operator smoke on 2026-09-07 through mirror PR #256 and production
-PR #563. Both PRs remain open for the operator's manual merges and final production-main
-verification. Confirmation history remains keep-all: the measured
+PR #563. Phase 2F prerequisite checks confirmed both PRs merged and production `main` at
+`2888512cbb2b329c4c7f472449f005ae2dd07a4e`; its Python source/tests match mirror base
+`88de37a2c77f96fe91be98b2e3ed40c4b639e199`. This verifies repository source, not a new
+bot-machine deployment. Confirmation history remains keep-all: the measured
 local state copy was proved to contain repeated test fixtures and is not production evidence, so no
 JSON shape, retention, cleanup, or SQL change is justified. Confirmation-flow tests now use
 temporary state paths. Registration delivery reports explicit `created`, `edited`, `moved`,
@@ -112,6 +114,16 @@ a documented clean no-diff skip. The operator reported that smoke testing comple
 messages posted and refreshed successfully. The Phase 2E pack and starter are archived.
 Phase 2F now owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
 Pre-KVK reservation; separate Stats/KVK History executor audits remain out of scope.
+
+Phase 2F implementation is operator-approved on `codex/discord-embed-payload-safety-phase-2f`.
+The public tracker now uses the unique-temp `file_utils.atomic_json_write` helper, with explicit
+ASCII escaping, recursive key sorting, and strict unsupported-value rejection to preserve the
+previous UTF-8/indent-2 JSON contract. Existing helper callers retain their prior defaults. The
+public save remains synchronous and non-raising; Discord ordering, in-memory transitions, IDs,
+fallback metadata, rehydration, mentions, timing, startup, scheduler, and executors are unchanged.
+Atomic replacement preserves the prior file on pre-replace failure; it does not merge snapshots
+from multiple bot processes or make Discord and disk transactional. Final validation/security,
+mirror delivery, promotion, and natural operator smoke are recorded in the active Phase 2F pack.
 
 ## KVK Target Publication And Quality Delivery
 
