@@ -304,7 +304,9 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Risk: medium
 - Dependencies: Separate operator approval; focused tracker round-trip, interrupted-write, failure, missing-message, cleanup, and restart/rehydration tests. No payload-policy change.
 - Status: Phase 2F audit and implementation approved; unique-temp replacement implemented on
-  `codex/discord-embed-payload-safety-phase-2f`, pending final validation, review, and delivery.
+  `codex/discord-embed-payload-safety-phase-2f`; 114 focused and 3240 full-suite tests passed.
+  Changes review found zero issues, but sealed coverage retained a stale partial checkpoint.
+  Final security evidence, delivery, and natural production smoke remain open; do not archive yet.
 - Last verified: 2026-09-07
 
 ### Deferred Optimisation

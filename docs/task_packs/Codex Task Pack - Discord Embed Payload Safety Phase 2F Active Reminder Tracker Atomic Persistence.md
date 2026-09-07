@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / next audit-first slice after Phase 2E candidate delivery`
 - Task type: `restart-sensitive persistence reliability`
 - One-pass approved: `initial audit/scope stop completed; operator subsequently approved the exact approach and manifest`
-- Status: `approved implementation and local validation complete; final security review and delivery pending`
+- Status: `implementation and local validation complete; security report retains stale partial-coverage checkpoint; draft mirror delivery pending`
 - Repository: `K98-bot-mirror` bot repository first; SQL is no-diff unless separately approved
 
 ## 2. Prerequisites And Required Reading
@@ -356,9 +356,38 @@ production operational log files unchanged. Architecture, deferred-item, securit
 selector, smoke imports, command-registration, Ruff, Black, and full pre-commit (including Pyright
 and secrets checks) passed. Focused coverage plus target-cache consumer coverage totals `114` tests.
 The implementation review found no blocking regression: the runtime diff only switches the
-public write boundary and adds backward-compatible serializer options. Final security evidence
-is pending.
+public write boundary and adds backward-compatible serializer options. Security evidence and its
+reporting limitation are recorded below.
 Bot review must be Changes-only against the exact approved base/final head, Deep off. SQL is a
 documented no-diff skip only if its revision/worktree and all SQL/DAL contracts remain unchanged.
 Mirror PR, production promotion, natural candidate smoke, and final deployment are pending; do not
 interpret local implementation or source prerequisite verification as deployment acceptance.
+
+### Security Review Evidence And Reporting Limitation
+
+Changes-only scan `634c0cca-9c72-40e7-b349-e79976135178`, Deep off, reviewed immutable range
+`88de37a2c77f96fe91be98b2e3ed40c4b639e199..60a66c1979e9e70628cc15aed311e8b48bc4cdbc`.
+The two runtime inventory entries and all seven changed test/documentation files were reviewed;
+no plausible security candidates or reportable findings were identified. Preflight passed and
+the independent architecture review confirmed the scoped model. TAC advisory status was granted
+(`tac1`, user grant `2026-09-07T20:10:40Z`). The tool measured 3,240,182 total tokens, including
+3,083,392 cached input tokens, across the three recorded threads.
+
+The final semantic draft requested complete coverage with no deferred work. Sealed readback,
+however, retained the earlier `discovery-in-progress` placeholder and reports `partial` coverage.
+Its final surfaces record both runtime reviews as `no_issue_found` and tests/records as
+`not_applicable`; the leftover placeholder is not an unreviewed source path or vulnerability.
+The sealed artifact is preserved unchanged. Do not claim that the final complete-coverage gate
+passed: resolving this reporting discrepancy remains required before merge/promotion. Mirror
+delivery is a draft for review, not merge readiness.
+
+Canonical report: the scan's `report.md` in the Codex Security workbench; scan ID above is the
+durable lookup key. This documentation-only evidence update receives an incremental security skip:
+the reviewed runtime/test blobs are unchanged, and no configuration, dependency, input, permission,
+network, SQL, or persistence behavior is altered by recording the result.
+
+SQL remains clean on `main` at `fc0e94ebd2e0a98286069c8a8b71365dd5178657`; the bot diff has no
+SQL, migration, schema, procedure, or DAL change. The separate SQL security review is a no-diff skip.
+The active persistence deferred item stays in the active register until delivery/smoke acceptance;
+the resolved archive is intentionally unchanged. Production promotion, natural smoke, and final
+operator verification remain pending.
