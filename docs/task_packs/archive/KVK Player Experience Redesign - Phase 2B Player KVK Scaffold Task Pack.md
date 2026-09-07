@@ -1,0 +1,175 @@
+# KVK Player Experience Redesign - Phase 2B Player KVK Scaffold Task Pack
+
+## 1. Task Header
+
+- Task name: `KVK Player Experience Redesign - Phase 2B Player /kvk Scaffold`
+- Date: `2026-06-03`
+- Task type: `feature / command-surface migration scaffold`
+- One-pass approved: `no`
+- Status: `complete - delivered, merged in mirror PR #141, and promoted to production`
+
+## Delivery Update
+
+Phase 2B is complete as of 2026-06-04.
+
+Delivered result:
+
+- Added the player-facing `/kvk` command group in `commands/kvk_cmds.py`.
+- Registered `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings`.
+- Implemented `/kvk rankings type` as a required option with `kvk`, `honor`, and `prekvk`
+  choices.
+- Preserved legacy player commands in parallel for rollout safety.
+- Preserved existing SQL, import, recompute, export, Google Sheets, and visual-output semantics.
+- Updated command registration governance, smoke expectations, tests, and canonical command docs.
+- Addressed review feedback so channel-denied `/kvk rankings` requests do not get recorded as
+  successful usage-tracked executions.
+
+Validation evidence from delivery:
+
+```powershell
+.\.venv\Scripts\python.exe -m py_compile commands\kvk_cmds.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe -m ruff check commands\kvk_cmds.py tests\test_kvk_cmds.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_cmds.py tests\test_mykvkstats.py tests\test_kvk_personal_views.py tests\test_mykvktargets.py tests\test_kvk_ui_rebuild_options.py tests\test_build_kvkrankings_embed.py tests\test_kvkrankingview.py tests\test_honor_rankings_view.py tests\test_prekvk_report_command.py tests\test_prekvk_report_views.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_governance_config.py tests\test_command_inventory.py tests\test_command_registration_smoke.py
+```
+
+Full-suite note: the initial full pytest run reached `1631 passed, 2 skipped` with one unrelated
+local mirror-governance failure caused by missing `.github/workflows/command-governance.yml` in the
+scrubbed mirror. The mirror publish configuration was corrected afterward so
+`command-governance.yml` is mirrored while production-only workflows remain excluded, and
+`tests\test_command_governance_config.py` passed.
+
+## 2. Objective
+
+Create the player-facing `/kvk` command group after Phase 2A resolved the admin collision.
+
+Prerequisite status: Phase 2A is complete in PR #140. Admin/operator KVK commands now live under `/kvk_admin ...`, and the old `/kvk ...` admin paths are no longer active.
+
+Initial player subcommands:
+
+```text
+/kvk stats
+/kvk targets
+/kvk history
+/kvk rankings
+```
+Legacy commands must remain live.
+
+## 3. Approved Behaviour
+
+- `/kvk rankings` should support all three initial modes: `kvk`, `honor`, and `prekvk`.
+- `/kvk stats` should keep account selection private, while selected single-account stats post publicly.
+- `/kvk targets` should start the in-programme move toward a KVK targets service payload contract and DAL boundary.
+- Acclaim/contribution metrics should be included in the programme after SQL source and terminology validation.
+- Visual cards remain out of Phase 2B unless explicitly approved.
+
+## 4. Scope
+
+In scope:
+
+- Add player `/kvk` subcommands backed by existing behaviour where safe.
+- Add ranking mode routing for KVK, honor, and PreKvK.
+- Preserve legacy flat commands unchanged.
+- Preserve current permissions and visibility unless this task explicitly changes them.
+- Add tests for command registration, permissions, delegation, ranking modes, and old-command preservation.
+- Update canonical command reference, approved top-level command baseline, and command inventory expectations for the new player `/kvk` group.
+- Begin targets service/DAL payload cleanup only where needed to keep `/kvk targets` thin and testable.
+
+Out of scope:
+
+- No generated KVK stats card.
+- No old command removal or deprecation.
+- No SQL schema/procedure/view/function changes.
+- No KVK import/recompute/export or Google Sheets behaviour changes.
+- No broad `/my` or `/player` self-service redesign.
+
+## 5. Architecture Direction
+
+- New player command module target: `commands/kvk_cmds.py`.
+- Existing admin/operator handlers remain in `commands/stats_cmds.py` under `/kvk_admin`.
+- Commands validate, defer safely, preserve permission checks, and call services/views.
+- Command registration governance should add `/kvk` as the player top-level group while keeping `/kvk_admin` as the operator top-level group.
+- KVK targets should move toward `kvk/services/` and `kvk/dal/` ownership for payload construction.
+- Ranking mode adapters should not duplicate ranking calculations.
+- PreKvK image/report rendering remains in `prekvk/` and `ui/views/prekvk_report_views.py`; `/kvk rankings type:prekvk` should delegate.
+
+## 6. `/kvk stats`
+
+Requirements:
+
+- Reuse existing account summary and KVK stats rendering for parity.
+- Private account selection.
+- Public selected single-account stats posting.
+- Preserve no-registration fallback actions.
+- Do not introduce the Phase 3 card yet.
+
+## 7. `/kvk targets`
+
+Requirements:
+
+- Preserve current target states: off-season, target unavailable, exempt, below-power, not active, unknown governor, and normal progress.
+- Create or prepare a service payload contract and DAL boundary so commands/views do not own target business logic.
+- Preserve current target formulas and SQL/cache source-of-truth.
+
+## 8. `/kvk history`
+
+Requirements:
+
+- Preserve existing chart/table output and account selection.
+- Keep table-first accessibility.
+- Do not add new charting or visual card output.
+
+## 9. `/kvk rankings`
+
+Initial modes:
+
+```text
+type: kvk
+type: honor
+type: prekvk
+```
+
+Requirements:
+
+- Preserve current KVK ranking calculations and pagination.
+- Preserve current honor ranking calculations and pagination.
+- Preserve current PreKvK report payload, sort, limit, and generated PNG behaviour by delegation.
+- Use `type` as a required slash option for the scaffold, with choices `kvk`, `honor`, and `prekvk`.
+
+## 10. Testing And Validation
+
+Run or justify:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_inventory.py tests\test_command_registration_smoke.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_mykvkstats.py tests\test_kvk_personal_views.py tests\test_mykvktargets.py tests\test_kvk_ui_rebuild_options.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_build_kvkrankings_embed.py tests\test_kvkrankingview.py tests\test_honor_rankings_view.py tests\test_prekvk_report_command.py tests\test_prekvk_report_views.py
+```
+
+Run Codex Security before PR handoff because user-facing commands, permissions, Discord interactions, SQL-backed outputs, and user-controlled options are touched.
+
+## 11. Acceptance Criteria
+
+- [x] Phase 2A is complete; `/kvk` is available for the player scaffold.
+- [x] `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` are registered.
+- [x] `/kvk rankings` supports `kvk`, `honor`, and `prekvk` modes.
+- [x] `/kvk rankings type` is implemented as a required slash option.
+- [x] `/kvk stats` preserves private selection and public selected stat output.
+- [x] Legacy commands remain live.
+- [x] No generated card work is mixed into this scaffold.
+- [x] No SQL/import/export/recompute semantics change.
+- [x] Targets service/DAL payload cleanup is started or explicitly scoped into the next targets phase.
+
+Targets follow-up: Phase 2B kept the command scaffold thin while preserving the existing target
+states and formulas. Deeper targets service/DAL payload cleanup remains part of the programme and
+should be picked up in the modern targets phase or a focused pre-Phase 4 cleanup pack.
