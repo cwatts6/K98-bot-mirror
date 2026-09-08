@@ -119,6 +119,87 @@ async def test_positive_receipt_disk_failure_is_uncertain(tmp_path, monkeypatch,
     assert result.outcome == "uncertain" and result.receipt == 100
     phase = repo.open(10, 20, 30, result.session).snapshot()["operations"][-1]["phase"]
     assert phase == ("sending" if failure_phase == "accepted" else "accepted")
+    assert result.snapshot["operations"][-1]["phase"] == phase
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["build", "send", "edit", "finish"])
+async def test_failure_result_contains_final_saved_snapshot(tmp_path, monkeypatch, failure):
+    repo, session = opened(tmp_path)
+    if failure == "edit":
+        session.begin("a" * 32)
+        session.transition("a" * 32, "sending")
+        session.transition("a" * 32, "accepted", receipt=100)
+        session.transition("a" * 32, "committed")
+        session.finish("a" * 32)
+
+    async def build():
+        if failure == "build":
+            raise RuntimeError("renderer failed")
+        return PreviewPayload(None, True, "", "a" * 64)
+
+    async def publish(preview, message_id, before_send):
+        await before_send()
+        if failure in {"send", "edit"}:
+            raise OSError("publication uncertain")
+        return 100
+
+    if failure == "finish":
+
+        def fail_finish(self, operation):
+            raise OSError("lease finalization failed")
+
+        monkeypatch.setattr(sessions.PreviewSession, "finish", fail_finish)
+
+    runner = PreviewRunner()
+    result = await runner.execute(
+        guild_id=10,
+        channel_id=20,
+        owner_id=30,
+        token=session.token,
+        action="run",
+        repository=repo,
+        build=build,
+        publish=publish,
+    )
+    assert result.outcome == ("failed" if failure == "build" else "uncertain")
+    assert result.snapshot == session.snapshot()
+    row = result.snapshot["operations"][-1]
+    assert (
+        row["phase"]
+        == {"build": "failed", "send": "sending", "edit": "editing", "finish": "committed"}[failure]
+    )
+    assert row["token"] and row["updated_at"]
+    assert runner.active is None
+
+
+@pytest.mark.asyncio
+async def test_failure_snapshot_read_is_best_effort(tmp_path, monkeypatch):
+    repo, session = opened(tmp_path)
+
+    def unreadable(self):
+        raise OSError("state unavailable")
+
+    async def build():
+        monkeypatch.setattr(sessions.PreviewSession, "snapshot", unreadable)
+        raise RuntimeError("renderer failed")
+
+    runner = PreviewRunner()
+    publish = AsyncMock()
+    result = await runner.execute(
+        guild_id=10,
+        channel_id=20,
+        owner_id=30,
+        token=session.token,
+        action="run",
+        repository=repo,
+        build=build,
+        publish=publish,
+    )
+    assert result.outcome == "failed" and result.snapshot is None
+    assert "saved state could not be read" in result.detail
+    publish.assert_not_awaited()
+    assert runner.active is None
 
 
 @pytest.mark.asyncio

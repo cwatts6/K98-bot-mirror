@@ -133,8 +133,20 @@ class PreviewRunner(DiagnosticRunner):
                     result.outcome = "uncertain" if entered or receipt else "failed"
                     result.detail = "Finalization failed; retain evidence and do not retry"
             finally:
-                if action == "run":
-                    self.active = None
+                try:
+                    if result is not None and result.snapshot is None:
+                        try:
+                            result.snapshot = await _io(session.snapshot)
+                        except Exception:
+                            logger.warning(
+                                "[KVK PREVIEW] result snapshot unavailable session=%s",
+                                session.token,
+                                exc_info=True,
+                            )
+                            result.detail += "; saved state could not be read"
+                finally:
+                    if action == "run":
+                        self.active = None
 
 
 runner = PreviewRunner()
