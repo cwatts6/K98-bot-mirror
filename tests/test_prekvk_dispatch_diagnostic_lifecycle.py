@@ -1,7 +1,10 @@
 import ast
 import asyncio
+import builtins
 from pathlib import Path
 import threading
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from test_prekvk_dispatch_diagnostics import Channel, harness as harness, run
@@ -74,3 +77,64 @@ def test_teardown_drains_diagnostics_before_other_teardown():
     assert source.index("await prekvk_diagnostic_runner.shutdown()") < source.index(
         "await task_monitor.stop()"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["import", "shutdown"])
+async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
+    tree = ast.parse(Path("bot_instance.py").read_text(encoding="utf-8"))
+    teardown = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_graceful_teardown"
+    )
+    diagnostic = SimpleNamespace(
+        runner=SimpleNamespace(
+            shutdown=AsyncMock(side_effect=RuntimeError("diagnostic shutdown failed"))
+        )
+    )
+    reminders = SimpleNamespace(cancel_all_and_wait=AsyncMock(return_value=0))
+
+    def controlled_import(name, *args, **kwargs):
+        if name == "stats_alerts.diagnostics":
+            if failure == "import":
+                raise ImportError("diagnostic module unavailable")
+            return diagnostic
+        if name == "reminder_task_registry":
+            return reminders
+        return builtins.__import__(name, *args, **kwargs)
+
+    tracker = SimpleNamespace(stop=AsyncMock())
+    namespace = {
+        "__builtins__": {**vars(builtins), "__import__": controlled_import},
+        "_shutdown_once": asyncio.Event(),
+        "logger": Mock(),
+        "daily_summary": Mock(),
+        "refresh_event_cache_task": Mock(),
+        "_drain_shutdown_queues": AsyncMock(),
+        "_flush_live_queue_state": AsyncMock(),
+        "task_monitor": SimpleNamespace(stop=AsyncMock(), list=lambda: []),
+        "_atomic_json_write": Mock(),
+        "os": __import__("os"),
+        "LOG_DIR": "unused",
+        "_aware": lambda value: value,
+        "utcnow": lambda: SimpleNamespace(isoformat=lambda: "2026-09-08T00:00:00+00:00"),
+        "usage_tracker": lambda: tracker,
+        "quiesce_logging": Mock(),
+    }
+    exec(
+        compile(ast.Module(body=[teardown], type_ignores=[]), "bot_instance.py", "exec"), namespace
+    )
+    await namespace["_graceful_teardown"]()
+    namespace["logger"].exception.assert_called_once_with(
+        "[SHUTDOWN] Failed draining Pre-KVK diagnostics; preserve session evidence."
+    )
+    namespace["daily_summary"].stop.assert_called_once()
+    namespace["refresh_event_cache_task"].stop.assert_called_once()
+    namespace["_drain_shutdown_queues"].assert_awaited_once()
+    namespace["_flush_live_queue_state"].assert_awaited_once()
+    namespace["task_monitor"].stop.assert_awaited_once()
+    reminders.cancel_all_and_wait.assert_awaited_once()
+    namespace["_atomic_json_write"].assert_called_once()
+    tracker.stop.assert_awaited_once()
+    namespace["quiesce_logging"].assert_called_once()

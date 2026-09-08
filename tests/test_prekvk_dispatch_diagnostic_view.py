@@ -50,3 +50,32 @@ async def test_reopen_has_same_component_identity(tmp_path):
     before = views.PreKvkDispatchDiagnosticView([], session)
     after = views.PreKvkDispatchDiagnosticView([], repo.open(10, 20, 30, session.token))
     assert before.children[0].custom_id == after.children[0].custom_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("revoked", ["view_channel", "send_messages"])
+async def test_revoked_destination_permission_denies_before_render(tmp_path, monkeypatch, revoked):
+    monkeypatch.setattr(views, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(views, "GUILD_ID", 10)
+    session = SessionRepository(tmp_path / "diagnostics").open(10, 20, 30)
+    view = views.PreKvkDispatchDiagnosticView([], session)
+    view.build_local_time_embed = AsyncMock()
+    permissions = SimpleNamespace(view_channel=True, send_messages=True)
+    setattr(permissions, revoked, False)
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=30),
+        guild_id=10,
+        channel_id=20,
+        channel=SimpleNamespace(permissions_for=lambda user: permissions),
+        response=SimpleNamespace(is_done=lambda: False, send_message=AsyncMock()),
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
+    await view.show_local_time(interaction)
+    interaction.response.send_message.assert_awaited_once()
+    call = interaction.response.send_message.call_args
+    assert "no longer have access" in call.args[0]
+    assert call.kwargs["ephemeral"] is True
+    assert call.kwargs["allowed_mentions"].to_dict() == {"parse": []}
+    assert "embed" not in call.kwargs
+    view.build_local_time_embed.assert_not_awaited()
+    interaction.followup.send.assert_not_awaited()

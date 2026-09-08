@@ -1469,9 +1469,14 @@ async def _graceful_teardown():
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
 
     # Diagnostic sends must finish their reservation finalizers before client teardown.
-    from stats_alerts.diagnostics import runner as prekvk_diagnostic_runner
+    try:
+        from stats_alerts.diagnostics import runner as prekvk_diagnostic_runner
 
-    await prekvk_diagnostic_runner.shutdown()
+        await prekvk_diagnostic_runner.shutdown()
+    except Exception:
+        logger.exception(
+            "[SHUTDOWN] Failed draining Pre-KVK diagnostics; preserve session evidence."
+        )
 
     # Stop task loops...
     try:
