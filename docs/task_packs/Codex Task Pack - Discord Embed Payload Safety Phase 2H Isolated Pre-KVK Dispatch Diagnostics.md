@@ -4,7 +4,7 @@
 
 - Date: 2026-09-08
 - Owner: Chris Watts
-- Status: operator-approved next task; first response audit/scope and architecture only, then approval before implementation.
+- Status: approved implementation and deterministic review complete; operator Discord smoke and Phase 2H promotion/deployment remain pending.
 - Repositories: K98-bot-mirror first; production patch promotion after validation; SQL separately gated.
 - Objective: enable an operator to exercise the real Pre-KVK reservation protocol against Discord outside the calendar window, with isolated durable diagnostic state and mentions disabled. This is a Phase 2 validation extension, not a change to production eligibility or payload policy.
 
@@ -175,7 +175,7 @@ Runtime manifest: `commands/admin_cmds.py`, `stats_alerts/diagnostics.py`,
 
 Test manifest: new `tests/test_prekvk_dispatch_diagnostics.py`,
 `tests/test_prekvk_dispatch_diagnostic_view.py`, `tests/test_prekvk_dispatch_diagnostic_lifecycle.py`;
-extended `tests/test_command_registration_smoke.py`. Existing reservation/embed/state/guard,
+extended `tests/test_command_registration_smoke.py` and `tests/test_validate_command_registration.py`. Existing reservation/embed/state/guard,
 off-season and fighting lifecycle suites are regression gates without unnecessary edits.
 Documentation manifest: this pack, its starter, task index, README-DEV, canonical command reference,
 events/reminders, diagnostics runbook and deferred register.
@@ -188,7 +188,20 @@ No shared view, guard, registration helper, dependency or config source edit.
 
 SQL manifest: empty. No schema/procedure/view/index/UDT/ProcConfig, embedded query, DAL result-shape
 or deployment delta. Bot security gate: Changes only, Deep off, exact immutable final diff.
-SQL receives a separate no-diff skip. Validation and security evidence are recorded at delivery.
+SQL receives a separate no-diff skip.
+
+Validation at runtime commit `81ee0a70c9c87ba6db68f3cbd29dafabce8a7bbc`: focused regression
+149 passed; full suite 3357 passed / 2 skipped; pytest operational log-noise check passed.
+Tests used the repository-pinned filelock 3.20.0. All pre-commit hooks, architecture boundaries,
+deferred-item validation, security routing, imports and command registration passed. Selector
+recommended the full suite and registration/import gates, all satisfied.
+
+Changes-only security scan `3a280eb6-65e6-4905-8c47-d56cc3698baf` is sealed complete with
+zero reportable findings and no deferred discovery. Deep remained off. Immutable target:
+`69895f32fefd18f77b4f1e1d6001e66bd5adebad..81ee0a70c9c87ba6db68f3cbd29dafabce8a7bbc`.
+Subsequent task-pack/starter evidence edits receive a documentation-only review/skip: no runtime,
+permissions, configuration, dependencies, network, SQL or persistence behavior changes.
+Code review found no blocking issue; mirror merge readiness does not imply live acceptance.
 
 Existing singleton/public-child lifecycle, generic view timeout, DM/JSON redesign, Stats/KVK
 History executor audits, ProcConfig result/false-success repair and Phase 2F natural-save observation
