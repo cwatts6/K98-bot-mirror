@@ -452,3 +452,13 @@ Implementation, automated review and candidate restart smoke are accepted. Archi
 and implemented persistence debt; Phase 2G is the active audit-first handoff. No runtime/test/SQL/
 config change accompanies closure. Documentation-only security routing is a precise skip.
 Earlier pending delivery notes are historical; this section is the authoritative candidate status.
+
+
+## Final prerequisite refresh — 2026-09-08
+
+GitHub confirms mirror PR #257 merged as bf3a4d326a5009fa1610b05b9f43979813b4aadc and
+production PR #564 merged as d9321328507add3b06704c25db2c6e59fe7352f6, the verified production main.
+Phase 2G source comparison found all 912 mirror Python blobs identical to production main.
+The operator answered “Yes deployed and restarted successfully” to the production-head question.
+That is operator attestation, not independent machine-log verification. The next natural public
+reminder atomic save remains unobserved. Historical candidate evidence above is unchanged.

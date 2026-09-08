@@ -366,12 +366,12 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests
 - Type: architecture
-- Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. Concurrent dispatches can theoretically pass the read before either claim is recorded, although normal singleton-process controls reduce the known frequency and no production duplicate from this race has been established.
+- Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. The Phase 2G isolated real-suffix/CSV harness proved two mocked sends before one success row; a separate process harness proved the singleton metadata check is nonexclusive. No production duplicate has been established.
 - Suggested Fix: Treat this as the separately approved reliability extension Phase 2G, not a reopening of payload policy. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
 - Impact: medium
 - Risk: high
 - Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
-- Status: active Phase 2G pack/starter prepared; audit first, evidence/design-gated; implementation not approved
+- Status: Phase 2G implementation approved and implemented 2026-09-08; 81 focused and full 3304 passed, 2 skipped; final Changes review, delivery and natural smoke gated; retain active until acceptance
 - Last verified: 2026-09-02
 
 ### Deferred Optimisation
@@ -384,3 +384,15 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate SQL/DAL transaction design and operator approval; authoritative `dbo.ArkMatchTeams` revalidation; focused service/view tests and a bot Changes-only security review. SQL review is required only if the SQL repository changes.
 - Status: low-priority reliability debt; no production incident established
 - Last verified: 2026-09-03
+
+
+### Deferred Optimisation
+- Area: `stats_alerts/interface.py` and `stats_alerts/db.py` executor fallback wrappers
+- Type: consistency
+- Description: Phase 2G source review found post-entry executor fallback in existing stats-alert read/orchestration helpers. A callable exception may cause another backend to invoke it again. Reservation transitions bypass these wrappers and use the existing once-only backend; other call shapes and side effects have not been independently reproduced.
+- Suggested Fix: Separately inventory callers and prove argument, return, exception and cancellation semantics with invocation counters before removing fallback. Coordinate with existing Stats and KVK History audits without merging unrelated surfaces into Phase 2G.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate operator-approved executor audit; preserve SQL/read behavior and telemetry; no SQL contract change approved.
+- Status: evidence required; owner Chris Watts; not a Phase 2G dependency
+- Last verified: 2026-09-08

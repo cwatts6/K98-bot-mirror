@@ -125,7 +125,9 @@ async def send_offseason_stats_embed_v2(
     target_channel_id: int | None = None,
     mention_everyone: bool = False,
     include_kingdom_summary: bool = True,
-) -> None:
+    before_send=None,
+    return_receipt: bool = False,
+) -> Any:
     """
     Sends a combo of embeds (kingdom summary + 3 supporting embeds) for either:
       - daily (is_weekly=False): kingdom summary with daily comparison
@@ -304,4 +306,7 @@ async def send_offseason_stats_embed_v2(
         logger.warning("[OFFSEASON EMBED] Nothing to send.")
         return
 
-    await ch.send(content=content, embeds=embeds_to_send, allowed_mentions=allowed)
+    if before_send is not None:
+        await before_send()
+    message = await ch.send(content=content, embeds=embeds_to_send, allowed_mentions=allowed)
+    return message if return_receipt else None

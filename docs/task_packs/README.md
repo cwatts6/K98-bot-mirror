@@ -4,12 +4,12 @@ This folder contains active execution packs, proposed/gated work, living program
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
 
-## Current execution set — 2026-09-07
+## Current execution set — 2026-09-08
 
 | Classification | Files / programme | Status |
 |---|---|---|
-| Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Candidate delivered/tested via mirror #257 and production #564; operator merges/final verification pending |
-| Active review/scope | Discord Embed Payload Safety Phase 2G Atomic Pre-KVK Reservation task pack and chat starter | Audit-first, implementation unapproved; revalidate Phase 2F PR merges/final verification |
+| Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Mirror #257 and production #564 merged; production-main source verified, deployment/restart operator-attested; next natural save unobserved |
+| Active implementation | Discord Embed Payload Safety Phase 2G Atomic Pre-KVK Reservation task pack and chat starter | Approved; 81 focused and 3304 full tests passed, 2 skipped; final Changes review/delivery/natural smoke gated |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |

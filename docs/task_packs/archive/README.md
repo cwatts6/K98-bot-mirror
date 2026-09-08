@@ -317,3 +317,11 @@ hardening is complete and recorded in `docs/reference/archive/deferred_optimisat
 
 Phase 2F pack/starter: candidate delivered and restart smoke accepted via mirror #257 / production
 #564; archived with explicit pending operator merges and final production verification.
+
+
+## Prerequisite refresh — 2026-09-08
+
+Phase 2F mirror #257 and production #564 are merged; production main is
+`d9321328507add3b06704c25db2c6e59fe7352f6`. The operator confirmed deployment and successful restart.
+This supersedes pending-merge preparation statements below; the next natural public save remains
+unobserved. Phase 2G implementation is approved and active; it is not archived or smoke-accepted.

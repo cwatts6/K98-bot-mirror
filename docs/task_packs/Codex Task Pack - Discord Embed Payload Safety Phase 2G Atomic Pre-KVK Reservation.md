@@ -186,3 +186,140 @@ also includes the existing implementation branch and recommends full pytest/impo
 those already passed for identical Python blobs (3240 passed, 2 skipped; 114 focused). Repeating
 runtime tests or a Changes scan solely for this inspected documentation delta is a documented skip.
 Mirror and production receive the same documentation patch, preserving separate Git histories.
+
+
+## 15. Approved Implementation Record — 2026-09-08
+
+This record supersedes preparation-only status above. The operator approved proceeding after
+review/scope and approved the versioned local reservation sidecar and exact manifest. No SQL,
+config, dependency, singleton, public-child lifecycle or general executor redesign is included.
+
+Prerequisites revalidated: mirror PR #257 merged as `bf3a4d326a5009fa1610b05b9f43979813b4aadc`;
+production PR #564 merged as `d9321328507add3b06704c25db2c6e59fe7352f6`. Both merge states and
+production main were read from GitHub. All 912 mirror Python blobs matched production main.
+The clean mirror base was `55bcfd4f6fe7934a6d9a87fc8a0bc6e6e7429dfd`; implementation branch is
+`codex/discord-embed-payload-safety-phase-2g`. The operator answered “Yes deployed and restarted
+successfully” to the production-head prerequisite question. This is operator attestation, not
+independently collected bot-machine logs. The next natural public reminder atomic save remains
+unobserved; archived candidate acceptance alone is not deployment evidence.
+
+### Evidence and scope decisions
+
+| Classification | Evidence / disposition |
+|---|---|
+| Fix now | Isolated execution of the real Pre-KVK fresh-send suffix and threaded CSV functions produced two mocked sends and one CSV row. Post-success claim cannot own the preceding network await. No production duplicate is asserted. |
+| Fix now | Shared legacy CSV migration/read/append could race; serialize the whole operation. Existing O_EXCL lock helper leaves its pathname when the body throws; use the already pinned OS-backed FileLock locally. |
+| Fix now | Coordinate active Pre-KVK and off-season attempts, durable positive receipts, compare-and-set message updates and fighting-generation invalidation. A renderer returning without sending must not create a success claim. |
+| Safe | Canonical Phase 1–2F payload construction, edit/test paths, permissions, visibility, ordering, eligibility, mentions and public reminder persistence retain their contracts. |
+| Defer | Two isolated processes passed the real singleton metadata check concurrently. Exclusive singleton acquisition/release remains separate; this protocol does not depend on it. Public child-task lifecycle, DM redesign, broad JSON consolidation and Stats/KVK History executor audits remain separate. |
+| Defer | Stats-alert interface/database offload fallback can retry after callable entry; reservation I/O uses the existing once-only backend directly. Audit those other callers separately. |
+| Not runtime | Archived acceptance/preparation text is historical evidence, not a deployment control or singleton guarantee. |
+
+Successful processing through admin_helpers dispatches Kingdom Summary first, then fighting KVK
+or Pre-KVK. Honor/Pre-KVK fast upload routes can overlap outside the queued processing lock.
+No separate timed Pre-KVK loop was found: the daily key is a guard, not a scheduler. Manual
+`/ops test_embed` and `/kvk_admin test_embed post_here=False` use the existing test bypass;
+`post_here=True` takes the direct KVK route. Same-day Pre-KVK references edit without daily
+reservation; missing/yesterday/fetch-or-edit failure selects fresh publication. Fighting clears the
+reference and fences late receipts. Payload preparation completes before fresh publication.
+Off-season daily precedes Monday weekly; their completed self-key guards remain independent.
+Completed off-season blocks Pre-KVK; completed Pre-KVK still does not block off-season. Active
+Pre-KVK attempts block both off-season kinds in both directions. Kingdom Summary ping claims
+retain their pre-send meaning and do not become delivery receipts.
+
+Coroutine overlap occurs at network awaits and offloaded I/O; separate dispatcher threads and
+processes share the filesystem protocol. A short OS lock covers only journal/CSV/state transitions,
+never Discord awaits. Lock order is dispatch then message-state, with no reverse acquisition.
+Cancellation waits for a started filesystem operation exactly once before cleanup; it does not
+retry through another executor. Shutdown may still kill the process, so durable phases rather
+than a successful graceful drain determine restart recovery. The 5-second acquisition bound does
+not bound filesystem completion time. Separate hosts/filesystems and mixed versions are excluded.
+
+### Selected persistence and state machine
+
+The prior post-success claim and an in-memory lock cannot coordinate restart/process overlap.
+Holding a file lock across Discord I/O would serialize network stalls without retaining ambiguous
+outcomes. A CSV schema extension would mix ownership with legacy success/ping meanings. SQL would
+require a separate schema, deployment and review gate. The approved choice is a narrow version-1
+`<STATS_ALERT_LOG>.dispatch.json` journal and `<STATS_ALERT_LOG>.dispatch.lck` OS lock, reusing
+existing `filelock==3.20.0` and atomic JSON helper. Message JSON stays in its legacy shape with
+`<STATE_PATH>.lck`; legacy CSV headers/rows/count APIs remain compatible. No historical CSV rows
+are imported as pending attempts; the journal is initialized on first reserve. Invalid journal
+content is preserved and fails closed. Never delete .lck pathnames while writers may exist.
+
+Each attempt records opaque token, kind, PID plus process creation time, UTC reserved day/time,
+channel and message generation. Start persists `sending` plus start time immediately before the
+Discord call. A positive message ID persists `accepted` plus receipt time before legacy message
+state/CSV projections, then becomes `committed`. Token matching owns transitions. A pre-invocation
+failure releases `reserved`; cancellation during start can release because the Discord caller has
+not been entered. Once the send callable is entered, exceptions/cancellation become `uncertain`.
+Even final HTTP 400/401/403/404 cannot prove non-delivery: the inspected Discord client can retry
+after an earlier ambiguous response. No exception-status retry or exactly-once claim is made.
+
+Recovery runs under the same lock at reservation admission. A provably dead reserved PID/create-time
+owner releases; a dead sending owner becomes uncertain; unknown/live ownership remains blocked.
+Accepted receipts replay projections idempotently. Uncertain attempts never expire or get stolen.
+UTC start rechecks current-day eligibility; accepted receipt day owns the CSV count. Active attempts
+block conflicts across midnight. Old-day recovered receipts cannot become today's editable message.
+Fighting/stale-reference clears advance a journal generation so late receipts cannot resurrect the
+cleared ID. Compare-and-set prevents a stale failure clearing a newer ID. Unrelated JSON keys and
+Unicode remain intact. Positive receipts retain authority if a CSV is later missing.
+
+`ReservationStore.reconcile_receipt` is a local operator recovery API, not a Discord command or
+automatic history search. Verify token, channel, bot author, exact payload/message identity and
+publication time from positive evidence before using it. It records the receipt and replays
+projections. Missing search results are not proof of non-delivery. With no conclusive evidence,
+leave the attempt blocked and escalate to an explicit operator recovery decision; do not delete
+or TTL-reset it. Receipt persistence failures log token/message ID for that investigation. Journal
+history is retained without automatic pruning; retention needs separate evidence/design approval.
+
+### Exact approved manifest
+
+Runtime: `stats_alerts/dispatch_reservations.py`, `stats_alerts/guard.py`, `stats_alerts/state.py`,
+`stats_alerts/interface.py`, `stats_alerts/embeds/prekvk.py`, `stats_alerts/embeds/offseason.py`,
+`embed_offseason_stats.py`. The interface/state changes are required to fence fighting clears and
+patch only the message reference; off-season participation closes the shared admission race.
+
+Tests: `tests/test_prekvk_reservation.py`, `tests/test_stats_alerts_guard.py`,
+`tests/test_stats_alerts_offseason_flow.py`, `tests/test_prekvk_embed.py`,
+`tests/test_stats_alerts_state.py`, `tests/test_stats_alerts_fighting_lifecycle.py`,
+`tests/test_embed_offseason_stats.py`.
+
+Docs: this pack and matching starter; `README-DEV.md`; `docs/task_packs/README.md`;
+`docs/task_packs/archive/README.md`; archived Phase 2F pack (prerequisite update only);
+`docs/task_packs/archive/Discord Embed Payload Safety Audit Findings.md`;
+`docs/reference/events_and_dm_reminders.md`; `docs/reference/deferred_optimisations.md`.
+No resolved-debt archive change until acceptance is earned.
+
+SQL manifest: **empty, separately gated**. Authoritative SQL repository remains clean main at
+`fc0e94ebd2e0a98286069c8a8b71365dd5178657`; no schema, migration, procedure, query or DAL contract
+changes. SQL Changes scan is a no-diff skip only while these conditions remain true.
+
+### Validation, delivery and remaining gates
+
+Deterministic tests use temporary files, mocked Discord, barriers and controlled clocks: same and
+distinct keys, threads/processes/coroutines, token mismatch, lock timeout, stale/unknown owner,
+pre/post-send cancellation, UTC rollover, receipt/state/CSV failures, recovery, corrupt files,
+legacy migration/quota and unchanged edit/test/mention paths. No live duplicates or mentions were
+forced. All 81 focused tests passed. Full pytest passed **3304 passed, 2 skipped** with production
+operational log-noise validation passing. Tests used isolated pinned filelock 3.20.0; the development
+venv has 3.29.0, and neither the venv nor requirements were modified. Selector requested full tests,
+smoke imports and command registration; imports and registration passed (36 primary/100 grouped).
+Architecture validation passed; final hooks, deferred/security-routing validation and immutable
+Changes-only/Deep-off bot review remain delivery gates, recorded in the PR/final handoff.
+
+Natural smoke remains pending: after approved mirror/production merge and deployment from
+production main, observe an eligible production fresh dispatch; verify one intended message,
+unchanged payload/mentions, matching receipt/channel/message-state and one CSV success row. Observe
+normal later edit/guard behavior and a restart with committed receipt intact. A bypass test command
+cannot establish production admission. Observe uncertainty only if it occurs naturally; do not
+inject live failures. Also retain the separate Phase 2F next-natural-save observation.
+
+Rollout and rollback require all bot writers stopped, legacy startup migration settled, and backups
+of CSV, message JSON and journal together. Never run mixed old/new writers. Inspect and reconcile
+accepted/uncertain attempts before restarting old code: old code ignores this journal, so reverting
+alone can duplicate a previously accepted send. Keep a consistent success CSV/reference and retain
+the journal backup; if uncertainty remains, keep dispatch stopped pending the operator's explicit
+recovery decision. Do not delete locks under live writers or blindly restore stale snapshots.
+No singleton repair, public child-task lifecycle or SQL work is a hard implementation dependency;
+exclusive operational stop during version changes is a deployment requirement.

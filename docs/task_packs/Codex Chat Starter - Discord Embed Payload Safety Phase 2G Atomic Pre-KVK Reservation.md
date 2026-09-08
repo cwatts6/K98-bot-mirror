@@ -1,6 +1,9 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2G Atomic Pre-KVK Reservation
 
-Status: prepared 2026-09-07; audit-first only. Implementation is not approved.
+Status: implementation approved 2026-09-08. Original audit starter below is historical.
+Continue from active pack section 15: finish final hooks, immutable bot Changes-only/Deep-off
+review and mirror delivery. No SQL change. Natural smoke and production promotion remain gated;
+do not repeat the already approved design gate.
 
 ## Copy/Paste Starter
 

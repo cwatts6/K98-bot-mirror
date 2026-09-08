@@ -24,11 +24,15 @@ from core.discord_embed_limits import (
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
 from prekvk import report_service
+from stats_alerts.dispatch_reservations import (
+    DispatchAttempt,
+    DispatchUnavailable,
+    ReservationStore,
+)
 from stats_alerts.formatters import fmt_honor
-from stats_alerts.guard import claim_send, sent_today, sent_today_any
 from stats_alerts.honors import get_latest_honor_top
 from stats_alerts.kvk_meta import get_latest_kvk_metadata_sql
-from stats_alerts.state import load_state, save_state
+from stats_alerts.state import load_state, update_prekvk_message
 from utils import date_to_utc_start, ensure_aware_utc, utcnow
 
 logger = logging.getLogger(__name__)
@@ -41,6 +45,13 @@ _PREKVK_FOOTER = "KD98 Discord Bot"
 
 class PreKvkSkip(Exception):
     """Raised to indicate the embed wasn't sent due to mutual exclusivity / limits."""
+
+
+def _clear_message(message_id):
+    try:
+        ReservationStore().clear_message(expected_id=message_id)
+    except Exception:
+        logger.exception("[PREKVK] Failed to clear stored message reference")
 
 
 def _normalise_event_name(event: dict[str, Any]) -> str:
@@ -521,11 +532,11 @@ async def send_prekvk_embed(
                 if msg_created is None or msg_created.date() != today_utc:
                     message = None
                     state.pop("prekvk_msg_id", None)
-                    save_state(state)
+                    _clear_message(msg_id)
         except Exception:
             message = None
             if state.pop("prekvk_msg_id", None) is not None:
-                save_state(state)
+                _clear_message(msg_id)
 
     # Silent edit path
     if message:
@@ -540,96 +551,37 @@ async def send_prekvk_embed(
         except Exception:
             logger.exception("[PREKVK] Edit failed; will send a fresh message.")
             if state.pop("prekvk_msg_id", None) is not None:
-                save_state(state)
+                _clear_message(msg_id)
 
-    # Fresh send path — mutual exclusivity + daily limits via guard (call via to_thread because guard uses file IO)
-    try:
-        try:
-            from file_utils import run_blocking_in_thread
-        except Exception:
-            run_blocking_in_thread = None
-
-        if not is_test and run_blocking_in_thread is not None:
-            if await run_blocking_in_thread(
-                sent_today_any,
-                ["offseason_daily", "offseason_weekly"],
-                name="sent_today_any",
-                meta={"checks": ["offseason_daily", "offseason_weekly"]},
-            ):
-                logger.info("[STATS EMBED] Off-season already posted today; skipping Pre-KVK.")
-                raise PreKvkSkip()
-        elif not is_test:
-            logger.debug(
-                "[PREKVK] run_blocking_in_thread not available; using asyncio.to_thread fallback for sent_today_any (consider converting to run_blocking_in_thread)"
-            )
-            if await asyncio.to_thread(sent_today_any, ["offseason_daily", "offseason_weekly"]):
-                logger.info("[STATS EMBED] Off-season already posted today; skipping Pre-KVK.")
-                raise PreKvkSkip()
-
-        if not is_test and run_blocking_in_thread is not None:
-            if await run_blocking_in_thread(
-                sent_today, "prekvk_daily", name="sent_today", meta={"key": "prekvk_daily"}
-            ):
-                logger.info("[STATS EMBED] Pre-KVK already sent today; skipping.")
-                raise PreKvkSkip()
-        elif not is_test:
-            logger.debug(
-                "[PREKVK] run_blocking_in_thread not available; using asyncio.to_thread fallback for sent_today (consider converting to run_blocking_in_thread)"
-            )
-            if await asyncio.to_thread(sent_today, "prekvk_daily"):
-                logger.info("[STATS EMBED] Pre-KVK already sent today; skipping.")
-                raise PreKvkSkip()
-    except PreKvkSkip:
-        raise
-    except Exception:
-        # If guard check fails due to unexpected error, log and allow send to proceed (best-effort)
-        logger.exception("[PREKVK] Guard checks failed (continuing with send)")
-
-    first_send_ping = not bool(state.get("prekvk_msg_id"))
-    sent = await channel.send(
-        embed=embed,
-        content="@everyone" if (first_send_ping and not is_test) else None,
-        view=view,
-        allowed_mentions=discord.AllowedMentions(everyone=(first_send_ping and not is_test)),
-    )
-    logger.info(
-        "[PREKVK] Sent new message id=%s in channel=%s",
-        getattr(sent, "id", "?"),
-        getattr(channel, "id", "?"),
-    )
-
-    try:
-        state["prekvk_msg_id"] = sent.id
-        save_state(state)
-    except Exception:
-        logger.exception("[PREKVK] Failed to persist message id")
-
-    # The module owns the one post-success daily claim for a fresh production send.
-    if not is_test:
-        try:
+    async def publish(attempt=None):
+        first_send_ping = not bool(state.get("prekvk_msg_id"))
+        if attempt is not None:
+            await attempt.start()
+        sent = await channel.send(
+            embed=embed,
+            content="@everyone" if (first_send_ping and not is_test) else None,
+            view=view,
+            allowed_mentions=discord.AllowedMentions(everyone=(first_send_ping and not is_test)),
+        )
+        logger.info(
+            "[PREKVK] Sent new message id=%s in channel=%s",
+            getattr(sent, "id", "?"),
+            getattr(channel, "id", "?"),
+        )
+        if attempt is not None:
+            await attempt.accept(sent.id)
+        else:
             try:
-                from file_utils import run_blocking_in_thread
+                update_prekvk_message(sent.id)
             except Exception:
-                run_blocking_in_thread = None
+                logger.exception("[PREKVK] Failed to persist message id")
+        return "sent"
 
-            if run_blocking_in_thread is not None:
-                claimed = await run_blocking_in_thread(
-                    claim_send,
-                    "prekvk_daily",
-                    max_per_day=1,
-                    name="claim_send_prekvk",
-                    meta={"key": "prekvk_daily"},
-                )
-            else:
-                logger.debug(
-                    "[PREKVK] run_blocking_in_thread not available; using asyncio.to_thread fallback for claim_send (consider converting to run_blocking_in_thread)"
-                )
-                claimed = await asyncio.to_thread(claim_send, "prekvk_daily", max_per_day=1)
-            if not claimed:
-                logger.warning(
-                    "[PREKVK] Fresh send succeeded but prekvk_daily claim was not recorded."
-                )
-        except Exception:
-            logger.exception("[PREKVK] claim_send failed")
-
-    return "sent"
+    if is_test:
+        return await publish()
+    try:
+        async with DispatchAttempt("prekvk_daily", channel.id) as attempt:
+            return await publish(attempt)
+    except DispatchUnavailable as exc:
+        logger.info("[PREKVK] Fresh dispatch unavailable: %s", exc)
+        raise PreKvkSkip() from exc

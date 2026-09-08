@@ -37,8 +37,7 @@ async def test_stats_alert_route_changes_only_at_fighting_open(
     monkeypatch.setattr(interface, "ks_mod", send_summary)
     monkeypatch.setattr(interface.prekvk_mod, "send_prekvk_embed", send_prekvk)
     monkeypatch.setattr(interface.kvk_mod, "send_kvk_embed", send_kvk)
-    monkeypatch.setattr(interface, "load_state", lambda: {})
-    monkeypatch.setattr(interface, "save_state", lambda _state: None)
+    monkeypatch.setattr(interface.ReservationStore, "clear_message", lambda self: True)
 
     bot = SimpleNamespace(get_channel=lambda _channel_id: object())
 

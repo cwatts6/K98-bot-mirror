@@ -778,3 +778,15 @@ separate reliability follow-ups, normally after 2G; Chris Watts owns prioritisat
 on a missing guarantee, scope a separate prerequisite rather than silently expanding its PR.
 No new phase letters or implementation approval are assigned. Stats/KVK History executor work,
 Ark transaction/retention policy and broad JSON/DM redesign remain independent.
+
+
+## Phase 2G implementation - 2026-09-08
+
+The isolated real Pre-KVK suffix/CSV harness proved two mocked sends before one post-success row;
+the singleton metadata harness allowed two process acquisitions. No production duplicate is asserted.
+Approved Phase 2G adds short OS-backed reservations and a versioned receipt journal; uncertain sends
+are never TTL-retried. Payloads, mentions, completed off-season asymmetry and test/edit paths remain.
+81 focused tests and full 3304 passed/2 skipped passed; log-noise/import/registration passed.
+Final Changes-only/Deep-off review, delivery and natural smoke remain gates. Active Phase 2G pack
+section 15 records the exact manifest, evidence and stopped-writer rollback. Phase 2F #257/#564
+merges and production main are verified; deployment/restart is operator-attested.

@@ -8,7 +8,15 @@ from prekvk.models import (
     PreKvkScheduledTopBlocks,
     PreKvkScheduledTopEntry,
 )
+from stats_alerts import guard, state
 from stats_alerts.embeds import prekvk as prekvk_embed
+
+
+@pytest.fixture(autouse=True)
+def isolated_dispatch(monkeypatch, tmp_path):
+    monkeypatch.setattr(guard, "LOG_PATH", str(tmp_path / "alerts.csv"))
+    monkeypatch.setattr(state, "STATE_PATH", str(tmp_path / "state.json"))
+    monkeypatch.setattr(state, "_STATE_LOCK_PATH", str(tmp_path / "state.lck"))
 
 
 def _metadata():
@@ -85,7 +93,7 @@ def _legacy_event_value(events):
     return "\n".join(event_line(event) for event in events[:12])
 
 
-def _patch_builder_dependencies(monkeypatch, *, events=None, claim=None):
+def _patch_builder_dependencies(monkeypatch, *, events=None):
     async def fake_summary(**_kwargs):
         return _summary()
 
@@ -100,10 +108,6 @@ def _patch_builder_dependencies(monkeypatch, *, events=None, claim=None):
     )
     monkeypatch.setattr(prekvk_embed, "get_latest_honor_top", fake_honor_top)
     monkeypatch.setattr(prekvk_embed, "get_all_upcoming_events", lambda: list(events or []))
-    monkeypatch.setattr(prekvk_embed, "sent_today", lambda _kind: False)
-    monkeypatch.setattr(prekvk_embed, "sent_today_any", lambda _kinds: False)
-    if claim is not None:
-        monkeypatch.setattr(prekvk_embed, "claim_send", claim)
 
 
 class _SentMessage:
@@ -144,7 +148,11 @@ async def test_send_prekvk_embed_uses_scheduled_summary_service(monkeypatch):
     monkeypatch.setattr(prekvk_embed, "get_latest_honor_top", fake_honor_top)
     monkeypatch.setattr(prekvk_embed, "get_all_upcoming_events", lambda: [])
     monkeypatch.setattr(prekvk_embed, "load_state", lambda: {})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda state: saved_states.append(dict(state)))
+    monkeypatch.setattr(
+        prekvk_embed,
+        "update_prekvk_message",
+        lambda mid: saved_states.append({"prekvk_msg_id": mid}),
+    )
 
     result = await prekvk_embed.send_prekvk_embed(
         object(),
@@ -213,11 +221,11 @@ async def test_send_prekvk_embed_edits_existing_today_message(monkeypatch):
     monkeypatch.setattr(prekvk_embed, "get_all_upcoming_events", _kvk16_launch_events)
     monkeypatch.setattr(prekvk_embed, "utcnow", lambda: fixed_now)
     monkeypatch.setattr(prekvk_embed, "load_state", lambda: {"prekvk_msg_id": 456})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda _state: None)
+    monkeypatch.setattr(prekvk_embed, "update_prekvk_message", lambda _mid: None)
     monkeypatch.setattr(
         prekvk_embed,
-        "claim_send",
-        lambda *_args, **_kwargs: pytest.fail("edit path must not claim a fresh send"),
+        "DispatchAttempt",
+        lambda *_args, **_kwargs: pytest.fail("edit path must not reserve a fresh send"),
     )
 
     result = await prekvk_embed.send_prekvk_embed(
@@ -255,7 +263,7 @@ async def test_exact_kvk16_event_payload_chunks_complete_blocks(monkeypatch):
     _patch_builder_dependencies(monkeypatch, events=source_events)
     monkeypatch.setattr(prekvk_embed, "utcnow", lambda: fixed_now)
     monkeypatch.setattr(prekvk_embed, "load_state", lambda: {})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda _state: None)
+    monkeypatch.setattr(prekvk_embed, "update_prekvk_message", lambda _mid: None)
 
     result = await prekvk_embed.send_prekvk_embed(
         object(), channel, "2026-08-25 12:00 UTC", is_test=True
@@ -348,30 +356,14 @@ def test_event_budget_exhaustion_uses_truthful_marker():
 
 
 @pytest.mark.asyncio
-async def test_fresh_production_send_claims_once_with_keyword_argument(monkeypatch):
-    import file_utils
-
-    claim_calls = []
-
-    def fake_claim(kind, *, max_per_day=1):
-        claim_calls.append((kind, max_per_day))
-        return True
-
-    async def run_blocking(func, *args, name=None, meta=None, **kwargs):
-        return func(*args, **kwargs)
-
-    _patch_builder_dependencies(monkeypatch, claim=fake_claim)
-    monkeypatch.setattr(file_utils, "run_blocking_in_thread", run_blocking)
-    monkeypatch.setattr(prekvk_embed, "load_state", lambda: {})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda _state: None)
+async def test_fresh_production_send_commits_once(monkeypatch):
+    _patch_builder_dependencies(monkeypatch)
     channel = _Channel()
-
-    result = await prekvk_embed.send_prekvk_embed(
-        object(), channel, "2026-08-25 12:00 UTC", is_test=False
-    )
-
+    result = await prekvk_embed.send_prekvk_embed(object(), channel, "audit", is_test=False)
     assert result == "sent"
-    assert claim_calls == [("prekvk_daily", 1)]
+    assert guard.sent_today("prekvk_daily")
+    assert len(list(guard.iter_log_rows())) == 1
+    assert state.load_state() == {"prekvk_msg_id": 123}
     assert channel.sent[0]["content"] == "@everyone"
     assert channel.sent[0]["allowed_mentions"].everyone is True
 
@@ -380,42 +372,88 @@ async def test_fresh_production_send_claims_once_with_keyword_argument(monkeypat
 async def test_send_failure_does_not_persist_or_claim(monkeypatch):
     class FailingChannel(_Channel):
         async def send(self, **_kwargs):
-            raise RuntimeError("Discord rejected send")
+            raise RuntimeError("transport failed")
 
-    claim_calls = []
-    saved_states = []
-    _patch_builder_dependencies(
-        monkeypatch,
-        claim=lambda *args, **kwargs: claim_calls.append((args, kwargs)),
-    )
-    monkeypatch.setattr(prekvk_embed, "load_state", lambda: {})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda state: saved_states.append(dict(state)))
-
-    with pytest.raises(RuntimeError, match="Discord rejected send"):
-        await prekvk_embed.send_prekvk_embed(
-            object(), FailingChannel(), "2026-08-25 12:00 UTC", is_test=False
-        )
-
-    assert saved_states == []
-    assert claim_calls == []
+    _patch_builder_dependencies(monkeypatch)
+    with pytest.raises(RuntimeError, match="transport failed"):
+        await prekvk_embed.send_prekvk_embed(object(), FailingChannel(), "audit", is_test=False)
+    assert state.load_state() == {}
+    assert list(guard.iter_log_rows()) == []
+    row = next(iter(prekvk_embed.ReservationStore()._read()["attempts"].values()))
+    assert row["phase"] == "uncertain"
 
 
 @pytest.mark.asyncio
 async def test_daily_guard_skip_does_not_send_or_claim(monkeypatch):
-    claim_calls = []
-    _patch_builder_dependencies(
-        monkeypatch,
-        claim=lambda *args, **kwargs: claim_calls.append((args, kwargs)),
-    )
-    monkeypatch.setattr(prekvk_embed, "sent_today", lambda _kind: True)
-    monkeypatch.setattr(prekvk_embed, "load_state", lambda: {})
-    monkeypatch.setattr(prekvk_embed, "save_state", lambda _state: None)
+    _patch_builder_dependencies(monkeypatch)
+    assert guard.claim_send("prekvk_daily")
     channel = _Channel()
-
     with pytest.raises(prekvk_embed.PreKvkSkip):
-        await prekvk_embed.send_prekvk_embed(
-            object(), channel, "2026-08-25 12:00 UTC", is_test=False
+        await prekvk_embed.send_prekvk_embed(object(), channel, "audit", is_test=False)
+    assert channel.sent == []
+    assert len(list(guard.iter_log_rows())) == 1
+
+
+@pytest.mark.asyncio
+async def test_two_real_builders_have_one_fresh_send(monkeypatch):
+    import asyncio
+
+    _patch_builder_dependencies(monkeypatch)
+    entered = asyncio.Event()
+    finish = asyncio.Event()
+
+    class WaitingChannel(_Channel):
+        async def send(self, **kwargs):
+            self.sent.append(kwargs)
+            entered.set()
+            await finish.wait()
+            return _SentMessage()
+
+    channel = WaitingChannel()
+    first = asyncio.create_task(prekvk_embed.send_prekvk_embed(object(), channel, "first"))
+    await asyncio.wait_for(entered.wait(), 3)
+    try:
+        with pytest.raises(prekvk_embed.PreKvkSkip):
+            await prekvk_embed.send_prekvk_embed(object(), channel, "second")
+    finally:
+        finish.set()
+        assert await first == "sent"
+    assert len(channel.sent) == 1
+    assert len(list(guard.iter_log_rows())) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["missing", "yesterday", "edit"])
+@pytest.mark.parametrize("claimed", [False, True])
+async def test_existing_reference_fallback_keeps_daily_guard(monkeypatch, failure, claimed):
+    from datetime import timedelta
+
+    _patch_builder_dependencies(monkeypatch)
+    state.update_prekvk_message(456)
+    if claimed:
+        guard.claim_send("prekvk_daily")
+
+    class Message:
+        id = 456
+        created_at = prekvk_embed.utcnow() - (
+            timedelta(days=1) if failure == "yesterday" else timedelta()
         )
 
-    assert channel.sent == []
-    assert claim_calls == []
+        async def edit(self, **kwargs):
+            raise RuntimeError("edit failure")
+
+    class Channel(_Channel):
+        async def fetch_message(self, mid):
+            if failure == "missing":
+                raise LookupError("missing")
+            return Message()
+
+    channel = Channel()
+    if claimed:
+        with pytest.raises(prekvk_embed.PreKvkSkip):
+            await prekvk_embed.send_prekvk_embed(object(), channel, "audit")
+        assert channel.sent == []
+    else:
+        assert await prekvk_embed.send_prekvk_embed(object(), channel, "audit") == "sent"
+        assert channel.sent[0]["content"] == "@everyone"
+        assert state.load_state()["prekvk_msg_id"] == 123

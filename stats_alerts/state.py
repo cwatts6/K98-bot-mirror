@@ -3,14 +3,16 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from filelock import FileLock
+
 from constants import STATS_ALERT_LOG
-from file_utils import acquire_lock, atomic_write_json, read_json_safe, resolve_path
+from file_utils import atomic_write_json, read_json_safe, resolve_path
 
 logger = logging.getLogger(__name__)
 
 # Single file beside the CSV log to preserve original layout and make migration simple.
 STATE_PATH = f"{resolve_path(STATS_ALERT_LOG)!s}.state.json"
-_STATE_LOCK_PATH = f"{STATE_PATH}.lock"
+_STATE_LOCK_PATH = f"{STATE_PATH}.lck"
 _LOCK_TIMEOUT_SECS = 5.0
 
 
@@ -21,7 +23,7 @@ def _repair_empty_state_file() -> bool:
         return False
 
     try:
-        with acquire_lock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
+        with FileLock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
             if not path.exists():
                 return False
 
@@ -79,12 +81,12 @@ def save_state(state: dict[str, Any]) -> None:
     """
     Persist state to disk atomically.
 
-    - Uses acquire_lock to avoid concurrent writers (simple cross-process guard).
+    - Uses FileLock to serialize participating writers across threads/processes.
     - Uses atomic_write_json for safe writes (write to temp + rename).
     """
     try:
-        # Use a short lock to avoid races; atomic_write_json itself is atomic on POSIX.
-        with acquire_lock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
+        # Keep replacement inside the OS-backed lock; never unlink its .lck pathname.
+        with FileLock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
             atomic_write_json(STATE_PATH, state)
     except TimeoutError:
         logger.exception(
@@ -92,3 +94,27 @@ def save_state(state: dict[str, Any]) -> None:
         )
     except Exception:
         logger.exception("[STATE] Failed to persist state to %s", STATE_PATH)
+
+
+def update_prekvk_message(message_id: int | None, *, expected_id: Any = ...) -> bool:
+    """Patch only the message reference; expose failures to reservation commit.
+
+    Optional compare-and-set prevents a stale fetch/edit failure from clearing a
+    newer reference. Preserve unrelated keys and the legacy JSON serialization.
+    """
+    import json
+
+    with FileLock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
+        path = Path(STATE_PATH)
+        raw = path.read_text(encoding="utf-8") if path.exists() else ""
+        current = json.loads(raw) if raw.strip() else {}
+        if not isinstance(current, dict):
+            raise ValueError("Stats alert message state must be an object")
+        if expected_id is not ... and current.get("prekvk_msg_id") != expected_id:
+            return False
+        if message_id is None:
+            current.pop("prekvk_msg_id", None)
+        else:
+            current["prekvk_msg_id"] = int(message_id)
+        atomic_write_json(path, current)
+        return True

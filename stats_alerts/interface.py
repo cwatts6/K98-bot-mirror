@@ -6,6 +6,7 @@ from typing import Any
 from bot_config import OFFSEASON_STATS_CHANNEL_ID, STATS_ALERT_CHANNEL_ID
 from utils import utcnow
 
+from .dispatch_reservations import ReservationStore
 from .embeds import (
     kvk as kvk_mod,
     offseason as off_mod,
@@ -14,7 +15,6 @@ from .embeds import (
 )
 from .guard import claim_send, read_counts_for, sent_today_any
 from .kvk_meta import is_kvk_fighting_open
-from .state import load_state, save_state
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,8 @@ async def send_stats_update_embed(
     # If fighting opened, clear any stored Pre-KVK message id
     if effective_is_kvk:
         try:
-            state = load_state()
-            if state.pop("prekvk_msg_id", None) is not None:
-                save_state(state)
-                logger.info("[PREKVK] Fighting opened — cleared stored prekvk_msg_id.")
+            ReservationStore().clear_message()
+            logger.info("[PREKVK] Fighting opened — cleared stored prekvk_msg_id.")
         except Exception:
             logger.exception("[PREKVK] Failed to clear prekvk_msg_id on fighting-open.")
 

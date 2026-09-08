@@ -24,6 +24,7 @@ class _Channel:
 
     async def send(self, **kwargs):
         self.sent.append(kwargs)
+        return type("Receipt", (), {"id": 123})()
 
 
 @pytest.mark.asyncio
@@ -64,3 +65,27 @@ async def test_offseason_embed_renders_plain_dal_payload_without_sql(monkeypatch
 def test_embed_module_contains_no_sql_execution_helpers() -> None:
     assert not hasattr(embed, "_fetchone")
     assert not hasattr(embed, "_fetchall")
+
+
+@pytest.mark.asyncio
+async def test_receipt_adapter_starts_only_at_publication(monkeypatch):
+    calls = []
+    channel = _Channel()
+    monkeypatch.setattr(embed, "get_conn_with_retries", lambda: _Connection())
+    monkeypatch.setattr(embed, "load_all_daily", lambda cur: {})
+    monkeypatch.setattr(embed, "_pick_daily_snapshot_date", lambda cur: date(2026, 9, 8))
+
+    async def before_send():
+        assert channel.sent == []
+        calls.append("start")
+
+    receipt = await embed.send_offseason_stats_embed_v2(
+        object(),
+        channel=channel,
+        include_kingdom_summary=False,
+        before_send=before_send,
+        return_receipt=True,
+    )
+    assert calls == ["start"]
+    assert receipt.id == 123
+    assert len(channel.sent) == 1

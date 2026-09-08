@@ -147,3 +147,22 @@ For reminder issues:
 - Keep reminder rules and persistence in services/state modules.
 - Preserve restart safety.
 - Add regression coverage for duplicate-send, unsubscribe/cancel, stale-state, and preference changes.
+
+
+## Pre-KVK reservation operations - Phase 2G
+
+Fresh production Pre-KVK/off-season admission uses `<STATS_ALERT_LOG>.dispatch.json` version 1
+and an OS-backed `.dispatch.lck` lock. The CSV remains the successful-send/ping log; message state
+retains its JSON shape. Test bypasses and same-day edits retain existing behavior. Active conflicts
+block fresh sends across midnight/restart. Only proven pre-invocation non-delivery releases;
+entered-send exceptions are uncertain because Discord client retries can obscure acceptance.
+Accepted receipts replay state/CSV projections without another send. No exactly-once claim is made.
+
+Preserve journal/logs for recovery. The local `ReservationStore.reconcile_receipt` API requires
+positive token/channel/bot-author/payload/message/time verification. History-search absence or TTL
+never permits retry. Unknown ownership remains blocked. Never unlink `.lck` files with live writers.
+Stop all writers for rollout/rollback and back up CSV, message state and journal together. Old code
+ignores the journal: reconcile accepted/uncertain attempts and retain consistent legacy projections
+before downgrade; keep dispatch stopped if outcomes remain unknown. Mixed versions and independent
+filesystems are excluded. Retention, singleton repair, public child supervision and DM redesign
+remain separate. See active Phase 2G pack section 15 for the full protocol and natural smoke gate.

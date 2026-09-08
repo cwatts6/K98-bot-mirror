@@ -746,3 +746,16 @@ pytest -q tests/test_offload_serialization.py
 pytest -q tests/test_file_utils_build_cmd.py
 pytest -q tests/test_maintenance_worker_truncation.py
 pytest -q tests/test_no_prints_in_cache_modules.py
+
+
+## Phase 2G implementation status — 2026-09-08
+
+Phase 2G Atomic Pre-KVK Reservation is operator-approved and implemented on
+`codex/discord-embed-payload-safety-phase-2g`; delivery/security review and natural smoke remain
+gated. The versioned local dispatch journal coordinates fresh production Pre-KVK/off-season sends
+and retains uncertain outcomes across restart/UTC rollover. Payloads and test/edit behavior remain
+unchanged; no SQL/config/dependency change. Validation: 81 focused; 3304 passed, 2 skipped full,
+log-noise/import/registration passed. See section 15 of the active Phase 2G pack for the exact
+manifest, recovery and stopped-writer rollback requirements. Phase 2F PRs #257/#564 are merged;
+production main d9321328 was verified and the operator confirmed successful deployment/restart.
+The next natural Phase 2F public save remains an observation.
