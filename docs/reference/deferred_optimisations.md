@@ -5,6 +5,50 @@ to GitHub issues/task packs.
 
 Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 
+### Deferred Optimisation
+- Area: Pre-KVK dispatch diagnostics; `commands/admin_cmds.py`, `stats_alerts/dispatch_reservations.py`, `stats_alerts/state.py` and `stats_alerts/embeds/prekvk.py`
+- Type: architecture
+- Description: Phase 2G delivery is accepted with automated coverage and restart/KVK guard smoke, but its fresh Pre-KVK reservation path cannot be naturally observed outside the calendar window. Existing test mode bypasses admission and still touches shared message state; a custom log path alone does not isolate message projections.
+- Suggested Fix: Execute the active Phase 2H scope-first pack: admin/notify-gated diagnostic in an existing group, explicit destination, mentions disabled, real reservation protocol and isolated durable journal/CSV/message state/locks. Prove repeat/edit/guard and restart behavior while retaining natural production routing as a separate observation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 2G operator merges and final source/deployed-head verification; approved isolation/permission design; deterministic regression and Changes-only/Deep-off review.
+- Status: next Phase 2 task approved for scope; implementation gated; owner Chris Watts
+- Last verified: 2026-09-08
+
+### Deferred Optimisation
+- Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
+- Type: consistency
+- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. This file is unchanged in Phase 2G; the log does not establish full post-procedure success.
+- Suggested Fix: Separately inspect pending result/cursor lifecycle and the authoritative procedure result contract; drain/close results at the correct transaction boundary and propagate failure through CLI exit/report and pipeline summary. Prove commit, cleanup failure, manifest and truthful status without rerunning side effects.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phase 2G or Phase 2H.
+- Status: production reliability observation; owner Chris Watts; separate approval required
+- Last verified: 2026-09-08
+
+### Deferred Optimisation
+- Area: `admin_helpers.py` stats dispatch completion logging and `stats_alerts/interface.py` outcome contract
+- Type: consistency
+- Description: At 2026-09-08 09:21:50 normal KVK daily-cap skip is followed by Stats update embed sent successfully. The wrapper conflates completion with delivery; there is no positive send receipt in this log.
+- Suggested Fix: Separately define truthful sent/edited/skipped/failed reporting while preserving existing routing and caller behavior. Phase 2H diagnostic status must use its own actual outcome rather than treating this legacy log as evidence.
+- Impact: low
+- Risk: low
+- Dependencies: Separate bounded status-contract audit and regression tests; no unrelated production adapter redesign in Phase 2H.
+- Status: observed reliability/logging debt; owner Chris Watts
+- Last verified: 2026-09-08
+
+### Deferred Optimisation
+- Area: `bot_instance.py` tracked-view startup timeout and `rehydrate_views.py`
+- Type: architecture
+- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. This repeats the separately noted Phase 2F smoke observation.
+- Suggested Fix: Separately inventory remaining views and prove whether deferred work is actually resumed before choosing timeout, batching or lifecycle changes. Record partial versus complete rehydration honestly and test cancellation/restart identity preservation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
+- Status: repeated operator observation; owner Chris Watts; separate approval required
+- Last verified: 2026-09-08
+
 ## Status model
 
 - `implementation-ready`: the current defect or hardening opportunity is confirmed and bounded.
@@ -363,16 +407,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Status: delivered and operator-smoke accepted in Discord Embed Payload Safety Phase 2D; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
 - Last verified: 2026-09-03
 
-### Deferred Optimisation
-- Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests
-- Type: architecture
-- Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. The Phase 2G isolated real-suffix/CSV harness proved two mocked sends before one success row; a separate process harness proved the singleton metadata check is nonexclusive. No production duplicate has been established.
-- Suggested Fix: Treat this as the separately approved reliability extension Phase 2G, not a reopening of payload policy. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
-- Impact: medium
-- Risk: high
-- Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
-- Status: Phase 2G implementation approved and implemented 2026-09-08; 81 focused and full 3304 passed, 2 skipped; final Changes review, delivery and natural smoke gated; retain active until acceptance
-- Last verified: 2026-09-02
 
 ### Deferred Optimisation
 - Area: `ark/dal/ark_dal.py::replace_match_draft_rows`, `ark/ark_draft_service.py`, and `ark/team_builder_service.py`

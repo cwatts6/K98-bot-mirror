@@ -165,4 +165,6 @@ Stop all writers for rollout/rollback and back up CSV, message state and journal
 ignores the journal: reconcile accepted/uncertain attempts and retain consistent legacy projections
 before downgrade; keep dispatch stopped if outcomes remain unknown. Mixed versions and independent
 filesystems are excluded. Retention, singleton repair, public child supervision and DM redesign
-remain separate. See active Phase 2G pack section 15 for the full protocol and natural smoke gate.
+remain separate. See archived Phase 2G pack sections 15–17 and its delivery closure for the protocol,
+validated boundaries and carried-forward live smoke. The active Phase 2H pack owns isolated
+Pre-KVK dispatch diagnostics; natural production calendar routing remains a separate observation.

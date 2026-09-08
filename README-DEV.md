@@ -115,18 +115,20 @@ messages posted and refreshed successfully. The Phase 2E pack and starter are ar
 Phase 2F now owns active-reminder tracker atomicity; Phase 2G owns evidence/design-gated atomic
 Pre-KVK reservation; separate Stats/KVK History executor audits remain out of scope.
 
-Phase 2F candidate delivery and operator restart smoke are accepted through mirror #257 and production #564.
-The public tracker now uses the unique-temp `file_utils.atomic_json_write` helper, with explicit
-ASCII escaping, recursive key sorting, and strict unsupported-value rejection to preserve the
-previous UTF-8/indent-2 JSON contract. Existing helper callers retain their prior defaults. The
-public save remains synchronous and non-raising; Discord ordering, in-memory transitions, IDs,
-fallback metadata, rehydration, mentions, timing, startup, scheduler, and executors are unchanged.
-Atomic replacement preserves the prior file on pre-replace failure; it does not merge snapshots
-from multiple bot processes or make Discord and disk transactional. Final validation/security,
-mirror delivery, promotion, and natural operator smoke are recorded in the archived Phase 2F pack. Both PR merges and final production-main verification remain pending.
-The active Phase 2G pack/starter scopes Pre-KVK reservation audit/design; implementation is unapproved.
-Singleton ownership and public child-task lifecycle are separate follow-ups, normally after 2G
-unless its audit proves a hard dependency. The next natural atomic save remains an observation.
+Phase 2F is archived; mirror #257 and production #564 are merged and deployment/restart is
+operator-attested. Its next natural public save remains an observation.
+
+Phase 2G is complete as an operator-accepted delivery with bounded validation, through mirror #258
+and production #565. Both PRs await operator merge and final production-main/deployed-head
+verification. Full validation passes 3314 tests (2 skipped), with 91 pinned focused and 67 production
+focused tests. Supplied restart and fighting-KVK guard smoke passed; no fresh reservation receipt
+was observed. Its pack/starter are archived with this limitation, not a claim of full live acceptance.
+
+Phase 2H Isolated Pre-KVK Dispatch Diagnostics is the next approved planning task. Its active
+pack/starter scopes an admin command using the real reservation flow with isolated durable state,
+explicit destination and mentions disabled. Implementation requires the first-response architecture
+gate. Natural calendar routing remains separately observable. Singleton repair, public child-task
+lifecycle, DM redesign and broader executor audits remain separate.
 
 ## KVK Target Publication And Quality Delivery
 
@@ -748,14 +750,60 @@ pytest -q tests/test_maintenance_worker_truncation.py
 pytest -q tests/test_no_prints_in_cache_modules.py
 
 
-## Phase 2G implementation status — 2026-09-08
+## Phase 2G delivery and next task — 2026-09-08
 
-Phase 2G Atomic Pre-KVK Reservation is operator-approved and implemented on
-`codex/discord-embed-payload-safety-phase-2g`; delivery/security review and natural smoke remain
-gated. The versioned local dispatch journal coordinates fresh production Pre-KVK/off-season sends
-and retains uncertain outcomes across restart/UTC rollover. Payloads and test/edit behavior remain
-unchanged; no SQL/config/dependency change. Validation: 81 focused; 3304 passed, 2 skipped full,
-log-noise/import/registration passed. See section 15 of the active Phase 2G pack for the exact
-manifest, recovery and stopped-writer rollback requirements. Phase 2F PRs #257/#564 are merged;
-production main d9321328 was verified and the operator confirmed successful deployment/restart.
-The next natural Phase 2F public save remains an observation.
+**Phase 2G is complete as an implementation and bounded-validation delivery, by explicit operator
+acceptance. Full live Pre-KVK validation is carried forward to Phase 2H; it is not claimed complete.**
+This status supersedes preparation and intermediate status statements in this historical record.
+
+Mirror PR #258 and production PR #565 were both OPEN when this closure was prepared. Reviewed
+runtime heads are mirror `bd99ea1421286ddb152f7729e11de664116d7e47` and production
+`fea2767f52f345450225bcdf0c1f03f3d5e3dc4c`; their Python trees match. Documentation closeout commits
+follow these heads. Operator merges, final production-main source verification and bot-machine
+deployed-head verification remain pending. Supplied restart logs contain no immutable Git head;
+they cannot prove deployment of the final merged source. Codex has not merged or deployed either PR.
+
+Delivered: durable reserve/start/accept/commit/release, conservative uncertain-send retention,
+receipt recovery, off-season coordination, generation/CAS fencing, bounded Windows CSV replacement
+retries and off-loop fighting/stale-reference invalidation. Phase 1–2F payload, permission,
+visibility, mention, eligibility, edit/test and executor contracts remain preserved.
+
+Final validation: full **3314 passed, 2 skipped**, production log-noise pass; **91** focused tests
+with pinned filelock 3.20.0; **67** production focused tests; strengthened lifecycle assertions
+passed separately (**3**). Pre-commit, architecture/deferred/security-routing validators, selector,
+smoke imports and registration (36 primary / 100 grouped) passed. Full suite evidence transfers
+through verified Python-tree identity; it was not independently rerun in production.
+
+Changes-only / Deep-off security: mirror full scan `43cd6ae2-7ea7-40b1-89e2-c916b16b79f1`
+through `fd93202f`, mirror delta `90ad6945-fded-4367-b915-ee5964414523` through `bd99ea14`, and
+separate production scan `eba7b5b2-73ad-4b39-8e64-263362802657` for `d9321328..fea2767f`
+completed with zero reportable findings and no deferred candidates. The final documentation-only
+delta changes no executable, configuration, dependency, SQL, permission or persistence control;
+an additional security scan and pytest run are skipped for that delta, with documentation/hooks
+and routing validators required. SQL manifest remains empty; authoritative repo was clean at
+`fc0e94ebd2e0a98286069c8a8b71365dd5178657`.
+
+Operator log evidence, 2026-09-08 09:16:40–09:22:06 (timestamps as supplied):
+
+- Graceful shutdown drained queues, persisted state and cancelled registered tasks. Full startup
+  completed at 09:17:05; reminder/live-event views reattached and command registration was unchanged.
+- At 09:21:50 the normal fighting KVK route skipped Kingdom Summary (already sent) and KVK
+  publication (daily cap). The generic subsequent “sent successfully” line is not a send receipt.
+- No `[DISPATCH] Reserved` / `Committed` evidence appears. Fresh Pre-KVK/off-season ownership,
+  matching CSV/journal/message references and restart-after-commit remain unobserved live.
+- ProcConfig failed at 09:20:17 while restoring `conn.autocommit` with pending SQL results;
+  later success reporting masked that failure. This unchanged pipeline is separate work.
+- Tracked-view rehydration timed out after 10 seconds; remaining generic tracked views are
+  unverified. Google Sheets 503 recovered on retry. Neither is silently counted as a clean pass.
+
+Phase 2H owns an admin-only, mention-neutral, explicitly targeted diagnostic using the real
+reservation flow and isolated durable journal/CSV/message state. Existing `is_test=True` bypasses
+cannot establish reservation admission and still touch shared message state. The diagnostic must
+support receipt inspection, repeat/guard/edit and restart verification without changing production
+calendar data or weakening eligibility. Natural production calendar routing stays a distinct gate;
+an isolated diagnostic cannot prove every live scheduling, contention or uncertain-send scenario.
+
+Rollout/rollback requirements remain binding: stop all writers; back up CSV, message state and
+journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
+keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
+The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.

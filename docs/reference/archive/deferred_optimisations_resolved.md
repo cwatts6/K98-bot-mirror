@@ -558,3 +558,18 @@ This file preserves resolved deferred-optimisation notes that used to live in
 - Resolution: Unique same-directory temp publication with explicit legacy serialization; unchanged tracker path/schema, IDs, metadata, Discord ordering, mentions, lifecycle and non-raising caller.
 - Validation: 114 focused tests; full 3240 passed, 2 skipped; validators/pre-commit/log hygiene passed. Changes scan 5447bbc9-4d2a-4525-aca6-adff604149eb, Deep off, complete sealed coverage, zero findings. Operator accepted candidate delivery/restart smoke via mirror #257 and production #564 on 2026-09-07; identical tracker snapshots and successful reminder view restoration.
 - Remaining operator gates: Both PR merges and final production-main verification pending. A natural post-restart atomic save is not demonstrated by unchanged snapshots/embed refresh. See archived Phase 2F pack for evidence limits and rollback. Archiving records implementation/candidate smoke acceptance, not final deployment verification.
+
+
+### Phase 2G Atomic Pre-KVK Reservation — completed delivery, 2026-09-08
+
+- Area: `stats_alerts/guard.py`, `stats_alerts/embeds/prekvk.py`, stats-alert state, and dispatch concurrency tests
+- Type: architecture
+- Description: The preserved Pre-KVK guard sequence checks the daily log, sends to Discord, then records the post-success claim. The Phase 2G isolated real-suffix/CSV harness proved two mocked sends before one success row; a separate process harness proved the singleton metadata check is nonexclusive. No production duplicate has been established.
+- Suggested Fix: Treat this as the separately approved reliability extension Phase 2G, not a reopening of payload policy. Gather overlap evidence, then define reserve/commit/release semantics, Discord-failure release, uncertain-send reconciliation, stale-reservation recovery, lock contention, restart behavior, and migration/rollback before changing the current CSV or introducing a sidecar.
+- Impact: medium
+- Risk: high
+- Dependencies: Production or deterministic concurrency evidence; explicit persistence-contract approval; restart/recovery tests and a separate Changes security review.
+- Status: operator accepted implementation and bounded validation on 2026-09-08; mirror #258 / production #565 await merge and final verification; diagnostic and natural live checks carried to Phase 2H
+- Last verified: 2026-09-02
+
+- Resolution: Versioned durable reservations and positive receipts replace post-success admission; uncertain sends remain blocked. Full 3314 passed/2 skipped, pinned focused 91 and production focused 67 passed; separate mirror/production Changes reviews passed. Restart and KVK guard smoke accepted; fresh Pre-KVK receipts are not claimed observed. See archived Phase 2G closure and active Phase 2H pack.
