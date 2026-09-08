@@ -208,3 +208,58 @@ Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final
 deployment/restart verification. The detailed receipt, hashes and limits are in the archived
 Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
 no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+
+## Fighting-KVK preview sessions (Phase 2I)
+
+Use `/kvk_admin test_embed destination:<channel> action:run`. Retain its issued session token;
+later run/status calls use the same destination and token. Status requires a token. This replaces
+post_here and the seasonal production test route; resync v1.05 through the normal command workflow.
+Invoke as configured ADMIN_USER_ID in notify or an accepted child thread. Destination must be an
+ordinary configured-guild text channel excluding STATS_ALERT_CHANNEL_ID and OFFSEASON_STATS_CHANNEL_ID.
+Requester needs view/send; bot needs view/send/embed/history. Permission is rechecked before send/edit.
+
+The real fighting metadata/reporting/honor reads and renderer are shared with production. No
+seasonal orchestrator, Kingdom Summary, production guard/CSV/journal/message projection or cache
+refresh is invoked by the preview. Operational usage/offload logs retain their existing behavior.
+All new output disables all mentions. Required fighting data empty/unavailable produces no message;
+optional missing honor is reported privately. No fabricated seasonal data. Payload violations reject
+the complete grouped two-embed message; the preview does not redesign or further clip appearance.
+
+Storage is `<resolved STATS_ALERT_LOG parent>/kvk_embed_diagnostics/<guild>/<channel>/<token>/`.
+Version 1 session.json binds owner/guild/channel/kind=fighting_preview and a server-issued 32-hex token.
+publication.json atomically records retained message ID, generations, operation phases, UTC times,
+payload digest and receipts. session.lck and root sessions.lck coordinate filesystem writes; root
+operation.json records process PID/create-time ownership. No file lock spans network awaits.
+Phase 2H's root, schema, capacity, view and reservation stores are unchanged. Shared low-level
+strict read/path/atomic-write and shutdown/_io mechanics are reused, not Pre-KVK receipt semantics.
+
+Sent/edited requires a positive Discord receipt plus durable publication commit. Missing/foreign
+messages or failed edits never cause replacement. Same-session edits retain identity across UTC
+dates and restart; there are no fighting buttons or tracked views to rehydrate. Status reads only,
+without locks, creation, migration or recovery. Run can reconcile an accepted receipt without a send.
+An ambiguous sending/editing phase blocks run until separately reviewed offline recovery; no-ID
+acceptance cannot be reconstructed by retry. A failed private acknowledgement does not undo a send.
+
+Runs serialize within this diagnostic root; competing/unknown owners fail closed. Keep all evidence:
+20 directories including incomplete allocations, 1 MiB state limit with preflight history capacity.
+No purge/reset/delete/force/clock/path options, TTL stealing or automatic cleanup. Offline cleanup
+requires separate approval, stopped/drained writers, exact contained paths, full backups and receipt
+reconciliation. Never unlink locks under active writers. At capacity, retain evidence and reject new work.
+Graceful teardown cancels/drains the new runner before client teardown alongside the Phase 2H drain.
+Once-entered filesystem work completes once before cancellation propagates; no alternate-backend retry.
+Existing data-reader executor/connection retries are unchanged and are not a completed executor audit.
+
+Smoke: record reviewed/deployed SHA and UTC; capture production CSV/journal/state, Phase 2H sessions
+and relevant tracker/cache baselines BEFORE first run. Run to a non-production destination, retain
+token/link/receipt and verify one unchanged two-embed payload with no mentions (or honest unavailable).
+Status must not mutate files/send. Repeat run must edit the same ID. Gracefully restart, retain SHA/logs,
+reopen status/run and verify identity plus Phase 2H compatibility. Compare baseline throughout, accounting
+for independent natural traffic. Safely verify unauthorized/excluded/revoked permission rejection.
+No live crash injection, deliberate message deletion, forced duplicates or fabricated SQL/calendar data.
+Candidate smoke and final-main deployment verification are separate. This does not prove production
+admission, exactly-once or every live failure. Natural calendar dispatch and Phase 2F public save stay pending.
+
+Rollback: close/drain previews, retain sessions/root records and reconcile uncertainty; deploy preceding
+reviewed Phase 2H production revision and resync old command schema. New messages remain inert; no SQL
+or state reset. A downgrade across Phase 2G separately requires stopping all writers and reconciling/backing
+up production CSV/message/journal together. Do not blindly restore a stale snapshot or retry unknown sends.

@@ -26,10 +26,7 @@ from decoraters import (
 )
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from kvk.services import kvk_admin_service
-from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import purge_latest_honor_scan
-from stats_alerts.interface import send_stats_update_embed
-from stats_alerts.kvk_meta import is_currently_kvk
 from ui.views.leadership_player_review_views import send_leadership_player_review
 from versioning import versioned
 
@@ -541,53 +538,99 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
     @kvk_admin_group.command(
         name="test_embed",
-        description="🧪 Post the KVK daily embed in test mode",
+        description="Preview the fighting-KVK embed in an isolated destination",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.04")  # bump to force re-register
+    @versioned("v1.05")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
     async def test_kvk_embed(
-        ctx: discord.ApplicationContext,
-        post_here: bool = discord.Option(  # <-- TYPE first, not default
-            bool,
-            "Post in THIS channel? (False → Stats Alert channel)",
-            required=False,
-            default=True,
+        ctx,
+        destination=discord.Option(discord.TextChannel, "Explicit diagnostic text destination"),
+        action=discord.Option(
+            str, "Run or inspect a preview", choices=["run", "status"], default="run"
         ),
+        session=discord.Option(str, "Issued preview session token", required=False, default=None),
     ):
-        await safe_defer(ctx, ephemeral=True)
+        from bot_config import ADMIN_USER_ID, NOTIFY_CHANNEL_ID, OFFSEASON_STATS_CHANNEL_ID
+        from core.interaction_safety import send_ephemeral
+        from stats_alerts.diagnostics import validate_destination
+        from stats_alerts.embeds.kvk import build_kvk_preview, publish_kvk_preview
+        from stats_alerts.kvk_diagnostics import runner
+        from utils import utcnow
 
-        context = await asyncio.to_thread(
-            kvk_admin_service.load_embed_test_context,
-            is_currently_kvk_checker=is_currently_kvk,
-            server=SERVER,
-            database=DATABASE,
-            username=USERNAME,
-            password=PASSWORD,
-        )
-        ts = context.timestamp_label
-        is_kvk = context.is_kvk
+        def check_destination():
+            if ctx.user.id != int(ADMIN_USER_ID) or (
+                ctx.channel.id != int(NOTIFY_CHANNEL_ID)
+                and getattr(ctx.channel, "parent_id", None) != int(NOTIFY_CHANNEL_ID)
+            ):
+                raise ValueError("Preview permission changed")
+            requester = destination.permissions_for(ctx.user)
+            publisher = destination.permissions_for(ctx.guild.me)
+            validate_destination(
+                guild_id=ctx.guild.id,
+                expected_guild_id=int(GUILD_ID),
+                channel_guild_id=destination.guild.id,
+                channel_id=destination.id,
+                forbidden_channels={STATS_ALERT_CHANNEL_ID, OFFSEASON_STATS_CHANNEL_ID},
+                is_text=isinstance(destination, discord.TextChannel)
+                and destination.type == discord.ChannelType.text,
+                requester_can_send=requester.view_channel and requester.send_messages,
+                bot_can_publish=publisher.view_channel
+                and publisher.send_messages
+                and publisher.embed_links
+                and publisher.read_message_history,
+            )
+
+        async def build():
+            check_destination()
+            return await build_kvk_preview(utcnow().strftime("%Y-%m-%d %H:%M UTC"))
+
+        async def publish(preview, message_id, before_send):
+            return await publish_kvk_preview(
+                ctx.bot, destination, preview, message_id, before_send, check_destination
+            )
 
         try:
-            if post_here:
-                # Directly call the internal builder to post in the invoking channel, test-mode (no ping)
-                await send_kvk_embed(ctx.bot, ctx.channel, ts, is_test=True)
-                where = ctx.channel.mention
-            else:
-                # Use the public entrypoint; test-mode skips daily-send guards and pings, posts to Stats channel
-                await send_stats_update_embed(ctx.bot, ts, is_kvk, is_test=True)
-                where = f"<#{STATS_ALERT_CHANNEL_ID}>"
-
-            await ctx.followup.send(
-                f"✅ Sent KVK test embed to {where} (is_kvk={is_kvk}).", ephemeral=True
+            check_destination()
+            if not await safe_defer(ctx, ephemeral=True):
+                return
+            result = await runner.execute(
+                guild_id=ctx.guild.id,
+                channel_id=destination.id,
+                owner_id=ctx.user.id,
+                token=session,
+                action=action,
+                build=build,
+                publish=publish,
             )
-        except Exception as e:
-            logger.exception("[/kvk_admin test_embed] failed")
-            await ctx.followup.send(
-                _safe_diagnostic_error("❌ Failed to send test embed:", f"{type(e).__name__}: {e}"),
-                ephemeral=True,
+            snapshot = result.snapshot or {}
+            operations = snapshot.get("operations") or []
+            operation = operations[-1] if operations else {}
+            message_id = result.receipt or snapshot.get("message_id")
+            lines = [
+                "**Fighting-KVK preview — outside production dispatch**",
+                f"Outcome: **{result.outcome}** — {result.detail}",
+                f"Session: `{result.session}`",
+                f"Destination: `{destination.id}`",
+                f"UTC: `{utcnow().isoformat()}`",
+                f"Saved phase: `{operation.get('phase', 'none')}`",
+                f"Operation: `{operation.get('token', 'none')}`",
+            ]
+            if message_id:
+                lines.append(
+                    f"Message: https://discord.com/channels/{ctx.guild.id}/{destination.id}/{message_id}"
+                )
+            await send_ephemeral(
+                ctx.interaction, "\n".join(lines), allowed_mentions=discord.AllowedMentions.none()
+            )
+        except Exception:
+            logger.exception("[KVK PREVIEW] Command rejected or failed")
+            await send_ephemeral(
+                ctx.interaction,
+                "Preview unavailable. Check destination, session ownership and logs. No automatic retry.",
+                allowed_mentions=discord.AllowedMentions.none(),
             )
 
     @kvk_admin_group.command(

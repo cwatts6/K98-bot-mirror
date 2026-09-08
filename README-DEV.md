@@ -816,3 +816,20 @@ Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-fi
 no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
 
 Current command: `/prekvk dispatch_test` v1.02. Final runtime suite: 3,381 passed, 2 skipped.
+
+## Phase 2I fighting-KVK preview — implementation candidate
+
+The operator approved replacing `/kvk_admin test_embed` v1.04, including removal of `post_here`
+and its seasonal production route. v1.05 requires an explicit ordinary non-production text
+destination; `action` is run/status (default run), with an optional issued session token required
+for status. This is the real fighting renderer with isolated durable preview publication records,
+not production admission validation. Same-session runs edit the same message across restart/dates.
+All new output disables mentions; uncertain sends/edits never trigger replacement.
+
+Phase 2H PRs #259/#566 are merged. Verified remote mains: mirror `851ec046`, production
+`3caf18e8a4955755ec5cbfe4830a4c57de15a41a`. Operator supplied corresponding restart evidence:
+2026-09-08 14:06:02 graceful teardown/queue persistence, 14:06:12 registration 36/101,
+14:06:26 successful startup. The log contains no immutable Git SHA; deployment association is
+operator-provided. Tracked-view rehydration still timed out at 14:06:34 and remains separate.
+Phase 2I has not been deployed or operator-smoke accepted. Phase 2H sessions and production defaults
+remain unchanged; natural calendar dispatch and Phase 2F natural public save remain pending.

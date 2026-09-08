@@ -1478,6 +1478,13 @@ async def _graceful_teardown():
             "[SHUTDOWN] Failed draining Pre-KVK diagnostics; preserve session evidence."
         )
 
+    try:
+        from stats_alerts.kvk_diagnostics import runner as kvk_preview_runner
+
+        await kvk_preview_runner.shutdown()
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed draining KVK previews; preserve session evidence.")
+
     # Stop task loops...
     try:
         if daily_summary.is_running():

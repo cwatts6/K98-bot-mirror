@@ -818,3 +818,8 @@ Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final
 deployment/restart verification. The detailed receipt, hashes and limits are in the archived
 Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
 no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+
+Phase 2I fighting-KVK diagnostic design is operator approved with one explicit revision: replace
+the old `/kvk_admin test_embed` routes, remove `post_here`, and require explicit destination with
+run/status sessions. Implementation/validation candidate is in progress; no live smoke acceptance
+or production admission proof is claimed. `/ops test_embed` remains separate.

@@ -435,3 +435,21 @@ with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured 
 - Dependencies: Phase 2H final merges/deployed-head verification, explicit scope/design approval, path isolation proof, deterministic tests and Changes-only/Deep-off review; no SQL or production reservation redesign implied.
 - Status: selected next scope-first task; implementation unapproved; owner Chris Watts
 - Last verified: 2026-09-08
+
+### Deferred Optimisation
+- Area: stats_alerts/interface.py, stats_alerts/embeds/kvk.py, commands/admin_cmds.py
+- Type: architecture
+- Description: Production fighting check/send/claim has no durable reservation; swallowed renderer failures and seasonal ops test wrappers can report success without a send receipt. Phase 2I preview intentionally does not alter these production semantics.
+- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes; assess retirement or repair of /ops test_embed.
+- Impact: high
+- Risk: high
+- Dependencies: Explicit protocol approval; immutable baseline and production rollback evidence.
+
+### Deferred Optimisation
+- Area: stats_alerts/db.py, stats_alerts/interface.py, embed_offseason_stats.py
+- Type: refactor
+- Description: Exception-based backend fallback may re-enter reads, and legacy off-season test rendering can write summary claims. Existing wider Stats/KVK History executor work remains separate.
+- Suggested Fix: Audit once-only executor entry and legacy test side effects in a separate bounded change; do not route isolated fighting previews through seasonal orchestration.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate approval and preserved public/SQL contracts.

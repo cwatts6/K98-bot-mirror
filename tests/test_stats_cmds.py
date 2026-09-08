@@ -43,7 +43,10 @@ def test_kvk_admin_commands_delegate_to_service_layer() -> None:
 
     for command_name, node in commands.items():
         segment = ast.get_source_segment(source, node) or ""
-        assert "kvk_admin_service." in segment, f"{command_name} must call the KVK admin service"
+        service_call = (
+            "runner.execute" if command_name == "test_kvk_embed" else "kvk_admin_service."
+        )
+        assert service_call in segment, f"{command_name} must delegate to its domain service"
         for marker in FORBIDDEN_SQL_MARKERS:
             assert marker not in segment, f"{command_name} must not contain direct admin SQL"
 
@@ -119,10 +122,11 @@ def test_kvk_export_all_reports_resolved_kvk_before_service_call() -> None:
     assert "kvk_no=resolved_kvk_no" in segment
 
 
-def test_kvk_test_embed_passes_computed_kvk_state_to_sender() -> None:
+def test_kvk_preview_excludes_legacy_seasonal_routing() -> None:
     source = Path("commands/stats_cmds.py").read_text(encoding="utf-8")
     command = _command_nodes()["test_kvk_embed"]
     segment = ast.get_source_segment(source, command) or ""
 
-    assert "is_kvk = context.is_kvk" in segment
-    assert "send_stats_update_embed(ctx.bot, ts, is_kvk, is_test=True)" in segment
+    assert "send_stats_update_embed" not in segment
+    assert "post_here" not in segment
+    assert "runner.execute" in segment

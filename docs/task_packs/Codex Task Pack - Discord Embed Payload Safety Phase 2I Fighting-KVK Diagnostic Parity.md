@@ -136,3 +136,36 @@ save. Do not close either from Phase 2I diagnostic evidence. Keep singleton/publ
 generic view timeout, DM/broad JSON redesign, Stats/KVK History executor audits, generic stats
 false-success logging and ProcConfig pending-results/error propagation in separate scopes.
 Keep natural production data and existing diagnostic evidence; no purge, reset or live duplicate.
+
+## Approved implementation amendment
+
+The operator approved the preview/session design and explicitly chose replacement of the current
+command behavior: keep `/kvk_admin test_embed`, remove post_here and legacy seasonal routing, require
+explicit destination, action run/status default run, session required for status. This supersedes
+the initial compatibility-preserving legacy selector proposal and the initial audit-only gate.
+Production reservation extension and SQL remain unapproved and excluded; /ops test_embed unchanged.
+
+Baseline evidence: #259 merged at 8081ddbe, #566 at 3caf18e8; current mirror main 851ec046.
+Operator supplied restart log 2026-09-08 14:06:01–14:06:39: drained/persisted queues, shutdown,
+restart and 36/101 registration, successful full startup at 14:06:26. No SHA appears in the log;
+association with supplied production merge is operator-attested. Generic tracked-view timeout
+recurs and remains separate. No ERROR/CRITICAL/traceback appears in this excerpt.
+
+Actual runtime manifest: commands/stats_cmds.py; stats_alerts/embeds/kvk.py; bot_instance.py;
+new stats_alerts/kvk_diagnostics.py and stats_alerts/kvk_diagnostic_sessions.py.
+Tests: new test_kvk_embed_diagnostic_command.py, test_kvk_embed_diagnostics.py,
+test_kvk_embed_diagnostic_lifecycle.py; update test_stats_cmds.py for the approved service boundary.
+Existing registration, payload, Phase 2G/H and daily-overview tests remain regression inputs.
+Tooling/config/dependency/SQL manifests: empty. Docs: this pack, task index, README-DEV,
+canonical command reference, diagnostics runbook and deferred register.
+
+Strict preview session/publication JSON is explicitly designed as diagnostic-only local authority;
+it never replaces SQL or the Phase 2G production admission store. Keep-all 20 sessions / 1 MiB,
+owner-bound identity, atomic receipt writes, uncertainty fencing, readonly status and graceful drain.
+Renderer extraction retains production outputs/reads/mentions/return semantics. New preview validates
+both embeds together and disables mentions. Missing/foreign messages never authorize replacement.
+See the diagnostics runbook for concrete smoke, evidence limits, retention and rollback.
+
+Security gate: Changes only, Deep off, immutable mirror base 851ec046 to final candidate head;
+production requires its own range at promotion. SQL separate no-diff skip. No Codebase/Deep scan.
+Natural calendar dispatch, Phase 2F natural public save and all listed excluded work remain pending.

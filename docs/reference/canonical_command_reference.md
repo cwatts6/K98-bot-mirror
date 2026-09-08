@@ -438,3 +438,15 @@ Options: required ordinary guild text `destination`; `action` run/status (defaul
 optional issued `session` token (required for status). No force/reset/path/clock options.
 Existing command defaults are preserved. Target registration: 36 primary, 101 grouped, 25 ops / 3 prekvk.
 Resync through the existing operator workflow; do not hand-edit generated command caches.
+
+## Phase 2I replacement of KVK test embed
+
+`/kvk_admin test_embed` v1.05 replaces v1.04's `post_here` test routes on operator approval.
+Required `destination`: ordinary same-guild text channel outside both production stats channels.
+Optional `action`: run/status, default run. Optional `session`: server-issued token, required for
+status and used to reopen existing previews. There is no legacy/post_here/force/reset selector.
+Old cached invocations must resync; do not silently route them to production.
+Existing configured admin AND notify/accepted-child-thread gate, versioning and usage remain.
+Acknowledgements/status/errors are private; one mention-neutral real fighting preview posts only
+at the explicit destination. Counts remain 36 primary / 101 grouped / 7 kvk_admin / 25 ops / 3 prekvk.
+`/ops test_embed` is unchanged and is not an isolated preview or trustworthy send receipt.

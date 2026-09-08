@@ -145,13 +145,7 @@ def _fmt_top_list(
     return "\n".join(lines)
 
 
-async def send_kvk_embed(
-    bot: Any,
-    channel: discord.abc.Messageable,
-    timestamp: str,
-    *,
-    is_test: bool = False,
-) -> None:
+async def build_kvk_preview(timestamp: str):
     # Prefer SQL metadata (blocking) -> offload
     try:
         if run_blocking_in_thread is not None:
@@ -439,11 +433,69 @@ async def send_kvk_embed(
     )
     e2.set_footer(text="KD98 Discord Bot")
 
+    # The diagnostic reports absence honestly without changing legacy render output.
+    from hashlib import sha256
+    import json
+
+    from stats_alerts.kvk_diagnostics import PreviewPayload
+
+    available = kvk_no != "?" and any(
+        blocks.get(key)
+        for key in ("players_by_kills", "kingdoms_by_kills", "camps_by_kills", "our_top_players")
+    )
+    payload = [e1, e2]
+    digest = sha256(
+        json.dumps([embed.to_dict() for embed in payload], sort_keys=True).encode()
+    ).hexdigest()
+    detail = (
+        "Current fighting report; honor may use a separately selected scan."
+        if available
+        else "Fighting data is empty or unavailable; no preview published."
+    )
+    if available and not honor_top:
+        detail += " Honor data is empty or unavailable."
+    return PreviewPayload(payload, available, detail, digest)
+
+
+async def publish_kvk_preview(bot, channel, preview, message_id, before_send, check_destination):
+    """Discord adapter: validate, bind identity and publish once; never replace on failure."""
+    from core.discord_embed_limits import require_valid_embed_payload
+
+    require_valid_embed_payload(preview.payload)
+    check_destination()
+    message = None
+    if message_id is not None:
+        message = await channel.fetch_message(message_id)
+        if (
+            message.id != message_id
+            or message.author.id != bot.user.id
+            or message.channel.id != channel.id
+        ):
+            raise ValueError("Preview message identity mismatch")
+    check_destination()
+    await before_send()
+    check_destination()
+    if message is not None:
+        await message.edit(
+            content=None, embeds=preview.payload, allowed_mentions=discord.AllowedMentions.none()
+        )
+        return message.id
+    sent = await channel.send(
+        content=None, embeds=preview.payload, allowed_mentions=discord.AllowedMentions.none()
+    )
+    return sent.id
+
+
+async def send_kvk_embed(
+    bot: Any, channel: discord.abc.Messageable, timestamp: str, *, is_test: bool = False
+) -> None:
+    """Legacy production adapter: retain reads, formatting, mentions and return behavior."""
+    preview = await build_kvk_preview(timestamp)
     content = "@everyone" if not is_test else None
     allowed_mentions = discord.AllowedMentions(everyone=(not is_test))
-
-    # Send both embeds together in a single message (so they appear as a combo)
     try:
-        await channel.send(content=content, embeds=[e1, e2], allowed_mentions=allowed_mentions)
+        await channel.send(
+            content=content, embeds=preview.payload, allowed_mentions=allowed_mentions
+        )
     except Exception:
         logger.exception("[KVK EMBED] Failed sending combined embeds")
