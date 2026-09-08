@@ -68,19 +68,21 @@ def register_prekvk(bot: ext_commands.Bot) -> None:
         description="Inspect or run an isolated, mention-neutral Pre-KVK diagnostic",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
     async def prekvk_dispatch_test(
         ctx,
-        destination: discord.Option(discord.TextChannel, "Explicit diagnostic text destination"),
-        action: discord.Option(
-            str, "Run or inspect an existing session", choices=["run", "status"]
-        ) = "run",
-        session: discord.Option(
-            str, "Issued session token; optional for a new session", required=False
-        ) = None,
+        destination: discord.TextChannel = discord.Option(
+            discord.TextChannel, "Explicit diagnostic text destination"
+        ),
+        action: str = discord.Option(
+            str, "Run or inspect an existing session", choices=["run", "status"], default="run"
+        ),
+        session: str | None = discord.Option(
+            str, "Issued session token; optional for a new session", required=False, default=None
+        ),
     ):
         from bot_config import STATS_ALERT_CHANNEL_ID
         from core.interaction_safety import send_ephemeral

@@ -9,7 +9,8 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", ["allowed", "owner", "notify", "guild", "permissions", "defer"])
-async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
+@pytest.mark.parametrize("mode", ["defaults", "run", "status"])
+async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case, mode):
     from unittest.mock import AsyncMock, Mock
 
     import discord
@@ -29,7 +30,14 @@ async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
     prekvk_cmds.register_prekvk(bot)
     ops = next(group for group in groups if group.name == "prekvk")
     command = next(cmd for cmd in ops.subcommands if cmd.name == "dispatch_test")
-    assert command.callback.__version__ == "v1.01"
+    assert command.callback.__version__ == "v1.02"
+    payload_options = {option["name"]: option for option in command.to_dict()["options"]}
+    assert payload_options["destination"]["type"] == 7
+    assert payload_options["destination"]["required"] is True
+    assert payload_options["action"]["type"] == 3
+    assert [choice["value"] for choice in payload_options["action"]["choices"]] == ["run", "status"]
+    assert payload_options["session"]["type"] == 3
+    assert payload_options["session"]["required"] is False
     user = types.SimpleNamespace(id=31 if case == "owner" else 30, display_name="Operator")
     guild = types.SimpleNamespace(id=11 if case == "guild" else 10, me=object())
     location = types.SimpleNamespace(id=41 if case == "notify" else 40, parent_id=None)
@@ -61,13 +69,29 @@ async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
     )
     monkeypatch.setattr(diagnostics.runner, "execute", execute)
     monkeypatch.setattr(prekvk_cmds, "safe_defer", AsyncMock(return_value=case != "defer"))
-    await command.callback(ctx, target, action="status", session="a" * 32)
+    guild._channels = {20: target}
+    guild._threads = {}
+    guild.get_channel_or_thread = lambda channel_id: guild._channels.get(channel_id)
+    options = [{"name": "destination", "type": 7, "value": "20"}]
+    if mode != "defaults":
+        options += [
+            {"name": "action", "type": 3, "value": mode},
+            {"name": "session", "type": 3, "value": "a" * 32},
+        ]
+    interaction.data = {
+        "options": options,
+        "resolved": {"channels": {"20": {"id": "20", "type": 0, "name": "diagnostic"}}},
+    }
+    await command._invoke(ctx)
     assert execute.await_count == (1 if case == "allowed" else 0)
     replies = response.send_message.call_args_list + interaction.followup.send.call_args_list
     for reply in replies:
         assert reply.kwargs["ephemeral"] is True
         assert not any(token in str(reply.args) for token in ("@everyone", "@here", "<@"))
     if case == "allowed":
+        assert execute.call_args.kwargs["channel_id"] == target.id
+        assert execute.call_args.kwargs["action"] == ("run" if mode == "defaults" else mode)
+        assert execute.call_args.kwargs["token"] == (None if mode == "defaults" else "a" * 32)
         assert replies[0].kwargs["allowed_mentions"].to_dict() == {"parse": []}
 
 

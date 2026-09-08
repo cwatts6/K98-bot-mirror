@@ -432,7 +432,7 @@ restart-sensitive persistence behavior changes.
 
 | Group | Command | Owner | Permission | Visibility | Version |
 | --- | --- | --- | --- | --- | --- |
-| PreKVK | `/prekvk dispatch_test` | `commands/prekvk_cmds.py` | Existing admin AND notify-channel gate | Ephemeral result; embed only at explicit destination | v1.01 |
+| PreKVK | `/prekvk dispatch_test` | `commands/prekvk_cmds.py` | Existing admin AND notify-channel gate | Ephemeral result; embed only at explicit destination | v1.02 |
 
 Options: required ordinary guild text `destination`; `action` run/status (default run);
 optional issued `session` token (required for status). No force/reset/path/clock options.

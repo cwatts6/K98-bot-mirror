@@ -183,7 +183,7 @@ events/reminders, diagnostics runbook and deferred register.
 The command and complete persistence/lifecycle contract are recorded in
 `docs/reference/runbook_diagnostics.md`. No production routing, payload budget, SQL, shared-state
 swap or global runtime monkeypatch changes. Existing production adapters retain defaults.
-Command version is v1.01; expected registration is 36 primary / 101 grouped / 25 ops / 3 prekvk.
+Command version is v1.02; expected registration is 36 primary / 101 grouped / 25 ops / 3 prekvk.
 No shared view, guard, registration helper, dependency or config source edit.
 
 SQL manifest: empty. No schema/procedure/view/index/UDT/ProcConfig, embedded query, DAL result-shape
@@ -221,3 +221,17 @@ and `commands/prekvk_cmds.py` (relocation); validation tooling additionally chan
 and recursively checks their option counts; static validation rejects a 26-child group and
 accepts 25. Existing scan/test evidence above remains tied to its original revisions; updated
 validation and separate mirror/production Changes-only results belong to the PR follow-up.
+
+### Live invocation correction
+
+Operator confirmed restart and deployed pre-merge production head `b1d22543`. Registration
+succeeded, but both diagnostic invocations failed in Pycord option conversion before the callback.
+Postponed `discord.Option(...)` annotations in the new module were retained as strings; destination
+was serialized as string instead of channel, then `_invoke` raised at `issubclass`.
+The v1.02 command uses explicit evaluated Option defaults with channel/str annotations, matching
+existing working declarations. No shared helper, dependency or persistence change. The command
+boundary tests now call real Pycord `_invoke` with resolved channel input, optional defaults,
+explicit run/status and session values across allowed and rejected permission cases. They also
+assert the serialized channel type and action choices. The regression reproduced the supplied
+TypeError before the fix and passed after it. These failures provide no reserve/send/commit receipt;
+isolated protocol and natural production routing smoke remain pending.
