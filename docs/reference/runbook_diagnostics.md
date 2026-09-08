@@ -1,0 +1,210 @@
+# Diagnostics Runbook
+
+Purpose: triage errors, crashes, performance issues, offload problems, and telemetry questions.
+
+## Primary Artifacts
+
+- `logs/log.txt` - application log
+- `logs/error_log.txt` - warnings and operational errors
+- `logs/crash.log` - unhandled exceptions and tracebacks
+- `logs/telemetry_log.jsonl` - structured telemetry
+- `logs/last_shutdown_info.json` - last clean shutdown summary
+- `QUEUE_CACHE_FILE` - live queue state
+- `COMMAND_CACHE_FILE` - command signature cache
+
+Exact paths are defined in `constants.py` and `logging_setup.py`.
+
+## Pytest Log Review
+
+Pytest runs are intentionally isolated from production operational logs. Expected negative-path
+ERROR/WARNING records remain visible through pytest output and `caplog`, but routine test execution
+must not write to `logs/log.txt`, `logs/error_log.txt`, `logs/crash.log`, or
+`logs/telemetry_log.jsonl`.
+
+For a saved pytest review artifact, tee the command to a non-production audit file:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
+```
+
+To verify that pytest did not touch production operational logs, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Use production log files only for runtime diagnostics, deployment health, and bot-machine
+operation review, not as the source of pytest negative-path evidence.
+
+## Collect Diagnostics
+
+```powershell
+python scripts/collect_diagnostics.py -o diagnostics.tar.gz
+```
+
+Include full logs when needed:
+
+```powershell
+python scripts/collect_diagnostics.py --include-logs -o diagnostics.tar.gz
+```
+
+Upload options are available through:
+
+- `--upload --s3-bucket <bucket> --s3-prefix <prefix>`
+- `--upload --artifact-url <url> --artifact-token <token>`
+- `DIAGNOSTICS_S3_BUCKET`
+- `DIAGNOSTICS_S3_PREFIX`
+- `ARTIFACT_UPLOAD_URL`
+- `ARTIFACT_UPLOAD_TOKEN`
+
+Keep upload tokens private. The diagnostics script redacts sensitive environment values in the
+archive.
+
+## Discord Operator Diagnostic Output
+
+Operator commands use the canonical embed limits plus the diagnostic payload policy in
+`core/operator_diagnostic_payloads.py`. Long previews keep complete rows or log lines in source
+order and show an exact count-bearing omission marker. When a complete private attachment is
+available, its content is redacted before upload and its UTF-8 byte size is checked against the
+current Discord destination limit. Page edits replace or clear older attachments.
+
+If the complete redacted attachment exceeds the destination limit, use this runbook and the local
+log paths instead of copying raw logs into a broader channel or DM. Do not work around the guard by
+renaming, splitting, or posting an unredacted archive. `scripts/collect_diagnostics.py` remains a
+separate operator-only CLI path; no Discord command invokes it.
+
+## Telemetry
+
+Telemetry is written through the `telemetry` logger to `TELEMETRY_LOG_PATH`.
+
+Useful searches:
+
+```powershell
+Select-String -Path logs\telemetry_log.jsonl -Pattern '"orphaned_offload_possible": true'
+Select-String -Path logs\telemetry_log.jsonl -Pattern '"processing_pipeline_summary"'
+Select-String -Path logs\telemetry_log.jsonl -Pattern '"maintenance_subproc"'
+```
+
+Common telemetry areas:
+
+- processing pipeline summaries
+- proc import and post-import stats offloads
+- maintenance subprocess events
+- orphaned offload markers
+- SQL preflight/log-headroom results
+- honor and activity import outcomes
+
+## Offload Inspection
+
+Use:
+
+```powershell
+python scripts/offload_admin.py list
+python scripts/offload_admin.py cancel --id <offload_id> --actor "<operator>"
+python scripts/offload_admin.py cancel --pid <pid> --actor "<operator>"
+python scripts/offload_monitor.py --once
+```
+
+Only cancel work when you understand the import/process being interrupted.
+
+## Live Queue Recovery
+
+`QUEUE_CACHE_FILE` stores queued job state and message metadata. If the bot restarts, queue
+helpers reload the persisted state and attempt to rehydrate the queue message. Since Phase 6K,
+startup awaits live queue state load/apply before best-effort embed refresh, live queue writes use
+the project atomic JSON helper, and stale/deleted queue message metadata is cleared and replaced
+during embed refresh while preserving queued job display state where possible.
+
+If recovery fails:
+
+1. Save a copy of the queue JSON.
+2. Check `logs/error_log.txt` and `logs/crash.log`.
+3. Confirm the queue message/channel still exists and is accessible.
+4. Clear stale metadata only after preserving the file for review.
+
+Queue-domain redesign and SQL-backed queue persistence are deferred follow-on programmes after the
+completed DL_bot Phase 6 lifecycle work. Treat investigations in this runbook as diagnostics for
+the current file-backed model unless a new approved task explicitly changes the persistence model.
+
+## Common Triage Flow
+
+1. Check `crash.log` first for unhandled exceptions.
+2. Check `error_log.txt` for operational failures.
+3. Search telemetry for the relevant event, filename, `offload_id`, or `pid`.
+4. Inspect persisted state under `DATA_DIR`.
+5. Run focused smoke/test commands for the affected subsystem.
+## Isolated Pre-KVK dispatch diagnostics (Phase 2H)
+
+Use `/prekvk dispatch_test destination:<channel> action:run` to allocate a session and
+exercise the real reserve/start/send/accept/commit flow outside seasonal routing.
+Use the returned `session:<token>` on later run or status invocations. Status requires a token.
+The invocation retains configured ADMIN_USER_ID AND notify-channel/accepted-child-thread rules.
+Destination is required: ordinary same-guild text, excluding both production stats channels.
+Requester needs view/send; bot needs view/send/embed/history. No fallback or user filesystem path.
+
+New acknowledgements, errors, status and local-time callbacks are ephemeral and disable mentions.
+The diagnostic embed is public only in the explicitly chosen destination and disables all mentions.
+Existing static permission-denial wrapper text remains private and contains no user/role/everyone
+mentions. Local-time buttons are bound to session owner/guild/channel/message and have no DM fallback.
+The canonical embed content is unchanged; it uses current report/metadata/honor/event reads.
+Appearance iteration works outside season, but unavailable seasonal data is not fabricated.
+
+Storage: `<resolved STATS_ALERT_LOG parent>/prekvk_dispatch_diagnostics/<guild>/<channel>/<token>/`.
+Server-issued tokens are 32 lowercase hexadecimal characters. Each session owns `session.json`,
+`alerts.csv`, `alerts.csv.dispatch.json` (Phase 2G version 1 including generation),
+`message.json`, `alerts.csv.dispatch.lck` and `message.json.lck`.
+Root `sessions.lck` coordinates allocation/admission; `operation.json` records operation token,
+session, PID/create time and active status. All paths reject redirection/escape. No filesystem lock
+is held over Discord awaits. Lock path existence itself is not durable ownership evidence.
+
+Keep all evidence. Capacity is 20 session directories, including incomplete initialization;
+admission/inspection rejects state files above 1 MiB. No purge/reset/delete/force/clock options,
+TTL stealing or automatic scavenger. Cleanup requires separately approved offline exact paths.
+Reopening requires the same owner and destination. Root operation ownership blocks other processes;
+unknown owner status fails closed. A positively dead operation owner may be replaced, but underlying
+uncertain dispatch attempts remain blocked by the real reservation protocol.
+
+Status is a read-only observation: no lock creation, migration, repair, reservation or receipt recovery.
+Run recovers accepted receipts before rendering. Valid same-day messages edit in place; this does not
+prove fresh-admission rejection. Missing/foreign messages and edit errors never trigger replacement.
+Old-date references clear only isolated state with generation fencing and preserved admission rules.
+Reports distinguish sent, edited, guarded, uncertain and failed, and include session, UTC,
+destination, durable phase/token and positive receipt when known. A positive receipt with incomplete
+projections or failed operation finalization is not a clean success. Never retry uncertain delivery
+to make a smoke pass. Read-only guard observation plus deterministic real-store tests prove admission
+without deleting state or forcing another live send.
+
+Graceful teardown closes diagnostic admission, cancels/drains its active operation and once-only
+filesystem finalizers before client teardown. Restart reopening retains session and receipt;
+run refreshes its local-time view. Until reopening, old diagnostic buttons may be unavailable.
+Generic tracked-view startup is unchanged. Current content-read executor behavior is unchanged;
+this diagnostic does not complete the separate Stats executor audit.
+
+Operator smoke after review and recorded candidate deployment (operator-approved pre-merge production-branch smoke is supported; final main verification remains separate):
+1. Record deployed SHA and UTC; capture production journal/CSV/reference baseline.
+2. Invoke from the permitted location with explicit diagnostic destination; retain session token.
+3. Verify one mention-neutral message, valid payload/button, positive receipt and matching committed
+   journal/CSV/reference. Retain link and logs.
+4. Inspect status, repeat the same session and verify edit/guard without another fresh publication.
+5. Gracefully restart; record SHA, reopen the same session and verify retained identity/projections
+   and restored button. Compare production baseline accounting for independent natural traffic.
+6. Exercise unauthorized invocation and invalid destination rejection without sending.
+
+No live crash injection, parallel bot processes, deliberate Discord ambiguity or uncertain-state reset.
+Diagnostic smoke cannot establish exactly-once or all live failures. Natural calendar/scheduler routing
+is a separate Chris Watts observation; Phase 2F's next natural public save also remains separate.
+
+Rollback: stop diagnostic admission and drain operations; preserve all session files, then redeploy
+the preceding production commit. No SQL/data reset. A downgrade across Phase 2G additionally requires
+stopping all writers, backing up CSV/message state/journal together and reconciling accepted/uncertain
+receipts before old code resumes. Keep dispatch stopped when outcomes remain unknown.
+
+## Phase 2H accepted smoke — 2026-09-08
+
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
