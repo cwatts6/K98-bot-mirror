@@ -47,6 +47,29 @@ def _install_connection(monkeypatch, *, fetchall_rows=None) -> _Cursor:
     return cursor
 
 
+@pytest.mark.parametrize("present", [True, False])
+def test_selected_details_parameterized_without_latest_fallback(monkeypatch, present):
+    cursor = _install_connection(monkeypatch)
+    row = dict(KVK_NO=15, KVK_NAME="Historical", KVK_START_DATE=None, KVK_END_DATE=None)
+    monkeypatch.setattr(dal, "fetch_one_dict", lambda _: row if present else None)
+    result = dal.fetch_kvk_details_record(15)
+    assert (result.kvk_no if result else None) == (15 if present else None)
+    assert len(cursor.executions) == 1
+    sql, params = cursor.executions[0]
+    assert "WHERE KVK_NO = ?" in sql and params == (15,)
+    assert "WHERE KVK_NO IS NOT NULL" not in sql
+
+
+@pytest.mark.parametrize("value", [0, -1, True, "15; DROP TABLE x", 2147483648])
+def test_invalid_selected_kvk_rejected_before_connection(monkeypatch, value):
+    def unexpected_connection():
+        raise AssertionError("Invalid selection reached SQL")
+
+    monkeypatch.setattr(dal, "get_conn_with_retries", unexpected_connection)
+    with pytest.raises(ValueError):
+        dal.fetch_kvk_details_record(value)
+
+
 def test_latest_details_query_and_named_mapping_are_exact(monkeypatch) -> None:
     cursor = _install_connection(monkeypatch)
     monkeypatch.setattr(

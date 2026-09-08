@@ -5,8 +5,9 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", ["allowed", "owner", "notify", "guild", "permissions", "defer"])
+@pytest.mark.parametrize("selected", [None, 15])
 @pytest.mark.parametrize("mode", ["defaults", "run", "status"])
-async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode):
+async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode, selected):
     from unittest.mock import AsyncMock, Mock
 
     import discord
@@ -29,15 +30,19 @@ async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode):
     prekvk_cmds.register_stats(bot)
     ops = next(group for group in groups if group.name == "kvk_admin")
     command = next(cmd for cmd in ops.subcommands if cmd.name == "test_embed")
-    assert command.callback.__version__ == "v1.05"
+    assert command.callback.__version__ == "v1.06"
     payload_options = {option["name"]: option for option in command.to_dict()["options"]}
-    assert set(payload_options) == {"destination", "action", "session"}
+    assert set(payload_options) == {"destination", "action", "session", "kvk_no"}
     assert payload_options["destination"]["type"] == 7
     assert payload_options["destination"]["required"] is True
     assert payload_options["action"]["type"] == 3
     assert [choice["value"] for choice in payload_options["action"]["choices"]] == ["run", "status"]
     assert payload_options["session"]["type"] == 3
     assert payload_options["session"]["required"] is False
+    assert payload_options["kvk_no"]["type"] == 4
+    assert payload_options["kvk_no"]["required"] is False
+    assert payload_options["kvk_no"]["min_value"] == 1
+    assert payload_options["kvk_no"]["max_value"] == 2147483647
     user = types.SimpleNamespace(id=31 if case == "owner" else 30, display_name="Operator")
     guild = types.SimpleNamespace(id=11 if case == "guild" else 10, me=object())
     location = types.SimpleNamespace(id=41 if case == "notify" else 40, parent_id=None)
@@ -78,6 +83,8 @@ async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode):
             {"name": "action", "type": 3, "value": mode},
             {"name": "session", "type": 3, "value": "a" * 32},
         ]
+    if selected is not None:
+        options.append({"name": "kvk_no", "type": 4, "value": selected})
     interaction.data = {
         "options": options,
         "resolved": {"channels": {"20": {"id": "20", "type": 0, "name": "diagnostic"}}},
@@ -89,6 +96,7 @@ async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode):
         assert reply.kwargs["ephemeral"] is True
         assert not any(token in str(reply.args) for token in ("@everyone", "@here", "<@"))
     if case == "allowed":
+        assert execute.call_args.kwargs["kvk_no"] == selected
         assert execute.call_args.kwargs["channel_id"] == target.id
         assert execute.call_args.kwargs["action"] == ("run" if mode == "defaults" else mode)
         assert execute.call_args.kwargs["token"] == (None if mode == "defaults" else "a" * 32)

@@ -23,6 +23,21 @@ from utils import date_to_utc_start, utcnow
 logger = logging.getLogger(__name__)
 
 
+def get_kvk_metadata_sql(kvk_no: int) -> dict[str, Any] | None:
+    """Exact-season display metadata; no latest-season or Sheets fallback."""
+    from kvk.dal.kvk_lifecycle_dal import fetch_kvk_details_record
+
+    row = fetch_kvk_details_record(kvk_no)
+    if row is None:
+        return None
+    return dict(
+        kvk_no=row.kvk_no,
+        kvk_name=row.kvk_name or f"KVK {kvk_no}",
+        start_date=row.start_date,
+        end_date=row.end_date,
+    )
+
+
 def get_latest_kvk_metadata_sql() -> dict[str, Any] | None:
     try:
         details = get_latest_kvk_details()

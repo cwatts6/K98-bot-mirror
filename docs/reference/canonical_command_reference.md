@@ -450,3 +450,38 @@ Existing configured admin AND notify/accepted-child-thread gate, versioning and 
 Acknowledgements/status/errors are private; one mention-neutral real fighting preview posts only
 at the explicit destination. Counts remain 36 primary / 101 grouped / 7 kvk_admin / 25 ops / 3 prekvk.
 `/ops test_embed` is unchanged and is not an isolated preview or trustworthy send receipt.
+
+
+### Approved historical fighting preview selection (Phase 2I v1.06)
+
+`/kvk_admin test_embed destination:<test-channel> action:run kvk_no:15` starts an isolated,
+explicit KVK 15 preview using that season's SQL metadata and real reporting blocks. The optional
+integer selector accepts 1..2147483647; omitting it on a new session retains the current-KVK flow.
+An explicit selection never falls back to current metadata or Sheets. Missing metadata or fighting
+rows returns unavailable without publication. Honor is omitted for all explicitly selected-KVK
+previews, and the private response explains why: the existing latest-honor reader is not bound to
+that selection. Default/current production renderer behavior and honor handling are unchanged.
+
+Explicit selections create version-2 session manifests with a durable `kvk_no`. Reopen run/status
+with the same destination/token and omit `kvk_no` to reuse the saved selection, or supply the same
+number. A conflicting number is rejected before dispatch or state changes. Version-1 current-KVK
+sessions remain readable and retain their current-selection behavior; they cannot be retargeted.
+Use a new session for historical selection. No migration of existing Phase 2I or Phase 2H files occurs.
+Status remains read-only and does not query metadata/reporting. Malformed version-2 selections fail
+closed. Downgrading to v1.05 or earlier leaves version-2 sessions unreadable; preserve them until the
+supporting version is restored rather than rewriting/resetting their manifests.
+
+The selector adds one option to the existing command, not a child or top-level command. Resync the
+v1.06 command schema. Runtime delta: command adapter, preview runner/store/renderer, exact-season
+metadata helper and lifecycle DAL reader. Tests cover real Pycord integer serialization/invocation,
+SQL parameter binding, unavailable metadata, no latest/honor fallback, owner/season binding,
+read-only status, reopening and same-message edits. No SQL schema, procedure, config, dependency,
+calendar, reservation or production-state changes are required. SQL manifest: no SQL-repository
+changes; bot-side read-only parameterized dbo.KVK_Details lookup validated against the SQL source.
+Security routing remains Changes-only, Deep off, with final mirror and production target reviews.
+
+Historical smoke: retain the existing unavailable KVK 16 session and production/Phase 2H baselines;
+start a new KVK 15 session, verify title/data belong to 15 and honor is omitted, then status, repeat
+run and restart/reopen with that token. All edits must retain the message ID and season. A conflicting
+KVK selector must reject without sending/editing. Historical publication is not proof of natural
+current-KVK dispatch, production admission or exactly-once; the separately pending observations remain.

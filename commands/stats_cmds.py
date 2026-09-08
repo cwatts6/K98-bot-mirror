@@ -541,7 +541,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="Preview the fighting-KVK embed in an isolated destination",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.05")
+    @versioned("v1.06")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -552,6 +552,14 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             str, "Run or inspect a preview", choices=["run", "status"], default="run"
         ),
         session=discord.Option(str, "Issued preview session token", required=False, default=None),
+        kvk_no=discord.Option(
+            int,
+            "Optional KVK number; omit to reuse the session or use current KVK",
+            required=False,
+            default=None,
+            min_value=1,
+            max_value=2147483647,
+        ),
     ):
         from bot_config import ADMIN_USER_ID, NOTIFY_CHANNEL_ID, OFFSEASON_STATS_CHANNEL_ID
         from core.interaction_safety import send_ephemeral
@@ -583,9 +591,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 and publisher.read_message_history,
             )
 
-        async def build():
+        async def build(*, kvk_no=None):
             check_destination()
-            return await build_kvk_preview(utcnow().strftime("%Y-%m-%d %H:%M UTC"))
+            return await build_kvk_preview(utcnow().strftime("%Y-%m-%d %H:%M UTC"), kvk_no=kvk_no)
 
         async def publish(preview, message_id, before_send):
             return await publish_kvk_preview(
@@ -604,6 +612,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 action=action,
                 build=build,
                 publish=publish,
+                kvk_no=kvk_no,
             )
             snapshot = result.snapshot or {}
             operations = snapshot.get("operations") or []

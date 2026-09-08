@@ -122,6 +122,17 @@ def fetch_latest_kvk_details_record() -> KvkLifecycleDetailsRecord | None:
     return _map_latest_kvk_details_row(row)
 
 
+def fetch_kvk_details_record(kvk_no: int) -> KvkLifecycleDetailsRecord | None:
+    """Read one explicitly selected season without consulting current-season config."""
+    if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+        raise ValueError("Invalid KVK number")
+    sql = LATEST_KVK_DETAILS_SQL.replace("WHERE KVK_NO IS NOT NULL", "WHERE KVK_NO = ?")
+    with get_conn_with_retries() as conn, conn.cursor() as cur:
+        cur.execute(sql, (kvk_no,))
+        row = fetch_one_dict(cur)
+    return _map_latest_kvk_details_row(row) if row else None
+
+
 def fetch_max_scan_order() -> int | None:
     """Read the latest imported ``KingdomScanData4`` scan order."""
     with get_conn_with_retries() as conn, conn.cursor() as cur:

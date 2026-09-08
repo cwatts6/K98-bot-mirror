@@ -26,7 +26,17 @@ class PreviewRunner(DiagnosticRunner):
     """Reuse Phase 2H's cancellation/drain lifecycle, not its session or receipt protocol."""
 
     async def execute(
-        self, *, guild_id, channel_id, owner_id, token, action, build, publish, repository=None
+        self,
+        *,
+        guild_id,
+        channel_id,
+        owner_id,
+        token,
+        action,
+        build,
+        publish,
+        repository=None,
+        kvk_no=None,
     ):
         if action not in {"run", "status"} or (action == "status" and token is None):
             raise ValueError("Status requires a preview session")
@@ -44,7 +54,7 @@ class PreviewRunner(DiagnosticRunner):
 
         def open_session():
             nonlocal session
-            session = repository.open(guild_id, channel_id, owner_id, token)
+            session = repository.open(guild_id, channel_id, owner_id, token, kvk_no=kvk_no)
 
         def begin():
             nonlocal began
@@ -53,6 +63,9 @@ class PreviewRunner(DiagnosticRunner):
 
         def outcome(kind, detail, snapshot=None):
             nonlocal result
+            selected = session.manifest.get("kvk_no")
+            if selected is not None:
+                detail = f"Selected KVK {selected}. " + detail
             result = DiagnosticResult(kind, session.token, detail, snapshot, receipt)
             return result
 
@@ -66,7 +79,8 @@ class PreviewRunner(DiagnosticRunner):
                 )
             await _io(begin)
             before = await _io(session.snapshot)
-            preview = await build()
+            selected = session.manifest.get("kvk_no")
+            preview = await build(kvk_no=selected) if selected is not None else await build()
             if not preview.available:
                 await _io(session.transition, operation, "unavailable")
                 return outcome("unavailable", preview.detail, await _io(session.snapshot))

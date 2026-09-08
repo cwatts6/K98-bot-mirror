@@ -209,11 +209,13 @@ class PreviewRepository:
             _contained(self.root, self.root / name)
         return FileLock(str(self.root / "sessions.lck"), timeout=5)
 
-    def open(self, guild_id: int, channel_id: int, owner_id: int, token=None):
+    def open(self, guild_id: int, channel_id: int, owner_id: int, token=None, *, kvk_no=None):
         if not all(_positive(value) for value in (guild_id, channel_id, owner_id)):
             raise ValueError("Invalid preview identity")
         if token is not None and (not isinstance(token, str) or not _TOKEN.fullmatch(token)):
             raise ValueError("Use the issued preview session token")
+        if kvk_no is not None and (not _positive(kvk_no) or kvk_no > 2147483647):
+            raise ValueError("KVK number must be a positive SQL integer")
         if token is None:
             _contained(self.root, self.root)
             self.root.mkdir(parents=True, exist_ok=True)
@@ -232,20 +234,34 @@ class PreviewRepository:
                 _write(
                     path / "session.json",
                     dict(
-                        version=1,
+                        version=2 if kvk_no is not None else 1,
                         kind="fighting_preview",
                         session=token,
                         guild_id=guild_id,
                         channel_id=channel_id,
                         owner_id=owner_id,
                         created_at=utcnow().isoformat(),
+                        **({"kvk_no": kvk_no} if kvk_no is not None else {}),
                     ),
                 )
         path = self.root / str(guild_id) / str(channel_id) / token
         _contained(self.root, path / "session.json")
         manifest = _read(path / "session.json")
+        version = manifest.get("version")
+        if type(version) is not int or version not in {1, 2}:
+            raise DispatchUnavailable("Unsupported preview session version")
+        selected = manifest.get("kvk_no")
+        if version == 2:
+            if not _positive(selected) or selected > 2147483647:
+                raise DispatchUnavailable("Invalid saved KVK selection")
+            if kvk_no is not None and kvk_no != selected:
+                raise DispatchUnavailable("Session KVK cannot change; use its saved selection")
+        elif "kvk_no" in manifest or kvk_no is not None:
+            raise DispatchUnavailable(
+                "Current-KVK session cannot be retargeted; create a new session"
+            )
         expected = dict(
-            version=1,
+            version=version,
             kind="fighting_preview",
             session=token,
             guild_id=guild_id,

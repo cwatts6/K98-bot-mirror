@@ -29,7 +29,11 @@ from constants import CUSTOM_AVATAR_URL, KVK_BANNER_MAP, STATS_SHEET_ID
 from stats_alerts.allkingdoms import load_allkingdom_blocks
 from stats_alerts.formatters import abbr
 from stats_alerts.honors import get_latest_honor_top
-from stats_alerts.kvk_meta import get_latest_kvk_metadata, get_latest_kvk_metadata_sql
+from stats_alerts.kvk_meta import (
+    get_kvk_metadata_sql,
+    get_latest_kvk_metadata,
+    get_latest_kvk_metadata_sql,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +149,27 @@ def _fmt_top_list(
     return "\n".join(lines)
 
 
-async def build_kvk_preview(timestamp: str):
+async def build_kvk_preview(timestamp: str, *, kvk_no: int | None = None):
+    from stats_alerts.kvk_diagnostics import PreviewPayload
+
+    selected_kvk = kvk_no
+    if selected_kvk is not None and (
+        type(selected_kvk) is not int or not 1 <= selected_kvk <= 2147483647
+    ):
+        raise ValueError("Invalid KVK selection")
     # Prefer SQL metadata (blocking) -> offload
     try:
-        if run_blocking_in_thread is not None:
+        if selected_kvk is not None:
+            if run_blocking_in_thread is not None:
+                meta_sql = await run_blocking_in_thread(
+                    get_kvk_metadata_sql,
+                    selected_kvk,
+                    name="get_selected_kvk_metadata_sql",
+                    meta={"kvk_no": selected_kvk},
+                )
+            else:
+                meta_sql = await asyncio.to_thread(get_kvk_metadata_sql, selected_kvk)
+        elif run_blocking_in_thread is not None:
             meta_sql = await run_blocking_in_thread(
                 get_latest_kvk_metadata_sql,
                 name="get_latest_kvk_metadata_sql",
@@ -160,10 +181,23 @@ async def build_kvk_preview(timestamp: str):
             )
             meta_sql = await asyncio.to_thread(get_latest_kvk_metadata_sql)
     except Exception:
-        logger.exception("[KVK EMBED] get_latest_kvk_metadata_sql failed")
+        if selected_kvk is None:
+            logger.exception("[KVK EMBED] get_latest_kvk_metadata_sql failed")
+        else:
+            logger.exception("[KVK EMBED] SQL metadata failed selected_kvk=%s", selected_kvk)
         meta_sql = None
 
-    if meta_sql and meta_sql.get("start_date") and meta_sql.get("end_date"):
+    if selected_kvk is not None and (not meta_sql or meta_sql.get("kvk_no") != selected_kvk):
+        return PreviewPayload(
+            [],
+            False,
+            f"KVK {selected_kvk} SQL metadata unavailable; no fallback or publication.",
+            "",
+        )
+
+    if meta_sql and (
+        selected_kvk is not None or (meta_sql.get("start_date") and meta_sql.get("end_date"))
+    ):
         kvk_no = meta_sql["kvk_no"]
         kvk_name = meta_sql["kvk_name"]
         start_dt, end_dt = meta_sql["start_date"], meta_sql["end_date"]
@@ -340,7 +374,8 @@ async def build_kvk_preview(timestamp: str):
     # Honor Top-5 (get_latest_honor_top may return fewer; format as Top 5 if available)
     honor_top = []
     try:
-        honor_top = await get_latest_honor_top(5)
+        if selected_kvk is None:
+            honor_top = await get_latest_honor_top(5)
     except Exception:
         logger.exception("[KVK EMBED] Honor block failed")
         honor_top = []
@@ -437,8 +472,6 @@ async def build_kvk_preview(timestamp: str):
     from hashlib import sha256
     import json
 
-    from stats_alerts.kvk_diagnostics import PreviewPayload
-
     available = kvk_no != "?" and any(
         blocks.get(key)
         for key in ("players_by_kills", "kingdoms_by_kills", "camps_by_kills", "our_top_players")
@@ -452,7 +485,14 @@ async def build_kvk_preview(timestamp: str):
         if available
         else "Fighting data is empty or unavailable; no preview published."
     )
-    if available and not honor_top:
+    if selected_kvk is not None:
+        detail = (
+            f"Fighting report for KVK {selected_kvk}."
+            if available
+            else f"KVK {selected_kvk} fighting data is empty or unavailable; no preview published."
+        )
+        detail += " Honor omitted for selected-KVK previews to avoid mixing seasons."
+    elif available and not honor_top:
         detail += " Honor data is empty or unavailable."
     return PreviewPayload(payload, available, detail, digest)
 
