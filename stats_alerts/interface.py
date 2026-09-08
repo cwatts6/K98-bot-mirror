@@ -58,7 +58,6 @@ async def send_stats_update_embed(
     if effective_is_kvk:
         try:
             ReservationStore().clear_message()
-            logger.info("[PREKVK] Fighting opened — cleared stored prekvk_msg_id.")
         except Exception:
             logger.exception("[PREKVK] Failed to clear prekvk_msg_id on fighting-open.")
 
