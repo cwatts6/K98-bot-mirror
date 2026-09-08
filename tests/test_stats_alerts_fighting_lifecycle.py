@@ -19,6 +19,7 @@ async def test_stats_alert_route_changes_only_at_fighting_open(
     expected_route: str,
 ) -> None:
     calls: list[str] = []
+    clears: list[bool] = []
 
     async def run_blocking(_func, **_kwargs):
         return fighting_open
@@ -37,7 +38,12 @@ async def test_stats_alert_route_changes_only_at_fighting_open(
     monkeypatch.setattr(interface, "ks_mod", send_summary)
     monkeypatch.setattr(interface.prekvk_mod, "send_prekvk_embed", send_prekvk)
     monkeypatch.setattr(interface.kvk_mod, "send_kvk_embed", send_kvk)
-    monkeypatch.setattr(interface.ReservationStore, "clear_message", lambda self: True)
+
+    async def clear_message():
+        clears.append(True)
+        return True
+
+    monkeypatch.setattr(interface, "clear_prekvk_message", clear_message)
 
     bot = SimpleNamespace(get_channel=lambda _channel_id: object())
 
@@ -49,6 +55,7 @@ async def test_stats_alert_route_changes_only_at_fighting_open(
     )
 
     assert calls == [expected_route]
+    assert clears == ([True] if fighting_open else [])
 
 
 @pytest.mark.asyncio

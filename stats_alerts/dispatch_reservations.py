@@ -323,6 +323,11 @@ async def _io(func, *args, **kwargs):
     return task.result()
 
 
+async def clear_prekvk_message(*, expected_id: Any = ...) -> bool:
+    """Complete reference invalidation off-loop, including during cancellation."""
+    return await _io(ReservationStore().clear_message, expected_id=expected_id)
+
+
 class DispatchAttempt:
     """Async lifetime adapter; the repository remains Discord-independent."""
 

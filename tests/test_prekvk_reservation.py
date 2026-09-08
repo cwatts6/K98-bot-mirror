@@ -390,3 +390,58 @@ def test_stale_clear_does_not_invalidate_newer_message(store):
     store.start(token)
     store.accept(token, 124)
     assert state.load_state()["prekvk_msg_id"] == 124
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_async_clear_keeps_loop_responsive_and_drains_once(store, monkeypatch, cancel):
+    state.update_prekvk_message(123)
+    token = store.reserve("prekvk_daily", 99)
+    original = dispatch.ReservationStore.clear_message
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+    loop_thread = threading.get_ident()
+
+    def delayed(self, *, expected_id):
+        calls.append((threading.get_ident(), expected_id))
+        entered.set()
+        if not release.wait(3):
+            raise TimeoutError("event loop did not release filesystem operation")
+        return original(self, expected_id=expected_id)
+
+    monkeypatch.setattr(dispatch.ReservationStore, "clear_message", delayed)
+    task = asyncio.create_task(dispatch.clear_prekvk_message(expected_id=123))
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        await asyncio.sleep(0)  # loop progresses while the worker is still blocked
+        assert not task.done()
+        if cancel:
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()  # do not abandon the started filesystem mutation
+    finally:
+        release.set()
+    if cancel:
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        assert await task is True
+    assert len(calls) == 1 and calls[0] == (calls[0][0], 123)
+    assert calls[0][0] != loop_thread
+    assert state.load_state() == {}
+    with pytest.raises(dispatch.DispatchUnavailable):
+        store.start(token)  # completed invalidation still fences an old generation
+
+
+@pytest.mark.asyncio
+async def test_async_clear_does_not_retry_worker_error(store, monkeypatch):
+    calls = []
+
+    def fail(self, **kwargs):
+        calls.append(kwargs)
+        raise OSError("filesystem failure after entry")
+
+    monkeypatch.setattr(dispatch.ReservationStore, "clear_message", fail)
+    with pytest.raises(OSError, match="filesystem failure after entry"):
+        await dispatch.clear_prekvk_message(expected_id=123)
+    assert calls == [{"expected_id": 123}]

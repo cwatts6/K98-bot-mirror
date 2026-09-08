@@ -27,7 +27,7 @@ from prekvk import report_service
 from stats_alerts.dispatch_reservations import (
     DispatchAttempt,
     DispatchUnavailable,
-    ReservationStore,
+    clear_prekvk_message,
 )
 from stats_alerts.formatters import fmt_honor
 from stats_alerts.honors import get_latest_honor_top
@@ -47,9 +47,9 @@ class PreKvkSkip(Exception):
     """Raised to indicate the embed wasn't sent due to mutual exclusivity / limits."""
 
 
-def _clear_message(message_id):
+async def _clear_message(message_id):
     try:
-        ReservationStore().clear_message(expected_id=message_id)
+        await clear_prekvk_message(expected_id=message_id)
     except Exception:
         logger.exception("[PREKVK] Failed to clear stored message reference")
 
@@ -532,11 +532,11 @@ async def send_prekvk_embed(
                 if msg_created is None or msg_created.date() != today_utc:
                     message = None
                     state.pop("prekvk_msg_id", None)
-                    _clear_message(msg_id)
+                    await _clear_message(msg_id)
         except Exception:
             message = None
             if state.pop("prekvk_msg_id", None) is not None:
-                _clear_message(msg_id)
+                await _clear_message(msg_id)
 
     # Silent edit path
     if message:
@@ -551,7 +551,7 @@ async def send_prekvk_embed(
         except Exception:
             logger.exception("[PREKVK] Edit failed; will send a fresh message.")
             if state.pop("prekvk_msg_id", None) is not None:
-                _clear_message(msg_id)
+                await _clear_message(msg_id)
 
     async def publish(attempt=None):
         first_send_ping = not bool(state.get("prekvk_msg_id"))

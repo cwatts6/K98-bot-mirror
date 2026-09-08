@@ -8,7 +8,7 @@ from prekvk.models import (
     PreKvkScheduledTopBlocks,
     PreKvkScheduledTopEntry,
 )
-from stats_alerts import guard, state
+from stats_alerts import dispatch_reservations, guard, state
 from stats_alerts.embeds import prekvk as prekvk_embed
 
 
@@ -379,7 +379,7 @@ async def test_send_failure_does_not_persist_or_claim(monkeypatch):
         await prekvk_embed.send_prekvk_embed(object(), FailingChannel(), "audit", is_test=False)
     assert state.load_state() == {}
     assert list(guard.iter_log_rows()) == []
-    row = next(iter(prekvk_embed.ReservationStore()._read()["attempts"].values()))
+    row = next(iter(dispatch_reservations.ReservationStore()._read()["attempts"].values()))
     assert row["phase"] == "uncertain"
 
 

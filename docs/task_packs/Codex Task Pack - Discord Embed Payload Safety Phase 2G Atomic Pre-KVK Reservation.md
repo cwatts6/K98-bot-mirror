@@ -348,3 +348,21 @@ temp bytes and one fsync, lock ownership throughout retries, exhaustion, non-sha
 legacy single-attempt defaults and no reservation on exhausted CSV creation. Pinned filelock 3.20.0
 focused validation passed 88 tests. Full local-version validation and a new immutable bot
 Changes-only/Deep-off review are recorded in the PR handoff. No SQL/config/dependency change.
+
+
+## 17. Production review follow-up - async invalidation
+
+Production PR #565 correctly identified that the synchronous fighting-open clear could wait for
+its filesystem lock on the Discord event loop. `clear_prekvk_message` now wraps the existing store
+transition through the once-only cancellation-draining `_io` boundary. The interface and all
+Pre-KVK stale/fetch/edit-failure clears await it; the synchronous store API, compare-and-set,
+generation fence and lock ordering remain unchanged. Errors retain existing caller logging, while
+cancellation propagates after any started filesystem operation completes. No alternate executor
+fallback, new retry, timing policy, permission or SQL change is introduced.
+
+Runtime delta: stats_alerts/dispatch_reservations.py, stats_alerts/interface.py and
+stats_alerts/embeds/prekvk.py. Test delta: tests/test_prekvk_reservation.py,
+tests/test_stats_alerts_fighting_lifecycle.py and tests/test_prekvk_embed.py. Tests verify off-loop
+execution, responsiveness during a blocked clear, once-only error propagation, cancellation drain,
+and existing generation fencing. Pinned focused validation passed 91 tests; final full-suite,
+separate mirror/production Changes-only review and patch-promotion evidence are retained in PRs.
