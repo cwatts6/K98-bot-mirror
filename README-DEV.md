@@ -817,7 +817,7 @@ no Phase 2I implementation is approved. Phase 2F's natural public-save observati
 
 Current command: `/prekvk dispatch_test` v1.02. Final runtime suite: 3,381 passed, 2 skipped.
 
-## Phase 2I fighting-KVK preview — implementation candidate
+## Phase 2I fighting-KVK preview — delivered and operator-smoke accepted
 
 The operator approved replacing `/kvk_admin test_embed` v1.04, including removal of `post_here`
 and its seasonal production route. v1.05 requires an explicit ordinary non-production text
@@ -831,7 +831,7 @@ Phase 2H PRs #259/#566 are merged. Verified remote mains: mirror `851ec046`, pro
 2026-09-08 14:06:02 graceful teardown/queue persistence, 14:06:12 registration 36/101,
 14:06:26 successful startup. The log contains no immutable Git SHA; deployment association is
 operator-provided. Tracked-view rehydration still timed out at 14:06:34 and remains separate.
-Phase 2I has not been deployed or operator-smoke accepted. Phase 2H sessions and production defaults
+Phase 2I pre-merge deployment and operator smoke are accepted; final main/deployed-head verification remains pending. Phase 2H sessions and production defaults
 remain unchanged; natural calendar dispatch and Phase 2F natural public save remain pending.
 
 
@@ -868,3 +868,39 @@ start a new KVK 15 session, verify title/data belong to 15 and honor is omitted,
 run and restart/reopen with that token. All edits must retain the message ID and season. A conflicting
 KVK selector must reject without sending/editing. Historical publication is not proof of natural
 current-KVK dispatch, production admission or exactly-once; the separately pending observations remain.
+
+
+## Accepted Phase 2I delivery — 2026-09-08
+
+This status supersedes earlier candidate/pending-smoke statements. Chris Watts explicitly accepted
+smoke testing as complete. Delivered and tested on the pre-merge production candidate; operator
+merges and final main/deployed-head verification remain pending and open the next phase.
+
+Reviewed runtime heads: mirror #260 `06f31a942a1b9b99b17769632beb58a760cb609a`; production #567
+`d89e606cf83759bdda4a7b7fdeb96e17aef0d121`. Documentation-only closeout commits follow these heads.
+No merge or deployment was performed by this documentation update.
+
+Evidence supplied by the operator: current KVK 16 truthfully returned unavailable with no rows;
+historical KVK 15 assembled 5 player, 5 kingdom and 4 camp entries and displayed successfully.
+Status at 19:50:52 UTC retained selected KVK 15 and its committed operation; an edit at
+19:51:52 UTC committed a new operation. The rejection in the instructed conflicting-selector
+sequence was followed by status at 19:54:43 UTC retaining KVK 15 and the same committed operation.
+Session tokens, destination identifiers and operation identifiers remain in private operator evidence. The generic rejection
+text does not independently identify its cause. Operator reports restart returned the same results
+and the capture helper matched the baseline with new diagnostic files created. These are operator
+reports; raw message IDs, post-restart receipts and capture files were not independently inspected.
+
+Validation: full mirror 3471 passed, 2 skipped; pinned-dependency matrix 129 passed; production
+focused matrix 129 passed; applicable hooks and CI passed. Separate Changes-only, Deep-off reviews
+of the two runtime heads covered all 19 changed files with zero findings. Sealed terminal reports
+are retained; they are not desktop workbench scan IDs. This Markdown-only closeout has no runtime,
+config, SQL, dependency, permission or persistence changes: additional pytest/security scans skipped;
+documentation hooks, selector, architecture/deferred/security-routing validation remain required.
+
+Natural production calendar dispatch is expected on 2026-09-09 morning, Europe/London; retain its
+actual routing/admission/receipt evidence separately. Phase 2F natural public save remains pending.
+Neither observation is closed by diagnostic success. Diagnostics do not prove exactly-once delivery
+or all live failure modes. Generic tracked-view timeout and ProcConfig repair remain separate.
+
+Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
+production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.

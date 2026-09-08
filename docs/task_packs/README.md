@@ -11,7 +11,8 @@ itself mean that the document is approved for execution.
 | Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Mirror #257 and production #564 merged; production-main source verified, deployment/restart operator-attested; next natural save unobserved |
 | Completed delivery archive | Discord Embed Payload Safety Phase 2G task pack and starter | Merged; operator accepted bounded validation; real protocol subsequently exercised by isolated Phase 2H smoke; natural calendar dispatch pending |
 | Completed delivery archive | Discord Embed Payload Safety Phase 2H task pack and starter | Operator accepted isolated smoke on deployed pre-merge `7794d2ae`; #259/#566 merges and final main deployment pending |
-| Next task: scope first | Discord Embed Payload Safety Phase 2I Fighting-KVK Diagnostic Parity task pack and starter | Audit existing `/kvk_admin test_embed`; design and implementation require approval |
+| Completed delivery archive | Phase 2I Fighting-KVK Diagnostic Parity pack and starter | Deployed candidate and operator smoke accepted; #260/#567 merges and final main/deployed verification pending |
+| Next task: scope first | Phase 2J Ops Diagnostic Convergence pack and starter | Audit retain/replace/retire options for `/ops test_embed`; implementation requires approval |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
@@ -823,3 +824,41 @@ Phase 2I fighting-KVK diagnostic design is operator approved with one explicit r
 the old `/kvk_admin test_embed` routes, remove `post_here`, and require explicit destination with
 run/status sessions. Implementation/validation candidate is in progress; no live smoke acceptance
 or production admission proof is claimed. `/ops test_embed` remains separate.
+
+
+## Accepted Phase 2I delivery — 2026-09-08
+
+This status supersedes earlier candidate/pending-smoke statements. Chris Watts explicitly accepted
+smoke testing as complete. Delivered and tested on the pre-merge production candidate; operator
+merges and final main/deployed-head verification remain pending and open the next phase.
+
+Reviewed runtime heads: mirror #260 `06f31a942a1b9b99b17769632beb58a760cb609a`; production #567
+`d89e606cf83759bdda4a7b7fdeb96e17aef0d121`. Documentation-only closeout commits follow these heads.
+No merge or deployment was performed by this documentation update.
+
+Evidence supplied by the operator: current KVK 16 truthfully returned unavailable with no rows;
+historical KVK 15 assembled 5 player, 5 kingdom and 4 camp entries and displayed successfully.
+Status at 19:50:52 UTC retained selected KVK 15 and its committed operation; an edit at
+19:51:52 UTC committed a new operation. The rejection in the instructed conflicting-selector
+sequence was followed by status at 19:54:43 UTC retaining KVK 15 and the same committed operation.
+Session tokens, destination identifiers and operation identifiers remain in private operator evidence. The generic rejection
+text does not independently identify its cause. Operator reports restart returned the same results
+and the capture helper matched the baseline with new diagnostic files created. These are operator
+reports; raw message IDs, post-restart receipts and capture files were not independently inspected.
+
+Validation: full mirror 3471 passed, 2 skipped; pinned-dependency matrix 129 passed; production
+focused matrix 129 passed; applicable hooks and CI passed. Separate Changes-only, Deep-off reviews
+of the two runtime heads covered all 19 changed files with zero findings. Sealed terminal reports
+are retained; they are not desktop workbench scan IDs. This Markdown-only closeout has no runtime,
+config, SQL, dependency, permission or persistence changes: additional pytest/security scans skipped;
+documentation hooks, selector, architecture/deferred/security-routing validation remain required.
+
+Natural production calendar dispatch is expected on 2026-09-09 morning, Europe/London; retain its
+actual routing/admission/receipt evidence separately. Phase 2F natural public save remains pending.
+Neither observation is closed by diagnostic success. Diagnostics do not prove exactly-once delivery
+or all live failure modes. Generic tracked-view timeout and ProcConfig repair remain separate.
+
+Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
+production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.
+
+Active: [Phase 2J task pack](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md).
