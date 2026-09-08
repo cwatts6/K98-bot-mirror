@@ -46,7 +46,8 @@ class PreKvkDispatchDiagnosticView(LocalTimeToggleView):
             if not permissions.view_channel or not permissions.send_messages:
                 await respond("You no longer have access to this diagnostic destination.")
                 return
-            await interaction.response.defer(ephemeral=True)
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
             snapshot = await _io(self.session.snapshot)
             if interaction.message.id != snapshot["message_id"]:
                 await respond(
@@ -55,7 +56,7 @@ class PreKvkDispatchDiagnosticView(LocalTimeToggleView):
                 return
             embed = await self.build_local_time_embed()
             await send_ephemeral(
-                interaction, None, embed=embed, allowed_mentions=discord.AllowedMentions.none()
+                interaction, "", embed=embed, allowed_mentions=discord.AllowedMentions.none()
             )
         except Exception:
             logger.exception(

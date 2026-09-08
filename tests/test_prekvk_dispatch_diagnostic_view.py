@@ -79,3 +79,46 @@ async def test_revoked_destination_permission_denies_before_render(tmp_path, mon
     assert "embed" not in call.kwargs
     view.build_local_time_embed.assert_not_awaited()
     interaction.followup.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("already_done", [False, True])
+async def test_local_time_initial_and_acknowledged_response(tmp_path, monkeypatch, already_done):
+    monkeypatch.setattr(views, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(views, "GUILD_ID", 10)
+    session = SessionRepository(tmp_path / "diagnostics").open(10, 20, 30)
+    session.store.message_state.update_prekvk_message(101)
+    view = views.PreKvkDispatchDiagnosticView([], session)
+    embed = object()
+    view.build_local_time_embed = AsyncMock(return_value=embed)
+    done = already_done
+
+    async def defer(**kwargs):
+        nonlocal done
+        assert not done, "Interaction must not be acknowledged twice"
+        assert kwargs == {"ephemeral": True}
+        done = True
+
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=30),
+        guild_id=10,
+        channel_id=20,
+        message=SimpleNamespace(id=101),
+        channel=SimpleNamespace(
+            permissions_for=lambda user: SimpleNamespace(view_channel=True, send_messages=True)
+        ),
+        response=SimpleNamespace(
+            is_done=lambda: done, defer=AsyncMock(side_effect=defer), send_message=AsyncMock()
+        ),
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
+    await view.show_local_time(interaction)
+    assert interaction.response.defer.await_count == (0 if already_done else 1)
+    interaction.response.send_message.assert_not_awaited()
+    view.build_local_time_embed.assert_awaited_once()
+    interaction.followup.send.assert_awaited_once()
+    call = interaction.followup.send.call_args
+    assert call.args == ("",)
+    assert call.kwargs["ephemeral"] is True
+    assert call.kwargs["embed"] is embed
+    assert call.kwargs["allowed_mentions"].to_dict() == {"parse": []}

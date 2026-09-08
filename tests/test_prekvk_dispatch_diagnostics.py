@@ -326,3 +326,32 @@ async def test_finalization_failure_never_reports_clean_success(harness, monkeyp
     assert result.outcome == "uncertain"
     assert result.receipt == 101
     assert "finalization failed" in result.detail
+
+
+@pytest.mark.asyncio
+async def test_status_without_lock_files_is_read_only(harness, monkeypatch):
+    from filelock import BaseFileLock
+
+    session = harness.open(10, 20, 30)
+    for path in harness.root.rglob("*.lck"):
+        path.unlink()
+    before = {str(p): p.read_bytes() for p in harness.root.rglob("*") if p.is_file()}
+
+    def reject_lock(*args, **kwargs):
+        pytest.fail("Read-only status must not acquire a filesystem lock")
+
+    monkeypatch.setattr(BaseFileLock, "acquire", reject_lock)
+    result = await run(harness, Channel(), token=session.token, action="status")
+    assert result.snapshot["message_id"] is None
+    assert not list(harness.root.rglob("*.lck"))
+    assert {str(p): p.read_bytes() for p in harness.root.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize(
+    "missing", ["session.json", "alerts.csv", "alerts.csv.dispatch.json", "message.json"]
+)
+def test_missing_durable_session_file_fails_closed(harness, missing):
+    session = harness.open(10, 20, 30)
+    (session.path / missing).unlink()
+    with pytest.raises(DispatchUnavailable, match="Incomplete diagnostic session"):
+        session.validate()
