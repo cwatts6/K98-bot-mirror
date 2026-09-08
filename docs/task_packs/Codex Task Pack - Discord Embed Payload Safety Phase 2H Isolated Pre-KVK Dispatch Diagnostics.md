@@ -154,3 +154,44 @@ Phase 2H closes only after its approved command, isolation and deterministic gat
 Discord protocol/restart smoke is recorded. Preserve any remaining natural production-window gate
 honestly. Archive this pack only on explicit acceptance; leave operator merges/deployed-head
 verification visibly pending until evidenced.
+## Approved implementation record — 2026-09-08
+
+The operator approved the design and retained Phase 2H scope. Mirror #258 is merged at
+`4cf1faddf0e5165b0a7f1e4d0f268b87baa71935`; production #565/main is
+`c0a3bc6ba5a618d5b6a2d9e26d7d4d332f5558ab`. All 916 Python blobs match clean mirror base
+`69895f32fefd18f77b4f1e1d6001e66bd5adebad`. Production changes since reviewed runtime
+`fea2767f` are documentation only. SQL is clean at `fc0e94ebd2e0a98286069c8a8b71365dd5178657`.
+
+Operator deployment evidence: "production is deployed", followed by
+`c0a3bc6ba5a618d5b6a2d9e26d7d4d332f5558ab 2026-09-08T10:49:43+01:00 Merge pull request #565`.
+This is operator attestation plus commit evidence, not independent process inspection; the
+timestamp is the commit timestamp, not a measured restart time.
+
+Implementation branch: `codex/discord-embed-payload-safety-phase-2h`, isolated mirror clone.
+Runtime manifest: `commands/admin_cmds.py`, `stats_alerts/diagnostics.py`,
+`stats_alerts/diagnostic_sessions.py`, `stats_alerts/dispatch_reservations.py`,
+`stats_alerts/state.py`, `stats_alerts/embeds/prekvk.py`,
+`ui/views/prekvk_dispatch_diagnostic_view.py`, `bot_instance.py` (diagnostic teardown only).
+
+Test manifest: new `tests/test_prekvk_dispatch_diagnostics.py`,
+`tests/test_prekvk_dispatch_diagnostic_view.py`, `tests/test_prekvk_dispatch_diagnostic_lifecycle.py`;
+extended `tests/test_command_registration_smoke.py`. Existing reservation/embed/state/guard,
+off-season and fighting lifecycle suites are regression gates without unnecessary edits.
+Documentation manifest: this pack, its starter, task index, README-DEV, canonical command reference,
+events/reminders, diagnostics runbook and deferred register.
+
+The command and complete persistence/lifecycle contract are recorded in
+`docs/reference/runbook_diagnostics.md`. No production routing, payload budget, SQL, shared-state
+swap or global runtime monkeypatch changes. Existing production adapters retain defaults.
+Command version is v1.00; expected registration is 36 primary / 101 grouped / 26 ops.
+No shared view, guard, registration helper, dependency or config source edit.
+
+SQL manifest: empty. No schema/procedure/view/index/UDT/ProcConfig, embedded query, DAL result-shape
+or deployment delta. Bot security gate: Changes only, Deep off, exact immutable final diff.
+SQL receives a separate no-diff skip. Validation and security evidence are recorded at delivery.
+
+Existing singleton/public-child lifecycle, generic view timeout, DM/JSON redesign, Stats/KVK
+History executor audits, ProcConfig result/false-success repair and Phase 2F natural-save observation
+remain separately owned by Chris Watts. Fighting-KVK diagnostic parity is future scope.
+Diagnostic Discord smoke and natural calendar routing remain distinct pending acceptance rows.
+Do not archive this pack merely on implementation delivery.

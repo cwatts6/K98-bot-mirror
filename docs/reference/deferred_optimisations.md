@@ -430,3 +430,10 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate operator-approved executor audit; preserve SQL/read behavior and telemetry; no SQL contract change approved.
 - Status: evidence required; owner Chris Watts; not a Phase 2G dependency
 - Last verified: 2026-09-08
+## Phase 2H progress note — 2026-09-08
+
+The active Pre-KVK diagnostic item has an operator-approved design and implementation in progress.
+Phase 2G merges and final production-main source are verified; deployment of c0a3bc6b is
+operator-attested. Do not resolve/archive the item until diagnostic Discord/restart smoke is accepted.
+Existing separately structured lifecycle, executor, ProcConfig and natural-observation items remain
+unchanged; their owner is Chris Watts. Fighting-KVK preview parity requires a later independent scope.

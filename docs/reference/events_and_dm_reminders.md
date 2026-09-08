@@ -168,3 +168,11 @@ filesystems are excluded. Retention, singleton repair, public child supervision 
 remain separate. See archived Phase 2G pack sections 15–17 and its delivery closure for the protocol,
 validated boundaries and carried-forward live smoke. The active Phase 2H pack owns isolated
 Pre-KVK dispatch diagnostics; natural production calendar routing remains a separate observation.
+## Phase 2H diagnostic isolation
+
+`/ops prekvk_dispatch_test` can invoke the real Pre-KVK renderer/reservation outside calendar
+routing using a dedicated durable session. Journal, CSV, message reference, generation and locks
+are isolated together; production default adapters and all natural seasonal routing remain unchanged.
+See `runbook_diagnostics.md` for exact paths, keep-all retention, reopen/recovery and smoke.
+A same-day edit is not fresh guard proof. Neither diagnostic smoke nor Phase 2G restart evidence
+completes the separately pending natural-calendar dispatch observation.

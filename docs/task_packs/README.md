@@ -808,3 +808,9 @@ Rollout/rollback requirements remain binding: stop all writers; back up CSV, mes
 journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
 keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
 The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.
+## Phase 2H approved implementation
+
+Phase 2H design is approved; the command implementation is on an isolated mirror branch.
+Phase 2G merges and production-main source are verified, and deployment of `c0a3bc6b` is
+operator-attested. The active Phase 2H pack and diagnostics runbook own its exact manifest,
+isolation, status, retention and smoke contract. Keep the pack active until explicit acceptance.

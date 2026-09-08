@@ -184,9 +184,10 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     for group_name, mapping in phase5a_moves.items():
         assert set(mapping).isdisjoint(names)
         assert set(mapping.values()).issubset(grouped[group_name])
-    assert len(grouped["ops"]) == 25
+    assert len(grouped["ops"]) == 26
+    assert "prekvk_dispatch_test" in grouped["ops"]
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 100
+    assert sum(len(commands) for commands in grouped.values()) == 101
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" not in names

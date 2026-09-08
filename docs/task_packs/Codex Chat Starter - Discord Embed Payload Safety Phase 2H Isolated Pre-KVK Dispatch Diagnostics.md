@@ -1,6 +1,8 @@
 # Codex Chat Starter - Discord Embed Payload Safety Phase 2H Isolated Pre-KVK Dispatch Diagnostics
 
-Status: next task approved for scope; command implementation awaits first-response architecture approval.
+Status: design approved; implementation in progress. Phase 2G PRs #258/#565 are merged and production
+deployment of c0a3bc6ba5a618d5b6a2d9e26d7d4d332f5558ab is operator-attested. Use the active pack's
+approved implementation record and diagnostics runbook; earlier preparation instructions below are historical.
 
 ## Copy/Paste Starter
 

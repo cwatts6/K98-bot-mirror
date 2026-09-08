@@ -35,6 +35,10 @@ class DispatchUnavailable(RuntimeError):
     """A fresh send cannot safely proceed; never retry through another backend."""
 
 
+class DispatchGuarded(DispatchUnavailable):
+    """Admission was denied by ownership/quota, rather than an I/O failure."""
+
+
 def _utc(value: str) -> datetime:
     result = datetime.fromisoformat(value)
     if result.tzinfo is None or result.utcoffset() != UTC.utcoffset(result):
@@ -58,11 +62,13 @@ class ReservationStore:
         *,
         clock: Callable[[], datetime] = utcnow,
         owner_alive: Callable[[dict], bool | None] = _owner_alive,
+        message_state=None,
     ):
         self.log_path = str(log_path or guard.LOG_PATH)
         self.path = Path(f"{self.log_path}.dispatch.json")
         self.clock = clock
         self.owner_alive = owner_alive
+        self.message_state = message_state if message_state is not None else state
 
     def _read(self) -> dict:
         if not self.path.exists():
@@ -134,7 +140,7 @@ class ReservationStore:
             and row["generation"] == data["message_generation"]
             and when.date() == self.clock().date()
         ):
-            state.update_prekvk_message(row["message_id"])
+            self.message_state.update_prekvk_message(row["message_id"])
         guard._append_success_unlocked(self.log_path, row["kind"], when)
         row["phase"] = "committed"
         self._write(data)
@@ -270,12 +276,20 @@ class ReservationStore:
         """Fence in-flight receipts when fighting opens or a reference is invalidated."""
         with guard.coordination_lock(self.log_path):
             data = self._read()
-            if expected_id is not ... and state.load_state().get("prekvk_msg_id") != expected_id:
+            if (
+                expected_id is not ...
+                and self.message_state.load_state().get("prekvk_msg_id") != expected_id
+            ):
                 return False
             if self.path.exists():
                 data["message_generation"] += 1
                 self._write(data)
-            return state.update_prekvk_message(None, expected_id=expected_id)
+            return self.message_state.update_prekvk_message(None, expected_id=expected_id)
+
+    def recover(self) -> None:
+        """Replay known receipts without admitting or sending another message."""
+        with guard.coordination_lock(self.log_path):
+            self._recover(self._read())
 
     def reconcile_receipt(
         self, token: str, *, channel_id: int, message_id: int, accepted_at: datetime
@@ -331,8 +345,8 @@ async def clear_prekvk_message(*, expected_id: Any = ...) -> bool:
 class DispatchAttempt:
     """Async lifetime adapter; the repository remains Discord-independent."""
 
-    def __init__(self, kind: str, channel_id: int):
-        self.store = ReservationStore()
+    def __init__(self, kind: str, channel_id: int, *, store: ReservationStore | None = None):
+        self.store = store if store is not None else ReservationStore()
         self.kind = kind
         self.channel_id = channel_id
         self.token: str | None = None
@@ -349,7 +363,7 @@ class DispatchAttempt:
                 await _io(self.store.finish_failure, self.token)
             raise
         if not self.token:
-            raise DispatchUnavailable("Dispatch is already owned or daily quota is satisfied")
+            raise DispatchGuarded("Dispatch is already owned or daily quota is satisfied")
         return self
 
     async def start(self) -> None:

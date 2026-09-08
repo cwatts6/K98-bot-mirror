@@ -4,6 +4,72 @@ from pathlib import Path
 import sys
 import types
 
+import pytest
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["allowed", "owner", "notify", "guild", "permissions", "defer"])
+async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
+    from unittest.mock import AsyncMock, Mock
+
+    import discord
+
+    from commands import admin_cmds
+    import decoraters
+    from stats_alerts import diagnostics
+
+    monkeypatch.setattr(decoraters, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(decoraters, "NOTIFY_CHANNEL_ID", 40)
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: types.SimpleNamespace(log=AsyncMock()))
+    monkeypatch.setattr(admin_cmds, "GUILD_ID", 10)
+    groups = []
+    bot = types.SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kwargs: lambda fn: fn
+    )
+    admin_cmds.register_admin(bot)
+    ops = next(group for group in groups if group.name == "ops")
+    command = next(cmd for cmd in ops.subcommands if cmd.name == "prekvk_dispatch_test")
+    assert command.callback.__version__ == "v1.00"
+    user = types.SimpleNamespace(id=31 if case == "owner" else 30, display_name="Operator")
+    guild = types.SimpleNamespace(id=11 if case == "guild" else 10, me=object())
+    location = types.SimpleNamespace(id=41 if case == "notify" else 40, parent_id=None)
+    response = types.SimpleNamespace(
+        is_done=lambda: False, send_message=AsyncMock(), defer=AsyncMock()
+    )
+    interaction = types.SimpleNamespace(
+        user=user,
+        guild=guild,
+        channel=location,
+        response=response,
+        followup=types.SimpleNamespace(send=AsyncMock()),
+    )
+    ctx = types.SimpleNamespace(
+        user=user, guild=guild, channel=location, interaction=interaction, command=command
+    )
+    target = Mock(spec=discord.TextChannel)
+    target.id = 20
+    target.guild = types.SimpleNamespace(id=10)
+    target.type = discord.ChannelType.text
+    target.permissions_for.return_value = types.SimpleNamespace(
+        view_channel=True,
+        send_messages=case != "permissions",
+        embed_links=True,
+        read_message_history=True,
+    )
+    execute = AsyncMock(
+        return_value=diagnostics.DiagnosticResult("status", "a" * 32, "observation")
+    )
+    monkeypatch.setattr(diagnostics.runner, "execute", execute)
+    monkeypatch.setattr(admin_cmds, "safe_defer", AsyncMock(return_value=case != "defer"))
+    await command.callback(ctx, target, action="status", session="a" * 32)
+    assert execute.await_count == (1 if case == "allowed" else 0)
+    replies = response.send_message.call_args_list + interaction.followup.send.call_args_list
+    for reply in replies:
+        assert reply.kwargs["ephemeral"] is True
+        assert not any(token in str(reply.args) for token in ("@everyone", "@here", "<@"))
+    if case == "allowed":
+        assert replies[0].kwargs["allowed_mentions"].to_dict() == {"parse": []}
+
 
 def test_register_commands_smoke(monkeypatch):
     monkeypatch.setenv("OUR_KINGDOM", os.getenv("OUR_KINGDOM", "0") or "0")

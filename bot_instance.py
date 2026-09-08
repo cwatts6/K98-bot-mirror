@@ -1468,6 +1468,11 @@ async def _graceful_teardown():
     _shutdown_once.set()
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
 
+    # Diagnostic sends must finish their reservation finalizers before client teardown.
+    from stats_alerts.diagnostics import runner as prekvk_diagnostic_runner
+
+    await prekvk_diagnostic_runner.shutdown()
+
     # Stop task loops...
     try:
         if daily_summary.is_running():

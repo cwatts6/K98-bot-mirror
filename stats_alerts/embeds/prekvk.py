@@ -27,6 +27,7 @@ from prekvk import report_service
 from stats_alerts.dispatch_reservations import (
     DispatchAttempt,
     DispatchUnavailable,
+    _io,
     clear_prekvk_message,
 )
 from stats_alerts.formatters import fmt_honor
@@ -167,11 +168,23 @@ async def send_prekvk_embed(
     timestamp: str,
     *,
     is_test: bool = False,
+    diagnostic_store=None,
+    diagnostic_view_factory=None,
+    on_diagnostic_receipt=None,
+    diagnostic_check_destination=None,
 ) -> str:
     """
     Build and either edit or send the Pre-KVK embed. Returns 'edited' or 'sent'.
     Blocking work is offloaded using asyncio.to_thread or the async DB helpers.
     """
+    diagnostic = diagnostic_store is not None
+    if diagnostic and (
+        is_test
+        or diagnostic_view_factory is None
+        or on_diagnostic_receipt is None
+        or diagnostic_check_destination is None
+    ):
+        raise ValueError("Diagnostics require isolated state, real admission and a scoped view")
     # Load SQL metadata off thread (get_latest_kvk_metadata_sql uses get_conn_with_retries internally)
     try:
         try:
@@ -510,20 +523,34 @@ async def send_prekvk_embed(
     )
 
     view = (
-        LocalTimeToggleView(week_events, prefix="prekvk_week", timeout=None)
-        if week_events
-        else None
+        diagnostic_view_factory(week_events)
+        if diagnostic
+        else (
+            LocalTimeToggleView(week_events, prefix="prekvk_week", timeout=None)
+            if week_events
+            else None
+        )
     )
 
     # Load state and decide edit vs send (state is sync -> use directly)
-    state = load_state()
+    state = await _io(diagnostic_store.message_state.load_state) if diagnostic else load_state()
     msg_id = state.get("prekvk_msg_id")
     message = None
     today_utc = utcnow().date()
 
+    async def clear_reference(expected_id):
+        if diagnostic:
+            await _io(diagnostic_store.clear_message, expected_id=expected_id)
+        else:
+            await _clear_message(expected_id)
+
     if msg_id:
         try:
             message = await channel.fetch_message(int(msg_id))
+            if diagnostic and (
+                message.author.id != bot.user.id or message.channel.id != channel.id
+            ):
+                raise ValueError("Diagnostic message author/destination mismatch")
             if message and getattr(message, "created_at", None):
                 try:
                     msg_created = ensure_aware_utc(message.created_at)
@@ -532,16 +559,25 @@ async def send_prekvk_embed(
                 if msg_created is None or msg_created.date() != today_utc:
                     message = None
                     state.pop("prekvk_msg_id", None)
-                    await _clear_message(msg_id)
+                    await clear_reference(msg_id)
         except Exception:
+            if diagnostic:
+                raise  # Absence/transport/identity errors do not authorize replacement.
             message = None
             if state.pop("prekvk_msg_id", None) is not None:
-                await _clear_message(msg_id)
+                await clear_reference(msg_id)
 
     # Silent edit path
     if message:
         try:
-            await message.edit(embed=embed, view=view)
+            if diagnostic:
+                diagnostic_check_destination()
+                on_diagnostic_receipt(message.id)
+                await message.edit(
+                    embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none()
+                )
+            else:
+                await message.edit(embed=embed, view=view)
             logger.info(
                 "[PREKVK] Edited existing message id=%s in channel=%s",
                 getattr(message, "id", "?"),
@@ -549,25 +585,35 @@ async def send_prekvk_embed(
             )
             return "edited"
         except Exception:
+            if diagnostic:
+                raise  # An ambiguous edit must never fall through to a fresh send.
             logger.exception("[PREKVK] Edit failed; will send a fresh message.")
             if state.pop("prekvk_msg_id", None) is not None:
-                await _clear_message(msg_id)
+                await clear_reference(msg_id)
 
     async def publish(attempt=None):
+        if diagnostic_check_destination is not None:
+            diagnostic_check_destination()
         first_send_ping = not bool(state.get("prekvk_msg_id"))
         if attempt is not None:
             await attempt.start()
         sent = await channel.send(
             embed=embed,
-            content="@everyone" if (first_send_ping and not is_test) else None,
+            content="@everyone" if (first_send_ping and not is_test and not diagnostic) else None,
             view=view,
-            allowed_mentions=discord.AllowedMentions(everyone=(first_send_ping and not is_test)),
+            allowed_mentions=(
+                discord.AllowedMentions.none()
+                if diagnostic
+                else discord.AllowedMentions(everyone=(first_send_ping and not is_test))
+            ),
         )
         logger.info(
             "[PREKVK] Sent new message id=%s in channel=%s",
             getattr(sent, "id", "?"),
             getattr(channel, "id", "?"),
         )
+        if diagnostic:
+            on_diagnostic_receipt(sent.id)
         if attempt is not None:
             await attempt.accept(sent.id)
         else:
@@ -580,8 +626,15 @@ async def send_prekvk_embed(
     if is_test:
         return await publish()
     try:
-        async with DispatchAttempt("prekvk_daily", channel.id) as attempt:
+        lifetime = (
+            DispatchAttempt("prekvk_daily", channel.id, store=diagnostic_store)
+            if diagnostic
+            else DispatchAttempt("prekvk_daily", channel.id)
+        )
+        async with lifetime as attempt:
             return await publish(attempt)
     except DispatchUnavailable as exc:
+        if diagnostic:
+            raise
         logger.info("[PREKVK] Fresh dispatch unavailable: %s", exc)
         raise PreKvkSkip() from exc

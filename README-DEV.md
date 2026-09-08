@@ -807,3 +807,11 @@ Rollout/rollback requirements remain binding: stop all writers; back up CSV, mes
 journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
 keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
 The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.
+## Phase 2H implementation status
+
+The operator approved isolated Pre-KVK diagnostics and attested production deployment of
+`c0a3bc6ba5a618d5b6a2d9e26d7d4d332f5558ab`. Phase 2G PRs #258/#565 are confirmed merged;
+916 Python blobs match mirror base `69895f32`. Earlier preparation notes about pending merges
+are historical. Phase 2H adds grouped `/ops prekvk_dispatch_test` v1.00, explicit destination,
+real reservation and fully isolated durable session state. See the active pack and diagnostics runbook.
+Phase 2H deployment/Discord smoke and natural calendar dispatch remain separately pending.

@@ -10,6 +10,40 @@ from file_utils import atomic_write_json, read_json_safe, resolve_path
 
 logger = logging.getLogger(__name__)
 
+
+class MessageStateStore:
+    """Strict, explicitly located diagnostic projection; legacy functions stay unchanged."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.lock_path = f"{path}.lck"
+
+    def load_state(self) -> dict[str, Any]:
+        import json
+
+        data = json.loads(self.path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or set(data) - {"prekvk_msg_id"}:
+            raise ValueError("Invalid diagnostic message state")
+        value = data.get("prekvk_msg_id")
+        if value is not None and (type(value) is not int or value <= 0):
+            raise ValueError("Invalid diagnostic message receipt")
+        return data
+
+    def update_prekvk_message(self, message_id: int | None, *, expected_id: Any = ...) -> bool:
+        with FileLock(self.lock_path, timeout=_LOCK_TIMEOUT_SECS):
+            current = self.load_state()
+            if expected_id is not ... and current.get("prekvk_msg_id") != expected_id:
+                return False
+            if message_id is None:
+                current.pop("prekvk_msg_id", None)
+            else:
+                if type(message_id) is not int or message_id <= 0:
+                    raise ValueError("Invalid diagnostic message receipt")
+                current["prekvk_msg_id"] = message_id
+            atomic_write_json(self.path, current)
+            return True
+
+
 # Single file beside the CSV log to preserve original layout and make migration simple.
 STATE_PATH = f"{resolve_path(STATS_ALERT_LOG)!s}.state.json"
 _STATE_LOCK_PATH = f"{STATE_PATH}.lck"

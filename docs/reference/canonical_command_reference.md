@@ -428,3 +428,13 @@ For runtime command changes, also run focused command, permission, interaction, 
 for the affected domain. Run or justify skipping Codex Security review when command runtime,
 permission, interaction, SQL/data access, file handling, config, network, user-input, or
 restart-sensitive persistence behavior changes.
+## Phase 2H isolated Pre-KVK diagnostic
+
+| Group | Command | Owner | Permission | Visibility | Version |
+| --- | --- | --- | --- | --- | --- |
+| Ops | `/ops prekvk_dispatch_test` | `commands/admin_cmds.py` | Existing admin AND notify-channel gate | Ephemeral result; embed only at explicit destination | v1.00 |
+
+Options: required ordinary guild text `destination`; `action` run/status (default run);
+optional issued `session` token (required for status). No force/reset/path/clock options.
+Existing command defaults are preserved. Target registration: 36 primary, 101 grouped, 26 ops.
+Resync through the existing operator workflow; do not hand-edit generated command caches.

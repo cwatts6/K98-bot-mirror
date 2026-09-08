@@ -133,3 +133,68 @@ the current file-backed model unless a new approved task explicitly changes the 
 3. Search telemetry for the relevant event, filename, `offload_id`, or `pid`.
 4. Inspect persisted state under `DATA_DIR`.
 5. Run focused smoke/test commands for the affected subsystem.
+## Isolated Pre-KVK dispatch diagnostics (Phase 2H)
+
+Use `/ops prekvk_dispatch_test destination:<channel> action:run` to allocate a session and
+exercise the real reserve/start/send/accept/commit flow outside seasonal routing.
+Use the returned `session:<token>` on later run or status invocations. Status requires a token.
+The invocation retains configured ADMIN_USER_ID AND notify-channel/accepted-child-thread rules.
+Destination is required: ordinary same-guild text, excluding both production stats channels.
+Requester needs view/send; bot needs view/send/embed/history. No fallback or user filesystem path.
+
+New acknowledgements, errors, status and local-time callbacks are ephemeral and disable mentions.
+The diagnostic embed is public only in the explicitly chosen destination and disables all mentions.
+Existing static permission-denial wrapper text remains private and contains no user/role/everyone
+mentions. Local-time buttons are bound to session owner/guild/channel/message and have no DM fallback.
+The canonical embed content is unchanged; it uses current report/metadata/honor/event reads.
+Appearance iteration works outside season, but unavailable seasonal data is not fabricated.
+
+Storage: `<resolved STATS_ALERT_LOG parent>/prekvk_dispatch_diagnostics/<guild>/<channel>/<token>/`.
+Server-issued tokens are 32 lowercase hexadecimal characters. Each session owns `session.json`,
+`alerts.csv`, `alerts.csv.dispatch.json` (Phase 2G version 1 including generation),
+`message.json`, `alerts.csv.dispatch.lck` and `message.json.lck`.
+Root `sessions.lck` coordinates allocation/admission; `operation.json` records operation token,
+session, PID/create time and active status. All paths reject redirection/escape. No filesystem lock
+is held over Discord awaits. Lock path existence itself is not durable ownership evidence.
+
+Keep all evidence. Capacity is 20 session directories, including incomplete initialization;
+admission/inspection rejects state files above 1 MiB. No purge/reset/delete/force/clock options,
+TTL stealing or automatic scavenger. Cleanup requires separately approved offline exact paths.
+Reopening requires the same owner and destination. Root operation ownership blocks other processes;
+unknown owner status fails closed. A positively dead operation owner may be replaced, but underlying
+uncertain dispatch attempts remain blocked by the real reservation protocol.
+
+Status is a read-only observation: no lock creation, migration, repair, reservation or receipt recovery.
+Run recovers accepted receipts before rendering. Valid same-day messages edit in place; this does not
+prove fresh-admission rejection. Missing/foreign messages and edit errors never trigger replacement.
+Old-date references clear only isolated state with generation fencing and preserved admission rules.
+Reports distinguish sent, edited, guarded, uncertain and failed, and include session, UTC,
+destination, durable phase/token and positive receipt when known. A positive receipt with incomplete
+projections or failed operation finalization is not a clean success. Never retry uncertain delivery
+to make a smoke pass. Read-only guard observation plus deterministic real-store tests prove admission
+without deleting state or forcing another live send.
+
+Graceful teardown closes diagnostic admission, cancels/drains its active operation and once-only
+filesystem finalizers before client teardown. Restart reopening retains session and receipt;
+run refreshes its local-time view. Until reopening, old diagnostic buttons may be unavailable.
+Generic tracked-view startup is unchanged. Current content-read executor behavior is unchanged;
+this diagnostic does not complete the separate Stats executor audit.
+
+Operator smoke after review, merge and production-main deployment:
+1. Record deployed SHA and UTC; capture production journal/CSV/reference baseline.
+2. Invoke from the permitted location with explicit diagnostic destination; retain session token.
+3. Verify one mention-neutral message, valid payload/button, positive receipt and matching committed
+   journal/CSV/reference. Retain link and logs.
+4. Inspect status, repeat the same session and verify edit/guard without another fresh publication.
+5. Gracefully restart; record SHA, reopen the same session and verify retained identity/projections
+   and restored button. Compare production baseline accounting for independent natural traffic.
+6. Exercise unauthorized invocation and invalid destination rejection without sending.
+
+No live crash injection, parallel bot processes, deliberate Discord ambiguity or uncertain-state reset.
+Diagnostic smoke cannot establish exactly-once or all live failures. Natural calendar/scheduler routing
+is a separate Chris Watts observation; Phase 2F's next natural public save also remains separate.
+
+Rollback: stop diagnostic admission and drain operations; preserve all session files, then redeploy
+the preceding production commit. No SQL/data reset. A downgrade across Phase 2G additionally requires
+stopping all writers, backing up CSV/message state/journal together and reconciling accepted/uncertain
+receipts before old code resumes. Keep dispatch stopped when outcomes remain unknown.
