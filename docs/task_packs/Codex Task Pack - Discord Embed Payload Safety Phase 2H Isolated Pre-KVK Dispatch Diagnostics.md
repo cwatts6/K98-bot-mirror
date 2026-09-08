@@ -49,7 +49,7 @@ lifetime; every journal/CSV/message-state/lock producer; offloads, cancellation,
 content sources, views/buttons and potential mentions. Distinguish singleton metadata from actual
 ownership. Classify safe / fix now / defer / not runtime with concrete source evidence.
 
-Propose one subcommand in an existing admin group (provisional name `/ops prekvk_dispatch_test`;
+Propose one subcommand in an existing admin group (provisional name `/prekvk dispatch_test`;
 final spelling/options require architecture approval). Preserve the existing admin AND notify-channel
 invocation boundary. Require an explicit validated guild text destination; no silent stats-channel
 fallback or arbitrary path input. Explain destination eligibility, bot permissions, requester
@@ -183,7 +183,7 @@ events/reminders, diagnostics runbook and deferred register.
 The command and complete persistence/lifecycle contract are recorded in
 `docs/reference/runbook_diagnostics.md`. No production routing, payload budget, SQL, shared-state
 swap or global runtime monkeypatch changes. Existing production adapters retain defaults.
-Command version is v1.00; expected registration is 36 primary / 101 grouped / 26 ops.
+Command version is v1.01; expected registration is 36 primary / 101 grouped / 25 ops / 3 prekvk.
 No shared view, guard, registration helper, dependency or config source edit.
 
 SQL manifest: empty. No schema/procedure/view/index/UDT/ProcConfig, embedded query, DAL result-shape
@@ -208,3 +208,16 @@ History executor audits, ProcConfig result/false-success repair and Phase 2F nat
 remain separately owned by Chris Watts. Fighting-KVK diagnostic parity is future scope.
 Diagnostic Discord smoke and natural calendar routing remain distinct pending acceptance rows.
 Do not archive this pack merely on implementation delivery.
+
+### Live registration correction
+
+Operator restart exposed Discord HTTP 50035: `/ops` had 26 options, exceeding the 25 limit.
+The previous count gate passed an invalid payload. The diagnostic now registers as
+`/prekvk dispatch_test` in `commands/prekvk_cmds.py`, with the same admin AND notify gate,
+destination checks, ephemeral responses and isolated service. Existing `/ops` commands stay put.
+No session migration is needed. Runtime correction manifest: `commands/admin_cmds.py` (removal)
+and `commands/prekvk_cmds.py` (relocation); validation tooling additionally changes
+`scripts/validate_command_registration.py`. The command smoke serializes actual group payloads
+and recursively checks their option counts; static validation rejects a 26-child group and
+accepts 25. Existing scan/test evidence above remains tied to its original revisions; updated
+validation and separate mirror/production Changes-only results belong to the PR follow-up.

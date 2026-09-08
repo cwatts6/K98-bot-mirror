@@ -170,7 +170,7 @@ validated boundaries and carried-forward live smoke. The active Phase 2H pack ow
 Pre-KVK dispatch diagnostics; natural production calendar routing remains a separate observation.
 ## Phase 2H diagnostic isolation
 
-`/ops prekvk_dispatch_test` can invoke the real Pre-KVK renderer/reservation outside calendar
+`/prekvk dispatch_test` can invoke the real Pre-KVK renderer/reservation outside calendar
 routing using a dedicated durable session. Journal, CSV, message reference, generation and locks
 are isolated together; production default adapters and all natural seasonal routing remain unchanged.
 See `runbook_diagnostics.md` for exact paths, keep-all retention, reopen/recovery and smoke.

@@ -14,22 +14,22 @@ async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
 
     import discord
 
-    from commands import admin_cmds
+    from commands import prekvk_cmds
     import decoraters
     from stats_alerts import diagnostics
 
     monkeypatch.setattr(decoraters, "ADMIN_USER_ID", 30)
     monkeypatch.setattr(decoraters, "NOTIFY_CHANNEL_ID", 40)
     monkeypatch.setattr(decoraters, "usage_tracker", lambda: types.SimpleNamespace(log=AsyncMock()))
-    monkeypatch.setattr(admin_cmds, "GUILD_ID", 10)
+    monkeypatch.setattr(prekvk_cmds, "GUILD_ID", 10)
     groups = []
     bot = types.SimpleNamespace(
         add_application_command=groups.append, slash_command=lambda **kwargs: lambda fn: fn
     )
-    admin_cmds.register_admin(bot)
-    ops = next(group for group in groups if group.name == "ops")
-    command = next(cmd for cmd in ops.subcommands if cmd.name == "prekvk_dispatch_test")
-    assert command.callback.__version__ == "v1.00"
+    prekvk_cmds.register_prekvk(bot)
+    ops = next(group for group in groups if group.name == "prekvk")
+    command = next(cmd for cmd in ops.subcommands if cmd.name == "dispatch_test")
+    assert command.callback.__version__ == "v1.01"
     user = types.SimpleNamespace(id=31 if case == "owner" else 30, display_name="Operator")
     guild = types.SimpleNamespace(id=11 if case == "guild" else 10, me=object())
     location = types.SimpleNamespace(id=41 if case == "notify" else 40, parent_id=None)
@@ -60,7 +60,7 @@ async def test_prekvk_diagnostic_command_boundaries(monkeypatch, case):
         return_value=diagnostics.DiagnosticResult("status", "a" * 32, "observation")
     )
     monkeypatch.setattr(diagnostics.runner, "execute", execute)
-    monkeypatch.setattr(admin_cmds, "safe_defer", AsyncMock(return_value=case != "defer"))
+    monkeypatch.setattr(prekvk_cmds, "safe_defer", AsyncMock(return_value=case != "defer"))
     await command.callback(ctx, target, action="status", session="a" * 32)
     assert execute.await_count == (1 if case == "allowed" else 0)
     replies = response.send_message.call_args_list + interaction.followup.send.call_args_list
@@ -93,7 +93,18 @@ def test_register_commands_smoke(monkeypatch):
     fake_bot = types.SimpleNamespace()
     fake_bot.tree = types.SimpleNamespace(command=lambda **kw: (lambda fn: fn))
     fake_bot.add_listener = lambda *args, **kwargs: None
-    fake_bot.add_application_command = lambda command: registered_top_level.append(command.name)
+
+    def validate_options(payload, path):
+        options = payload.get("options", [])
+        assert len(options) <= 25, f"/{path}: {len(options)} options exceeds Discord's 25 limit"
+        for option in options:
+            validate_options(option, f"{path} {option['name']}")
+
+    def add_application_command(command):
+        validate_options(command.to_dict(), command.name)
+        registered_top_level.append(command.name)
+
+    fake_bot.add_application_command = add_application_command
 
     def slash_command(**kwargs):
         def deco(fn):

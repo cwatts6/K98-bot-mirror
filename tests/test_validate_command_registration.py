@@ -184,8 +184,9 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     for group_name, mapping in phase5a_moves.items():
         assert set(mapping).isdisjoint(names)
         assert set(mapping.values()).issubset(grouped[group_name])
-    assert len(grouped["ops"]) == 26
-    assert "prekvk_dispatch_test" in grouped["ops"]
+    assert len(grouped["ops"]) == 25
+    assert "dispatch_test" in grouped["prekvk"]
+    assert len(grouped["prekvk"]) == 3
     assert len(grouped["ark"]) == 14
     assert sum(len(commands) for commands in grouped.values()) == 101
     assert "calendar" in names
@@ -526,3 +527,15 @@ def test_report_secondary_counts_tolerate_missing_or_extended_labels() -> None:
     assert report.secondary_cogs_count == 0
     assert report.secondary_subscribe_count == 0
     assert report.disabled_legacy_count == 2
+
+
+def test_group_limit_accepts_25_and_rejects_26(monkeypatch, capsys):
+    from dataclasses import replace
+
+    baseline = validator._build_report()
+    for count, expected in ((25, 0), (26, 1)):
+        report = replace(baseline, grouped={"ops": {f"command_{i}" for i in range(count)}})
+        monkeypatch.setattr(validator, "_build_report", lambda: report)
+        assert validator.main([]) == expected
+        output = capsys.readouterr().out
+        assert ("exceeds Discord group option limit" in output) == (count == 26)

@@ -30,6 +30,7 @@ collect_declared_command_names = _COMMAND_INVENTORY.collect_declared_command_nam
 collect_static_primary_inventory = _COMMAND_INVENTORY.collect_static_primary_inventory
 
 PRIMARY_COMMAND_LIMIT = 100
+GROUP_OPTION_LIMIT = 25
 PRIMARY_COMMAND_WARNING_THRESHOLD = 90
 PRIMARY_COMMAND_SURFACE_LABEL = "commands package (authoritative)"
 SECONDARY_COGS_LABEL = "cogs/commands.py (disabled legacy)"
@@ -234,6 +235,11 @@ def _format_text(report: CommandRegistrationReport) -> str:
         for group_name in sorted(report.grouped):
             subcommands = report.grouped[group_name]
             lines.append(f"  /{group_name}: {len(subcommands)} subcommand(s)")
+            if len(subcommands) > GROUP_OPTION_LIMIT:
+                lines.append(
+                    f"ERROR: /{group_name} exceeds Discord group option limit: "
+                    f"{len(subcommands)}/{GROUP_OPTION_LIMIT}"
+                )
 
     if report.primary_count > PRIMARY_COMMAND_LIMIT:
         lines.append(
@@ -327,6 +333,7 @@ def _format_markdown(report: CommandRegistrationReport) -> str:
 def _is_failed(report: CommandRegistrationReport) -> bool:
     return (
         report.primary_count > PRIMARY_COMMAND_LIMIT
+        or any(len(commands) > GROUP_OPTION_LIMIT for commands in report.grouped.values())
         or bool(report.unexpected_top_level)
         or bool(report.missing_approved_top_level)
     )

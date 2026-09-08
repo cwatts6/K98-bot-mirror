@@ -135,7 +135,7 @@ the current file-backed model unless a new approved task explicitly changes the 
 5. Run focused smoke/test commands for the affected subsystem.
 ## Isolated Pre-KVK dispatch diagnostics (Phase 2H)
 
-Use `/ops prekvk_dispatch_test destination:<channel> action:run` to allocate a session and
+Use `/prekvk dispatch_test destination:<channel> action:run` to allocate a session and
 exercise the real reserve/start/send/accept/commit flow outside seasonal routing.
 Use the returned `session:<token>` on later run or status invocations. Status requires a token.
 The invocation retains configured ADMIN_USER_ID AND notify-channel/accepted-child-thread rules.

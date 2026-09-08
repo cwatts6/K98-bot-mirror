@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=37 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=37
+primary=36 grouped_subcommands_detected=101 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=36
 ```
 
 Grouped command summary:
@@ -36,7 +36,7 @@ Grouped command summary:
 | `/me` | 8 |
 | `/mge` | 6 |
 | `/ops` | 25 |
-| `/prekvk` | 2 |
+| `/prekvk` | 3 |
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
@@ -432,9 +432,9 @@ restart-sensitive persistence behavior changes.
 
 | Group | Command | Owner | Permission | Visibility | Version |
 | --- | --- | --- | --- | --- | --- |
-| Ops | `/ops prekvk_dispatch_test` | `commands/admin_cmds.py` | Existing admin AND notify-channel gate | Ephemeral result; embed only at explicit destination | v1.00 |
+| PreKVK | `/prekvk dispatch_test` | `commands/prekvk_cmds.py` | Existing admin AND notify-channel gate | Ephemeral result; embed only at explicit destination | v1.01 |
 
 Options: required ordinary guild text `destination`; `action` run/status (default run);
 optional issued `session` token (required for status). No force/reset/path/clock options.
-Existing command defaults are preserved. Target registration: 36 primary, 101 grouped, 26 ops.
+Existing command defaults are preserved. Target registration: 36 primary, 101 grouped, 25 ops / 3 prekvk.
 Resync through the existing operator workflow; do not hand-edit generated command caches.
