@@ -180,7 +180,7 @@ run refreshes its local-time view. Until reopening, old diagnostic buttons may b
 Generic tracked-view startup is unchanged. Current content-read executor behavior is unchanged;
 this diagnostic does not complete the separate Stats executor audit.
 
-Operator smoke after review, merge and production-main deployment:
+Operator smoke after review and recorded candidate deployment (operator-approved pre-merge production-branch smoke is supported; final main verification remains separate):
 1. Record deployed SHA and UTC; capture production journal/CSV/reference baseline.
 2. Invoke from the permitted location with explicit diagnostic destination; retain session token.
 3. Verify one mention-neutral message, valid payload/button, positive receipt and matching committed
@@ -198,3 +198,13 @@ Rollback: stop diagnostic admission and drain operations; preserve all session f
 the preceding production commit. No SQL/data reset. A downgrade across Phase 2G additionally requires
 stopping all writers, backing up CSV/message state/journal together and reconciling accepted/uncertain
 receipts before old code resumes. Keep dispatch stopped when outcomes remain unknown.
+
+## Phase 2H accepted smoke — 2026-09-08
+
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.

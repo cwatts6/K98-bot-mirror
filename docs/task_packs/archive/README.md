@@ -2,6 +2,15 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+
+
 Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability
 completed its audit-first gate, review remediation, automated validation, final
 Changes-only/Deep-off security review, candidate delivery, and operator smoke on 2026-09-07.

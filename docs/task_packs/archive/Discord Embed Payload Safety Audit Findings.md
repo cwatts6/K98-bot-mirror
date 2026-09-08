@@ -849,3 +849,13 @@ Rollout/rollback requirements remain binding: stop all writers; back up CSV, mes
 journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
 keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
 The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.
+
+## Phase 2H follow-up acceptance — 2026-09-08
+
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.

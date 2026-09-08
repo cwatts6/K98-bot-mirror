@@ -573,3 +573,27 @@ This file preserves resolved deferred-optimisation notes that used to live in
 - Last verified: 2026-09-02
 
 - Resolution: Versioned durable reservations and positive receipts replace post-success admission; uncertain sends remain blocked. Full 3314 passed/2 skipped, pinned focused 91 and production focused 67 passed; separate mirror/production Changes reviews passed. Restart and KVK guard smoke accepted; fresh Pre-KVK receipts are not claimed observed. See archived Phase 2G closure and active Phase 2H pack.
+
+## Phase 2H isolated diagnostic completed item — 2026-09-08
+
+### Original captured item (historical)
+- Area: Pre-KVK dispatch diagnostics; `commands/admin_cmds.py`, `stats_alerts/dispatch_reservations.py`, `stats_alerts/state.py` and `stats_alerts/embeds/prekvk.py`
+- Type: architecture
+- Description: Phase 2G delivery is accepted with automated coverage and restart/KVK guard smoke, but its fresh Pre-KVK reservation path cannot be naturally observed outside the calendar window. Existing test mode bypasses admission and still touches shared message state; a custom log path alone does not isolate message projections.
+- Suggested Fix: Execute the active Phase 2H scope-first pack: admin/notify-gated diagnostic in an existing group, explicit destination, mentions disabled, real reservation protocol and isolated durable journal/CSV/message state/locks. Prove repeat/edit/guard and restart behavior while retaining natural production routing as a separate observation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 2G operator merges and final source/deployed-head verification; approved isolation/permission design; deterministic regression and Changes-only/Deep-off review.
+- Status: next Phase 2 task approved for scope; implementation gated; owner Chris Watts
+- Last verified: 2026-09-08
+
+
+### Resolution
+
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.

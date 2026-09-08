@@ -166,7 +166,7 @@ ignores the journal: reconcile accepted/uncertain attempts and retain consistent
 before downgrade; keep dispatch stopped if outcomes remain unknown. Mixed versions and independent
 filesystems are excluded. Retention, singleton repair, public child supervision and DM redesign
 remain separate. See archived Phase 2G pack sections 15–17 and its delivery closure for the protocol,
-validated boundaries and carried-forward live smoke. The active Phase 2H pack owns isolated
+validated boundaries and carried-forward live smoke. The archived, operator-accepted Phase 2H pack records isolated
 Pre-KVK dispatch diagnostics; natural production calendar routing remains a separate observation.
 ## Phase 2H diagnostic isolation
 

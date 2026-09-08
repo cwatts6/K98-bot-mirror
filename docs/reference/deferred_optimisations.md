@@ -6,17 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: Pre-KVK dispatch diagnostics; `commands/admin_cmds.py`, `stats_alerts/dispatch_reservations.py`, `stats_alerts/state.py` and `stats_alerts/embeds/prekvk.py`
-- Type: architecture
-- Description: Phase 2G delivery is accepted with automated coverage and restart/KVK guard smoke, but its fresh Pre-KVK reservation path cannot be naturally observed outside the calendar window. Existing test mode bypasses admission and still touches shared message state; a custom log path alone does not isolate message projections.
-- Suggested Fix: Execute the active Phase 2H scope-first pack: admin/notify-gated diagnostic in an existing group, explicit destination, mentions disabled, real reservation protocol and isolated durable journal/CSV/message state/locks. Prove repeat/edit/guard and restart behavior while retaining natural production routing as a separate observation.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 2G operator merges and final source/deployed-head verification; approved isolation/permission design; deterministic regression and Changes-only/Deep-off review.
-- Status: next Phase 2 task approved for scope; implementation gated; owner Chris Watts
-- Last verified: 2026-09-08
-
-### Deferred Optimisation
 - Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
 - Type: consistency
 - Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. This file is unchanged in Phase 2G; the log does not establish full post-procedure success.
@@ -430,10 +419,19 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate operator-approved executor audit; preserve SQL/read behavior and telemetry; no SQL contract change approved.
 - Status: evidence required; owner Chris Watts; not a Phase 2G dependency
 - Last verified: 2026-09-08
-## Phase 2H progress note — 2026-09-08
+## Phase 2H closure — 2026-09-08
 
-The active Pre-KVK diagnostic item has an operator-approved design and implementation in progress.
-Phase 2G merges and final production-main source are verified; deployment of c0a3bc6b is
-operator-attested. Do not resolve/archive the item until diagnostic Discord/restart smoke is accepted.
-Existing separately structured lifecycle, executor, ProcConfig and natural-observation items remain
-unchanged; their owner is Chris Watts. Fighting-KVK preview parity requires a later independent scope.
+Pre-KVK diagnostic delivery is accepted and moved to archive/deferred_optimisations_resolved.md.
+Natural production calendar dispatch and Phase 2F's natural public-save observation remain pending
+with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured items remain open.
+
+### Deferred Optimisation
+- Area: `commands/stats_cmds.py::test_kvk_embed`, `stats_alerts/embeds/kvk.py`, and diagnostic session reuse
+- Type: architecture
+- Description: Existing `/kvk_admin test_embed` has test-mode routes; parity with accepted isolated Pre-KVK diagnostics needs its own source audit before claiming safe off-season appearance iteration, identity preservation or admission proof.
+- Suggested Fix: Use the Phase 2I Fighting-KVK Diagnostic Parity pack to audit both post_here routes and all sends/state/guards, then propose an explicitly targeted, mention-neutral, isolated diagnostic contract using existing domain command/service patterns.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 2H final merges/deployed-head verification, explicit scope/design approval, path isolation proof, deterministic tests and Changes-only/Deep-off review; no SQL or production reservation redesign implied.
+- Status: selected next scope-first task; implementation unapproved; owner Chris Watts
+- Last verified: 2026-09-08

@@ -9,8 +9,9 @@ itself mean that the document is approved for execution.
 | Classification | Files / programme | Status |
 |---|---|---|
 | Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Mirror #257 and production #564 merged; production-main source verified, deployment/restart operator-attested; next natural save unobserved |
-| Completed delivery archive | Discord Embed Payload Safety Phase 2G task pack and starter | Operator accepted bounded validation; mirror #258 / production #565 OPEN, final merges/source verification pending; live reservation smoke carried forward |
-| Next task: scope first | Discord Embed Payload Safety Phase 2H Isolated Pre-KVK Dispatch Diagnostics task pack and starter | Admin diagnostic with isolated durable state and real reserve/send/commit; implementation gated after architecture review |
+| Completed delivery archive | Discord Embed Payload Safety Phase 2G task pack and starter | Merged; operator accepted bounded validation; real protocol subsequently exercised by isolated Phase 2H smoke; natural calendar dispatch pending |
+| Completed delivery archive | Discord Embed Payload Safety Phase 2H task pack and starter | Operator accepted isolated smoke on deployed pre-merge `7794d2ae`; #259/#566 merges and final main deployment pending |
+| Next task: scope first | Discord Embed Payload Safety Phase 2I Fighting-KVK Diagnostic Parity task pack and starter | Audit existing `/kvk_admin test_embed`; design and implementation require approval |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
@@ -25,7 +26,7 @@ itself mean that the document is approved for execution.
 | Retained contract fixtures | KVK_ALL Phase 4 Metric Source Rules and Phase 10 Metric Source Correction | Completed records retained at asserted top-level paths; not active work |
 | Index/reference | `README.md`; removed `me_dashboard_screenshot.jpg` asset record | Documentation index; the operator-owned deletion is preserved, the image is absent, and the former path is not active work |
 
-Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, 2C, 2D, 2E, 2F, and 2G, the Pinned Calendar Tracker Atomic
+Recently archived: Discord Embed Payload Safety Phases 1, 2A, 2B, 2C, 2D, 2E, 2F, 2G, and 2H, the Pinned Calendar Tracker Atomic
 Persistence task pack/starter, the `DL_bot`
 offload-callable once-only task pack/starter, KingdomScanData4 Phase 5.2 task pack/starter,
 GovernorOS Phase 8.1 task pack/starter, and the MGE Process Polish Phase 2 initiation statement.
@@ -808,9 +809,12 @@ Rollout/rollback requirements remain binding: stop all writers; back up CSV, mes
 journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
 keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
 The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.
-## Phase 2H approved implementation
+## Phase 2H accepted delivery and Phase 2I handoff
 
-Phase 2H design is approved; the command implementation is on an isolated mirror branch.
-Phase 2G merges and production-main source are verified, and deployment of `c0a3bc6b` is
-operator-attested. The active Phase 2H pack and diagnostics runbook own its exact manifest,
-isolation, status, retention and smoke contract. Keep the pack active until explicit acceptance.
+Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
+
+Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
+Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
+deployment/restart verification. The detailed receipt, hashes and limits are in the archived
+Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
+no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
