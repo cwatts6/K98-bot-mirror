@@ -678,8 +678,17 @@ def run_post_import_stats_update(
 
 
 def atomic_write_csv(
-    path: Path | str, header: Iterable[str], rows: Iterable[Iterable[str]]
+    path: Path | str,
+    header: Iterable[str],
+    rows: Iterable[Iterable[str]],
+    *,
+    replace_retries: int = 1,
 ) -> None:
+    """Write once, optionally retrying only transient Windows replacement failures.
+
+    Callers enabling retries must serialize writers to the deterministic temp path.
+    The default preserves the existing single-attempt contract for other callers.
+    """
     p = Path(path)
     _ensure_parent(p)
     tmp = p.with_suffix(p.suffix + ".tmp")
@@ -690,7 +699,22 @@ def atomic_write_csv(
             w.writerow(list(r))
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, p)
+    attempts = max(1, int(replace_retries))
+    for attempt in range(1, attempts + 1):
+        try:
+            os.replace(tmp, p)
+            return
+        except OSError as exc:
+            if not _is_winerr32(exc) or attempt == attempts:
+                raise
+            delay = random.uniform(0.0, min(0.02 * (2 ** (attempt - 1)), 0.25))
+            logger.warning(
+                "[atomic_write_csv] WinError32 contention on %s (attempt %d/%d), retrying",
+                p,
+                attempt,
+                attempts,
+            )
+            time.sleep(delay)
 
 
 def read_csv_rows_safe(path: Path | str) -> list[list[str]]:

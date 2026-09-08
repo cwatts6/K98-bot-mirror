@@ -29,7 +29,7 @@ def _read_rows_unlocked(log_path: str) -> tuple[list[str], list[list[str]]]:
     """Read/migrate under the caller's coordination lock; errors propagate."""
     rows = read_csv_rows_safe(log_path)
     if not rows:
-        atomic_write_csv(log_path, HEADER, [])
+        atomic_write_csv(log_path, HEADER, [], replace_retries=5)
         logger.info("[STATS_ALERT] created log at %s", log_path)
         return list(HEADER), []
     has_header = bool(rows[0] and rows[0][0].strip().lower() == "date")
@@ -40,7 +40,7 @@ def _read_rows_unlocked(log_path: str) -> tuple[list[str], list[list[str]]]:
     if changed:
         data = [[row["date"], row["time_utc"], row["kind"]] for row in normalized if row]
         header = list(HEADER)
-        atomic_write_csv(log_path, header, data)
+        atomic_write_csv(log_path, header, data, replace_retries=5)
         logger.info("[STATS_ALERT] migrated log to headered 3-col format at %s", log_path)
     return header, data
 
@@ -67,7 +67,7 @@ def _append_success_unlocked(log_path: str, kind: str, when, max_per_day: int = 
         )
         return False
     rows.append([day, when.strftime("%H:%M:%S"), kind])
-    atomic_write_csv(log_path, header, rows)
+    atomic_write_csv(log_path, header, rows, replace_retries=5)
     logger.info(
         "[SEND GUARD] Claimed slot %d/%d for '%s' on %s (log=%s).",
         count + 1,

@@ -138,6 +138,28 @@ def test_lock_contention_does_not_send_or_overwrite(store, monkeypatch):
     assert store.reserve("prekvk_daily", 99)
 
 
+def test_exhausted_csv_sharing_retry_never_grants_ownership(store, monkeypatch):
+    import file_utils
+
+    attempts = []
+
+    def fail(source, target):
+        assert str(target) == store.log_path
+        attempts.append(source)
+        error = PermissionError("sharing violation")
+        error.winerror = 32
+        raise error
+
+    with monkeypatch.context() as patch:
+        patch.setattr(file_utils.os, "replace", fail)
+        patch.setattr(file_utils.time, "sleep", lambda _: None)
+        with pytest.raises(PermissionError):
+            store.reserve("prekvk_daily", 99)
+    assert len(attempts) == 5
+    assert not store.path.exists()
+    assert store.reserve("prekvk_daily", 99)
+
+
 @pytest.mark.parametrize(
     "phase,alive,available",
     [

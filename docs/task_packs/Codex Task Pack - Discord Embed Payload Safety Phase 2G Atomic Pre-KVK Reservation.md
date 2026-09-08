@@ -323,3 +323,28 @@ the journal backup; if uncertainty remains, keep dispatch stopped pending the op
 recovery decision. Do not delete locks under live writers or blindly restore stale snapshots.
 No singleton repair, public child-task lifecycle or SQL work is a hard implementation dependency;
 exclusive operational stop during version changes is a deployment requirement.
+
+
+## 16. Local Windows validation follow-up - 2026-09-08
+
+The operator's local full suite failed in test_process_contenders_have_one_owner: one child hit
+WinError 32 replacing alerts.csv.tmp before any reservation was written. The other child obtained
+ownership. This is evidence of pre-send CSV availability failure, not two successful owners; the
+original external handle owner is unknown. Twelve local reruns did not reproduce the transient
+holder. The strict process test remains unchanged and is not skipped or relaxed.
+
+The follow-up narrowly extends the runtime manifest with `file_utils.py::atomic_write_csv`:
+optional replacement-attempt count defaults to one for unchanged callers. Stats guard creation,
+migration and append opt into five attempts while retaining the existing coordination lock.
+Only os.replace is retried for the existing WinError32 classification; row iteration, CSV writing,
+fsync, executor entry and Discord sends are not repeated. Backoff uses the existing JSON-helper
+20ms exponential/full-jitter convention capped at 250ms per delay. Exhaustion/other errors still
+propagate, preserving the old destination and blocking reservation admission. This is not a fix
+for persistent external file locks or permission errors, and it makes no new delivery guarantee.
+
+Changed tests are `tests/test_stats_alerts_guard.py` and `tests/test_prekvk_reservation.py`.
+Deterministic injected sharing violations cover initialization/migration/append recovery, unchanged
+temp bytes and one fsync, lock ownership throughout retries, exhaustion, non-sharing failures,
+legacy single-attempt defaults and no reservation on exhausted CSV creation. Pinned filelock 3.20.0
+focused validation passed 88 tests. Full local-version validation and a new immutable bot
+Changes-only/Deep-off review are recorded in the PR handoff. No SQL/config/dependency change.
