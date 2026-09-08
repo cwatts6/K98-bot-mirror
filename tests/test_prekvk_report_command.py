@@ -1,3 +1,4 @@
+import ast
 import inspect
 import types
 
@@ -11,6 +12,12 @@ def test_prekvk_report_command_is_public_read_only_surface():
 
     assert "SlashCommandGroup" in source
     assert '"prekvk"' in source
+    report = next(
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "prekvk_report"
+    )
+    source = "\n".join(source.splitlines()[report.decorator_list[0].lineno - 1 : report.end_lineno])
     assert 'name="report"' in source
     assert "@safe_command" in source
     assert "@track_usage()" in source
