@@ -211,3 +211,289 @@ limits. Keep private player rows/credentials/findings out of Git. No PR creation
 preparation. End with slice status and next required gate.
 
 **Prepared only. S2A G3 pending; no implementation executed.**
+
+
+## S2A G3 implementation delivery - 2026-09-09
+
+The operator explicitly approved **S2A only** and requested implementation/static validation,
+then a stop for review. This supersedes this pack's historical G3-pending wording. No disposable
+SQL server/database was supplied: offline authoring is authorized; **integration acceptance is
+pending**. S2B and every successor retain their separate approval gates.
+
+### 1. Summary
+
+Authored the isolated twelve-table observation/artifact/roster/aggregate foundation, its migration,
+static validator and synthetic rollback fixture. No existing SQL object, bot runtime, importer,
+configuration, publication state, command or daily namespace changes. B0 membership/attribution,
+exact source endpoints and semantic re-export identity remain separate from aggregate authority.
+Interim 11-10 then 12-10; final 13-10; authorized EndScanID=14 itself permits replacement 14-10
+in the later configuration/publication implementation. S2A neither performs those calculations
+nor requires an extra correction command. SQL authoring is delivered for review, not activated.
+
+S1 prerequisite verified through the connected GitHub reader: mirror #263 merged at
+2026-09-09 18:36:00 UTC, merge `e427e27904d4e20e75cab40bac23776c83dc2e29`; production #570
+merged at 18:36:48 UTC, merge `abfc3845e9f8b78d70f88bada5a76c454ff32cb8`. The ten S1
+source/test Git blobs match both merge trees and the current local bot tree. Local archived S1
+receipt and merged PR metadata retain operator acceptance and **200 passed, 1 warning in 5.39s**,
+restart/startup success, no machine Git HEAD, and the separate tracked-view timeout limitation.
+These historical tests/restart are not S2A SQL execution or new deployment evidence. GitHub CLI
+reads returned HTTP 401; the connected GitHub reader supplied the successful verification.
+
+### 2. File Manifest
+
+SQL base/start HEAD: `fc0e94ebd2e0a98286069c8a8b71365dd5178657`, clean `main` at
+`C:/K98-bot-SQL-Server`. Its origin remains `https://github.com/cwatts6/K98-bot-SQL-Server.git`.
+Implementation is in the same SQL history on `codex/kvk-source-s2a`, isolated worktree
+`C:/discord_file_downloader/.sql-worktrees/kvk-source-s2a`, same HEAD. The original checkout
+and every pre-existing worktree remain preserved. New files are unstaged and uncommitted.
+
+Bot base/start HEAD: `d3a5c5565d9eb5e8cf5994e3044307db66d7fecb`, clean `main`. Evidence branch
+`codex/kvk-source-s2a` retains that HEAD. Origin remains `https://github.com/cwatts6/K98-bot-mirror.git`;
+production remains `https://github.com/cwatts6/K98-bot.git`. Only this appendix modifies the bot tree.
+No pull, reset, merge, push or PR; no production checkout/history mutation.
+
+The exact section 11 manifest is unchanged: twelve snapshots plus one migration and two validators.
+The creation date was verified as 2026-09-09 and no migration occupied that day's sequence.
+**Final migration path recorded before authoring:**
+`migrations/20260909_001_kvk_source_observation_facts.sql`. No allocation exception was needed.
+
+### 3. New Files
+
+All fifteen paths below are relative to the SQL worktree above:
+
+- `migrations/20260909_001_kvk_source_observation_facts.sql`
+- `sql_schema/KVK.SourceArtifact.Table.sql`
+- `sql_schema/KVK.SourceImportAttempt.Table.sql`
+- `sql_schema/KVK.SourceObservation.Table.sql`
+- `sql_schema/KVK.SourceObservationRevision.Table.sql`
+- `sql_schema/KVK.SourcePlayerSnapshot.Table.sql`
+- `sql_schema/KVK.SourceLogicalScan.Table.sql`
+- `sql_schema/KVK.SourceRoster.Table.sql`
+- `sql_schema/KVK.SourceRosterMember.Table.sql`
+- `sql_schema/KVK.SourceAggregateReport.Table.sql`
+- `sql_schema/KVK.SourceAggregateRevision.Table.sql`
+- `sql_schema/KVK.SourceKingdomReportRow.Table.sql`
+- `sql_schema/KVK.SourceCampReportRow.Table.sql`
+- `deploy/Test-KvkSourceObservationContracts.ps1`
+- `validation/kvk_source/observation_constraints.sql`
+
+### 4. Modified Files
+
+Only this S2A pack's append-only delivery evidence. No existing SQL file, index document,
+predecessor, architecture, plan, acceptance-scenario or Python file was modified. Private scan
+artifacts and temporary validator-mutation fixtures are outside Git. The existing repository
+validator writes only its ignored `logs/validation.jsonl` in the isolated SQL worktree.
+
+### 5. SQL Changes
+
+Exactly twelve new tables under KVK. Composite source/season keys enforce revision, roster,
+scan and aggregate references; selected revisions include the parent observation/report ID.
+Circular selected-pointer and import-attempt outcome links are added after all tables exist.
+Equivalent re-export attempts can point at an existing revision with their own original artifact.
+Player semantic uniqueness includes observation/schema/digest version; aggregate finalization
+may reuse unchanged content as a separate state event. LogicalScanID remains positive int,
+unique per source/season and observation, with no identity, default, trigger or aggregate allocator.
+
+Player counters have 31 dedicated nullable bigint columns with one-to-one snake_case S1 header
+mapping and explicit JSON field-state checks; valid zero differs from unavailable NULL. Names,
+Alliance and Civilization are nullable text; bounded private raw JSON retains source evidence.
+Frozen roster references the exact B0 revision and scope/member digests; absent B0 power does
+not remove eligibility. Kingdom/camp rows each retain eight nonnegative decimal(38,6) values,
+eight raw tokens, eight positive displayed units, precision kinds and raw cell provenance.
+Row mapping digests reference the same immutable aggregate revision. No DKP calculation,
+player rollup, camp sum or universal 36-kingdom constraint is introduced.
+
+The migration checks existing KVK schema, SQL JSON compatibility >=130, explicit
+Latin1_General_100_BIN2 availability and absent destination names. Collision/repeat execution
+fails closed for migration-history/drift review. It owns a transaction only if none exists,
+propagates errors and verifies all twelve tables and trusted/enabled constraints. Rollback
+retains additive objects with source disabled; no DROP or evidence deletion is supplied.
+
+Limits: actual compilation, FK/check/unique enforcement and rollback have not run on SQL Server.
+Typed SQL conversions can round before CHECK evaluation; later DAL must bind S1-validated
+integers/Decimals exactly and test driver precision. NULL selected pointers, immutable accepted
+writes, scope/map completeness, row counts/digests, monotonic revisions/selection and allocation
+locks require later transactional service/DAL enforcement. S2B alone adds the period FK and
+publication/configuration state. These are explicit contract boundaries, not S2A runtime claims.
+
+### 6. Helpers Reused
+
+The static validator follows `Test-KvkTargetPublicationContract.ps1`'s read-only text/assertion
+pattern; no connection/deployment helper is invoked by it. Existing `Validate-SqlRepo.ps1` and
+its inspected JSON-log helper are used unchanged with explicit RepoPath. Existing SQL snapshots
+and JSON conventions were checked. No Python business helper, legacy numeric coercion, upload-time
+default or reporting calculation is reused; no shared helper extraction is needed for this slice.
+
+### 7. Refactor Findings
+
+No command/view SQL, duplicated business calculation or runtime-state refactor was introduced.
+Existing legacy summation and ProcConfig WS1 debt remain outside the exact manifest. No newly
+proved unrelated debt was identified. K98 PR-review checks retain a review hold on integration
+acceptance: static assertions cannot establish SQL runtime correctness or deployment readiness.
+
+### 8. Test Plan with Actual Outcomes
+
+- `deploy/Test-KvkSourceObservationContracts.ps1 -RepoPath C:/discord_file_downloader/.sql-worktrees/kvk-source-s2a`:
+  **passed, 393 assertions** across all twelve snapshots, migration and rollback fixture.
+- Six temporary offline mutations: **all correctly rejected** (snapshot mismatch, allocator
+  default, missing composite FK columns, FLOAT substitution, removed source allowlist, removed
+  disposable server guard). Delivered source remained unchanged.
+- `deploy/Validate-SqlRepo.ps1 -RepoPath C:/discord_file_downloader/.sql-worktrees/kvk-source-s2a`:
+  **succeeded, zero errors, 15 warnings**, all warnings refer to pre-existing migrations.
+  Log source reviewed before execution; ignored isolated-worktree validation log only.
+- `validation/kvk_source/observation_constraints.sql`: **authored, NOT executed**. Contains 91
+  expected-rejection cases plus valid graph, bigint/decimal boundary, genuine-zero/unavailable,
+  re-export alias, same-content aggregate finalization, half-aggregate rollback and all-twelve-table
+  rollback checks. Error expectations distinguish constraint violations from arbitrary failures.
+- SQL integration remains **pending**: explicitly authorized exact disposable server/database,
+  compilation, actual constraint/error behavior and rollback receipts. Fixture refuses ambient
+  transactions; requires three explicit session-context authorizations, exact server/database
+  equality and a `K98_S2A_Disposable_` database name. It has no connection target or USE statement.
+  Concurrent T50 allocation/acceptance and T68 registry behavior remain later DAL integration tests.
+- T13/T17 identity and duplicate-row foundations, T46 rollback and T50 uniqueness are represented;
+  SQL execution is not counted as passed. T01-T08/T68 have storage identity foundations only.
+  Parser cases retain historical accepted S1 coverage; S2A did not rerun or execute S1 as a pack.
+- Bot focused/full pytest, log-noise suite, smoke imports and command inventory/registration checks
+  are intentionally skipped: no bot source/test, command, runtime wiring, startup, scheduler,
+  cache or operational logging changed. SQL tests do not substitute for those future gates.
+
+### 9. Security Review Decision and Evidence
+
+SQL: **Changes**, Deep **off**, exact fifteen-file working-tree target at
+`fc0e94ebd2e0a98286069c8a8b71365dd5178657` in the isolated SQL worktree. Scan
+`030f5b97-1524-44bf-b5aa-9b3ea79a2ec8`; snapshot digest
+`codex-security-snapshot/v1:sha256:4f0e343990a5c40f2ae133d6dcb64c41895cafce36a56995901cc373b322e2e8`.
+Final scan outcome is recorded in the validation closeout below. Preflight passed all three
+checks without config edits; TAC advisory returned `granted`, `tac1`. A helper invocation with
+a session-cap flag failed because protocol version was unknown; the supported retry preserved
+verified native ownership without guessing a version and passed. Required skill review workers
+are internal to this task; no new user-facing task was created.
+
+Bot: separate **documentation-only skip** for this appendix against
+`d3a5c5565d9eb5e8cf5994e3044307db66d7fecb`: no runtime, config, dependency, permission,
+input, data-access or persistence behavior change. Original SQL main checkout: separate no-diff
+skip; the authored SQL patch is reviewed in its own history/worktree. No production bot patch.
+No standard/deep scan, combined-history target, private player rows or credentials in Git.
+
+### 10. Deployment Steps
+
+**None performed or authorized.** Review S2A, then supply a named authorized disposable target
+before migration/constraint execution and integration acceptance. No production SQL, imports,
+exports, Discord actions, restart, deployment or activation. Retain additive objects and evidence
+with source disabled for rollback. Stop here; S2B needs its own approval and is not executed.
+
+### 11. Deferred Optimisations
+
+None newly established. Preserve existing unrelated work and known legacy/WS1 items separately.
+Integration evidence is an open acceptance gate, not a deferred optimisation or an assumed pass.
+
+### Validation closeout — 2026-09-09
+
+The SQL Changes review is sealed complete at 19:05:32 UTC: **15/15 files covered,
+zero findings, zero deferred candidates**, Deep off. The exact snapshot above is unchanged.
+Private scan artifacts are outside Git at
+`C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-mvEYrZ/kvk-source-s2a/fc0e94ebd2e0a98286069c8a8b71365dd5178657_20260909T185852Z_uvwbtkvl`
+(`report.md`, `scan-manifest.json`, `findings.json`, `coverage.json`, and
+`exports/results.sarif`). Measured scan rollout accounting: 4,533,706 total tokens,
+including 4,380,416 cached input tokens; three internal review threads. The skill-created
+scan goal completed with 113,056 tokens used; no user token budget was requested.
+
+Static evidence: **393 assertions passed**; six deliberately corrupted temporary copies
+were rejected. Repository SQL validation passed with **0 errors / 15 pre-existing migration
+warnings**. The 91 expected-rejection SQL cases are authored only, **not executed**.
+No SQL compilation, migration execution, constraint execution or integration acceptance is
+claimed. A named, explicitly authorized disposable SQL server/database remains required.
+
+Hook scope: Python lint, formatting, typing and runtime tests are skipped because the bot
+change is documentation only and the SQL patch adds no Python. The configured LF rewrite
+hook is replaced with read-only consistent line endings (SQL CRLF; document LF), whitespace, EOF, conflict-marker and size
+checks to preserve the original task-pack bytes. No YAML changed. The staged-only secrets
+hook cannot cover unstaged SQL additions; the cached Gitleaks executable is used instead
+against temporary exact copies of the fifteen SQL files and this delivery document. No hook
+installation, staging or repository-wide auto-fix is needed. Final hygiene, secrets and
+preservation outcomes are recorded below after those checks.
+
+**Stopped for S2A review. Integration validation pending. S2B remains unapproved and untouched.**
+
+Final closeout: all sixteen files passed read-only hygiene; Gitleaks reported no leaks.
+Preservation hashes confirm all 713 original SQL files unchanged and exactly this pack changed
+among 1,532 bot files; its original byte prefix is intact. All fifteen SQL hashes match the
+sealed review manifest. The initial hygiene assertion expected CRLF for the document too;
+the appendix was normalized to the original document LF and the check passed.
+
+### Authorized disposable SQL validation — 2026-09-09 21:08 UTC
+
+This dated execution receipt supersedes the earlier offline-only/pending statements for the
+S2A migration and constraint fixture. The operator explicitly authorized creation and S2A
+migration/constraint testing of `9SX2VF4\K98DEV` / `K98_S2A_Disposable_20260909`, then requested
+execution. No production SQL target was connected to or changed.
+
+Local environment: SQL Server 2022 Developer x64, build `16.0.1200.5` (matching the
+operator-reported production build), server collation `SQL_Latin1_General_CP1_CI_AS`, Windows
+authentication, and max server memory 8192 MB configured/active. Database collation is
+`Latin1_General_CI_AS`, compatibility 160. SQL service startup remains Manual. SSMS was installed
+separately; the operator completed KB5122771 installation and the requested local PC restart.
+The update's valid Microsoft signature and published SHA-256 were verified before installation.
+
+Execution and outcomes:
+
+- Reverified bot/SQL branches, HEADs and remotes against the baseline above. All fifteen SQL
+  SHA-256 hashes still match the sealed Changes review; no SQL source edits were required.
+- Re-ran the exact static validator: **393 assertions passed**.
+- Created the empty authorized disposable database and its prerequisite `KVK` schema owned by
+  `dbo`; no legacy tables, production data, jobs, bot configuration or successor packs imported.
+- Used Windows-authenticated SQLCMD with explicit local shared-memory connection and guards
+  for exact server/database, engine version, database collation and compatibility. The sandbox
+  initially could not authenticate; the authorized elevated local execution succeeded.
+- Applied unchanged `20260909_001_kvk_source_observation_facts.sql`: **exit 0**, all twelve
+  tables created; the migration's own transaction and postchecks completed successfully.
+- Ran unchanged `observation_constraints.sql` with the three explicit authorization session
+  context values: **exit 0; 91 expected rejections passed; 12-table rollback verified**.
+  The fixture also exercised valid synthetic rows, exact numeric boundaries, semantic aliases,
+  same-content aggregate finalization and partial aggregate rollback.
+- Independent postcheck: **12 tables, 18 foreign keys and 89 CHECK constraints; zero disabled
+  or untrusted constraints; zero rows in every table; zero user procedures or triggers**.
+- Execution transcripts and guarded local wrappers are outside Git at
+  `C:/Users/cwatt/AppData/Local/Temp/s2a-integration-20260909` (`migration-result.txt`,
+  `constraints-result.txt`, `post-check-result.txt`). Migration transcript is empty on success;
+  its exit status and independent catalog checks establish the outcome.
+
+The disposable database is retained with the twelve empty tables for inspection. S2A's authored
+migration and SQL constraint/rollback integration checks now **pass on the authorized local
+SQL Server target**. This does not establish whole-production-schema coexistence, production
+rollout, real imports, future driver Decimal admission, concurrent DAL locking, immutable-write
+policy, commit-time completeness, startup/restart behavior or S2B publication behavior. The
+future-layer obligations already recorded above remain separate; no broader acceptance is claimed.
+
+Security routing: reuse the sealed 15-file SQL Changes review (Deep off), because every reviewed
+SQL source hash is unchanged. Bot changes remain solely this evidence appendix, a documentation-only
+skip; original SQL main remains a separate no-diff skip. No new scan, staging, commit, pull, reset,
+merge, push, PR, production action, deployment, activation or successor implementation occurred.
+Runtime Python tests remain skipped: no bot runtime or Python code changed. Stop for operator
+review of this new S2A execution evidence; S2B still requires its own approval.
+
+### Operator acceptance and PR handoff — 2026-09-09 21:11 UTC
+
+**S2A accepted by Chris Watts**, including the unchanged implementation and successful authorized
+disposable SQL migration, 91 expected rejections and twelve-table rollback verification. The
+operator said "approved, whats next?" and then explicitly authorized recording approval,
+preparing the changes, creating the PRs and marking them ready for review. This supersedes
+historical G3-pending, offline-only and integration-pending status for S2A in this document.
+
+The handoff consists of two separate PRs: the exact fifteen-file implementation in
+`cwatts6/K98-bot-SQL-Server`, and this evidence-only task-pack appendix in
+`cwatts6/K98-bot-mirror`, both from `codex/kvk-source-s2a` into `main`. Local commits and branch
+pushes needed for these PRs are authorized by that request. The production bot remote is not
+part of this handoff; no merge, deployment, source activation or S2B implementation is authorized.
+
+Final review: no blocking issue identified within the approved S2A boundary. The previously
+sealed SQL Changes review covers the unchanged fifteen source files; the bot appendix has a
+separate documentation-only security skip. The local SQL execution results above remain the
+integration evidence; production-schema coexistence and future DAL/publication obligations
+remain outside this acceptance. The SQL checkout at `C:/K98-bot-SQL-Server` stays unchanged.
+
+Handoff validation: architecture, deferred-item and security-routing validators passed; the
+test selector was run for the exact document. Runtime pytest, import smoke, command registration,
+Python lint/format/type checks and log-noise tests are skipped because no bot runtime, command
+surface, Python or dependency files changed. SQL static validation and the actual SQL harness
+supply the relevant implementation checks. No new deferred optimisation item was established.
