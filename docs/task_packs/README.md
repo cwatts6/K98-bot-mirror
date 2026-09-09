@@ -12,7 +12,7 @@ itself mean that the document is approved for execution.
 | Completed delivery archive | Discord Embed Payload Safety Phase 2G task pack and starter | Merged; operator accepted bounded validation; real protocol subsequently exercised by isolated Phase 2H smoke; natural calendar dispatch pending |
 | Completed delivery archive | Discord Embed Payload Safety Phase 2H task pack and starter | Operator accepted isolated smoke on deployed pre-merge `7794d2ae`; #259/#566 merged; bounded acceptance preserved |
 | Completed delivery archive | Phase 2I Fighting-KVK Diagnostic Parity pack and starter | Candidate smoke accepted; #260/#567 merged; final source verified; merged-head process/restart association pending |
-| Approved implementation | Phase 2J Ops Diagnostic Convergence pack and starter | Remove `/ops test_embed` entirely; use H/I directly. Revised candidate validation; deployment/smoke pending |
+| Approved implementation | Phase 2J Ops Diagnostic Convergence pack and starter | Remove `/ops test_embed` entirely; mirror PR #261 open, runtime checks/review complete; deployment/smoke pending |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
 | Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
@@ -853,12 +853,16 @@ are retained; they are not desktop workbench scan IDs. This Markdown-only closeo
 config, SQL, dependency, permission or persistence changes: additional pytest/security scans skipped;
 documentation hooks, selector, architecture/deferred/security-routing validation remain required.
 
-Natural production calendar dispatch is expected on 2026-09-09 morning, Europe/London; retain its
-actual routing/admission/receipt evidence separately. Phase 2F natural public save remains pending.
-Neither observation is closed by diagnostic success. Diagnostics do not prove exactly-once delivery
-or all live failure modes. Generic tracked-view timeout and ProcConfig repair remain separate.
+The 2026-09-09 07:16 natural post-import fighting route is observed: ACTIVE KVK 16, scan 1121,
+empty reporting blocks, KS already-sent skip and legacy KVK claim 2/3. A matching message receipt,
+natural calendar Pre-KVK reservation and Phase 2F public save remain pending. Diagnostics do not
+prove exactly-once delivery. Generic tracked-view timeout and ProcConfig repair remain separate.
 
-Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
-production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.
+Phase 2J complete removal is operator-approved and implemented in mirror PR #261. Runtime head
+`dd9ad0c8` passed 74 focused tests, 3471 full-suite tests (2 skipped), applicable hooks and sealed
+Changes-only/Deep-off review. Preserve all Phase 1–2I production defaults and existing H/I sessions.
+Continue with PR feedback and the separately approved production promotion/deployment workflow;
+do not restart the superseded retain/replace/retire audit. Deployed-process/restart association,
+command resync/removal and retained-session smoke remain pending.
 
 Active: [Phase 2J task pack](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md).

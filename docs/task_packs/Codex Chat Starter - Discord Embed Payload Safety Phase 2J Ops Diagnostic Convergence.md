@@ -1,25 +1,43 @@
-Begin Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence.
-Use C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence.md.
-Historical evidence: archived Phase 2I Fighting-KVK Diagnostic Parity pack, Phase 2H Isolated
-Pre-KVK Dispatch Diagnostics pack, Phase 2G Atomic Pre-KVK Reservation pack and original audit findings.
+Continue Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence from mirror PR #261:
+https://github.com/cwatts6/K98-bot-mirror/pull/261
+Use the Phase 2J task pack in docs/task_packs and its final approved implementation amendment.
 
-Phase 2I is delivered and operator-smoke accepted on pre-merge production d89e606c; mirror reviewed
-head 06f31a94. Verify #260/#567 merges, final main/deployed heads, restart evidence, clean worktree and
-Phase 1–2I source first. Operator reports KVK 15 rendering, status/edit, rejection, restart reopening
-and matching production/Phase 2H baseline captures. Keep those limits explicit. Natural production
-calendar run expected 2026-09-09 morning and Phase 2F natural public save remain separately pending;
-collect actual evidence without forcing dispatch.
+The operator approved complete removal of `/ops test_embed`. It is implemented at reviewed runtime
+head dd9ad0c8d3e281b3a513dd248d2b6e6055e51da6, based on mirror main
+8cdbb908d391441c5cc6a75a4101f185268a7cfe. Verify the current PR head, any later documentation-only
+commits, clean worktree and review state before continuing. The earlier audit-only brief and
+retirement-with-guidance candidate are superseded; do not restart that decision or restore a handler.
 
-First response audit/scope and architecture only. Trace `/ops test_embed` through both seasonal
-routes, all sends/edits, actual destinations, guards, state, locks, returns and offloads. Recommend
-retain/replace/retire based on real gaps and reuse Phase 2H/2I diagnostics. `/ops` already has 25
-children. Prove real Pycord invocation, serialized options and group limits. Preserve production
-defaults and existing diagnostic sessions. Distinguish preview from real admission/receipt proof.
-Define explicit destination, no mentions, truthful outcomes, owner-bound isolated state, restart,
-retention, cancellation, uncertainty and rollback only where required by the proposed design.
+The final runtime removes only the ops command and unused imports. Registration is 36 primary /
+100 grouped / 24 ops, with 3 prekvk and 7 kvk_admin. Existing production dispatch and H/I diagnostic
+commands, permissions, explicit destinations and owner/season-bound sessions remain unchanged.
+Use `/kvk_admin test_embed` for fighting preview receipts and `/prekvk dispatch_test` for real isolated
+Pre-KVK admission. Neither proves natural production delivery or exactly-once. No isolated
+off-season/Kingdom Summary diagnostic exists.
 
-Produce safe/fix-now/defer/not-runtime findings, exact manifests, separately gated SQL manifest,
-selector/risk tests, Changes-only/Deep-off routing and concrete smoke. Keep reservation extensions,
-singleton/public-child lifecycle, generic view timeout, DM/broad JSON, Stats/KVK History executor
-audits and ProcConfig repair separate. No global monkeypatch, live state swapping, forced duplicate,
-SQL/calendar mutation or appearance redesign. Stop for approval; no command or test implementation.
+Runtime validation: 74 focused tests, 3471 full passed / 2 skipped, production operational logs
+unchanged, imports/registration/architecture/deferred/security-routing validators and applicable
+hooks passed. Changes-only, Deep-off review of 8cdbb908..dd9ad0c8 is sealed with zero reportable
+findings. Later Markdown-only status corrections require focused documentation validation and a
+precise security-skip record, not a claim that the sealed runtime review covered later commits.
+
+Continue with PR feedback; production promotion, merge and deployment remain separate operator
+gates. No production deployment has been performed by this task. After approved deployment, record
+running SHA and restart evidence, resync through the existing operator workflow, verify the old ops
+child is absent remotely and in the regenerated cache, then check retained H/I status/identity after
+restart. Refresh stale client suggestions; never manually edit command caches or force duplicates.
+
+Baseline #260/#567 merges and production main 00817eca were verified; earlier startup logs predate
+those merges and do not establish the final running-process SHA. Preserve operator-reported KVK 15
+rendering/status/edit/rejection/restart/capture acceptance and its evidence limits. The 2026-09-09
+07:16 natural post-import fighting route reached ACTIVE KVK 16, scan 1121, empty reporting blocks,
+KS already-sent skip and legacy claim 2/3. Matching Discord receipt, natural calendar Pre-KVK
+reservation, Phase 2F public-reminder atomic save and merged-head process/restart association remain
+pending. Collect actual evidence without forcing dispatch. ProcConfig failure followed by success
+remains a separate issue.
+
+Keep reservation extensions, singleton/public-child lifecycle, generic view timeout, DM/broad JSON,
+Stats/KVK History executor audits and ProcConfig repair separate. SQL/service/DAL/view/startup/config/
+dependency manifests are empty. No global monkeypatch, live state swapping, SQL/calendar mutation,
+state reset or appearance redesign. Follow the task pack and diagnostics runbook for rollback:
+preserve H/I sessions and receipts; restoring the pre-Phase-2J source restores unsafe ops publication.
