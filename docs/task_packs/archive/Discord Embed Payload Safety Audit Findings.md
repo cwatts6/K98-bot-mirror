@@ -1,6 +1,23 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phase 1–2K delivery slices accepted; Phase 2K #262/#569 operator merges/final verification pending; Phase 2L ProcConfig audit/design next.
+## Programme boundary decision — 2026-09-09
+
+The operator closed the Discord Embed Payload Safety approved implementation scope through
+Phase 2K and moved former Phase 2L to **Bot Operational Reliability Workstream 1**.
+The [new programme](../Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) owns the proposed reliability workstreams; no implementation
+is approved. Priority awaits comparison with the incoming missing-KVK-import and inventory-upload
+privacy programme packs. Historical next-phase instructions below are superseded by this decision.
+Natural Pre-KVK/off-season and Phase 2F public-save observations remain open independently.
+
+Final Phase 2K closeout, 2026-09-09: mirror #262 merged at 12:06:38 UTC and production
+#569 at 12:07:06 UTC. Verified mirror main: `1a3a5de3d2e9f349c276725f6271ef19a7517c4f`;
+production main: `1e72949dc69f1a1e5a529dbf1951039fe0ba74a6`. Operator supplied the same
+production bot HEAD and empty `git status --short`. Associated restart invoked 12:08:56.672,
+ready 12:09:10.755, full startup complete 12:09:15.539, new child PID 4800. This closes the
+final deployment evidence gap; candidate smoke/test revisions below remain historical evidence.
+
+
+Status: approved embed implementation scope closed through Phase 2K; final deployment verified; natural observations remain open. Former Phase 2L is Bot Operational Reliability WS1, with implementation and programme priority pending.
 Audit date: 2026-09-01; delivery updates through accepted Phase 2K on 2026-09-09
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
@@ -26,8 +43,8 @@ repository vulnerability or payload scan was performed for this documentation re
 | Production fighting/offseason and MGE bounded contracts | Original safe-within-contract assessment retained | Optional canonical final-boundary convergence is now explicitly captured |
 | Voting and bounded self-service paths | No original realistic breach established within enforced contract | Future changes require feature-local validation; not blanket proof |
 | Test-only MGE builder and inert fixtures/docs | Not runtime in original inventory | Reclassify only if a live caller is introduced |
-| Production delivery outcomes and receipts | Phase 2K delivered and smoke accepted; natural fighting receipt/claim plus isolated Pre-KVK send/status/edit | #262/#569 merges/final verification; natural Pre-KVK/off-season observations |
-| ProcConfig resource lifetime and false success | Repeated failure confirmed, including Phase 2K smoke | Selected Phase 2L audit/design; runtime implementation unapproved |
+| Production delivery outcomes and receipts | Phase 2K delivered and smoke accepted; natural fighting receipt/claim plus isolated Pre-KVK send/status/edit | Merges/final deployment verified; natural Pre-KVK/off-season observations remain |
+| ProcConfig resource lifetime and false success | Transferred to Bot Operational Reliability WS1; completed audit/design retained | Implementation unapproved; compare incoming programmes before selection |
 
 All approved Phase 1–2K delivery slices are accounted for. This does NOT mean every original defer
 or later reliability observation is complete. The active register retains ProcConfig failure/false

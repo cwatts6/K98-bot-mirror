@@ -1,5 +1,22 @@
 # Archived Task Packs
 
+## Programme boundary decision — 2026-09-09
+
+The operator closed the Discord Embed Payload Safety approved implementation scope through
+Phase 2K and moved former Phase 2L to **Bot Operational Reliability Workstream 1**.
+The [new programme](../Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) owns the proposed reliability workstreams; no implementation
+is approved. Priority awaits comparison with the incoming missing-KVK-import and inventory-upload
+privacy programme packs. Historical next-phase instructions below are superseded by this decision.
+Natural Pre-KVK/off-season and Phase 2F public-save observations remain open independently.
+
+Final Phase 2K closeout, 2026-09-09: mirror #262 merged at 12:06:38 UTC and production
+#569 at 12:07:06 UTC. Verified mirror main: `1a3a5de3d2e9f349c276725f6271ef19a7517c4f`;
+production main: `1e72949dc69f1a1e5a529dbf1951039fe0ba74a6`. Operator supplied the same
+production bot HEAD and empty `git status --short`. Associated restart invoked 12:08:56.672,
+ready 12:09:10.755, full startup complete 12:09:15.539, new child PID 4800. This closes the
+final deployment evidence gap; candidate smoke/test revisions below remain historical evidence.
+
+
 This folder keeps completed task packs and chat starters for historical reference.
 
 Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.

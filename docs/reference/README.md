@@ -62,3 +62,38 @@ usage against:
 `C:\K98-bot-SQL-Server`
 
 The SQL repo overrides inferred schema assumptions from Python code.
+
+## KVK Source Migration audit
+
+For migration work, read the [decision/evidence register](kvk_source_migration/decision_and_evidence_register.md)
+and [Phase 1 audit](kvk_source_migration/phase_1_audit.md). The audit links the dependency and field
+matrices, proposed next slice and validation log. Delivered 2026-09-09 for operator review;
+B0/deployed-state/aggregate-period limits remain explicit. No implementation is approved.
+
+
+## KVK Source Migration — Phase 2A architecture review
+
+The 2026-09-09 bounded design pass is delivered: [contract and architecture](kvk_source_migration/phase_2_contract_and_architecture.md),
+[synthetic acceptance scenarios](kvk_source_migration/phase_2_acceptance_scenarios.md), and
+[evidence/validation](kvk_source_migration/phase_2_evidence_and_validation_log.md).
+Latest B0, per-fight/final-overall and Pass-4 evidence supersedes earlier missing-input wording.
+G2 awaits operator review; no implementation or Phase 2B packs approved. Local SQL/config parity
+is operator-attested; independent live rows/jobs remain later readiness evidence.
+
+
+KVK Phase 2A clarification (2026-09-09): authorized EndScanID changes are explicit player-window
+corrections through normal configuration processing, without a separate correction command.
+The contract and scenarios T68-T70 now cover interim scans, revised finals and pending endpoints.
+G2 remains pending; no Phase 2B packs or implementation started.
+
+
+## Phase 2B delivery and G2 approval — 2026-09-09
+
+Chris Watts explicitly approved: **“G2 approved, please proceed”.** G2 is approved, including
+the EndScanID clarification and scenarios T68–T70. This supersedes earlier G2-pending/no-pack
+statements as current status; their historical evidence remains intact. Phase 2B planning is
+delivered in the [implementation plan](kvk_source_migration/phase_2_implementation_plan.md)
+and [planning evidence log](kvk_source_migration/phase_2b_evidence_and_validation_log.md).
+Ten bounded task packs and matching starters are prepared. **G3 remains pending per slice; S1 is
+the recommended first approval.** No implementation, SQL change, live action, PR or deployment
+is authorized by this delivery. S6 prepares readiness evidence and stops at separate G4 approval.

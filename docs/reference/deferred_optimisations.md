@@ -5,12 +5,13 @@ to GitHub issues/task packs.
 
 Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 
-Phase 2K delivery outcomes and receipt-only fighting claims are delivered and operator-smoke
-accepted on 2026-09-09. Its completed item is in the resolved register and archived pack.
-PRs #262/#569 still require operator merges and final main/deployment verification.
-Phase 2L selects ProcConfig result lifecycle and truthful completion as the next audit/design.
-Natural Pre-KVK/off-season and Phase 2F public-save observations remain pending independently;
-durable fighting ownership, executors, lifecycle and DM/JSON work remain separately scoped.
+The approved embed implementation programme closes through Phase 2K, whose merges and final
+clean deployed-main/restart evidence are now recorded. Unresolved items below remain open.
+[Bot Operational Reliability](../task_packs/Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) groups ProcConfig WS1, remaining executors,
+lifecycle, DM/JSON, durable dispatch and evidence-gated import admission as separate workstreams.
+WS1 design is complete; implementation and comparative programme priority remain pending.
+Natural Pre-KVK/off-season and Phase 2F public-save observations remain independent. The incoming
+inventory upload privacy finding belongs in security triage, not this optimisation register.
 
 ### Deferred Optimisation
 - Area: standalone/embedded KS claims and production Pre-KVK edit fallback
@@ -38,13 +39,13 @@ durable fighting ownership, executors, lifecycle and DM/JSON work remain separat
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2G–2J; separate from Phase 2K delivery outcomes.
-- Status: selected for Phase 2L audit/design; owner Chris Watts; runtime/test/SQL implementation requires design approval
+- Status: Bot Operational Reliability WS1 (formerly Phase 2L); audit/design complete; owner Chris Watts; runtime/test/SQL approval and cross-programme priority pending
 - Last verified: 2026-09-09
 
 ### Deferred Optimisation
 - Area: `bot_instance.py` tracked-view startup timeout and `rehydrate_views.py`
 - Type: architecture
-- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. Repeated at 2026-09-09 08:40:30 while fetching arkmatch_50; remaining views were aborted. Removal smoke does not establish full generic rehydration.
+- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. Repeated at 2026-09-09 08:40:30 while fetching arkmatch_50; remaining views were aborted. Repeated again at 2026-09-09 12:09:24.054 while fetching arkmatch_50 after final Phase 2K restart; remaining work was aborted. Removal smoke/full-startup completion does not establish full generic rehydration. Programme owner: Reliability WS3.
 - Suggested Fix: Separately inventory remaining views and prove whether deferred work is actually resumed before choosing timeout, batching or lifecycle changes. Record partial versus complete rehydration honestly and test cancellation/restart identity preservation.
 - Impact: medium
 - Risk: medium
@@ -464,3 +465,22 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Risk: low
 - Dependencies: Natural calendar opportunities and operator evidence; not blockers to accepted Phase 2K smoke and not Phase 2L implementation.
 - Status: observation pending; owner Chris Watts
+
+### Deferred Optimisation
+- Area: independent ProcConfig admin/startup/pipeline invocations and offload ownership
+- Type: architecture
+- Description: At-most-one backend per invocation does not prevent overlapping independent imports or reconstruct lost commit evidence after process death. Current reports/offload records do not establish durable admission authority; actual overlap has not been established by this audit.
+- Suggested Fix: Reliability WS6 should first measure overlapping invocation evidence and existing SQL protection; if justified, design bounded admission/provenance with exact ownership, compatibility and concurrency tests. Missing reports must not initiate replay or recovery.
+- Impact: medium
+- Risk: high
+- Dependencies: Separate source-of-truth SQL validation, scope and operator approval; outside WS1; preserve committed effects and existing dispatch policy.
+- Status: evidence-gated candidate; owner Chris Watts; implementation unapproved
+
+### Deferred Optimisation
+- Area: `gsheet_module.py::_aggregate_windowed_dfs` and `create_additional_kvk_spreadsheets`
+- Type: consistency
+- Description: KVK Source Migration Phase 1 at bot `1a3a5de3` confirms generic numeric summation across windows includes `starting_power`, while player grouping includes `name` and camp attributes. Repeated starting power can be added across windows and a label change can split one governor's export grouping. This is a static legacy export observation, not evidence of a measured deployed incident.
+- Suggested Fix: In a separately approved legacy export slice, define metric-specific aggregation and stable-ID grouping with an explicit label-selection policy; test two windows and a renamed governor using synthetic records. Coordinate with new-source period selection without changing legacy behavior in the Phase 1 audit.
+- Impact: medium
+- Risk: medium
+- Dependencies: Operator-approved legacy export scope; current `gsheet_module.py` export and compatibility tests; source-period architecture decision for new-source adaptation.

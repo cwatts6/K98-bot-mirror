@@ -6,20 +6,25 @@ itself mean that the document is approved for execution.
 
 ## Current execution set — 2026-09-09
 
+The operator approved the programme boundary below. Later dated historical paragraphs retain
+their original provenance; earlier pending/next-phase wording does not override this table.
+
+[Backlog priority assessment — 2026-09-09](Backlog%20Priority%20Assessment%20-%202026-09-09.md)
+reconciles all 22 pre-assessment top-level files into six actionable groups. Operator-selected
+order: **KVK Source Migration, Private Inventory Import and Support Sharing, then Reliability
+WS1**. KVK affects all players three times daily; inventory is optional and used by a handful.
+The operator plans warnings/advice to defer uploads; exposure remains technically possible and
+the security finding stays open. Next task: KVK Phase 1 read-only audit. No runtime or live action
+is authorized by the priority decision; supplied programme packs remain unchanged.
+
 | Classification | Files / programme | Status |
 |---|---|---|
-| Recently delivered archive | Discord Embed Payload Safety Phase 2F Active Reminder Tracker Atomic Persistence task pack and chat starter | Mirror #257 and production #564 merged; production-main source verified, deployment/restart operator-attested; next natural save unobserved |
-| Completed delivery archive | Discord Embed Payload Safety Phase 2G task pack and starter | Merged; operator accepted bounded validation; real protocol subsequently exercised by isolated Phase 2H smoke; natural calendar dispatch pending |
-| Completed delivery archive | Discord Embed Payload Safety Phase 2H task pack and starter | Operator accepted isolated smoke on deployed pre-merge `7794d2ae`; #259/#566 merged; bounded acceptance preserved |
-| Completed delivery archive | Phase 2I Fighting-KVK Diagnostic Parity pack and starter | Candidate smoke accepted; #260/#567 merged; final source verified; merged-head process/restart association pending |
-| Completed delivery archive | Phase 2J Ops Diagnostic Convergence pack and starter | Command removed; restart/resync/operator smoke accepted; #261/#568 merges and final verification pending |
-| Next task: audit/design only | Phase 2K Production Stats Delivery Outcomes pack and starter | Proposed truthful production outcomes/receipts; no implementation approval |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2E Ark Persistence Orchestration and Delivery Observability task pack and chat starter | Candidate delivered and operator-smoke accepted through mirror PR #256 and production PR #563; both PRs await manual merge and final production-main verification |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2D Operator Diagnostics Convergence task pack and chat starter | Merged through mirror PR #255 and production PR #562; automated validation, Changes-only review, candidate deployment, operator smoke, and final production-main source verification passed |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2C Player-Facing Rankings and History Convergence task pack and chat starter | Merged through mirror PR #254 and production PR #561; review and candidate smoke passed; no runtime correction was required |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening task pack and chat starter | Delivered tree is on mirror `main`; production PR #560 is merged; `3090 passed, 2 skipped`, zero-finding Changes review, and operator candidate smoke passed |
-| Recently delivered archive | Discord Embed Payload Safety Phase 2A Event and Calendar Convergence task pack and chat starter | Merged through mirror PR #252 and production PR #559; automated validation and representative production restart/pinned-edit smoke passed |
-| Recently delivered archive | Discord Embed Payload Safety Phase 1 task pack, chat starter and findings record | Mirror PR #251 and production PR #558 are merged; automated validation and operator edit-path smoke passed |
+| Closed implementation programme | Discord Embed Payload Safety Phases 1–2K, archived packs and audit | Accepted deliveries accounted for; final Phase 2K merges and clean deployed-main/restart verified. Natural Pre-KVK/off-season and Phase 2F public-save observations remain independently open. |
+| Programme charter / selection pending | [Bot Operational Reliability](Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) | Proposed WS1–WS6 deliverables; WS1 is third after KVK and inventory; any proved KVK prerequisite exception returns for approval. Implementation unapproved. |
+| Completed design / implementation unapproved | [Reliability WS1 ProcConfig task pack](Codex%20Task%20Pack%20-%20Bot%20Operational%20Reliability%20Workstream%201%20ProcConfig%20Import%20Reliability%20and%20Truthful%20Completion%20Reporting.md), matching starter and [design/manifests](Bot%20Operational%20Reliability%20Workstream%201%20-%20Design%20and%20Manifests.md) | Formerly Phase 2L. First designed workstream, not preselected ahead of incoming programmes. |
+| Compatibility redirects | Former Phase 2L pack/starter paths | Link to canonical Reliability WS1; no active embed Phase 2L execution. |
+| Assessed programme / urgent audit recommended | [KVK Source Migration](KVK%20Source%20Migration%20-%20Programme%20Pack.md), Phase 1 pack/starter and decision/evidence register | Operator confirms needed now during KVK. Recommend Phase 1 audit; broader migration and missing-import symptoms must be reconciled. No full domain audit or implementation performed here. |
+| Assessed security programme / response recommended | [Private Inventory Import and Support Sharing](Private%20Inventory%20Import%20and%20Support%20Sharing%20-%20Programme%20Pack.md), Phase 1 pack/starter | Recent exposure reported; static triage completed privately. Operator selects inventory second after KVK and plans voluntary upload-deferral advice; this does not technically close exposure. Dependency foundation alone is not remediation. |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
 | Proposed/gated feature | Phase 9 `/stats kingdom` task pack and chat starter | Product direction retained; audit, SQL, visual, performance, security and scheduling gates still apply |
@@ -869,3 +874,79 @@ Production Stats Delivery Outcomes, audit/design only; do not restart the supers
 Archived delivery: [Phase 2J task pack](archive/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](archive/Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md).
 
 Active next scope: [Codex Task Pack - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md).
+
+## KVK Source Migration — Phase 1 audit delivered, 2026-09-09
+
+The [Phase 1 audit](../reference/kvk_source_migration/phase_1_audit.md), dependency/field matrices,
+[design recommendation](../reference/kvk_source_migration/phase_1_decisions_and_next_slice.md) and
+[validation log](../reference/kvk_source_migration/phase_1_validation_log.md) are delivered for
+operator review. This updates the earlier recommendation to start the audit. B0, aggregate-period
+confirmation and deployed SQL/configuration evidence remain open. No architecture approval,
+implementation, Phase 2 execution, PR or deployment is implied.
+
+## KVK migration follow-up — 2026-09-09
+
+The Phase 1 audit now includes the designated B0 roster: 5,806 eligible governors, 5,410 with
+both sample endpoints. Operator chose per-fight revised/final reports plus a separate final overall
+report and agreed separate new-source direction. See the latest sections of the
+[register](../reference/kvk_source_migration/decision_and_evidence_register.md) and
+[audit](../reference/kvk_source_migration/phase_1_audit.md). Prior missing-B0/period-open status is
+historical. Detailed design, deployed verification and implementation remain gated.
+
+## KVK Source Migration — Phase 2 design pack prepared, 2026-09-09
+
+- [Task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+- [Chat starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+
+Prepared for operator use; not executed. Covers contract/architecture and synthetic acceptance
+scenarios using the supplied master roster, revised per-fight reports and final overall report.
+Stops at G2; exact implementation planning and all code/SQL work remain separately gated.
+
+## KVK Phase 2 preparation — evidence refreshed, 2026-09-09
+
+The prepared Contract and Architecture pack/starter now include B0 time (26 August 04:07 UTC),
+Pass 4 start/middle/end player scans, flexible naming and operator-attested SQL/config synchronization.
+Only one fight has occurred; synthetic later-fight cases suffice. No RDP or Phase-2 execution.
+See the latest `kvk_source_migration/phase_1_audit.md` and decision register for provenance/checks.
+
+
+## KVK Source Migration — Phase 2A delivered, G2 pending (2026-09-09)
+
+The bounded design pass was explicitly invoked and is delivered for architecture review:
+[contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[synthetic acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md),
+and [evidence/validation](../reference/kvk_source_migration/phase_2_evidence_and_validation_log.md).
+This supersedes preparation-only status. No architecture self-approval, Phase 2B executable packs,
+code/test/SQL edits, live actions, PR or deployment. Stop at G2; Phase 2B planning follows only
+after operator architecture approval. Existing task packs and earlier evidence remain unchanged.
+
+
+KVK Phase 2A clarification (2026-09-09): authorized EndScanID changes are explicit player-window
+corrections through normal configuration processing, without a separate correction command.
+The contract and scenarios T68-T70 now cover interim scans, revised finals and pending endpoints.
+G2 remains pending; no Phase 2B packs or implementation started.
+
+
+## Phase 2B delivery and G2 approval — 2026-09-09
+
+Chris Watts explicitly approved: **“G2 approved, please proceed”.** G2 is approved, including
+the EndScanID clarification and scenarios T68–T70. This supersedes earlier G2-pending/no-pack
+statements as current status; their historical evidence remains intact. Phase 2B planning is
+delivered in the [implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md)
+and [planning evidence log](../reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md).
+Ten bounded task packs and matching starters are prepared. **G3 remains pending per slice; S1 is
+the recommended first approval.** No implementation, SQL change, live action, PR or deployment
+is authorized by this delivery. S6 prepares readiness evidence and stops at separate G4 approval.
+
+| Slice | Task pack | Approval starter |
+|---|---|---|
+| S1 | [Offline Source Validation](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
+| S2A | [SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
+| S2B | [SQL Publication State](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
+| S3A | [Player Window Calculations](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
+| S3B | [Acceptance and Atomic Publication](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) |
+| S4A | [Shared Reports and Cards](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |
+| S4B | [Versioned Exports and Delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) |
+| S5A | [Private Intake and Admin Controls](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) |
+| S5B | [Endpoint Config and Recovery Integration](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) |
+| S6 | [Release Readiness and Controlled Activation](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) |

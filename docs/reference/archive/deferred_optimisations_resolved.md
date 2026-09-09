@@ -1,5 +1,16 @@
 # Resolved Deferred Optimisation History
 
+## Programme-boundary record — 2026-09-09
+
+The approved embed implementation scope closes through Phase 2K. Final merged production HEAD
+`1e72949dc69f1a1e5a529dbf1951039fe0ba74a6`, clean bot checkout and associated 12:08:56.672 restart /
+12:09:10.755 ready / 12:09:15.539 full-startup evidence are operator supplied and recorded in the
+[Bot Operational Reliability programme](../../task_packs/Bot%20Operational%20Reliability%20-%20Programme%20Pack.md). Candidate smoke evidence remains
+distinct. Former Phase 2L transfers as Reliability WS1 with a completed design, not a delivered fix.
+No unresolved ProcConfig, executor, lifecycle, DM/JSON, policy or natural-observation item is resolved
+by the programme rename; their active-register records remain open. Historical next-phase wording
+below is superseded by the new boundary and cross-programme priority gate.
+
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 

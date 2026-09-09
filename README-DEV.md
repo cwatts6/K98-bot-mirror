@@ -7,24 +7,40 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
-## Current Discord Embed Payload Safety Work
+## Programme boundary and next priority
 
-Phase 2K Production Stats Delivery Outcomes is delivered, tested and operator-smoke accepted
-(Chris Watts, 2026-09-09). Tested production candidate: `36208765bf7200fa6855f3892e6b32d43b23bccf`;
-mirror runtime head: `2d892cefcfdfa0a8263efe69997bf292503b23aa`. PRs #262/#569 await operator
-merges and final main/deployed-head, clean-checkout and restart verification. Documentation-only
-closeout commits follow the tested candidate. Full production pytest: 3514 passed, 2 skipped.
+Discord Embed Payload Safety's approved implementation scope is closed through Phase 2K.
+Original payload families are delivered, assessed safe within their enforced contracts, or
+explicitly deferred. Natural Pre-KVK/off-season and Phase 2F public-save observations remain open;
+they do not extend the implementation programme or invalidate accepted Phase 2K smoke.
 
-Restart/registration (36 primary / 100 grouped / 24 ops), natural KVK16 scan1122 acknowledged
-fighting receipt with confirmed claim, independent KS skip, and isolated Pre-KVK committed
-send/status/same-message edit passed. H/I sessions, production payloads/mentions and Phase 2J
-removal are preserved. Natural Pre-KVK/off-season and Phase 2F public-save observations remain
-separate follow-ups. The Phase 2K pack/starter are archived with exact evidence limits.
+Final Phase 2K closeout, 2026-09-09: mirror #262 merged at 12:06:38 UTC and production
+#569 at 12:07:06 UTC. Verified mirror main: `1a3a5de3d2e9f349c276725f6271ef19a7517c4f`;
+production main: `1e72949dc69f1a1e5a529dbf1951039fe0ba74a6`. Operator supplied the same
+production bot HEAD and empty `git status --short`. Associated restart invoked 12:08:56.672,
+ready 12:09:10.755, full startup complete 12:09:15.539, new child PID 4800. This closes the
+final deployment evidence gap; candidate smoke/test revisions below remain historical evidence.
 
-Next active scope: [Phase 2L task pack](docs/task_packs/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202L%20ProcConfig%20Import%20Reliability%20and%20Truthful%20Completion%20Reporting.md).
-Audit/design first: resolve ProcConfig result/transaction cleanup and propagate truthful outcomes
-through worker, offload, report and pipeline paths. No Phase 2L runtime/test/SQL work is yet approved.
-Start by verifying the operator-completed #262/#569 merges and final deployment evidence.
+
+The new [Bot Operational Reliability programme](docs/task_packs/Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) owns ProcConfig WS1
+(formerly Phase 2L), executor replay prevention, lifecycle/rehydration, DM/JSON persistence,
+durable dispatch policy and evidence-gated cross-invocation admission. WS1 audit/design is complete;
+runtime/test/SQL implementation remains unapproved. Retain the exact design/manifests and recheck
+source drift if work resumes later. Programme numbering does not determine next priority.
+
+The [2026-09-09 backlog assessment](docs/task_packs/Backlog%20Priority%20Assessment%20-%202026-09-09.md)
+records the operator's selected order: **KVK Source Migration first, Private Inventory Import and
+Support Sharing second, Reliability WS1 third**. All players see empty KVK stats three times daily;
+inventory is optional and used by a handful of players. The operator plans a risk warning and
+advice to defer inventory uploads. This is communication-based risk reduction, not technical
+containment or a resolved security finding. Start with KVK's read-only Phase 1; implementation and
+live actions retain their own approval gates. Bring any proved WS1 prerequisite back for approval.
+
+## Discord Embed Payload Safety delivery history
+
+The following dated delivery history retains original evidence limits. The programme decision
+and final Phase 2K deployment record above supersede historical pending/next-phase instructions.
+Phase 2J removal, H/I sessions/defaults and Phase 2K receipt/claim semantics remain preserved.
 
 Discord Embed Payload Safety Phase 1 is merged through mirror PR #251 and production PR #558. It
 establishes dependency-light canonical ownership in
