@@ -23,7 +23,7 @@ from bot_config import (
     GUILD_ID,
     NOTIFY_CHANNEL_ID,
 )
-from core.interaction_safety import get_operation_lock, safe_command, safe_defer, send_ephemeral
+from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 from core.discord_embed_limits import (
     MAX_DESCRIPTION_CHARACTERS,
     MAX_FIELD_NAME_CHARACTERS,
@@ -1348,34 +1348,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     "❌ Failed to read crash log:", f"{type(e).__name__}: {e}"
                 )
             )
-
-    @ops_group.command(
-        # architecture-check: allow
-        name="test_embed",
-        description="Show guidance for isolated stats embed diagnostics",  # architecture-check: allow
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.08")
-    @safe_command
-    @is_admin_and_notify_channel()
-    @track_usage()
-    async def test_embed_command(ctx):
-        if not await safe_defer(ctx, ephemeral=True):
-            return
-        logger.info("[/ops test_embed] diagnostic guidance requested")
-        await send_ephemeral(
-            ctx.interaction,
-            "This command now provides diagnostic guidance; it does not publish a stats embed.\n\n"
-            "**Fighting-KVK preview:** use `/kvk_admin test_embed` with an explicit diagnostic "
-            "destination. Optional `kvk_no` selects a historical season.\n\n"
-            "**Isolated Pre-KVK dispatch check:** use `/prekvk dispatch_test` with an explicit "
-            "diagnostic destination.\n\n"
-            "Fighting previews show appearance and record preview publication. Pre-KVK diagnostics "
-            "exercise the real reservation protocol in isolated state. Neither proves natural "
-            "production delivery. An isolated off-season/Kingdom Summary diagnostic is not "
-            "currently available.",
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
 
     @ops_group.command(
         name="usage",

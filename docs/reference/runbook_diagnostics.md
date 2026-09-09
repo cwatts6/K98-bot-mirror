@@ -332,33 +332,36 @@ actual routing/admission/receipt evidence separately. Phase 2F natural public sa
 Neither observation is closed by diagnostic success. Diagnostics do not prove exactly-once delivery
 or all live failure modes. Generic tracked-view timeout and ProcConfig repair remain separate.
 
-Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
-production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.
+Phase 2J is now approved as command removal. Preserve all Phase 1–2I production defaults and
+existing Phase 2H/2I sessions; the current delivery contract follows.
 
-## Phase 2J ops publication retirement
+## Phase 2J ops command removal
 
-Operator-approved `/ops test_embed` v1.08 returns only private, all-mentions-disabled diagnostic
-guidance. It makes no seasonal read, send/edit, guard claim, production-state write or session
-allocation. It retains the admin AND notify/accepted-child-thread gate. Failed defer stops;
-response failure/cancellation does not retry or fall through to a publisher. Logs say guidance
-requested, never stats delivery succeeded. The off-season/Kingdom Summary gap is explicit.
+The operator approved removing `/ops test_embed` entirely. Use `/kvk_admin test_embed` for
+fighting previews and `/prekvk dispatch_test` for isolated Pre-KVK admission, each with an explicit
+safe destination. No isolated off-season/Kingdom Summary diagnostic exists. The removed ops
+callback has no response, seasonal read, send/edit, guard claim, offload or session allocation.
 
 Smoke after candidate validation and recorded production deployment:
 1. Record deployed SHA, UTC and restart evidence. Preserve production CSV/journal/reference and
    existing H/I session baselines; account for unrelated natural traffic separately.
-2. Resync v1.08 and invoke ops in the allowed location. Expect only private guidance and no new
-   stats/summary message, edit, receipt, session or attributable guard/state change.
-3. Verify user/location rejection, accepted notify child thread, unchanged 36/101 registration
-   and 25 ops children; repeat after restart.
+2. Resync through the existing operator workflow. Confirm `/ops test_embed` is absent from the
+   remote ops options and regenerated command cache; refresh stale client suggestions. No manual
+   cache edit, fallback alias or versioned guidance handler is introduced.
+3. Verify 36 primary / 100 grouped / 24 ops, with 3 prekvk and 7 kvk_admin; repeat after restart.
 4. Use H/I directly with explicit safe destinations. Read retained status first; when appropriate
    edit the same session, retaining message identity, KVK 15 selection/honor omission and H's
-   scoped local-time button. Preserve current-KVK unavailable outcomes. Never force duplicates.
-5. Retain natural selector/channel/message/receipt evidence separately. The 2026-09-09 ACTIVE KVK
-   16 and CSV claims are not Pre-KVK reservation proof. Generic success and live-event tracker
-   saves do not close Phase 2F's public-reminder atomic-save observation.
+   scoped local-time button. Preserve owner/location rejection and current-KVK unavailable
+   outcomes. Never force duplicates or retarget an existing historical session.
+5. The 2026-09-09 07:16 natural post-import run selected ACTIVE KVK 16 at scan 1121, skipped the
+   already-sent Kingdom Summary, assembled empty fighting blocks, and claimed legacy KVK slot 2/3.
+   This observes the natural fighting route, not Pre-KVK admission. No Discord message identity
+   is logged; generic success cannot prove receipt. Natural calendar Pre-KVK reservation and
+   Phase 2F public-reminder atomic save remain separately pending, as does running-SHA/restart
+   association. ProcConfig again failed before logging success and remains separate scope.
 
 H/I keep owner/season binding, keep-all 20-session/1-MiB limits, read-only status, uncertainty
 fences, shutdown drains and separately approved offline recovery. No new cancellation, cleanup,
-SQL, calendar or startup mechanism. Rollback preserves sessions/receipts and resyncs the prior
-reviewed schema; it restores unsafe ops publication, so keep operators on H/I during rollback.
-No reset, purge, message deletion, historical retargeting or live lock removal is authorized.
+SQL, calendar or startup mechanism. Rollback to the pre-Phase-2J baseline preserves all sessions
+and receipts but restores unsafe ops publication; keep operators on H/I and resync the restored
+schema. No reset, purge, message deletion, historical retargeting or live lock removal is authorized.

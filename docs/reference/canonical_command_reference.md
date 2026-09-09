@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-18
+Last updated: 2026-09-09
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=36 grouped_subcommands_detected=101 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=36
+primary=36 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=36
 ```
 
 Grouped command summary:
@@ -35,7 +35,7 @@ Grouped command summary:
 | `/location` | 2 |
 | `/me` | 8 |
 | `/mge` | 6 |
-| `/ops` | 25 |
+| `/ops` | 24 |
 | `/prekvk` | 3 |
 | `/registry` | 7 |
 | `/stats` | 1 |
@@ -168,7 +168,6 @@ Legend:
 | Ops | `/ops show_logs` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Log display. |
 | Ops | `/ops last_errors` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Recent errors. |
 | Ops | `/ops crash_log` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Crash log excerpt. |
-| Ops | `/ops test_embed` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Guidance only, v1.08 | Private routing guide to isolated Phase 2H/2I diagnostics; no seasonal read or publication. |
 | Ops | `/ops usage` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics summary. |
 | Ops | `/ops usage_detail` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics detail. |
 | Player/KVK | `/kvk stats` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private selector; selected single-account stats post public | Standard | Canonical player KVK stats command | Player KVK stats journey. |
@@ -449,8 +448,8 @@ Old cached invocations must resync; do not silently route them to production.
 Existing configured admin AND notify/accepted-child-thread gate, versioning and usage remain.
 Acknowledgements/status/errors are private; one mention-neutral real fighting preview posts only
 at the explicit destination. Counts remain 36 primary / 101 grouped / 7 kvk_admin / 25 ops / 3 prekvk.
-Historical Phase 2I boundary: `/ops test_embed` was unchanged. Phase 2J v1.08 now retires its
-publication behaviour as described below.
+Historical Phase 2I boundary: `/ops test_embed` was unchanged. Phase 2J removes the command
+entirely as described below. Counts above record the historical Phase 2H/2I surfaces.
 
 
 ### Approved historical fighting preview selection (Phase 2I v1.06)
@@ -487,17 +486,19 @@ run and restart/reopen with that token. All edits must retain the message ID and
 KVK selector must reject without sending/editing. Historical publication is not proof of natural
 current-KVK dispatch, production admission or exactly-once; the separately pending observations remain.
 
-## Phase 2J ops diagnostic guidance (v1.08)
+## Phase 2J ops command removal
 
-`/ops test_embed` retains its zero-option schema, admin AND notify/accepted-child-thread gate,
-safe-command wrapper and usage tracking. It returns only private guidance with all mentions
-disabled. Failed defer stops; response failure/cancellation does not retry. There is no seasonal
-read, publish/edit, destination claim, receipt or session allocation.
+`/ops test_embed` is removed on explicit operator approval. Its sole user knows the replacements;
+there is no redirect, guidance callback, alias or new version to invoke. Current counts are
+36 primary / 100 grouped / 24 ops / 3 prekvk / 7 kvk_admin. The top-level baseline is unchanged.
+
 Use `/kvk_admin test_embed destination:<safe-channel>` for fighting appearance/preview receipts,
 or `/prekvk dispatch_test destination:<safe-channel>` for real isolated Pre-KVK admission.
-No isolated off-season/Kingdom Summary diagnostic is currently available.
-
-Resync v1.08 through the existing operator workflow; do not edit generated caches. Counts remain
-36 primary / 101 grouped / 25 ops / 3 prekvk / 7 kvk_admin. H/I owner/guild/destination bindings,
+No isolated off-season/Kingdom Summary diagnostic is currently available. Neither diagnostic
+proves natural production delivery or exactly-once. H/I owner/guild/destination bindings,
 v1 current and v2 historical KVK sessions, saved selection and honor omission remain unchanged.
-Neither diagnostic proves natural production delivery or exactly-once.
+
+Resync the registered commands through the existing operator workflow and confirm the old ops
+child is absent remotely and from the regenerated cache. Do not edit generated caches manually.
+A client may retain stale suggestions until refreshed; there is no compatibility callback and
+no reroute to a publisher. After restart, verify removal and retained H/I session status again.

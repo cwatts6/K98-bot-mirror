@@ -32,7 +32,6 @@ def test_phase3_ops_commands_are_grouped_with_existing_wrappers():
         "weeksummary_command": "weeksummary",
         "history_command": "history",
         "failures_command": "failures",
-        "test_embed_command": "test_embed",
         "usage_command": "usage",
         "usage_detail_command": "usage_detail",
     }
@@ -76,7 +75,6 @@ def test_phase3_ops_command_logs_use_grouped_paths():
         "/ops weeksummary",
         "/ops history",
         "/ops failures",
-        "/ops test_embed",
         "/ops usage",
         "/ops usage_detail",
     ]

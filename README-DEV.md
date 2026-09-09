@@ -9,11 +9,11 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
-Phase 2J is operator-approved: `/ops test_embed` v1.08 retires publication and returns only
-private, mention-neutral guidance to the existing Phase 2H/2I commands. No seasonal read,
-send/edit, guard claim or session allocation occurs. Production and existing diagnostic sessions
-remain unchanged. Validation and candidate delivery are tracked in the Phase 2J pack; deployment
-and operator smoke are not yet claimed.
+Phase 2J is operator-approved: remove `/ops test_embed` entirely. Its sole operator knows the
+replacement commands, so no transition handler is needed. Use existing Phase 2H/2I diagnostics
+directly with explicit destinations. Production and existing diagnostic sessions remain unchanged.
+Registration becomes 36 primary / 100 grouped / 24 ops. Resync removes the old child; do not edit
+generated caches. Candidate validation and security evidence are separate from deployment/smoke.
 
 Entry verified 2026-09-09: #260/#567 merged; production main `00817eca`, mirror main `8cdbb908`.
 All Python source matches reviewed Phase 2I `06f31a94` / `d89e606c`. The operator supplied a clean
@@ -33,7 +33,7 @@ reportable issues.
 
 Operator smoke on 2026-09-02 validated a 13-field, 1,847-character payload whose largest field was
 530 characters, then edited existing message `1544617668999381044` in place with matching persisted
-state and no duplicate or Discord `50035` rejection. `/ops test_embed` bypasses daily guards, so the
+state and no duplicate or Discord `50035` rejection. Historical `/ops test_embed` bypassed daily guards, so the
 valid same-day message ID selected the edit path; a scheduled fresh-send ping and post-success claim
 remain a natural operational observation rather than evidence from that test command.
 

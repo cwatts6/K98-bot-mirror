@@ -114,6 +114,7 @@ def test_register_commands_smoke(monkeypatch):
     import Commands
 
     registered_top_level = []
+    registered_groups = {}
     fake_bot = types.SimpleNamespace()
     fake_bot.tree = types.SimpleNamespace(command=lambda **kw: (lambda fn: fn))
     fake_bot.add_listener = lambda *args, **kwargs: None
@@ -125,7 +126,9 @@ def test_register_commands_smoke(monkeypatch):
             validate_options(option, f"{path} {option['name']}")
 
     def add_application_command(command):
-        validate_options(command.to_dict(), command.name)
+        payload = command.to_dict()
+        validate_options(payload, command.name)
+        registered_groups[command.name] = payload
         registered_top_level.append(command.name)
 
     fake_bot.add_application_command = add_application_command
@@ -143,6 +146,12 @@ def test_register_commands_smoke(monkeypatch):
 
     registered_names = [name for name in registered_top_level if name]
     assert len(registered_names) == 36
+    ops_options = registered_groups["ops"]["options"]
+    assert len(ops_options) == 24
+    assert "test_embed" not in {option["name"] for option in ops_options}
+    assert sum(len(group.get("options", [])) for group in registered_groups.values()) == 100
+    assert "test_embed" in {option["name"] for option in registered_groups["kvk_admin"]["options"]}
+    assert "dispatch_test" in {option["name"] for option in registered_groups["prekvk"]["options"]}
     assert "ark" in registered_top_level
     assert "activity" in registered_top_level
     assert "crystaltech" in registered_top_level
