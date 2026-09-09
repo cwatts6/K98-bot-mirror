@@ -1,8 +1,7 @@
 # Phase 2J — Ops Diagnostic Convergence
 
-Status: proposed next scope; first response audit/architecture only. Stop for operator approval
-before runtime or test implementation. This preparation is documentation-only and does not approve
-retaining, replacing or removing a command.
+Status: operator approved retirement-with-guidance on 2026-09-09. The implementation amendment
+below supersedes the original first-response stop. Production deployment and smoke remain gated.
 
 ## Entry gate and accepted baseline
 
@@ -84,3 +83,70 @@ remain separately scoped. Do not conflate the touched command's success reportin
 logging rewrite. Diagnostics cannot prove exactly-once or every live failure mode.
 
 The first response ends after scope and architecture for approval. Do not implement commands or tests.
+
+## Approved implementation amendment — 2026-09-09
+
+The operator approved retirement-with-guidance, not a publishing wrapper or command deletion.
+`/ops test_embed` v1.08 keeps zero options, admin AND notify/accepted-thread checks, versioning,
+usage and safe private replies. It points to H/I with explicit destinations and distinguishes
+fighting appearance/preview receipts from real isolated Pre-KVK admission. It states that no
+isolated off-season/Kingdom Summary diagnostic exists. No success/destination claim, seasonal
+read, publisher, offload, state write or new session framework is required. Failed defer stops;
+response failure/cancellation does not retry. Production and H/I contracts remain unchanged.
+
+Runtime manifest: `commands/admin_cmds.py` only. Test manifest: new
+`tests/test_ops_test_embed_retirement.py` only. Docs: this pack, README-DEV, canonical command
+reference, diagnostics runbook, deferred register and task-pack README. Tooling/config/dependency/
+service/DAL/view/startup/SQL/migration manifests: empty. Remove only now-unused handler imports.
+
+Audit: the handler claimed sent/NOTIFY location unconditionally, while the interface selects
+STATS_ALERT for broad-KVK or OFFSEASON_STATS otherwise and first sends KS to OFFSEASON. Test
+fighting clears live Pre-KVK state; test Pre-KVK edits/replaces/persists live IDs; off-season test
+suppresses ping but can claim live KS CSV keys. Interface returns None and loses outcomes;
+fighting send exceptions are also swallowed. Retiring ops access fixes its misleading result and
+side effects; other production callers and broader executor fallback remain separate work.
+
+Entry: #260 merged at be6607db and #567 at 00817eca. Verified production main
+00817ecafc631887d7dcd2436745413e5df5cf09 and mirror main
+8cdbb908d391441c5cc6a75a4101f185268a7cfe. Clean mirror and all Python source match reviewed
+06f31a94/d89e606c and production main. Operator shell is clean at 00817eca; 05:55 startup predates
+06:28 merges and has no immutable process SHA. Runtime preparation proceeds under explicit
+implementation approval; merged-head process/restart proof remains required for deployment
+acceptance and is not marked complete by that approval.
+
+Morning evidence: ACTIVE KVK 16 at scan 1120 in the 1090..1202 fighting window, empty reporting
+blocks, legacy KVK slots 1/3 then 2/3; summary send logged to 1417194970997330001 without message
+ID. Generic success/claims are not KVK receipts because legacy send errors can be swallowed. No
+fresh production Pre-KVK reserve/commit/message tuple was supplied. Natural calendar admission
+and Phase 2F public-reminder atomic save remain separately pending. Prior KVK 15 smoke/restart/
+capture acceptance retains operator-report limits and no exactly-once claim. ProcConfig failure/
+false success and generic view timeout remain excluded. No dispatch is forced.
+
+Validation: real Pycord invocation and zero-option serialization of v1.08; recursive group limits
+and 25 ops children; original owner/notify/thread gates, private mention-neutral bounded guidance,
+failed defer, response failure, cancellation and concurrency. Downstream legacy selector/outcome
+values cannot cause dispatch. Regress H/I owner/season/destination, strict payloads, status/restart,
+isolation and uncertainty. Run selector, focused/full pytest with log-noise validation, imports,
+registration, architecture/deferred/security-routing validators and hooks. Distinguish exact pinned
+dependency evidence from installed-environment checks. Final results are recorded at delivery.
+
+Security: Changes only, Deep off, immutable mirror base 8cdbb908 to reviewed implementation head.
+Production promotion needs its own immutable range; SQL is a separate no-diff skip. No Codebase
+or Deep scan. Smoke/rollback follow the Phase 2J diagnostics runbook: record deployed SHA/restart
+and baselines, resync v1.08, verify private guide without stats/state/session effects, rejection
+and post-restart behaviour. Use retained H/I sessions directly, never a forced duplicate or
+ambiguous retry. Preserve all state/receipts on rollback; prior runtime restores unsafe ops
+publication, so operators should continue with H/I. No SQL or state reset.
+
+## Candidate automated validation — 2026-09-09
+
+Focused selector/risk/H/I regression matrix: 271 passed. Full suite with operational log-noise
+check: 3485 passed, 2 skipped; production operational logs unchanged. Validation used local
+Python 3.11 and exact Pycord commit e4738227b3d22e92d3b0be4c016a4c287bb0fd1e (installed VCS receipt),
+filelock 3.20.0. The audioop deprecation warning is from Pycord/Python, not this change.
+Initial full-suite failures were the Windows local-venv interpreter gate; corrected by using the
+checkout's .venv without changing runtime. No unrelated source fix was included.
+
+Architecture, deferred-item and security-routing validators, import smoke and registration pass.
+Black/Ruff and applicable pre-commit checks run on the exact eight-file manifest. Final Changes
+security review and operator candidate deployment/smoke remain separate delivery evidence.

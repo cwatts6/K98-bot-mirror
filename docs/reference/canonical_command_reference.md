@@ -168,7 +168,7 @@ Legend:
 | Ops | `/ops show_logs` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Log display. |
 | Ops | `/ops last_errors` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Recent errors. |
 | Ops | `/ops crash_log` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Crash log excerpt. |
-| Ops | `/ops test_embed` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Test embed dispatch. |
+| Ops | `/ops test_embed` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Guidance only, v1.08 | Private routing guide to isolated Phase 2H/2I diagnostics; no seasonal read or publication. |
 | Ops | `/ops usage` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics summary. |
 | Ops | `/ops usage_detail` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics detail. |
 | Player/KVK | `/kvk stats` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private selector; selected single-account stats post public | Standard | Canonical player KVK stats command | Player KVK stats journey. |
@@ -449,7 +449,8 @@ Old cached invocations must resync; do not silently route them to production.
 Existing configured admin AND notify/accepted-child-thread gate, versioning and usage remain.
 Acknowledgements/status/errors are private; one mention-neutral real fighting preview posts only
 at the explicit destination. Counts remain 36 primary / 101 grouped / 7 kvk_admin / 25 ops / 3 prekvk.
-`/ops test_embed` is unchanged and is not an isolated preview or trustworthy send receipt.
+Historical Phase 2I boundary: `/ops test_embed` was unchanged. Phase 2J v1.08 now retires its
+publication behaviour as described below.
 
 
 ### Approved historical fighting preview selection (Phase 2I v1.06)
@@ -485,3 +486,18 @@ start a new KVK 15 session, verify title/data belong to 15 and honor is omitted,
 run and restart/reopen with that token. All edits must retain the message ID and season. A conflicting
 KVK selector must reject without sending/editing. Historical publication is not proof of natural
 current-KVK dispatch, production admission or exactly-once; the separately pending observations remain.
+
+## Phase 2J ops diagnostic guidance (v1.08)
+
+`/ops test_embed` retains its zero-option schema, admin AND notify/accepted-child-thread gate,
+safe-command wrapper and usage tracking. It returns only private guidance with all mentions
+disabled. Failed defer stops; response failure/cancellation does not retry. There is no seasonal
+read, publish/edit, destination claim, receipt or session allocation.
+Use `/kvk_admin test_embed destination:<safe-channel>` for fighting appearance/preview receipts,
+or `/prekvk dispatch_test destination:<safe-channel>` for real isolated Pre-KVK admission.
+No isolated off-season/Kingdom Summary diagnostic is currently available.
+
+Resync v1.08 through the existing operator workflow; do not edit generated caches. Counts remain
+36 primary / 101 grouped / 25 ops / 3 prekvk / 7 kvk_admin. H/I owner/guild/destination bindings,
+v1 current and v2 historical KVK sessions, saved selection and honor omission remain unchanged.
+Neither diagnostic proves natural production delivery or exactly-once.

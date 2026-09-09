@@ -9,6 +9,20 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
+Phase 2J is operator-approved: `/ops test_embed` v1.08 retires publication and returns only
+private, mention-neutral guidance to the existing Phase 2H/2I commands. No seasonal read,
+send/edit, guard claim or session allocation occurs. Production and existing diagnostic sessions
+remain unchanged. Validation and candidate delivery are tracked in the Phase 2J pack; deployment
+and operator smoke are not yet claimed.
+
+Entry verified 2026-09-09: #260/#567 merged; production main `00817eca`, mirror main `8cdbb908`.
+All Python source matches reviewed Phase 2I `06f31a94` / `d89e606c`. The operator supplied a clean
+production checkout at the merged head; the 05:55 startup excerpt predates the 06:28 merges and
+does not identify the running SHA. Final process/restart association remains pending. Natural
+morning ACTIVE KVK 16 selection and legacy CSV claims are observed; matching KVK message identity,
+natural Pre-KVK reservation/receipt and Phase 2F public-reminder atomic save remain unverified.
+Live-event tracker saves and diagnostic edits do not close those observations.
+
 Discord Embed Payload Safety Phase 1 is merged through mirror PR #251 and production PR #558. It
 establishes dependency-light canonical ownership in
 `core/discord_embed_limits.py`, fixes the exact Pre-KVK launch-week overflow through complete-event
@@ -123,10 +137,10 @@ Phase 2G PRs #258/#565 are merged; deployment of `c0a3bc6b` was operator-atteste
 Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
 
 Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
-Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
-deployment/restart verification. The detailed receipt, hashes and limits are in the archived
-Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
-no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+Phase 2H #259/#566 and Phase 2I #260/#567 are merged. Phase 2I candidate smoke is accepted;
+final merged-head process/restart association remains pending. Archived packs retain exact
+receipts and historical evidence limits. Phase 2J retires ops publication on operator approval.
+Phase 2F's natural public-save observation stays pending.
 
 ## KVK Target Publication And Quality Delivery
 
@@ -810,10 +824,10 @@ The separate Phase 2F next-natural-public-save observation remains pending unles
 Phase 2H isolated diagnostic smoke passed on deployed pre-merge commit `7794d2ae`. Phase 2G’s real reservation protocol was exercised successfully through isolated diagnostics. Production-state comparison passed for the observed status/edit operations. Natural production calendar dispatch remains separately pending.
 
 Operator acceptance: 2026-09-08, Chris Watts. The Phase 2H pack/starter are archived.
-Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final production-main
-deployment/restart verification. The detailed receipt, hashes and limits are in the archived
-Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
-no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+Phase 2H #259/#566 and Phase 2I #260/#567 are merged. Phase 2I candidate smoke is accepted;
+final merged-head process/restart association remains pending. Archived packs retain exact
+receipts and historical evidence limits. Phase 2J retires ops publication on operator approval.
+Phase 2F's natural public-save observation stays pending.
 
 Current command: `/prekvk dispatch_test` v1.02. Final runtime suite: 3,381 passed, 2 skipped.
 

@@ -433,14 +433,14 @@ with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured 
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 2H final merges/deployed-head verification, explicit scope/design approval, path isolation proof, deterministic tests and Changes-only/Deep-off review; no SQL or production reservation redesign implied.
-- Status: selected next scope-first task; implementation unapproved; owner Chris Watts
+- Status: resolved by accepted Phase 2I preview and v1.06 historical selection; #260/#567 merged; owner Chris Watts
 - Last verified: 2026-09-08
 
 ### Deferred Optimisation
 - Area: stats_alerts/interface.py, stats_alerts/embeds/kvk.py, commands/admin_cmds.py
 - Type: architecture
 - Description: Production fighting check/send/claim has no durable reservation; swallowed renderer failures and seasonal ops test wrappers can report success without a send receipt. Phase 2I preview intentionally does not alter these production semantics.
-- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes; assess retirement or repair of /ops test_embed.
+- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes. Phase 2J retires ops publication; remaining production callers and admission/outcome semantics require separate approval.
 - Impact: high
 - Risk: high
 - Dependencies: Explicit protocol approval; immutable baseline and production rollback evidence.
@@ -453,3 +453,16 @@ with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured 
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate approval and preserved public/SQL contracts.
+
+### Deferred Optimisation
+- Area: `embed_offseason_stats.py`, `stats_alerts/embeds/offseason.py`
+- Type: architecture
+- Description: No isolated off-season/Kingdom Summary diagnostic exists. Legacy test rendering can claim live summary CSV keys despite ping suppression, and daily/weekly SQL reads remain synchronous in the async renderer. Phase 2J removes the ops entrypoint only.
+- Suggested Fix: Scope a diagnostic only when needed; separate read/build/publication boundaries and prove isolation with existing helpers. Coordinate executor work with the existing Stats audit and preserve production defaults.
+- Impact: medium
+- Risk: medium
+- Dependencies: Explicit diagnostic approval, authoritative SQL validation for any DAL change, independent production admission/outcome design and Changes review. No forced calendar or SQL data changes.
+
+Phase 2J leaves existing production receipt/reservation, once-only executor, singleton/public-child,
+generic-view timeout, DM/broad JSON and ProcConfig records separately scoped. Natural production
+calendar admission and Phase 2F public-save observations remain pending.

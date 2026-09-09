@@ -334,3 +334,31 @@ or all live failure modes. Generic tracked-view timeout and ProcConfig repair re
 
 Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
 production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.
+
+## Phase 2J ops publication retirement
+
+Operator-approved `/ops test_embed` v1.08 returns only private, all-mentions-disabled diagnostic
+guidance. It makes no seasonal read, send/edit, guard claim, production-state write or session
+allocation. It retains the admin AND notify/accepted-child-thread gate. Failed defer stops;
+response failure/cancellation does not retry or fall through to a publisher. Logs say guidance
+requested, never stats delivery succeeded. The off-season/Kingdom Summary gap is explicit.
+
+Smoke after candidate validation and recorded production deployment:
+1. Record deployed SHA, UTC and restart evidence. Preserve production CSV/journal/reference and
+   existing H/I session baselines; account for unrelated natural traffic separately.
+2. Resync v1.08 and invoke ops in the allowed location. Expect only private guidance and no new
+   stats/summary message, edit, receipt, session or attributable guard/state change.
+3. Verify user/location rejection, accepted notify child thread, unchanged 36/101 registration
+   and 25 ops children; repeat after restart.
+4. Use H/I directly with explicit safe destinations. Read retained status first; when appropriate
+   edit the same session, retaining message identity, KVK 15 selection/honor omission and H's
+   scoped local-time button. Preserve current-KVK unavailable outcomes. Never force duplicates.
+5. Retain natural selector/channel/message/receipt evidence separately. The 2026-09-09 ACTIVE KVK
+   16 and CSV claims are not Pre-KVK reservation proof. Generic success and live-event tracker
+   saves do not close Phase 2F's public-reminder atomic-save observation.
+
+H/I keep owner/season binding, keep-all 20-session/1-MiB limits, read-only status, uncertainty
+fences, shutdown drains and separately approved offline recovery. No new cancellation, cleanup,
+SQL, calendar or startup mechanism. Rollback preserves sessions/receipts and resyncs the prior
+reviewed schema; it restores unsafe ops publication, so keep operators on H/I during rollback.
+No reset, purge, message deletion, historical retargeting or live lock removal is authorized.

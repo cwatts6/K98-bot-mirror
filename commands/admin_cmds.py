@@ -22,9 +22,8 @@ from admin_helpers import prompt_admin_inputs, log_processing_result
 from bot_config import (
     GUILD_ID,
     NOTIFY_CHANNEL_ID,
-    OFFSEASON_STATS_CHANNEL_ID,
 )
-from core.interaction_safety import get_operation_lock, safe_command, safe_defer
+from core.interaction_safety import get_operation_lock, safe_command, safe_defer, send_ephemeral
 from core.discord_embed_limits import (
     MAX_DESCRIPTION_CHARACTERS,
     MAX_FIELD_NAME_CHARACTERS,
@@ -58,8 +57,6 @@ from file_utils import append_csv_line, read_json_safe, read_summary_log_rows
 from gsheet_module import check_basic_gsheets_access, run_all_exports
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH, flush_logs
 from proc_config_import import run_proc_config_import_offload
-from stats_alerts.interface import send_stats_update_embed
-from stats_alerts.kvk_meta import is_currently_kvk
 from stats_module import run_stats_copy_archive
 from ui.views.admin_views import LogTailView
 from utils import utcnow
@@ -1355,51 +1352,30 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @ops_group.command(
         # architecture-check: allow
         name="test_embed",
-        description="🧪 Manually trigger the stats update embed",  # architecture-check: allow
+        description="Show guidance for isolated stats embed diagnostics",  # architecture-check: allow
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.07")
+    @versioned("v1.08")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
     async def test_embed_command(ctx):
-        from datetime import datetime
-
-        from bot_config import NOTIFY_CHANNEL_ID
-
-        await safe_defer(ctx, ephemeral=True)
-        start_ts = datetime.now(UTC)
-
-        # Where the embed will land (for the admin’s confirmation)
-        notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
-
-        try:
-            # Determine if KVK fighting is open (blocking) — run off the loop
-            is_kvk = await asyncio.to_thread(is_currently_kvk)
-
-            timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-
-            # Send the test embed (async interface accepts (bot, timestamp, is_kvk, is_test=...))
-            await send_stats_update_embed(bot, timestamp, is_kvk, is_test=True)
-
-            dur = (datetime.now(UTC) - start_ts).total_seconds()
-            where = notify_channel.mention if notify_channel else f"<#{OFFSEASON_STATS_CHANNEL_ID}>"
-            await ctx.interaction.edit_original_response(
-                content=(
-                    "✅ **Test stats embed sent.**\n"
-                    f"- KVK active: **{is_kvk}**\n"
-                    f"- Timestamp: `{timestamp}`\n"
-                    f"- Posted to: {where}\n"
-                    f"- Duration: **{dur:.1f}s**"
-                )
-            )
-            logger.info("[/ops test_embed] success (kvk=%s, dur=%.2fs)", is_kvk, dur)
-
-        except Exception as e:
-            logger.exception("[/ops test_embed] failed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to send embed:\n```{type(e).__name__}: {e}```"
-            )
+        if not await safe_defer(ctx, ephemeral=True):
+            return
+        logger.info("[/ops test_embed] diagnostic guidance requested")
+        await send_ephemeral(
+            ctx.interaction,
+            "This command now provides diagnostic guidance; it does not publish a stats embed.\n\n"
+            "**Fighting-KVK preview:** use `/kvk_admin test_embed` with an explicit diagnostic "
+            "destination. Optional `kvk_no` selects a historical season.\n\n"
+            "**Isolated Pre-KVK dispatch check:** use `/prekvk dispatch_test` with an explicit "
+            "diagnostic destination.\n\n"
+            "Fighting previews show appearance and record preview publication. Pre-KVK diagnostics "
+            "exercise the real reservation protocol in isolated state. Neither proves natural "
+            "production delivery. An isolated off-season/Kingdom Summary diagnostic is not "
+            "currently available.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @ops_group.command(
         name="usage",
