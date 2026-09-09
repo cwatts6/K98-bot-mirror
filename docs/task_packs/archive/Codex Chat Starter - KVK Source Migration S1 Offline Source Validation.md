@@ -1,5 +1,7 @@
 # Codex Chat Starter — KVK Source Migration S1 Offline Source Validation
 
+**Archived completed record - 2026-09-09.** S1 implementation and candidate smoke are accepted; PR merges/final verification remain pending. Do not rerun this historical starter.
+
 Prepared 2026-09-09 during Phase 2B. **Not executed; S1 G3 pending.**
 Use this only when approving this slice; G2 alone does not approve implementation.
 

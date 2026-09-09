@@ -1,5 +1,11 @@
 # KVK Source Migration — Phase 2B implementation plan
 
+## Current KVK delivery status - 2026-09-09
+
+S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+
+Next: [S2A SQL Observation Facts](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+
 2026-09-09. **G2 approved by Chris Watts: “G2 approved, please proceed”.** This approves
 the architecture including the confirmed EndScanID workflow. It authorizes this planning pass,
 not implementation. **G3 is pending separately for each slice below.** Earlier G2-pending and
@@ -327,7 +333,7 @@ evidence are separate. **Stop for G3 review; do not execute a task pack merely b
 
 | Slice | Task pack | Approval starter |
 |---|---|---|
-| S1 | [Offline Source Validation](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
+| S1 | [Offline Source Validation](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
 | S2A | [SQL Observation Facts](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
 | S2B | [SQL Publication State](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
 | S3A | [Player Window Calculations](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |

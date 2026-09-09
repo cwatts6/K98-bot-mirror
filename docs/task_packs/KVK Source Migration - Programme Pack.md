@@ -1,5 +1,11 @@
 # KVK Source Migration — Programme Pack
 
+## Current KVK delivery status - 2026-09-09
+
+S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+
+Next: [S2A SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+
 ## 1. Programme header and execution boundary
 
 | Item | Value |
@@ -233,8 +239,8 @@ SQL `fc0e94ebd2e0a98286069c8a8b71365dd5178657`. Pre-existing bot documentation w
 SQL remained unchanged. Local evidence is distinct from deployed state.
 
 - [Audit and claim ledger](../reference/kvk_source_migration/phase_1_audit.md)
-- [Dependency matrix](../reference/kvk_source_migration/phase_1_dependency_matrix.csv)
-- [Field compatibility](../reference/kvk_source_migration/phase_1_field_compatibility.csv)
+- Dependency matrix (`phase_1_dependency_matrix.csv`; local audit artifact, not included in this PR)
+- Field compatibility (`phase_1_field_compatibility.csv`; local audit artifact, not included in this PR)
 - [Decisions and proposed next slice](../reference/kvk_source_migration/phase_1_decisions_and_next_slice.md)
 - [Validation and scope evidence](../reference/kvk_source_migration/phase_1_validation_log.md)
 
@@ -274,8 +280,8 @@ contract/architecture pass, stopping at G2. After explicit architecture approval
 prepare exact implementation packs for separate G3 approval. This clarifies the Phase-2 roadmap
 without skipping either gate or authorizing Phase 3.
 
-- [Phase 2 task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
-- [Phase 2 chat starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+- [Phase 2 task pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+- [Phase 2 chat starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
 
 Enough evidence exists to begin design. Optional same-fight live/final revisions and a later-fight
 example would strengthen metadata checks; the final overall report can follow when available.

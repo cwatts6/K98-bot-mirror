@@ -1,5 +1,31 @@
 # Codex Task Pack — KVK Source Migration S2A SQL Observation Facts
 
+## Execution handoff refreshed after S1 smoke - 2026-09-09
+
+**Prepared for S2A approval only; G3 pending.** S1 typed schemas/digest are accepted and the
+operator's bot-machine smoke passed 200 tests; restart/startup succeeded. Read the
+[archived S1 delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md).
+The operator will merge PRs #263/#570 and perform final verification before the next handoff.
+At S2A execution, verify the actual accepted/merged predecessor revision and both repository
+branches, HEADs, remotes and status; do not reuse the historical main hashes as current proof.
+SQL is currently clean at `fc0e94ebd2e0a98286069c8a8b71365dd5178657`; no S2A migration exists.
+The proposed date/sequence must be checked and allocated under the existing plan rule before edits.
+
+The section 11 manifest remains exactly twelve tables, one migration, one static validator and
+one disposable constraint-test script. Preserve section 12 invariants and section 14 tests.
+S2B publication/configuration tables, DAL/intake, runtime activation and real imports are excluded.
+Read current SQL instructions if present (no root AGENTS.md was present at preparation),
+`sql_schema/README.md`, `migrations/README.md` and `docs/SQL_DATA_MIGRATION_GUARDRAILS.md`.
+Offline schema authoring/static validation may proceed after explicit S2A G3; executing migration
+or constraint SQL requires an explicitly named, authorized disposable SQL Server database.
+If unavailable, report integration validation pending; do not use production or discover credentials.
+No disposable target is supplied or authorized by this preparation. SQL integration acceptance
+must retain actual FK/unique/check/rollback evidence, not substitute text checks for execution.
+
+Security at execution: separate SQL Changes target for exact migration/snapshots/validators,
+Deep off; bot no-code-change skip except any approved evidence appendix. Stop for review after
+S2A; S2B needs its own G3. No automatic successor, PR, deployment, restart or activation.
+
 ## 1. Task Header
 
 - Prepared 2026-09-09; owner Chris Watts; Phase 2B specification.

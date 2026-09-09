@@ -1,5 +1,11 @@
 # K98 Bot Reference Docs
 
+## Current KVK delivery status - 2026-09-09
+
+S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+
+Next: [S2A SQL Observation Facts](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+
 This folder contains active project standards, operating runbooks, and domain references.
 Do not read every file for every task. Use the tiers below.
 

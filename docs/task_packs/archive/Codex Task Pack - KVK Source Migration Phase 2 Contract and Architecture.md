@@ -1,5 +1,7 @@
 # Codex Task Pack — KVK Source Migration Phase 2 Contract and Architecture
 
+**Archived completed record - 2026-09-09.** Audit/architecture preparation completed; G2 approved. Retained as evidence, not a new execution instruction.
+
 ## 1. Task Header
 
 - Date: 2026-09-09

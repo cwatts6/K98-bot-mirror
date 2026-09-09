@@ -1,5 +1,11 @@
 # Task Packs
 
+## Current KVK delivery status - 2026-09-09
+
+S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+
+Next: [S2A SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+
 This folder contains active execution packs, proposed/gated work, living programme records,
 retained contract fixtures, indexes, and reference material. A top-level Markdown path does not by
 itself mean that the document is approved for execution.
@@ -758,8 +764,8 @@ mirror #257 / production #564. Manual merges and final verification remain pendi
 ## Phase 2G closeout / Phase 2H execution pointer
 
 Completed: [Phase 2G delivery record](archive/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202G%20Atomic%20Pre-KVK%20Reservation.md).
-Next: [Phase 2H task pack](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202H%20Isolated%20Pre-KVK%20Dispatch%20Diagnostics.md) and
-[chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202H%20Isolated%20Pre-KVK%20Dispatch%20Diagnostics.md).
+Next: [Phase 2H task pack](archive/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202H%20Isolated%20Pre-KVK%20Dispatch%20Diagnostics.md) and
+[chat starter](archive/Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202H%20Isolated%20Pre-KVK%20Dispatch%20Diagnostics.md).
 
 **Phase 2G is complete as an implementation and bounded-validation delivery, by explicit operator
 acceptance. Full live Pre-KVK validation is carried forward to Phase 2H; it is not claimed complete.**
@@ -873,7 +879,7 @@ Production Stats Delivery Outcomes, audit/design only; do not restart the supers
 
 Archived delivery: [Phase 2J task pack](archive/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](archive/Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md).
 
-Active next scope: [Codex Task Pack - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md).
+Active next scope: [Codex Task Pack - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md](archive/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md) and [chat starter](archive/Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202K%20Production%20Stats%20Delivery%20Outcomes.md).
 
 ## KVK Source Migration — Phase 1 audit delivered, 2026-09-09
 
@@ -895,8 +901,8 @@ historical. Detailed design, deployed verification and implementation remain gat
 
 ## KVK Source Migration — Phase 2 design pack prepared, 2026-09-09
 
-- [Task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
-- [Chat starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+- [Task pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
+- [Chat starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20Phase%202%20Contract%20and%20Architecture.md)
 
 Prepared for operator use; not executed. Covers contract/architecture and synthetic acceptance
 scenarios using the supplied master roster, revised per-fight reports and final overall report.
@@ -940,7 +946,7 @@ is authorized by this delivery. S6 prepares readiness evidence and stops at sepa
 
 | Slice | Task pack | Approval starter |
 |---|---|---|
-| S1 | [Offline Source Validation](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
+| S1 | [Offline Source Validation](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
 | S2A | [SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
 | S2B | [SQL Publication State](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
 | S3A | [Player Window Calculations](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |

@@ -1,5 +1,31 @@
 # Codex Task Pack — KVK Source Migration S1 Offline Source Validation
 
+## Current S1 delivery and next slice - 2026-09-09
+
+S1 is implemented, reviewed, operator accepted and candidate smoke-tested successfully.
+The operator supplied **200 passed, 1 warning in 5.39s** on the bot-machine virtual environment;
+the warning is discord/player.py's Python audioop deprecation. The restart excerpt records
+new child PID 1988 at 18:22:14.699, bot ready at 18:22:21.084, and successful full startup
+completion at 18:22:27.011 (timestamps as logged). It also records tracked-view rehydration
+timing out after 10 seconds at 18:22:36.435 and being deferred; complete tracked-view recovery
+is not proved by this excerpt and is outside the unwired S1 parser boundary.
+
+PRs [mirror #263](https://github.com/cwatts6/K98-bot-mirror/pull/263) and
+[production #570](https://github.com/cwatts6/k98-bot/pull/570) remain open for the operator's
+merge and final production-main verification. Candidate delivery/testing is complete; final
+merge/deployment verification is not claimed. Pre-closeout PR heads are mirror
+`8533260239ff6dac75dc68f460da4874bd8de759` and production
+`5d594ad5bb169438c3a3fac88893719a56d0395e`. The supplied machine output does not include a Git
+HEAD, so exact machine revision remains operator-attested rather than independently verified.
+Raw logs and private identifiers remain outside Git; only this bounded summary is retained.
+
+Completed Phase 1 audit, Phase 2 architecture and S1 execution packs/starters are archived;
+the approved architecture, field contracts, evidence and implementation plan remain active
+references. Their historical pending statements are superseded by this current status.
+The next implementation approval is **S2A SQL Observation Facts only**, then separately S2B
+SQL Publication State. S2A preparation is complete; G3 is pending. No S2 implementation,
+SQL execution, new task, merge, restart or deployment is authorized by this documentation update.
+
 ## 1. Task Header
 
 - Prepared 2026-09-09; owner Chris Watts; Phase 2B specification.
@@ -12,9 +38,9 @@
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.

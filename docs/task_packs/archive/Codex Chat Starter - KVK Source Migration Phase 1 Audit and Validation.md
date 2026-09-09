@@ -1,5 +1,7 @@
 # Codex Chat Starter — KVK Source Migration Phase 1 Audit and Validation
 
+**Archived completed record - 2026-09-09.** Audit/architecture preparation completed; G2 approved. Retained as evidence, not a new execution instruction.
+
 Paste the prompt below into Codex with access to both supplied local repositories.
 
 ---
