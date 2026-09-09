@@ -2,9 +2,19 @@
 
 ## Current KVK delivery status - 2026-09-09
 
-S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](docs/task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+**S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
+200-test smoke and restart/startup evidence remain historical S1 results.
 
-Next: [S2A SQL Observation Facts](docs/task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+**S2A is implemented, disposable-SQL validated and operator accepted.** The migration created
+twelve tables; all 96 expected-rejection tests and complete fixture rollback passed.
+SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78) and documentation
+[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) are in review; review fixes and their
+fresh validation are recorded in the S2A delivery. PR acceptance/merge must be rechecked at handoff.
+
+**Next: finish S2A PR review, then scope S2B for its own explicit G3 approval.** Do not rerun S1
+or S2A as an unstarted slice. S2B has no implementation approval; no production SQL deployment,
+source activation or successor execution is authorized. This current status supersedes historical
+pending/next-S1/S2A preparation wording below.
 
 ## Core Reference Contract
 

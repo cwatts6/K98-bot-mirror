@@ -2,13 +2,23 @@
 
 ## Current KVK delivery status - 2026-09-09
 
-S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+**S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
+200-test smoke and restart/startup evidence remain historical S1 results.
 
-Next: [S2A SQL Observation Facts](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+**S2A is implemented, disposable-SQL validated and operator accepted.** The migration created
+twelve tables; all 96 expected-rejection tests and complete fixture rollback passed.
+SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78) and documentation
+[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) are in review; review fixes and their
+fresh validation are recorded in the S2A delivery. PR acceptance/merge must be rechecked at handoff.
+
+**Next: finish S2A PR review, then scope S2B for its own explicit G3 approval.** Do not rerun S1
+or S2A as an unstarted slice. S2B has no implementation approval; no production SQL deployment,
+source activation or successor execution is authorized. This current status supersedes historical
+pending/next-S1/S2A preparation wording below.
 
 2026-09-09. **G2 approved by Chris Watts: “G2 approved, please proceed”.** This approves
 the architecture including the confirmed EndScanID workflow. It authorizes this planning pass,
-not implementation. **G3 is pending separately for each slice below.** Earlier G2-pending and
+not implementation. **S1/S2A subsequently received G3 and were accepted; remaining slices require separate G3.** Earlier G2-pending and
 no-pack-authoring statements are historical and superseded only to this extent.
 
 Authority: [approved architecture](phase_2_contract_and_architecture.md), including its EndScanID
@@ -26,8 +36,8 @@ changes reviewable; approved semantics are unchanged. No cross-repository combin
 
 | Slice | Boundary | Required predecessors | G3 readiness |
 |---|---|---|---|
-| S1 | Offline schema, metadata, parser and semantic digest | G2 | Recommended first approval; no live prerequisites |
-| S2A | SQL observation/artifact/roster/report facts and constraints | S1 contract accepted | Static authoring can proceed after approval; disposable SQL required to validate |
+| S1 | Offline schema, metadata, parser and semantic digest | G2 | Accepted and merged; see current status above |
+| S2A | SQL observation/artifact/roster/report facts and constraints | S1 contract accepted | Implemented and accepted after disposable SQL validation; PR review in progress |
 | S2B | SQL config/publication/routing/delivery state and constraints | S2A | Separate SQL diff and disposable SQL validation |
 | S3A | Pure player/window calculations and report DTOs | S1 | Can follow S1 independently of SQL deployment |
 | S3B | DAL acceptance, CAS publication and config-request services | S2A/S2B/S3A | Disposable SQL integration; no live activation |
@@ -321,7 +331,7 @@ environment-specific release/rollback receipts after G4; no default-server deplo
 
 ## 8. G3 decision and next action
 
-Recommend approving **S1 only** first. Its manifest is self-contained: schema/models/parser/metadata/
+Historical planning recommendation (superseded by current status): approve **S1 only** first. Its manifest is self-contained: schema/models/parser/metadata/
 digest modules plus synthetic tests, no SQL or runtime wiring. Current baseline has pinned
 openpyxl and inert kvk package entrypoints, so no dependency/config migration is needed.
 

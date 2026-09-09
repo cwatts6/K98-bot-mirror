@@ -2,9 +2,19 @@
 
 ## Current KVK delivery status - 2026-09-09
 
-S1 is delivered, operator accepted and candidate smoke-tested: **200 passed, 1 warning in 5.39s**; restart/startup successful. See the [archived S1 receipt](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) for timing, the separately observed tracked-view timeout and evidence limits. PRs #263/#570 await operator merge and final verification. Completed audit/architecture/S1 packs and starters are archived; approved domain references remain active. Historical pending/next-S1 wording below is superseded.
+**S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
+200-test smoke and restart/startup evidence remain historical S1 results.
 
-Next: [S2A SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md), prepared for separate G3 approval. S2B stays a separate successor; no S2 implementation or live action is authorized.
+**S2A is implemented, disposable-SQL validated and operator accepted.** The migration created
+twelve tables; all 96 expected-rejection tests and complete fixture rollback passed.
+SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78) and documentation
+[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) are in review; review fixes and their
+fresh validation are recorded in the S2A delivery. PR acceptance/merge must be rechecked at handoff.
+
+**Next: finish S2A PR review, then scope S2B for its own explicit G3 approval.** Do not rerun S1
+or S2A as an unstarted slice. S2B has no implementation approval; no production SQL deployment,
+source activation or successor execution is authorized. This current status supersedes historical
+pending/next-S1/S2A preparation wording below.
 
 ## 1. Programme header and execution boundary
 
@@ -18,14 +28,14 @@ Next: [S2A SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migra
 | Bot remote supplied by operator | `cwatts6/K98-bot-mirror` |
 | SQL working copy | `C:\K98-bot-SQL-Server` |
 | SQL remote supplied by operator | `cwatts6/K98-bot-SQL-Server` |
-| Current stage | Phase 1 ready for Codex: evidence validation and end-to-end audit |
-| One-pass implementation approved | **No** |
-| Runtime, SQL, configuration or deployment changes approved | **No** |
-| Current permitted output | Audit evidence, dependency/compatibility analysis, documentation, decision questions and a proposed next slice |
+| Current stage | S2A accepted; PR review in progress; S2B separately gated |
+| One-pass implementation approved | S1/S2A only, delivered; no successor approval |
+| Runtime, SQL, configuration or deployment changes approved | S2A SQL and disposable validation accepted; no production deployment or activation |
+| Current permitted output | Complete S2A PR review and evidence; seek separate S2B G3 |
 
 The operator reports both working copies and their Git repositories are synced. Codex must verify their actual branches, commit IDs and working-tree state rather than assume a branch name or deployed version. This pack was prepared from the supplied discussion, source assessment and task template; it does **not** certify that the current code or production SQL has already been audited.
 
-**First action:** execute `Codex Task Pack - KVK Source Migration Phase 1 Audit and Validation.md`, produce its evidence-backed outputs, and stop for operator review. Future phases are a planning roadmap, not standing permission to implement them.
+**Historical Phase 1 first action (completed; do not repeat):** execute `Codex Task Pack - KVK Source Migration Phase 1 Audit and Validation.md`, produce its evidence-backed outputs, and stop for operator review. Future phases are a planning roadmap, not standing permission to implement them.
 
 ## 2. Outcome and scope
 

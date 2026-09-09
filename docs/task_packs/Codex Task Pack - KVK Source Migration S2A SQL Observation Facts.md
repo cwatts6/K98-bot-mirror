@@ -1,6 +1,14 @@
 # Codex Task Pack — KVK Source Migration S2A SQL Observation Facts
 
-## Execution handoff refreshed after S1 smoke - 2026-09-09
+## Current status — S2A accepted; PR review in progress
+
+S1 PRs #263/#570 are merged. S2A implementation and authorized disposable SQL validation are
+operator accepted; SQL PR #78 and bot PR #264 remain under review. The delivery and later review
+receipts below contain current evidence. Next is separate S2B scope/G3 approval after S2A review;
+no production deployment or source activation is authorized. Original preparation text below is
+historical and does not select the next action.
+
+## Historical execution handoff after S1 smoke - 2026-09-09
 
 **Prepared for S2A approval only; G3 pending.** S1 typed schemas/digest are accepted and the
 operator's bot-machine smoke passed 200 tests; restart/startup succeeded. Read the
@@ -216,9 +224,10 @@ preparation. End with slice status and next required gate.
 ## S2A G3 implementation delivery - 2026-09-09
 
 The operator explicitly approved **S2A only** and requested implementation/static validation,
-then a stop for review. This supersedes this pack's historical G3-pending wording. No disposable
-SQL server/database was supplied: offline authoring is authorized; **integration acceptance is
-pending**. S2B and every successor retain their separate approval gates.
+then a stop for review. At that initial authoring checkpoint no disposable target was supplied,
+so integration was pending then. The later authorized disposable SQL validation and operator
+acceptance receipts below supersede that limit: S2A integration evidence is now included and
+accepted. S2B and every successor retain their separate approval gates.
 
 ### 1. Summary
 
@@ -497,3 +506,40 @@ test selector was run for the exact document. Runtime pytest, import smoke, comm
 Python lint/format/type checks and log-noise tests are skipped because no bot runtime, command
 surface, Python or dependency files changed. SQL static validation and the actual SQL harness
 supply the relevant implementation checks. No new deferred optimisation item was established.
+
+### PR review follow-up — 2026-09-09
+
+The operator authorized checking, actioning, replying to and resolving PR comments. SQL PR #78
+identified two valid gaps: case-insensitive JSON field-status comparisons and corrected player
+revisions without a predecessor. Both are fixed in the original migration and matching snapshots:
+`FieldStatusJson` explicitly uses `Latin1_General_100_BIN2`; corrected observation revisions
+require non-null `SupersedesRevisionID`, with existing same-parent FK and self-link rejection intact.
+The exact fifteen-file SQL manifest is unchanged; only five existing files changed in this follow-up.
+
+Regression evidence: the new casing case failed against the prior disposable schema (the invalid
+case was accepted). Rebuilt exactly the twelve verified-empty tables inside a guarded transaction
+on the already authorized disposable database, using the revised migration. All **96 expected
+rejections passed**, including four casing cases and missing correction lineage. Canonical status
+values and a valid same-observation correction predecessor passed. Twelve-table rollback and
+independent zero-row checks passed; all 18 foreign keys and 89 CHECK constraints remain trusted
+and enabled. Static validator: **401 assertions passed**. SQL repository validator: 0 errors,
+15 existing warnings. No production database or successor behavior was changed.
+
+Bot PR #264 identified historical pending language and stale canonical status pages. The initial
+pending paragraph is now explicitly historical; current status says S1 merged and S2A accepted,
+with PR review still open and S2B requiring separate G3. This explicitly requested documentation
+follow-up expands the original appendix-only handoff to ten documentation files: README-DEV,
+reference/task-pack/archive indexes, programme pack, decision register, implementation plan,
+Phase 2B evidence log, historical S2A starter and this delivery. Historical evidence is retained.
+
+Fresh SQL security routing: Changes, Deep off, exact five-file working-tree delta from
+`b4175db954f984ed62254fc40c067fdaf63f4c85`; scan `ca8c1c81-64f5-44e8-a2a6-cba908e386bd`, snapshot
+`codex-security-snapshot/v1:sha256:74075e7bae0da60d972ff25fb78ce11c87998592e13ce00a78d7bd2d487701cc`.
+Sealed complete, **5/5 files, zero findings, zero deferred candidates**. This supplements the
+prior complete fifteen-file baseline review; it does not reuse that baseline as proof of changed
+SQL. Preflight passed all three checks, TAC granted tac1, prior canonical threat model retained.
+Scan goal usage: 43,156 tokens, 140 seconds. Private report artifacts remain under
+`C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-xwpop1/kvk-source-s2a/b4175db954f984ed62254fc40c067fdaf63f4c85_20260909T214535Z_7_sby_9k`.
+Bot follow-up is a separate documentation-only security skip: status/evidence only, no runtime,
+permissions, config or SQL execution code. Architecture/deferred/security-routing checks passed;
+test selector run. Runtime Python tests/import smoke/registration checks remain inapplicable.
