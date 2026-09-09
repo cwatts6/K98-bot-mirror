@@ -502,3 +502,8 @@ Resync the registered commands through the existing operator workflow and confir
 child is absent remotely and from the regenerated cache. Do not edit generated caches manually.
 A client may retain stale suggestions until refreshed; there is no compatibility callback and
 no reroute to a publisher. After restart, verify removal and retained H/I session status again.
+
+Phase 2J removal/restart/resync smoke was operator accepted on 2026-09-09. The startup list proves
+24 ops children without test_embed; 36/100 totals and sync/cache update are logged. Existing-command
+behaviour and successful cache validation are operator reported. #261/#568 merges and final
+main/deployed-SHA verification remain pending; see archived Phase 2J delivery evidence.

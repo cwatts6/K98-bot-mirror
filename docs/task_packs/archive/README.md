@@ -393,3 +393,7 @@ Rollout/rollback requirements remain binding: stop all writers; back up CSV, mes
 journal together; no mixed versions; reconcile accepted/uncertain receipts before downgrade and
 keep dispatch stopped if outcomes remain unknown. No exactly-once, cross-host or TTL-stealing claim.
 The separate Phase 2F next-natural-public-save observation remains pending unless new evidence proves it.
+
+## Phase 2J — accepted delivery, 2026-09-09
+
+Archived [Codex Task Pack - Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence.md](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md). Operator smoke passed; #261/#568 merges and final main/deployed verification remain pending. The original embed audit now includes a Phase 1–2J disposition reconciliation. Phase 2K audit/design pack is active one directory above.

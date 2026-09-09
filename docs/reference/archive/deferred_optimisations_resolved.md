@@ -597,3 +597,88 @@ Both Phase 2H PRs (#259 mirror / #566 production) await operator merge and final
 deployment/restart verification. The detailed receipt, hashes and limits are in the archived
 Phase 2H task pack. Phase 2I Fighting-KVK Diagnostic Parity is the next scope-first task;
 no Phase 2I implementation is approved. Phase 2F's natural public-save observation stays pending.
+
+## Phase 2J programme reconciliation — 2026-09-09
+
+Current disposition supersedes the historical pending statuses in copied entries: Phase 2B/C/D are delivered per the programme acceptance record; Phase 2I #260/#567 are merged and operator-smoke accepted. Final process/head association remains an independent release record.
+
+### Deferred Optimisation
+- Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests
+- Type: consistency
+- Description: Ark roster fields are locally split to the field-value limit, but dynamic alliance titles, notes, updates, result notes, team descriptions, field count, and aggregate payload size are not modeled together across scheduled posts, DMs, registration messages, and team publication edits.
+- Suggested Fix: First add payload measurements and deterministic pathological tests, then use the canonical embed contract to fix only proven failing builders. Approve product-specific choices for large rosters and notes, including pagination, additional embeds, attachments, or explicit omission markers, while preserving the existing first-publication mention and SQL-backed publication/message-ID behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
+- Status: delivered and operator candidate-smoke accepted in Phase 2B; PR merges and final
+  production-main verification pending
+- Last verified: 2026-09-02
+- Archived task pack: `docs/task_packs/archive/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
+
+### Deferred Optimisation
+- Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests
+- Type: architecture
+- Description: Player-facing rankings and history outputs use bounded page counts and local clipping but do not uniformly prove title, field, footer, embed-count, and combined-character limits across charts, tables, multiple embeds, files, and interaction edits.
+- Suggested Fix: Scope a player-facing payload slice that measures realistic and pathological rows, applies the canonical final validator, and chooses pagination or existing export paths rather than silent list truncation. Preserve canonical `/kvk history` placement, visibility, interaction ownership, chart/table meaning, files, and existing offload contracts.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 canonical primitive; separate product/output review; coordinate with the existing KVK History offload deferred item without combining unrelated executor work.
+- Status: delivered and operator smoke accepted in Discord Embed Payload Safety Phase 2C; no runtime correction was required; mirror PR #254 and production PR #561 await manual merge and final production-main verification
+- Last verified: 2026-09-03
+
+### Deferred Optimisation
+- Area: `commands/admin_cmds.py`, processing history/failure views in `embed_utils.py`, bot-health, queue, maintenance, and log-oriented diagnostic output
+- Type: consistency
+- Description: Operator diagnostics use mixed description slicing, field clipping, pagination, and log attachment behavior. Long paths, filenames, errors, or log summaries can still require output-specific handling beyond the same-root shared-helper corrections delivered in Phase 1.
+- Suggested Fix: Audit live diagnostic routes separately from player-facing rankings. Use attachments plus short bounded summaries for log/export-like content, canonical final validation for every send/edit path, explicit omission markers for non-file lists, and focused privacy/redaction and fallback tests.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
+- Status: delivered and operator-smoke accepted in Discord Embed Payload Safety Phase 2D; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
+- Last verified: 2026-09-03
+
+### Deferred Optimisation
+- Area: `commands/stats_cmds.py::test_kvk_embed`, `stats_alerts/embeds/kvk.py`, and diagnostic session reuse
+- Type: architecture
+- Description: Existing `/kvk_admin test_embed` has test-mode routes; parity with accepted isolated Pre-KVK diagnostics needs its own source audit before claiming safe off-season appearance iteration, identity preservation or admission proof.
+- Suggested Fix: Use the Phase 2I Fighting-KVK Diagnostic Parity pack to audit both post_here routes and all sends/state/guards, then propose an explicitly targeted, mention-neutral, isolated diagnostic contract using existing domain command/service patterns.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 2H final merges/deployed-head verification, explicit scope/design approval, path isolation proof, deterministic tests and Changes-only/Deep-off review; no SQL or production reservation redesign implied.
+- Status: resolved by accepted Phase 2I preview and v1.06 historical selection; #260/#567 merged; owner Chris Watts
+- Last verified: 2026-09-08
+
+## Phase 2J delivery accepted — 2026-09-09
+
+Complete removal of `/ops test_embed` is implemented and operator-smoke accepted. Mirror PR #261
+and production PR #568 remain OPEN for operator merge and final main/deployed-head verification.
+Reviewed mirror runtime is dd9ad0c8; pre-closeout mirror head ad3048f7 and production candidate
+1639e90c have identical Python trees. The restart excerpt does not contain an immutable Git SHA;
+do not substitute candidate/source parity for final running-process association.
+
+Operator confirms command removal, successful validation, existing commands behaving as before,
+and successful follow-up resync/cache validation. Logs prove graceful teardown/queue persistence
+at 08:39:59, child PID 14484 at 08:40:09, registration 36 primary / 100 grouped at 08:40:11.747,
+explicit old v1.07 `/ops test_embed` -> null at 08:40:14.654, and successful sync/cache update at
+08:40:16.490. The loaded list has exactly 24 ops children, no retired child, and both H/I commands.
+Startup completes at 08:40:21.115. Manual sync succeeds at 08:42:15.741; usage logs show resync and
+cache-validation invocation. Validation success and unchanged existing-command behaviour are
+operator reports; individual H/I tokens/status/message receipts were not independently inspected.
+
+Validation on the removal candidate: 74 focused tests, 3471 full passed / 2 skipped, operational
+logs unchanged, applicable hooks and import/registration/architecture/deferred/security-routing
+checks passed. Sealed mirror Changes review 8cdbb908..dd9ad0c8 covers ten implementation files,
+zero reportable findings, Deep off. Later status/closeout changes are Markdown-only; their precise
+incremental security skip does not relabel the sealed runtime range or invent a production scan.
+
+The 07:16 natural post-import run observed ACTIVE KVK 16/scan 1121, empty fighting blocks, KS skip
+and legacy KVK slot 2/3. Matching fighting message receipt, natural calendar Pre-KVK admission and
+Phase 2F public-reminder atomic save remain separate. DM saves, live-event tracker writes and
+pinned-calendar edits do not close Phase 2F. Generic tracked-view rehydration again timed out at
+08:40:30; not all views are proven restored. ProcConfig succeeded at 08:40:35, which does not resolve
+its previously observed intermittent busy-results/false-success defect. Those remain deferred.
+
+Next: Phase 2K Production Stats Delivery Outcomes, first-response audit/design only. No Phase 2K
+runtime, test, SQL, calendar or state mutation is authorized by preparing its pack. Preserve all
+Phase 1–2J production defaults and existing H/I sessions. Final merges and verification are owned
+by the operator; this closeout performs neither merge nor deployment.

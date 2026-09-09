@@ -1,3 +1,42 @@
+# Archived Phase 2J delivery record
+
+## Phase 2J delivery accepted — 2026-09-09
+
+Complete removal of `/ops test_embed` is implemented and operator-smoke accepted. Mirror PR #261
+and production PR #568 remain OPEN for operator merge and final main/deployed-head verification.
+Reviewed mirror runtime is dd9ad0c8; pre-closeout mirror head ad3048f7 and production candidate
+1639e90c have identical Python trees. The restart excerpt does not contain an immutable Git SHA;
+do not substitute candidate/source parity for final running-process association.
+
+Operator confirms command removal, successful validation, existing commands behaving as before,
+and successful follow-up resync/cache validation. Logs prove graceful teardown/queue persistence
+at 08:39:59, child PID 14484 at 08:40:09, registration 36 primary / 100 grouped at 08:40:11.747,
+explicit old v1.07 `/ops test_embed` -> null at 08:40:14.654, and successful sync/cache update at
+08:40:16.490. The loaded list has exactly 24 ops children, no retired child, and both H/I commands.
+Startup completes at 08:40:21.115. Manual sync succeeds at 08:42:15.741; usage logs show resync and
+cache-validation invocation. Validation success and unchanged existing-command behaviour are
+operator reports; individual H/I tokens/status/message receipts were not independently inspected.
+
+Validation on the removal candidate: 74 focused tests, 3471 full passed / 2 skipped, operational
+logs unchanged, applicable hooks and import/registration/architecture/deferred/security-routing
+checks passed. Sealed mirror Changes review 8cdbb908..dd9ad0c8 covers ten implementation files,
+zero reportable findings, Deep off. Later status/closeout changes are Markdown-only; their precise
+incremental security skip does not relabel the sealed runtime range or invent a production scan.
+
+The 07:16 natural post-import run observed ACTIVE KVK 16/scan 1121, empty fighting blocks, KS skip
+and legacy KVK slot 2/3. Matching fighting message receipt, natural calendar Pre-KVK admission and
+Phase 2F public-reminder atomic save remain separate. DM saves, live-event tracker writes and
+pinned-calendar edits do not close Phase 2F. Generic tracked-view rehydration again timed out at
+08:40:30; not all views are proven restored. ProcConfig succeeded at 08:40:35, which does not resolve
+its previously observed intermittent busy-results/false-success defect. Those remain deferred.
+
+Next: Phase 2K Production Stats Delivery Outcomes, first-response audit/design only. No Phase 2K
+runtime, test, SQL, calendar or state mutation is authorized by preparing its pack. Preserve all
+Phase 1–2J production defaults and existing H/I sessions. Final merges and verification are owned
+by the operator; this closeout performs neither merge nor deployment.
+
+## Historical implementation record (superseded status below)
+
 Continue Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence from mirror PR #261:
 https://github.com/cwatts6/K98-bot-mirror/pull/261
 Use the Phase 2J task pack in docs/task_packs and its final approved implementation amendment.

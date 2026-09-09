@@ -9,11 +9,12 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
-Phase 2J is operator-approved: remove `/ops test_embed` entirely. Its sole operator knows the
-replacement commands, so no transition handler is needed. Use existing Phase 2H/2I diagnostics
-directly with explicit destinations. Production and existing diagnostic sessions remain unchanged.
-Registration becomes 36 primary / 100 grouped / 24 ops. Resync removes the old child; do not edit
-generated caches. Candidate validation and security evidence are separate from deployment/smoke.
+Phase 2J command removal is delivered and operator-smoke accepted (2026-09-09): restart,
+36 primary / 100 grouped / 24 ops, sync/cache validation and unchanged existing commands.
+Mirror #261 / production #568 await operator merge and final main/deployed-SHA verification.
+Phase 2J pack/starter are archived. Phase 2K Production Stats Delivery Outcomes is the next
+audit/design-only pack; no runtime/test implementation is approved. Existing H/I sessions and
+production defaults remain preserved. The deferred register and original audit are reconciled.
 
 Entry verified 2026-09-09: #260/#567 merged; production main `00817eca`, mirror main `8cdbb908`.
 All Python source matches reviewed Phase 2I `06f31a94` / `d89e606c`. The operator supplied a clean

@@ -8,35 +8,35 @@ Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
 - Type: consistency
-- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. This file is unchanged in Phase 2G; the log does not establish full post-procedure success.
+- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. Repeated at 2026-09-09 07:14:26; a subsequent startup import succeeded at 08:40:35 with a manifest. This intermittent failure/false-success contract remains unresolved, not disproved by one successful run.
 - Suggested Fix: Separately inspect pending result/cursor lifecycle and the authoritative procedure result contract; drain/close results at the correct transaction boundary and propagate failure through CLI exit/report and pipeline summary. Prove commit, cleanup failure, manifest and truthful status without rerunning side effects.
 - Impact: medium
 - Risk: medium
-- Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phase 2G or Phase 2H.
+- Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2G–2J; separate from Phase 2K delivery outcomes.
 - Status: production reliability observation; owner Chris Watts; separate approval required
-- Last verified: 2026-09-08
+- Last verified: 2026-09-09
 
 ### Deferred Optimisation
 - Area: `admin_helpers.py` stats dispatch completion logging and `stats_alerts/interface.py` outcome contract
 - Type: consistency
-- Description: At 2026-09-08 09:21:50 normal KVK daily-cap skip is followed by Stats update embed sent successfully. The wrapper conflates completion with delivery; there is no positive send receipt in this log.
-- Suggested Fix: Separately define truthful sent/edited/skipped/failed reporting while preserving existing routing and caller behavior. Phase 2H diagnostic status must use its own actual outcome rather than treating this legacy log as evidence.
+- Description: At 2026-09-08 09:21:50 a KVK cap skip is followed by generic send success. The 2026-09-09 07:16 route also records success/legacy claim without message identity. Phase 2J removes the ops entrypoint only; remaining production callers still lose delivery outcomes.
+- Suggested Fix: Separately define truthful sent/edited/skipped/failed reporting while preserving existing routing and caller behavior. Phase 2K audit owns this status/receipt contract; reuse existing outcome patterns while keeping admission/reservation redesign separate.
 - Impact: low
 - Risk: low
-- Dependencies: Separate bounded status-contract audit and regression tests; no unrelated production adapter redesign in Phase 2H.
-- Status: observed reliability/logging debt; owner Chris Watts
-- Last verified: 2026-09-08
+- Dependencies: Separate bounded status-contract audit and regression tests; Phase 2K architecture approval required before changing adapter return/error semantics; reservation redesign remains separate.
+- Status: selected for Phase 2K audit/design only; implementation unapproved; owner Chris Watts
+- Last verified: 2026-09-09
 
 ### Deferred Optimisation
 - Area: `bot_instance.py` tracked-view startup timeout and `rehydrate_views.py`
 - Type: architecture
-- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. This repeats the separately noted Phase 2F smoke observation.
+- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. Repeated at 2026-09-09 08:40:30 while fetching arkmatch_50; remaining views were aborted. Removal smoke does not establish full generic rehydration.
 - Suggested Fix: Separately inventory remaining views and prove whether deferred work is actually resumed before choosing timeout, batching or lifecycle changes. Record partial versus complete rehydration honestly and test cancellation/restart identity preservation.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
 - Status: repeated operator observation; owner Chris Watts; separate approval required
-- Last verified: 2026-09-08
+- Last verified: 2026-09-09
 
 ## Status model
 
@@ -351,19 +351,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-09-07
 
 ### Deferred Optimisation
-- Area: `ark/embeds.py`, `ark/ark_scheduler.py`, `ark/team_publish.py`, `ark/reminders.py`, selected Ark registration/confirmation renderers, and focused Ark payload tests
-- Type: consistency
-- Description: Ark roster fields are locally split to the field-value limit, but dynamic alliance titles, notes, updates, result notes, team descriptions, field count, and aggregate payload size are not modeled together across scheduled posts, DMs, registration messages, and team publication edits.
-- Suggested Fix: First add payload measurements and deterministic pathological tests, then use the canonical embed contract to fix only proven failing builders. Approve product-specific choices for large rosters and notes, including pagination, additional embeds, attachments, or explicit omission markers, while preserving the existing first-publication mention and SQL-backed publication/message-ID behavior.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 1 canonical primitive; production-representative payload evidence; separate Ark presentation approval and Changes security review.
-- Status: delivered and operator candidate-smoke accepted in Phase 2B; PR merges and final
-  production-main verification pending
-- Last verified: 2026-09-02
-- Archived task pack: `docs/task_packs/archive/Codex Task Pack - Discord Embed Payload Safety Phase 2B Evidence-Led Ark Payload Hardening.md`
-
-### Deferred Optimisation
 - Area: `ark/state/ark_state.py`, `ark/confirmation_flow.py`, and persisted `confirmation_updates`
 - Type: architecture
 - Description: Phase 2B proves that persisted confirmation update history is not render-bounded and can grow to high cardinality. Phase 2B safely packs or explicitly marks omitted render units, but changing retention or storage would alter restart-sensitive state and historical visibility.
@@ -373,29 +360,6 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Production state evidence; operator decision on historical visibility; `k98-sql-validation` and a separate SQL PR only if durable SQL storage is selected.
 - Status: operator-approved defer in Phase 2E; keep-all behavior retained because the measured local copy was test-generated and no current production cardinality or historical-visibility evidence justifies mutation
 - Last verified: 2026-09-03
-
-### Deferred Optimisation
-- Area: `build_KVKrankings_embed.py`, `embed_kvk_history.py`, `ui/views/kvk_history_view.py`, related rankings/history views, exports, and tests
-- Type: architecture
-- Description: Player-facing rankings and history outputs use bounded page counts and local clipping but do not uniformly prove title, field, footer, embed-count, and combined-character limits across charts, tables, multiple embeds, files, and interaction edits.
-- Suggested Fix: Scope a player-facing payload slice that measures realistic and pathological rows, applies the canonical final validator, and chooses pagination or existing export paths rather than silent list truncation. Preserve canonical `/kvk history` placement, visibility, interaction ownership, chart/table meaning, files, and existing offload contracts.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 1 canonical primitive; separate product/output review; coordinate with the existing KVK History offload deferred item without combining unrelated executor work.
-- Status: delivered and operator smoke accepted in Discord Embed Payload Safety Phase 2C; no runtime correction was required; mirror PR #254 and production PR #561 await manual merge and final production-main verification
-- Last verified: 2026-09-03
-
-### Deferred Optimisation
-- Area: `commands/admin_cmds.py`, processing history/failure views in `embed_utils.py`, bot-health, queue, maintenance, and log-oriented diagnostic output
-- Type: consistency
-- Description: Operator diagnostics use mixed description slicing, field clipping, pagination, and log attachment behavior. Long paths, filenames, errors, or log summaries can still require output-specific handling beyond the same-root shared-helper corrections delivered in Phase 1.
-- Suggested Fix: Audit live diagnostic routes separately from player-facing rankings. Use attachments plus short bounded summaries for log/export-like content, canonical final validation for every send/edit path, explicit omission markers for non-file lists, and focused privacy/redaction and fallback tests.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 1 shared sender correction; operator-output inventory; separate diagnostics scope so private logs and player-facing pagination are not mixed in one PR.
-- Status: delivered and operator-smoke accepted in Discord Embed Payload Safety Phase 2D; mirror PR #255 and production PR #562 ready for manual merge; final production-main verification pending
-- Last verified: 2026-09-03
-
 
 ### Deferred Optimisation
 - Area: `ark/dal/ark_dal.py::replace_match_draft_rows`, `ark/ark_draft_service.py`, and `ark/team_builder_service.py`
@@ -419,40 +383,20 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate operator-approved executor audit; preserve SQL/read behavior and telemetry; no SQL contract change approved.
 - Status: evidence required; owner Chris Watts; not a Phase 2G dependency
 - Last verified: 2026-09-08
-## Phase 2H closure — 2026-09-08
+## Phase 2H historical closure — 2026-09-08
 
 Pre-KVK diagnostic delivery is accepted and moved to archive/deferred_optimisations_resolved.md.
 Natural production calendar dispatch and Phase 2F's natural public-save observation remain pending
 with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured items remain open.
 
 ### Deferred Optimisation
-- Area: `commands/stats_cmds.py::test_kvk_embed`, `stats_alerts/embeds/kvk.py`, and diagnostic session reuse
-- Type: architecture
-- Description: Existing `/kvk_admin test_embed` has test-mode routes; parity with accepted isolated Pre-KVK diagnostics needs its own source audit before claiming safe off-season appearance iteration, identity preservation or admission proof.
-- Suggested Fix: Use the Phase 2I Fighting-KVK Diagnostic Parity pack to audit both post_here routes and all sends/state/guards, then propose an explicitly targeted, mention-neutral, isolated diagnostic contract using existing domain command/service patterns.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 2H final merges/deployed-head verification, explicit scope/design approval, path isolation proof, deterministic tests and Changes-only/Deep-off review; no SQL or production reservation redesign implied.
-- Status: resolved by accepted Phase 2I preview and v1.06 historical selection; #260/#567 merged; owner Chris Watts
-- Last verified: 2026-09-08
-
-### Deferred Optimisation
 - Area: stats_alerts/interface.py, stats_alerts/embeds/kvk.py, commands/admin_cmds.py
 - Type: architecture
-- Description: Production fighting check/send/claim has no durable reservation; swallowed renderer failures and seasonal ops test wrappers can report success without a send receipt. Phase 2I preview intentionally does not alter these production semantics.
-- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes. Phase 2J retires ops publication; remaining production callers and admission/outcome semantics require separate approval.
+- Description: Production fighting check/send/claim has no durable reservation; swallowed renderer failures can report success without a send receipt. The former ops test entrypoint is removed by Phase 2J. Phase 2I preview intentionally does not alter these production semantics.
+- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes. Phase 2J command removal is delivered and smoke accepted. Phase 2K owns truthful outcomes/receipts audit only; durable admission/cap/mutual-exclusion changes remain a separately approved protocol extension.
 - Impact: high
 - Risk: high
 - Dependencies: Explicit protocol approval; immutable baseline and production rollback evidence.
-
-### Deferred Optimisation
-- Area: stats_alerts/db.py, stats_alerts/interface.py, embed_offseason_stats.py
-- Type: refactor
-- Description: Exception-based backend fallback may re-enter reads, and legacy off-season test rendering can write summary claims. Existing wider Stats/KVK History executor work remains separate.
-- Suggested Fix: Audit once-only executor entry and legacy test side effects in a separate bounded change; do not route isolated fighting previews through seasonal orchestration.
-- Impact: medium
-- Risk: medium
-- Dependencies: Separate approval and preserved public/SQL contracts.
 
 ### Deferred Optimisation
 - Area: `embed_offseason_stats.py`, `stats_alerts/embeds/offseason.py`
@@ -466,3 +410,33 @@ with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured 
 Phase 2J leaves existing production receipt/reservation, once-only executor, singleton/public-child,
 generic-view timeout, DM/broad JSON and ProcConfig records separately scoped. Natural production
 calendar admission and Phase 2F public-save observations remain pending.
+
+## Phase 2J reconciliation — 2026-09-09
+
+Completed Phase 2B/C/D and Phase 2I diagnostic items are moved to the resolved register; Phase 2J
+command removal is accepted there. Phase 2E keep-all confirmation history is an approved defer,
+not an unresolved rendering fix. ProcConfig, Stats and KVK History executors, stats-alert fallback,
+singleton ownership and public-child supervision remain open. A duplicate stats-alert/offseason
+entry was consolidated into the existing executor and isolated-offseason owners, not closed as fixed.
+
+### Deferred Optimisation
+- Area: `event_scheduler.py` DM sent/scheduled tracker writers and asynchronous offload wrappers; other JSON writers only after a separate inventory
+- Type: consistency
+- Description: Phase 2F changed only active public-reminder atomic replacement. DM sent/scheduled writers already call atomic_write_json, but async exception fallback may re-enter them through asyncio.to_thread. Their task ownership, multi-writer ordering and restart contract were not certified by Phase 2F or Phase 2J; a broad JSON audit has not been performed.
+- Suggested Fix: Audit DM writer callers and invocation counts, ownership, failure/cancellation and restart contracts separately. Reuse existing atomic helpers; do not assume every JSON writer needs replacement or conflate atomic replacement with transactional workflow ownership.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate scope and deterministic no-double-entry/restart tests; coordinate with executor and public-child work without expanding Phase 2K. No DM or broad JSON redesign approved.
+- Status: evidence/design required; owner Chris Watts
+- Last verified: 2026-09-09
+
+### Deferred Optimisation
+- Area: production `stats_alerts/embeds/kvk.py`, off-season renderers and `mge/mge_content_renderer.py` final payload boundaries
+- Type: consistency
+- Description: The original payload audit classified these live contracts safe within existing bounds and deferred wider canonical adoption. Phase 2I validates isolated fighting preview publication, not every production send. No current production overflow is established; blanket canonical coverage must not be claimed.
+- Suggested Fix: If evidence warrants a separate payload slice, measure real/pathological complete payloads and add canonical final validation at proven outbound boundaries while preserving appearance, mentions and route semantics. Keep MGE and off-season product changes independently approved.
+- Impact: low
+- Risk: medium
+- Dependencies: Concrete current payload failure or measured convergence benefit; regression evidence and scoped Changes review. Not Phase 2K receipt/admission work.
+- Status: optional convergence; no demonstrated incident; owner Chris Watts
+- Last verified: 2026-09-09

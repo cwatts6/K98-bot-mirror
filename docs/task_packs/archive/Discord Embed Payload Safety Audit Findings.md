@@ -1,11 +1,76 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phases 1-2D delivered and final-verified; Phase 2E candidate-delivered and operator-smoke accepted through open mirror PR #256 and production PR #563; manual merges and final production-main verification pending
+Status: Phase 1–2J delivery slices accepted; Phase 2J #261/#568 merges/final verification pending; Phase 2K proposed audit/design next.
 Audit date: 2026-09-01; delivery updates through Phase 2E on 2026-09-07
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
-## 1. Baseline and scope
+## Current programme reconciliation — 2026-09-09
+
+The original inventory below is historical, not a current list of unfixed defects. No new broad
+repository vulnerability or payload scan was performed for this documentation reconciliation.
+
+| Original audit family / follow-up | Delivered disposition | Still separate |
+| --- | --- | --- |
+| Pre-KVK overflow, shared sender, same-file formatting boundaries | Phase 1 delivered | No reopening of accepted compaction/appearance |
+| Event/calendar live payload boundaries | Phase 2A delivered | Public/DM lifecycle and natural observations |
+| Ark high-cardinality renderers | Phase 2B delivered | Phase 2E keep-all confirmation-history retention is approved defer |
+| Player rankings/history contracts | Phase 2C audited safe, regression/smoke accepted; no runtime correction required | KVK History once-only executor audit |
+| Operator diagnostics payload/privacy | Phase 2D delivered | Broader production outcome logging |
+| Ark audit-service/orchestration and observability | Phase 2E delivered | Keep-all retention decision; strict transactional draft-write debt |
+| Active public-reminder atomic replacement | Phase 2F delivered | Natural public-save receipt; DM/broad JSON and task lifecycle |
+| Atomic Pre-KVK admission | Phase 2G implementation delivered; Phase 2H exercised real protocol in isolation | Natural calendar reserve/commit/message tuple; no exactly-once claim |
+| Isolated Pre-KVK diagnostic | Phase 2H delivered | Existing owner/destination/state contracts preserved |
+| Fighting/current/historical diagnostic parity | Phase 2I delivered, #260/#567 merged | Preview receipt is not production admission |
+| Unsafe ops seasonal test entrypoint | Phase 2J removed; restart/resync/operator smoke accepted | #261/#568 operator merges and final SHA verification |
+| Production fighting/offseason and MGE bounded contracts | Original safe-within-contract assessment retained | Optional canonical final-boundary convergence is now explicitly captured |
+| Voting and bounded self-service paths | No original realistic breach established within enforced contract | Future changes require feature-local validation; not blanket proof |
+| Test-only MGE builder and inert fixtures/docs | Not runtime in original inventory | Reclassify only if a live caller is introduced |
+| Production delivery outcomes and receipts | Remaining gap confirmed by natural fighting logs | Phase 2K audit/design next; runtime unapproved |
+
+All approved Phase 1–2J delivery slices are accounted for. This does NOT mean every original defer
+or later reliability observation is complete. The active register retains ProcConfig failure/false
+success, executor audits, singleton/public-child/generic-view lifecycle, DM/JSON, reservation
+extensions, off-season isolation, optional canonical convergence and Ark persistence debt.
+The automatic similarity checker did not complete in the original audit; manual inventory was used.
+Retain that original coverage limit rather than claiming an exhaustive automated proof.
+
+## Phase 2J delivery accepted — 2026-09-09
+
+Complete removal of `/ops test_embed` is implemented and operator-smoke accepted. Mirror PR #261
+and production PR #568 remain OPEN for operator merge and final main/deployed-head verification.
+Reviewed mirror runtime is dd9ad0c8; pre-closeout mirror head ad3048f7 and production candidate
+1639e90c have identical Python trees. The restart excerpt does not contain an immutable Git SHA;
+do not substitute candidate/source parity for final running-process association.
+
+Operator confirms command removal, successful validation, existing commands behaving as before,
+and successful follow-up resync/cache validation. Logs prove graceful teardown/queue persistence
+at 08:39:59, child PID 14484 at 08:40:09, registration 36 primary / 100 grouped at 08:40:11.747,
+explicit old v1.07 `/ops test_embed` -> null at 08:40:14.654, and successful sync/cache update at
+08:40:16.490. The loaded list has exactly 24 ops children, no retired child, and both H/I commands.
+Startup completes at 08:40:21.115. Manual sync succeeds at 08:42:15.741; usage logs show resync and
+cache-validation invocation. Validation success and unchanged existing-command behaviour are
+operator reports; individual H/I tokens/status/message receipts were not independently inspected.
+
+Validation on the removal candidate: 74 focused tests, 3471 full passed / 2 skipped, operational
+logs unchanged, applicable hooks and import/registration/architecture/deferred/security-routing
+checks passed. Sealed mirror Changes review 8cdbb908..dd9ad0c8 covers ten implementation files,
+zero reportable findings, Deep off. Later status/closeout changes are Markdown-only; their precise
+incremental security skip does not relabel the sealed runtime range or invent a production scan.
+
+The 07:16 natural post-import run observed ACTIVE KVK 16/scan 1121, empty fighting blocks, KS skip
+and legacy KVK slot 2/3. Matching fighting message receipt, natural calendar Pre-KVK admission and
+Phase 2F public-reminder atomic save remain separate. DM saves, live-event tracker writes and
+pinned-calendar edits do not close Phase 2F. Generic tracked-view rehydration again timed out at
+08:40:30; not all views are proven restored. ProcConfig succeeded at 08:40:35, which does not resolve
+its previously observed intermittent busy-results/false-success defect. Those remain deferred.
+
+Next: Phase 2K Production Stats Delivery Outcomes, first-response audit/design only. No Phase 2K
+runtime, test, SQL, calendar or state mutation is authorized by preparing its pack. Preserve all
+Phase 1–2J production defaults and existing H/I sessions. Final merges and verification are owned
+by the operator; this closeout performs neither merge nor deployment.
+
+## 1. Historical baseline and scope
 
 After `git fetch origin --prune`, the checked-out branch is `main` at
 `cca6d9cdb0dd15ba99403b89f03d1fede69f0e68` (`Mirror: 2026-09-01T14:09:23Z from
