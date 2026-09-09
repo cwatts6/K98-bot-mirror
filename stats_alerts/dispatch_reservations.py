@@ -393,8 +393,8 @@ class DispatchAttempt:
             # Even a final HTTP rejection can follow an ambiguous client retry.
             try:
                 await _io(self.store.finish_failure, self.token)
-            except Exception as exc:
-                self.finalization_error = type(exc).__name__
+            except Exception as finalization_exc:
+                self.finalization_error = type(finalization_exc).__name__
                 logger.exception(
                     "[DISPATCH] Failed finalizing token=%s; retained state requires recovery",
                     self.token,

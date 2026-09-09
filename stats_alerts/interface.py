@@ -6,7 +6,7 @@ from typing import Any
 from bot_config import OFFSEASON_STATS_CHANNEL_ID, STATS_ALERT_CHANNEL_ID
 from utils import utcnow
 
-from .delivery_outcomes import DeliveryResult, delivery_outcome
+from .delivery_outcomes import delivery_outcome
 from .dispatch_reservations import clear_prekvk_message
 from .embeds import (
     kvk as kvk_mod,
@@ -83,17 +83,16 @@ async def _send_stats_update_embed(
         _delivery.update(reason="missing_destination")
         return
 
-    def include(value, component, destination):
-        if isinstance(value, DeliveryResult):
-            _delivery.attempts[-1:] = value.attempts
-        elif _delivery.attempts[-1].reason == "no_receipt":
+    def mark_unverified():
+        # Adapters update the shared observer; their native returns are not receipts.
+        if _delivery.attempts[-1].reason == "no_receipt":
             _delivery.update(reason="legacy_unverified")
 
     # Preserve the standalone summary before all primary guards.
     try:
         ks_channel = bot.get_channel(OFFSEASON_STATS_CHANNEL_ID)
-        result = await ks_mod(bot, ks_channel, timestamp, is_test=is_test, _delivery=_delivery)
-        include(result, "kingdom_summary_daily", OFFSEASON_STATS_CHANNEL_ID)
+        await ks_mod(bot, ks_channel, timestamp, is_test=is_test, _delivery=_delivery)
+        mark_unverified()
     except Exception as exc:
         _delivery.failure(exc)
         logger.exception("[STATS EMBED] Kingdom Summary send failed.")
@@ -106,10 +105,8 @@ async def _send_stats_update_embed(
         if not is_test and read_counts_for("kvk", utcnow().date().isoformat()) >= 3:
             _delivery.skip("daily_cap")
             return
-        result = await kvk_mod.send_kvk_embed(
-            bot, channel, timestamp, is_test=is_test, _delivery=_delivery
-        )
-        include(result, "fighting", channel_id)
+        await kvk_mod.send_kvk_embed(bot, channel, timestamp, is_test=is_test, _delivery=_delivery)
+        mark_unverified()
         receipt = _delivery.attempts[-1]
         if (
             not is_test
@@ -123,16 +120,14 @@ async def _send_stats_update_embed(
         return
 
     if is_kvk:
-        result = await prekvk_mod.send_prekvk_embed(
+        await prekvk_mod.send_prekvk_embed(
             bot, channel, timestamp, is_test=is_test, _delivery=_delivery
         )
-        include(result, "prekvk", channel_id)
+        mark_unverified()
         return
 
-    result = await off_mod.send_offseason_flow(
-        bot, channel, timestamp, is_test=is_test, _delivery=_delivery
-    )
-    include(result, "offseason", channel_id)
+    await off_mod.send_offseason_flow(bot, channel, timestamp, is_test=is_test, _delivery=_delivery)
+    mark_unverified()
 
 
 async def send_stats_update_embed(bot: Any, timestamp: str, is_kvk: bool, is_test: bool = False):

@@ -11,6 +11,17 @@ approval checkpoint historically; the subsequent explicit operator approval auth
 
 ## Implementation record — current
 
+PR #262 review follow-up: renamed the finalization exception binding to avoid shadowing the
+context-manager exit exception. Simplified interface fallback reporting to `mark_unverified()`:
+all four adapters share the observer and return native None/string values without opting into
+DeliveryResult, so the unused arguments, result assignments and unreachable result-splice branch
+were removed. Existing outcome/reservation/seasonal regression coverage passed: 99 tests.
+No additional tests or full-suite rerun are needed for this bounded cleanup. Per security routing,
+additional discovery is skipped for this delta: a local exception-binding rename and removal of
+unused arguments/unreachable internal result handling introduce no reachable publication,
+permission, SQL, persistence, cancellation or retry change. The earlier sealed scan is retained
+for its exact snapshot, with this mechanical follow-up explicitly accounted for rather than relabeled.
+
 Implemented the 11-runtime-file combined slice. Added immutable DeliveryAttempt/DeliveryResult and
 an explicitly passed in-memory observer; no global context/store or additional dispatch lifetime.
 Default direct adapter returns remain compatible. Opt-in wrappers return results, while the
