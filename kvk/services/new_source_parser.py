@@ -242,8 +242,8 @@ def _workbook(content: bytes, limits: ParseLimits):
                 if chunks:
                     xml = b"".join(chunks)
                     values = _xml_preflight(xml, limits, total_cells)
+                    numeric_cells[name] = values
                     if values:
-                        numeric_cells[name] = values
                         invalid = {key for key, value in values.items() if _decimal(value) is None}
                         if invalid:
                             # openpyxl casts numeric XML before handing cells to us. A
@@ -305,6 +305,18 @@ def _workbook(content: bytes, limits: ParseLimits):
             workbook.close()
 
 
+def _sheet_numeric_tokens(sheet, numeric_cells) -> dict[str, str]:
+    """Keep the pinned loader's private path dependency in one fail-closed adapter."""
+    path = getattr(sheet, "_worksheet_path", None)
+    if not isinstance(path, str) or not path:
+        _reject("numeric_evidence", "Worksheet source evidence cannot be resolved.")
+    # OPC relationships may expose a package-absolute path; ZIP keys are relative.
+    path = path.removeprefix("/")
+    if path not in numeric_cells:
+        _reject("numeric_evidence", "Worksheet source evidence cannot be resolved.")
+    return numeric_cells[path]
+
+
 def _cell(header, cell, numeric_cells, limits) -> TypedCell:
     value = cell.value
     tag = cell.data_type
@@ -323,7 +335,9 @@ def _cell(header, cell, numeric_cells, limits) -> TypedCell:
     elif isinstance(value, (datetime, date, time)):
         tag, raw = "d", value.isoformat()
     elif tag == "n":
-        raw = numeric_cells.get(cell.coordinate, str(value))
+        if cell.coordinate not in numeric_cells:
+            _reject("numeric_evidence", "Numeric cell source evidence is missing.")
+        raw = numeric_cells[cell.coordinate]
         numeric = _decimal(raw)
     else:
         tag = "e" if tag == "e" else "s"
@@ -487,7 +501,7 @@ def parse_player_workbook(
         raw_rows, diagnostics = _table(
             sheet,
             PLAYER_HEADERS,
-            numeric_cells.get(sheet._worksheet_path, {}),
+            _sheet_numeric_tokens(sheet, numeric_cells),
             limits,
             limits.max_player_rows,
         )
@@ -579,7 +593,7 @@ def parse_aggregate_workbook(
             raw_rows, notes = _table(
                 sheet,
                 headers,
-                numeric_cells.get(sheet._worksheet_path, {}),
+                _sheet_numeric_tokens(sheet, numeric_cells),
                 limits,
                 maximum,
                 tail=title == KINGDOM_SHEET,

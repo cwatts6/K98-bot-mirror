@@ -431,3 +431,20 @@ Only the ten approved Python files and this canonical S1 pack belong in the PR d
 Other planning documents and pre-existing working-tree edits remain outside these PRs.
 The pack links to locally retained architecture/planning references that are not published by
 this S1-only change. The complete implementation and validation boundary is recorded here.
+
+
+## S1 PR review follow-up - 2026-09-09
+
+The operator requested review comments be actioned, answered and resolved. Mirror PR #263
+had one optional precision-evidence comment; production #570 had no inline findings.
+Centralized the pinned openpyxl worksheet-path adapter, normalized one package-leading slash,
+and reject absent/unresolvable worksheet evidence with SourceValidationError. Every preflighted
+XML part now retains its token map, including empty maps. Numeric cells require their original
+XML lexeme; the float-derived string fallback is removed. No dependency or schema version changes.
+Nine synthetic regressions cover relative/absolute paths, missing loader attributes or paths,
+lost token maps in player/aggregate parsing and legitimate text-only aggregate worksheets.
+Exact six-file S1/legacy suite: 190 passed in 5.59 seconds. Existing digest golden vector passes.
+Only the parser, its test file and this append change; original S1 and operational boundaries hold.
+Separate Changes reviews of the follow-up commit ranges, Deep off, are recorded in PR replies.
+The hosted Codex code-review summaries report failed jobs on both original PR heads; these are
+not passing reviews. Copilot reviewed both PRs, and local Changes evidence remains separate.

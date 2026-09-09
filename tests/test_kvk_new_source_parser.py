@@ -522,3 +522,66 @@ def test_all_consumed_parts_receive_preflight_regardless_of_extension(extension,
         assert error.value.code == "xml_declaration"
     else:
         assert player(content).digest == player(original).digest
+
+
+@pytest.mark.parametrize("path", ["xl/worksheets/sheet1.xml", "/xl/worksheets/sheet1.xml"])
+def test_sheet_numeric_evidence_resolves_package_paths_without_rounding(path):
+    from types import SimpleNamespace
+
+    from kvk.services.new_source_parser import _sheet_numeric_tokens
+
+    tokens = {"A2": "12345678901234567890.123456"}
+    assert (
+        _sheet_numeric_tokens(
+            SimpleNamespace(_worksheet_path=path), {"xl/worksheets/sheet1.xml": tokens}
+        )
+        is tokens
+    )
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {},
+        {"_worksheet_path": None},
+        {"_worksheet_path": ""},
+        {"_worksheet_path": "xl/worksheets/missing.xml"},
+    ],
+)
+def test_missing_or_changed_loader_path_rejects_safely(attributes):
+    from types import SimpleNamespace
+
+    from kvk.services.new_source_parser import _sheet_numeric_tokens
+
+    with pytest.raises(SourceValidationError) as error:
+        _sheet_numeric_tokens(SimpleNamespace(**attributes), {"xl/worksheets/sheet1.xml": {}})
+    assert error.value.code == "numeric_evidence"
+
+
+@pytest.mark.parametrize("kind", ["player", "aggregate"])
+def test_missing_numeric_lexemes_never_fall_back_to_loader_values(monkeypatch, kind):
+    import kvk.services.new_source_parser as parser
+
+    original = parser._xml_preflight
+
+    def lose_tokens(data, limits, total_cells):
+        original(data, limits, total_cells)
+        return {}
+
+    monkeypatch.setattr(parser, "_xml_preflight", lose_tokens)
+    with pytest.raises(SourceValidationError) as error:
+        if kind == "player":
+            player(player_bytes())
+        else:
+            aggregate(aggregate_bytes(token=1))
+    assert error.value.code == "numeric_evidence"
+
+
+def test_text_only_aggregate_sheet_keeps_empty_numeric_evidence():
+    def text_identities(workbook):
+        for row in (2, 3):
+            cell = workbook[KINGDOM_SHEET].cell(row, 2)
+            cell.value = str(cell.value)
+
+    result = aggregate(aggregate_bytes(edit=text_identities))
+    assert result.kingdom_rows[0].cell("DKP").metric.value == Decimal("25300000")
