@@ -474,3 +474,37 @@ Pre-KVK replacement-policy change or durable fighting admission change is bundle
 - Impact: medium
 - Risk: medium
 - Dependencies: Authoritative SQL validation and separate contract approval; no SQL/audit mutation in Phase 2K.
+
+## Production PR #569 review follow-up (2026-09-09)
+
+Both additional comments were accepted. The off-season renderer now records `ctx.channel.id`
+with the same precedence as its existing destination selection. This corrects pre-publication
+failures (for example, data loading); send entry already recorded the resolved channel. The
+outcome decorator docstring now distinguishes default/shared-observer exception propagation,
+opt-in ordinary exception capture, cancellation rethrow, and invalid option errors.
+
+Exact delta manifest: `embed_offseason_stats.py`, `stats_alerts/delivery_outcomes.py`,
+`tests/test_embed_offseason_stats.py`, and this task pack. SQL manifest: empty. No SQL, config,
+permissions, payload, mentions, destination routing, reservations, claims or retry policy changed.
+Reuse: existing observer, channel selection and fake-channel test harness; no new helper.
+
+Validation: focused suite 31 passed, including six context-only/conflicting-destination cases
+covering success, data-load failure and send failure. Full log-noise suite passed 3512 tests,
+2 skipped, with production operational logs unchanged, before adding the two data-load cases;
+those cases passed in the final focused run. No runtime changes followed the full run.
+Architecture, deferred, security-routing, selector, import smoke and command registration passed
+(36 primary, 100 grouped, 24 ops). Selector's full-suite recommendation was satisfied above.
+
+Security: Changes-only, Deep off, scan `cf1d3cfe-2fee-4f4f-b66e-cb947e1beba4`, mirror baseline
+`0ff2de4dea0d9e4364662ad9079a0862ea7b58ee`, snapshot digest
+`18f7290961f6de8e7f6df4c28186c5f453f0e421c05841a513ba88cd8684bf8c`.
+Sealed complete coverage, no findings or deferred surfaces. Preflight ready; TAC granted/tac1.
+Review goal usage: 15,562 tokens, 74 seconds. Canonical report is retained in the local scan store.
+Post-scan delta is this documentation and two offline data-load regression cases only; inspected
+and security rescan skipped because no runtime/security boundary changed. The sealed snapshot
+is not relabeled as a later commit. Retain the earlier full Phase 2K review for the unchanged body.
+
+Promote through the existing patch-based script, preserving separate Git histories, and verify
+production file content against the mirror. The existing bounded rollback and deployment/natural
+Pre-KVK/Phase 2F evidence requirements remain unchanged. This review follow-up does not certify
+bot-machine deployment or natural production admission.

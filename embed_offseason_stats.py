@@ -157,7 +157,11 @@ async def send_offseason_stats_embed_v2(
     if _delivery:
         _delivery.update(
             component="offseason_weekly" if is_weekly else "offseason_daily",
-            requested_channel_id=getattr(channel, "id", target_channel_id),
+            requested_channel_id=getattr(
+                getattr(ctx, "channel", None) if ctx else None,
+                "id",
+                getattr(channel, "id", target_channel_id),
+            ),
         )
     if ch is None:
         if _delivery:

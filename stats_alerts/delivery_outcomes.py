@@ -159,8 +159,10 @@ class DeliveryTracker:
 def delivery_outcome(component):
     """Opt-in results around the original adapter, outside its reservation lifetime.
 
-    Internal observers are shared explicitly and do not catch exceptions. This leaves
-    reservation finalization and legacy callers' exception behavior intact.
+    Default calls, including explicitly shared internal observers, preserve the
+    adapter's return and exception behavior. With return_outcome=True, ordinary
+    exceptions become outcomes after reservation finalization; cancellation is
+    recorded and re-raised. Incompatible observer/receipt options raise ValueError.
     """
 
     def decorate(func):

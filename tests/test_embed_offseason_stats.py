@@ -113,3 +113,47 @@ async def test_outcome_uses_actual_destination_and_keeps_receipt_api(monkeypatch
     assert item.requested_channel_id == 90 and item.includes_summary is False
     with pytest.raises(ValueError):
         await embed.send_offseason_stats_embed_v2(None, return_receipt=True, return_outcome=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("conflicting_destination", [False, True])
+@pytest.mark.parametrize("failure_stage", [None, "load", "send"])
+async def test_ctx_destination_precedence_in_outcomes(
+    monkeypatch, conflicting_destination, failure_stage
+):
+    from types import SimpleNamespace
+
+    calls = []
+    channel = SimpleNamespace(id=92, guild=SimpleNamespace(id=80))
+
+    async def send(**kwargs):
+        calls.append(kwargs)
+        if failure_stage == "send":
+            raise RuntimeError("send failed")
+        return SimpleNamespace(id=101, channel=channel)
+
+    channel.send = send
+    monkeypatch.setattr(embed, "get_conn_with_retries", lambda: _Connection())
+
+    def load_daily(_):
+        if failure_stage == "load":
+            raise RuntimeError("load failed")
+        return {}
+
+    monkeypatch.setattr(embed, "load_all_daily", load_daily)
+    monkeypatch.setattr(embed, "_pick_daily_snapshot_date", lambda _: date(2026, 9, 8))
+    result = await embed.send_offseason_stats_embed_v2(
+        object(),
+        ctx=SimpleNamespace(channel=channel),
+        channel=SimpleNamespace(id=93) if conflicting_destination else None,
+        target_channel_id=94 if conflicting_destination else None,
+        include_kingdom_summary=False,
+        return_outcome=True,
+    )
+    item = result.attempts[0]
+    assert len(calls) == (0 if failure_stage == "load" else 1)
+    assert item.requested_channel_id == 92
+    assert item.outcome == {None: "sent", "load": "failed", "send": "unknown"}[failure_stage]
+    assert item.message_id == (None if failure_stage else 101)
+    if not failure_stage:
+        assert (item.channel_id, item.guild_id) == (92, 80)
