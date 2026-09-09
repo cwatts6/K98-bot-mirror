@@ -2,6 +2,33 @@
 
 Purpose: triage errors, crashes, performance issues, offload problems, and telemetry questions.
 
+## Phase 2K stats delivery evidence
+
+After approved Phase 2K deployment, use `[STATS DELIVERY]` records to distinguish each component's
+delivery from bookkeeping. Correlate `correlation`, `caller`, source message, selected route/test
+mode, requested channel and actual channel/guild/message. `sent` requires a positive receipt;
+`edited` requires an acknowledged edit. An unknown edit may retain its target ID without proving
+the edit completed. Separate KS, primary and off-season daily/weekly records can have different
+outcomes. Included KS in an off-season group shares that message; it is not a second receipt.
+
+`claim=confirmed` describes a legacy CSV claim, not delivery. `persistence=unconfirmed` after a
+positive receipt means the message was sent but reservation projection/commit was not confirmed.
+Use existing approved operational procedures; do not reset state, add claims, retry or replay
+publication based on these records. SQL import audit completion continues to mean workflow
+completion and is not Discord receipt evidence.
+
+Fighting no longer claims after an unconfirmed send. No automatic retry is added. A later natural
+invocation can still publish following an ambiguous send or receipt-before-claim process failure;
+Phase 2K adds no fighting reservation or exactly-once promise. KS pre-send ping claims and existing
+production Pre-KVK edit-to-fresh fallback remain unchanged and are separately scoped policies.
+
+Smoke requires deployed SHA/clean checkout/restart association and natural eligible routes with
+matching message identities. Observe skips without exhausting caps or forcing duplicates. H/I
+preview success is not production admission. Natural Pre-KVK and Phase 2F public-save evidence
+remain pending until independently observed. Rollback only the approved Phase 2K delta, retaining
+Phase 2J removal and all CSV/journal/reference/session state; it restores the old misleading logging
+and fighting claim-after-error behavior. No migration, backfill or state reset is required.
+
 ## Primary Artifacts
 
 - `logs/log.txt` - application log

@@ -426,3 +426,23 @@ async def test_prekvk_route_stats_refresh_failure_is_best_effort(caplog):
     assert title == "Pre-KVK Snapshot Imported ✅"
     assert color == 0x2ECC71
     assert "Failed to refresh stats embed after Pre-KVK import" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_delivery_result_logged_without_changing_import_completion(caplog):
+    from stats_alerts.delivery_outcomes import DeliveryAttempt, DeliveryResult
+
+    audit_events = []
+
+    async def refresh(*args, **kwargs):
+        return DeliveryResult(
+            (DeliveryAttempt("fighting", outcome="unknown", reason="TimeoutError"),),
+            "upload-receipt",
+            "fighting",
+        )
+
+    deps, *_ = _deps(audit_events=audit_events, send_stats_update_embed=refresh)
+    with caplog.at_level("INFO"):
+        assert await route.handle_prekvk_upload(_message(), deps) is True
+    assert "correlation=upload-receipt" in caplog.text and "outcome=unknown" in caplog.text
+    assert audit_events[-1][2]["status"] == "completed"

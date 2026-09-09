@@ -24,8 +24,10 @@ from core.discord_embed_limits import (
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
 from prekvk import report_service
+from stats_alerts.delivery_outcomes import delivery_outcome
 from stats_alerts.dispatch_reservations import (
     DispatchAttempt,
+    DispatchGuarded,
     DispatchUnavailable,
     _io,
     clear_prekvk_message,
@@ -162,6 +164,7 @@ def _build_upcoming_event_fields(
     )
 
 
+@delivery_outcome("prekvk")
 async def send_prekvk_embed(
     bot: Any,
     channel: discord.abc.Messageable,
@@ -172,11 +175,14 @@ async def send_prekvk_embed(
     diagnostic_view_factory=None,
     on_diagnostic_receipt=None,
     diagnostic_check_destination=None,
+    _delivery=None,
 ) -> str:
     """
     Build and either edit or send the Pre-KVK embed. Returns 'edited' or 'sent'.
     Blocking work is offloaded using asyncio.to_thread or the async DB helpers.
     """
+    if _delivery:
+        _delivery.update(requested_channel_id=getattr(channel, "id", None))
     diagnostic = diagnostic_store is not None
     if diagnostic and (
         is_test
@@ -570,6 +576,10 @@ async def send_prekvk_embed(
     # Silent edit path
     if message:
         try:
+            if _delivery:
+                _delivery.enter(
+                    getattr(channel, "id", None), operation="edit", message_id=message.id
+                )
             if diagnostic:
                 diagnostic_check_destination()
                 on_diagnostic_receipt(message.id)
@@ -578,18 +588,25 @@ async def send_prekvk_embed(
                 )
             else:
                 await message.edit(embed=embed, view=view)
+            if _delivery:
+                _delivery.receipt(message, channel, operation="edit")
             logger.info(
                 "[PREKVK] Edited existing message id=%s in channel=%s",
                 getattr(message, "id", "?"),
                 getattr(channel, "id", "?"),
             )
             return "edited"
-        except Exception:
+        except Exception as exc:
+            if _delivery:
+                _delivery.failure(exc)
             if diagnostic:
                 raise  # An ambiguous edit must never fall through to a fresh send.
             logger.exception("[PREKVK] Edit failed; will send a fresh message.")
             if state.pop("prekvk_msg_id", None) is not None:
                 await clear_reference(msg_id)
+
+    if _delivery and _delivery.attempts[-1].operation == "edit":
+        _delivery.begin("prekvk", channel_id=getattr(channel, "id", None))
 
     async def publish(attempt=None):
         if diagnostic_check_destination is not None:
@@ -597,6 +614,8 @@ async def send_prekvk_embed(
         first_send_ping = not bool(state.get("prekvk_msg_id"))
         if attempt is not None:
             await attempt.start()
+        if _delivery:
+            _delivery.enter(getattr(channel, "id", None))
         sent = await channel.send(
             embed=embed,
             content="@everyone" if (first_send_ping and not is_test and not diagnostic) else None,
@@ -607,6 +626,8 @@ async def send_prekvk_embed(
                 else discord.AllowedMentions(everyone=(first_send_ping and not is_test))
             ),
         )
+        if _delivery:
+            _delivery.receipt(sent)
         logger.info(
             "[PREKVK] Sent new message id=%s in channel=%s",
             getattr(sent, "id", "?"),
@@ -615,10 +636,18 @@ async def send_prekvk_embed(
         if diagnostic:
             on_diagnostic_receipt(sent.id)
         if attempt is not None:
-            await attempt.accept(sent.id)
+            try:
+                await attempt.accept(sent.id)
+            finally:
+                if _delivery:
+                    _delivery.observe_commit(attempt)
         else:
             try:
+                if _delivery:
+                    _delivery.update(persistence="unconfirmed")
                 update_prekvk_message(sent.id)
+                if _delivery:
+                    _delivery.update(persistence="confirmed")
             except Exception:
                 logger.exception("[PREKVK] Failed to persist message id")
         return "sent"
@@ -631,9 +660,18 @@ async def send_prekvk_embed(
             if diagnostic
             else DispatchAttempt("prekvk_daily", channel.id)
         )
-        async with lifetime as attempt:
-            return await publish(attempt)
+        try:
+            async with lifetime as attempt:
+                return await publish(attempt)
+        finally:
+            if _delivery:
+                _delivery.observe_commit(lifetime)
     except DispatchUnavailable as exc:
+        if _delivery:
+            if isinstance(exc, DispatchGuarded):
+                _delivery.skip("dispatch_guarded")
+            else:
+                _delivery.failure(exc)
         if diagnostic:
             raise
         logger.info("[PREKVK] Fresh dispatch unavailable: %s", exc)

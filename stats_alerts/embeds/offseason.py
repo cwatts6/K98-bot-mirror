@@ -5,16 +5,19 @@ from typing import Any
 
 from embed_offseason_stats import send_offseason_stats_embed_v2
 from file_utils import run_blocking_in_thread
-from stats_alerts.dispatch_reservations import DispatchAttempt, DispatchUnavailable
+from stats_alerts.delivery_outcomes import delivery_outcome
+from stats_alerts.dispatch_reservations import DispatchAttempt, DispatchGuarded, DispatchUnavailable
 from stats_alerts.guard import sent_today
 from utils import utcnow
 
 logger = logging.getLogger(__name__)
 
 
-async def _send_period(bot, channel, *, weekly: bool, is_test: bool) -> None:
+async def _send_period(bot, channel, *, weekly: bool, is_test: bool, _delivery=None) -> None:
     period = "weekly" if weekly else "daily"
     kind = f"offseason_{period}"
+    if _delivery:
+        _delivery.update(component=kind, requested_channel_id=getattr(channel, "id", None))
     posted = (
         False
         if is_test
@@ -23,6 +26,8 @@ async def _send_period(bot, channel, *, weekly: bool, is_test: bool) -> None:
         )
     )
     if posted:
+        if _delivery:
+            _delivery.skip("already_posted")
         logger.info("[STATS EMBED] Offseason %s already posted today; skipping.", period)
         return
 
@@ -43,6 +48,8 @@ async def _send_period(bot, channel, *, weekly: bool, is_test: bool) -> None:
         options = {}
         if attempt is not None:
             options = {"before_send": attempt.start, "return_receipt": True}
+        if _delivery:
+            options.update(_delivery=_delivery, return_receipt=True)
         message = await send_offseason_stats_embed_v2(
             bot,
             channel=channel,
@@ -52,28 +59,58 @@ async def _send_period(bot, channel, *, weekly: bool, is_test: bool) -> None:
             **options,
         )
         if attempt is not None and message is not None:
-            await attempt.accept(message.id)
+            try:
+                await attempt.accept(message.id)
+            finally:
+                if _delivery:
+                    _delivery.observe_commit(attempt)
 
     if is_test:
         await publish()
     else:
-        async with DispatchAttempt(kind, channel.id) as attempt:
-            await publish(attempt)
+        attempt = DispatchAttempt(kind, channel.id)
+        try:
+            async with attempt:
+                await publish(attempt)
+        finally:
+            if _delivery:
+                _delivery.observe_commit(attempt)
 
 
-async def send_offseason_flow(bot: Any, channel, timestamp: str, *, is_test: bool = False) -> None:
+@delivery_outcome("offseason")
+async def send_offseason_flow(
+    bot: Any, channel, timestamp: str, *, is_test: bool = False, _delivery=None
+) -> None:
     try:
-        await _send_period(bot, channel, weekly=False, is_test=is_test)
+        await _send_period(bot, channel, weekly=False, is_test=is_test, _delivery=_delivery)
     except DispatchUnavailable as exc:
+        if _delivery:
+            if isinstance(exc, DispatchGuarded):
+                _delivery.skip("dispatch_guarded")
+            else:
+                _delivery.failure(exc)
         logger.info("[OFFSEASON] Daily dispatch unavailable: %s", exc)
-    except Exception:
+    except Exception as exc:
+        if _delivery:
+            _delivery.failure(exc)
         logger.exception("[STATS EMBED] Off-season daily send failed.")
 
     # Preserve the existing Monday decision after the daily operation.
+    if _delivery:
+        _delivery.begin("offseason_weekly", channel_id=getattr(channel, "id", None))
     if utcnow().weekday() == 0:
         try:
-            await _send_period(bot, channel, weekly=True, is_test=is_test)
+            await _send_period(bot, channel, weekly=True, is_test=is_test, _delivery=_delivery)
         except DispatchUnavailable as exc:
+            if _delivery:
+                if isinstance(exc, DispatchGuarded):
+                    _delivery.skip("dispatch_guarded")
+                else:
+                    _delivery.failure(exc)
             logger.info("[OFFSEASON] Weekly dispatch unavailable: %s", exc)
-        except Exception:
+        except Exception as exc:
+            if _delivery:
+                _delivery.failure(exc)
             logger.exception("[STATS EMBED] Off-season weekly send failed.")
+    elif _delivery:
+        _delivery.skip("not_scheduled")

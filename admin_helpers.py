@@ -17,6 +17,7 @@ from constants import (
 from embed_utils import send_embed
 from file_utils import append_csv_line
 from input_helpers import wait_with_reminder
+from stats_alerts.delivery_outcomes import log_delivery
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
 from utils import ensure_aware_utc, load_cached_input, save_cached_input, utcnow
@@ -291,9 +292,13 @@ async def log_processing_result(
     if all([success_excel, success_archive, success_sql, success_export, success_proc_import]):
         is_kvk = is_currently_kvk()
         try:
-            await send_stats_update_embed(
+            delivery = await send_stats_update_embed(
                 bot, timestamp=end_time.strftime("%Y-%m-%d %H:%M UTC"), is_kvk=is_kvk
             )
-            logger.info("[STATS EMBED] Stats update embed sent successfully.")
+            log_delivery(
+                delivery,
+                caller="log_processing_result",
+                source_message_id=getattr(message, "id", None),
+            )
         except Exception:
             logger.exception("[STATS EMBED] Failed to send embed")

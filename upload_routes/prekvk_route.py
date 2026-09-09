@@ -25,6 +25,7 @@ from services.prekvk_import_audit_service import (
     record_prekvk_audit_phase,
     start_prekvk_audit_batch,
 )
+from stats_alerts.delivery_outcomes import log_delivery
 from utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -79,13 +80,13 @@ async def _load_current_kvk_metadata(deps: PreKvkRouteDeps) -> dict[str, Any] | 
     return await asyncio.to_thread(metadata_func)
 
 
-async def _refresh_stats_embed(deps: PreKvkRouteDeps) -> None:
+async def _refresh_stats_embed(deps: PreKvkRouteDeps):
     stats_refresh = deps.send_stats_update_embed
     if stats_refresh is None:
         from stats_alerts.interface import send_stats_update_embed as stats_refresh
 
     ts = deps.now_utc().strftime("%Y-%m-%d %H:%M UTC")
-    await stats_refresh(deps.bot, ts, True, is_test=False)
+    return await stats_refresh(deps.bot, ts, True, is_test=False)
 
 
 def _metadata_dict(result: Any) -> dict[str, Any]:
@@ -365,7 +366,12 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 refresh_error: Exception | None = None
                 refresh_started = deps.now_utc()
                 try:
-                    await _refresh_stats_embed(deps)
+                    delivery = await _refresh_stats_embed(deps)
+                    log_delivery(
+                        delivery,
+                        caller="prekvk_upload",
+                        source_message_id=getattr(message, "id", None),
+                    )
                 except Exception as exc:
                     refresh_error = exc
                     logger.debug(

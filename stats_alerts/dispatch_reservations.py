@@ -350,6 +350,8 @@ class DispatchAttempt:
         self.kind = kind
         self.channel_id = channel_id
         self.token: str | None = None
+        self.persistence_outcome = "not_applicable"
+        self.finalization_error: str | None = None
 
     async def __aenter__(self):
         def reserve():
@@ -375,8 +377,10 @@ class DispatchAttempt:
             raise
 
     async def accept(self, message_id: int) -> None:
+        self.persistence_outcome = "unconfirmed"
         try:
             await _io(self.store.accept, self.token, message_id)
+            self.persistence_outcome = "confirmed"
         except Exception:
             logger.exception(
                 "[DISPATCH] Delivery accepted; persistence requires reconciliation token=%s message_id=%s",
@@ -389,7 +393,8 @@ class DispatchAttempt:
             # Even a final HTTP rejection can follow an ambiguous client retry.
             try:
                 await _io(self.store.finish_failure, self.token)
-            except Exception:
+            except Exception as exc:
+                self.finalization_error = type(exc).__name__
                 logger.exception(
                     "[DISPATCH] Failed finalizing token=%s; retained state requires recovery",
                     self.token,

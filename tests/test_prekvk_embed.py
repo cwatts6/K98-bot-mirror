@@ -457,3 +457,89 @@ async def test_existing_reference_fallback_keeps_daily_guard(monkeypatch, failur
         assert await prekvk_embed.send_prekvk_embed(object(), channel, "audit") == "sent"
         assert channel.sent[0]["content"] == "@everyone"
         assert state.load_state()["prekvk_msg_id"] == 123
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("edit_error", [False, True])
+async def test_production_outcome_edit_identity_and_existing_fallback(monkeypatch, edit_error):
+    from types import SimpleNamespace
+
+    _patch_builder_dependencies(monkeypatch)
+    channel = _Channel()
+    message = SimpleNamespace(id=77, channel=channel, created_at=datetime.now(UTC))
+
+    async def edit(**kwargs):
+        if edit_error:
+            raise TimeoutError("ambiguous edit")
+
+    message.edit = edit
+
+    async def fetch(_):
+        return message
+
+    async def send(**kwargs):
+        channel.sent.append(kwargs)
+        return SimpleNamespace(id=123, channel=channel)
+
+    channel.fetch_message = fetch
+    channel.send = send
+    monkeypatch.setattr(prekvk_embed, "load_state", lambda: {"prekvk_msg_id": 77})
+    result = await prekvk_embed.send_prekvk_embed(None, channel, "stamp", return_outcome=True)
+    assert [a.outcome for a in result.attempts] == (
+        ["unknown", "sent"] if edit_error else ["edited"]
+    )
+    assert result.attempts[0].message_id == 77
+    assert result.attempts[-1].channel_id == 99
+    assert len(channel.sent) == int(edit_error)
+    if edit_error:
+        assert result.attempts[-1].persistence == "confirmed"
+
+
+@pytest.mark.asyncio
+async def test_positive_prekvk_receipt_survives_commit_failure(monkeypatch):
+    _patch_builder_dependencies(monkeypatch)
+    channel = _Channel()
+
+    def fail(*args):
+        raise OSError("disk")
+
+    monkeypatch.setattr(dispatch_reservations.ReservationStore, "accept", fail)
+    result = await prekvk_embed.send_prekvk_embed(None, channel, "stamp", return_outcome=True)
+    item = result.attempts[-1]
+    assert item.outcome == "sent" and item.message_id == 123
+    assert item.persistence == "unconfirmed"
+    assert len(channel.sent) == 1
+    assert not guard.sent_today("prekvk_daily")
+    again = await prekvk_embed.send_prekvk_embed(None, channel, "stamp", return_outcome=True)
+    assert again.attempts[-1].outcome == "skipped"
+    assert len(channel.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_prekvk_cancellation_during_commit_logs_receipt(monkeypatch, caplog):
+    import asyncio
+
+    _patch_builder_dependencies(monkeypatch)
+
+    async def cancelled(self, message_id):
+        self.persistence_outcome = "unconfirmed"
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(dispatch_reservations.DispatchAttempt, "accept", cancelled)
+    channel = _Channel()
+    with caplog.at_level("INFO"), pytest.raises(asyncio.CancelledError):
+        await prekvk_embed.send_prekvk_embed(None, channel, "stamp", return_outcome=True)
+    assert "outcome=sent" in caplog.text
+    assert "message=123" in caplog.text and "persistence=unconfirmed" in caplog.text
+    assert len(channel.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_prekvk_invalid_store_is_failure_not_guard_skip(monkeypatch):
+    _patch_builder_dependencies(monkeypatch)
+    store = dispatch_reservations.ReservationStore()
+    store.path.write_text("not json", encoding="utf-8")
+    channel = _Channel()
+    result = await prekvk_embed.send_prekvk_embed(None, channel, "stamp", return_outcome=True)
+    assert result.attempts[-1].outcome == "failed"
+    assert not channel.sent

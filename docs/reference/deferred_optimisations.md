@@ -5,6 +5,30 @@ to GitHub issues/task packs.
 
 Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 
+Phase 2K combined delivery outcomes and positive-receipt-only fighting claims are implemented
+locally following design approval and passed full pytest. The security receipt discrepancy is
+closed by fresh complete-coverage review 9884a327-68c2-48ff-9ff9-f548bec39b88; operational gates
+remain recorded in the Phase 2K pack. This does not close durable fighting
+ownership, executor, ProcConfig, lifecycle, DM/JSON or natural smoke observations below.
+
+### Deferred Optimisation
+- Area: standalone/embedded KS claims and production Pre-KVK edit fallback
+- Type: consistency
+- Description: KS pre-send ping claims can remain consumed after send failure; production Pre-KVK may replace after an ambiguous edit. Phase 2K records these outcomes but preserves both policies.
+- Suggested Fix: Review each policy in a separately bounded decision with failure/ambiguity and mention semantics, preserving existing reservations and diagnostic behavior until approved.
+- Impact: medium
+- Risk: medium
+- Dependencies: Explicit policy approval and deterministic claim/edit/send ordering tests; no policy change in Phase 2K.
+
+### Deferred Optimisation
+- Area: services/honor_import_audit_service.py and services/prekvk_import_audit_service.py
+- Type: consistency
+- Description: SQL refresh/batch completion records workflow status and has no per-publication receipt contract. Phase 2K correlated outcome logs do not change its persisted meaning.
+- Suggested Fix: Separately validate and design durable delivery details/status semantics without turning successful ingestion into a false delivery receipt or retrying imports.
+- Impact: medium
+- Risk: medium
+- Dependencies: Authoritative SQL validation and separate contract approval; no SQL audit mutation in Phase 2K.
+
 ### Deferred Optimisation
 - Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
 - Type: consistency

@@ -9,12 +9,24 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
+Phase 2K combined implementation is locally tested (operator design approval, 2026-09-09).
+Seasonal publication now returns per-attempt send/edit/skip/failure/unknown evidence, including
+Pre-KVK and daily/weekly off-season message IDs. Delivery and claim/commit observations are
+separate. Fighting claims only after a positive send receipt; ambiguous calls do not claim or
+automatically retry, but later natural calls remain eligible. Existing KS ping claims, Pre-KVK
+fallback, reservations and H/I sessions/defaults are preserved. No deployment is claimed.
+Full pytest: 3508 passed, 2 skipped; operational logs unchanged. The revised Phase 2K pack owns
+the current manifest and remaining operational gates. Fresh Changes-only/Deep-off review
+`9884a327-68c2-48ff-9ff9-f548bec39b88` is sealed with complete coverage and zero findings;
+it supersedes the earlier partial-coverage receipt without altering that historical artifact.
+
 Phase 2J command removal is delivered and operator-smoke accepted (2026-09-09): restart,
 36 primary / 100 grouped / 24 ops, sync/cache validation and unchanged existing commands.
-Mirror #261 / production #568 await operator merge and final main/deployed-SHA verification.
-Phase 2J pack/starter are archived. Phase 2K Production Stats Delivery Outcomes is the next
-audit/design-only pack; no runtime/test implementation is approved. Existing H/I sessions and
-production defaults remain preserved. The deferred register and original audit are reconciled.
+Mirror #261 / production #568 merges are verified; final bot-machine deployed-SHA/clean checkout
+and restart association remain pending operator evidence (see the Phase 2K pack for exact SHAs).
+Phase 2J pack/starter are archived. Phase 2K Production Stats Delivery Outcomes was subsequently
+approved and implemented as recorded above. Existing H/I sessions and production defaults remain
+preserved. The deferred register and original audit are reconciled.
 
 Entry verified 2026-09-09: #260/#567 merged; production main `00817eca`, mirror main `8cdbb908`.
 All Python source matches reviewed Phase 2I `06f31a94` / `d89e606c`. The operator supplied a clean

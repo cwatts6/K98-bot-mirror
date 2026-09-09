@@ -78,3 +78,61 @@ async def test_transport_failure_keeps_uncertain_and_preserves_summary_suppressi
     row = next(iter(dispatch.ReservationStore()._read()["attempts"].values()))
     assert row["phase"] == "uncertain"
     assert not guard.sent_today("offseason_daily")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("daily_failure", [False, True])
+async def test_daily_weekly_receipts_are_independent(isolated, monkeypatch, daily_failure):
+    from datetime import date
+
+    import embed_offseason_stats as renderer
+
+    class Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def cursor(self):
+            return object()
+
+    monkeypatch.setattr(renderer, "get_conn_with_retries", Conn)
+    monkeypatch.setattr(renderer, "load_all_daily", lambda _: {})
+    monkeypatch.setattr(renderer, "load_all_weekly", lambda _: {})
+    monkeypatch.setattr(renderer, "_pick_daily_snapshot_date", lambda _: date(2026, 9, 7))
+    monkeypatch.setattr(renderer, "load_latest_and_prev_rows", lambda _: (None, None))
+    channel = SimpleNamespace(id=99, guild=SimpleNamespace(id=88))
+    calls = []
+
+    async def send(**kwargs):
+        calls.append(kwargs)
+        if daily_failure and len(calls) == 1:
+            raise TimeoutError("unknown")
+        return SimpleNamespace(id=100 + len(calls), channel=channel)
+
+    channel.send = send
+    result = await offseason.send_offseason_flow(None, channel, "stamp", return_outcome=True)
+    assert [a.component for a in result.attempts] == ["offseason_daily", "offseason_weekly"]
+    assert [a.outcome for a in result.attempts] == (
+        ["unknown", "sent"] if daily_failure else ["sent", "sent"]
+    )
+    assert result.attempts[-1].message_id == 102
+    assert result.attempts[-1].persistence == "confirmed"
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_weekly_not_scheduled_is_explicit(isolated, monkeypatch):
+    monkeypatch.setattr(offseason, "utcnow", lambda: datetime(2026, 9, 8, tzinfo=UTC))
+
+    async def no_send(*a, **k):
+        return None
+
+    monkeypatch.setattr(offseason, "send_offseason_stats_embed_v2", no_send)
+    result = await offseason.send_offseason_flow(
+        None, SimpleNamespace(id=99), "stamp", return_outcome=True
+    )
+    assert result.attempts[-1].outcome == "skipped"
+    assert result.attempts[-1].reason == "not_scheduled"
+    assert result.attempts[0].outcome == "unknown"

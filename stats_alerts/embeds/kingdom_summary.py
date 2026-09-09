@@ -29,6 +29,7 @@ import discord
 
 from constants import CUSTOM_AVATAR_URL
 from file_utils import fetch_one_dict, get_conn_with_retries
+from stats_alerts.delivery_outcomes import delivery_outcome
 from stats_alerts.guard import claim_send, sent_today
 from utils import fmt_short
 
@@ -374,16 +375,20 @@ def build_kingdom_summary_embed(
     return embed
 
 
+@delivery_outcome("kingdom_summary_daily")
 async def send_kingdom_summary(
     bot: Any,
     channel: discord.abc.Messageable,
     timestamp: str,
     *,
     is_test: bool = False,
+    _delivery=None,
 ) -> None:
     """
     Attempt to send the daily Kingdom Summary embed. Guarded by 'kingdom_summary_daily'.
     """
+    if _delivery and channel is not None:
+        _delivery.update(requested_channel_id=getattr(channel, "id", None))
     # Guard check (sent_today)
     try:
         try:
@@ -398,10 +403,14 @@ async def send_kingdom_summary(
                 name="sent_today_kingdom_summary",
                 meta={"key": "kingdom_summary_daily"},
             ):
+                if _delivery:
+                    _delivery.skip("already_sent")
                 logger.info("[KINGDOM SUMMARY] Already sent today; skipping.")
                 return
         elif not is_test:
             if await asyncio.to_thread(sent_today, "kingdom_summary_daily"):
+                if _delivery:
+                    _delivery.skip("already_sent")
                 logger.info("[KINGDOM SUMMARY] Already sent today; skipping.")
                 return
     except Exception:
@@ -428,9 +437,14 @@ async def send_kingdom_summary(
         latest_row, prev_row = None, None
 
     if not latest_row:
+        if _delivery:
+            _delivery.update(data="empty_or_unavailable")
+            _delivery.skip("no_data")
         logger.info("[KINGDOM SUMMARY] No KS data available; skipping.")
         return
 
+    if _delivery:
+        _delivery.update(data="available")
     # Build embed using centralized builder
     embed = build_kingdom_summary_embed(latest_row, prev_row, timestamp)
 
@@ -440,6 +454,8 @@ async def send_kingdom_summary(
     try:
         first_ping = False
         if not is_test:
+            if _delivery:
+                _delivery.update(claim="not_confirmed")
             try:
                 try:
                     from file_utils import run_blocking_in_thread
@@ -454,11 +470,15 @@ async def send_kingdom_summary(
                         meta={"key": "kingdom_summary_daily", "max_per_day": 1},
                     )
                     first_ping = bool(res)
+                    if _delivery:
+                        _delivery.update(claim="confirmed" if res is True else "not_confirmed")
                 else:
                     res = await asyncio.to_thread(
                         claim_send, "kingdom_summary_daily", max_per_day=1
                     )
                     first_ping = bool(res)
+                    if _delivery:
+                        _delivery.update(claim="confirmed" if res is True else "not_confirmed")
             except Exception:
                 logger.exception(
                     "[KINGDOM SUMMARY] claim_send failed; will still send without ping"
@@ -470,7 +490,13 @@ async def send_kingdom_summary(
         logger.exception("[KINGDOM SUMMARY] Claim/ping logic failed; sending without ping")
 
     try:
-        await channel.send(embed=embed, content=content, allowed_mentions=allowed_mentions)
+        if _delivery and channel is not None:
+            _delivery.enter(getattr(channel, "id", None))
+        sent = await channel.send(embed=embed, content=content, allowed_mentions=allowed_mentions)
+        if _delivery:
+            _delivery.receipt(sent)
         logger.info("[KINGDOM SUMMARY] Sent summary to channel %s", getattr(channel, "id", "?"))
-    except Exception:
+    except Exception as exc:
+        if _delivery:
+            _delivery.failure(exc)
         logger.exception("[KINGDOM SUMMARY] Failed sending summary")

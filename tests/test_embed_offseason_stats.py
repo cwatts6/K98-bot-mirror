@@ -89,3 +89,27 @@ async def test_receipt_adapter_starts_only_at_publication(monkeypatch):
     assert calls == ["start"]
     assert receipt.id == 123
     assert len(channel.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_outcome_uses_actual_destination_and_keeps_receipt_api(monkeypatch):
+    from types import SimpleNamespace
+
+    channel = SimpleNamespace(id=90)
+    actual = SimpleNamespace(id=91, guild=SimpleNamespace(id=80))
+
+    async def send(**kwargs):
+        return SimpleNamespace(id=100, channel=actual)
+
+    channel.send = send
+    monkeypatch.setattr(embed, "get_conn_with_retries", lambda: _Connection())
+    monkeypatch.setattr(embed, "load_all_daily", lambda _: {})
+    monkeypatch.setattr(embed, "_pick_daily_snapshot_date", lambda _: date(2026, 9, 8))
+    result = await embed.send_offseason_stats_embed_v2(
+        None, channel=channel, include_kingdom_summary=False, return_outcome=True
+    )
+    item = result.attempts[0]
+    assert (item.outcome, item.channel_id, item.message_id) == ("sent", 91, 100)
+    assert item.requested_channel_id == 90 and item.includes_summary is False
+    with pytest.raises(ValueError):
+        await embed.send_offseason_stats_embed_v2(None, return_receipt=True, return_outcome=True)

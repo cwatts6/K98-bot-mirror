@@ -445,3 +445,35 @@ async def test_async_clear_does_not_retry_worker_error(store, monkeypatch):
     with pytest.raises(OSError, match="filesystem failure after entry"):
         await dispatch.clear_prekvk_message(expected_id=123)
     assert calls == [{"expected_id": 123}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "accept", "finish"])
+async def test_commit_observation_does_not_change_lifetime_contract(store, monkeypatch, failure):
+    calls = []
+    accept = store.accept
+    finish = store.finish_failure
+
+    def accepting(*args):
+        calls.append("accept")
+        if failure == "accept":
+            raise OSError("disk")
+        return accept(*args)
+
+    def finishing(*args):
+        calls.append("finish")
+        if failure == "finish":
+            raise OSError("disk")
+        return finish(*args)
+
+    monkeypatch.setattr(store, "accept", accepting)
+    monkeypatch.setattr(store, "finish_failure", finishing)
+    attempt = dispatch.DispatchAttempt("prekvk_daily", 99, store=store)
+    async with attempt:
+        await attempt.start()
+        assert await attempt.accept(123) is None
+    assert calls == ["accept", "finish"]
+    assert attempt.persistence_outcome == ("unconfirmed" if failure == "accept" else "confirmed")
+    assert attempt.finalization_error == ("OSError" if failure == "finish" else None)
+    phases = [r["phase"] for r in store._read()["attempts"].values()]
+    assert phases == (["uncertain"] if failure == "accept" else ["committed"])

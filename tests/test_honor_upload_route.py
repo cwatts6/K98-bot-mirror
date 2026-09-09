@@ -346,3 +346,23 @@ async def test_honor_route_stats_refresh_failure_is_best_effort(caplog):
     assert audit_events[-1][0] == "complete"
     assert audit_events[-1][2]["status"] == "failed"
     assert audit_events[-1][2]["external_batch_id"] == "15:9"
+
+
+@pytest.mark.asyncio
+async def test_delivery_result_logged_without_changing_import_completion(caplog):
+    from stats_alerts.delivery_outcomes import DeliveryAttempt, DeliveryResult
+
+    audit_events = []
+
+    async def refresh(*args, **kwargs):
+        return DeliveryResult(
+            (DeliveryAttempt("fighting", outcome="unknown", reason="TimeoutError"),),
+            "upload-receipt",
+            "fighting",
+        )
+
+    deps, *_ = _deps(audit_events=audit_events, send_stats_update_embed=refresh)
+    with caplog.at_level("INFO"):
+        assert await route.handle_honor_upload(_message(), deps) is True
+    assert "correlation=upload-receipt" in caplog.text and "outcome=unknown" in caplog.text
+    assert audit_events[-1][2]["status"] == "completed"

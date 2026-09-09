@@ -27,6 +27,7 @@ import discord
 
 from constants import CUSTOM_AVATAR_URL, KVK_BANNER_MAP, STATS_SHEET_ID
 from stats_alerts.allkingdoms import load_allkingdom_blocks
+from stats_alerts.delivery_outcomes import delivery_outcome
 from stats_alerts.formatters import abbr
 from stats_alerts.honors import get_latest_honor_top
 from stats_alerts.kvk_meta import (
@@ -526,16 +527,32 @@ async def publish_kvk_preview(bot, channel, preview, message_id, before_send, ch
     return sent.id
 
 
+@delivery_outcome("fighting")
 async def send_kvk_embed(
-    bot: Any, channel: discord.abc.Messageable, timestamp: str, *, is_test: bool = False
+    bot: Any,
+    channel: discord.abc.Messageable,
+    timestamp: str,
+    *,
+    is_test: bool = False,
+    _delivery=None,
 ) -> None:
     """Legacy production adapter: retain reads, formatting, mentions and return behavior."""
+    if _delivery and channel is not None:
+        _delivery.update(requested_channel_id=getattr(channel, "id", None))
     preview = await build_kvk_preview(timestamp)
+    if _delivery:
+        _delivery.update(data="available" if preview.available else "empty_or_unavailable")
     content = "@everyone" if not is_test else None
     allowed_mentions = discord.AllowedMentions(everyone=(not is_test))
     try:
-        await channel.send(
+        if _delivery and channel is not None:
+            _delivery.enter(getattr(channel, "id", None))
+        sent = await channel.send(
             content=content, embeds=preview.payload, allowed_mentions=allowed_mentions
         )
-    except Exception:
+        if _delivery:
+            _delivery.receipt(sent)
+    except Exception as exc:
+        if _delivery:
+            _delivery.failure(exc)
         logger.exception("[KVK EMBED] Failed sending combined embeds")

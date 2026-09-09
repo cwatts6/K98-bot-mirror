@@ -116,6 +116,10 @@ def _fmt_top10_list(rows: list[tuple[str, int]], limit: int) -> str:
 
 
 # New: send_offseason_stats_embed_v2 now accepts include_kingdom_summary
+from stats_alerts.delivery_outcomes import delivery_outcome
+
+
+@delivery_outcome("offseason")
 async def send_offseason_stats_embed_v2(
     bot,
     ctx: discord.ApplicationContext | None = None,
@@ -127,6 +131,7 @@ async def send_offseason_stats_embed_v2(
     include_kingdom_summary: bool = True,
     before_send=None,
     return_receipt: bool = False,
+    _delivery=None,
 ) -> Any:
     """
     Sends a combo of embeds (kingdom summary + 3 supporting embeds) for either:
@@ -149,7 +154,14 @@ async def send_offseason_stats_embed_v2(
         ch = bot.get_channel(target_channel_id)
     if ch is None and NOTIFY_CHANNEL_ID is not None:
         ch = bot.get_channel(NOTIFY_CHANNEL_ID)
+    if _delivery:
+        _delivery.update(
+            component="offseason_weekly" if is_weekly else "offseason_daily",
+            requested_channel_id=getattr(channel, "id", target_channel_id),
+        )
     if ch is None:
+        if _delivery:
+            _delivery.update(outcome="failed", reason="missing_destination")
         logger.warning("[OFFSEASON EMBED] No channel resolved.")
         return
 
@@ -209,6 +221,8 @@ async def send_offseason_stats_embed_v2(
                     except Exception:
                         claim_send = None
                     if claim_send is not None and not mention_everyone:
+                        if _delivery:
+                            _delivery.update(claim="not_confirmed")
                         # attempt to claim via run_blocking_in_thread else to_thread
                         try:
                             from file_utils import run_blocking_in_thread
@@ -233,6 +247,8 @@ async def send_offseason_stats_embed_v2(
                                 ping_allowed = bool(await asyncio.to_thread(claim_send, key))
                             except Exception:
                                 logger.exception("[OFFSEASON] claim_send (to_thread) failed")
+                        if _delivery:
+                            _delivery.update(claim="confirmed" if ping_allowed else "not_confirmed")
                         if ping_allowed and not is_weekly:
                             # set mention only if requested and claim_successful
                             e1.content = "@everyone" if mention_everyone else None
@@ -298,15 +314,23 @@ async def send_offseason_stats_embed_v2(
         name, val = _fmt_list("RSS Assisted", data.get("rss_assisted", []))
         e4.add_field(name=name, value=val or "—", inline=True)
 
+    if _delivery:
+        _delivery.update(includes_summary=e1 is not None)
     # Decide content/mentions:
     content = "@everyone" if (mention_everyone and include_kingdom_summary) else None
     allowed = discord.AllowedMentions(everyone=(mention_everyone and include_kingdom_summary))
     embeds_to_send = [e for e in (e1, e2, e3, e4) if e is not None]
     if not embeds_to_send:
+        if _delivery:
+            _delivery.skip("nothing_to_send")
         logger.warning("[OFFSEASON EMBED] Nothing to send.")
         return
 
     if before_send is not None:
         await before_send()
+    if _delivery:
+        _delivery.enter(getattr(ch, "id", None))
     message = await ch.send(content=content, embeds=embeds_to_send, allowed_mentions=allowed)
+    if _delivery:
+        _delivery.receipt(message)
     return message if return_receipt else None

@@ -23,6 +23,7 @@ from services.honor_import_audit_service import (
     record_honor_audit_phase,
     start_honor_audit_batch,
 )
+from stats_alerts.delivery_outcomes import log_delivery
 from upload_routes.common import message_source_fields, resolve_notify_channel, schedule_best_effort
 from utils import utcnow
 
@@ -61,13 +62,13 @@ def _is_test_upload(message: Any, filename: str) -> bool:
     )
 
 
-async def _refresh_stats_embed(deps: HonorRouteDeps, is_test: bool) -> None:
+async def _refresh_stats_embed(deps: HonorRouteDeps, is_test: bool):
     stats_refresh = deps.send_stats_update_embed
     if stats_refresh is None:
         from stats_alerts.interface import send_stats_update_embed as stats_refresh
 
     ts = deps.now_utc().strftime("%Y-%m-%d %H:%M UTC")
-    await stats_refresh(deps.bot, ts, True, is_test=is_test)
+    return await stats_refresh(deps.bot, ts, True, is_test=is_test)
 
 
 async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
@@ -250,7 +251,10 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
         refresh_failed: Exception | None = None
         refresh_started = deps.now_utc()
         try:
-            await _refresh_stats_embed(deps, is_test)
+            delivery = await _refresh_stats_embed(deps, is_test)
+            log_delivery(
+                delivery, caller="honor_upload", source_message_id=getattr(message, "id", None)
+            )
         except Exception as exc:
             refresh_failed = exc
             logger.debug("Failed to refresh stats embed after KVK Honor import", exc_info=True)

@@ -6,6 +6,7 @@ from typing import Any
 from bot_config import OFFSEASON_STATS_CHANNEL_ID, STATS_ALERT_CHANNEL_ID
 from utils import utcnow
 
+from .delivery_outcomes import DeliveryResult, delivery_outcome
 from .dispatch_reservations import clear_prekvk_message
 from .embeds import (
     kvk as kvk_mod,
@@ -19,11 +20,13 @@ from .kvk_meta import is_kvk_fighting_open
 logger = logging.getLogger(__name__)
 
 
-async def send_stats_update_embed(
+@delivery_outcome("seasonal")
+async def _send_stats_update_embed(
     bot: Any,
     timestamp: str,
     is_kvk: bool,
     is_test: bool = False,
+    _delivery=None,
 ) -> None:
     """
     Public orchestrator. Keeps the original behaviour but delegates to embed modules.
@@ -69,52 +72,71 @@ async def send_stats_update_embed(
     else:
         channel_id = OFFSEASON_STATS_CHANNEL_ID
 
+    route = "fighting" if effective_is_kvk else "prekvk" if is_kvk else "offseason"
+    _delivery.begin("kingdom_summary_daily", channel_id=OFFSEASON_STATS_CHANNEL_ID)
+    _delivery.route = route
     channel = bot.get_channel(channel_id)
     if not channel:
-        logger.warning("[STATS ALERT] Could not find channel id %s.", channel_id)
+        _delivery.skip("primary_destination_unavailable")
+        _delivery.begin(route, channel_id=channel_id)
+        _delivery.failure(ValueError("missing destination"))
+        _delivery.update(reason="missing_destination")
         return
 
-    # New: attempt to send the daily Kingdom Summary first (runs once-per-day guard inside)
+    def include(value, component, destination):
+        if isinstance(value, DeliveryResult):
+            _delivery.attempts[-1:] = value.attempts
+        elif _delivery.attempts[-1].reason == "no_receipt":
+            _delivery.update(reason="legacy_unverified")
+
+    # Preserve the standalone summary before all primary guards.
     try:
-        kschannel_id = OFFSEASON_STATS_CHANNEL_ID
-        ks_channel = bot.get_channel(kschannel_id)
-        await ks_mod(bot, ks_channel, timestamp, is_test=is_test)
-    except Exception:
+        ks_channel = bot.get_channel(OFFSEASON_STATS_CHANNEL_ID)
+        result = await ks_mod(bot, ks_channel, timestamp, is_test=is_test, _delivery=_delivery)
+        include(result, "kingdom_summary_daily", OFFSEASON_STATS_CHANNEL_ID)
+    except Exception as exc:
+        _delivery.failure(exc)
         logger.exception("[STATS EMBED] Kingdom Summary send failed.")
 
-    # KVK path (only once Pass 4 opened)
+    _delivery.begin(route, channel_id=channel_id)
     if effective_is_kvk:
-        # off-season mutual exclusivity
         if not is_test and sent_today_any(["offseason_daily", "offseason_weekly"]):
-            logger.info("[STATS EMBED] Off-season already posted today; skipping KVK.")
+            _delivery.skip("offseason_already_posted")
             return
-        # respect daily cap
         if not is_test and read_counts_for("kvk", utcnow().date().isoformat()) >= 3:
-            logger.info("[STATS EMBED] KVK daily limit reached, skipping broadcast.")
+            _delivery.skip("daily_cap")
             return
-        try:
-            await kvk_mod.send_kvk_embed(bot, channel, timestamp, is_test=is_test)
-            if not is_test:
-                claim_send("kvk", max_per_day=3)
-        except Exception:
-            logger.exception("[STATS EMBED] KVK send failed.")
+        result = await kvk_mod.send_kvk_embed(
+            bot, channel, timestamp, is_test=is_test, _delivery=_delivery
+        )
+        include(result, "fighting", channel_id)
+        receipt = _delivery.attempts[-1]
+        if (
+            not is_test
+            and receipt.outcome == "sent"
+            and receipt.acknowledged
+            and receipt.message_id
+        ):
+            _delivery.update(claim="not_confirmed")
+            claimed = claim_send("kvk", max_per_day=3)
+            _delivery.update(claim="confirmed" if claimed is True else "not_confirmed")
         return
 
-    # Pre-KVK path (KVK but before Pass 4)
     if is_kvk:
-        # If a Pre-KVK msg id exists, do silent edit path in module
-        try:
-            await prekvk_mod.send_prekvk_embed(bot, channel, timestamp, is_test=is_test)
-            return
-        except prekvk_mod.PreKvkSkip:
-            # The module signals it skipped due to mutual exclusivity or limits
-            return
-        except Exception:
-            logger.exception("[STATS EMBED] Pre-KVK send failed.")
-            return
+        result = await prekvk_mod.send_prekvk_embed(
+            bot, channel, timestamp, is_test=is_test, _delivery=_delivery
+        )
+        include(result, "prekvk", channel_id)
+        return
 
-    # Off-season path
-    try:
-        await off_mod.send_offseason_flow(bot, channel, timestamp, is_test=is_test)
-    except Exception:
-        logger.exception("[STATS EMBED] Off-season flow failed.")
+    result = await off_mod.send_offseason_flow(
+        bot, channel, timestamp, is_test=is_test, _delivery=_delivery
+    )
+    include(result, "offseason", channel_id)
+
+
+async def send_stats_update_embed(bot: Any, timestamp: str, is_kvk: bool, is_test: bool = False):
+    """Publish once through the existing selectors and return per-attempt evidence."""
+    return await _send_stats_update_embed(
+        bot, timestamp, is_kvk, is_test=is_test, return_outcome=True
+    )
