@@ -5,11 +5,12 @@ to GitHub issues/task packs.
 
 Resolved historical notes live in `archive/deferred_optimisations_resolved.md`.
 
-Phase 2K combined delivery outcomes and positive-receipt-only fighting claims are implemented
-locally following design approval and passed full pytest. The security receipt discrepancy is
-closed by fresh complete-coverage review 9884a327-68c2-48ff-9ff9-f548bec39b88; operational gates
-remain recorded in the Phase 2K pack. This does not close durable fighting
-ownership, executor, ProcConfig, lifecycle, DM/JSON or natural smoke observations below.
+Phase 2K delivery outcomes and receipt-only fighting claims are delivered and operator-smoke
+accepted on 2026-09-09. Its completed item is in the resolved register and archived pack.
+PRs #262/#569 still require operator merges and final main/deployment verification.
+Phase 2L selects ProcConfig result lifecycle and truthful completion as the next audit/design.
+Natural Pre-KVK/off-season and Phase 2F public-save observations remain pending independently;
+durable fighting ownership, executors, lifecycle and DM/JSON work remain separately scoped.
 
 ### Deferred Optimisation
 - Area: standalone/embedded KS claims and production Pre-KVK edit fallback
@@ -32,23 +33,12 @@ ownership, executor, ProcConfig, lifecycle, DM/JSON or natural smoke observation
 ### Deferred Optimisation
 - Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
 - Type: consistency
-- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. Repeated at 2026-09-09 07:14:26; a subsequent startup import succeeded at 08:40:35 with a manifest. This intermittent failure/false-success contract remains unresolved, not disproved by one successful run.
+- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. Repeated at 2026-09-09 07:14:26 and again at 11:46:51 during accepted Phase 2K smoke; a subsequent startup import succeeded at 08:40:35 with a manifest. This intermittent failure/false-success contract remains unresolved, not disproved by one successful run.
 - Suggested Fix: Separately inspect pending result/cursor lifecycle and the authoritative procedure result contract; drain/close results at the correct transaction boundary and propagate failure through CLI exit/report and pipeline summary. Prove commit, cleanup failure, manifest and truthful status without rerunning side effects.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2G–2J; separate from Phase 2K delivery outcomes.
-- Status: production reliability observation; owner Chris Watts; separate approval required
-- Last verified: 2026-09-09
-
-### Deferred Optimisation
-- Area: `admin_helpers.py` stats dispatch completion logging and `stats_alerts/interface.py` outcome contract
-- Type: consistency
-- Description: At 2026-09-08 09:21:50 a KVK cap skip is followed by generic send success. The 2026-09-09 07:16 route also records success/legacy claim without message identity. Phase 2J removes the ops entrypoint only; remaining production callers still lose delivery outcomes.
-- Suggested Fix: Separately define truthful sent/edited/skipped/failed reporting while preserving existing routing and caller behavior. Phase 2K audit owns this status/receipt contract; reuse existing outcome patterns while keeping admission/reservation redesign separate.
-- Impact: low
-- Risk: low
-- Dependencies: Separate bounded status-contract audit and regression tests; Phase 2K architecture approval required before changing adapter return/error semantics; reservation redesign remains separate.
-- Status: selected for Phase 2K audit/design only; implementation unapproved; owner Chris Watts
+- Status: selected for Phase 2L audit/design; owner Chris Watts; runtime/test/SQL implementation requires design approval
 - Last verified: 2026-09-09
 
 ### Deferred Optimisation
@@ -417,7 +407,7 @@ with Chris Watts. Existing lifecycle, executor, ProcConfig and other structured 
 - Area: stats_alerts/interface.py, stats_alerts/embeds/kvk.py, commands/admin_cmds.py
 - Type: architecture
 - Description: Production fighting check/send/claim has no durable reservation; swallowed renderer failures can report success without a send receipt. The former ops test entrypoint is removed by Phase 2J. Phase 2I preview intentionally does not alter these production semantics.
-- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes. Phase 2J command removal is delivered and smoke accepted. Phase 2K owns truthful outcomes/receipts audit only; durable admission/cap/mutual-exclusion changes remain a separately approved protocol extension.
+- Suggested Fix: Separately scope real fighting admission, all participating callers, cap/mutual exclusion, receipts and truthful public outcomes. Phase 2J command removal is delivered and smoke accepted. Phase 2K delivered truthful outcomes/receipts and passed operator smoke; durable admission/cap/mutual-exclusion changes remain a separately approved protocol extension.
 - Impact: high
 - Risk: high
 - Dependencies: Explicit protocol approval; immutable baseline and production rollback evidence.
@@ -464,3 +454,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Dependencies: Concrete current payload failure or measured convergence benefit; regression evidence and scoped Changes review. Not Phase 2K receipt/admission work.
 - Status: optional convergence; no demonstrated incident; owner Chris Watts
 - Last verified: 2026-09-09
+
+### Deferred Optimisation
+- Area: natural seasonal stats delivery and Phase 2F public reminder save evidence
+- Type: consistency
+- Description: Phase 2K smoke proves natural fighting receipt/claim and isolated Pre-KVK send/status/edit. Natural Pre-KVK and off-season routes and Phase 2F's next natural public-save path have not been independently observed.
+- Suggested Fix: Retain matching destination/receipt and state evidence on the next naturally eligible run; Pre-KVK is about two months away. Keep the Phase 2F observation separate. Do not force dispatch, mutate calendars or reset state.
+- Impact: low
+- Risk: low
+- Dependencies: Natural calendar opportunities and operator evidence; not blockers to accepted Phase 2K smoke and not Phase 2L implementation.
+- Status: observation pending; owner Chris Watts

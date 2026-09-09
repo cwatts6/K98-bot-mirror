@@ -682,3 +682,12 @@ Next: Phase 2K Production Stats Delivery Outcomes, first-response audit/design o
 runtime, test, SQL, calendar or state mutation is authorized by preparing its pack. Preserve all
 Phase 1–2J production defaults and existing H/I sessions. Final merges and verification are owned
 by the operator; this closeout performs neither merge nor deployment.
+
+### Phase 2K production delivery outcomes — delivered and smoke accepted
+
+- Area: admin_helpers.py, seasonal interface/adapters, honor and Pre-KVK upload routes
+- Type: consistency
+- Description: Generic success logging and swallowed send failures did not prove Discord delivery, and fighting could claim success without a receipt.
+- Resolution: Per-attempt sent/edited/skipped/failed/unknown outcomes retain actual identity and partial results; fighting success claims require positive send acknowledgment. Delivery and bookkeeping remain separate.
+- Validation: Production candidate 36208765bf7200fa6855f3892e6b32d43b23bccf; operator acceptance 2026-09-09. Clean checkout/restart, KVK16 scan1122 receipt plus claim, KS skip and isolated Pre-KVK committed send/status/edit passed. Full production suite 3514 passed, 2 skipped; both review rounds resolved and Changes-only security evidence retained.
+- Remaining: Operator merges #262/#569 and final main/deployment verification. Natural seasonal and Phase 2F observations, durable admission policy, ProcConfig, executor/lifecycle/DM/JSON work remain separate. See archived Phase 2K pack and active Phase 2L pack.

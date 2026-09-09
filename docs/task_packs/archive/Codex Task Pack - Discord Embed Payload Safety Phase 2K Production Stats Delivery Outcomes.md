@@ -1,3 +1,50 @@
+# Archived — Phase 2K delivered and smoke accepted
+
+## Accepted Phase 2K delivery — 2026-09-09
+
+This acceptance supersedes earlier local-only, pending-smoke and implementation-approval statements below.
+Chris Watts explicitly accepted smoke testing as complete. Delivered and tested on production PR
+candidate `36208765bf7200fa6855f3892e6b32d43b23bccf`; mirror runtime head
+`2d892cefcfdfa0a8263efe69997bf292503b23aa`. Mirror #262 and production #569 remain open.
+The operator will merge both and perform final main/deployed-SHA, clean-checkout and restart
+verification. Documentation-only closeout commits follow the tested heads; do not label them as
+the already-running revision or claim final-main deployment.
+
+Operator evidence: clean `git status --short` at the candidate SHA, graceful restart at 11:41:57,
+ready at 11:42:10 and full startup completed at 11:42:15 (attached log timestamps).
+Registration remained 36 primary / 100 grouped / 24 ops with unchanged command cache.
+
+Natural production processing at 11:48:30 selected ACTIVE KVK16 / scan1122 with `test=False`.
+Fighting recorded `sent/acknowledged`, positive actual message/channel/guild identity and
+`claim=confirmed`; requested and actual destinations matched. KS independently recorded
+`skipped/already_sent`. The adapter and processing caller logged the same correlation and receipt,
+not two sends. Empty/unavailable fighting data still produced the existing report.
+Exact message, correlation and session identifiers are retained in private operator evidence.
+
+The isolated Pre-KVK session sent at 11:47:02 UTC, committed receipt/projections, retained the
+committed attempt on read-only status at 11:47:58, then edited the same message at 11:48:13.
+Fresh-admission blocking was reported as a read-only observation. This session proves isolated
+send/status/edit behavior, not natural seasonal admission or a post-session restart test.
+No live failure injection or forced duplicate was required.
+
+Final production validation: 3514 passed, 2 skipped; promoted hooks/whitespace passed.
+Mirror log-noise validation: 3512 passed, 2 skipped before two extra offline load-failure cases;
+operational logs unchanged; final focused suite 31 passed. Both review rounds were addressed
+and resolved. Full security scan `9884a327-68c2-48ff-9ff9-f548bec39b88` and follow-up
+`cf1d3cfe-2fee-4f4f-b66e-cb947e1beba4` retain complete coverage and no findings, Changes only,
+Deep off. Snapshot/test/documentation deltas and promotion equivalence are detailed below/in PRs.
+
+Natural Pre-KVK (about two months away), off-season production observations and Phase 2F's next
+natural public-save evidence remain separately tracked follow-ups, not blockers to this acceptance.
+ProcConfig failed again at 11:46:51 while restoring autocommit, followed by false completion
+reporting. That issue is selected for Phase 2L; it does not invalidate the Discord receipts.
+
+Next: Phase 2L ProcConfig Import Reliability and Truthful Completion Reporting, audit/design first.
+No Phase 2L runtime/test/SQL implementation is approved by this closeout.
+
+
+## Historical pack / starter (superseded where noted)
+
 # Phase 2K — Production Stats Delivery Outcomes
 
 Status: combined design and implementation approved on 2026-09-09; locally tested, not deployed.
@@ -371,8 +418,8 @@ Documentation:
 - `README-DEV.md`
 - `docs/reference/runbook_diagnostics.md`
 - `docs/reference/deferred_optimisations.md`
-- `docs/task_packs/Codex Task Pack - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md`
-- `docs/task_packs/Codex Chat Starter - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md`
+- `docs/task_packs/archive/Codex Chat Starter - Discord Embed Payload Safety Phase 2K Production Stats Delivery Outcomes.md`
 
 Tooling, config, dependency, command, view, startup, SQL/DAL/migration and state-format manifests:
 empty. The observation change in dispatch_reservations.py is runtime code, not a persistence
@@ -508,3 +555,14 @@ Promote through the existing patch-based script, preserving separate Git histori
 production file content against the mirror. The existing bounded rollback and deployment/natural
 Pre-KVK/Phase 2F evidence requirements remain unchanged. This review follow-up does not certify
 bot-machine deployment or natural production admission.
+
+
+## Documentation closeout validation decision
+
+Closeout delta: README-DEV, diagnostics runbook, original audit, active/resolved deferred registers,
+archived Phase 2K pack/starter and new Phase 2L pack/starter. Markdown only; no runtime, tests,
+SQL, config, dependencies, permission or deployment-script changes. Additional pytest/import/
+registration runs and security discovery are skipped for this delta; retain the reviewed and
+smoke-tested runtime evidence. Run architecture/deferred/security-routing validators, explicit
+document-only test selector, applicable hooks and whitespace/link checks. The standard production
+promotion script may independently enforce full validation. No Phase 2L runtime work is included.

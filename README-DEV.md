@@ -9,32 +9,22 @@ entire `docs/reference` folder.
 
 ## Current Discord Embed Payload Safety Work
 
-Phase 2K combined implementation is locally tested (operator design approval, 2026-09-09).
-Seasonal publication now returns per-attempt send/edit/skip/failure/unknown evidence, including
-Pre-KVK and daily/weekly off-season message IDs. Delivery and claim/commit observations are
-separate. Fighting claims only after a positive send receipt; ambiguous calls do not claim or
-automatically retry, but later natural calls remain eligible. Existing KS ping claims, Pre-KVK
-fallback, reservations and H/I sessions/defaults are preserved. No deployment is claimed.
-Full pytest: 3508 passed, 2 skipped; operational logs unchanged. The revised Phase 2K pack owns
-the current manifest and remaining operational gates. Fresh Changes-only/Deep-off review
-`9884a327-68c2-48ff-9ff9-f548bec39b88` is sealed with complete coverage and zero findings;
-it supersedes the earlier partial-coverage receipt without altering that historical artifact.
+Phase 2K Production Stats Delivery Outcomes is delivered, tested and operator-smoke accepted
+(Chris Watts, 2026-09-09). Tested production candidate: `36208765bf7200fa6855f3892e6b32d43b23bccf`;
+mirror runtime head: `2d892cefcfdfa0a8263efe69997bf292503b23aa`. PRs #262/#569 await operator
+merges and final main/deployed-head, clean-checkout and restart verification. Documentation-only
+closeout commits follow the tested candidate. Full production pytest: 3514 passed, 2 skipped.
 
-Phase 2J command removal is delivered and operator-smoke accepted (2026-09-09): restart,
-36 primary / 100 grouped / 24 ops, sync/cache validation and unchanged existing commands.
-Mirror #261 / production #568 merges are verified; final bot-machine deployed-SHA/clean checkout
-and restart association remain pending operator evidence (see the Phase 2K pack for exact SHAs).
-Phase 2J pack/starter are archived. Phase 2K Production Stats Delivery Outcomes was subsequently
-approved and implemented as recorded above. Existing H/I sessions and production defaults remain
-preserved. The deferred register and original audit are reconciled.
+Restart/registration (36 primary / 100 grouped / 24 ops), natural KVK16 scan1122 acknowledged
+fighting receipt with confirmed claim, independent KS skip, and isolated Pre-KVK committed
+send/status/same-message edit passed. H/I sessions, production payloads/mentions and Phase 2J
+removal are preserved. Natural Pre-KVK/off-season and Phase 2F public-save observations remain
+separate follow-ups. The Phase 2K pack/starter are archived with exact evidence limits.
 
-Entry verified 2026-09-09: #260/#567 merged; production main `00817eca`, mirror main `8cdbb908`.
-All Python source matches reviewed Phase 2I `06f31a94` / `d89e606c`. The operator supplied a clean
-production checkout at the merged head; the 05:55 startup excerpt predates the 06:28 merges and
-does not identify the running SHA. Final process/restart association remains pending. Natural
-morning ACTIVE KVK 16 selection and legacy CSV claims are observed; matching KVK message identity,
-natural Pre-KVK reservation/receipt and Phase 2F public-reminder atomic save remain unverified.
-Live-event tracker saves and diagnostic edits do not close those observations.
+Next active scope: [Phase 2L task pack](docs/task_packs/Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202L%20ProcConfig%20Import%20Reliability%20and%20Truthful%20Completion%20Reporting.md).
+Audit/design first: resolve ProcConfig result/transaction cleanup and propagate truthful outcomes
+through worker, offload, report and pipeline paths. No Phase 2L runtime/test/SQL work is yet approved.
+Start by verifying the operator-completed #262/#569 merges and final deployment evidence.
 
 Discord Embed Payload Safety Phase 1 is merged through mirror PR #251 and production PR #558. It
 establishes dependency-light canonical ownership in

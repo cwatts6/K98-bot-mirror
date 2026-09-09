@@ -1,7 +1,7 @@
 # Discord Embed Payload Safety Audit Findings
 
-Status: Phase 1–2J delivery slices accepted; Phase 2J #261/#568 merges/final verification pending; Phase 2K proposed audit/design next.
-Audit date: 2026-09-01; delivery updates through Phase 2E on 2026-09-07
+Status: Phase 1–2K delivery slices accepted; Phase 2K #262/#569 operator merges/final verification pending; Phase 2L ProcConfig audit/design next.
+Audit date: 2026-09-01; delivery updates through accepted Phase 2K on 2026-09-09
 Repository: `C:\discord_file_downloader`
 Scope: bot repository only; functional Discord payload audit, not a Codex Security codebase scan
 
@@ -22,13 +22,14 @@ repository vulnerability or payload scan was performed for this documentation re
 | Atomic Pre-KVK admission | Phase 2G implementation delivered; Phase 2H exercised real protocol in isolation | Natural calendar reserve/commit/message tuple; no exactly-once claim |
 | Isolated Pre-KVK diagnostic | Phase 2H delivered | Existing owner/destination/state contracts preserved |
 | Fighting/current/historical diagnostic parity | Phase 2I delivered, #260/#567 merged | Preview receipt is not production admission |
-| Unsafe ops seasonal test entrypoint | Phase 2J removed; restart/resync/operator smoke accepted | #261/#568 operator merges and final SHA verification |
+| Unsafe ops seasonal test entrypoint | Phase 2J removed; restart/resync/operator smoke accepted | Merges verified; preserved in accepted Phase 2K candidate |
 | Production fighting/offseason and MGE bounded contracts | Original safe-within-contract assessment retained | Optional canonical final-boundary convergence is now explicitly captured |
 | Voting and bounded self-service paths | No original realistic breach established within enforced contract | Future changes require feature-local validation; not blanket proof |
 | Test-only MGE builder and inert fixtures/docs | Not runtime in original inventory | Reclassify only if a live caller is introduced |
-| Production delivery outcomes and receipts | Remaining gap confirmed by natural fighting logs | Phase 2K audit/design next; runtime unapproved |
+| Production delivery outcomes and receipts | Phase 2K delivered and smoke accepted; natural fighting receipt/claim plus isolated Pre-KVK send/status/edit | #262/#569 merges/final verification; natural Pre-KVK/off-season observations |
+| ProcConfig resource lifetime and false success | Repeated failure confirmed, including Phase 2K smoke | Selected Phase 2L audit/design; runtime implementation unapproved |
 
-All approved Phase 1–2J delivery slices are accounted for. This does NOT mean every original defer
+All approved Phase 1–2K delivery slices are accounted for. This does NOT mean every original defer
 or later reliability observation is complete. The active register retains ProcConfig failure/false
 success, executor audits, singleton/public-child/generic-view lifecycle, DM/JSON, reservation
 extensions, off-season isolation, optional canonical convergence and Ark persistence debt.
@@ -960,3 +961,46 @@ or all live failure modes. Generic tracked-view timeout and ProcConfig repair re
 
 Next proposed scope: Phase 2J Ops Diagnostic Convergence, audit first. Preserve all Phase 1–2I
 production defaults and existing Phase 2H/2I sessions. No Phase 2J runtime work is approved yet.
+
+
+## Accepted Phase 2K delivery — 2026-09-09
+
+This acceptance supersedes earlier local-only, pending-smoke and implementation-approval statements below.
+Chris Watts explicitly accepted smoke testing as complete. Delivered and tested on production PR
+candidate `36208765bf7200fa6855f3892e6b32d43b23bccf`; mirror runtime head
+`2d892cefcfdfa0a8263efe69997bf292503b23aa`. Mirror #262 and production #569 remain open.
+The operator will merge both and perform final main/deployed-SHA, clean-checkout and restart
+verification. Documentation-only closeout commits follow the tested heads; do not label them as
+the already-running revision or claim final-main deployment.
+
+Operator evidence: clean `git status --short` at the candidate SHA, graceful restart at 11:41:57,
+ready at 11:42:10 and full startup completed at 11:42:15 (attached log timestamps).
+Registration remained 36 primary / 100 grouped / 24 ops with unchanged command cache.
+
+Natural production processing at 11:48:30 selected ACTIVE KVK16 / scan1122 with `test=False`.
+Fighting recorded `sent/acknowledged`, positive actual message/channel/guild identity and
+`claim=confirmed`; requested and actual destinations matched. KS independently recorded
+`skipped/already_sent`. The adapter and processing caller logged the same correlation and receipt,
+not two sends. Empty/unavailable fighting data still produced the existing report.
+Exact message, correlation and session identifiers are retained in private operator evidence.
+
+The isolated Pre-KVK session sent at 11:47:02 UTC, committed receipt/projections, retained the
+committed attempt on read-only status at 11:47:58, then edited the same message at 11:48:13.
+Fresh-admission blocking was reported as a read-only observation. This session proves isolated
+send/status/edit behavior, not natural seasonal admission or a post-session restart test.
+No live failure injection or forced duplicate was required.
+
+Final production validation: 3514 passed, 2 skipped; promoted hooks/whitespace passed.
+Mirror log-noise validation: 3512 passed, 2 skipped before two extra offline load-failure cases;
+operational logs unchanged; final focused suite 31 passed. Both review rounds were addressed
+and resolved. Full security scan `9884a327-68c2-48ff-9ff9-f548bec39b88` and follow-up
+`cf1d3cfe-2fee-4f4f-b66e-cb947e1beba4` retain complete coverage and no findings, Changes only,
+Deep off. Snapshot/test/documentation deltas and promotion equivalence are detailed below/in PRs.
+
+Natural Pre-KVK (about two months away), off-season production observations and Phase 2F's next
+natural public-save evidence remain separately tracked follow-ups, not blockers to this acceptance.
+ProcConfig failed again at 11:46:51 while restoring autocommit, followed by false completion
+reporting. That issue is selected for Phase 2L; it does not invalidate the Discord receipts.
+
+Next: Phase 2L ProcConfig Import Reliability and Truthful Completion Reporting, audit/design first.
+No Phase 2L runtime/test/SQL implementation is approved by this closeout.
