@@ -75,6 +75,7 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
     cell = None
     numeric = False
     in_value = False
+    value_seen = False
     value_parts: list[str] = []
     text_length = 0
     depth = 0
@@ -88,7 +89,7 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
 
     def start(name, attrs):
         nonlocal cell, numeric, in_value, text_length, depth, text_depth, text_count
-        nonlocal previous_row, previous_column
+        nonlocal previous_row, previous_column, value_seen
         local = name.rsplit("}", 1)[-1]
         depth += 1
         if depth > 64 or any(len(v) > limits.max_cell_characters for v in attrs.values()):
@@ -130,9 +131,15 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
             ):
                 _reject("worksheet_span", "Worksheet row/column span exceeds parser limits.")
             numeric = attrs.get("t", "n") == "n"
+            value_seen = False
             text_length = 0
             value_parts.clear()
         if local == "v" and cell is not None:
+            if value_seen:
+                _reject(
+                    "duplicate_cell_value", "Each source cell may contain only one value element."
+                )
+            value_seen = True
             in_value = True
 
     def characters(text):

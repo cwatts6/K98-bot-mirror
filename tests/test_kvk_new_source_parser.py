@@ -585,3 +585,50 @@ def test_text_only_aggregate_sheet_keeps_empty_numeric_evidence():
 
     result = aggregate(aggregate_bytes(edit=text_identities))
     assert result.kingdom_rows[0].cell("DKP").metric.value == Decimal("25300000")
+
+
+@pytest.mark.parametrize(
+    "kind,coordinate",
+    [
+        ("player", "A2"),
+        ("player", "AJ2"),
+        ("player", "K2"),
+        ("aggregate", "B2"),
+        ("aggregate", "C2"),
+    ],
+)
+@pytest.mark.parametrize("empty_first", [False, True])
+def test_duplicate_cell_value_elements_reject_before_loader(
+    kind, coordinate, empty_first, monkeypatch
+):
+    import re
+
+    import kvk.services.new_source_parser as parser
+
+    source = player_bytes() if kind == "player" else aggregate_bytes(token=1)
+
+    def duplicate(name, data):
+        if name != "xl/worksheets/sheet1.xml":
+            return data
+        pattern = rb'(<c r="' + coordinate.encode() + rb'"[^>]*>)<v>([^<]*)</v>'
+
+        def replace_value(match):
+            first = b"" if empty_first else match[2]
+            return match[1] + b"<v>" + first + b"</v><v>9999</v>"
+
+        result, count = re.subn(pattern, replace_value, data)
+        assert count == 1
+        return result
+
+    content = rewrite_zip(source, duplicate)
+
+    def must_not_load(*args, **kwargs):
+        pytest.fail("Malformed duplicate values must reject before openpyxl loading")
+
+    monkeypatch.setattr(parser, "load_workbook", must_not_load)
+    with pytest.raises(SourceValidationError) as error:
+        if kind == "player":
+            player(content)
+        else:
+            aggregate(content)
+    assert error.value.code == "duplicate_cell_value"

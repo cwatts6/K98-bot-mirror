@@ -448,3 +448,16 @@ Only the parser, its test file and this append change; original S1 and operation
 Separate Changes reviews of the follow-up commit ranges, Deep off, are recorded in PR replies.
 The hosted Codex code-review summaries report failed jobs on both original PR heads; these are
 not passing reviews. Copilot reviewed both PRs, and local Changes evidence remains separate.
+
+
+## S1 additional Codex review follow-up - 2026-09-09
+
+The hosted mirror review completed and identified duplicate XML cell value elements.
+The requested correction rejects a second value element per cell during preflight, including
+when the first element is empty, before openpyxl loads the workbook. Ten synthetic regressions
+cover governor/kingdom identities and player/aggregate metrics. All ten fail against the prior
+parser and pass with the correction; the exact six-file S1/legacy suite passes 200 tests
+in 5.48 seconds. Existing valid-workbook and golden-digest tests pass unchanged.
+Only parser, parser tests and this evidence append change. The same patch is applied to both
+PR branches; separate Changes-only security review evidence is retained in PR responses.
+No live action, SQL change, dependency change, merge or later slice is included.
