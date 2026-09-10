@@ -62,7 +62,25 @@ def fetch_source_report_metadata(connect, envelope):
 
     publication = envelope.get("publication")
     if not publication:
-        return {}
+        with transaction(connect) as cursor:
+            cursor.execute(
+                "SELECT p.SourceKey,p.KVK_NO,p.PeriodKey,p.PeriodKind,"
+                "w.ConfigVersionID,w.WindowName,w.StartScanID,w.EndScanID "
+                "FROM KVK.SourcePeriod p LEFT JOIN KVK.SourceWindowConfig w "
+                "ON w.SourceKey=p.SourceKey AND w.KVK_NO=p.KVK_NO "
+                "AND w.PeriodKey=p.PeriodKey AND w.ConfigVersionID=? "
+                "WHERE p.PeriodID=? AND p.SourceKey=? AND p.KVK_NO=?",
+                envelope.get("desired_config_id"),
+                envelope["period_id"],
+                envelope["source_key"],
+                envelope["kvk_no"],
+            )
+            requested = one(cursor)
+            if not requested or (
+                envelope.get("desired_config_id") and not requested["ConfigVersionID"]
+            ):
+                raise SourceConflict("Requested report configuration or period is unavailable.")
+            return {"configs": {"requested": requested}}
     with transaction(connect) as cursor:
         configs = {}
         for key, config_id in (

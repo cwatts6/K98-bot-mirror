@@ -159,8 +159,22 @@ async def build_kvk_preview(
         from kvk.schemas.new_source_schema import SOURCE_KEY
         from stats_alerts.allkingdoms import load_allkingdom_report_v2
 
-        if source_selection.get("source_key") != SOURCE_KEY or connect is None:
+        if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+            raise ValueError("Explicit source preview requires a positive SQL KVK number.")
+        if (
+            not isinstance(source_selection, dict)
+            or set(source_selection) != {"source_key", "period_id", "publication_id"}
+            or source_selection.get("source_key") != SOURCE_KEY
+            or connect is None
+        ):
             raise ValueError("Explicit source selection and connection provider required.")
+        from stats_alerts.dispatch_reservations import DispatchUnavailable
+        from stats_alerts.kvk_diagnostic_sessions import _validate_source_selection
+
+        try:
+            _validate_source_selection(source_selection)
+        except DispatchUnavailable as exc:
+            raise ValueError("Invalid source preview selection.") from exc
         report = await asyncio.to_thread(
             load_allkingdom_report_v2,
             kvk_no,
@@ -521,14 +535,25 @@ def build_source_preview(report):
     import json
 
     from core.discord_embed_limits import require_valid_embed_payload, truncate_text
-    from core.operator_diagnostic_payloads import neutralize_discord_mentions, pack_complete_units
+    from core.operator_diagnostic_payloads import (
+        neutralize_discord_mentions,
+        pack_complete_units,
+        redact_diagnostic_text,
+    )
     from kvk.services.new_source_reporting_service import BLOCK_KEYS
     from stats_alerts.kvk_diagnostics import PreviewPayload
 
     if report.get("schema_version") != 2:
         raise ValueError("Source renderer requires V2 metadata.")
     if report.get("publication_id") is None:
-        return PreviewPayload([], False, "Source publication not_received; no legacy fallback.", "")
+        detail = (
+            f"Source publication not_received; period {report.get('period_key')}; "
+            f"requested configuration {report.get('requested_config_id')}; "
+            f"requested endpoints {report.get('requested_start_scan_id')} → "
+            f"{report.get('requested_end_scan_id')}; no legacy fallback."
+        )
+        detail = truncate_text(neutralize_discord_mentions(redact_diagnostic_text(detail)), 640)
+        return PreviewPayload([], False, detail, "")
     status = report["player_state"] if report["is_current"] else "retained; configuration pending"
     description = (
         f"Source: {report['source_key']} | {report['period_key']}\n"
@@ -540,6 +565,15 @@ def build_source_preview(report):
         f"B0 eligible: {report['eligible_count']}; each rank uses its available metric cohort.\n"
         "Aggregate tier KP is supplied; total KP is unsupported. Rounded reports retain source precision."
     )
+    reason = report.get("final_unavailable_reason")
+    if reason:
+        safe_reason = truncate_text(
+            discord.utils.escape_markdown(
+                neutralize_discord_mentions(redact_diagnostic_text(reason))
+            ).replace("\n", " "),
+            256,
+        )
+        description += f"\nFinal unavailable reason: {safe_reason}"
     embed = discord.Embed(
         title=f"KVK {report['kvk_no']} — {report['period_label']}", description=description
     )

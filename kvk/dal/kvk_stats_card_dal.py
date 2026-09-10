@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 import logging
 from typing import Any
 
@@ -15,14 +16,16 @@ def fetch_source_card_report(*, connect, kvk_no, period_id):
     return load_snapshot(connect, kvk_no=kvk_no, period_id=period_id)
 
 
-def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[str, Any]:
+def fetch_kvk_stats_card_context(
+    kvk_no: int | None, governor_id: str, *, include_overall_rank=True, connect=None
+) -> dict[str, Any]:
     """Fetch KVK mode and camp context for the player stats card."""
     if not kvk_no:
         return {}
 
     context: dict[str, Any] = {}
-    conn = get_conn_with_retries()
-    with conn:
+    conn = (connect or get_conn_with_retries)()
+    with closing(conn) if connect is not None else conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT TOP 1 KVK_NAME FROM dbo.KVK_Details WHERE KVK_NO = ?",
@@ -67,6 +70,9 @@ def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[s
             context["kingdom"] = data.get("kingdom")
             context["camp_id"] = data.get("campid")
             context["camp_name"] = data.get("camp_name")
+
+        if not include_overall_rank:
+            return context
 
         try:
             cur.execute(

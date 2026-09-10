@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import discord
 import pytest
@@ -263,3 +263,29 @@ async def test_explicit_source_preview_bypasses_legacy_reads(monkeypatch):
     assert preview.available
     load.assert_called_once()
     assert "not scan time" not in str(preview.payload[0].to_dict())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selection", [[], "source", {}, {"source_key": "wrong"}])
+async def test_source_preview_rejects_malformed_selection_before_io(selection):
+    connect = Mock(side_effect=AssertionError("No SQL"))
+    with pytest.raises(ValueError):
+        await kvk.build_kvk_preview(
+            "unused", kvk_no=16, source_selection=selection, connect=connect
+        )
+    connect.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kvk_no", [None, True, 0, -1, "16", 2147483648])
+async def test_source_preview_rejects_invalid_season_before_io(kvk_no):
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+    from tests.test_kvk_source_reporting import PERIOD, PUBLICATION
+
+    connect = Mock(side_effect=AssertionError("No SQL"))
+    selection = dict(source_key=SOURCE_KEY, period_id=PERIOD, publication_id=PUBLICATION)
+    with pytest.raises(ValueError, match="positive SQL KVK"):
+        await kvk.build_kvk_preview(
+            "unused", kvk_no=kvk_no, source_selection=selection, connect=connect
+        )
+    connect.assert_not_called()

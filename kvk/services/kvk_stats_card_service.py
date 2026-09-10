@@ -146,6 +146,8 @@ async def load_kvk_stats_card_context(
     if source_period_id is not None:
         from kvk.services.new_source_reporting_service import card_context, load_report_v2
 
+        if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+            raise ValueError("Explicit source card context requires a positive SQL KVK number.")
         if connect is None:
             raise ValueError("Explicit source context requires a connection provider.")
         report = await asyncio.to_thread(
@@ -156,7 +158,15 @@ async def load_kvk_stats_card_context(
             our_kingdom=0,
             snapshot_loader=kvk_stats_card_dal.fetch_source_card_report,
         )
-        return _build_context(card_context(report, governor_id))
+        source = card_context(report, governor_id)
+        display = await asyncio.to_thread(
+            kvk_stats_card_dal.fetch_kvk_stats_card_context,
+            kvk_no,
+            governor_id,
+            include_overall_rank=False,
+            connect=connect,
+        )
+        return _build_context({**display, **source})
     try:
         raw = await asyncio.to_thread(
             kvk_stats_card_dal.fetch_kvk_stats_card_context, kvk_no, governor_id

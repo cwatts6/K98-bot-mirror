@@ -103,13 +103,13 @@ def _row(raw, *, aggregate=False):
     return row
 
 
-def _ranked(rows, metric, identity, *, no_fight=False):
+def _ranked(rows, metric, identity, *, no_fight=False, limit=None):
     usable = [r for r in rows if r[metric] is not None]
     ordered = sorted(usable, key=lambda r: (r[metric].copy_negate(), r[identity]))
     # No-fight scores remain visible, but there is no combat competition/rank.
     return [
         dict(r, rank=None if no_fight else i, population=None if no_fight else len(ordered))
-        for i, r in enumerate(ordered, 1)
+        for i, r in enumerate(ordered[:limit], 1)
     ]
 
 
@@ -148,9 +148,27 @@ def load_report_v2(
         current_period_state="not_received",
         player_state="not_received",
         aggregate_state="not_received",
+        requested_config_id=envelope.get("desired_config_id"),
+        requested_start_scan_id=None,
+        requested_end_scan_id=None,
+        selected_start_scan_id=None,
+        selected_end_scan_id=None,
         blocks={k: [] for k in BLOCK_KEYS},
     )
     if not publication:
+        requested = kvk_admin_dal.fetch_source_report_metadata(connect, envelope)["configs"][
+            "requested"
+        ]
+        if requested["SourceKey"] != SOURCE_KEY or requested["KVK_NO"] != kvk_no:
+            raise SourceConflict("Source configuration scope mismatch.")
+        report.update(
+            period_key=requested["PeriodKey"],
+            period_kind=requested["PeriodKind"],
+            period_label=requested.get("WindowName") or requested["PeriodKey"],
+            requested_start_scan_id=requested.get("StartScanID"),
+            requested_end_scan_id=requested.get("EndScanID"),
+            endpoint_pending=report["requested_config_id"] is not None,
+        )
         return report
     meta = kvk_admin_dal.fetch_source_report_metadata(connect, envelope)
     selected, requested = meta["configs"]["selected"], meta["configs"]["requested"]
@@ -215,12 +233,15 @@ def load_report_v2(
         ("camps", camps, "camp_id"),
     ):
         for suffix, metric in (("kills", "kills_gain"), ("deads", "deads"), ("dkp", "dkp")):
-            blocks[f"{family}_by_{suffix}"] = _ranked(rows, metric, identity, no_fight=no_fight)
+            blocks[f"{family}_by_{suffix}"] = _ranked(
+                rows, metric, identity, no_fight=no_fight, limit=5
+            )
     blocks["our_top_players"] = _ranked(
         [p for p in players if p["kingdom"] == our_kingdom],
         "kills_gain",
         "governor_id",
         no_fight=no_fight,
+        limit=5,
     )
     blocks["our_kingdom"] = [r for r in kingdoms if r["kingdom"] == our_kingdom]
     our_camp = mapping.get(our_kingdom, {}).get("CampID")
@@ -241,6 +262,8 @@ def card_context(report, governor_id):
     """Whole-KVK context only; the independent KS4 numerator is never read here."""
     if report.get("schema_version") != 2 or report.get("period_kind") != "overall":
         raise ValueError("Card context requires an explicit V2 overall report.")
+    if report.get("publication_id") is None:
+        return {"source_context": {"available": False, "source_key": SOURCE_KEY}}
     rank = report.get("overall_ranks", {}).get(int(governor_id))
     if not report["is_current"] or rank is None:
         return {"source_context": {"available": False, "source_key": SOURCE_KEY}}

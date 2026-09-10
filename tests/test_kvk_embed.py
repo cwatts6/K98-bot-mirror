@@ -74,3 +74,21 @@ def test_source_preview_maximum_names_and_numbers_pack_complete_rows(monkeypatch
     assert "not shown" in str(preview.payload[0].to_dict())
     assert "@everyone" not in str(preview.payload[0].to_dict())
     require_valid_embed_payload(preview.payload)
+
+
+def test_source_final_unavailable_reason_is_visible_bounded_and_safe(monkeypatch):
+    from core.discord_embed_limits import require_valid_embed_payload
+    from stats_alerts.embeds.kvk import build_source_preview
+    from tests.test_kvk_source_reporting import load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch)
+    report.update(
+        player_state="final_unavailable",
+        aggregate_state="final_unavailable",
+        final_unavailable_reason="Reviewed: incomplete export. @everyone **reason** " * 100,
+    )
+    preview = build_source_preview(report)
+    assert "Final unavailable reason: Reviewed: incomplete export." in preview.detail
+    assert "@everyone" not in preview.detail
+    assert len(preview.detail.split("Final unavailable reason: ")[1]) <= 256
+    require_valid_embed_payload(preview.payload)

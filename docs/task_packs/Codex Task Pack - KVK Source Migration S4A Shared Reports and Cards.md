@@ -541,3 +541,74 @@ suite exception and preservation constraints. No reset or force push is required
 No merge, deployment, bot-machine update/restart, SQL operation, live import/export,
 Discord action or source activation occurred. New-source routing remains disabled.
 Stop for operator PR review and validation; no later slice is authorized.
+
+
+### PR Review Fixes — 2026-09-10
+
+Seven inline review comments across mirror #268 and private #575 were verified and addressed
+within the existing S4A manifest. This supersedes the initial delivery's all-legacy-read
+bypass statement for source cards: independent display-only reads are now retained, while
+legacy overall-rank SQL remains bypassed and source rank remains independently suppressed.
+
+1. Mirror comment 3980446694: no-publication envelopes retain requested configuration,
+   endpoints and period metadata through a scoped, parameterized SourcePeriod/SourceWindowConfig
+   read. Configured/pending and unconfigured periods remain distinguishable; no fallback.
+2. Mirror comment 3980446705: final-unavailable reason is visible, redacted, mention-neutral,
+   Markdown-escaped and capped at 256 characters. Unpublished detail is separately capped.
+3. Private comment 3980503378: all ten Top blocks cap dictionary materialization at five rows;
+   rank population, players and overall_ranks retain the complete usable cohort. A 50,000-player
+   regression verifies cardinality, deterministic ordering and complete rank/population data.
+4. Private comment 3980503385: a valid unpublished overall period returns unavailable source
+   context while the independent KS4 card remains renderable. Non-overall context is rejected.
+5. Private comment 3980503391: source card context preserves KVK name/kingdom/camp display
+   metadata through the existing DAL with include_overall_rank=False and the injected connection.
+   The connection closes; no legacy overall-rank query executes. Both mobile cards render with
+   and without a publication, preserving independent KS4 values and targets.
+6. Private comment 3980512666: invalid/missing source-card KVK numbers fail before I/O.
+7. Private comment 3980512745: explicit preview selection mapping/keys/source/UUIDs and KVK
+   integer bounds are validated before I/O; malformed input raises ValueError.
+
+Exact review-fix manifest (nine Python paths plus this existing pack):
+- kvk/dal/kvk_admin_dal.py
+- kvk/dal/kvk_stats_card_dal.py
+- kvk/services/kvk_stats_card_service.py
+- kvk/services/new_source_reporting_service.py
+- stats_alerts/embeds/kvk.py
+- tests/test_kvk_embed.py
+- tests/test_kvk_embed_diagnostics.py
+- tests/test_kvk_source_card_context.py
+- tests/test_kvk_source_reporting.py
+
+Fresh validation: the ten-file S4A focused suite passed **134 tests in 13.73s** through
+analyse_pytest_log_noise.py; production operational logs were unchanged. The first smaller
+run exposed a missing Mock import in new tests; corrected before this passing run. Import
+smoke and registration 36/100 passed, along with architecture/deferred/security-routing
+validators and exact staged-file hooks including secret detection on both branches.
+No fresh full-suite or broad-exclusion pass is claimed for these fixes. The accepted
+incomplete-full-suite exception remains; operator PR validation owns the next full run.
+
+SQL definitions rechecked: SourcePeriod, SourceWindowConfig, dbo.KVK_Details,
+KVK.KVK_Player_Windowed and KVK.KVK_CampMap match the parameterized read shapes. SQL remains
+clean at 44afa315dd6cbfe9fec101f2a39a62e534f5b583, separate no-change skip; mocks only.
+No SQL deployment, live database operations, imports/exports, Discord actions or restart.
+
+Separate review-fix security scans, **Changes, Deep off**, completed with canonical readbacks:
+- Mirror target C:/discord_file_downloader, base/head
+  98be2e5df532335fb113da71374c39a36dada6da plus nine-file local patch;
+  scan 7e4ae070-0ce3-4444-946c-5dac9238b24d.
+- Private target C:/discord_file_downloader/.codex_scan_stage/s4a-prod, base/head
+  fd6a3b45aa4e6feb1baa7e124201c5753dfc8dfd plus the identical nine-file local patch;
+  scan f292412a-a94d-4293-aade-559d0e2311e1.
+- Both snapshot digests:
+  codex-security-snapshot/v1:sha256:cc0aa7e933dbbe5dcbf0e76b7f85bbfc05baddb2d85f6a117dcf523205f9265c.
+- Each covered five runtime files and four supporting tests, with zero findings, deferred
+  candidates or open questions. Dedicated preflights passed, Daybreak Blue access granted,
+  independent source-backed architecture review retained separately for each target.
+- Tool-reported usage: mirror 4,200,160 total tokens (4,113,536 cached input); private
+  4,428,678 total (4,339,968 cached input). These tool totals overlap the shared workflow;
+  do not sum them as unique usage. Private canonical artifacts stay outside Git.
+
+This documentation-only appendix is outside runtime discovery: no authority/configuration
+or executable change. The original thirteen-document closeout manifest and both archive
+renames remain intact. Both PR branches receive the identical fix files and appendix.
+No merge/deployment/activation is authorized; source routing remains disabled.

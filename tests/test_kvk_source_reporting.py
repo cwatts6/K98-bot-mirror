@@ -19,7 +19,7 @@ PERIOD = "00000000-0000-0000-0000-000000000001"
 PUBLICATION = "00000000-0000-0000-0000-000000000002"
 
 
-def source_inputs(*, end_scan=13, desired_end=None, overall=False, aggregate=True):
+def source_inputs(*, end_scan=13, desired_end=None, overall=False, aggregate=True, received=True):
     b0, start, middle, end = worked_calculation_inputs()
     config = calculation_config(end_scan_id=end_scan)
     calculation = calculate_period(resolve_window(config, (start, middle, end)), b0)
@@ -88,7 +88,7 @@ def source_inputs(*, end_scan=13, desired_end=None, overall=False, aggregate=Tru
         source_key=SOURCE_KEY,
         kvk_no=16,
         period_id=PERIOD,
-        publication=pub,
+        publication=pub if received else None,
         selection=dict(SelectionVersion=7),
         desired_config_id="c2" if desired_end is not None else "c1",
         is_current=desired_end is None,
@@ -178,6 +178,8 @@ def test_t36_t37_overall_stays_independent(monkeypatch):
 
 
 def test_no_publication_and_wrong_scope_fail_without_legacy(monkeypatch):
+    _, meta = source_inputs(overall=True, received=False)
+    monkeypatch.setattr(kvk_admin_dal, "fetch_source_report_metadata", lambda *args: meta)
     monkeypatch.setattr(
         new_source_reporting_dal,
         "load_snapshot",
@@ -189,6 +191,87 @@ def test_no_publication_and_wrong_scope_fail_without_legacy(monkeypatch):
         service.load_report_v2(
             connect=Mock(), kvk_no=16, period_id=PERIOD, our_kingdom=98, publication_id=PUBLICATION
         )
+
+
+def test_unpublished_configuration_preserves_period_endpoints_and_diagnostics(monkeypatch):
+    from kvk.services.kvk_admin_service import load_source_diagnostic
+    from stats_alerts.embeds.kvk import build_source_preview
+
+    report, _, _, _ = load_synthetic(monkeypatch, received=False, desired_end=14)
+    assert report["publication_id"] is None and not report["is_current"]
+    assert report["requested_config_id"] == "c2"
+    assert (report["requested_start_scan_id"], report["requested_end_scan_id"]) == (10, 14)
+    assert report["period_kind"] == "fight" and report["period_label"] == "Pass 4"
+    assert all(not rows for rows in report["blocks"].values())
+    preview = build_source_preview(report)
+    assert not preview.available and "10 → 14" in preview.detail and "c2" in preview.detail
+    diagnostic = load_source_diagnostic(
+        action="window_preview", connect=Mock(), kvk_no=16, period_id=PERIOD
+    )
+    assert diagnostic["requested_end_scan_id"] == 14
+
+
+@pytest.mark.parametrize("configured", [True, False])
+def test_unpublished_metadata_query_is_scoped_and_parameterized(configured):
+    from unittest.mock import MagicMock
+
+    desired = PUBLICATION if configured else None
+    row = dict(
+        SourceKey=SOURCE_KEY,
+        KVK_NO=16,
+        PeriodKey="overall",
+        PeriodKind="overall",
+        ConfigVersionID=desired,
+        WindowName="Overall" if configured else None,
+        StartScanID=10 if configured else None,
+        EndScanID=14 if configured else None,
+    )
+    cursor = MagicMock()
+    cursor.description = [(name,) for name in row]
+    cursor.fetchone.return_value = tuple(row.values())
+    conn = MagicMock(autocommit=False)
+    conn.cursor.return_value = cursor
+    metadata = kvk_admin_dal.fetch_source_report_metadata(
+        lambda: conn,
+        dict(
+            publication=None,
+            desired_config_id=desired,
+            source_key=SOURCE_KEY,
+            kvk_no=16,
+            period_id=PERIOD,
+        ),
+    )
+    assert metadata["configs"]["requested"] == row
+    query, *params = cursor.execute.call_args.args
+    assert "LEFT JOIN KVK.SourceWindowConfig" in query
+    assert "p.PeriodID=? AND p.SourceKey=? AND p.KVK_NO=?" in query
+    assert params == [desired, PERIOD, SOURCE_KEY, 16]
+    conn.close.assert_called_once()
+
+
+def test_top_blocks_are_five_with_full_50000_player_population(monkeypatch):
+    _, _, envelope, meta = load_synthetic(monkeypatch)
+    sample = envelope["players"][0]
+    envelope["players"] = [dict(sample, GovernorID=i) for i in range(1, 50001)]
+    envelope["publication"]["EligibleCount"] = 50000
+    for table, identity in (
+        ("SourceKingdomReportRow", "Kingdom"),
+        ("SourceCampReportRow", "CampID"),
+    ):
+        sample_aggregate = envelope["aggregates"][table][0]
+        envelope["aggregates"][table] = [
+            dict(sample_aggregate, **{identity: i}) for i in range(1, 9)
+        ]
+    report = service.load_report_v2(
+        connect=Mock(), kvk_no=16, period_id=PERIOD, our_kingdom=meta["camps"][0]["Kingdom"]
+    )
+    for key, rows in report["blocks"].items():
+        if key not in {"our_kingdom", "our_camp"}:
+            assert len(rows) == 5
+    assert len(report["players"]) == len(report["overall_ranks"]) == 50000
+    assert report["overall_ranks"][50000] == (50000, 50000)
+    assert [r["governor_id"] for r in report["blocks"]["players_by_kills"]] == [1, 2, 3, 4, 5]
+    assert all(r["population"] == 50000 for r in report["blocks"]["players_by_kills"])
 
 
 def test_high_precision_ranking_does_not_round():
