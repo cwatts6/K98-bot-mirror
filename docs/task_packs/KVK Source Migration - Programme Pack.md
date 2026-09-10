@@ -5,16 +5,18 @@
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
 
-**S2A is implemented, disposable-SQL validated and operator accepted.** The migration created
-twelve tables; all 96 expected-rejection tests and complete fixture rollback passed.
-SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78) and documentation
-[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) are in review; review fixes and their
-fresh validation are recorded in the S2A delivery. PR acceptance/merge must be rechecked at handoff.
+**S2A is complete, operator accepted and merged.** SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78)
+merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
+[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) merged as
+`9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
+assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**Next: finish S2A PR review, then scope S2B for its own explicit G3 approval.** Do not rerun S1
-or S2A as an unstarted slice. S2B has no implementation approval; no production SQL deployment,
-source activation or successor execution is authorized. This current status supersedes historical
-pending/next-S1/S2A preparation wording below.
+**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
+PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
+instance, retained S2A evidence database and per-slice target authorization requirements.
+No production SQL deployment, bot-machine update/restart or source activation is part of this
+handoff. Earlier pending/preparation/review-in-progress wording below is historical.
 
 ## 1. Programme header and execution boundary
 
@@ -28,10 +30,10 @@ pending/next-S1/S2A preparation wording below.
 | Bot remote supplied by operator | `cwatts6/K98-bot-mirror` |
 | SQL working copy | `C:\K98-bot-SQL-Server` |
 | SQL remote supplied by operator | `cwatts6/K98-bot-SQL-Server` |
-| Current stage | S2A accepted; PR review in progress; S2B separately gated |
-| One-pass implementation approved | S1/S2A only, delivered; no successor approval |
-| Runtime, SQL, configuration or deployment changes approved | S2A SQL and disposable validation accepted; no production deployment or activation |
-| Current permitted output | Complete S2A PR review and evidence; seek separate S2B G3 |
+| Current stage | S2A merged; S2B implemented, validated and authorized for PR review |
+| One-pass implementation approved | S1/S2A/S2B delivered; no successor approval |
+| Runtime, SQL, configuration or deployment changes approved | S2B SQL and named disposable validation completed; no production deployment or activation |
+| Current permitted output | Separate S2B SQL and mirror PRs, ready for review |
 
 The operator reports both working copies and their Git repositories are synced. Codex must verify their actual branches, commit IDs and working-tree state rather than assume a branch name or deployed version. This pack was prepared from the supplied discussion, source assessment and task template; it does **not** certify that the current code or production SQL has already been audited.
 

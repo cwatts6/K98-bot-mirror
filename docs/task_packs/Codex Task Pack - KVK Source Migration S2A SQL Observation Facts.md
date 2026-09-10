@@ -1,12 +1,14 @@
 # Codex Task Pack — KVK Source Migration S2A SQL Observation Facts
 
-## Current status — S2A accepted; PR review in progress
+## Current status — S2A complete, accepted and merged
 
-S1 PRs #263/#570 are merged. S2A implementation and authorized disposable SQL validation are
-operator accepted; SQL PR #78 and bot PR #264 remain under review. The delivery and later review
-receipts below contain current evidence. Next is separate S2B scope/G3 approval after S2A review;
-no production deployment or source activation is authorized. Original preparation text below is
-historical and does not select the next action.
+SQL PR #78 and mirror PR #264 merged on 2026-09-10. The final review fixes passed 401 static
+assertions and 96 disposable SQL rejection cases with twelve-table rollback. S2B has since
+completed implementation and local validation and is authorized for separate PR review;
+production SQL deployment and source activation remain separate.
+See the [local SQL development reference](../reference/local_sql_development.md) for K98DEV
+setup and per-slice disposable-target authorization. Earlier preparation/delivery entries below
+are dated history and do not supersede this closeout.
 
 ## Historical execution handoff after S1 smoke - 2026-09-09
 
@@ -543,3 +545,20 @@ Scan goal usage: 43,156 tokens, 140 seconds. Private report artifacts remain und
 Bot follow-up is a separate documentation-only security skip: status/evidence only, no runtime,
 permissions, config or SQL execution code. Architecture/deferred/security-routing checks passed;
 test selector run. Runtime Python tests/import smoke/registration checks remain inapplicable.
+
+### Merged S2A closeout and S2B handoff — 2026-09-10
+
+Verified GitHub SQL PR #78 merged at 07:27:22 UTC as
+`845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror PR #264 merged at 07:27:43 UTC as
+`9fc0255dbaa0cbcb80c63c563657dad90bd5bcec`. Local SQL main is at the SQL merge. Local bot mirror
+main was clean at `58fc307935fdf1cfecdde839670ce5439f11baac`; its mirror commit records source
+`566c564b` and its tree has no difference from the accepted mirror merge. These are observed
+handoff anchors, not instructions to reset a later checkout. The operator reports production
+has not received the runtime deployment/update or restart; no independent production execution
+is claimed here.
+
+The canonical status/index surfaces and S2B pack/starter now point past S2A. The reusable local
+SQL reference records instance configuration, Manual startup, existing S2A evidence and separate
+future-slice database authorization. S2B remains unimplemented and G3 pending. No new chat,
+SQL execution, production promotion/deployment, restart or successor work occurred in this
+read-only repository verification and documentation refresh.

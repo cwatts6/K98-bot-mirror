@@ -1,9 +1,8 @@
 # Codex Chat Starter — KVK Source Migration S2A SQL Observation Facts
 
 **Historical S2A starter — implementation and disposable validation completed and accepted.**
-S1 PRs #263/#570 are merged. S2A SQL PR #78 and bot-documentation PR #264 are in review.
-Retain the original request below as history; do not launch it as new S2A work. Finish S2A PR
-review, then use the separate S2B pack only after its own explicit G3 approval.
+S1 PRs #263/#570 and S2A SQL PR #78 / bot-documentation PR #264 are merged.
+Retain the original request below as history; do not launch it as new S2A work. Use the separate S2B pack only after its own explicit G3 approval.
 
 ---
 

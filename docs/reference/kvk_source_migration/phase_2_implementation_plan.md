@@ -5,16 +5,18 @@
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
 
-**S2A is implemented, disposable-SQL validated and operator accepted.** The migration created
-twelve tables; all 96 expected-rejection tests and complete fixture rollback passed.
-SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78) and documentation
-[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) are in review; review fixes and their
-fresh validation are recorded in the S2A delivery. PR acceptance/merge must be rechecked at handoff.
+**S2A is complete, operator accepted and merged.** SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78)
+merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
+[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) merged as
+`9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
+assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**Next: finish S2A PR review, then scope S2B for its own explicit G3 approval.** Do not rerun S1
-or S2A as an unstarted slice. S2B has no implementation approval; no production SQL deployment,
-source activation or successor execution is authorized. This current status supersedes historical
-pending/next-S1/S2A preparation wording below.
+**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
+PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../local_sql_development.md) records the reusable K98DEV
+instance, retained S2A evidence database and per-slice target authorization requirements.
+No production SQL deployment, bot-machine update/restart or source activation is part of this
+handoff. Earlier pending/preparation/review-in-progress wording below is historical.
 
 2026-09-09. **G2 approved by Chris Watts: “G2 approved, please proceed”.** This approves
 the architecture including the confirmed EndScanID workflow. It authorizes this planning pass,
@@ -37,8 +39,8 @@ changes reviewable; approved semantics are unchanged. No cross-repository combin
 | Slice | Boundary | Required predecessors | G3 readiness |
 |---|---|---|---|
 | S1 | Offline schema, metadata, parser and semantic digest | G2 | Accepted and merged; see current status above |
-| S2A | SQL observation/artifact/roster/report facts and constraints | S1 contract accepted | Implemented and accepted after disposable SQL validation; PR review in progress |
-| S2B | SQL config/publication/routing/delivery state and constraints | S2A | Separate SQL diff and disposable SQL validation |
+| S2A | SQL observation/artifact/roster/report facts and constraints | S1 contract accepted | Complete, accepted and merged; disposable SQL validation passed |
+| S2B | SQL config/publication/routing/delivery state and constraints | S2A | Implemented and disposable-SQL validated; operator-authorized PR review |
 | S3A | Pure player/window calculations and report DTOs | S1 | Can follow S1 independently of SQL deployment |
 | S3B | DAL acceptance, CAS publication and config-request services | S2A/S2B/S3A | Disposable SQL integration; no live activation |
 | S4A | Shared report/card/diagnostic adapters | S3B | V2 consumers; new routing remains disabled |
