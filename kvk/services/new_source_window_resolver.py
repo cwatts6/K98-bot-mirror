@@ -70,7 +70,9 @@ def _validate_change(
     elif change is not None and change != previous.endpoint_change:
         raise ValueError("Unexpected endpoint request.")
     for pinned in (previous.start, previous.end):
-        if pinned is not None and pinned.logical_scan_id in events:
+        if pinned is not None:
+            if pinned.logical_scan_id not in events:
+                raise ValueError("Binding snapshot is missing previously pinned endpoint.")
             if events[pinned.logical_scan_id] != pinned:
                 raise ValueError("Endpoint authority does not permit source-content corrections.")
 

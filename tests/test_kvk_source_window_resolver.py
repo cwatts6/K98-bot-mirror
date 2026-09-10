@@ -177,3 +177,21 @@ def test_utc_and_daily_namespace_are_not_inferred():
                 ),
             ),
         )
+
+
+@pytest.mark.parametrize("missing", ["start", "end"])
+@pytest.mark.parametrize("update", [False, True])
+def test_previously_pinned_endpoint_cannot_disappear(missing, update):
+    _, start, middle, end = worked_calculation_inputs()
+    old = calculation_config()
+    previous = resolve_window(old, (start, end))
+    config = replace(old, version_id="config-2", end_scan_id=14) if update else old
+    events = (middle, end) if missing == "start" else (start, middle)
+    with pytest.raises(ValueError, match="missing previously pinned"):
+        resolve_window(
+            config,
+            events,
+            previous=previous,
+            endpoint_change=request(old, config) if update else None,
+        )
+    assert previous.end == end and previous.player_state == StreamState.FINAL

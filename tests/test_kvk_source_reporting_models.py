@@ -217,3 +217,45 @@ def test_forged_endpoint_or_same_version_config_is_rejected():
         replace(selected, config=replace(selected.config, end_scan_id=14))
     with pytest.raises(ValueError, match="different contents"):
         replace(report, requested_config=replace(report.requested_config, end_scan_id=14))
+
+
+@pytest.mark.parametrize("kind", [PeriodKind.FIGHT, PeriodKind.OVERALL])
+def test_combat_period_cannot_finalize_with_not_applicable_aggregate(kind):
+    original = snapshot(aggregate=False)
+    if kind == PeriodKind.OVERALL:
+        b0, _, _, end = worked_calculation_inputs()
+        config = calculation_config(
+            period_id="overall", period_key="overall", period_kind=kind, start_scan_id=1
+        )
+        calculation = calculate_period(resolve_window(config, (b0, end)), b0)
+        original = replace(original, requested_config=config, calculation=calculation)
+    with pytest.raises(ValueError, match="only valid for no-fight"):
+        replace(
+            original, aggregate_state=StreamState.NOT_APPLICABLE, period_state=StreamState.FINAL
+        )
+
+
+def test_no_fight_retains_not_applicable_aggregate():
+    from tests.kvk_source_fixtures import calculation_event
+
+    b0 = calculation_event(1, day=1, periods=("no_fight:baseline",))
+    config = calculation_config(
+        period_id="baseline",
+        period_key="no_fight:baseline",
+        period_kind=PeriodKind.NO_FIGHT,
+        start_scan_id=1,
+        end_scan_id=1,
+    )
+    calculation = calculate_period(resolve_window(config, (b0,)), b0)
+    report = ReportSnapshotV2(
+        "baseline-pub",
+        1,
+        1,
+        config,
+        calculation,
+        None,
+        StreamState.NOT_APPLICABLE,
+        StreamState.NOT_APPLICABLE,
+        StreamState.FINAL,
+    )
+    assert report.period_state == StreamState.FINAL

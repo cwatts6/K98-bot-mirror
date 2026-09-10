@@ -430,3 +430,41 @@ carried-forward documents and both sides of all four archive moves. The runtime 
 match the completed seven-file Changes scan exactly. SQL is unchanged, so no SQL PR is needed.
 Production promotion, merge, deployment, activation and successor work remain separate.
 The dated pre-PR restrictions above are retained as historical delivery evidence.
+
+#### PR #266 review follow-up — 2026-09-10
+
+Both inline P2 comments were reproduced and addressed within S3A. The resolver now rejects
+a binding snapshot missing either previously pinned endpoint, including during an authorized
+EndScanID update; an incomplete snapshot cannot silently regress final 13-10 to live 12-10.
+ReportSnapshotV2 now permits aggregate NOT_APPLICABLE only for NO_FIGHT, preventing fight or
+overall finality from bypassing independent aggregate authority. Valid no-fight behavior and
+authorized 13-to-14 replacement remain covered and passing.
+
+Exact follow-up manifest:
+- `kvk/services/new_source_window_resolver.py`
+- `kvk/models/new_source_reporting.py`
+- `tests/test_kvk_source_window_resolver.py`
+- `tests/test_kvk_source_reporting_models.py`
+- This task pack evidence appendix (documentation-only security skip).
+
+Seven new regression cases produced six expected failures and one passing no-fight control
+before the fixes. After fixes: **256 passed** across the original nine-file S3A/S1 regression
+command; the five-file focused log-noise command passed **73 tests**, operational logs unchanged.
+Architecture, deferred-item, security-routing and exact-path test selection passed. Exact
+four-file pre-commit hooks passed after Black and line-ending normalization of the new tests.
+The previously documented full-app/runtime test skips remain applicable; no integration added.
+
+Fresh Changes review, Deep off, covers the exact four Python files against PR head
+`1226227e14151c33356e6a948b6ee352aa82368d`. Scan
+`d5ed4ef2-d294-4d1b-8425-e5f49cc8646f` sealed once at
+`2026-09-10T10:38:16.507872Z`, with canonical readback: **4/4 reviewed, zero findings,
+zero deferred candidates and no coverage gaps**. Snapshot:
+`codex-security-snapshot/v1:sha256:78958092433c99d38003a18dbb020d0afbf8980be862d0c31f407237ca79a469`.
+Preflight 3/3 passed, Daybreak Blue granted, independent architecture review completed.
+Private report:
+`C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-paQHPb/discord_file_downloader/1226227e14151c33356e6a948b6ee352aa82368d_20260910T103456Z_5cl20a6p/report.md`.
+Security goal: 27,713 tokens over 2m49s; workbench total 601,228 includes repeated/cached input.
+Earlier source-hash equivalence statements describe the initial PR commit; this separate scan
+covers its follow-up. SQL remains clean at `44afa315dd6cbfe9fec101f2a39a62e534f5b583`,
+with a separate no-change skip. All carried-forward documentation and archive moves remain
+included. No production, deployment, merge, activation or successor action is part of this fix.

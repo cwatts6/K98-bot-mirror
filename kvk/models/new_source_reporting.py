@@ -389,6 +389,11 @@ class ReportSnapshotV2:
             and self.aggregate_state != StreamState.NOT_APPLICABLE
         ):
             raise ValueError("No-fight aggregates are not applicable.")
+        if (
+            selected.period_kind != PeriodKind.NO_FIGHT
+            and self.aggregate_state == StreamState.NOT_APPLICABLE
+        ):
+            raise ValueError("Not-applicable aggregates are only valid for no-fight periods.")
 
     @property
     def is_current(self) -> bool:
