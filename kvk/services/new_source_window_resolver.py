@@ -3,7 +3,6 @@
 from kvk.models.new_source_reporting import (
     EndpointChange,
     ObservationInput,
-    PeriodKind,
     StreamState,
     WindowConfig,
     WindowInputSelection,
@@ -28,7 +27,7 @@ def _validate_change(
     events: dict[int, ObservationInput],
 ) -> None:
     old = previous.config
-    # An endpoint-only request cannot grant map, weights, roster, start or source corrections.
+    # Endpoint requests cannot grant map, weights, roster or source corrections.
     components = (
         "source_key",
         "kvk_no",
@@ -36,7 +35,6 @@ def _validate_change(
         "period_key",
         "period_kind",
         "label",
-        "start_scan_id",
         "roster_id",
         "b0_revision_id",
         "map_version_id",
@@ -65,7 +63,12 @@ def _validate_change(
             config.end_scan_id,
         ):
             raise ValueError("Endpoint request does not match this exact configuration transition.")
-        if config.end_scan_id == old.end_scan_id:
+        if config.start_scan_id != old.start_scan_id and (
+            change.old_start_scan_id,
+            change.new_start_scan_id,
+        ) != (old.start_scan_id, config.start_scan_id):
+            raise ValueError("Start change requires exact authorized endpoint provenance.")
+        if config.end_scan_id == old.end_scan_id and config.start_scan_id == old.start_scan_id:
             raise ValueError("No endpoint transition was requested.")
     elif change is not None and change != previous.endpoint_change:
         raise ValueError("Unexpected endpoint request.")
@@ -123,7 +126,7 @@ def resolve_window(
         raise ValueError("Exact start is not mapped to this period.")
     if config.closes_at_utc is not None and start.scan_start_utc > config.closes_at_utc:
         raise ValueError("Start event is after the configured close.")
-    if config.period_kind == PeriodKind.NO_FIGHT:
+    if config.is_no_fight:
         if config.end_scan_id != config.start_scan_id:
             raise ValueError("No-fight requires equal exact endpoints.")
         return WindowInputSelection(config, start, start, StreamState.NOT_APPLICABLE, False, change)

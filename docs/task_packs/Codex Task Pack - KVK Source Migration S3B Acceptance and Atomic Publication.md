@@ -1,5 +1,50 @@
 # Codex Task Pack — KVK Source Migration S3B Acceptance and Atomic Publication
 
+## Current entry handoff — 2026-09-10
+
+Start S3B in a new chat with its matching starter only when granting S3B G3. S1/S2A/S2B/S3A
+are accepted and merged; S3A mirror #266 and private bot #573 merge evidence and operator smoke
+are in the [archived S3A pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md).
+Verified local mirror main `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; SQL main
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both local pulls are complete; the bot machine
+has not been updated or restarted. Recheck actual branches/HEADs/remotes/status and preserve
+all pending documentation, including untracked Markdown. Historical planning anchors below
+are not reset targets. S3B can be developed locally without deploying S3A to the bot machine.
+
+S3B G3 and its disposable integration target remain unapproved by this preparation. The reusable
+instance is `9SX2VF4\K98DEV` (alias `localhost\K98DEV`), but the operator must explicitly name
+and authorize the S3B database and prerequisite installation/test operations before connection.
+See [local SQL development](../reference/local_sql_development.md). Preserve retained S2A/S2B
+state. No default production connection, silent evidence-database reuse or automatic service start.
+Actual two-connection transaction/concurrency evidence is required for acceptance; mocks alone
+cannot close it. If target authorization is missing, keep integration pending and request it.
+
+### Required carried-forward documentation in the later S3B PR
+
+The operator explicitly requires this S3A closeout and archive work to accompany the S3B PR
+when PR creation is separately authorized. This is approved carried-forward work, not unrelated
+dirt to discard. At entry inventory tracked edits/deletions and untracked Markdown. Preserve
+all thirteen documentation entries below (fifteen paths counting both sides of the two renames).
+Include the complete manifest, both source deletions and archive destinations, repaired links,
+and S3B implementation evidence in that PR. Do not omit untracked archive files or blanket-stage
+unrelated work. Reconcile the final staged manifest, link checks and preservation evidence.
+This documentation allowance supplements section 11; it changes no S3B runtime/SQL boundary
+and does not authorize a push/PR, deployment, activation or successor pack by itself.
+
+- Update: `README-DEV.md`.
+- Update: `docs/reference/README.md`.
+- Update: `docs/reference/local_sql_development.md`.
+- Update: `docs/reference/kvk_source_migration/decision_and_evidence_register.md`.
+- Update: `docs/reference/kvk_source_migration/phase_2_implementation_plan.md`.
+- Update: `docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md`.
+- Update: `docs/task_packs/KVK Source Migration - Programme Pack.md`.
+- Update: `docs/task_packs/README.md`.
+- Update: `docs/task_packs/archive/README.md`.
+- Update: `docs/task_packs/Codex Task Pack - KVK Source Migration S3B Acceptance and Atomic Publication.md`.
+- Update: `docs/task_packs/Codex Chat Starter - KVK Source Migration S3B Acceptance and Atomic Publication.md`.
+- Archive move: `docs/task_packs/Codex Task Pack - KVK Source Migration S3A Player Window Calculations.md` → `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S3A Player Window Calculations.md`.
+- Archive move: `docs/task_packs/Codex Chat Starter - KVK Source Migration S3A Player Window Calculations.md` → `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S3A Player Window Calculations.md`.
+
 ## 1. Task Header
 
 - Prepared 2026-09-09; owner Chris Watts; Phase 2B specification.
@@ -88,7 +133,7 @@ No second domain implementation in DL_bot.py or gsheet_module.py; no duplicated 
 All paths below are relative to **C:/discord_file_downloader**.
 New files are proposed, not present yet; predecessor-created modifications require accepted delivery.
 No wildcard authorizes extra files. Append implementation evidence to this pack after execution;
-do not rewrite unrelated indexes. Migration date/sequence is the sole controlled allocation exception
+preserve/include the explicitly authorized carried-forward documentation manifest above; do not rewrite unrelated indexes. Migration date/sequence is the sole controlled allocation exception
 in implementation-plan section 4; final name must be recorded before authoring and never renamed after merge.
 
 ### Read only
@@ -115,7 +160,7 @@ in implementation-plan section 4; final name must be recorded before authoring a
 
 ### Modify
 
-- None.
+- No existing runtime files. Include the exact carried-forward documentation manifest above and append S3B delivery evidence to this pack.
 
 ## 12. Implementation Requirements
 
@@ -175,6 +220,452 @@ Rollback: Retain accepted facts/candidates, routing disabled. Read durable outco
 
 Describe concrete behavior, exact manifest, actual tests/security target, dependencies and rollback
 limits. Keep private player rows/credentials/findings out of Git. No PR creation authorized by
-preparation. End with slice status and next required gate.
+preparation. Include the full carried-forward documentation manifest, both sides of archive renames and repaired links. End with slice status and next required gate.
 
 **Prepared only. S3B G3 pending; no implementation executed.**
+
+
+## Documentation handoff validation — 2026-09-10
+
+Documentation preparation only; S3B G3 and its explicitly named disposable SQL target remain
+pending. Current merge/local/no-bot-update evidence is in the entry handoff and archived S3A pack.
+Exact closeout: thirteen Markdown entries, fifteen paths including both sides of two archive moves.
+Architecture validator passed (zero Python changed), deferred validator passed (thirteen Markdown),
+security-routing validator passed (zero errors/warnings), and exact test selection completed.
+All 120 relative links in changed documents resolved; archived security scan identities retained.
+Runtime pytest, broad smoke imports and command-registration reruns are skipped for these solely
+Markdown changes; operator S3A smoke and previous runtime results are retained as dated evidence.
+Security: precise documentation-only skip for the exact manifest above; SQL remains unchanged.
+No runtime/config/SQL/helper/refactor/deferred change, new implementation branch, commit/push/PR,
+SQL connection, service start, bot-machine update, restart or activation. Preserve the pending
+tracked edits, old-path deletions and untracked archive Markdown for the separately authorized PR.
+
+Exact thirteen-file documentation pre-commit hooks passed; applicable checks required no rewrites.
+
+## S3B G3 prerequisite verification — 2026-09-10
+
+### 1. Summary
+
+The operator approved S3B G3 in this task and subsequently authorized creation of an S3B
+database on `9SX2VF4\K98DEV`. Earlier G3-pending wording is historical. Implementation
+is **blocked at the SQL contract check**, not delivered or accepted: the accepted S3A
+event-time endpoint behavior conflicts with two accepted S2B CHECK constraints. No runtime
+file has been authored and no successor or predecessor implementation pack was executed.
+
+Fresh connected GitHub readback confirms mirror #266 merged at 11:28:48 UTC as
+`3154997fa2dfc124da75ee35dca79463c3196a43`; private bot #573 merged at 11:29:18 UTC as
+`140fc89765b1d6ec8418ac6f6d039e575419c29e`. Archived final evidence was inspected,
+including final separate Changes reviews and the operator's historical 77-test smoke.
+
+### 2. File Manifest
+
+Bot remains on `main`, HEAD `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`, with
+`origin` = `https://github.com/cwatts6/K98-bot-mirror.git` and `production` =
+`https://github.com/cwatts6/K98-bot.git`. SQL remains clean on `main`, HEAD
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`, origin
+`https://github.com/cwatts6/K98-bot-SQL-Server.git`. Both worktree inventories were read.
+No branch, staging, commit, pull, reset, merge, push or PR operation occurred.
+
+All thirteen carried-forward documentation entries (fifteen paths) listed at this pack's
+entry remain required. Both old-path deletions and both untracked archive destinations
+are preserved. This execution changes only this pack by appending evidence; its earlier
+contents and all other pending documents remain preserved. The thirteen-entry manifest
+must still accompany any separately authorized S3B PR.
+
+### 3. New Files
+
+None. All twelve proposed runtime/test files in section 11 remain uncreated.
+
+### 4. Modified Files
+
+Only this task pack receives the present evidence appendix. Other dirty files are the
+operator-authorized carried-forward work and have not been rewritten by this execution.
+
+### 5. SQL Changes
+
+SQL repository changes: none. The authorized fresh database is
+`K98_S3B_Disposable_20260910` on verified `9SX2VF4\K98DEV`, engine `16.0.1200.5`,
+compatibility 160 and collation `Latin1_General_CI_AS`. Created the prerequisite KVK
+schema and installed the unchanged accepted migrations
+`20260909_001_kvk_source_observation_facts.sql` and
+`20260910_001_kvk_source_publication_state.sql` in that database only. Readback:
+25 source tables, zero disabled/untrusted CHECKs and zero source rows. Retain this database.
+Retained S2A/S2B databases were listed for target verification; neither was written or rebuilt.
+
+The service was already running with startup type Automatic; this differs from the dated
+Manual reference. No service configuration, start or restart was performed. Initial sandbox
+authentication failed; elevated Windows authentication succeeded. SQLCMD rejected a forward-
+slash input path before execution; the Windows-path retry installed S2A successfully.
+
+**Blocking contract:** `KVK.SourceWindowConfig.CK_SourceWindowConfig_Bounds` requires
+`EndScanID >= StartScanID`. `KVK.SourceConfigRequest.CK_SourceConfigRequest_Endpoints`
+requires the same numeric order for both old and new endpoints. The merged migration contains
+these checks at lines 168 and 248, and both reference snapshots agree. The approved architecture
+and accepted S3A instead use event UTC, explicitly supporting a lower-ID end with later UTC.
+S3B cannot persist those supported configurations/requests under the installed constraints.
+
+Proposed bounded amendment, **not authorized or authored**: a new forward migration removing
+only numeric endpoint ordering from these two source CHECKs, retaining positive/null ID rules;
+update the two matching snapshots and add regression coverage to the SQL publication validator
+and synthetic constraint fixture. Keep UTC ordering enforced and tested in S3A/S3B. Do not
+alter legacy Windows, renumber scans, disable trusted constraints or rewrite merged migrations.
+Candidate new migration name is `20260910_002_kvk_source_endpoint_identity_bounds.sql`;
+recheck allocation before authoring. Proposed SQL manifest:
+
+- Create `migrations/20260910_002_kvk_source_endpoint_identity_bounds.sql`.
+- Modify `sql_schema/KVK.SourceWindowConfig.Table.sql`.
+- Modify `sql_schema/KVK.SourceConfigRequest.Table.sql`.
+- Modify `deploy/Test-KvkSourcePublicationContracts.ps1`.
+- Modify `validation/kvk_source/publication_constraints.sql`.
+
+This requires an explicit amendment to S3B's current bot-only boundary and a separate SQL
+Changes review, Deep off. Existing S3B G3 and disposable-target authorization remain valid.
+
+### 6. Helpers Reused
+
+Existing S3A resolver tests were executed unchanged. No runtime helper added or modified.
+
+### 7. Refactor Findings
+
+The prerequisite endpoint constraint mismatch above blocks compatibility; it is not an
+optional refactor or an accepted limitation. No generic WS1, exporter or daily namespace work.
+
+### 8. Test Plan with Outcomes
+
+Fresh command: `.venv/Scripts/python.exe -m pytest -q
+tests/test_kvk_source_window_resolver.py -k lower` — **4 passed, 21 deselected**.
+This verifies existing final/replacement lower-ID support and equal/earlier UTC rejection.
+On the authorized S3B database, read the exact two installed CHECK definitions from
+`sys.check_constraints` and evaluated them against synthetic VALUES: start/end 10/9 and
+old 10/13 to new 10/9 were both **rejected**. This was evaluation of installed predicates,
+not a full DAL insert/concurrency test; no source rows were inserted.
+
+S3B unit tests, actual two-connection concurrency/CAS/uncertain-commit tests, full pytest,
+runtime smoke and registration remain unexecuted. No S3B runtime exists; predecessor tests
+and SQL predicate checks cannot establish S3B acceptance. Documentation validation results
+are recorded below after execution.
+
+### 9. Security Review Decision and Evidence
+
+Current execution: precise bot Markdown-only skip for this evidence appendix and preserved
+thirteen-entry carried-forward manifest; no runtime/configuration/permission/data-access
+code changed. SQL repository: separate no-change skip at the HEAD above. No scan launched.
+The planned S3B Changes review against its exact authored bot patch, Deep off, remains
+required after implementation. Any approved SQL amendment needs its own immutable target
+and separate Changes review. No standard/deep scan, new task, private data or credentials.
+
+### 10. Deployment Steps
+
+None. Only the authorized disposable database prerequisites were installed. No production
+SQL, bot-machine update, real imports/exports, Discord action, restart, deployment or activation.
+Stop for the bounded SQL contract amendment decision before implementing incompatible DAL.
+
+### 11. Deferred Optimisations
+
+No new unrelated deferred optimisation. The blocking prerequisite is retained above as a
+required compatibility decision, not deferred technical debt or self-approved scope expansion.
+
+#### Final prerequisite-pass checks
+
+Architecture validator passed (zero Python changed); deferred validator passed (thirteen
+Markdown documents); security-routing validator passed (zero errors/warnings); exact task-pack
+test selection and `git diff --check` passed. All 120 relative links across the carried-forward
+documents resolve. Applicable task-pack pre-commit hooks passed, including secret detection;
+the first sandbox attempt could not write its cache, and the elevated retry passed.
+The selector's broad smoke/registration recommendations are skipped for this documentation-only
+execution with no runtime changes. This is not S3B implementation acceptance.
+
+SHA-256 preservation check: the fourteen other paths are unchanged from entry, including both
+absent old paths and both untracked archive files. The original S3B pack prefix remains byte-for-
+byte intact. Both repository HEADs/branches and the SQL clean status remain unchanged.
+No files were staged. Await an explicit SQL scope amendment; do not silently waive the accepted
+S3A endpoint cases or alter the SQL schema under the current bot-only manifest.
+
+## Operator correction and resumed S3B implementation — 2026-09-10
+
+The operator clarified: **EndScanID must be greater than StartScanID; new player scans are
+imported in calendar order, oldest first, with IDs allocated 1, 2, 3, ... and strictly
+increasing scan-start UTC.** This supersedes lower-ID/later-UTC acceptance for the S3B write
+boundary. The earlier prerequisite blocker and proposed five-file SQL amendment above are
+withdrawn. Do not create that migration or relax S2B constraints. Existing baseline/no-fight
+equal-endpoint semantics remain separate. Replays and accepted content corrections retain
+their scan ID; aggregate reports never allocate player or daily scan IDs.
+
+Source verification: `KVK.sp_KVK_AllPlayers_Ingest` allocates `MAX(ScanID)+1` under its
+transaction/range locks; `dbo.IMPORT_STAGING_PROC_CORE` takes the maximum across kingdom
+scan/receipt registries and allocates the next SCANORDER. Those statements establish
+sequential allocation, not by themselves enforcement of chronological UTC admission. S3B
+adds explicit increasing-UTC admission. Neither legacy importer nor SQL source was changed.
+
+Resumed on local branch `codex/kvk-source-s3b` from the recorded bot HEAD, retaining all
+pending work. The exact twelve new Python files in section 11 are now authored and under
+validation; the historical prerequisite-pass statement that none existed no longer describes
+the current working tree. Existing S3A runtime/tests remain unchanged; S3B validates its
+stricter admission/config/selection boundary. No deployment or activation is involved.
+
+Intermediate validation: 15 exact focused tests passed; 6 explicit S3B disposable SQL tests
+passed, including two real concurrent connections for admission and CAS, caller transaction
+rollback, uncertain commit readback, candidate invisibility, aggregate final/late-live behavior,
+and actual 11-10, 12-10, 13-10, 14-10 progression. Broader S1/S3A/S3B regression/log hygiene:
+255 passed with production operational logs unchanged. Architecture/deferred/security-routing
+validators and exact-path test selection passed. All twelve-file hooks passed, including
+Pyright and secret detection; registration remains 36/100 without drift. These are intermediate
+results; final review, complete scenario coverage accounting and security results remain pending.
+
+Synthetic SQL rows are isolated by generated test seasons in the authorized S3B database and
+retained there. Later test runs use separately retained private temporary artifact roots rather
+than pytest's rotating temporary directories. Initial fixture runs used pytest temporary roots;
+those earlier rows are test evidence only and must not be mistaken for durable production
+artifact-retention validation. Both retained S2A/S2B databases remain untouched.
+
+Security started for the immutable twelve-file task-only working patch at
+`C:/discord_file_downloader/.codex_scan_stage/s3b`, base
+`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`: scan
+`55a9e4fc-2f9c-4940-8053-479ea19bb5f3`, Changes, Deep off; snapshot
+`codex-security-snapshot/v1:sha256:29e8c1ffd3a5b04a6b1429ca21b7252d0e2116881fbb9f30aaa3770df80863e5`.
+Only that new review directory was appended to local `.git/info/exclude`. No staging, commit,
+push or PR occurred. SQL still has a separate no-change skip; security is not yet complete.
+
+## Operator scenarios and endpoint amendment review — 2026-09-10
+
+The latest operator requirement supersedes the preceding strict-combat-ID wording: both
+configured endpoints may change; a supplied EndScanID must be **greater than or equal to**
+StartScanID. A blank/future end permits the latest accepted interim scan. Equal endpoints
+represent a fight that never happened, with zero fight scores for every eligible B0 member.
+Distinct scans still require increasing UTC; identical endpoints necessarily share their UTC.
+
+1. **Summary:** Scenarios 1–3 now have explicit disposable SQL tests and pass. Scenario 4
+   and authorized start-endpoint changes need the bounded predecessor-file amendment below;
+   they are not implemented or accepted. Do not waive these requirements.
+2. **File manifest:** Existing twelve S3B files and thirteen carried-forward documentation
+   entries remain preserved. Bot branch `codex/kvk-source-s3b`, HEAD
+   `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; SQL clean main at
+   `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. No staging/commit/push/PR.
+3. **New files:** No additional files this scenario-review pass.
+4. **Modified files:** Added three cases within `tests/test_kvk_source_sql_integration.py`;
+   appended this evidence. The proposed extra runtime modifications, not yet made, are
+   `kvk/models/new_source_reporting.py`, `kvk/services/new_source_window_resolver.py`, and
+   `kvk/services/new_source_calculation.py`. The first needs start-change provenance and
+   equal-endpoint invariants; the second needs authorized start/end transitions and equal
+   fight endpoints; the third needs explicit no-fight zero scores for the frozen eligible
+   cohort, including members absent from the identical scan. Preserve ordinary missing-data
+   semantics, B0 attribution, aggregate authority and daily namespaces.
+5. **SQL changes:** None. Existing SourceWindowConfig/SourceConfigRequest checks already
+   permit equality and store both old/new starts. Tests use only the previously authorized
+   `K98_S3B_Disposable_20260910` on `9SX2VF4\K98DEV`; retained S2A/S2B remain untouched.
+6. **Helpers reused:** S3A resolver/calculator, S3B injected transaction/config/publication
+   operations and existing synthetic workbook fixtures. No legacy importer edits.
+7. **Refactor findings:** This is a contract amendment, not unrelated cleanup. Section 11
+   currently forbids editing existing runtime files; the three-file extension is pending
+   operator review. No duplicate workaround implementation was introduced.
+8. **Test plan/outcomes:** Fresh full opt-in S3B integration run: **17 passed**. Scenario 1
+   selects 11−10 with desired end 15 absent; scenario 2 selects 11−10 with blank end;
+   scenario 3 retains 14−10 on scan-15 arrival alone, then selects 15−10 after the authorized
+   endpoint request, with synthetic DKP changing 400 to 500. Read-only synthetic probes show
+   both S3B and S3A reject equal endpoints in a fight. Existing separate no-fight calculation
+   gives zero for present eligible members but `missing_start` for an absent B0 member.
+   These probes expose gaps; they are not scenario-4 acceptance. Add start-change, equality,
+   below-start rejection and complete eligible-cohort zero-score tests with the amendment.
+9. **Security review:** Still incomplete. Frozen scan
+   `55a9e4fc-2f9c-4940-8053-479ea19bb5f3` failed canonical completion with
+   “The latest saved scan draft is incomplete; continue the scan before completing it.”
+   Its earlier snapshot does not cover subsequent hardening or these tests. Retain the same
+   scan and evidence; do not report completion/no findings. Final exact Changes coverage,
+   Deep off, remains required after the endpoint amendment. SQL separate no-change skip.
+10. **Deployment steps:** None. No production connection, import/export, Discord action,
+    restart, deployment or activation. Stop for bounded manifest review.
+11. **Deferred optimisations:** None newly identified. Endpoint behavior gaps are required
+    acceptance work, not deferred debt or implicit acceptance exceptions.
+
+## S3B implementation delivery — final endpoint amendment, 2026-09-10
+
+### 1. Summary
+
+The operator explicitly approved adding the three S3A runtime files identified above.
+This is the current S3B boundary; the historical pending/strict-greater/blocked entries above
+remain as dated evidence, not current instructions. Both starts and ends can change through
+an authorized, versioned endpoint request. A configured end must be at least the start;
+blank/future ends use an explicit interim. Equal endpoints mark no-fight player scoring:
+all frozen B0-eligible members receive zero supported fight-score deltas, even if absent from
+the identical scan. Absolute power/profile availability and unsupported metrics are not
+fabricated, and raw coverage counts remain truthful. Distinct scans retain increasing UTC.
+
+Admission, immutable facts, candidate completion, publication CAS, action/outbox insertion,
+caller-owned endpoint requests and coherent private reads are implemented without runtime
+activation. End/start updates preserve roster, map, weights and unaffected source revisions;
+the request itself authorizes the replacement. Source-content corrections remain separate.
+
+### 2. File Manifest
+
+Bot branch `codex/kvk-source-s3b`, unchanged base/HEAD
+`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`. Remotes remain mirror `origin`
+(`cwatts6/K98-bot-mirror`) and private `production` (`cwatts6/K98-bot`). SQL remains clean
+`main`, HEAD `44afa315dd6cbfe9fec101f2a39a62e534f5b583`, origin
+`cwatts6/K98-bot-SQL-Server`. Nothing is staged or committed; no network Git mutation or PR.
+The exact runtime/test patch is twelve created files plus three explicitly authorized edits.
+
+All thirteen carried-forward documentation entries in the entry manifest remain required
+for the later separately authorized PR, including both deleted old paths, both untracked
+archive destinations, repaired links and this delivery. SHA-256 verification preserved all
+fourteen other paths and the original byte prefix of this pack. No blanket staging or discard.
+
+### 3. New Files
+
+- `kvk/dal/new_source_import_dal.py`: transactional observation/aggregate admission and replay.
+- `kvk/dal/new_source_publication_dal.py`: completed candidates, input guards, CAS/action/outbox.
+- `kvk/dal/new_source_config_dal.py`: caller-owned durable start/end requests.
+- `kvk/dal/new_source_reporting_dal.py`: single-generation private read envelope.
+- `kvk/services/new_source_artifact_store.py`: bounded private content-addressed originals.
+- `kvk/services/new_source_publication_service.py`: S3A calculation and publication orchestration.
+- `kvk/services/new_source_config_service.py`: authorized request boundary and endpoint order.
+- `tests/test_kvk_source_import_dal.py`.
+- `tests/test_kvk_source_publication.py`.
+- `tests/test_kvk_source_config_service.py`.
+- `tests/test_kvk_source_artifact_store.py`.
+- `tests/test_kvk_source_sql_integration.py`.
+
+### 4. Modified Files
+
+- `kvk/models/new_source_reporting.py`: endpoint-pair provenance and equal-endpoint invariants.
+- `kvk/services/new_source_window_resolver.py`: authorized start/end changes and no-fight slots.
+- `kvk/services/new_source_calculation.py`: explicit zero fight scores across the eligible B0 cohort.
+- This pack: appended evidence. All other carried-forward documentation remains unchanged.
+
+### 5. SQL Changes
+
+No SQL source/migration changes. Existing accepted S2A/S2B objects already support the
+endpoint pair and equality. Only the previously authorized
+`K98_S3B_Disposable_20260910` on `9SX2VF4\K98DEV` was used for setup and synthetic tests.
+The initial prerequisite schema installation is recorded above. Later test seasons and
+private temporary artifact roots are retained; S2A/S2B retained databases were not rebuilt
+or written. No production data or connection fallback.
+
+### 6. Helpers Reused and Legacy Importer Comparison
+
+Reused S1 parser/metadata/digest types, S3A exact resolver/calculator/DTOs, fixed decimal
+validation and the compatible healed-times-20 helper. DAL owns SQL; connections and private
+artifact roots are injected. No automatic uncertain-write retry or ImportAudit admission gate.
+
+Read-only source comparison found:
+
+- `KVK.sp_KVK_Recompute_Windows` lines 103–119 substitutes maximum ScanID for a blank or
+  future end; an existing configured end remains exact. Starts absent or above the maximum
+  are skipped. Its later endpoint joins recalculate using both currently configured bounds.
+- `KVK.sp_KVK_Get_Exports` lines 38–43 exposes the same effective-end cap.
+- `KVK.sp_KVK_AllPlayers_Ingest` lines 69–85 checks season/timestamp/file-hash duplicates
+  and allocates `MAX(ScanID)+1`. It does not itself enforce calendar-order admission or
+  semantic ZIP re-export deduplication; S3B explicitly enforces both.
+- `kvk/dal/kvk_all_import_dal.py` lines 485–491 commits facts before a separately committed
+  recompute. S3B tests therefore cover accepted facts surviving failed candidate builds,
+  and uncertain pointer commits with durable action/outbox readback.
+- The transactional `proc_config_import.py` window write at lines 878–890 commits at 927;
+  no direct window-recompute call was found in that module. Changing configuration without
+  another player upload is therefore a distinct recovery/trigger case, not something to
+  assume the legacy upload callback covers. The S3B scenario-3 test processes its durable
+  endpoint request against already accepted scans without a second upload. Wiring the
+  configuration-import hook/worker remains the separately authorized later slice.
+- Legacy recompute full-outer-joins endpoint members, uses missing-value fallbacks and
+  current weights. These behaviors are not copied into S3B: B0 eligibility/attribution,
+  frozen weights, missing-data states, Decimal precision and supplied aggregate authority
+  remain the approved contracts. Only explicit equal-endpoint no-fight scores become zero.
+- With only the start imported, legacy capping can temporarily calculate start-minus-start.
+  S3B retains `missing_end` while a blank/future configured end awaits a distinct scan;
+  it does not declare a cancelled fight unless the configured endpoints are explicitly equal.
+
+These are source-code observations, not claims about deployed SQL or live data. Legacy
+importer, recompute, exports, daily SCANORDER and bot-machine behavior remain untouched.
+
+### 7. Refactor Findings
+
+The three-file amendment resolves the accepted model's end-only/equal-fight restrictions
+without duplicating the calculator. No generic exporter, WS1 or ProcConfig refactor. Existing
+historical lower-ID pure S3A tests remain compatibility tests; the S3B write boundary rejects
+an end below start and admits new scans chronologically. They do not override current policy.
+
+### 8. Test Plan with Actual Outcomes and Limits
+
+- **22 real disposable SQL tests passed**, plus **3 publication unit tests** in the same
+  focused run (25 total). Includes all four operator scenarios; start earlier/later, end
+  shorter/blank/equal, future start, 11−10/12−10/13−10/14−10, exact 14−10→15−10, durable
+  pending requests and rollback/replay, two-connection allocation/CAS/config races, coherent
+  reads, aggregate both-tab rollback/finality/correction, stale mixed-stream rejection,
+  candidate crash recovery and before/after commit acknowledgement failures.
+- Broader source/legacy regression through `scripts/analyse_pytest_log_noise.py`:
+  **256 passed**, production operational logs unchanged. An initial command used incorrect
+  schema-test filenames and collected no tests; corrected explicit paths produced this pass.
+- Architecture: 15 Python files passed. Deferred/security-routing validators passed with
+  zero routing errors/warnings. Exact-path selector completed. Fifteen-file hooks passed,
+  including Ruff, Black and Pyright after formatting/unused-import fixes.
+- Import-only smoke passed with its built-in no-login/no-startup/no-file-logging guards.
+  Registration: 36 primary commands, 100 grouped subcommands, no drift.
+- Staged-only secret hook was supplemented by a separate redacted filesystem scan of the
+  exact fifteen files (including untracked files): **no leaks found**.
+- Initial full-suite sandbox run: **3,762 passed, 24 skipped, 2 failed**. The failures were
+  `test_prekvk_dispatch_diagnostics.py::test_real_send_edit_readonly_status_and_restart`
+  and `test_stats_alerts_guard.py::test_migration_and_distinct_claims_do_not_lose_rows`;
+  Windows temporary-file replacement failed outside the changed S3B paths. Both passed
+  in an isolated elevated rerun, with operational logs unchanged and no unrelated fixes.
+  The wrapper exits before its log comparison on a failing suite, so the failed run is not
+  itself a log-hygiene pass. The elevated full rerun completed: **3,764 passed, 24 skipped**
+  in 166.45 seconds, with production operational logs unchanged. The 22 opt-in SQL cases
+  are skipped without target environment variables in this full run and passed separately
+  against the expressly authorized target; no default SQL connection was used.
+
+Scenario accounting: T01/T04/T07/T41–T44/T46–T53/T65/T68–T70 have applicable admission,
+config, publication or SQL evidence above. T45 roster-impact UI/onboarding and T54 interaction
+refresh/actor rechecking remain later consumer/interaction integration work; S3B checks the
+frozen roster and expected selection and exposes no interaction surface. Delivery workers,
+external sends/cache invalidation, real workbooks, production throughput and bot-machine
+restart/deployment are not exercised or authorized. This is local implementation evidence,
+not live acceptance or authorization for later packs.
+
+### 9. Security Review Decision and Evidence
+
+SQL: separate no-change skip at its recorded clean HEAD. Bot: required **Changes**, **Deep
+off**, final exact fifteen-file immutable working patch at
+`C:/discord_file_downloader/.codex_scan_stage/s3b-final`, base
+`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`, scan
+`8e276080-b141-4469-b0b3-320f38355fc0`, snapshot SHA-256
+`163c101a17baa9da88dd972d1fb5bae1b4b72e134d1ec3b5b774738cbb014c49`.
+Completed at `2026-09-10T12:52:39Z`; canonical readback confirms **complete coverage,
+15/15 reviewed surfaces, zero findings, zero deferred items and zero open questions**.
+SHA-256 comparison verified every final working file still matches this frozen target.
+Scan usage measurement was unavailable (`scan_thread_unavailable`). Private report directory:
+`C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-D9VbP8/s3b-final/9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f_20260910T124632Z_tr1xswzx`.
+Retained canonical `report.md`, `coverage.json`, `findings.json`, `scan-manifest.json` and
+`exports/results.sarif`; do not commit private scan artifacts.
+
+The earlier twelve-file scan was recovered in a subsequent continuation and sealed, but its
+canonical coverage remained partial because it retained an obsolete pending checkpoint.
+It cannot establish the final gate; it and its private artifacts remain preserved. No standard
+or deep scan, public finding details, credentials or private player fixtures entered Git.
+Local detached review worktrees and exact local excludes are review artifacts, not PRs.
+
+### 10. Deployment Steps
+
+None. Routing remains unwired. No pull/reset/merge/push/PR, bot-machine update, production SQL,
+real import/export, Discord action, restart, deployment or activation. Retain originals,
+accepted facts and candidates. Read durable actions after uncertain commits; rollback uses
+an increasing selection version and retained immutable facts. Stop for operator review.
+
+### 11. Deferred Optimisations
+
+No new unrelated deferred item. Known legacy recompute/fallback behavior is comparison
+evidence, not scope to repair here. Later consumer/delivery/roster integration boundaries
+remain owned by their separate packs, which were not executed.
+
+### Final review checkpoint
+
+The final fifteen-file Changes review and runtime checks above are complete. No blocking
+finding was identified within the implemented local S3B boundary. Operator acceptance is
+not self-granted: T45/T54 interaction/onboarding aspects and later consumer/delivery/live
+validation remain explicitly unclosed as described above. Review this delivery before
+authorizing any next gate; no successor pack was started.
+
+Final preservation: all fifteen carried-forward paths (thirteen entries) retain their entry
+state, except this pack's appended evidence; its original byte prefix remains preserved.
+Both archive source deletions and untracked destinations remain present. All **120 relative
+links resolve**. Final Markdown hooks, architecture/deferred/security-routing checks and
+`git diff --check` passed. Final bot/SQL HEADs and remotes are the recorded values, SQL is
+clean, and staging remains empty. Only the authorized twelve new files, three amended S3A
+files and the carried-forward documentation appear in the working-tree handoff.

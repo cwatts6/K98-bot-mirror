@@ -86,3 +86,32 @@ S2B SQL #79, mirror #265 and private bot #572 are merged. Both local repositorie
 by the operator; the bot machine was not updated. Repository merge is not production SQL
 execution. Preserve both evidence databases. S3A uses pure offline tests and requires no SQL
 connection, database rebuild, bot restart or source activation.
+
+
+## S3A merged closeout and S3B handoff — 2026-09-10
+
+GitHub readback confirms mirror #266 merged at 11:28:48 UTC as
+`3154997fa2dfc124da75ee35dca79463c3196a43`, and private bot #573 at 11:29:18 UTC as
+`140fc89765b1d6ec8418ac6f6d039e575419c29e`. The synchronized local mirror main is
+`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; SQL main is
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both local repos were clean at documentation
+entry. Operator confirms local pulls complete, with no bot-machine pull or restart.
+
+Operator smoke on mirror `d5cf27613e54047efb856f4bc3777ee6923fa14e` passed 77 tests in
+3.10s, operational logs unchanged, and command registration 36/100 without drift or duplicates.
+The prior implementation/regression results (260 tests) and separate completed production/mirror
+Changes reviews remain in the archived S3A pack; those are historical runs, not newly rerun here.
+S3A runtime/test contents matched the production candidate. Repository merge is not deployment.
+
+S3A pack and starter are archived with repaired links. All predecessor evidence is retained.
+Start S3B in a new chat using its refreshed pack/starter only with explicit S3B G3 approval and
+an explicitly named disposable SQL integration target. Existing S2A/S2B evidence databases are
+retained and not authorized for reuse/rebuild by this handoff. The bot machine need not be updated
+for S3B local development. No SQL connection, service start, production action or successor
+implementation occurred in this documentation closeout.
+
+These documentation edits, including untracked archive destinations, remain pending for the
+separately authorized S3B PR. Its pack contains the full carried-forward manifest and requires
+both sides of renames, repaired links and preservation checks. No commit/push/PR is performed
+by this closeout. Security routing: exact Markdown-only skip (status, evidence, links and archive
+moves; no runtime/config/permission/data-access effect), plus separate SQL no-change skip.

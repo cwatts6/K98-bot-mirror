@@ -193,6 +193,18 @@ def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> P
             else:
                 metrics["healed_points"] = healed
             metrics["dkp_power_ratio"] = _ratio(metrics["dkp"], metrics["starting_power"])
+            if config.is_no_fight:
+                # Explicit cancelled fights score zero for the entire frozen B0 cohort.
+                # Absolute power/profile fields and unsupported metrics keep their basis.
+                for key in (
+                    *(key for key, _ in COUNTER_FIELDS),
+                    "kills_gain",
+                    "kp_t4_t5",
+                    "dkp",
+                    "healed_points",
+                    "dkp_power_ratio",
+                ):
+                    metrics[key] = CalculatedMetric(Decimal(0), MetricState.AVAILABLE)
             for key in ("t4_dead", "t5_dead", "t4_t5_dead", "power_extrema", "tanking_score"):
                 metrics[key] = _unavailable(MetricState.UNSUPPORTED, "no_approved_compatible_basis")
             results.append(
@@ -212,7 +224,7 @@ def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> P
         for key, _ in results[0].metrics:
             usable = [result for result in results if result.metric(key).value is not None]
             coverage.append((key, len(usable)))
-            if config.period_kind == PeriodKind.NO_FIGHT:
+            if config.is_no_fight:
                 continue
             usable.sort(key=lambda result: (-result.metric(key).value, result.governor_id))
             with localcontext() as rank_context:

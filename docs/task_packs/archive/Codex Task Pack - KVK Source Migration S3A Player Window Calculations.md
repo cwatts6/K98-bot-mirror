@@ -1,5 +1,14 @@
 # Codex Task Pack — KVK Source Migration S3A Player Window Calculations
 
+## Archived S3A closeout — 2026-09-10
+
+S3A is complete, operator smoke accepted and merged through mirror #266 and private bot #573.
+The operator pulled locally; the bot machine was not updated or restarted. Local mirror main
+is `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; production merge is
+`140fc89765b1d6ec8418ac6f6d039e575419c29e`. The original preparation, open-PR and pending
+wording below is historical evidence, superseded by this closeout. Do not re-execute this pack
+or starter. Next is separately approved S3B G3 with an explicit disposable SQL target.
+
 ## Current review handoff — 2026-09-10
 
 S3A G3 was approved and the implementation and review follow-up were delivered. Mirror #266
@@ -61,9 +70,9 @@ authorize a push/PR now, expand the runtime manifest or grant S3B/production aut
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.

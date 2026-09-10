@@ -1,7 +1,9 @@
 # Codex Chat Starter — KVK Source Migration S3B Acceptance and Atomic Publication
 
-Prepared 2026-09-09 during Phase 2B. **Not executed; S3B G3 pending.**
-Use this only when approving this slice; G2 alone does not approve implementation.
+Refreshed 2026-09-10 after S3A merge and archive closeout. **Not executed; S3B G3 pending.**
+Use this in a new chat only when approving this slice; G2 alone does not approve implementation.
+Supply the exact authorized S3B disposable SQL server/database and permitted setup/test operations
+with the prompt. Prior S2A/S2B target approval is not reusable permission.
 
 ---
 
@@ -11,7 +13,15 @@ Implement and validate its exact boundary, then stop for review.
 Read current instructions/core references, approved architecture including EndScanID, Phase 2B plan
 and pack. Verify both repos branches/HEADs/remotes/status; preserve all existing work.
 Prerequisites: S1/S2A/S2B/S3A accepted; S3B G3; disposable SQL integration target.
-Confirm evidence before edits; do not execute predecessor or later packs automatically.
+S3A is complete and merged: verify mirror #266, private bot #573 and the archived final evidence.
+Local pulls are complete; the bot machine has not been updated or restarted. S3B local development
+does not require a bot-machine deployment. Confirm the explicitly authorized disposable SQL
+target before any connection/setup; preserve retained S2A/S2B databases and never use production.
+Preserve all pending S3A closeout documentation and archive moves, including untracked Markdown.
+When the S3B PR is separately authorized, include the full thirteen-document carried-forward
+manifest from its pack, both sides of both archive renames, repaired links and delivery evidence.
+Do not omit or discard this work. Confirm evidence before edits; do not execute predecessor or
+later packs automatically.
 
 Preserve B0 eligibility, exact endpoints, UTC scan start and semantic re-export deduplication.
 Interim 11−10 then 12−10; final 13−10; authorized EndScanID update to 14 itself permits replacement

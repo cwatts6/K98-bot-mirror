@@ -14,11 +14,15 @@ assertions and 96 disposable SQL rejection cases, with twelve-table rollback ver
 **S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
 merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
 rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
-**S3A is implemented and validated; review/merge closeout is pending.** Mirror PR #266 and
-private bot PR #573 were both verified open on 2026-09-10; neither is recorded as merged.
-Do not restart S3A implementation. Complete S3A review/acceptance and repository merge gates,
-then request separate **S3B Acceptance and Atomic Publication G3** with its approved disposable
-SQL integration target. S3B is not authorized by S3A delivery or by this handoff.
+**S3A is complete, smoke accepted and merged.** Mirror #266 merged at 11:28:48 UTC
+(`3154997fa2dfc124da75ee35dca79463c3196a43`); private bot #573 merged at 11:29:18 UTC
+(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. Local mirror main is
+`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
+logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
+**Next: S3B Acceptance and Atomic Publication in a new chat, with separate G3 approval and
+an explicitly named disposable SQL integration target.** Preserve this pending documentation
+closeout and archive moves for inclusion in the later S3B PR. No S3B implementation is authorized.
 The operator confirms local pulls completed; no changes were pulled to the bot machine.
 Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A/S2B/S3A as unstarted slices. The [local SQL development reference](../local_sql_development.md) records the reusable K98DEV
@@ -361,7 +365,7 @@ evidence are separate. **Stop for G3 review; do not execute a task pack merely b
 | S1 | [Offline Source Validation](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
 | S2A | [SQL Observation Facts](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
 | S2B | [SQL Publication State](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
-| S3A | [Player Window Calculations](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
+| S3A | [Player Window Calculations](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
 | S3B | [Acceptance and Atomic Publication](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) |
 | S4A | [Shared Reports and Cards](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |
 | S4B | [Versioned Exports and Delivery](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) |

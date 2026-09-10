@@ -1,5 +1,14 @@
 # Codex Chat Starter — KVK Source Migration S3A Player Window Calculations
 
+## Archived S3A closeout — 2026-09-10
+
+S3A is complete, operator smoke accepted and merged through mirror #266 and private bot #573.
+The operator pulled locally; the bot machine was not updated or restarted. Local mirror main
+is `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; production merge is
+`140fc89765b1d6ec8418ac6f6d039e575419c29e`. The original preparation, open-PR and pending
+wording below is historical evidence, superseded by this closeout. Do not re-execute this pack
+or starter. Next is separately approved S3B G3 with an explicit disposable SQL target.
+
 Historical S3A approval prompt: G3 was granted and S3A implementation is complete.
 Mirror #266 and private bot #573 remain open as verified 2026-09-10. Do not execute this
 starter again. Complete review/acceptance and merge gates, then obtain separate S3B G3 and

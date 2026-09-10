@@ -137,6 +137,12 @@ class WindowConfig:
     closes_at_utc: datetime | None = None
     source_key: str = SOURCE_KEY
 
+    @property
+    def is_no_fight(self) -> bool:
+        return self.period_kind == PeriodKind.NO_FIGHT or (
+            self.start_scan_id is not None and self.start_scan_id == self.end_scan_id
+        )
+
     def __post_init__(self):
         if (
             self.source_key != SOURCE_KEY
@@ -194,6 +200,8 @@ class EndpointChange:
     new_end_scan_id: int | None
     actor: str
     reason: str
+    old_start_scan_id: int | None = None
+    new_start_scan_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,7 +229,7 @@ class WindowInputSelection:
         if self.player_state in usable and (self.start is None or self.end is None):
             raise ValueError("Usable player streams require both exact endpoints.")
         if self.start is not None and self.end is not None:
-            if self.config.period_kind == PeriodKind.NO_FIGHT:
+            if self.config.is_no_fight:
                 if self.start != self.end or self.player_state != StreamState.NOT_APPLICABLE:
                     raise ValueError("No-fight requires identical endpoints and no combat state.")
             elif self.end.scan_start_utc <= self.start.scan_start_utc:
@@ -387,10 +395,7 @@ class ReportSnapshotV2:
             and self.aggregate_state != StreamState.NOT_APPLICABLE
         ):
             raise ValueError("No-fight aggregates are not applicable.")
-        if (
-            selected.period_kind != PeriodKind.NO_FIGHT
-            and self.aggregate_state == StreamState.NOT_APPLICABLE
-        ):
+        if not selected.is_no_fight and self.aggregate_state == StreamState.NOT_APPLICABLE:
             raise ValueError("Not-applicable aggregates are only valid for no-fight periods.")
 
     @property
