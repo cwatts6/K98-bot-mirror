@@ -43,3 +43,36 @@ def test_equal_fight_endpoints_score_zero_for_all_b0_members():
     assert (
         result.missing_start_count == 1
     )  # Raw coverage remains truthful despite no-fight scoring.
+
+
+def test_no_fight_rejects_aggregate_in_service_and_model():
+    from kvk.models.new_source_reporting import AggregateSelection, ReportSnapshotV2, StreamState
+    from kvk.services.new_source_parser import parse_aggregate_workbook
+    from kvk.services.new_source_publication_service import PublicationService
+    from tests.kvk_source_fixtures import MAPPING, aggregate_bytes, metadata
+
+    b0, start, _, _ = worked_calculation_inputs()
+    config = calculation_config(end_scan_id=10)
+    report = parse_aggregate_workbook(aggregate_bytes(), metadata(aggregate=True), MAPPING)
+    aggregate = AggregateSelection("report", "revision", report)
+
+    def forbidden():
+        pytest.fail("No-fight aggregate must fail before connection acquisition.")
+
+    with pytest.raises(ValueError, match="No-fight"):
+        PublicationService(forbidden).build_candidate(
+            config=config, observations=(start,), b0=b0, aggregate=aggregate
+        )
+    calculation = calculate_period(resolve_window(config, (start,)), b0)
+    with pytest.raises(ValueError, match="applicability"):
+        ReportSnapshotV2(
+            "publication",
+            1,
+            1,
+            config,
+            calculation,
+            aggregate,
+            StreamState.NOT_APPLICABLE,
+            StreamState.LIVE,
+            StreamState.LIVE,
+        )

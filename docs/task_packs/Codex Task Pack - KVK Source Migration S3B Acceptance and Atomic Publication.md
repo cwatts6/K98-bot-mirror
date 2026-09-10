@@ -669,3 +669,72 @@ links resolve**. Final Markdown hooks, architecture/deferred/security-routing ch
 `git diff --check` passed. Final bot/SQL HEADs and remotes are the recorded values, SQL is
 clean, and staging remains empty. Only the authorized twelve new files, three amended S3A
 files and the carried-forward documentation appear in the working-tree handoff.
+
+## PR review response — mirror #267 / private #574, 2026-09-10
+
+The operator authorized assessment, fixes, replies and appropriate thread resolution on both
+PRs. Five inline comments identify four distinct issues (action replay appears in both repos).
+All four were accepted after inspecting the changed code and authoritative SQL definitions.
+
+- **Rollback delivery reconciliation:** existing non-pending destination rows become
+  `uncertain`, retaining receipts, owners/claim history and attempt counts while incrementing
+  their fence and clearing confirmation. This queues reconciliation without discarding an
+  ambiguous external outcome or resetting a fence to zero. The accepted CHECK permits only
+  fence-zero initial `pending` rows, so a blind pending reset was deliberately avoided.
+  Exact action replay returns before this transition and cannot repeatedly increment fences.
+- **Equal-endpoint aggregate rejection:** the service and report model both use
+  `is_no_fight` to reject aggregate objects. A cancelled fight may publish no aggregate
+  while earlier accepted aggregate history remains immutable and retained.
+- **Complete action replay identity:** the action compares request ID, reason, routing
+  version and a canonical destination set, in addition to its prior identity fields. The
+  destination scope is persisted in immutable action provenance; reordering/duplicates are
+  equivalent, changed delivery intent is a conflict rather than apparent success.
+- **Accepted observation period scope:** endpoint associations must be included in the
+  accepted revision's persisted `MetadataJson.scope.period_keys`; a caller-supplied
+  `ObservationInput.period_keys` cannot broaden it. The B0 roster input is independent,
+  but B0 used as an actual start endpoint is checked like every other endpoint.
+
+Exact follow-up manifest: `kvk/dal/new_source_publication_dal.py`,
+`kvk/models/new_source_reporting.py`, `kvk/services/new_source_publication_service.py`,
+`tests/test_kvk_source_publication.py`, `tests/test_kvk_source_sql_integration.py`, plus
+this evidence appendix. No SQL schema/migration or unrelated file changes. Mirror fix base
+`1364fa161cccec7295f78ec2f783b5f84ae7b1a1`; private fix base
+`ea8ccdde752080e2d260b14cf364be0b04fcd07c`. Apply the identical file delta on each history.
+
+Fresh focused validation: **32 disposable SQL tests plus 4 publication unit tests passed**.
+Regressions cover all three destination kinds and four existing delivery states, stale worker
+fences, once-only rollback replay, changed action inputs, both start/end scope forgery,
+model/service aggregate rejection and retained aggregate history after cancellation. Five-file
+hooks (including Ruff/Black/Pyright), architecture, deferred and routing validators passed.
+Affected source/legacy regression and log-hygiene suite: **257 passed**, operational logs
+unchanged. Smoke imports and registration (36/100, no drift) passed. The fresh elevated full
+suite stopped producing progress around 19% and was interrupted after several minutes;
+it is **not a new full-suite pass**, and the wrapper did not complete its log comparison.
+The earlier 3,764-test full pass remains dated pre-fix evidence. No unrelated code was changed
+to address the stalled run. The final narrow Changes review is appended after completion;
+the prior security result is not claimed to cover this new patch. No external deliveries
+were executed.
+
+The general reviewer concern about missing SQL context is addressed by local verification
+against clean SQL HEAD `44afa315dd6cbfe9fec101f2a39a62e534f5b583` and the expressly
+authorized disposable database tests. This evidence does not replace human code review or
+authorize production SQL, merges, deployment, activation or subsequent packs.
+
+Mirror follow-up security: Changes, Deep off, scan
+`308e7130-8e09-45fc-9765-c4c9673fc21f`, base/head
+`1364fa161cccec7295f78ec2f783b5f84ae7b1a1`, frozen five-file patch digest
+`f87292989c3a05addbd5f1d010d5c36dcfb822333ceff5c6c44f1019bc33b18c`.
+Canonical completion/readback: **5/5 files, zero findings, deferred items or open questions**.
+Root source bytes match the frozen reviewed target. Canonical report, coverage, findings,
+manifest and SARIF remain in the private temporary security artifact directory, outside Git.
+
+Separate private-history follow-up security: Changes, Deep off, scan
+`97196427-2c4a-40e5-acbd-3f3c3f71c6e9`, base/head
+`ea8ccdde752080e2d260b14cf364be0b04fcd07c`, at isolated target
+`.codex_scan_stage/s3b-review-fixes-private`. The same five-file content digest above was
+independently reviewed against this private history. Canonical completion/readback at
+13:44:21 UTC: **5/5 files, zero findings, deferred items or open questions**. Private artifacts
+remain outside Git. These narrow scans cover the review-fix delta; the initial full S3B
+mirror review and its original private patch-equivalence evidence remain historical records.
+All thirteen carried-forward entries (fifteen physical paths), including both archive renames
+and the original S3B byte prefix, were reverified as preserved before publishing these fixes.

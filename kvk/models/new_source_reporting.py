@@ -381,7 +381,7 @@ class ReportSnapshotV2:
                 selected.period_key,
             ):
                 raise ValueError("Aggregate belongs to another source/season/period.")
-            if report.mapping != selected.mapping or selected.period_kind == PeriodKind.NO_FIGHT:
+            if report.mapping != selected.mapping or selected.is_no_fight:
                 raise ValueError("Aggregate mapping or applicability mismatch.")
             if meta.report_state is None or self.aggregate_state.value != meta.report_state.value:
                 raise ValueError("Aggregate finality must remain its own supplied state.")
@@ -390,10 +390,7 @@ class ReportSnapshotV2:
                 StreamState.CORRECTED_FINAL,
             ):
                 raise ValueError("Overall aggregates require their separate final report.")
-        if (
-            selected.period_kind == PeriodKind.NO_FIGHT
-            and self.aggregate_state != StreamState.NOT_APPLICABLE
-        ):
+        if selected.is_no_fight and self.aggregate_state != StreamState.NOT_APPLICABLE:
             raise ValueError("No-fight aggregates are not applicable.")
         if not selected.is_no_fight and self.aggregate_state == StreamState.NOT_APPLICABLE:
             raise ValueError("Not-applicable aggregates are only valid for no-fight periods.")

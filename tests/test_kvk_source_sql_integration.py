@@ -724,6 +724,54 @@ def test_t07_t43_aggregate_order_correction_and_mixed_stream_rebuild(database):
     assert read["publication"]["AggregateRevisionID"] == corrected_result.revision_id
     assert read["publication"]["PeriodState"] == "corrected_final"
 
+    # Cancelling a fight retains its aggregate history but excludes it from the new report.
+    with transaction(connect) as cur:
+        cur.execute("BEGIN TRANSACTION")
+        request = snapshot_endpoint_request(
+            cur,
+            kvk_no=season,
+            period_id=config.period_id,
+            base_config_id=config.version_id,
+            new_end_scan_id=1,
+            actor="synthetic",
+            reason="cancel fight",
+            requested_utc=datetime.now(UTC).replace(microsecond=0),
+            origin="authorized_import",
+            provenance={},
+        )
+        cur.execute("COMMIT TRANSACTION")
+    cancelled = replace(config, version_id=request["DesiredConfigVersionID"], end_scan_id=1)
+    change = EndpointChange(
+        request["RequestID"],
+        config.period_id,
+        config.version_id,
+        cancelled.version_id,
+        3,
+        1,
+        "synthetic",
+        "cancel fight",
+    )
+    cancelled_candidate = service.build_candidate(
+        config=cancelled,
+        observations=(b0, end, next_end),
+        b0=b0,
+        previous=combined.snapshot.calculation.selection,
+        endpoint_change=change,
+    )
+    service.select_publication(
+        cancelled_candidate,
+        **publication_action(2, action_type="endpoint_update", request_id=request["RequestID"]),
+    )
+    cancelled_read = load_snapshot(connect, kvk_no=season, period_id=config.period_id)
+    assert cancelled_read["publication"]["AggregateRevisionID"] is None
+    assert cancelled_read["publication"]["AggregateState"] == "not_applicable"
+    with transaction(connect) as cur:
+        cur.execute(
+            "SELECT COUNT(*) FROM KVK.SourceAggregateRevision WHERE RevisionID=?",
+            corrected_result.revision_id,
+        )
+        assert cur.fetchone()[0] == 1
+
 
 def test_t52_reader_holds_one_generation_across_concurrent_selection(database):
     connect, season, store = database
@@ -978,3 +1026,113 @@ def test_authorized_start_and_end_changes(new_start, new_end, database):
         assert all(p.metric("dkp").value == 0 for p in replacement.snapshot.calculation.players)
         assert read["publication"]["PlayerState"] == "not_applicable"
     assert final.snapshot.calculation.selection.start.logical_scan_id == 10
+
+
+@pytest.mark.parametrize("old_state", ["confirmed", "claimed", "uncertain", "failed"])
+def test_review_rollback_reconciles_existing_delivery_and_fences_old_worker(database, old_state):
+    connect, season, store = database
+    dal = SourceImportDAL(connect, store)
+    b0 = accepted_event(dal, season, 1, store)
+    end = accepted_event(dal, season, 2, store)
+    config = seed_config(connect, season, b0, end=3)
+    service = PublicationService(connect)
+    old = service.build_candidate(config=config, observations=(b0, end), b0=b0)
+    destinations = tuple((kind, "synthetic-destination") for kind in ("file", "sheets", "discord"))
+    action = publication_action()
+    action["destinations"] = destinations
+    service.select_publication(old, **action)
+    with transaction(connect) as cur:
+        cur.execute(
+            "UPDATE KVK.SourceDelivery SET DeliveryState=?,AttemptCount=2,Fence=7,OwnerID=?,Receipt='synthetic-receipt',ClaimedUTC=SYSUTCDATETIME(),ConfirmedUTC=CASE WHEN ?='confirmed' THEN SYSUTCDATETIME() ELSE NULL END,UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=?",
+            old_state,
+            str(uuid4()),
+            old_state,
+            old.snapshot.publication_id,
+        )
+    newer = accepted_event(dal, season, 3, store)
+    new = service.build_candidate(config=config, observations=(b0, end, newer), b0=b0)
+    service.select_publication(new, **publication_action(1))
+    rollback = publication_action(2, action_type="rollback", admin_authorized=True)
+    rollback["destinations"] = destinations
+    service.select_publication(old, **rollback)
+    service.select_publication(old, **rollback)
+    with transaction(connect) as cur:
+        cur.execute(
+            "SELECT DeliveryState,Fence,AttemptCount,Receipt,ConfirmedUTC FROM KVK.SourceDelivery WHERE PublicationID=?",
+            old.snapshot.publication_id,
+        )
+        assert [tuple(row) for row in cur.fetchall()] == [
+            ("uncertain", 8, 2, "synthetic-receipt", None)
+        ] * 3
+        cur.execute(
+            "UPDATE KVK.SourceDelivery SET UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=? AND Fence=7",
+            old.snapshot.publication_id,
+        )
+        cur.execute("SELECT @@ROWCOUNT")
+        assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.parametrize(
+    "changed", ["request_id", "reason", "expected_routing_version", "destinations"]
+)
+def test_review_action_replay_rejects_changed_scope(database, changed):
+    connect, season, store = database
+    dal = SourceImportDAL(connect, store)
+    b0 = accepted_event(dal, season, 1, store)
+    end = accepted_event(dal, season, 2, store)
+    config = seed_config(connect, season, b0, end=2)
+    service = PublicationService(connect)
+    candidate = service.build_candidate(config=config, observations=(b0, end), b0=b0)
+    action = publication_action()
+    action["destinations"] = (("file", "first"), ("file", "second"))
+    service.select_publication(candidate, **action)
+    equivalent = {
+        **action,
+        "destinations": (("file", "second"), ("file", "first"), ("file", "first")),
+    }
+    assert service.select_publication(candidate, **equivalent)["NewSelectionVersion"] == 1
+    changed_values = {
+        "request_id": str(uuid4()),
+        "reason": "changed reason",
+        "expected_routing_version": 2,
+        "destinations": (("file", "third"),),
+    }
+    with pytest.raises(SourceConflict, match="replay"):
+        service.select_publication(candidate, **{**action, changed: changed_values[changed]})
+    assert (
+        load_snapshot(connect, kvk_no=season, period_id=config.period_id)["selection"][
+            "SelectionVersion"
+        ]
+        == 1
+    )
+
+
+@pytest.mark.parametrize("restricted_scan", [1, 2])
+def test_review_rejects_forged_observation_period_scope(database, restricted_scan):
+    connect, season, store = database
+    dal = SourceImportDAL(connect, store)
+    events = []
+    for number in (1, 2):
+        prepared, artifact = observation(season, number, store)
+        if number == restricted_scan:
+            meta = replace(
+                prepared.metadata, scope=replace(prepared.metadata.scope, period_keys=("overall",))
+            )
+            prepared = parse_player_workbook(store.read(artifact), meta)
+        accepted = dal.accept_observation(prepared, artifact, admission())
+        events.append(
+            ObservationInput(
+                accepted.logical_scan_id,
+                accepted.identity_id,
+                accepted.revision_id,
+                prepared,
+                ("fight:pass4", "overall"),
+            )
+        )
+    b0, end = events
+    config = seed_config(connect, season, b0, end=2)
+    with pytest.raises(SourceConflict, match="accepted scope"):
+        PublicationService(connect).build_candidate(config=config, observations=(b0, end), b0=b0)
+    with transaction(connect) as cur:
+        cur.execute("SELECT COUNT(*) FROM KVK.SourcePublication WHERE KVK_NO=?", season)
+        assert cur.fetchone()[0] == 0

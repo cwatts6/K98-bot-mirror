@@ -34,6 +34,8 @@ class PublicationService:
         publication_id=None,
     ):
         validate_endpoint_order(config)
+        if config.is_no_fight and aggregate is not None:
+            raise ValueError("No-fight publications cannot include aggregate reports.")
         selection = resolve_window(
             config, observations, previous=previous, endpoint_change=endpoint_change
         )

@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+import json
 
 from kvk.dal.new_source_config_dal import desired_config, locked_period
 from kvk.dal.new_source_import_dal import SourceConflict, canonical, digest, one, rows, transaction
@@ -225,7 +226,9 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
     membership = [(r["GovernorID"], r["b0_kingdom"]) for r in rows(cursor)]
     if membership != [(p.governor_id, p.b0_kingdom) for p in snapshot.calculation.players]:
         raise SourceConflict("Candidate does not match frozen B0 membership.")
-    for event in (b0, snapshot.calculation.selection.start, snapshot.calculation.selection.end):
+    for role, event in enumerate(
+        (b0, snapshot.calculation.selection.start, snapshot.calculation.selection.end)
+    ):
         if event is None:
             continue
         cursor.execute(
@@ -247,6 +250,12 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
             event.observation.digest.sha256,
         ):
             raise SourceConflict("Candidate observation binding differs from accepted input.")
+        accepted_periods = json.loads(accepted["MetadataJson"])["scope"]["period_keys"]
+        if role != 0 and (
+            config.period_key not in accepted_periods
+            or not set(event.period_keys).issubset(accepted_periods)
+        ):
+            raise SourceConflict("Observation period binding exceeds its accepted scope.")
         if (
             require_selected
             and event is not b0
@@ -271,8 +280,11 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
         config.period_key,
     )
     family = one(cursor)
-    if require_selected and (str(family["SelectedRevisionID"]) if family else None) != (
-        aggregate.revision_id if aggregate else None
+    if (
+        require_selected
+        and not config.is_no_fight
+        and (str(family["SelectedRevisionID"]) if family else None)
+        != (aggregate.revision_id if aggregate else None)
     ):
         raise SourceConflict("Candidate aggregate input changed; rebuild both streams.")
     if aggregate:
@@ -460,6 +472,7 @@ class PublicationDAL:
             raise PermissionError("Administrative publication authority required.")
         if not actor.strip() or len(actor) > 128 or not reason.strip() or len(reason) > 1024:
             raise ValueError("Publication actor and reason required.")
+        destinations = tuple(sorted(set(destinations)))
         if any(
             kind not in ("discord", "sheets", "file")
             or not target.strip()
@@ -468,6 +481,9 @@ class PublicationDAL:
             for kind, target in destinations
         ):
             raise ValueError("Invalid delivery destination identity.")
+        action_scope = canonical(
+            {"routing_version": expected_routing_version, "destinations": destinations}
+        )
         with transaction(self.connect) as cursor:
             routing, selection, requests = locked_period(cursor, kvk_no, period_id)
             cursor.execute("SELECT * FROM KVK.SourceAction WHERE ActionID=?", action_id)
@@ -480,6 +496,9 @@ class PublicationDAL:
                     prior["Actor"],
                     prior["ExpectedSelectionVersion"],
                     prior["ActionType"],
+                    prior["RequestID"],
+                    prior["Reason"],
+                    prior["ProvenanceJson"],
                 ) != (
                     kvk_no,
                     period_id,
@@ -487,6 +506,9 @@ class PublicationDAL:
                     actor,
                     expected_selection_version,
                     action_type,
+                    request_id,
+                    reason,
+                    action_scope,
                 ):
                     raise SourceConflict("Action replay differs from durable outcome.")
                 return prior
@@ -611,9 +633,19 @@ class PublicationDAL:
                 publication_id,
                 request_id,
                 reason,
-                canonical({"routing_version": expected_routing_version}),
+                action_scope,
             )
             for kind, destination in sorted(set(destinations)):
+                if action_type == "rollback":
+                    # Reconcile the previous external receipt rather than blindly resend.
+                    # Preserve receipt/attempt history and invalidate any old worker fence.
+                    # Pending is restricted to fence=0 by the accepted S2B CHECK.
+                    cursor.execute(
+                        "UPDATE KVK.SourceDelivery SET DeliveryState='uncertain',Fence=Fence+1,ConfirmedUTC=NULL,UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=? AND DestinationKind=? AND DestinationID=? AND DeliveryState<>'pending'",
+                        publication_id,
+                        kind,
+                        destination,
+                    )
                 cursor.execute(
                     "IF NOT EXISTS (SELECT 1 FROM KVK.SourceDelivery WHERE PublicationID=? AND DestinationKind=? AND DestinationID=?) INSERT KVK.SourceDelivery (PublicationID,SourceKey,KVK_NO,PeriodID,DestinationKind,DestinationID,DeliveryState,AttemptCount,Fence,CreatedUTC,UpdatedUTC) VALUES (?,?,?,?,?,?,'pending',0,0,SYSUTCDATETIME(),SYSUTCDATETIME())",
                     publication_id,
