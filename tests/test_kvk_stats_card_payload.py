@@ -130,3 +130,11 @@ def test_kill_progress_policy_preserves_existing_threshold_quotes():
         "#666666",
         "No targets assigned this KVK",
     )
+
+
+def test_source_context_does_not_populate_legacy_rank_fields():
+    from kvk.services.kvk_stats_card_service import _build_context
+
+    context = _build_context({"source_context": {"available": True, "rank": 1, "population": 4}})
+    assert context.overall_kvk_rank is None
+    assert context.overall_kvk_total_governors is None

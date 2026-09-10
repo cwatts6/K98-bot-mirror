@@ -5,6 +5,16 @@ from kvk.services import kvk_reporting_service
 from stats_alerts import allkingdoms
 
 
+def test_explicit_v2_wrapper_keeps_envelope_and_missing_values(monkeypatch):
+    from tests.test_kvk_source_reporting import PERIOD, load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch)
+    result = allkingdoms.load_allkingdom_report_v2(16, connect=lambda: None, period_id=PERIOD)
+    assert result["publication_id"] == report["publication_id"]
+    assert result["blocks"]["camps_by_kills"][0]["kp_gain"] is None
+    assert result["schema_version"] == 2
+
+
 def test_reporting_service_preserves_block_keys_and_adds_contribution_fields(monkeypatch) -> None:
     raw_blocks = {
         "players_by_kills": [

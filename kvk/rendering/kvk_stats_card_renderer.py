@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 
@@ -30,6 +31,22 @@ BLUE = (164, 220, 255)
 RED = (255, 87, 118)
 PURPLE = (168, 85, 247)
 GOLD = (255, 211, 87)
+
+
+def _independent_context_payload(payload):
+    """Mobile cards cannot fit full source/period/cohort/as-of provenance.
+
+    Suppress the independent rank on both cards; retain the KS4 values/targets.
+    A separate text context can be rendered by callers supporting that contract.
+    """
+    if payload.source_context is not None:
+        return replace(
+            payload,
+            overall_kvk_rank=None,
+            overall_kvk_total_governors=None,
+            overall_kvk_top_percent=None,
+        )
+    return payload
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
@@ -380,6 +397,7 @@ def _progress(draw: ImageDraw.ImageDraw, payload: KvkStatsCardPayload) -> None:
 def render_kvk_stats_card(
     payload: KvkStatsCardPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedKvkStatsCard | None:
+    payload = _independent_context_payload(payload)
     background_path = _background_for_mode(payload.kvk_name)
     if background_path is None:
         return None
@@ -542,6 +560,7 @@ def render_kvk_stats_card(
 
 
 def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard | None:
+    payload = _independent_context_payload(payload)
     background_path = _background_for_mode(payload.kvk_name)
     if background_path is None:
         return None

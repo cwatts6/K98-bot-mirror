@@ -123,6 +123,7 @@ def _date_display(value: Any) -> str | None:
 def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
     raw = raw or {}
     return KvkStatsCardContext(
+        source_context=raw.get("source_context"),
         kvk_name=_str_from_variants(raw, ["kvk_name", "KVK_NAME"], default="") or None,
         kingdom=_int_from_variants(raw, ["kingdom", "Kingdom"], default=0) or None,
         camp_id=_int_from_variants(raw, ["camp_id", "campid", "CampID"], default=0) or None,
@@ -139,7 +140,23 @@ def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
     )
 
 
-async def load_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> KvkStatsCardContext:
+async def load_kvk_stats_card_context(
+    kvk_no: int | None, governor_id: str, *, source_period_id=None, connect=None
+) -> KvkStatsCardContext:
+    if source_period_id is not None:
+        from kvk.services.new_source_reporting_service import card_context, load_report_v2
+
+        if connect is None:
+            raise ValueError("Explicit source context requires a connection provider.")
+        report = await asyncio.to_thread(
+            load_report_v2,
+            connect=connect,
+            kvk_no=kvk_no,
+            period_id=source_period_id,
+            our_kingdom=0,
+            snapshot_loader=kvk_stats_card_dal.fetch_source_card_report,
+        )
+        return _build_context(card_context(report, governor_id))
     try:
         raw = await asyncio.to_thread(
             kvk_stats_card_dal.fetch_kvk_stats_card_context, kvk_no, governor_id
@@ -229,6 +246,7 @@ async def build_kvk_stats_card_payload(
         governor_name=governor_name,
         kvk_no=kvk_no,
         kvk_name=context.kvk_name,
+        source_context=context.source_context,
         kingdom=context.kingdom,
         camp_name=context.camp_name,
         last_refresh=_date_display(row.get("LAST_REFRESH")),

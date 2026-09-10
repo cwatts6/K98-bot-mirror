@@ -42,3 +42,35 @@ def test_kvk_truncation_stability_logs_and_limits(caplog) -> None:
     assert len(result) == 32
     assert result.endswith("…")
     assert "truncated from 1100 to 32" in caplog.text
+
+
+def test_source_preview_renders_twelve_blocks_and_explicit_unavailable(monkeypatch):
+    from core.discord_embed_limits import require_valid_embed_payload
+    from stats_alerts.embeds.kvk import build_source_preview
+    from tests.test_kvk_source_reporting import load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch, desired_end=14)
+    preview = build_source_preview(report)
+    assert len(preview.payload[0].fields) == 12
+    assert "configuration pending" in preview.payload[0].description
+    assert "13" in preview.payload[0].description and "14" in preview.payload[0].description
+    assert "unsupported" in str(preview.payload[0].to_dict())
+    require_valid_embed_payload(preview.payload)
+
+
+def test_source_preview_maximum_names_and_numbers_pack_complete_rows(monkeypatch):
+    from decimal import Decimal
+
+    from core.discord_embed_limits import require_valid_embed_payload
+    from stats_alerts.embeds.kvk import build_source_preview
+    from tests.test_kvk_source_reporting import load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch)
+    for rows in report["blocks"].values():
+        if rows:
+            row = dict(rows[0], name="@everyone **" * 25, dkp=Decimal("9" * 32 + ".123456"))
+            rows[:] = [row] * 500
+    preview = build_source_preview(report)
+    assert "not shown" in str(preview.payload[0].to_dict())
+    assert "@everyone" not in str(preview.payload[0].to_dict())
+    require_valid_embed_payload(preview.payload)

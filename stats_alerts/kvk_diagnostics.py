@@ -37,6 +37,7 @@ class PreviewRunner(DiagnosticRunner):
         publish,
         repository=None,
         kvk_no=None,
+        source_selection=None,
     ):
         if action not in {"run", "status"} or (action == "status" and token is None):
             raise ValueError("Status requires a preview session")
@@ -54,7 +55,14 @@ class PreviewRunner(DiagnosticRunner):
 
         def open_session():
             nonlocal session
-            session = repository.open(guild_id, channel_id, owner_id, token, kvk_no=kvk_no)
+            session = repository.open(
+                guild_id,
+                channel_id,
+                owner_id,
+                token,
+                kvk_no=kvk_no,
+                source_selection=source_selection,
+            )
 
         def begin():
             nonlocal began
@@ -80,7 +88,11 @@ class PreviewRunner(DiagnosticRunner):
             await _io(begin)
             before = await _io(session.snapshot)
             selected = session.manifest.get("kvk_no")
-            preview = await build(kvk_no=selected) if selected is not None else await build()
+            saved_source = session.manifest.get("source_selection")
+            if saved_source is not None:
+                preview = await build(kvk_no=selected, source_selection=dict(saved_source))
+            else:
+                preview = await build(kvk_no=selected) if selected is not None else await build()
             if not preview.available:
                 await _io(session.transition, operation, "unavailable")
                 return outcome("unavailable", preview.detail, await _io(session.snapshot))

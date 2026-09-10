@@ -230,3 +230,23 @@ def test_more_stats_card_renders_png():
     assert more is not None
     assert more.filename == "kvk_more_stats_58744139.png"
     assert Image.open(BytesIO(more.image_bytes.getvalue())).size == (1180, 640)
+
+
+def test_both_mobile_cards_suppress_unlabelled_source_rank():
+    from kvk.rendering.kvk_stats_card_renderer import _independent_context_payload
+
+    original = _payload()
+    source = replace(
+        original,
+        source_context={"available": True},
+        overall_kvk_rank=1,
+        overall_kvk_total_governors=4,
+        overall_kvk_top_percent=25.0,
+    )
+    expected = replace(original, source_context={"available": True})
+    assert _independent_context_payload(source) == expected
+    for render in (render_kvk_stats_card, render_kvk_more_stats_card):
+        actual, baseline = render(source), render(expected)
+        assert actual is not None and baseline is not None
+        assert actual.image_bytes.getvalue() == baseline.image_bytes.getvalue()
+        assert Image.open(actual.image_bytes).size == (1180, 640)

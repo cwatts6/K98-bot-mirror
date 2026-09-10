@@ -1,10 +1,14 @@
 # Codex Task Pack — KVK Source Migration S3B Acceptance and Atomic Publication
 
+> Archived 2026-09-10: S3B complete, operator smoke accepted and merged (#267/#574).
+> Historical instructions below are not a new execution authorization. S4A is the next
+> separately gated slice; see the current S4A pack/starter in the parent folder.
+
 ## Current entry handoff — 2026-09-10
 
 Start S3B in a new chat with its matching starter only when granting S3B G3. S1/S2A/S2B/S3A
 are accepted and merged; S3A mirror #266 and private bot #573 merge evidence and operator smoke
-are in the [archived S3A pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md).
+are in the [archived S3A pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md).
 Verified local mirror main `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f`; SQL main
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both local pulls are complete; the bot machine
 has not been updated or restarted. Recheck actual branches/HEADs/remotes/status and preserve
@@ -14,7 +18,7 @@ are not reset targets. S3B can be developed locally without deploying S3A to the
 S3B G3 and its disposable integration target remain unapproved by this preparation. The reusable
 instance is `9SX2VF4\K98DEV` (alias `localhost\K98DEV`), but the operator must explicitly name
 and authorize the S3B database and prerequisite installation/test operations before connection.
-See [local SQL development](../reference/local_sql_development.md). Preserve retained S2A/S2B
+See [local SQL development](../../reference/local_sql_development.md). Preserve retained S2A/S2B
 state. No default production connection, silent evidence-database reuse or automatic service start.
 Actual two-connection transaction/concurrency evidence is required for acceptance; mocks alone
 cannot close it. If target authorization is missing, keep integration pending and request it.
@@ -57,9 +61,9 @@ and does not authorize a push/PR, deployment, activation or successor pack by it
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -738,3 +742,64 @@ remain outside Git. These narrow scans cover the review-fix delta; the initial f
 mirror review and its original private patch-equivalence evidence remain historical records.
 All thirteen carried-forward entries (fifteen physical paths), including both archive renames
 and the original S3B byte prefix, were reverified as preserved before publishing these fixes.
+
+
+## S3B merged closeout and S4A handoff — 2026-09-10
+
+**S3B is complete, operator smoke accepted and merged.** Mirror
+[PR #267](https://github.com/cwatts6/K98-bot-mirror/pull/267) merged at 13:59:47 UTC as
+`e915f9727f9492fe4ecc02b5c0d9f3c6e443be13`; private bot
+[PR #574](https://github.com/cwatts6/k98-bot/pull/574) merged at 14:01:14 UTC as
+`a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` on 2026-09-10.
+Operator post-merge smoke on mirror main `e915f972`: import smoke passed, registration
+36/100 without drift or duplicates, **36 tests passed in 9.11s** (4 publication + 32 SQL).
+Current synchronized local mirror main is `02385a0edc0ec83f77241e02648eabb3b7640ea6`;
+local production/main is `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`; SQL main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both repos were clean at closeout entry.
+S3B pack/starter are archived. **Next: S4A Shared Reports and Cards in a new chat, with
+separate S4A G3 approval.** Preserve pending S3B closeout docs and both archive moves
+for the eventual separately authorized S4A PR; its pack contains the complete manifest.
+S3B's latest full-suite rerun stalled around 19% and remains incomplete; the accepted smoke
+does not replace it. The earlier 3,764-pass full result is pre-review-fix evidence.
+
+The operator confirms local pulls completed and no changes were pulled to the bot machine.
+No bot-machine restart, production SQL deployment or source activation is evidenced or performed.
+S4A local development does not require a bot-machine deployment. New routing remains disabled.
+
+The accepted S3B boundary includes immutable acceptance, atomic publication and four review fixes:
+rollback delivery reconciliation with increasing fences; aggregate rejection for equal-endpoint
+no-fight windows; complete immutable action replay scope; accepted revision period-scope checks.
+All five inline threads were replied to and resolved before merge. The two separate final
+five-file Changes reviews, Deep off, completed with zero findings/deferred/open questions:
+mirror `308e7130-8e09-45fc-9765-c4c9673fc21f`, private
+`97196427-2c4a-40e5-acbd-3f3c3f71c6e9`. Earlier implementation/security evidence is retained.
+
+Preserve the operator-approved endpoint amendment: either StartScanID or EndScanID may change;
+a supplied end must be >= start. Distinct imported scans advance both ScanID and UTC scan start,
+oldest first; semantic re-exports allocate no new scan. Blank/future end uses the latest eligible
+interim; an available end pins the final, and an authorized endpoint update permits replacement
+without a separate correction command. Equal endpoints produce zero supported fight scores for
+every frozen B0-eligible member, including absent scan members, with aggregates not applicable.
+Ordinary missing-data states remain explicit. Aggregate reports and daily SCANORDER stay separate.
+
+The authorized S3B test target was `9SX2VF4\K98DEV` /
+`K98_S3B_Disposable_20260910`, including prerequisite schema and synthetic two-connection tests.
+Retain this database and the separate S2A/S2B evidence databases; no reuse/rebuild for S4A is
+implicitly authorized. S4A uses mocks by default; any SQL integration must first have an explicitly
+authorized disposable target and operations. No connection or setup was performed in this closeout.
+
+The supplied transcript shows 36 passed in 9.11s on merged mirror main `e915f972`, import smoke
+success and registration 36/100 without drift/duplicates. Its raw attachment stays outside Git.
+The current synchronized main contains identical KVK source and these test files to private merge
+`a8ad9f1d`. Historical 257 affected regressions passed with logs unchanged. The operator smoke
+did not run the log-noise wrapper, so it is not new log-hygiene or full-suite evidence.
+The interrupted post-review full suite remains an explicit S4A validation follow-up; investigate
+its cause and run the required full suite/log-noise gate without silently expanding runtime scope.
+
+S3B pack and historical starter are archived, with links repaired and delivery history retained.
+The S4A pack/starter require all pending closeout documentation, including untracked archive
+destinations and both source deletions, in the eventual separately authorized S4A PR.
+These edits stay uncommitted for that handoff. No new chat or S4A implementation is started here.
+Documentation-only security skip: exact closeout/status/links/archive manifest, no runtime,
+configuration, permission, data-access or deployment effect. SQL repository: separate no-change skip.
+Runtime pytest/smoke/registration reruns are skipped for this Markdown-only closeout.

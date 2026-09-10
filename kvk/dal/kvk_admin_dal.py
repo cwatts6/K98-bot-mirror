@@ -52,6 +52,84 @@ ORDER BY CASE WHEN w.StartScanID IS NULL THEN 1 ELSE 0 END, w.WindowName;
 RECOMPUTE_SQL = "EXEC KVK.sp_KVK_Recompute_Windows @KVK_NO=?;"
 
 
+def fetch_source_report_metadata(connect, envelope):
+    """Enrich S3B's pinned read using immutable IDs only; never reselect inputs.
+
+    The selection/desired-config snapshot is owned by S3B. These subsequent reads
+    cannot mix generations because configuration and accepted revisions are immutable.
+    """
+    from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
+
+    publication = envelope.get("publication")
+    if not publication:
+        return {}
+    with transaction(connect) as cursor:
+        configs = {}
+        for key, config_id in (
+            ("selected", publication["ConfigVersionID"]),
+            ("requested", envelope["desired_config_id"]),
+        ):
+            cursor.execute(
+                "SELECT w.*,p.PeriodKind FROM KVK.SourceWindowConfig w "
+                "JOIN KVK.SourcePeriod p ON p.SourceKey=w.SourceKey AND p.KVK_NO=w.KVK_NO "
+                "AND p.PeriodKey=w.PeriodKey WHERE w.ConfigVersionID=? AND p.PeriodID=?",
+                config_id,
+                envelope["period_id"],
+            )
+            configs[key] = one(cursor)
+            if not configs[key]:
+                raise SourceConflict("Pinned report configuration is unavailable.")
+        endpoints = {}
+        for key in ("Start", "End"):
+            revision = publication[key + "RevisionID"]
+            if revision is None:
+                endpoints[key.lower()] = None
+                continue
+            cursor.execute(
+                "SELECT o.ObservationID,o.ScanStartUTC,o.TimePrecision FROM "
+                "KVK.SourceObservationRevision r JOIN KVK.SourceObservation o "
+                "ON o.ObservationID=r.ObservationID WHERE r.RevisionID=?",
+                revision,
+            )
+            endpoints[key.lower()] = one(cursor)
+            if not endpoints[key.lower()]:
+                raise SourceConflict("Pinned report endpoint is unavailable.")
+        cursor.execute(
+            "SELECT Kingdom,CampID,CampName FROM KVK.SourceCampConfig WHERE ConfigVersionID=?",
+            publication["ConfigVersionID"],
+        )
+        camps = rows(cursor)
+        aggregate = None
+        if publication["AggregateRevisionID"] is not None:
+            cursor.execute(
+                "SELECT CoverageStartUTC,CoverageEndUTC,AsOfUTC,ReportState "
+                "FROM KVK.SourceAggregateRevision WHERE RevisionID=?",
+                publication["AggregateRevisionID"],
+            )
+            aggregate = one(cursor)
+            if not aggregate:
+                raise SourceConflict("Pinned aggregate metadata is unavailable.")
+    return dict(configs=configs, endpoints=endpoints, camps=camps, aggregate=aggregate)
+
+
+def fetch_source_recent_scans(connect, kvk_no, limit):
+    """Private source registry diagnostics; aggregates never allocate these IDs."""
+    from kvk.dal.new_source_import_dal import rows, transaction
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+
+    with transaction(connect) as cursor:
+        cursor.execute(
+            "SELECT TOP (?) s.LogicalScanID AS ScanID,o.ScanStartUTC AS ScanTimestampUTC,"
+            "o.TimePrecision,o.ObservationID FROM KVK.SourceLogicalScan s "
+            "JOIN KVK.SourceObservation o ON o.ObservationID=s.ObservationID "
+            "WHERE s.SourceKey=? AND s.KVK_NO=? ORDER BY s.LogicalScanID DESC",
+            limit,
+            SOURCE_KEY,
+            kvk_no,
+        )
+        return rows(cursor)
+
+
 def resolve_kvk_no(kvk_no: int | None = None) -> int:
     """Resolve an explicit/current KVK number using the shared metadata contract."""
     with get_conn_with_retries() as conn:

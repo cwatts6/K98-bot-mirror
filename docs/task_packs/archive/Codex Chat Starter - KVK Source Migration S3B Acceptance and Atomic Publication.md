@@ -1,5 +1,9 @@
 # Codex Chat Starter — KVK Source Migration S3B Acceptance and Atomic Publication
 
+> Archived 2026-09-10: S3B complete, operator smoke accepted and merged (#267/#574).
+> Historical instructions below are not a new execution authorization. S4A is the next
+> separately gated slice; see the current S4A pack/starter in the parent folder.
+
 Refreshed 2026-09-10 after S3A merge and archive closeout. **Not executed; S3B G3 pending.**
 Use this in a new chat only when approving this slice; G2 alone does not approve implementation.
 Supply the exact authorized S3B disposable SQL server/database and permitted setup/test operations
@@ -30,3 +34,7 @@ Use exact file/test/security manifests; report canonical delivery with actual ou
 No pull/reset/merge/push/PR, production SQL, real imports/exports, Discord actions, restarts,
 deployment or activation. No private player data or credentials in Git. Required security reviews
 use Changes at exact separate repo targets, Deep off; no standard/deep scan or automatic new task.
+
+
+S3B post-merge smoke: 36 passed in 9.11s; imports and registration 36/100 passed.
+Bot machine remains unupdated. Use the active S4A starter for the next separately approved slice.

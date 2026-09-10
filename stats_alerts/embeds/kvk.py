@@ -150,8 +150,25 @@ def _fmt_top_list(
     return "\n".join(lines)
 
 
-async def build_kvk_preview(timestamp: str, *, kvk_no: int | None = None):
+async def build_kvk_preview(
+    timestamp: str, *, kvk_no: int | None = None, source_selection=None, connect=None
+):
     from stats_alerts.kvk_diagnostics import PreviewPayload
+
+    if source_selection is not None:
+        from kvk.schemas.new_source_schema import SOURCE_KEY
+        from stats_alerts.allkingdoms import load_allkingdom_report_v2
+
+        if source_selection.get("source_key") != SOURCE_KEY or connect is None:
+            raise ValueError("Explicit source selection and connection provider required.")
+        report = await asyncio.to_thread(
+            load_allkingdom_report_v2,
+            kvk_no,
+            connect=connect,
+            period_id=source_selection["period_id"],
+            publication_id=source_selection["publication_id"],
+        )
+        return build_source_preview(report)
 
     selected_kvk = kvk_no
     if selected_kvk is not None and (
@@ -496,6 +513,83 @@ async def build_kvk_preview(timestamp: str, *, kvk_no: int | None = None):
     elif available and not honor_top:
         detail += " Honor data is empty or unavailable."
     return PreviewPayload(payload, available, detail, digest)
+
+
+def build_source_preview(report):
+    """Render all twelve blocks with complete-row budgets and separate stream times."""
+    from hashlib import sha256
+    import json
+
+    from core.discord_embed_limits import require_valid_embed_payload, truncate_text
+    from core.operator_diagnostic_payloads import neutralize_discord_mentions, pack_complete_units
+    from kvk.services.new_source_reporting_service import BLOCK_KEYS
+    from stats_alerts.kvk_diagnostics import PreviewPayload
+
+    if report.get("schema_version") != 2:
+        raise ValueError("Source renderer requires V2 metadata.")
+    if report.get("publication_id") is None:
+        return PreviewPayload([], False, "Source publication not_received; no legacy fallback.", "")
+    status = report["player_state"] if report["is_current"] else "retained; configuration pending"
+    description = (
+        f"Source: {report['source_key']} | {report['period_key']}\n"
+        f"Players: {status}; {report['selected_start_scan_id']} → {report['selected_end_scan_id']}\n"
+        f"Scan start UTC: {report['player_start_utc']} → {report['player_end_utc']}\n"
+        f"Requested endpoints: {report['requested_start_scan_id']} → {report['requested_end_scan_id']}\n"
+        f"Aggregates: {report['aggregate_state']}; as-of {report['aggregate_as_of_utc']}\n"
+        f"Coverage: {report['aggregate_coverage_start_utc']} → {report['aggregate_coverage_end_utc']}\n"
+        f"B0 eligible: {report['eligible_count']}; each rank uses its available metric cohort.\n"
+        "Aggregate tier KP is supplied; total KP is unsupported. Rounded reports retain source precision."
+    )
+    embed = discord.Embed(
+        title=f"KVK {report['kvk_no']} — {report['period_label']}", description=description
+    )
+    embed.set_footer(
+        text=f"Publication {report['publication_id']} | generation {report['generation']}"
+    )
+
+    def metric(row, key):
+        if row[key] is None:
+            return row["states"][key]
+        reported = row["reported"].get(key)
+        if reported:
+            prefix = "≈ " if reported["precision"] != "reported_numeric" else ""
+            return prefix + str(reported["raw"])
+        return (
+            format(row[key], "f").rstrip("0").rstrip(".")
+            if "." in format(row[key], "f")
+            else format(row[key], "f")
+        )
+
+    for key in BLOCK_KEYS:
+        rows = report["blocks"][key]
+        units = []
+        for row in rows:
+            name = row.get("name") or row.get("kingdom") or row.get("camp_name") or "Unknown"
+            name = truncate_text(
+                discord.utils.escape_markdown(neutralize_discord_mentions(str(name))).replace(
+                    "\n", " "
+                ),
+                64,
+            )
+            rank = f"{row['rank']}/{row['population']} " if row.get("rank") else ""
+            units.append(
+                f"{rank}{name}: kills {metric(row, 'kills_gain')} | deaths {metric(row, 'deads')} | DKP {metric(row, 'dkp')} | total KP {metric(row, 'kp_gain')}"
+            )
+        # 12 * 360 leaves a fixed reserve for metadata, headings and footer.
+        value = (
+            pack_complete_units(units, limit=360, label="rows").text
+            if units
+            else (
+                report["aggregate_state"]
+                if key.startswith(("kingdom", "camp")) or key in ("our_kingdom", "our_camp")
+                else "No available metric values"
+            )
+        )
+        embed.add_field(name=key.replace("_", " ").title(), value=value, inline=False)
+    payload = [embed]
+    require_valid_embed_payload(payload)
+    digest = sha256(json.dumps([e.to_dict() for e in payload], sort_keys=True).encode()).hexdigest()
+    return PreviewPayload(payload, True, description, digest)
 
 
 async def publish_kvk_preview(bot, channel, preview, message_id, before_send, check_destination):

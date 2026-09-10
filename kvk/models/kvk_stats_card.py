@@ -14,6 +14,7 @@ class KvkStatsCardContext:
     overall_kvk_rank: int | None = None
     overall_kvk_total_governors: int | None = None
     overall_kvk_top_percent: float | None = None
+    source_context: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class KvkStatsCardPayload:
     last_kvk_summary: dict[str, int | float | str | None] = field(default_factory=dict)
     matchmaking_snapshot: dict[str, int] = field(default_factory=dict)
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source_context: dict | None = None
 
     @property
     def display_kvk_label(self) -> str:

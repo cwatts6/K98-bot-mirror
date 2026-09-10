@@ -209,13 +209,26 @@ class PreviewRepository:
             _contained(self.root, self.root / name)
         return FileLock(str(self.root / "sessions.lck"), timeout=5)
 
-    def open(self, guild_id: int, channel_id: int, owner_id: int, token=None, *, kvk_no=None):
+    def open(
+        self,
+        guild_id: int,
+        channel_id: int,
+        owner_id: int,
+        token=None,
+        *,
+        kvk_no=None,
+        source_selection=None,
+    ):
         if not all(_positive(value) for value in (guild_id, channel_id, owner_id)):
             raise ValueError("Invalid preview identity")
         if token is not None and (not isinstance(token, str) or not _TOKEN.fullmatch(token)):
             raise ValueError("Use the issued preview session token")
         if kvk_no is not None and (not _positive(kvk_no) or kvk_no > 2147483647):
             raise ValueError("KVK number must be a positive SQL integer")
+        if source_selection is not None:
+            _validate_source_selection(source_selection)
+            if token is None and kvk_no is None:
+                raise ValueError("Source previews require an explicit KVK")
         if token is None:
             _contained(self.root, self.root)
             self.root.mkdir(parents=True, exist_ok=True)
@@ -234,7 +247,9 @@ class PreviewRepository:
                 _write(
                     path / "session.json",
                     dict(
-                        version=2 if kvk_no is not None else 1,
+                        version=(
+                            3 if source_selection is not None else 2 if kvk_no is not None else 1
+                        ),
                         kind="fighting_preview",
                         session=token,
                         guild_id=guild_id,
@@ -242,16 +257,21 @@ class PreviewRepository:
                         owner_id=owner_id,
                         created_at=utcnow().isoformat(),
                         **({"kvk_no": kvk_no} if kvk_no is not None else {}),
+                        **(
+                            {"source_selection": source_selection}
+                            if source_selection is not None
+                            else {}
+                        ),
                     ),
                 )
         path = self.root / str(guild_id) / str(channel_id) / token
         _contained(self.root, path / "session.json")
         manifest = _read(path / "session.json")
         version = manifest.get("version")
-        if type(version) is not int or version not in {1, 2}:
+        if type(version) is not int or version not in {1, 2, 3}:
             raise DispatchUnavailable("Unsupported preview session version")
         selected = manifest.get("kvk_no")
-        if version == 2:
+        if version in {2, 3}:
             if not _positive(selected) or selected > 2147483647:
                 raise DispatchUnavailable("Invalid saved KVK selection")
             if kvk_no is not None and kvk_no != selected:
@@ -260,6 +280,12 @@ class PreviewRepository:
             raise DispatchUnavailable(
                 "Current-KVK session cannot be retargeted; create a new session"
             )
+        if version == 3:
+            _validate_source_selection(manifest.get("source_selection"))
+            if source_selection is not None and source_selection != manifest["source_selection"]:
+                raise DispatchUnavailable("Session source/publication cannot change")
+        elif source_selection is not None or "source_selection" in manifest:
+            raise DispatchUnavailable("Legacy session cannot be retargeted to a source publication")
         expected = dict(
             version=version,
             kind="fighting_preview",
@@ -278,3 +304,22 @@ class PreviewRepository:
         session = PreviewSession(self, path, manifest)
         session.snapshot()
         return session
+
+
+def _validate_source_selection(selection):
+    from uuid import UUID
+
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+
+    if (
+        not isinstance(selection, dict)
+        or set(selection) != {"source_key", "period_id", "publication_id"}
+        or selection["source_key"] != SOURCE_KEY
+    ):
+        raise DispatchUnavailable("Invalid source preview selection")
+    for key in ("period_id", "publication_id"):
+        try:
+            if not isinstance(selection[key], str) or str(UUID(selection[key])) != selection[key]:
+                raise ValueError()
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise DispatchUnavailable("Invalid source preview identity") from exc

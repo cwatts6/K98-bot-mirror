@@ -16,16 +16,28 @@ merged on 2026-09-10. Final validation passed 265 static assertions and 144 disp
 rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
 **S3A is complete, smoke accepted and merged.** Mirror #266 merged at 11:28:48 UTC
 (`3154997fa2dfc124da75ee35dca79463c3196a43`); private bot #573 merged at 11:29:18 UTC
-(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. Local mirror main is
+(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. At the S3A checkpoint, local mirror main was
 `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
 logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
-**Next: S3B Acceptance and Atomic Publication in a new chat, with separate G3 approval and
-an explicitly named disposable SQL integration target.** Preserve this pending documentation
-closeout and archive moves for inclusion in the later S3B PR. No S3B implementation is authorized.
+**S3B is complete, operator smoke accepted and merged.** Mirror
+[PR #267](https://github.com/cwatts6/K98-bot-mirror/pull/267) merged at 13:59:47 UTC as
+`e915f9727f9492fe4ecc02b5c0d9f3c6e443be13`; private bot
+[PR #574](https://github.com/cwatts6/k98-bot/pull/574) merged at 14:01:14 UTC as
+`a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` on 2026-09-10.
+Operator post-merge smoke on mirror main `e915f972`: import smoke passed, registration
+36/100 without drift or duplicates, **36 tests passed in 9.11s** (4 publication + 32 SQL).
+Current synchronized local mirror main is `02385a0edc0ec83f77241e02648eabb3b7640ea6`;
+local production/main is `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`; SQL main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both repos were clean at closeout entry.
+S3B pack/starter are archived. **Next: S4A Shared Reports and Cards in a new chat, with
+separate S4A G3 approval.** Preserve pending S3B closeout docs and both archive moves
+for the eventual separately authorized S4A PR; its pack contains the complete manifest.
+S3B's latest full-suite rerun stalled around 19% and remains incomplete; the accepted smoke
+does not replace it. The earlier 3,764-pass full result is pre-review-fix evidence.
 The operator confirms local pulls completed; no changes were pulled to the bot machine.
 Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A/S2B/S3A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
+Do not repeat S1/S2A/S2B/S3A/S3B as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
 handoff. Earlier pending/preparation/review-in-progress wording below is historical.
@@ -42,10 +54,10 @@ handoff. Earlier pending/preparation/review-in-progress wording below is histori
 | Bot remote supplied by operator | `cwatts6/K98-bot-mirror` |
 | SQL working copy | `C:\K98-bot-SQL-Server` |
 | SQL remote supplied by operator | `cwatts6/K98-bot-SQL-Server` |
-| Current stage | S1/S2A/S2B/S3A complete and merged; S3B next, separate G3 and disposable SQL target pending |
+| Current stage | S1/S2A/S2B/S3A/S3B complete and merged; S4A next, separate G3 pending |
 | One-pass implementation approved | S1/S2A/S2B delivered; no successor approval |
 | Runtime, SQL, configuration or deployment changes approved | S2B SQL and named disposable validation completed; no production deployment or activation |
-| Current permitted output | S3A documentation/archive closeout; S3B implementation requires separate G3 and disposable SQL target |
+| Current permitted output | S3B documentation/archive closeout; S4A implementation requires separate G3 |
 
 The operator reports both working copies and their Git repositories are synced. Codex must verify their actual branches, commit IDs and working-tree state rather than assume a branch name or deployed version. This pack was prepared from the supplied discussion, source assessment and task template; it does **not** certify that the current code or production SQL has already been audited.
 

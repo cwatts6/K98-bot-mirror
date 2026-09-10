@@ -16,16 +16,28 @@ merged on 2026-09-10. Final validation passed 265 static assertions and 144 disp
 rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
 **S3A is complete, smoke accepted and merged.** Mirror #266 merged at 11:28:48 UTC
 (`3154997fa2dfc124da75ee35dca79463c3196a43`); private bot #573 merged at 11:29:18 UTC
-(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. Local mirror main is
+(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. At the S3A checkpoint, local mirror main was
 `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
 logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
-**Next: S3B Acceptance and Atomic Publication in a new chat, with separate G3 approval and
-an explicitly named disposable SQL integration target.** Preserve this pending documentation
-closeout and archive moves for inclusion in the later S3B PR. No S3B implementation is authorized.
+**S3B is complete, operator smoke accepted and merged.** Mirror
+[PR #267](https://github.com/cwatts6/K98-bot-mirror/pull/267) merged at 13:59:47 UTC as
+`e915f9727f9492fe4ecc02b5c0d9f3c6e443be13`; private bot
+[PR #574](https://github.com/cwatts6/k98-bot/pull/574) merged at 14:01:14 UTC as
+`a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` on 2026-09-10.
+Operator post-merge smoke on mirror main `e915f972`: import smoke passed, registration
+36/100 without drift or duplicates, **36 tests passed in 9.11s** (4 publication + 32 SQL).
+Current synchronized local mirror main is `02385a0edc0ec83f77241e02648eabb3b7640ea6`;
+local production/main is `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`; SQL main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both repos were clean at closeout entry.
+S3B pack/starter are archived. **Next: S4A Shared Reports and Cards in a new chat, with
+separate S4A G3 approval.** Preserve pending S3B closeout docs and both archive moves
+for the eventual separately authorized S4A PR; its pack contains the complete manifest.
+S3B's latest full-suite rerun stalled around 19% and remains incomplete; the accepted smoke
+does not replace it. The earlier 3,764-pass full result is pre-review-fix evidence.
 The operator confirms local pulls completed; no changes were pulled to the bot machine.
 Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A/S2B/S3A as unstarted slices. The [local SQL development reference](../../reference/local_sql_development.md) records the reusable K98DEV
+Do not repeat S1/S2A/S2B/S3A/S3B as unstarted slices. The [local SQL development reference](../../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
 handoff. Earlier pending/preparation/review-in-progress wording below is historical.
@@ -460,5 +472,14 @@ S3A is complete, smoke accepted and merged through mirror #266 and private bot #
 Retained: [task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md)
 and [historical starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md).
 They contain the exact implementation/review/security/smoke evidence; do not execute them again.
-Next is [S3B](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md),
-with separate G3 and disposable SQL target authorization. Bot-machine deployment remains absent.
+The historical successor was [S3B](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md),
+now accepted and archived. S4A is the current next slice with separate G3. Bot-machine deployment remains absent.
+
+
+## S3B archived — 2026-09-10
+
+Retained [task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) and [historical starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md).
+Mirror #267 and private #574 are merged; operator smoke passed 36 tests in 9.11s.
+All implementation/review/security and validation-gap evidence is preserved.
+Next: [S4A pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) and [starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md), separate G3 pending.
+Both archive moves and all closeout docs must accompany the eventual S4A PR.

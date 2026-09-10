@@ -233,6 +233,44 @@ def load_window_preview(kvk_no: int | None = None) -> KvkWindowPreviewResult:
     )
 
 
+def load_source_diagnostic(*, action, connect, kvk_no, period_id=None, limit=20):
+    """Private source-specific companion to unchanged legacy admin contracts.
+
+    Recompute is inspection only: accepted immutable publications are not rebuilt
+    by a legacy procedure or by this reader. Later writer controls own rebuilding.
+    """
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+    from kvk.services.new_source_reporting_service import load_report_v2
+
+    if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+        raise ValueError("Explicit source KVK required")
+    if action == "list_scans":
+        return dict(
+            source_key=SOURCE_KEY,
+            kvk_no=kvk_no,
+            rows=kvk_admin_dal.fetch_source_recent_scans(
+                connect, kvk_no, max(1, min(int(limit), 100))
+            ),
+        )
+    if action not in {"recompute", "window_preview"}:
+        raise ValueError("Unsupported read-only source diagnostic")
+    report = load_report_v2(connect=connect, kvk_no=kvk_no, period_id=period_id, our_kingdom=0)
+    return {
+        "source_key": SOURCE_KEY,
+        "kvk_no": kvk_no,
+        "action": action,
+        "publication_id": report["publication_id"],
+        "current_period_state": report["current_period_state"],
+        "requested_start_scan_id": report.get("requested_start_scan_id"),
+        "requested_end_scan_id": report.get("requested_end_scan_id"),
+        "selected_start_scan_id": report.get("selected_start_scan_id"),
+        "selected_end_scan_id": report.get("selected_end_scan_id"),
+        "player_start_utc": report.get("player_start_utc"),
+        "player_end_utc": report.get("player_end_utc"),
+        "detail": "Read-only publication inspection; no recomputation or SQL writes.",
+    }
+
+
 async def _run_cache_builder(
     label: str,
     builder: Callable[[], Awaitable[Any]],

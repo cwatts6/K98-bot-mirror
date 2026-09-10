@@ -193,3 +193,73 @@ async def test_legacy_production_payload_and_return_preserved(preview_data, is_t
     )
     channel.error = RuntimeError("legacy swallow")
     assert await kvk.send_kvk_embed(None, channel, "same", is_test=is_test) is None
+
+
+def test_source_session_v3_pins_selection_and_keeps_legacy_readable(tmp_path):
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+    from stats_alerts.dispatch_reservations import DispatchUnavailable
+    from tests.test_kvk_source_reporting import PERIOD, PUBLICATION
+
+    repo = PreviewRepository(tmp_path / "sessions")
+    selection = dict(source_key=SOURCE_KEY, period_id=PERIOD, publication_id=PUBLICATION)
+    old = repo.open(1, 2, 3, kvk_no=16)
+    session = repo.open(1, 2, 3, kvk_no=16, source_selection=selection)
+    assert session.manifest["version"] == 3
+    assert repo.open(1, 2, 3, session.token).manifest == session.manifest
+    assert repo.open(1, 2, 3, old.token).manifest == old.manifest
+    with pytest.raises(DispatchUnavailable, match="cannot change"):
+        repo.open(1, 2, 3, session.token, source_selection=dict(selection, publication_id=PERIOD))
+    with pytest.raises(DispatchUnavailable, match="Legacy"):
+        repo.open(1, 2, 3, old.token, source_selection=selection)
+    with pytest.raises(DispatchUnavailable, match="owner"):
+        repo.open(1, 2, 4, session.token)
+
+
+@pytest.mark.asyncio
+async def test_source_runner_reuses_saved_selection_on_restart(tmp_path):
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+    from tests.test_kvk_source_reporting import PERIOD, PUBLICATION
+
+    repo = PreviewRepository(tmp_path / "sessions")
+    selection = dict(source_key=SOURCE_KEY, period_id=PERIOD, publication_id=PUBLICATION)
+    session = repo.open(1, 2, 3, kvk_no=16, source_selection=selection)
+    build = AsyncMock(return_value=PreviewPayload([], False, "publication changed", ""))
+    publish = AsyncMock(side_effect=AssertionError("No external delivery"))
+    result = await PreviewRunner().execute(
+        guild_id=1,
+        channel_id=2,
+        owner_id=3,
+        token=session.token,
+        action="run",
+        build=build,
+        publish=publish,
+        repository=PreviewRepository(repo.root),
+    )
+    build.assert_awaited_once_with(kvk_no=16, source_selection=selection)
+    publish.assert_not_awaited()
+    assert result.outcome == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_explicit_source_preview_bypasses_legacy_reads(monkeypatch):
+    from unittest.mock import Mock
+
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+    from stats_alerts import allkingdoms
+    from tests.test_kvk_source_reporting import PERIOD, PUBLICATION, load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch)
+    load = Mock(return_value=report)
+    monkeypatch.setattr(allkingdoms, "load_allkingdom_report_v2", load)
+    monkeypatch.setattr(
+        kvk, "get_latest_kvk_metadata_sql", Mock(side_effect=AssertionError("legacy"))
+    )
+    preview = await kvk.build_kvk_preview(
+        "not scan time",
+        kvk_no=16,
+        source_selection=dict(source_key=SOURCE_KEY, period_id=PERIOD, publication_id=PUBLICATION),
+        connect=Mock(),
+    )
+    assert preview.available
+    load.assert_called_once()
+    assert "not scan time" not in str(preview.payload[0].to_dict())

@@ -8,6 +8,13 @@ from file_utils import cursor_row_to_dict, get_conn_with_retries
 logger = logging.getLogger(__name__)
 
 
+def fetch_source_card_report(*, connect, kvk_no, period_id):
+    """Read the source publication, without invoking legacy rank SQL."""
+    from kvk.dal.new_source_reporting_dal import load_snapshot
+
+    return load_snapshot(connect, kvk_no=kvk_no, period_id=period_id)
+
+
 def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[str, Any]:
     """Fetch KVK mode and camp context for the player stats card."""
     if not kvk_no:
