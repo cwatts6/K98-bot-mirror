@@ -164,7 +164,7 @@ the approved field dictionary. Never implement cross-season integrity solely in 
 | S2B SourceWeightConfig | PK ConfigVersionID; X/Y/Z decimal(38,12), original round-trip strings and EffectiveFromUTC; no implicit latest row |
 | S2B SourcePeriod | PK PeriodID; unique source/KVK/PeriodKey, kind and declared bounds; S2B adds matching source/KVK/period FK to aggregate family |
 | S2B SourceScanBinding | PK ConfigVersionID/LogicalScanID; exact existing observation/scan FK; historical bindings immutable |
-| S2B SourceConfigRequest | PK RequestID; unique source/KVK/config-content hash/base-config version; old/new endpoint snapshot, origin/import actor or system identity, requested/pending/applied/rejected status and applied publication reference |
+| S2B SourceConfigRequest | PK RequestID; unique source/KVK/PeriodID/config-content hash/base-config version; old/new endpoint snapshot, origin/import actor or system identity, requested/pending/applied/rejected status and applied publication reference |
 | S2B SourcePublication | PK PublicationID; unique source/KVK/PeriodID/generation; exact roster/config/calculation/input revision FKs, stream availability/finality, counts/digest; building/complete state |
 | S2B SourcePlayerResult | PK PublicationID/GovernorID; nullable measured fields, DKP decimal(38,6), statuses and metric ranks/cohort sizes; aggregate rows remain immutable revision references |
 | S2B SourceSelection | PK source/KVK/PeriodID; PublicationID and monotonic SelectionVersion; same-scope FK, never points at another period |
@@ -248,6 +248,8 @@ Start/End against selected source and keeps approved weight/map/roster component
 EndScanID change is automatic final replacement authority. Start changes, roster changes or
 weight/map changes remain explicit reviewed config actions. Exact request idempotency includes
 base config so 13→14→13 is a new action, not suppressed as an old content replay.
+S2B PR review clarified that the replay key also includes PeriodID: one imported configuration
+transition may create independent fight/overall requests, while same-period retries deduplicate.
 
 S5B startup worker resumes pending requests; normal accepted scan triggers also wake it. Missing
 14 is pending with usable interim displayed, not failed or falsely final; arrival of 14 completes

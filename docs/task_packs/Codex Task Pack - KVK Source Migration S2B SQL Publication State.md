@@ -1,6 +1,19 @@
 # Codex Task Pack — KVK Source Migration S2B SQL Publication State
 
-## Current prerequisite handoff — 2026-09-10
+## Current review handoff — 2026-09-10
+
+S2B G3 was explicitly approved. Implementation and authorized local validation completed;
+SQL [PR #79](https://github.com/cwatts6/K98-bot-SQL-Server/pull/79) and mirror
+[PR #265](https://github.com/cwatts6/K98-bot-mirror/pull/265) are open for review.
+The named S2B database already exists and is retained evidence. Do not provision it again
+from the original starter. The operator authorized addressing both PRs' review comments.
+No production execution, merge, deployment, activation or successor slice is authorized.
+
+The prerequisite handoff and sections 1–17 below are retained pre-execution specification
+and history. Their pending-G3, proposed-target and prepared-only wording is superseded by
+this current status and the dated delivery/review receipts at the end of this pack.
+
+## Historical prerequisite handoff — 2026-09-10
 
 S2A is accepted and merged: SQL PR #78 at `845a25fe66b1d2365fb38720390b4dadf50baa67`,
 mirror PR #264 at `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec`. Final review fixes passed
@@ -457,3 +470,78 @@ all matched. The 259 static assertions passed again and staged diff hygiene pass
 Final mirror handoff checks passed across all thirteen files: architecture, deferred items,
 security routing, exact-path test selector, applicable pre-commit hooks and staged Gitleaks.
 Runtime-only hooks selected no files; the previously documented runtime-test skip still applies.
+
+### PR review remediation — 2026-09-10
+
+The operator authorized checking, actioning, replying to and resolving review comments on
+SQL #79 and mirror #265. Both local branches matched their PR heads before edits: SQL
+`51b227a7127974ab50c905881d412a981e2e88e8`, mirror
+`dd307de70df8fef478486e9abaf6ad24ae79139e`; both working trees were clean.
+
+All three SQL comments reproduced with rollback-only synthetic rows against the original
+S2B schema. The bounded follow-up:
+
+- Requires explicit `final_unavailable` component state and a nonempty reason for terminal
+  unavailability. A reason cannot make any `live` or ordinary missing component final.
+  Final/corrected-final publications require both components terminal; the later writer
+  still owns admin authorization and immutable transition enforcement.
+- Extends the result eligibility FK to `(RosterID, GovernorID, b0_kingdom)`, backed by a new
+  roster-member unique key. The existing narrower primary key guarantees that adding the
+  key cannot introduce duplicate data. Config/camp FKs continue to enforce the mapping.
+- Adds `PeriodID` to request replay uniqueness. Different periods can apply the same imported
+  config transition; duplicates within a period remain rejected and 13→14→13 remains valid.
+  This refines the Phase 2 plan's earlier uniqueness tuple to match its per-period request model.
+- Marks the entire pre-execution handoff/specification historical and places current approval,
+  retained database and review status first, addressing the mirror review comment.
+
+Exact SQL follow-up manifest (seven modified files):
+
+1. `migrations/20260910_001_kvk_source_publication_state.sql`
+2. `sql_schema/KVK.SourcePublication.Table.sql`
+3. `sql_schema/KVK.SourcePlayerResult.Table.sql`
+4. `sql_schema/KVK.SourceConfigRequest.Table.sql`
+5. `sql_schema/KVK.SourceRosterMember.Table.sql`
+6. `deploy/Test-KvkSourcePublicationContracts.ps1`
+7. `validation/kvk_source/publication_constraints.sql`
+
+The necessary manifest expansion is the roster-member snapshot, reflecting the S2B-added
+referenced key; no accepted S2A migration is edited or re-executed. Total SQL PR manifest is
+now eighteen files. This follows the operator's review-fix request and preserves the thirteen
+S2B table boundary. Mirror follow-up is limited to this pack, the Phase 2 implementation plan
+and local SQL development reference; prior documentation remains included in the PR.
+
+Validation: 265 static assertions and 144 expected SQL rejections passed. Positive cases cover
+explicit terminal unavailability in either/both streams, distinct-period requests, preserved
+endpoint correction/history and existing valid B0 attribution. All 25 tables were empty after
+rollback. Before rerunning the full revised migration, the local helper locked and proved every
+foundation table empty, then replaced only the thirteen S2B tables and their dependency FKs
+inside one transaction. It did not recreate the database, delete data, change the accepted S2A
+migration, or touch the separate S2A evidence database. This local test-only rebuild is not a
+production rollback recipe. Initial evidence transcripts remain retained alongside review results
+under `C:/Users/cwatt/AppData/Local/Temp/k98-s2b-20260910/review-*-result.txt`.
+
+Final review checks: SQL repository validator passed with zero errors and the same fifteen
+historical warnings. Independent readback confirmed 25 empty S2B tables, 47 trusted/enabled
+FKs and 165 trusted/enabled CHECKs; separate S2A remains twelve empty tables, eighteen FKs
+and eighty-nine CHECKs. Bot architecture/deferred/security-routing validators, exact three-path
+test selection and applicable document hooks passed. Runtime pytest, imports and registration
+remain skipped because there is no bot runtime change.
+
+Additional diagnostic: the accepted S2A-only static validator rejects the post-S2B snapshots
+for SourceAggregateReport and SourceRosterMember because it compares every appended ALTER
+against the S2A migration alone. Those are intentional S2B additions and both are verified by
+the S2B validator; the S2A migration/test and historical acceptance evidence remain unchanged.
+This diagnostic is not reported as a fresh S2A static pass.
+
+Security: Changes, Deep off, exact seven-file follow-up from SQL `51b227a7127974ab50c905881d412a981e2e88e8`.
+Scan `125c7408-e200-4223-93e3-306c29d7d96e` sealed at 08:51:12 UTC with 7/7 reviewed,
+zero findings and zero deferred candidates. Snapshot:
+`codex-security-snapshot/v1:sha256:3afec07729ff4c1f14424e988a9d9678dbbaa2acf6a87b119cf9e1776f2feb16`.
+Preflight passed 3/3; Daybreak Blue access granted. Independent architecture model and all
+material citations were verified before finalization. The workbench retained an earlier
+checkpoint surface saying architecture was pending; the final canonical model and completed
+seven-file coverage supersede that historical checkpoint note. Private report:
+`C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-R6uB4n/K98-bot-SQL-Server/51b227a7127974ab50c905881d412a981e2e88e8_20260910T084516Z_jglp81oe/report.md`.
+Measured goal usage: 63,952 tokens, 216 seconds. This supplements the original S2B Changes scan.
+The mirror follow-up is a precise three-Markdown-file security skip: status, plan alignment and
+validation evidence only, no executable/runtime/configuration/permission changes.

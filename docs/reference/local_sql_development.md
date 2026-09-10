@@ -61,7 +61,10 @@ The operator authorized `9SX2VF4\K98DEV` and `K98_S2B_Disposable_20260910` for S
 Creation with compatibility 160 and `Latin1_General_CI_AS`, accepted S2A prerequisite
 installation and migration `20260910_001_kvk_source_publication_state.sql` passed.
 The service was already running at execution; no start or restart occurred.
-Synthetic validation passed 131 rejection cases and full 25-table rollback. Independent
+Initial validation passed 131 rejection cases; the S2B PR review revision passed 144, with
+265 static assertions and full 25-table rollback. The reviewed migration was retested by
+transactionally replacing only verified-empty S2B tables in this same authorized database.
+The accepted S2A migration and separate S2A evidence database were preserved. Independent
 readback found 25 empty tables, 47 trusted/enabled FKs and 165 trusted/enabled CHECKs.
 The separate S2A evidence database remained unchanged. Both databases are retained.
 
