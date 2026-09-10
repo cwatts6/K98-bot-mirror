@@ -499,3 +499,45 @@ The private PR will use a file-delta patch on production/main, preserving separa
 The stock promotion script includes unconditional full pytest and reset-on-error behavior;
 its equivalent patch/check/commit/push steps are used individually to honor the accepted
 suite exception and preservation constraints. No reset or force push is required.
+
+
+### PR Delivery Readback — 2026-09-10
+
+- Mirror [PR #268](https://github.com/cwatts6/K98-bot-mirror/pull/268): open, ready for review;
+  branch `codex/kvk-source-s4a`, implementation commit
+  `e0ab51df40708684d899dbf87141b38be217db27`, base
+  `02385a0edc0ec83f77241e02648eabb3b7640ea6`.
+- Private [PR #575](https://github.com/cwatts6/k98-bot/pull/575): open, ready for review;
+  branch `prod/kvk-source-s4a`, implementation commit
+  `3ed1c960af2b188a49ccf113765e3f428a033e9d`, direct parent
+  `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`. The exact file delta was applied on
+  production/main; no mirror history was pushed to the private repository.
+- All 34 physical manifest paths match between the two delivered implementations:
+  nineteen Python paths and fifteen carried documentation paths (thirteen logical
+  documents including both archive renames). All original closeout content is preserved;
+  125 relative Markdown links resolve. Hooks normalized appended pack line endings only.
+- Fresh staged-file hooks, including staged secret detection, passed on both branches.
+  Architecture, deferred and security-routing validators passed. The existing S4A test
+  outcomes above remain the evidence; no redundant full run or historical pass is claimed.
+  The operator-accepted incomplete-suite exception is prominent in both PR descriptions.
+- Separate private security review: Changes, Deep off, target
+  `C:/discord_file_downloader/.codex_scan_stage/s4a-prod`, base/head
+  `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` plus staged patch.
+  Scan `311e487e-fd99-43fb-977b-79b1b75fafee`, snapshot
+  `codex-security-snapshot/v1:sha256:8e8ce907817a459c987b2768ec450956b2cf83035d8ce3fe0e2ca1bc0c2f0204`,
+  completed at 14:58:20 UTC with canonical readback verified: twelve runtime files and
+  seven supporting tests reviewed, zero findings/deferred candidates/open questions.
+  Dedicated preflight passed; Daybreak access granted (Daybreak Blue); independent
+  architecture review completed. Private artifacts remain outside Git under
+  `C:/Users/cwatt/AppData/Local/Temp/codex-security-scans-tFar8J/s4a-prod/a8ad9f1d81cfb7884a9cdcc0b067c4346a204488_20260910T145217Z_jx0pzs9x`.
+  Tool-reported scan usage: 3,825,453 total tokens, including 3,699,072 cached input tokens.
+- The earlier mirror scan still matches all nineteen Python files. This final delivery
+  appendix is documentation only; it changes no runtime, configuration, authority or
+  data-access behavior, so no additional discovery scan is required. The final evidence
+  commits add only this same appendix on both branches.
+- SQL remains clean main at `44afa315dd6cbfe9fec101f2a39a62e534f5b583`: separate
+  no-change security skip and no SQL PR. No retained database was touched.
+
+No merge, deployment, bot-machine update/restart, SQL operation, live import/export,
+Discord action or source activation occurred. New-source routing remains disabled.
+Stop for operator PR review and validation; no later slice is authorized.
