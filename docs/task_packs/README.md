@@ -14,10 +14,14 @@ assertions and 96 disposable SQL rejection cases, with twelve-table rollback ver
 **S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
 merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
 rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
-**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+**S3A is implemented and validated; review/merge closeout is pending.** Mirror PR #266 and
+private bot PR #573 were both verified open on 2026-09-10; neither is recorded as merged.
+Do not restart S3A implementation. Complete S3A review/acceptance and repository merge gates,
+then request separate **S3B Acceptance and Atomic Publication G3** with its approved disposable
+SQL integration target. S3B is not authorized by S3A delivery or by this handoff.
 The operator confirms local pulls completed; no changes were pulled to the bot machine.
 Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
+Do not repeat S1/S2A/S2B/S3A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
 handoff. Earlier pending/preparation/review-in-progress wording below is historical.
@@ -36,7 +40,7 @@ reconciles all 22 pre-assessment top-level files into six actionable groups. Ope
 order: **KVK Source Migration, Private Inventory Import and Support Sharing, then Reliability
 WS1**. KVK affects all players three times daily; inventory is optional and used by a handful.
 The operator plans warnings/advice to defer uploads; exposure remains technically possible and
-the security finding stays open. The original next task was the now-completed KVK Phase 1 audit; current next slice is S3A. No runtime or live action
+the security finding stays open. The original next task was the now-completed KVK Phase 1 audit; S3A is implemented; review/merge closeout precedes separately gated S3B. No runtime or live action
 is authorized by the priority decision; supplied programme packs remain unchanged.
 
 | Classification | Files / programme | Status |
@@ -45,7 +49,7 @@ is authorized by the priority decision; supplied programme packs remain unchange
 | Programme charter / selection pending | [Bot Operational Reliability](Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) | Proposed WS1–WS6 deliverables; WS1 is third after KVK and inventory; any proved KVK prerequisite exception returns for approval. Implementation unapproved. |
 | Completed design / implementation unapproved | [Reliability WS1 ProcConfig task pack](Codex%20Task%20Pack%20-%20Bot%20Operational%20Reliability%20Workstream%201%20ProcConfig%20Import%20Reliability%20and%20Truthful%20Completion%20Reporting.md), matching starter and [design/manifests](Bot%20Operational%20Reliability%20Workstream%201%20-%20Design%20and%20Manifests.md) | Formerly Phase 2L. First designed workstream, not preselected ahead of incoming programmes. |
 | Compatibility redirects | Former Phase 2L pack/starter paths | Link to canonical Reliability WS1; no active embed Phase 2L execution. |
-| Active implementation programme | [KVK Source Migration](KVK%20Source%20Migration%20-%20Programme%20Pack.md), Phase 1 pack/starter and decision/evidence register | S1/S2A/S2B complete and merged; S3A scope/G3 next. Completed packs are archived; source remains inactive. |
+| Active implementation programme | [KVK Source Migration](KVK%20Source%20Migration%20-%20Programme%20Pack.md), Phase 1 pack/starter and decision/evidence register | S1/S2A/S2B merged; S3A implemented, review/merge pending; S3B requires separate G3. Completed packs are archived; source remains inactive. |
 | Assessed security programme / response recommended | [Private Inventory Import and Support Sharing](Private%20Inventory%20Import%20and%20Support%20Sharing%20-%20Programme%20Pack.md), Phase 1 pack/starter | Recent exposure reported; static triage completed privately. Operator selects inventory second after KVK and plans voluntary upload-deferral advice; this does not technically close exposure. Dependency foundation alone is not remediation. |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
@@ -957,7 +961,7 @@ statements as current status; their historical evidence remains intact. Phase 2B
 delivered in the [implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md)
 and [planning evidence log](../reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md).
 The table below is the current slice index: S1/S2A/S2B are complete and archived;
-**S3A is next and requires its own G3 approval.** Later slices remain gated. The original
+**S3A implementation is complete; review/merge closeout is pending. S3B requires separate G3.** Later slices remain gated. The original
 Phase 2B planning delivery did not authorize implementation or deployment. S6 prepares readiness evidence and stops at separate G4 approval.
 
 | Slice | Task pack | Approval starter |

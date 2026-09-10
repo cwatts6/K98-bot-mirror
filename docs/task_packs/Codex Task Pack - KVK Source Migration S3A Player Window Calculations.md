@@ -1,6 +1,15 @@
 # Codex Task Pack — KVK Source Migration S3A Player Window Calculations
 
-## Current entry handoff — 2026-09-10
+## Current review handoff — 2026-09-10
+
+S3A G3 was approved and the implementation and review follow-up were delivered. Mirror #266
+and private bot #573 remain open, verified 2026-09-10. Finish review/acceptance and merge gates;
+do not re-execute this pack. S3B Acceptance and Atomic Publication requires its own G3 and
+approved disposable SQL target after its predecessors are accepted. No S3B work is authorized.
+All fifteen carried-forward documents and four archive moves are included in both PRs.
+The preparation instructions below are historical; delivery and follow-up evidence supersede them.
+
+## Historical implementation entry — 2026-09-10
 
 Start S3A in a new chat using the matching starter only when granting S3A G3. S1 is accepted;
 S2A and S2B are also complete and merged (S2B SQL #79, mirror #265, private bot #572).
@@ -468,3 +477,77 @@ Earlier source-hash equivalence statements describe the initial PR commit; this 
 covers its follow-up. SQL remains clean at `44afa315dd6cbfe9fec101f2a39a62e534f5b583`,
 with a separate no-change skip. All carried-forward documentation and archive moves remain
 included. No production, deployment, merge, activation or successor action is part of this fix.
+
+#### PR #573 review and offline smoke — 2026-09-10
+
+Review found numeric endpoint ordering in WindowConfig inconsistent with event-time selection.
+Removed that numeric comparison; positive integer identity validation and resolver/selection UTC
+ordering remain enforced. Four added cases failed before the fix; after it, **260 S3A/S1 tests
+passed** and **77 focused log-noise tests passed**, operational logs unchanged. They cover a lower
+end ID with later UTC, equal/earlier UTC rejection, and an authorized lower-ID replacement while
+retaining the previous final. Ten entry/handoff documents now distinguish implemented S3A from
+open mirror #266/production #573 and the separate S3B G3 gate. No premature merged claim.
+
+Offline smoke uses synthetic in-memory data only. On the local development checkout containing
+this PR's reviewed head, run from `C:\discord_file_downloader` in PowerShell:
+
+```powershell
+git status --short
+git log -1 --format=%H
+.\.venv\Scripts\python.exe -S -c "import kvk.models.new_source_reporting; import kvk.services.new_source_calculation; import kvk.services.new_source_window_resolver; print('S3A pure imports OK')"
+.\.venv\Scripts\python.exe scripts/analyse_pytest_log_noise.py --pytest-args -q tests/test_kvk_source_calculation.py tests/test_kvk_source_window_resolver.py tests/test_kvk_source_reporting_models.py tests/test_kvk_combat_metrics.py tests/test_kvk_all_recompute_sql_contract.py
+.\.venv\Scripts\python.exe scripts/validate_command_registration.py
+```
+
+Expected: clean checkout at the reviewed revision, `S3A pure imports OK`, 77 passing tests with
+production operational logs unchanged, registration 36 top-level/100 grouped and no drift.
+The suite exercises interim 11-10 then 12-10, final 13-10, authorized replacement 14-10,
+B0 attribution, exact Decimal arithmetic, semantic report states, independent aggregates and
+the new out-of-order-ID cases. The full nine-file regression command additionally includes
+`tests/test_kvk_new_source_schema.py`, `tests/test_kvk_new_source_metadata.py`,
+`tests/test_kvk_new_source_parser.py`, and `tests/test_kvk_new_source_digest.py` (260 passed),
+covering S1 semantic re-export deduplication as well.
+
+On a separately prepared bot-machine test checkout use `venv` instead of `.venv`. These steps
+do not fetch, switch the running checkout, restart or deploy. Do not use real workbook imports,
+SQL/config writes, `/kvk_admin test_embed` or player-facing stats to claim S3A validation: those
+existing consumers are not wired to this new calculation layer. After a separately authorized
+main-branch deployment, startup/unchanged-command observations are general regression evidence
+only. Full application pytest and broad app smoke remain skipped for this pure S3A boundary;
+no live/runtime integration coverage is claimed. SQL remains unchanged and needs no deployment
+for these tests. Final exact-target security and publication evidence follows after review.
+
+#### PR #573 final review evidence
+
+Private production Changes scan `4850b085-cee4-4235-a309-a1babe95d065`, Deep off, reviewed
+`8cc62c30bca6e2f79f6066f38a6b8ac169bef2f2..1b770e4e420f0980fa5cd3b0b254224586c37f0a`.
+Sealed/read back `2026-09-10T11:07:07.090880Z`: seven Python files reviewed, fifteen Markdown
+entries inspected (including both sides of four renames), zero findings/deferred candidates,
+complete coverage. Snapshot:
+`codex-security-snapshot/v1:sha256:c6ca431c55abec98e7b9fa57548c3980cbb8bbce998e0189bdd22e46a0fe1212`.
+Private report directory ends in
+`1b770e4e420f0980fa5cd3b0b254224586c37f0a_20260910T110322Z_1umom97a/report.md`
+under the existing private Codex Security scan root. Goal measured 61,088 tokens/3m07s;
+workbench total 968,238 includes repeated/cached input. The subsequent Programme Pack table
+correction in `c55602fb` and this evidence appendix are documentation-only security skips.
+
+Separate mirror Changes scan `91ea65a7-532a-45e4-9291-fa7c6943a0c4`, Deep off, reviewed the
+two-Python/ten-Markdown follow-up against `dd746eeb898c1961a65addc93be7d2bdff5f58c0`.
+Sealed/read back `2026-09-10T11:10:41.413166Z`: both Python files reviewed, all ten Markdown
+diffs inspected with documentation-only skip, zero findings/deferred candidates, complete coverage.
+Snapshot: `codex-security-snapshot/v1:sha256:c78263ae41850fc748caabd6834c987b92456cf7b29f67fbd45641d714e7ea33`.
+Private report directory ends in
+`dd746eeb898c1961a65addc93be7d2bdff5f58c0_20260910T110801Z_2xy7m8eg/report.md`.
+Goal measured 18,386 tokens/2m08s; workbench total 885,750 includes repeated/cached input.
+Both scans passed preflight 3/3, Daybreak Blue advisory and independent architecture review.
+Protected reports remain accessible through their completed-scan API identities.
+
+Mirror execution additionally passed all **260 tests under log-noise validation** with operational
+logs unchanged. Pure import smoke passed; registration remained 36/100 without drift; all 123
+relative documentation links resolved. All twelve follow-up file contents matched the production
+branch after Git line normalization. Exact staged hooks, including secret detection and Pyright,
+passed. The complete original fifteen-document manifest remains carried in both PRs. SQL stayed
+clean with a separate no-change skip; no production SQL or real data was used. No new helper,
+runtime wiring, persistence, config, dependency, command or deferred optimisation was introduced.
+Review-fix commit/push and thread replies/resolution were authorized by the operator's PR #573
+request; merge, deployment, activation and S3B remain outside that authorization.

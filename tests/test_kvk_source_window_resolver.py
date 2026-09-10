@@ -28,6 +28,41 @@ def request(old, new):
     )
 
 
+def test_exact_final_uses_event_time_when_end_id_is_lower_than_start():
+    b0, start, _, end = worked_calculation_inputs()
+    end = replace(end, logical_scan_id=9)
+    config = calculation_config(end_scan_id=9)
+    selected = resolve_window(config, (end, start))
+    assert selected.start == start and selected.end == end
+    assert selected.player_state == StreamState.FINAL
+    assert calculate_period(selected, b0).players[0].metric("dkp").value == 1800
+
+
+@pytest.mark.parametrize("day", [4, 5])
+def test_lower_end_id_does_not_bypass_event_time_validation(day):
+    _, start, _, _ = worked_calculation_inputs()
+    config = calculation_config(end_scan_id=9)
+    with pytest.raises(ValueError, match="temporal window"):
+        resolve_window(config, (start, calculation_event(9, day=day)))
+
+
+def test_authorized_end_update_can_select_lower_id_with_later_event_time():
+    _, start, _, end = worked_calculation_inputs()
+    old = calculation_config()
+    previous = resolve_window(old, (start, end))
+    desired = replace(old, version_id="config-lower-end", end_scan_id=9)
+    replacement = calculation_event(9, day=8)
+    selected = resolve_window(
+        desired,
+        (start, end, replacement),
+        previous=previous,
+        endpoint_change=request(old, desired),
+    )
+    assert selected.end == replacement
+    assert selected.player_state == StreamState.CORRECTED_FINAL
+    assert previous.end == end and previous.player_state == StreamState.FINAL
+
+
 def test_t68_interim_11_then_12_selected_by_event_time_not_larger_id():
     b0, start, middle, end = worked_calculation_inputs()
     config = calculation_config()

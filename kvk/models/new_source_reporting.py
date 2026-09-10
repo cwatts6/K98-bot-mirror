@@ -165,9 +165,7 @@ class WindowConfig:
         for scan in (self.start_scan_id, self.end_scan_id):
             if scan is not None and (type(scan) is not int or not 1 <= scan <= INT_MAX):
                 raise ValueError("Invalid configured scan ID.")
-        if self.start_scan_id is not None and self.end_scan_id is not None:
-            if self.end_scan_id < self.start_scan_id:
-                raise ValueError("Configured end precedes start slot.")
+        # Logical IDs identify bindings; selected event UTC establishes endpoint order.
         if self.closes_at_utc is not None:
             require_utc(self.closes_at_utc)
         entries = self.mapping.entries

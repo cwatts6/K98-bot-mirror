@@ -1,7 +1,9 @@
 # Codex Chat Starter — KVK Source Migration S3A Player Window Calculations
 
-Refreshed 2026-09-10 after S2B merge and documentation closeout. **Not executed; S3A G3 pending.**
-Use this only when approving this slice; G2 alone does not approve implementation.
+Historical S3A approval prompt: G3 was granted and S3A implementation is complete.
+Mirror #266 and private bot #573 remain open as verified 2026-09-10. Do not execute this
+starter again. Complete review/acceptance and merge gates, then obtain separate S3B G3 and
+an approved disposable SQL integration target. This retained prompt grants no successor action.
 
 ---
 

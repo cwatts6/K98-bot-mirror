@@ -14,10 +14,14 @@ assertions and 96 disposable SQL rejection cases, with twelve-table rollback ver
 **S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
 merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
 rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
-**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+**S3A is implemented and validated; review/merge closeout is pending.** Mirror PR #266 and
+private bot PR #573 were both verified open on 2026-09-10; neither is recorded as merged.
+Do not restart S3A implementation. Complete S3A review/acceptance and repository merge gates,
+then request separate **S3B Acceptance and Atomic Publication G3** with its approved disposable
+SQL integration target. S3B is not authorized by S3A delivery or by this handoff.
 The operator confirms local pulls completed; no changes were pulled to the bot machine.
 Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](docs/reference/local_sql_development.md) records the reusable K98DEV
+Do not repeat S1/S2A/S2B/S3A as unstarted slices. The [local SQL development reference](docs/reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
 handoff. Earlier pending/preparation/review-in-progress wording below is historical.
