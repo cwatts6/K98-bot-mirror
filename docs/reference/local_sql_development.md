@@ -79,3 +79,10 @@ in a fresh test database does not reopen S2A implementation or automatically exe
 Keep migrations/fixtures in their owning slice's exact SQL manifest. Recheck migration date and
 sequence at authoring time; the proposal in a prepared task pack is not an allocated slot.
 Production deployment, real imports/exports, Discord actions and source activation remain separate.
+
+## S2B repository closeout — 2026-09-10
+
+S2B SQL #79, mirror #265 and private bot #572 are merged. Both local repositories were pulled
+by the operator; the bot machine was not updated. Repository merge is not production SQL
+execution. Preserve both evidence databases. S3A uses pure offline tests and requires no SQL
+connection, database rebuild, bot restart or source activation.

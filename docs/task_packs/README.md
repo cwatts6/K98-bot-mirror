@@ -1,6 +1,6 @@
 # Task Packs
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
@@ -32,7 +36,7 @@ reconciles all 22 pre-assessment top-level files into six actionable groups. Ope
 order: **KVK Source Migration, Private Inventory Import and Support Sharing, then Reliability
 WS1**. KVK affects all players three times daily; inventory is optional and used by a handful.
 The operator plans warnings/advice to defer uploads; exposure remains technically possible and
-the security finding stays open. Next task: KVK Phase 1 read-only audit. No runtime or live action
+the security finding stays open. The original next task was the now-completed KVK Phase 1 audit; current next slice is S3A. No runtime or live action
 is authorized by the priority decision; supplied programme packs remain unchanged.
 
 | Classification | Files / programme | Status |
@@ -41,7 +45,7 @@ is authorized by the priority decision; supplied programme packs remain unchange
 | Programme charter / selection pending | [Bot Operational Reliability](Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) | Proposed WS1–WS6 deliverables; WS1 is third after KVK and inventory; any proved KVK prerequisite exception returns for approval. Implementation unapproved. |
 | Completed design / implementation unapproved | [Reliability WS1 ProcConfig task pack](Codex%20Task%20Pack%20-%20Bot%20Operational%20Reliability%20Workstream%201%20ProcConfig%20Import%20Reliability%20and%20Truthful%20Completion%20Reporting.md), matching starter and [design/manifests](Bot%20Operational%20Reliability%20Workstream%201%20-%20Design%20and%20Manifests.md) | Formerly Phase 2L. First designed workstream, not preselected ahead of incoming programmes. |
 | Compatibility redirects | Former Phase 2L pack/starter paths | Link to canonical Reliability WS1; no active embed Phase 2L execution. |
-| Assessed programme / urgent audit recommended | [KVK Source Migration](KVK%20Source%20Migration%20-%20Programme%20Pack.md), Phase 1 pack/starter and decision/evidence register | Operator confirms needed now during KVK. Recommend Phase 1 audit; broader migration and missing-import symptoms must be reconciled. No full domain audit or implementation performed here. |
+| Active implementation programme | [KVK Source Migration](KVK%20Source%20Migration%20-%20Programme%20Pack.md), Phase 1 pack/starter and decision/evidence register | S1/S2A/S2B complete and merged; S3A scope/G3 next. Completed packs are archived; source remains inactive. |
 | Assessed security programme / response recommended | [Private Inventory Import and Support Sharing](Private%20Inventory%20Import%20and%20Support%20Sharing%20-%20Programme%20Pack.md), Phase 1 pack/starter | Recent exposure reported; static triage completed privately. Operator selects inventory second after KVK and plans voluntary upload-deferral advice; this does not technically close exposure. Dependency foundation alone is not remediation. |
 | Active evidence collection | Task C Slice 14 task pack and chat starter | Collect naturally occurring fallback evidence through the `2026-09-15` target and at least 30 completed batches before the formal `SUMMARY_PROC` audit |
 | Recently delivered archive | Pinned Calendar Tracker Atomic Persistence task pack and chat starter | Completed through mirror PR #250 and production PR #557; all validation and production restart smoke passed on `2026-09-01` |
@@ -952,15 +956,15 @@ the EndScanID clarification and scenarios T68–T70. This supersedes earlier G2-
 statements as current status; their historical evidence remains intact. Phase 2B planning is
 delivered in the [implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md)
 and [planning evidence log](../reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md).
-Ten bounded task packs and matching starters are prepared. **G3 remains pending per slice; S1 is
-the recommended first approval.** No implementation, SQL change, live action, PR or deployment
-is authorized by this delivery. S6 prepares readiness evidence and stops at separate G4 approval.
+The table below is the current slice index: S1/S2A/S2B are complete and archived;
+**S3A is next and requires its own G3 approval.** Later slices remain gated. The original
+Phase 2B planning delivery did not authorize implementation or deployment. S6 prepares readiness evidence and stops at separate G4 approval.
 
 | Slice | Task pack | Approval starter |
 |---|---|---|
 | S1 | [Offline Source Validation](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
-| S2A | [SQL Observation Facts](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
-| S2B | [SQL Publication State](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
+| S2A | [SQL Observation Facts](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
+| S2B | [SQL Publication State](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
 | S3A | [Player Window Calculations](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
 | S3B | [Acceptance and Atomic Publication](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) |
 | S4A | [Shared Reports and Cards](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |

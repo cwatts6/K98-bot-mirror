@@ -1,6 +1,6 @@
 # KVK Source Migration — Decision and Evidence Register
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
@@ -250,3 +254,22 @@ and [planning evidence log](phase_2b_evidence_and_validation_log.md).
 Ten bounded task packs and matching starters are prepared. **G3 remains pending per slice; S1 is
 the recommended first approval.** No implementation, SQL change, live action, PR or deployment
 is authorized by this delivery. S6 prepares readiness evidence and stops at separate G4 approval.
+
+### S2B merged closeout and S3A handoff — 2026-09-10
+
+GitHub verified SQL #79 merged at 09:42:44 UTC as
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`; mirror #265 at 09:42:55 UTC as
+`a65f01ca4017f5c5e9bd7a87510fa2386c9414b8`; private bot #572 at 09:43:17 UTC as
+`8cc62c30bca6e2f79f6066f38a6b8ac169bef2f2`. The operator confirms all reviews passed.
+After the operator's local pulls, SQL main is at its merge and bot mirror main is
+`5014266267acdff277d501d72fd12a1348ca864c`; the bot tree matches the accepted mirror merge.
+Both working trees were clean and local main hashes matched origin/main before this doc update.
+These are observed handoff anchors, not instructions to reset future checkouts.
+
+The operator explicitly confirms no changes have been pulled to the bot machine. No production
+SQL deployment, runtime rollout/restart or activation is established by these repository merges.
+Both disposable evidence databases remain retained. S2B is closed; no predecessor pack rerun.
+S2A/S2B task packs and starters are archived as evidence; active architecture, plan, scenario
+and local SQL references remain in place. S3A is ready for scope/G3 in a new chat, not already
+authorized or implemented. Its future PR must include this documentation closeout and archive
+moves, including any still-untracked documents, after inspecting the exact pending manifest.

@@ -1,5 +1,9 @@
 # Codex Chat Starter — KVK Source Migration S2B SQL Publication State
 
+**Archived completed slice — 2026-09-10.** S2A/S2B are accepted and merged.
+All earlier approval requests, pending states and next-S2 instructions below are dated history.
+Next is the active S3A pack with separate G3 approval; do not execute this archived starter/pack.
+
 **Historical S2B starter: G3 approved, implementation and local validation completed.**
 The operator authorized separate SQL and mirror PRs for review on 2026-09-10.
 Do not rerun this starter or execute successor slices. The requests below are retained history.

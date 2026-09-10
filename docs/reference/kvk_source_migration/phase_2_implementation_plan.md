@@ -1,6 +1,6 @@
 # KVK Source Migration — Phase 2B implementation plan
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
@@ -20,7 +24,7 @@ handoff. Earlier pending/preparation/review-in-progress wording below is histori
 
 2026-09-09. **G2 approved by Chris Watts: “G2 approved, please proceed”.** This approves
 the architecture including the confirmed EndScanID workflow. It authorizes this planning pass,
-not implementation. **S1/S2A subsequently received G3 and were accepted; remaining slices require separate G3.** Earlier G2-pending and
+not implementation. **S1/S2A/S2B subsequently received G3 and were accepted; remaining slices require separate G3.** Earlier G2-pending and
 no-pack-authoring statements are historical and superseded only to this extent.
 
 Authority: [approved architecture](phase_2_contract_and_architecture.md), including its EndScanID
@@ -40,7 +44,7 @@ changes reviewable; approved semantics are unchanged. No cross-repository combin
 |---|---|---|---|
 | S1 | Offline schema, metadata, parser and semantic digest | G2 | Accepted and merged; see current status above |
 | S2A | SQL observation/artifact/roster/report facts and constraints | S1 contract accepted | Complete, accepted and merged; disposable SQL validation passed |
-| S2B | SQL config/publication/routing/delivery state and constraints | S2A | Implemented and disposable-SQL validated; operator-authorized PR review |
+| S2B | SQL config/publication/routing/delivery state and constraints | S2A | Complete, accepted and merged; 265 static / 144 disposable rejections passed |
 | S3A | Pure player/window calculations and report DTOs | S1 | Can follow S1 independently of SQL deployment |
 | S3B | DAL acceptance, CAS publication and config-request services | S2A/S2B/S3A | Disposable SQL integration; no live activation |
 | S4A | Shared report/card/diagnostic adapters | S3B | V2 consumers; new routing remains disabled |
@@ -181,6 +185,9 @@ selection DAL verifies manifest hash/counts in the same lock-protected transacti
 
 Config/raw-only field state may use bounded JSON text with ISJSON checks if database compatibility
 supports the existing SQL JSON conventions; numeric serving fields and keys remain typed columns.
+S2B final/corrected-final publication requires terminal components; `final_unavailable` requires
+an explicit nonempty reason. Result eligibility also binds the member's `b0_kingdom`; S3A/S3B
+must preserve these accepted storage contracts.
 Choose dedicated raw/unit columns for the eight aggregate metrics, not an opaque FLOAT payload.
 Counter/status field names map one-to-one from S1 schema; physical snake_case names remain fixed
 in the S2 snapshots and S3 DAL. Do not expand legacy Windowed to fit them.
@@ -191,9 +198,9 @@ global KS4 index. Test same-season FK rejection and concurrent allocation using 
 
 ### Migration naming and rollback
 
-Proposed authoring paths are `migrations/20260909_001_kvk_source_observation_facts.sql` (S2A)
-and `migrations/20260909_002_kvk_source_publication_state.sql` (S2B). No files exist or names
-are globally reserved by this plan. SQL convention uses the **actual creation date** and next
+Merged migration paths are `migrations/20260909_001_kvk_source_observation_facts.sql` (S2A)
+and `migrations/20260910_001_kvk_source_publication_state.sql` (S2B). The original provisional
+S2B date/sequence was corrected before authoring; merged filenames must remain unchanged. SQL convention uses the **actual creation date** and next
 available sequence: if implemented later or occupied, update that one manifest entry before
 authoring and retain the final name permanently after merge. This controlled date allocation is
 not permission to change object scope. Both use RequiresBackup Yes, RiskLevel Medium,
@@ -348,8 +355,8 @@ evidence are separate. **Stop for G3 review; do not execute a task pack merely b
 | Slice | Task pack | Approval starter |
 |---|---|---|
 | S1 | [Offline Source Validation](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md) |
-| S2A | [SQL Observation Facts](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
-| S2B | [SQL Publication State](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
+| S2A | [SQL Observation Facts](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md) |
+| S2B | [SQL Publication State](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
 | S3A | [Player Window Calculations](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
 | S3B | [Acceptance and Atomic Publication](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) |
 | S4A | [Shared Reports and Cards](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |

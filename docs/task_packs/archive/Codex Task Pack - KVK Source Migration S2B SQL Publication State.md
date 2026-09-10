@@ -1,6 +1,10 @@
 # Codex Task Pack — KVK Source Migration S2B SQL Publication State
 
-## Current review handoff — 2026-09-10
+**Archived completed slice — 2026-09-10.** S2A/S2B are accepted and merged.
+All earlier approval requests, pending states and next-S2 instructions below are dated history.
+Next is the active S3A pack with separate G3 approval; do not execute this archived starter/pack.
+
+## Historical review handoff — 2026-09-10
 
 S2B G3 was explicitly approved. Implementation and authorized local validation completed;
 SQL [PR #79](https://github.com/cwatts6/K98-bot-SQL-Server/pull/79) and mirror
@@ -19,7 +23,7 @@ S2A is accepted and merged: SQL PR #78 at `845a25fe66b1d2365fb38720390b4dadf50ba
 mirror PR #264 at `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec`. Final review fixes passed
 401 static assertions and 96 disposable rejection cases with twelve-table rollback. Read the
 [S2A delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2A%20SQL%20Observation%20Facts.md)
-and [local SQL development reference](../reference/local_sql_development.md).
+and [local SQL development reference](../../reference/local_sql_development.md).
 
 Observed local clean-main anchors before this documentation refresh: bot
 `58fc307935fdf1cfecdde839670ce5439f11baac` (tree matches accepted mirror merge), SQL
@@ -48,9 +52,9 @@ unless an explicitly explained date/sequence correction is required. No producti
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -293,7 +297,7 @@ Exactly seventeen SQL paths, relative to `C:/K98-bot-SQL-Server`:
 | Modify | `sql_schema/KVK.SourceAggregateReport.Table.sql` |
 
 Bot task-authored change: append-only evidence in this exact pack,
-`docs/task_packs/Codex Task Pack - KVK Source Migration S2B SQL Publication State.md`.
+`docs/task_packs/archive/Codex Task Pack - KVK Source Migration S2B SQL Publication State.md`.
 The controlled migration date allocation above is the only manifest-name change.
 
 #### 3. New Files
@@ -545,3 +549,22 @@ seven-file coverage supersede that historical checkpoint note. Private report:
 Measured goal usage: 63,952 tokens, 216 seconds. This supplements the original S2B Changes scan.
 The mirror follow-up is a precise three-Markdown-file security skip: status, plan alignment and
 validation evidence only, no executable/runtime/configuration/permission changes.
+
+### S2B merged closeout and S3A handoff — 2026-09-10
+
+GitHub verified SQL #79 merged at 09:42:44 UTC as
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`; mirror #265 at 09:42:55 UTC as
+`a65f01ca4017f5c5e9bd7a87510fa2386c9414b8`; private bot #572 at 09:43:17 UTC as
+`8cc62c30bca6e2f79f6066f38a6b8ac169bef2f2`. The operator confirms all reviews passed.
+After the operator's local pulls, SQL main is at its merge and bot mirror main is
+`5014266267acdff277d501d72fd12a1348ca864c`; the bot tree matches the accepted mirror merge.
+Both working trees were clean and local main hashes matched origin/main before this doc update.
+These are observed handoff anchors, not instructions to reset future checkouts.
+
+The operator explicitly confirms no changes have been pulled to the bot machine. No production
+SQL deployment, runtime rollout/restart or activation is established by these repository merges.
+Both disposable evidence databases remain retained. S2B is closed; no predecessor pack rerun.
+S2A/S2B task packs and starters are archived as evidence; active architecture, plan, scenario
+and local SQL references remain in place. S3A is ready for scope/G3 in a new chat, not already
+authorized or implemented. Its future PR must include this documentation closeout and archive
+moves, including any still-untracked documents, after inspecting the exact pending manifest.

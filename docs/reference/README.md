@@ -1,6 +1,6 @@
 # K98 Bot Reference Docs
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this

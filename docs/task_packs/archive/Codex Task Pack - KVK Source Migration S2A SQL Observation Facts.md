@@ -1,12 +1,16 @@
 # Codex Task Pack — KVK Source Migration S2A SQL Observation Facts
 
+**Archived completed slice — 2026-09-10.** S2A/S2B are accepted and merged.
+All earlier approval requests, pending states and next-S2 instructions below are dated history.
+Next is the active S3A pack with separate G3 approval; do not execute this archived starter/pack.
+
 ## Current status — S2A complete, accepted and merged
 
 SQL PR #78 and mirror PR #264 merged on 2026-09-10. The final review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases with twelve-table rollback. S2B has since
 completed implementation and local validation and is authorized for separate PR review;
 production SQL deployment and source activation remain separate.
-See the [local SQL development reference](../reference/local_sql_development.md) for K98DEV
+See the [local SQL development reference](../../reference/local_sql_development.md) for K98DEV
 setup and per-slice disposable-target authorization. Earlier preparation/delivery entries below
 are dated history and do not supersede this closeout.
 
@@ -14,7 +18,7 @@ are dated history and do not supersede this closeout.
 
 **Prepared for S2A approval only; G3 pending.** S1 typed schemas/digest are accepted and the
 operator's bot-machine smoke passed 200 tests; restart/startup succeeded. Read the
-[archived S1 delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md).
+[archived S1 delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S1%20Offline%20Source%20Validation.md).
 The operator will merge PRs #263/#570 and perform final verification before the next handoff.
 At S2A execution, verify the actual accepted/merged predecessor revision and both repository
 branches, HEADs, remotes and status; do not reuse the historical main hashes as current proof.
@@ -48,9 +52,9 @@ S2A; S2B needs its own G3. No automatic successor, PR, deployment, restart or ac
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.

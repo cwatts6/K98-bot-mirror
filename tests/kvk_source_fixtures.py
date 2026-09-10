@@ -117,3 +117,121 @@ def rewrite_zip(content, transform=None, *, additions=(), compression=ZIP_DEFLAT
             for name, data in additions:
                 new.writestr(name, data)
         return output.getvalue()
+
+
+def calculation_event(scan_id=10, *, rows=None, day=5, periods=("fight:pass4", "overall")):
+    """S3A revision-pinned synthetic observation, using the accepted S1 parser."""
+    from dataclasses import replace
+
+    from kvk.models.new_source_reporting import ObservationInput
+    from kvk.services.new_source_parser import parse_player_workbook
+
+    meta = metadata()
+    meta = replace(
+        meta,
+        candidate=replace(
+            meta.candidate, scan_start_utc=datetime(2026, 9, day, 15, 26, tzinfo=UTC)
+        ),
+    )
+    prepared = parse_player_workbook(player_bytes(rows), meta)
+    return ObservationInput(
+        scan_id, f"observation-{scan_id}", f"revision-{scan_id}", prepared, periods
+    )
+
+
+def calculation_config(**changes):
+    """10/20/40 are synthetic coefficients, never production configuration evidence."""
+    from dataclasses import replace
+
+    from kvk.models.new_source_reporting import FrozenWeights, PeriodKind, WindowConfig
+
+    return replace(
+        WindowConfig(
+            "config-1",
+            16,
+            "period-pass4",
+            "fight:pass4",
+            PeriodKind.FIGHT,
+            "Pass 4",
+            10,
+            13,
+            "roster-1",
+            "revision-1",
+            "map-1",
+            MAPPING,
+            FrozenWeights("weights-1", "10", "20", "40", datetime(2026, 9, 1, tzinfo=UTC)),
+        ),
+        **changes,
+    )
+
+
+def worked_calculation_inputs():
+    """T21-T30: four B0 members, one outsider, different endpoint coverage."""
+    b0 = calculation_event(
+        1,
+        day=1,
+        rows=[
+            player_row(1001, Power=100_000_000),
+            player_row(1002),
+            player_row(1003),
+            player_row(1004),
+        ],
+    )
+    start = calculation_event(
+        10,
+        rows=[
+            player_row(
+                1001,
+                **{
+                    "T4 Kills": 100,
+                    "T5 Kills": 200,
+                    "Dead": 50,
+                    "Total Kill Points": 6000,
+                    "Power": 100_000_000,
+                },
+            ),
+            player_row(1002),
+            player_row(1004),
+            player_row(9999),
+        ],
+    )
+    middle = calculation_event(
+        11,
+        day=6,
+        rows=[
+            player_row(
+                1001,
+                **{
+                    "T4 Kills": 120,
+                    "T5 Kills": 230,
+                    "Dead": 55,
+                    "Total Kill Points": 6850,
+                    "Power": 99_000_000,
+                },
+            ),
+            player_row(1002),
+            player_row(1003),
+            player_row(9999),
+        ],
+    )
+    end = calculation_event(
+        13,
+        day=7,
+        rows=[
+            player_row(
+                1001,
+                **{
+                    "T4 Kills": 140,
+                    "T5 Kills": 250,
+                    "Dead": 60,
+                    "Total Kill Points": 7500,
+                    "Power": 98_000_000,
+                },
+            ),
+            player_row(1002),
+            player_row(1003),
+            player_row(1004),
+            player_row(9999, **{"T4 Kills": 999_999}),
+        ],
+    )
+    return b0, start, middle, end

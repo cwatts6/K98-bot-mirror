@@ -1,6 +1,6 @@
 # KVK Source Migration — Programme Pack
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
@@ -30,10 +34,10 @@ handoff. Earlier pending/preparation/review-in-progress wording below is histori
 | Bot remote supplied by operator | `cwatts6/K98-bot-mirror` |
 | SQL working copy | `C:\K98-bot-SQL-Server` |
 | SQL remote supplied by operator | `cwatts6/K98-bot-SQL-Server` |
-| Current stage | S2A merged; S2B implemented, validated and authorized for PR review |
+| Current stage | S1/S2A/S2B complete and merged; S3A next, G3 pending |
 | One-pass implementation approved | S1/S2A/S2B delivered; no successor approval |
 | Runtime, SQL, configuration or deployment changes approved | S2B SQL and named disposable validation completed; no production deployment or activation |
-| Current permitted output | Separate S2B SQL and mirror PRs, ready for review |
+| Current permitted output | S2B closeout and S3A scope/G3 handoff; no S3A implementation yet |
 
 The operator reports both working copies and their Git repositories are synced. Codex must verify their actual branches, commit IDs and working-tree state rather than assume a branch name or deployed version. This pack was prepared from the supplied discussion, source assessment and task template; it does **not** certify that the current code or production SQL has already been audited.
 

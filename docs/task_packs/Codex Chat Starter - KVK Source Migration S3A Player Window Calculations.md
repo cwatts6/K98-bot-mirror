@@ -1,6 +1,6 @@
 # Codex Chat Starter — KVK Source Migration S3A Player Window Calculations
 
-Prepared 2026-09-09 during Phase 2B. **Not executed; S3A G3 pending.**
+Refreshed 2026-09-10 after S2B merge and documentation closeout. **Not executed; S3A G3 pending.**
 Use this only when approving this slice; G2 alone does not approve implementation.
 
 ---
@@ -10,7 +10,12 @@ I approve G3 for **KVK Source Migration S3A only**, following
 Implement and validate its exact boundary, then stop for review.
 Read current instructions/core references, approved architecture including EndScanID, Phase 2B plan
 and pack. Verify both repos branches/HEADs/remotes/status; preserve all existing work.
-Prerequisites: S1 accepted and S3A G3. No SQL deployment for pure tests.
+Prerequisites: S1 accepted and S3A G3. S2A/S2B are complete and merged; verify S2B SQL #79,
+mirror #265 and private bot #572 plus the archived final evidence. Local repository pulls are
+complete; the bot machine has not been updated. No SQL deployment or connection for pure tests.
+Preserve all pending S2B documentation updates and archive moves, including untracked Markdown.
+When the S3A PR is separately authorized, include the full carried-forward documentation
+manifest in that PR, with both sides of renames and repaired links; do not omit or discard it.
 Confirm evidence before edits; do not execute predecessor or later packs automatically.
 
 Preserve B0 eligibility, exact endpoints, UTC scan start and semantic re-export deduplication.

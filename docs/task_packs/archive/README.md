@@ -1,6 +1,6 @@
 # Archived Task Packs
 
-## Current KVK delivery status - 2026-09-09
+## Current KVK delivery status - 2026-09-10
 
 **S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
 200-test smoke and restart/startup evidence remain historical S1 results.
@@ -11,8 +11,12 @@ merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
 `9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
 assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
 
-**S2B is implemented and locally validated; the operator authorized separate SQL and mirror
-PRs for review on 2026-09-10.** Next is S2B PR review; no successor slice is authorized.
+**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
+merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
+rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
+**Next: S3A Player Window Calculations in a new chat, with separate G3 approval.**
+The operator confirms local pulls completed; no changes were pulled to the bot machine.
+Repository merges do not establish production SQL deployment or source activation.
 Do not repeat S1/S2A as unstarted slices. The [local SQL development reference](../../reference/local_sql_development.md) records the reusable K98DEV
 instance, retained S2A evidence database and per-slice target authorization requirements.
 No production SQL deployment, bot-machine update/restart or source activation is part of this
@@ -432,3 +436,11 @@ The separate Phase 2F next-natural-public-save observation remains pending unles
 ## Phase 2J — accepted delivery, 2026-09-09
 
 Archived [Codex Task Pack - Discord Embed Payload Safety Phase 2J Ops Diagnostic Convergence.md](Codex%20Task%20Pack%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md) and [chat starter](Codex%20Chat%20Starter%20-%20Discord%20Embed%20Payload%20Safety%20Phase%202J%20Ops%20Diagnostic%20Convergence.md). Operator smoke passed; #261/#568 merges and final main/deployed verification remain pending. The original embed audit now includes a Phase 1–2J disposition reconciliation. Phase 2K audit/design pack is active one directory above.
+
+## KVK S2 closeout — 2026-09-10
+
+S2A and S2B task packs and matching chat starters are archived here after accepted merges.
+S2B SQL #79, mirror #265 and private bot #572 are merged; no bot-machine update is claimed.
+Retain all delivery, review and disposable-SQL evidence. The active S3A pack/starter in the
+parent folder owns the next separately approved implementation; no archived starter is runnable
+as a new slice. Architecture, scenarios and local SQL guidance remain active references.
