@@ -760,3 +760,59 @@ These are named programme acceptance checks, not unspecified optimisation debt:
 - **S6-CAP01: open before activation** - provisioned current/staging/retained/quarantined capacity and bounded-receipt exhaustion handling; no silent evidence truncation or reuse of protected history.
 
 The S5B/S6 packs and starters now require these IDs explicitly. S6 G3 prepares reviewable plans only; operational execution still needs separate G4/exact-target approval. Required runtime/schema changes discovered by rehearsal need a bounded approved manifest, not automatic expansion of S6.
+
+
+## S4B mirror PR 269 review fixes - 2026-09-11
+
+### 1. Summary
+
+Operator authorized checking, fixing, responding to and resolving review comments on mirror PR #269. The multipart terminal-rejection retry defect is fixed; the binder test now imports its required names locally. No later slice is implemented.
+
+### 2. File Manifest
+
+This continuation changes exactly `kvk/services/new_source_export_service.py`, `tests/test_kvk_source_delivery.py`, `tests/test_kvk_export_service.py` and this task pack. The complete original PR manifest, seventeen-document/nineteen-physical-path handoff and both S4A archive moves remain preserved.
+
+### 3. New Files
+
+No new repository files. Private security artifacts remain outside Git.
+
+### 4. Modified Files
+
+The adapter validates all existing generation bindings for canonical unique part numbers and an exact manifest, preserves those bindings, and fills only missing parts from blank or safely released slots. Partial sets already built or current require reconciliation. Retained, current, referenced and quarantined destinations remain protected; unknown mutations still block retries. A fresh client can resume terminal 400/403/429 binding rejection without overwriting prior part identity. Strict complete-part, directory and full data verification still precede publication. The two binder constants are imported alongside the local V2 binder import.
+
+### 5. SQL Changes
+
+None. Authoritative SQL remains clean at `44afa315dd6cbfe9fec101f2a39a62e534f5b583`; SourceDelivery receipt/state contracts were inspected. No database connection or live provider operation occurred.
+
+### 6. Helpers Reused
+
+Existing partition_manifest, binding/ACL/private/reuse checks and strict complete-generation verification. Tests reuse GoogleMemoryAPI, FakeRepository and extracted multipart fixture setup from the existing split-parts test.
+
+### 7. Refactor Findings
+
+The in-scope retry defect was fixed and the import-maintainability comment addressed. No unrelated runtime refactor or new deferred optimisation. Two incidental punctuation encoding changes in existing test comments were restored before commit; AST equivalence confirmed no behavioral delta.
+
+### 8. Test Plan and Actual Outcomes
+
+- Twelve multipart regression/negative cases passed in 2.32s: blank and retired-slot retries for 400/403/429, recreated client with reordered registration, exact manifest/current pointer and deduplication, conflicting binding evidence, and uncertain response blocking.
+- Exact four-file pack suite: **131 passed in 8.07s**; operational logs unchanged.
+- Full suite: **3,921 passed, 34 skipped in 127.41s**; operational logs unchanged.
+- Imports passed; registration 36 primary / 100 grouped without drift or duplicates. Selector-required full/import/registration gates completed.
+- Architecture and security-routing validators passed; Black API passed with repository settings; final Git diff whitespace check passed. Staged hooks and documentation validation are required during packaging.
+- An initial retry fixture omitted the changed selection version from its snapshot and was corrected. An initial focused invocation named a nonexistent report test and collected no tests; the exact pack command above was then run successfully. Neither initial attempt is counted as a pass.
+
+### 9. Security Review Decision and Evidence
+
+Incremental Changes review **b60a799b-cf56-4db0-b634-70427a297431**, Deep off, completed and sealed on 2026-09-11 at 12:02:48 UTC with **zero findings**, covering the runtime fix and both changed test files. Base/head for the immutable working-tree snapshot: `235e8f60fb042803da055d10544fa7419eca1cb4`; snapshot digest `codex-security-snapshot/v1:sha256:e4d9cf32eef51765812f0ca34b87b03c2ef5883d794cd0566e39841e0c437773`. Existing whole-S4B review remains separate retained evidence. SQL has a separate no-change skip.
+
+The first draft submission incorrectly included server-owned coverage fields; validation rejected it and completion failed because scan-manifest.json did not exist. Following the operator's recovery request, the same running scan was repaired using accepted semantic fields, canonical artifacts were verified, and finalization/readback succeeded. This was a tooling/reporting failure, not a vulnerability finding. No replacement, standard or deep scan was started. Subsequent restoration of two test-comment punctuation sequences and this evidence appendix are nonexecutable changes with a documented incremental scan skip; test AST and runtime content are unchanged.
+
+### 10. Deployment Steps
+
+Push only the reviewed fix commit to the existing mirror PR #269, respond with concrete evidence and resolve the addressed inline threads. No private PR/push, merge, deployment, restart, Discord action or activation. Source routing remains disabled.
+
+### 11. Remaining Acceptance Work
+
+S4B-MP01 remains complete. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain explicitly open under their existing owners and approval gates; this fake-destination fix does not close live integration, process-interruption, shared-quota throughput or capacity acceptance.
+
+Final packaging: deferred-document validation and staged Ruff, Pyright, hardcoded-secret, merge-conflict, file-size and logging checks passed. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes; Black CLI retains its documented stall skip and direct API validation passed. Git diff whitespace checks passed.

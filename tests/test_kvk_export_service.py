@@ -5,7 +5,11 @@ import pytest
 
 
 def test_v2_binder_never_uses_positional_legacy_fallback():
-    from kvk.services.kvk_export_service import bind_kvk_export_sections_v2
+    from kvk.services.kvk_export_service import (
+        KVK_EXPORT_SECTION_NAMES,
+        KvkExportBindingError,
+        bind_kvk_export_sections_v2,
+    )
     from kvk.services.new_source_export_service import build_generation
     from tests.test_kvk_source_exports import export_input
 

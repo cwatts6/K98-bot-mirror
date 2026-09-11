@@ -1019,7 +1019,7 @@ def test_actual_dal_slot_reuse_requires_terminal_unselected_live_export(monkeypa
     ) == (case == "unreferenced")
 
 
-def test_registered_google_split_parts_verify_all_rows_and_directory(monkeypatch):
+def multipart_google_delivery(monkeypatch):
     from copy import deepcopy
     from dataclasses import replace
 
@@ -1036,6 +1036,13 @@ def test_registered_google_split_parts_verify_all_rows_and_directory(monkeypatch
         api.files_data[id]["id"] = id
         api.grids[id] = deepcopy(api.grids["fake-1"])
     args["transport"].registration = replace(args["transport"].registration, slot_file_ids=ids)
+    return args, repo, api, count
+
+
+def test_registered_google_split_parts_verify_all_rows_and_directory(monkeypatch):
+    from kvk.services.new_source_export_service import GoogleSheetsTransport
+
+    args, repo, api, count = multipart_google_delivery(monkeypatch)
     result = deliver_export(**args)
     assert result.delivery_state == "confirmed"
     assert (
@@ -1058,6 +1065,137 @@ def test_registered_google_split_parts_verify_all_rows_and_directory(monkeypatch
 
     with pytest.raises(DestinationSetupRequired):
         args["transport"].verify(args["destination"], args["generation"].key)
+
+
+@pytest.mark.parametrize("status", [400, 403, 429])
+@pytest.mark.parametrize("reuse", [False, True])
+def test_multipart_binding_rejection_resumes_after_client_restart(monkeypatch, status, reuse):
+    from copy import deepcopy
+
+    from kvk.services.new_source_export_service import GoogleSheetsTransport
+
+    args, repo, api, count = multipart_google_delivery(monkeypatch)
+    transport = args["transport"]
+    if reuse:
+        assert deliver_export(**args).delivery_state == "confirmed"
+        old_key = args["generation"].key
+        # The completed generation is now retired and unreferenced; other slots are retained.
+        api.values[("fake-index", "Sheet1")] = []
+        for file in api.files_data.values():
+            if file["id"] in transport.registration.slot_file_ids:
+                file["appProperties"].update(
+                    k98Destination=transport._identity(args["destination"], old_key),
+                    k98Role="generation",
+                    k98Generation=old_key,
+                    k98Retain=(
+                        "False" if file["id"] in {f"part-{i}" for i in range(count)} else "True"
+                    ),
+                )
+        selection, snapshot = export_input()
+        selection = replace(selection, selection_version=selection.selection_version + 1)
+        snapshot["envelope"]["selection"]["SelectionVersion"] = selection.selection_version
+        args["selection"] = repo.selected = selection
+        args["generation"] = compact_sheets_generation(build_generation(((selection, snapshot),)))
+        transport.reuse_guard = lambda destination, key: key == old_key
+    original = api.execute
+    rejected = []
+
+    def execute(path, method, payload, retries):
+        if (
+            path == "/files"
+            and method == "update"
+            and payload["body"].get("appProperties", {}).get("k98Part") == "1"
+            and not rejected
+        ):
+            rejected.append(payload["fileId"])
+            raise google_http_error(status)
+        return original(path, method, payload, retries)
+
+    api.execute = execute
+    outcome = deliver_export(**args)
+    assert outcome.delivery_state == "failed"
+    assert outcome.diagnostic["status"] == status
+    key = args["generation"].key
+    first = deepcopy(api.files_data["part-0"]["appProperties"])
+    assert first["k98Generation"] == key and first["k98Stage"] == "preparing"
+    assert api.files_data["part-1"]["appProperties"].get("k98Generation") != key
+    previous_fence = repo.fence
+    retry_start = len(api.calls)
+    # Reconstruct the client and reverse registration order: saved part identities win.
+    args["transport"] = GoogleSheetsTransport(
+        drive=api.client(),
+        sheets=api.client(),
+        registration=replace(
+            transport.registration,
+            slot_file_ids=tuple(reversed(transport.registration.slot_file_ids)),
+        ),
+        reuse_guard=transport.reuse_guard,
+        protected_file_ids={"config-workbook"},
+        rows_per_request=3,
+    )
+    assert deliver_export(**args).delivery_state == "confirmed"
+    assert repo.fence > previous_fence
+    assert args["transport"].verify(args["destination"], key) == args["generation"].manifest()
+    assert api.values[("fake-index", "Sheet1")][0][0] == key
+    assert args["transport"]._files(args["destination"], key)[0]["id"] == "part-0"
+    assert not any(
+        path == "/files"
+        and method == "update"
+        and payload["fileId"] == "part-0"
+        and "k98Generation" in payload["body"].get("appProperties", {})
+        for path, method, payload in api.calls[retry_start:]
+    )
+    assert api.files_data["part-0"]["appProperties"]["k98Previous"] == first["k98Previous"]
+    calls = len(api.calls)
+    assert deliver_export(**args).delivery_state == "confirmed"
+    assert len(api.calls) == calls
+
+
+@pytest.mark.parametrize("damage", ["duplicate", "out_of_range", "manifest", "built", "current"])
+def test_multipart_partial_binding_rejects_conflicting_evidence_before_mutation(
+    monkeypatch, damage
+):
+    args, _, api, count = multipart_google_delivery(monkeypatch)
+    transport, key = args["transport"], args["generation"].key
+    manifest = args["generation"].manifest()
+    transport._bind(args["destination"], key, api.files_data["part-0"], "generation", manifest)
+    props = api.files_data["part-0"]["appProperties"]
+    if damage == "duplicate":
+        transport._bind(args["destination"], key, api.files_data["part-1"], "generation", manifest)
+    elif damage == "out_of_range":
+        props["k98Part"] = str(count)
+    elif damage == "manifest":
+        api.files_data["part-0"]["description"] = "{}"
+    elif damage == "built":
+        props["k98Stage"] = "built"
+    else:
+        transport._bind(args["destination"], key, api.files_data["fake-index"], "index", {})
+        api.values[("fake-index", "Sheet1")] = [[key, "1", "part-0"]]
+    start = len(api.calls)
+    assert deliver_export(**args).delivery_state == "failed"
+    assert all(method in ("get", "batchGet") for _, method, _ in api.calls[start:])
+
+
+def test_multipart_unknown_binding_outcome_blocks_retry(monkeypatch):
+    args, _, api, _ = multipart_google_delivery(monkeypatch)
+    original = api.execute
+
+    def execute(path, method, payload, retries):
+        result = original(path, method, payload, retries)
+        if (
+            path == "/files"
+            and method == "update"
+            and payload["body"].get("appProperties", {}).get("k98Part") == "1"
+        ):
+            raise TimeoutError("binding response lost")
+        return result
+
+    api.execute = execute
+    assert deliver_export(**args).delivery_state == "uncertain"
+    calls = len(api.calls)
+    with pytest.raises(SourceConflict, match="reconciliation"):
+        deliver_export(**args)
+    assert len(api.calls) == calls
 
 
 def test_registered_google_replacement_never_deletes_last_sheet():

@@ -944,35 +944,51 @@ class GoogleSheetsTransport:
             raise SourceConflict("Malformed current index requires reconciliation.")
         matches = [f for f in files if f.get("appProperties", {}).get("k98Generation") == key]
         replacing = not matches
-        if matches:
-            chosen = self._files(destination, key)
-            if json.loads(chosen[0]["description"]) != manifest:
+        bound_parts = {}
+        for file in matches:
+            part = file["appProperties"].get("k98Part")
+            if part not in {str(i) for i in range(len(layout))} or part in bound_parts:
+                raise SourceConflict("Generation parts are incomplete or ambiguous.")
+            if json.loads(file["description"]) != manifest:
                 raise SourceConflict("Existing generation has another manifest.")
-        else:
-            chosen = [f for f in files if not f.get("appProperties")]
+            bound_parts[part] = file
+        missing = [str(i) for i in range(len(layout)) if str(i) not in bound_parts]
+        if (
+            matches
+            and missing
+            and (
+                any(f["appProperties"].get("k98Stage") != "preparing" for f in matches)
+                or (current and current[0][0] == key)
+            )
+        ):
+            raise SourceConflict("Incomplete established generation requires reconciliation.")
+        if missing:
+            available = [f for f in files if not f.get("appProperties")]
             for candidate in files:
-                if len(chosen) >= len(layout):
+                if len(available) >= len(missing):
                     break
                 props = candidate.get("appProperties", {})
                 previous = props.get("k98Generation")
                 if (
                     not previous
+                    or previous == key
                     or props.get("k98Retain") != "False"
                     or (current and (current[0][0] == previous or candidate["id"] in current[0][2]))
                 ):
                     continue
                 if self.reuse_guard(destination, previous) is True:
-                    chosen.append(candidate)
-            if len(chosen) < len(layout):
+                    available.append(candidate)
+            if len(available) < len(missing):
                 raise DestinationSetupRequired(
-                    f"No reusable slot set: need {len(layout)}, have {len(chosen)}. "
+                    f"No reusable slot set: need {len(missing)}, have {len(available)}. "
                     "Retain current, final and referenced generations. Create dedicated workbooks, "
                     "grant the registered service account Editor access and register their file IDs."
                 )
-            chosen = chosen[: len(layout)]
-            for part, file in enumerate(chosen):
+            for part, file in zip(missing, available[: len(missing)], strict=True):
                 file = self._private_file(file)
-                self._bind(destination, key, file, "generation", manifest, part)
+                self._bind(destination, key, file, "generation", manifest, int(part))
+                bound_parts[part] = self._get(file["id"])
+        chosen = [bound_parts[str(i)] for i in range(len(layout))]
         for part, (file, pieces) in enumerate(zip(chosen, layout, strict=True)):
             self._private_file(self._get(file["id"]))
             props = self._execute(
