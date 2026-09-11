@@ -281,6 +281,12 @@ def reconcile_delivery(*, selection, destination, repository, transport):
         claim = repository.read_receipt(selection, destination)
         if claim is None or claim.state not in ("claimed", "uncertain"):
             return claim
+        historical = repository.rollback_completed_receipt(claim)
+        if historical is not None:
+            # An audited rollback invalidated the fence after this operation completed.
+            # Preserve its old selection version: the new export still needs a fresh claim.
+            repository.finish(claim, "confirmed", historical)
+            return repository.read_receipt(selection, destination)
         state, receipt = transport.reconcile(destination, claim)
         if state == "unknown":
             return claim

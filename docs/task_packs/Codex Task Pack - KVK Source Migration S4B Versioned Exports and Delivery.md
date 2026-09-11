@@ -816,3 +816,61 @@ Push only the reviewed fix commit to the existing mirror PR #269, respond with c
 S4B-MP01 remains complete. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain explicitly open under their existing owners and approval gates; this fake-destination fix does not close live integration, process-interruption, shared-quota throughput or capacity acceptance.
 
 Final packaging: deferred-document validation and staged Ruff, Pyright, hardcoded-secret, merge-conflict, file-size and logging checks passed. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes; Black CLI retains its documented stall skip and direct API validation passed. Git diff whitespace checks passed.
+
+
+## S4B production PR 576 rollback review fix - 2026-09-11
+
+### 1. Summary
+
+The operator authorized action, replies and appropriate resolution of production PR #576 comments. The reported rollback fence mismatch was confirmed: an acknowledged earlier delivery was marked uncertain by rollback, while remote pointer equality could never match the deliberately advanced SQL fence. The fix recognizes terminal historical acknowledgement through exact rollback audit evidence, without claiming the new generation was delivered.
+
+### 2. File Manifest
+
+Exactly four existing paths: `kvk/dal/new_source_delivery_dal.py`, `kvk/services/new_source_delivery_service.py`, `tests/test_kvk_source_delivery.py`, and this task pack. The original S4B manifest, documentation and archive moves remain intact. Mirror and production use separate histories and identical file deltas.
+
+### 3. New Files
+
+No new Git paths. An isolated mirror checkout and a local .venv junction to the existing interpreter were used; only that checkout was added to local Git exclusions. Private security evidence remains outside Git.
+
+### 4. Modified Files
+
+DAL rollback_completed_receipt admits only an uncertain row with a previously completed acknowledged receipt, exact publication, older positive selection version and bounded remote identity. It verifies current selection/config, owner/fence, unchanged receipt and the parameterized SourceAction rollback record for the exact source/KVK/period/publication/new version, including the exact destination in provenance. Reconciliation settles only that historical receipt via the existing CAS, preserving its old generation and selection version. A subsequent export must acquire a fresh increasing fence and perform normal verification/publication. Old, newer or missing external pointers do not change the already acknowledged historical outcome. In-flight, incomplete, unknown and unaudited operations retain normal strict reconciliation; no fence equality check was weakened.
+
+### 5. SQL Changes
+
+No SQL-repository change, migration or live SQL operation. SourceAction and SourceDelivery columns, scoped action uniqueness, JSON provenance and receipt/state constraints were validated against authoritative SQL HEAD `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. SQL remains clean.
+
+### 6. Helpers Reused
+
+Existing _selected, _check_claim, finish, claim and destination serialization; existing synthetic GoogleMemoryAPI and FakeRepository. The repository protocol gains rollback_completed_receipt; test doubles implement its no-evidence default.
+
+### 7. Refactor Findings
+
+In-scope rollback liveness defect fixed in delivery DAL/service; predecessor selection writer and Google pointer checks remain unchanged. No unrelated runtime refactor or new deferred optimisation.
+
+### 8. Test Plan and Actual Outcomes
+
+- Mirror rollback focus: **14 passed in 4.42s** (13 new cases plus prior rollback claim regression), operational logs unchanged.
+- Production exact four-file S4B suite: **144 passed in 13.75s**, operational logs unchanged.
+- Production full suite: **3,934 passed, 34 skipped in 160.05s**, operational logs unchanged.
+- Isolated mirror full suite initially produced **3,916 passed, 34 skipped, 18 failed in 177.79s**. All 18 failures were the unchanged DL_bot interpreter-location guard because this new worktree lacked its own .venv path. A local junction to the existing environment resolved it: both affected test files reran with **18 passed in 3.46s**, operational logs unchanged. This is an initial full run plus focused environment-repair rerun, not a second full-suite pass.
+- Imports passed in both checkouts; architecture validator passed the exact three Python paths. Production registration passed 36 primary / 100 grouped without drift; selector requested full/import/registration and those gates completed. Security-routing passed. Final packaging checks are recorded below.
+
+### 9. Security Review Decision and Evidence
+
+Two separate incremental Changes scans, Deep off, completed and sealed with zero findings and complete three-file coverage:
+
+- Mirror `b580b3d5-064a-48e2-85bd-812564f90482`, working-tree base/head `c18085213e82c7d005596822d52a697c8c131e21`, digest `codex-security-snapshot/v1:sha256:4a41e963751fb93a949c3ec69cdbb899292e5a337592164eac088cb3100e1fb9`.
+- Production `3021108c-a356-46eb-a4ca-f43d667034ec`, working-tree base/head `8c3996a284bbd280d0f76e3a685e622d0f8985cb`, digest `codex-security-snapshot/v1:sha256:5cb2f77ae869e5bc227143094dc28578ab379bd9f01ba88fdf16f8880c61ce86`.
+
+SQL has a separate no-change skip. Original S4B and multipart reviews remain retained evidence. This later Markdown evidence appendix is nonexecutable and has an incremental documented scan skip; runtime/test bytes remain the scanned content. No standard/deep scan, private data/credential read, external provider operation or automatic new user task.
+
+### 10. Deployment Steps
+
+Update the existing mirror and production PR branches with the same reviewed file delta; reply to the production finding with commit and validation evidence, then resolve the addressed thread. No merge, activation, bot-machine pull/restart or deployment. Source routing remains disabled.
+
+### 11. Remaining Acceptance Work
+
+S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open. These tests compose the real reconciliation/claim decisions with mocked SQL and fake Google storage; they do not prove live SQL transaction timing, process interruption, shared quotas or operational capacity. Historical completion is not a claim that the rollback generation is already current; normal new-generation delivery remains mandatory.
+
+Final packaging: both exact staged manifests passed Ruff, Pyright, hardcoded-secret detection, merge-conflict, file-size and logging checks. Black API checks passed for all three Python files; Black CLI remains skipped for the previously recorded stall. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes; Git whitespace checks passed. All four mirror/production files are byte-identical.

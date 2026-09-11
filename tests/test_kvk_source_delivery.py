@@ -103,6 +103,9 @@ class FakeRepository:
     def read_receipt(self, selection, destination):
         return self.claims.get(destination)
 
+    def rollback_completed_receipt(self, claim):
+        return None
+
 
 class FakeTransport:
     def __init__(self):
@@ -1469,3 +1472,177 @@ def test_quarantine_is_preserved_by_finish_and_blocks_future_slot_registration(m
             args["destination"], args["generation"].key, args["generation"].manifest()
         )
     assert not api.calls
+
+
+@pytest.mark.parametrize("pointer", ["old", "newer", "missing"])
+def test_audited_rollback_settles_completed_history_then_exports_new_selection(
+    monkeypatch, pointer
+):
+    from contextlib import nullcontext
+
+    import kvk.dal.new_source_delivery_dal as dal
+
+    args, old_repo, api = google_delivery()
+    assert deliver_export(**args).delivery_state == "confirmed"
+    destination = args["destination"]
+    old = old_repo.claims[destination]
+    old_receipt = json.loads(old.receipt)
+    selection, snapshot = export_input()
+    selection = replace(selection, selection_version=selection.selection_version + 1)
+    snapshot["envelope"]["selection"]["SelectionVersion"] = selection.selection_version
+
+    class Repository(FakeRepository):
+        rollback_completed_receipt = DeliveryRepository.rollback_completed_receipt
+        _check_claim = DeliveryRepository._check_claim
+
+        def claim(self, selection, destination, key):
+            result = DeliveryRepository.claim(self, selection, destination, key)
+            self.claims[destination] = result
+            self.fence = result.fence
+            return result
+
+        _receipt_json = staticmethod(DeliveryRepository._receipt_json)
+
+    repo = Repository()
+    repo.connect = Mock(side_effect=AssertionError("real SQL forbidden"))
+    repo.selected = selection
+    repo.claims[destination] = replace(
+        old, selection=selection, state="uncertain", fence=old.fence + 1
+    )
+    args.update(
+        repository=repo,
+        selection=selection,
+        generation=compact_sheets_generation(build_generation(((selection, snapshot),))),
+    )
+    cursor = Mock()
+
+    def row():
+        claim = repo.claims[destination]
+        return dict(
+            PublicationID=selection.publication_id,
+            OwnerID=claim.owner_id,
+            Fence=claim.fence,
+            DeliveryState=claim.state,
+            Receipt=claim.receipt,
+        )
+
+    monkeypatch.setattr(dal, "transaction", lambda connect: nullcontext(cursor))
+    monkeypatch.setattr(dal, "_selected", lambda cursor, chosen: repo.check_selections((chosen,)))
+    monkeypatch.setattr(dal, "rows", lambda cursor: [row()])
+    monkeypatch.setattr(
+        dal,
+        "one",
+        lambda cursor: (
+            dict(
+                ProvenanceJson=json.dumps(
+                    {"destinations": [["sheets", destination.destination_id]]}
+                )
+            )
+            if "SourceAction" in cursor.execute.call_args.args[0]
+            else row()
+        ),
+    )
+    if pointer == "newer":
+        api.values[("fake-index", "Sheet1")] = [["f" * 64, str(old.fence + 1), "other-file"]]
+    elif pointer == "missing":
+        api.values[("fake-index", "Sheet1")] = []
+    remote_before = len(api.calls)
+    reconciled = reconcile_delivery(
+        selection=selection, destination=destination, repository=repo, transport=args["transport"]
+    )
+    assert reconciled.state == "confirmed"
+    assert json.loads(reconciled.receipt) == old_receipt
+    assert (
+        len(api.calls) == remote_before
+    )  # Historical acknowledgement, not a current-pointer claim.
+    assert reconciled.fence == old.fence + 1
+    assert deliver_export(**args).delivery_state == "confirmed"
+    assert repo.fence == old.fence + 2
+    assert (
+        json.loads(repo.claims[destination].receipt)["selection_version"]
+        == selection.selection_version
+    )
+    assert api.values[("fake-index", "Sheet1")][0][0] == args["generation"].key
+    calls = len(api.calls)
+    assert deliver_export(**args).delivery_state == "confirmed"
+    assert len(api.calls) == calls
+    action_call = next(c for c in cursor.execute.call_args_list if "SourceAction" in c.args[0])
+    assert action_call.args[1:] == (
+        "snapshot_report_v1",
+        selection.kvk_no,
+        selection.period_id,
+        selection.publication_id,
+        selection.selection_version,
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "claimed",
+        "unknown",
+        "incomplete",
+        "same_version",
+        "wrong_publication",
+        "missing_remote",
+        "no_action",
+        "other_destination",
+        "stale_fence",
+        "changed_receipt",
+    ],
+)
+def test_rollback_reconciliation_requires_terminal_receipt_and_exact_audit(monkeypatch, case):
+    from contextlib import nullcontext
+
+    import kvk.dal.new_source_delivery_dal as dal
+
+    selection, _ = export_input()
+    destination = Destination("sheets", "fake-index")
+    data = dict(
+        phase="published",
+        export_complete=True,
+        publication_id=selection.publication_id,
+        selection_version=selection.selection_version - 1,
+        export_key="a" * 64,
+        remote_id="https://example.invalid/completed",
+    )
+    state = "uncertain"
+    if case == "claimed":
+        state = "claimed"
+    if case == "unknown":
+        data["phase"] = "publish_uncertain"
+    if case == "incomplete":
+        data["export_complete"] = False
+    if case == "same_version":
+        data["selection_version"] = selection.selection_version
+    if case == "wrong_publication":
+        data["publication_id"] = "another-publication"
+    if case == "missing_remote":
+        data["remote_id"] = None
+    claim = DeliveryClaim(selection, destination, "owner", 8, state, json.dumps(data))
+    cursor = Mock()
+    repo = DeliveryRepository(Mock(side_effect=AssertionError("real SQL forbidden")))
+    monkeypatch.setattr(dal, "transaction", lambda connect: nullcontext(cursor))
+    monkeypatch.setattr(dal, "_selected", lambda *args: None)
+
+    def one(cursor):
+        if "SourceAction" in cursor.execute.call_args.args[0]:
+            return (
+                None
+                if case == "no_action"
+                else dict(ProvenanceJson=json.dumps({"destinations": [["sheets", "other-index"]]}))
+            )
+        return dict(
+            OwnerID="owner",
+            Fence=9 if case == "stale_fence" else 8,
+            DeliveryState=state,
+            Receipt="{}" if case == "changed_receipt" else claim.receipt,
+        )
+
+    monkeypatch.setattr(dal, "one", one)
+    if case in ("stale_fence", "changed_receipt"):
+        with pytest.raises(SourceConflict):
+            repo.rollback_completed_receipt(claim)
+    else:
+        assert repo.rollback_completed_receipt(claim) is None
+    assert all("UPDATE" not in c.args[0] for c in cursor.execute.call_args_list)

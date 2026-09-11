@@ -451,6 +451,48 @@ class DeliveryRepository:
             )
         return receipt
 
+    def rollback_completed_receipt(self, claim):
+        """Recognize a terminal historical acknowledgement invalidated by audited rollback.
+
+        This confirms only the old receipt, never the newly selected export. Unknown
+        sends/writes have no completed acknowledgement and must still be probed externally.
+        """
+        data = json.loads(claim.receipt) if claim.receipt else {}
+        version = data.get("selection_version")
+        remote = data.get("remote_id")
+        if (
+            claim.state != "uncertain"
+            or data.get("phase")
+            != ("discord_confirmed" if claim.destination.kind == "discord" else "published")
+            or data.get("export_complete") is not True
+            or data.get("publication_id") != claim.selection.publication_id
+            or type(version) is not int
+            or not 0 < version < claim.selection.selection_version
+            or not isinstance(remote, str)
+            or not 0 < len(remote) <= 512
+        ):
+            return None
+        with transaction(self.connect) as cursor:
+            _selected(cursor, claim.selection)
+            row = self._check_claim(cursor, claim)
+            if row["Receipt"] != claim.receipt:
+                raise SourceConflict("Rollback receipt changed during reconciliation.")
+            cursor.execute(
+                "SELECT ProvenanceJson FROM KVK.SourceAction WHERE SourceKey=? AND KVK_NO=? "
+                "AND PeriodID=? AND NewPublicationID=? AND NewSelectionVersion=? AND ActionType='rollback'",
+                SOURCE_KEY,
+                claim.selection.kvk_no,
+                claim.selection.period_id,
+                claim.selection.publication_id,
+                claim.selection.selection_version,
+            )
+            action = one(cursor)
+            if not action or [claim.destination.kind, claim.destination.destination_id] not in (
+                json.loads(action["ProvenanceJson"]).get("destinations", [])
+            ):
+                return None
+        return claim.receipt
+
     def read_receipt(self, selection, destination):
         with transaction(self.connect) as cursor:
             cursor.execute(
