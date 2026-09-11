@@ -1030,10 +1030,11 @@ def multipart_google_delivery(monkeypatch):
 
     args, repo, api = google_delivery()
     # Small budgets exercise real splitting, header repetition and exact reconstruction.
-    monkeypatch.setattr(GoogleSheetsTransport, "MAX_CELLS", 10_500)
+    monkeypatch.setattr(GoogleSheetsTransport, "MAX_CELLS", 11_000)
     count = len(args["transport"].partition_manifest(args["generation"].manifest()))
     assert count > 1
     ids = tuple(f"part-{i}" for i in range(count * 2))
+    assert len(ids) <= 16  # Exercise multipart delivery within the durable receipt contract.
     for id in ids:
         api.files_data[id] = deepcopy(api.files_data["fake-1"])
         api.files_data[id]["id"] = id
@@ -1646,3 +1647,63 @@ def test_rollback_reconciliation_requires_terminal_receipt_and_exact_audit(monke
     else:
         assert repo.rollback_completed_receipt(claim) is None
     assert all("UPDATE" not in c.args[0] for c in cursor.execute.call_args_list)
+
+
+@pytest.mark.parametrize("case", ["count", "bytes", "quarantine", "recovery"])
+def test_registration_receipt_capacity_returns_setup_before_claim_or_remote(case):
+    args, repo, api = google_delivery()
+    transport = args["transport"]
+    slots = (
+        tuple(f"slot-{i}" for i in range(17))
+        if case == "count"
+        else tuple(f"s{i}" + "x" * 126 for i in range(8))
+    )
+    if case in ("count", "bytes"):
+        transport.registration = replace(transport.registration, slot_file_ids=slots)
+    elif case == "quarantine":
+        repo.quarantined_files = lambda destination: frozenset(slots)
+    else:
+        args.update(
+            recover_private=True,
+            prior_registration=replace(transport.registration, slot_file_ids=slots),
+        )
+    repo.claim = Mock(side_effect=AssertionError("claim must not occur"))
+    repo.recover_private_claim = Mock(side_effect=AssertionError("recovery claim must not occur"))
+    for _ in range(2):
+        outcome = deliver_export(**args)
+        assert outcome.delivery_state == "failed" and outcome.sql_selected
+        assert not outcome.export_complete and outcome.receipt is None
+        assert "1,024 UTF-16" in outcome.setup_required
+    assert not repo.claims and repo.fence == 0
+    assert api.calls == []
+
+
+@pytest.mark.parametrize("extra", [0, 1])
+def test_registration_receipt_exact_utf16_capacity_before_claim(extra):
+    args, repo, api = google_delivery()
+    transport = args["transport"]
+    # Reserve a fixed longest file ID, then fill the publication receipt to its limit.
+    slots = ["s0" + "x" * 126, *[f"s{i}x" for i in range(1, 8)]]
+    evidence = dict(
+        export_key=args["generation"].key,
+        publication_id=args["selection"].publication_id,
+        selection_version=args["selection"].selection_version,
+        attempt_slots=slots,
+        audience=transport.registration.audience,
+        phase="published",
+        export_complete=False,
+        remote_id=f"https://docs.google.com/spreadsheets/d/{slots[0]}/edit#gid=2147483647",
+    )
+    while len(json.dumps(evidence, separators=(",", ":")).encode("utf-16-le")) // 2 < 1024 + extra:
+        index = next(i for i in range(1, len(slots)) if len(slots[i]) < 128)
+        slots[index] += "x"
+    transport.registration = replace(transport.registration, slot_file_ids=tuple(slots))
+    repo.claim = Mock(side_effect=SourceConflict("capacity accepted"))
+    if extra:
+        assert deliver_export(**args).setup_required is not None
+        repo.claim.assert_not_called()
+    else:
+        with pytest.raises(SourceConflict, match="capacity accepted"):
+            deliver_export(**args)
+        repo.claim.assert_called_once()
+    assert api.calls == []

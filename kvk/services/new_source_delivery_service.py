@@ -102,6 +102,63 @@ def deliver_export(
         if google:
             generation = transport.prepare_generation(generation)
         repository.check_selections(generation.selections)
+        if google:
+            from kvk.dal.new_source_delivery_dal import DeliveryRepository
+
+            transport.quarantined = repository.quarantined_files(destination)
+            quarantined = set(transport.quarantined)
+            if recover_private:
+                quarantined.update(prior_registration.slot_file_ids)
+            transport.quarantined = frozenset(quarantined)
+            evidence = dict(
+                export_key=generation.key,
+                publication_id=selection.publication_id,
+                selection_version=selection.selection_version,
+                attempt_slots=list(transport.registration.slot_file_ids),
+                audience=transport.registration.audience,
+            )
+            if quarantined:
+                evidence["quarantined_slots"] = sorted(quarantined)
+            try:
+                for phase, complete in (("private_started", False), ("publication_pending", True)):
+                    DeliveryRepository._receipt_json(
+                        dict(evidence, phase=phase, export_complete=complete)
+                    )
+                longest_slot = max(transport.registration.slot_file_ids, key=len)
+                # Reserve the longest possible directory URL and sanitized failure receipt.
+                for phase, remote, diagnostic in (
+                    (
+                        "published",
+                        f"https://docs.google.com/spreadsheets/d/{longest_slot}/edit#gid=2147483647",
+                        None,
+                    ),
+                    (
+                        "private_incomplete",
+                        None,
+                        dict(
+                            operation="sheets.spreadsheets.values.batchGet",
+                            status=429,
+                            reason="frozen_rows_shrink",
+                        ),
+                    ),
+                ):
+                    completion = dict(
+                        evidence, phase=phase, export_complete=False, remote_id=remote
+                    )
+                    if diagnostic is not None:
+                        completion["diagnostic"] = diagnostic
+                    DeliveryRepository._receipt_json(completion)
+            except ValueError:
+                return DeliveryOutcome(
+                    True,
+                    False,
+                    "failed",
+                    setup_required=(
+                        "Registered slots and retained quarantine exceed the durable receipt "
+                        "capacity (16 IDs per list; 1,024 UTF-16 units total). Register a smaller "
+                        "slot set or provision a separate destination; preserve quarantine history."
+                    ),
+                )
         if recover_private:
             if prior_registration.index_file_id != destination.destination_id:
                 raise ValueError("Recovery must retain the same destination index.")
@@ -124,7 +181,6 @@ def deliver_export(
         complete, exposed = False, False
         try:
             if google:
-                transport.quarantined = repository.quarantined_files(destination)
                 if transport.quarantined.intersection(transport.registration.slot_file_ids):
                     raise SourceConflict("Registration contains quarantined workbook slots.")
                 claim = repository.checkpoint(

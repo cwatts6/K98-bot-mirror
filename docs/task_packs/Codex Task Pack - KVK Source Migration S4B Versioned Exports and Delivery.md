@@ -874,3 +874,63 @@ Update the existing mirror and production PR branches with the same reviewed fil
 S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open. These tests compose the real reconciliation/claim decisions with mocked SQL and fake Google storage; they do not prove live SQL transaction timing, process interruption, shared quotas or operational capacity. Historical completion is not a claim that the rollback generation is already current; normal new-generation delivery remains mandatory.
 
 Final packaging: both exact staged manifests passed Ruff, Pyright, hardcoded-secret detection, merge-conflict, file-size and logging checks. Black API checks passed for all three Python files; Black CLI remains skipped for the previously recorded stall. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes; Git whitespace checks passed. All four mirror/production files are byte-identical.
+
+
+## S4B production PR 576 receipt-capacity review fix - 2026-09-11
+
+### 1. Summary
+
+Address review comment 3989310006: oversized registrations now return actionable setup_required before a claim/fence change or provider request, instead of repeatedly failing after claiming.
+
+### 2. File Manifest
+
+Exactly three existing paths: `kvk/services/new_source_delivery_service.py`, `tests/test_kvk_source_delivery.py`, and this task pack. All original S4B documents and archive moves remain preserved. Mirror and production have separate histories and identical file deltas.
+
+### 3. New Files
+
+No new Git paths. Existing isolated mirror checkout and interpreter junction reused; private security artifacts remain outside Git.
+
+### 4. Modified Files
+
+Under the existing destination lock, validate the exact durable serializer against registered attempt slots, the complete retained quarantine, and the union with prior slots for explicit private recovery. Reserve capacity for both checkpoints and bounded success/failure completion receipts, including the longest registered directory URL and sanitized diagnostic. Reject count or serialized UTF-16 overflow with setup guidance; never truncate quarantine. Six synthetic cases cover repeated rejection, count, byte budget, retained/recovery quarantine, and the 1,024/1,025-unit boundary. The multipart fixture still forces partitioning but now uses a valid ten-slot registration instead of eighteen slots.
+
+### 5. SQL Changes
+
+No SQL change or live operation. Existing SourceDelivery nvarchar(1024) receipt shape checked at authoritative SQL HEAD `44afa315dd6cbfe9fec101f2a39a62e534f5b583`; the DAL also limits each exact slot list to sixteen IDs. SQL remains unchanged.
+
+### 6. Helpers Reused
+
+Reuse DeliveryRepository._receipt_json, destination serialization and quarantined_files, plus existing fake repository and GoogleMemoryAPI. No new persistence protocol or schema.
+
+### 7. Refactor Findings
+
+Fix the reported registration/receipt contract mismatch within S4B. No unrelated refactor or new deferred optimisation.
+
+### 8. Test Plan and Actual Outcomes
+
+- New capacity focus: 6 passed in 1.45s; operational logs unchanged.
+- Final production four-file S4B suite: 150 passed in 15.37s; operational logs unchanged.
+- Final production full suite: 3,940 passed, 34 skipped in 166.93s; operational logs unchanged.
+- Final mirror full suite: 3,940 passed, 34 skipped in 168.50s; operational logs unchanged. This fresh full pass supersedes the earlier mirror interpreter-path gap.
+- Initial intermediate focused failures exposed the old eighteen-slot multipart fixture; adjusting its synthetic cell budget preserves splitting within the real receipt contract. Final suites above pass without relaxing runtime limits.
+- Architecture and security-routing validation passed; selector requested full/import/registration. Production imports and 36 primary / 100 grouped command registration passed without drift. Black API verified final Python formatting; Git whitespace and packaging checks follow below.
+
+### 9. Security Review Decision and Evidence
+
+Separate incremental Changes scans, Deep off, completed and sealed with zero findings and complete coverage of the two changed Python files:
+
+- Mirror `1dbc1e86-4263-4c81-8bc9-a0dd60092885`, working-tree base/head `328f040d5ff39cf5f76b380e009a4862350f266d`.
+- Production `1684f5ed-ed3e-4887-8987-026f0e2bd4be`, working-tree base/head `8b78ce61407de36cf811a71f600ee85743b6d061`.
+- Both exact patch digests: `codex-security-snapshot/v1:sha256:da00b89f2cf7727505540cbf6cbc18e88c4a02aa912d786fa8b7a4b289f6c07a`.
+
+SQL has a separate no-change skip. This later nonexecutable evidence appendix has a documented incremental scan skip; runtime/test bytes remain the scanned content. Prior complete S4B and review-fix scans remain retained. No standard/deep scan or live provider operation.
+
+### 10. Deployment Steps
+
+Push the reviewed delta to the existing mirror and production PR branches, reply to the addressed comment with commit and validation evidence, and resolve that thread. No merge, deployment, restart or activation. Source routing remains disabled.
+
+### 11. Remaining Acceptance Work
+
+S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open under their existing approval gates. Preclaim receipt admission does not close real allocation, retained-final/quarantine capacity, process-interruption, integration or shared-quota throughput acceptance. S4B-MP01 remains complete.
+
+Final packaging: both exact staged manifests passed Ruff, Pyright, hardcoded-secret, merge-conflict, file-size and logging checks. Deferred-document validation and Git whitespace checks passed. Black API checks passed; the CLI retains its documented stall skip. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes. All three mirror/production files are byte-identical.
