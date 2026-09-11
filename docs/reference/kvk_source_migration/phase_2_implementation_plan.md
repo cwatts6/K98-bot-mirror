@@ -20,27 +20,12 @@ rejections with 25-table rollback; the seven-file review-fix Changes scan found 
 `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
 logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
-**S3B is complete, operator smoke accepted and merged.** Mirror
-[PR #267](https://github.com/cwatts6/K98-bot-mirror/pull/267) merged at 13:59:47 UTC as
-`e915f9727f9492fe4ecc02b5c0d9f3c6e443be13`; private bot
-[PR #574](https://github.com/cwatts6/k98-bot/pull/574) merged at 14:01:14 UTC as
-`a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` on 2026-09-10.
-Operator post-merge smoke on mirror main `e915f972`: import smoke passed, registration
-36/100 without drift or duplicates, **36 tests passed in 9.11s** (4 publication + 32 SQL).
-Current synchronized local mirror main is `02385a0edc0ec83f77241e02648eabb3b7640ea6`;
-local production/main is `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`; SQL main remains
-`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both repos were clean at closeout entry.
-S3B pack/starter are archived. **Next: S4A Shared Reports and Cards in a new chat, with
-separate S4A G3 approval.** Preserve pending S3B closeout docs and both archive moves
-for the eventual separately authorized S4A PR; its pack contains the complete manifest.
-S3B's latest full-suite rerun stalled around 19% and remains incomplete; the accepted smoke
-does not replace it. The earlier 3,764-pass full result is pre-review-fix evidence.
-The operator confirms local pulls completed; no changes were pulled to the bot machine.
-Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A/S2B/S3A/S3B as unstarted slices. The [local SQL development reference](../local_sql_development.md) records the reusable K98DEV
-instance, retained S2A evidence database and per-slice target authorization requirements.
-No production SQL deployment, bot-machine update/restart or source activation is part of this
-handoff. Earlier pending/preparation/review-in-progress wording below is historical.
+**S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
+Operator candidate smoke on `055b9590e1114661ff0369c7815fbbea82661454` passed imports, registration **36/100** without drift/duplicates, **134 focused tests in 11.97s**, and **3,810 full-suite tests with 34 skipped in 134.19s**. Both pytest runs left operational logs unchanged. This closes the S4A full-suite gap; earlier stalls and passes remain historical evidence, not a post-merge rerun.
+Local mirror `main` is `7baf92c7badc3f40006841046825a788bc823373`; local `production/main` is `021fc7adc9952ab07d21517e8e47f3966c285f7a`; SQL `main` remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Bot and SQL checkouts were clean at closeout entry. Local pulls are complete, per operator and local refs; **nothing has been pulled to the bot machine**.
+S4A pack/starter are archived. **Next: S4B Versioned Exports and Delivery in a new chat, with separate S4B G3 approval.** S4B's pack requires all pending closeout documents and both archive rename sides in its eventual separately authorized PR. Prior S3B closeout documents were included in the merged S4A PRs.
+Source routing remains disabled. No bot-machine update/restart, SQL deployment, live imports/exports, Discord action or activation is needed for S4B local development. Use mocks/fake destinations unless a disposable SQL target and exact operations are explicitly authorized first; preserve retained S2A/S2B/S3B databases. Historical prerequisite wording below does not reopen completed slices.
+
 
 2026-09-09. **G2 approved by Chris Watts: “G2 approved, please proceed”.** This approves
 the architecture including the confirmed EndScanID workflow. It authorizes this planning pass,
@@ -67,7 +52,7 @@ changes reviewable; approved semantics are unchanged. No cross-repository combin
 | S2B | SQL config/publication/routing/delivery state and constraints | S2A | Complete, accepted and merged; 265 static / 144 disposable rejections passed |
 | S3A | Pure player/window calculations and report DTOs | S1 | Can follow S1 independently of SQL deployment |
 | S3B | DAL acceptance, CAS publication and config-request services | S2A/S2B/S3A | Disposable SQL integration; no live activation |
-| S4A | Shared report/card/diagnostic adapters | S3B | V2 consumers; new routing remains disabled |
+| S4A | Shared report/card/diagnostic adapters | S3B | Complete, smoke accepted and merged; routing disabled |
 | S4B | Generation-bound exports and destination receipts | S3B/S4A | Private fake destinations first; no real exports through G3 alone |
 | S5A | Private intake and one grouped admin control | S1/S3B/S4A/S4B | Disabled defaults; no channel provisioning or imports yet |
 | S5B | Config transaction hook and startup/recovery integration | S3B/S4B/S5A | EndScanID transaction/recovery tests; source disabled |
@@ -379,7 +364,7 @@ evidence are separate. **Stop for G3 review; do not execute a task pack merely b
 | S2B | [SQL Publication State](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S2B%20SQL%20Publication%20State.md) |
 | S3A | [Player Window Calculations](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md) |
 | S3B | [Acceptance and Atomic Publication](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) |
-| S4A | [Shared Reports and Cards](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |
+| S4A | [Shared Reports and Cards](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) | [Starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) |
 | S4B | [Versioned Exports and Delivery](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) |
 | S5A | [Private Intake and Admin Controls](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) |
 | S5B | [Endpoint Config and Recovery Integration](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) | [Starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) |
@@ -444,3 +429,21 @@ These edits stay uncommitted for that handoff. No new chat or S4A implementation
 Documentation-only security skip: exact closeout/status/links/archive manifest, no runtime,
 configuration, permission, data-access or deployment effect. SQL repository: separate no-change skip.
 Runtime pytest/smoke/registration reruns are skipped for this Markdown-only closeout.
+
+
+<a id="s4b-follow-ups"></a>
+## S4B validation follow-ups - 2026-09-11
+
+Operator-approved follow-up: record the remaining work and complete the synthetic multi-period delivery test now. This register supersedes earlier generic S4B gap lists only as stated below. S4B remains local/review-ready, not merged or activated. Phase ownership is explicit; an open item is not acceptance or permission to execute a later slice. Chris Watts owns operational acceptance and approval; the named slice implementer owns its evidence.
+
+| ID | Owner / gate | Status and required closure evidence |
+| --- | --- | --- |
+| S4B-MP01 | S4B implementer; closeout review | Completed in `tests/test_kvk_source_delivery.py::test_multi_period_delivery_uses_changed_anchor_and_deduplicates`, parameterized for either fight changing. Real generation loader, delivery orchestration, DAL claim decision and Google adapter compose over synthetic SQL I/O and fake Google storage. Proves changed anchor, unchanged-anchor rejection before remote calls, monotonic fence, both fight outputs, unchanged period preservation, missing-overall status, remote manifest/pointer and receipt reload deduplication. This is not a real SQL/Google multi-period or process-restart measurement. |
+| S5B-REC01 | S5B implementer; S5B acceptance | Open. Wire the default-off worker to durable requests/receipts, bounded off-event-loop execution, one registration, clean cancellation and restart resumption. Prove committed config followed by return error still recovers; use the changed selection as multi-period delivery anchor and recheck every included selection. Test stale/uncertain work and preserve daily claims; no blind public repost. Required disposable SQL and deterministic failures remain explicit. |
+| S6-OPS01 | S6 readiness author; operator-approved isolated rehearsal before activation | Open. Prepare exact disposable process/database/file targets and interruption points during private writes, audience grants and pointer publication. After separate operational authorization, record real process exit/restart, durable phase/owner/fence/receipt, actual file ACL/manifests/index and repeated-delivery outcome. Private recovery must quarantine prior targets; publication uncertainty must remain blocked or reconcile from terminal evidence. Never infer absence from time or one missing read. |
+| S6-PERF01 | S6 readiness author; operator-approved load rehearsal before activation | Open. Establish an operator-approved acceptable export duration/cadence and request budget, then measure representative synthetic player/period volumes, all multipart writes/readbacks, API counts, bytes/cells, 429/503 behavior and end-to-end duration. Include the quota shared by other processes/machines using the service account without invoking production operations. A local partition-sizing pass or process-local pacer alone cannot close this item. |
+| S6-CAP01 | S6 readiness author; destination provisioning/rollback review before activation | Open. Size current/staging plus retained final/referenced generations and recovery quarantine. The measured nine files are an initial allowance, not a lifetime cap. Verify provisioned exact IDs/owner/SA Editor/canShare and intended Viewer audience. Exercise receipt-capacity exhaustion (nvarchar(1024)), insufficient slots and a safe new-destination path. Do not truncate evidence, reuse quarantined/final files, or silently widen schema. Any needed code/schema change requires a bounded separately approved manifest. |
+
+S5B must reference S4B-MP01 in its caller integration tests rather than claim the component test proves worker wiring. S6 must carry S6-OPS01/S6-PERF01/S6-CAP01 into `release_readiness_and_rollback.md` and `release_evidence_log.md` when those planned files are authored. They remain activation blockers until measured and accepted. S6 G3 prepares documentation only; separate G4/exact-operation approval is required to execute a rehearsal. Recording this register does not execute S5A, S5B or S6.
+
+Evidence is retained in the S4B pack's latest dated appendix. Keep statuses, measured results, exact tested revisions/targets and operator acceptance together; do not replace an unmeasured result with a test count. Source routing and intake/recovery defaults remain off.

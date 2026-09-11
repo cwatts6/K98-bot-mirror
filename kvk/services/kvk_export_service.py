@@ -279,6 +279,12 @@ def bind_kvk_export_sections(
     compatibility tie-breaker. Extra compatible result sets are ignored once all
     required sections are bound.
     """
+    if not isinstance(result_sets, Sequence) or any(
+        not isinstance(item, pd.DataFrame) for item in result_sets
+    ):
+        raise KvkExportBindingError(
+            "Legacy binder requires legacy DataFrames; use the explicit V2 binder for source exports."
+        )
     sections: dict[str, pd.DataFrame] = {}
     assigned_indexes: set[int] = set()
 
@@ -361,3 +367,33 @@ def section_ref_to_name(section_ref: Any) -> str | None:
     if isinstance(section_ref, int):
         return resolve_kvk_export_section_name(section_ref)
     return None
+
+
+def bind_kvk_export_sections_v2(sections, *, schema_version):
+    """Bind only explicitly named V2 tables; never infer legacy positions/schemas."""
+    from kvk.rendering.new_source_export import ExportTable
+
+    if schema_version != 2 or not isinstance(sections, Mapping):
+        raise KvkExportBindingError("V2 exports require a versioned named mapping.")
+    if not set(KVK_EXPORT_SECTION_NAMES).issubset(sections):
+        raise KvkExportBindingError("V2 export is missing required sections.")
+    allowed = {*KVK_EXPORT_SECTION_NAMES, "ALL_WINDOWS", "COMPARISONS"}
+    for name, value in sections.items():
+        if name not in allowed or not isinstance(value, ExportTable) or value.name != name:
+            raise KvkExportBindingError("V2 export section identity/schema mismatch.")
+        if not {"schema_version", "source_key", "kvk_no", "period_key"}.issubset(value.columns):
+            raise KvkExportBindingError("V2 export provenance columns are required.")
+        for row in value.rows:
+            if (
+                row[value.columns.index("schema_version")] != "2"
+                or row[value.columns.index("source_key")] != "snapshot_report_v1"
+            ):
+                raise KvkExportBindingError("V2 export row source/schema mismatch.")
+    return {name: sections[name] for name in KVK_EXPORT_SECTION_NAMES}
+
+
+def load_kvk_export_v2(*, connect, selections, snapshot_loader=None):
+    """Dormant explicit source entry point; legacy export API stays unchanged."""
+    from kvk.services.new_source_export_service import load_generation
+
+    return load_generation(connect=connect, selections=selections, snapshot_loader=snapshot_loader)

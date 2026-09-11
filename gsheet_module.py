@@ -728,6 +728,19 @@ def _coerce_date_uk(df: pd.DataFrame, cols: list[str]):
         df[c] = parsed.dt.date
 
 
+def run_kvk_source_export(*, generation, selection, destination, repository, transport):
+    """Explicit dormant V2 dispatch; destination transport/configuration is caller-owned."""
+    from kvk.services.new_source_delivery_service import deliver_export
+
+    return deliver_export(
+        generation=generation,
+        selection=selection,
+        destination=destination,
+        repository=repository,
+        transport=transport,
+    )
+
+
 def _prepare_kvk_export_df(df: pd.DataFrame, kvk_no: int) -> pd.DataFrame:
     df = _drop_cols_case_insensitive(df, ["camp_id", "campid"])
     df = _ensure_kvk_no_first(df, kvk_no)
@@ -1130,7 +1143,11 @@ def transfer_and_sort(
         ws = _get_or_create_ws(ss, tab_name, cols=max(1, len(df.columns)))
 
     export_dataframe_to_sheet(
-        ws, df, service=service, format_columns=format_columns or [], correlation_id=correlation_id
+        ws,
+        df,
+        service=service,
+        format_columns=format_columns or [],
+        correlation_id=correlation_id,
     )
 
     if sort_column_index is not None and service:
@@ -1569,7 +1586,10 @@ def get_spreadsheet_modified_time(drive_service, spreadsheet_id: str) -> str | N
         return resp.get("modifiedTime")
     except Exception as exc:
         logger.warning(
-            "[GSHEETS] Could not fetch modifiedTime for %s: %s", spreadsheet_id, exc, exc_info=True
+            "[GSHEETS] Could not fetch modifiedTime for %s: %s",
+            spreadsheet_id,
+            exc,
+            exc_info=True,
         )
         try:
             _record_sheets_error("drive_metadata_fetch", exc)
@@ -1670,7 +1690,8 @@ def run_kvk_export_test(
             )
         except SpreadsheetNotFound:
             ss = _retry_gspread_call(
-                lambda: client.create(sheet_name), action_desc=f"create_spreadsheet:{sheet_name}"
+                lambda: client.create(sheet_name),
+                action_desc=f"create_spreadsheet:{sheet_name}",
             )
         written_tabs = []
         skipped_tabs = []
@@ -2276,14 +2297,24 @@ def create_additional_kvk_spreadsheets(
     pass4_specs = [
         # add KVK_Scan_Log (src_idx 0) so PASS4 sheet includes the same scan log as KVK_ALLPLAYER_OUTPUT
         {"type": "raw", "src_idx": 0, "target_tab": "KVK_Scan_Log"},
-        {"type": "filtered", "src_idx": 3, "filter_window": "Pass 4", "target_tab": "PASS4_PLAYER"},
+        {
+            "type": "filtered",
+            "src_idx": 3,
+            "filter_window": "Pass 4",
+            "target_tab": "PASS4_PLAYER",
+        },
         {
             "type": "filtered",
             "src_idx": 4,
             "filter_window": "Pass 4",
             "target_tab": "PASS4_KINGDOM",
         },
-        {"type": "filtered", "src_idx": 5, "filter_window": "Pass 4", "target_tab": "PASS4_CAMP"},
+        {
+            "type": "filtered",
+            "src_idx": 5,
+            "filter_window": "Pass 4",
+            "target_tab": "PASS4_CAMP",
+        },
         {"type": "raw", "src_idx": 1, "target_tab": "KVK_Windows"},
         {"type": "raw", "src_idx": 2, "target_tab": "KVK_DKP_Weights"},
     ]
@@ -2518,14 +2549,24 @@ def create_additional_kvk_spreadsheets(
     pass7_specs = [
         # include scan log to mirror primary output
         {"type": "raw", "src_idx": 0, "target_tab": "KVK_Scan_Log"},
-        {"type": "filtered", "src_idx": 3, "filter_window": "Pass 7", "target_tab": "PASS7_PLAYER"},
+        {
+            "type": "filtered",
+            "src_idx": 3,
+            "filter_window": "Pass 7",
+            "target_tab": "PASS7_PLAYER",
+        },
         {
             "type": "filtered",
             "src_idx": 4,
             "filter_window": "Pass 7",
             "target_tab": "PASS7_KINGDOM",
         },
-        {"type": "filtered", "src_idx": 5, "filter_window": "Pass 7", "target_tab": "PASS7_CAMP"},
+        {
+            "type": "filtered",
+            "src_idx": 5,
+            "filter_window": "Pass 7",
+            "target_tab": "PASS7_CAMP",
+        },
         {"type": "raw", "src_idx": 1, "target_tab": "KVK_Windows"},
         {"type": "raw", "src_idx": 2, "target_tab": "KVK_DKP_Weights"},
         # Aggregates: Pass 4 + 1st Altar + 2nd Altar + 3rd Altar + Pass 7
@@ -2577,34 +2618,65 @@ def create_additional_kvk_spreadsheets(
     # and KVK_ALL_WINDOWS_* = Pass4 + 1st Altar + 2nd Altar + 3rd Altar + Pass7 + Pass 8
     pass8_specs = [
         {"type": "raw", "src_idx": 0, "target_tab": "KVK_Scan_Log"},
-        {"type": "filtered", "src_idx": 3, "filter_window": "Pass 8", "target_tab": "PASS8_PLAYER"},
+        {
+            "type": "filtered",
+            "src_idx": 3,
+            "filter_window": "Pass 8",
+            "target_tab": "PASS8_PLAYER",
+        },
         {
             "type": "filtered",
             "src_idx": 4,
             "filter_window": "Pass 8",
             "target_tab": "PASS8_KINGDOM",
         },
-        {"type": "filtered", "src_idx": 5, "filter_window": "Pass 8", "target_tab": "PASS8_CAMP"},
+        {
+            "type": "filtered",
+            "src_idx": 5,
+            "filter_window": "Pass 8",
+            "target_tab": "PASS8_CAMP",
+        },
         {"type": "raw", "src_idx": 1, "target_tab": "KVK_Windows"},
         {"type": "raw", "src_idx": 2, "target_tab": "KVK_DKP_Weights"},
         {
             "type": "aggregate",
             "src_idx": 3,
-            "agg_windows": ["Pass 4", "1st Altar", "2nd Altar", "3rd Altar", "Pass 7", "Pass 8"],
+            "agg_windows": [
+                "Pass 4",
+                "1st Altar",
+                "2nd Altar",
+                "3rd Altar",
+                "Pass 7",
+                "Pass 8",
+            ],
             "agg_type": "player",
             "target_tab": "KVK_ALL_WINDOWS_PLAYER",
         },
         {
             "type": "aggregate",
             "src_idx": 4,
-            "agg_windows": ["Pass 4", "1st Altar", "2nd Altar", "3rd Altar", "Pass 7", "Pass 8"],
+            "agg_windows": [
+                "Pass 4",
+                "1st Altar",
+                "2nd Altar",
+                "3rd Altar",
+                "Pass 7",
+                "Pass 8",
+            ],
             "agg_type": "kingdom",
             "target_tab": "KVK_ALL_WINDOWS_KINGDOM",
         },
         {
             "type": "aggregate",
             "src_idx": 5,
-            "agg_windows": ["Pass 4", "1st Altar", "2nd Altar", "3rd Altar", "Pass 7", "Pass 8"],
+            "agg_windows": [
+                "Pass 4",
+                "1st Altar",
+                "2nd Altar",
+                "3rd Altar",
+                "Pass 7",
+                "Pass 8",
+            ],
             "agg_type": "camp",
             "target_tab": "KVK_ALL_WINDOWS_CAMP",
         },
@@ -2727,14 +2799,24 @@ def create_additional_kvk_spreadsheets(
     # and KVK_ALL_WINDOWS_* = Pass4 + 1st Altar + 2nd Altar + 3rd Altar + Pass7 + Pass8 + Great Zig + Pass 9
     pass9_specs = [
         {"type": "raw", "src_idx": 0, "target_tab": "KVK_Scan_Log"},
-        {"type": "filtered", "src_idx": 3, "filter_window": "Pass 9", "target_tab": "PASS9_PLAYER"},
+        {
+            "type": "filtered",
+            "src_idx": 3,
+            "filter_window": "Pass 9",
+            "target_tab": "PASS9_PLAYER",
+        },
         {
             "type": "filtered",
             "src_idx": 4,
             "filter_window": "Pass 9",
             "target_tab": "PASS9_KINGDOM",
         },
-        {"type": "filtered", "src_idx": 5, "filter_window": "Pass 9", "target_tab": "PASS9_CAMP"},
+        {
+            "type": "filtered",
+            "src_idx": 5,
+            "filter_window": "Pass 9",
+            "target_tab": "PASS9_CAMP",
+        },
         {"type": "raw", "src_idx": 1, "target_tab": "KVK_Windows"},
         {"type": "raw", "src_idx": 2, "target_tab": "KVK_DKP_Weights"},
         {
@@ -2885,7 +2967,11 @@ def create_additional_kvk_spreadsheets(
         except Exception:
             # fallback using pivot_table
             pivot = df_filtered.pivot_table(
-                index=group_keys, columns="WindowName", values=metric, aggfunc="sum", fill_value=0
+                index=group_keys,
+                columns="WindowName",
+                values=metric,
+                aggfunc="sum",
+                fill_value=0,
             )
 
         # Ensure all windows are present as columns in the pivot (create zeros if missing)
@@ -2946,9 +3032,19 @@ def create_additional_kvk_spreadsheets(
         {"tab_name": "KINGDOM_DKP", "src_idx": 4, "agg_type": "kingdom", "metric": "dkp"},
         {"tab_name": "PLAYER_DKP", "src_idx": 3, "agg_type": "player", "metric": "dkp"},
         {"tab_name": "CAMP_KP_GAIN", "src_idx": 5, "agg_type": "camp", "metric": "kp_gain"},
-        {"tab_name": "KINGDOM_KP_GAIN", "src_idx": 4, "agg_type": "kingdom", "metric": "kp_gain"},
+        {
+            "tab_name": "KINGDOM_KP_GAIN",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "kp_gain",
+        },
         {"tab_name": "PLAYER_KP_GAIN", "src_idx": 3, "agg_type": "player", "metric": "kp_gain"},
-        {"tab_name": "CAMP_KILLS_GAIN", "src_idx": 5, "agg_type": "camp", "metric": "kills_gain"},
+        {
+            "tab_name": "CAMP_KILLS_GAIN",
+            "src_idx": 5,
+            "agg_type": "camp",
+            "metric": "kills_gain",
+        },
         {
             "tab_name": "KINGDOM_KILLS_GAIN",
             "src_idx": 4,
@@ -2962,16 +3058,41 @@ def create_additional_kvk_spreadsheets(
             "metric": "kills_gain",
         },
         {"tab_name": "CAMP_T5_KILLS", "src_idx": 5, "agg_type": "camp", "metric": "t5_kills"},
-        {"tab_name": "KINGDOM_T5_KILLS", "src_idx": 4, "agg_type": "kingdom", "metric": "t5_kills"},
-        {"tab_name": "PLAYER_T5_KILLS", "src_idx": 3, "agg_type": "player", "metric": "t5_kills"},
+        {
+            "tab_name": "KINGDOM_T5_KILLS",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "t5_kills",
+        },
+        {
+            "tab_name": "PLAYER_T5_KILLS",
+            "src_idx": 3,
+            "agg_type": "player",
+            "metric": "t5_kills",
+        },
         {"tab_name": "CAMP_T4_KILLS", "src_idx": 5, "agg_type": "camp", "metric": "t4_kills"},
-        {"tab_name": "KINGDOM_T4_KILLS", "src_idx": 4, "agg_type": "kingdom", "metric": "t4_kills"},
-        {"tab_name": "PLAYER_T4_KILLS", "src_idx": 3, "agg_type": "player", "metric": "t4_kills"},
+        {
+            "tab_name": "KINGDOM_T4_KILLS",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "t4_kills",
+        },
+        {
+            "tab_name": "PLAYER_T4_KILLS",
+            "src_idx": 3,
+            "agg_type": "player",
+            "metric": "t4_kills",
+        },
         {"tab_name": "CAMP_DEADS", "src_idx": 5, "agg_type": "camp", "metric": "deads"},
         {"tab_name": "KINGDOM_DEADS", "src_idx": 4, "agg_type": "kingdom", "metric": "deads"},
         {"tab_name": "PLAYER_DEADS", "src_idx": 3, "agg_type": "player", "metric": "deads"},
         {"tab_name": "CAMP_KP_LOSS", "src_idx": 5, "agg_type": "camp", "metric": "kp_loss"},
-        {"tab_name": "KINGDOM_KP_LOSS", "src_idx": 4, "agg_type": "kingdom", "metric": "kp_loss"},
+        {
+            "tab_name": "KINGDOM_KP_LOSS",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "kp_loss",
+        },
         {"tab_name": "PLAYER_KP_LOSS", "src_idx": 3, "agg_type": "player", "metric": "kp_loss"},
         {
             "tab_name": "CAMP_HEALED_TROOPS",
@@ -3020,7 +3141,8 @@ def create_additional_kvk_spreadsheets(
         try:
             try:
                 target_ss = _retry_gspread_call(
-                    lambda: client.open(target_name), action_desc=f"open_spreadsheet:{target_name}"
+                    lambda: client.open(target_name),
+                    action_desc=f"open_spreadsheet:{target_name}",
                 )
                 created_new = False
             except SpreadsheetNotFound:

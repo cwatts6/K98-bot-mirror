@@ -3,6 +3,44 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+
+def test_v2_binder_never_uses_positional_legacy_fallback():
+    from kvk.services.kvk_export_service import bind_kvk_export_sections_v2
+    from kvk.services.new_source_export_service import build_generation
+    from tests.test_kvk_source_exports import export_input
+
+    generation = build_generation((export_input(),))
+    sections = {t.name: t for t in generation.tables}
+    assert (
+        tuple(bind_kvk_export_sections_v2(sections, schema_version=2)) == KVK_EXPORT_SECTION_NAMES
+    )
+    for bad, version in ((list(sections.values()), 2), (sections, 1), ({}, 2)):
+        with pytest.raises(KvkExportBindingError):
+            bind_kvk_export_sections_v2(bad, schema_version=version)
+
+
+def test_gsheet_v2_dispatch_is_thin_and_does_not_enter_legacy_sum(monkeypatch):
+    from unittest.mock import Mock
+
+    import gsheet_module
+    from kvk.services import new_source_delivery_service
+
+    delivery = Mock(return_value="fake-outcome")
+    monkeypatch.setattr(new_source_delivery_service, "deliver_export", delivery)
+    monkeypatch.setattr(
+        gsheet_module, "_aggregate_windowed_dfs", Mock(side_effect=AssertionError("legacy sum"))
+    )
+    args = dict(
+        generation=object(),
+        selection=object(),
+        destination=object(),
+        repository=object(),
+        transport=object(),
+    )
+    assert gsheet_module.run_kvk_source_export(**args) == "fake-outcome"
+    delivery.assert_called_once_with(**args)
+
+
 from kvk.services.kvk_export_service import (
     KVK_EXPORT_SECTION_NAMES,
     KvkExportBindingError,

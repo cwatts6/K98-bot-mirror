@@ -20,3 +20,8 @@ Use exact file/test/security manifests; report canonical delivery with actual ou
 No pull/reset/merge/push/PR, production SQL, real imports/exports, Discord actions, restarts,
 deployment or activation. No private player data or credentials in Git. Required security reviews
 use Changes at exact separate repo targets, Deep off; no standard/deep scan or automatic new task.
+
+
+## Required carried-forward validation
+
+Read the [S4B follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) and this pack's 2026-09-11 handoff appendix. Track S6-OPS01, S6-PERF01 and S6-CAP01 explicitly through acceptance. Preserve exact evidence and unresolved gates. This reminder does not approve execution or expand the pack's operation/file permissions.

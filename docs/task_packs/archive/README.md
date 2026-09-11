@@ -20,27 +20,12 @@ rejections with 25-table rollback; the seven-file review-fix Changes scan found 
 `9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
 logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
-**S3B is complete, operator smoke accepted and merged.** Mirror
-[PR #267](https://github.com/cwatts6/K98-bot-mirror/pull/267) merged at 13:59:47 UTC as
-`e915f9727f9492fe4ecc02b5c0d9f3c6e443be13`; private bot
-[PR #574](https://github.com/cwatts6/k98-bot/pull/574) merged at 14:01:14 UTC as
-`a8ad9f1d81cfb7884a9cdcc0b067c4346a204488` on 2026-09-10.
-Operator post-merge smoke on mirror main `e915f972`: import smoke passed, registration
-36/100 without drift or duplicates, **36 tests passed in 9.11s** (4 publication + 32 SQL).
-Current synchronized local mirror main is `02385a0edc0ec83f77241e02648eabb3b7640ea6`;
-local production/main is `a8ad9f1d81cfb7884a9cdcc0b067c4346a204488`; SQL main remains
-`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both repos were clean at closeout entry.
-S3B pack/starter are archived. **Next: S4A Shared Reports and Cards in a new chat, with
-separate S4A G3 approval.** Preserve pending S3B closeout docs and both archive moves
-for the eventual separately authorized S4A PR; its pack contains the complete manifest.
-S3B's latest full-suite rerun stalled around 19% and remains incomplete; the accepted smoke
-does not replace it. The earlier 3,764-pass full result is pre-review-fix evidence.
-The operator confirms local pulls completed; no changes were pulled to the bot machine.
-Repository merges do not establish production SQL deployment or source activation.
-Do not repeat S1/S2A/S2B/S3A/S3B as unstarted slices. The [local SQL development reference](../../reference/local_sql_development.md) records the reusable K98DEV
-instance, retained S2A evidence database and per-slice target authorization requirements.
-No production SQL deployment, bot-machine update/restart or source activation is part of this
-handoff. Earlier pending/preparation/review-in-progress wording below is historical.
+**S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
+Operator candidate smoke on `055b9590e1114661ff0369c7815fbbea82661454` passed imports, registration **36/100** without drift/duplicates, **134 focused tests in 11.97s**, and **3,810 full-suite tests with 34 skipped in 134.19s**. Both pytest runs left operational logs unchanged. This closes the S4A full-suite gap; earlier stalls and passes remain historical evidence, not a post-merge rerun.
+Local mirror `main` is `7baf92c7badc3f40006841046825a788bc823373`; local `production/main` is `021fc7adc9952ab07d21517e8e47f3966c285f7a`; SQL `main` remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Bot and SQL checkouts were clean at closeout entry. Local pulls are complete, per operator and local refs; **nothing has been pulled to the bot machine**.
+S4A pack/starter are archived. **Next: S4B Versioned Exports and Delivery in a new chat, with separate S4B G3 approval.** S4B's pack requires all pending closeout documents and both archive rename sides in its eventual separately authorized PR. Prior S3B closeout documents were included in the merged S4A PRs.
+Source routing remains disabled. No bot-machine update/restart, SQL deployment, live imports/exports, Discord action or activation is needed for S4B local development. Use mocks/fake destinations unless a disposable SQL target and exact operations are explicitly authorized first; preserve retained S2A/S2B/S3B databases. Historical prerequisite wording below does not reopen completed slices.
+
 
 ## Programme boundary decision — 2026-09-09
 
@@ -473,7 +458,7 @@ Retained: [task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3A%2
 and [historical starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3A%20Player%20Window%20Calculations.md).
 They contain the exact implementation/review/security/smoke evidence; do not execute them again.
 The historical successor was [S3B](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md),
-now accepted and archived. S4A is the current next slice with separate G3. Bot-machine deployment remains absent.
+now accepted and archived. S4A subsequently completed; S4B is the current next slice with separate G3. Bot-machine deployment remains absent.
 
 
 ## S3B archived — 2026-09-10
@@ -481,5 +466,9 @@ now accepted and archived. S4A is the current next slice with separate G3. Bot-m
 Retained [task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md) and [historical starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md).
 Mirror #267 and private #574 are merged; operator smoke passed 36 tests in 9.11s.
 All implementation/review/security and validation-gap evidence is preserved.
-Next: [S4A pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) and [starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md), separate G3 pending.
-Both archive moves and all closeout docs must accompany the eventual S4A PR.
+Historical S3B successor (now complete): [S4A pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) and [starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md), separate G3 pending.
+Both S3B archive moves and closeout docs were included in the merged S4A PRs.
+
+## S4A completed and archived — 2026-09-10
+
+[Final task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) and [historical starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) retain implementation, review fixes, security, operator smoke/full-suite and verified merge evidence. Next active slice: [S4B](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md), separate G3 pending.

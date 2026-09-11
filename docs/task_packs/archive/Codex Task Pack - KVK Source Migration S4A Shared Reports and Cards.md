@@ -1,9 +1,19 @@
 # Codex Task Pack — KVK Source Migration S4A Shared Reports and Cards
 
+## Archived final closeout — 2026-09-10
+
+**S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
+Operator candidate smoke on `055b9590e1114661ff0369c7815fbbea82661454` passed imports, registration **36/100** without drift/duplicates, **134 focused tests in 11.97s**, and **3,810 full-suite tests with 34 skipped in 134.19s**. Both pytest runs left operational logs unchanged. This closes the S4A full-suite gap; earlier stalls and passes remain historical evidence, not a post-merge rerun.
+Local mirror `main` is `7baf92c7badc3f40006841046825a788bc823373`; local `production/main` is `021fc7adc9952ab07d21517e8e47f3966c285f7a`; SQL `main` remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Bot and SQL checkouts were clean at closeout entry. Local pulls are complete, per operator and local refs; **nothing has been pulled to the bot machine**.
+S4A pack/starter are archived. **Next: S4B Versioned Exports and Delivery in a new chat, with separate S4B G3 approval.** S4B's pack requires all pending closeout documents and both archive rename sides in its eventual separately authorized PR. Prior S3B closeout documents were included in the merged S4A PRs.
+Source routing remains disabled. No bot-machine update/restart, SQL deployment, live imports/exports, Discord action or activation is needed for S4B local development. Use mocks/fake destinations unless a disposable SQL target and exact operations are explicitly authorized first; preserve retained S2A/S2B/S3B databases. Historical prerequisite wording below does not reopen completed slices.
+
+Seven review findings were fixed in both PRs and all seven threads resolved. Separate Changes security reviews, Deep off, completed with zero findings: mirror `7e4ae070-0ce3-4444-946c-5dac9238b24d`, private `f292412a-a94d-4293-aade-559d0e2311e1`. Exact coverage and earlier implementation evidence remain below. Live SQL/Discord integration was not performed. All following approval requests, readiness exceptions and entry instructions are historical; do not execute this archived starter/pack again.
+
 ## Current entry handoff — 2026-09-10
 
 S1/S2A/S2B/S3A/S3B are accepted and merged. S3B mirror #267/private #574 merge and post-merge
-smoke evidence are retained in the [archived S3B pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md).
+smoke evidence are retained in the [archived S3B pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S3B%20Acceptance%20and%20Atomic%20Publication.md).
 Start S4A in a new chat using its matching starter when granting **S4A G3**; this documentation
 closeout does not grant it. Verify actual branches/HEADs/remotes/status before any edits.
 Current mirror main `02385a0edc0ec83f77241e02648eabb3b7640ea6`; private main
@@ -60,9 +70,9 @@ unrelated files. Reconcile actual staged paths and preservation/link evidence be
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.

@@ -169,3 +169,15 @@ limits. Keep private player rows/credentials/findings out of Git. No PR creation
 preparation. End with slice status and next required gate.
 
 **Prepared only. S6 G3 pending; no implementation executed.**
+
+
+## Required S4B operational evidence handoff - 2026-09-11
+
+Read the [named follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups). Carry **S6-OPS01, S6-PERF01 and S6-CAP01** as explicit open activation gates into both planned release documents. Owner: S6 readiness author for the plan/evidence, Chris Watts for operational approval and acceptance.
+
+- [ ] S6-OPS01: prepare exact disposable targets and process-interruption points for private writes, Viewer grants and current-pointer updates. Require durable phase/fence/receipt, external readback, quarantine/uncertainty handling and no duplicate publication after restart.
+- [ ] S6-PERF01: agree acceptable duration/cadence and shared request budget before measuring representative multipart synthetic uploads and complete readbacks. Record player/period volumes, actual API counts, bytes/cells, elapsed time and quota/retry outcomes; account for other service-account consumers without running production operations.
+- [ ] S6-CAP01: size current/staging, final/reference retention and private-recovery quarantine, verify exact provisioned owner/Editor/canShare/audience configuration, and rehearse insufficient slots/bounded receipt exhaustion with safe fail-closed handling. Nine initial files is not a lifetime cap. Any new code/schema helper needs separate bounded approval.
+- [ ] Include evidence paths, exact revisions/targets, actual outcomes and operator acceptance or an explicit unresolved blocker for every ID. Do not mark activation ready while any gate lacks its required evidence.
+
+S6 remains documentation-only through G3. Prepare concrete reviewable rehearsal steps and stop for separate G4/exact-operation authorization before execution. This handoff grants no live SQL, file write, message, restart, deployment or activation permission and does not run the future pack.

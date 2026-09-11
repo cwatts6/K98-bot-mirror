@@ -175,3 +175,16 @@ limits. Keep private player rows/credentials/findings out of Git. No PR creation
 preparation. End with slice status and next required gate.
 
 **Prepared only. S5B G3 pending; no implementation executed.**
+
+
+## Required S4B handoff checks - 2026-09-11
+
+Read the [named follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) before S5B implementation. **S5B-REC01 is required for S5B acceptance**, not optional debt. S4B-MP01 supplies component-level synthetic multi-period coverage; it does not prove this worker/caller wiring.
+
+- [ ] Prove default-off startup, one worker registration, bounded off-event-loop calls and clean cancellation.
+- [ ] Prove a committed endpoint request survives importer return error and resumes after restart using disposable SQL.
+- [ ] Compose the actual caller with S4B delivery: when either included period changes, pass that changed selection as anchor, recheck all selections, preserve the other period and deduplicate receipt reload. An unchanged confirmed anchor with a new combined key must fail closed.
+- [ ] Preserve uncertain receipts and private quarantine; no TTL reclaim, blind send/edit replacement or automatic public repost. Daily three-claim ownership is unchanged.
+- [ ] Record exact tests, SQL target/revision, runtime gates and remaining S6-OPS01/S6-PERF01/S6-CAP01 evidence. Do not claim deterministic restart tests are real in-flight Google interruption proof.
+
+These clarify testing of the existing S5B integration boundary. They do not expand its runtime/SQL file manifest, authorize a later slice, or permit production/external operations. S5B G3 and predecessors remain separate prerequisites.
