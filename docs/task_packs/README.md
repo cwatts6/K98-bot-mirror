@@ -1,5 +1,54 @@
 # Task Packs
 
+## Current status — S7 approved; S8A pack prepared, 2026-09-12
+
+Chris Watts approved the S7 contract and exact implementation manifests, then authorized
+preparation of the next pack and starter. The approved technical direction includes initial
+account serialization, durable legacy snapshots with worker affinity where needed, and the
+stated quarantine/reserve allowance. Settled S7 decisions are not reopened.
+
+**Next: S8A SQL Foundation, after separate file-implementation authorization.**
+[Task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md); [implementation starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md).
+Preparation is documentation-only. No S8A SQL/runtime/config implementation, database
+execution, Git publication or activation is authorized by this status. Preserve the full
+27-path Bot carry-forward union, including both S6 archive move sides and both S7 outputs;
+SQL implementation belongs in its own repository and review. Historical status blocks below
+retain their original evidence; this latest status supersedes pending S7 review wording.
+
+## Current delivery and next slice — 2026-09-12 post-S6 closeout
+
+**S6 evidence/rehearsal delivered, accepted and merged; feature activation remains blocked.**
+Mirror [#272](https://github.com/cwatts6/K98-bot-mirror/pull/272) merged at
+19:20:50 UTC as `016df1e61c8017556a7e8ba8374d31375aebfb74`; production-repository
+[#579](https://github.com/cwatts6/k98-bot/pull/579) merged at 19:21:34 UTC as
+`a8c9c515066ca6ef079120b76dd160e3389badab` (reviewed/final head
+`b9c84751d3cc1deaba0a5772ab45d89263fcb398`). Mirror review fix `fa1f4733` records
+the missing public routing consumer. Bot local main/origin main is
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`; SQL main/origin main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both were clean at this update's entry.
+
+Operator reports merged and deployed locally, with nothing pushed to production.
+GitHub confirms the production-repository merge above; **no production runtime or
+bot-machine deployment, source activation, or fresh post-merge smoke is claimed**.
+Local deployment is operator-attested; exact running process/config was not checked.
+
+All preceding slices remain accepted. S6-OPS01/PERF01/CAP01 retain their open
+operational components; accepted measured evidence is not pending reapproval.
+The newly agreed requirements are fixed source per KVK for all affected outputs,
+matched-pair public publication, confirmed reuse of an unchanged correction
+counterpart, import-triggered serialized/latest-pending exports, export-only
+recovery, retained input/publication history and safe output reuse after each KVK.
+These are requirements, not claims of implemented behavior.
+
+**Next: S7 Integration Contract and Implementation Planning**, documentation/read-only
+scope after explicit S7 approval. Do not rerun predecessors or start later packs.
+Carry every path in the post-S6 handoff manifest into the next separately authorized
+slice PR, including both S6 archive move sides. No Git publication, SQL/provider
+execution, restart, production promotion or activation is authorized by this update.
+Earlier dated blocks below are historical and do not select the next task.
+
+[Settled requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md); [handoff and exact manifest](../reference/kvk_source_migration/post_s6_handoff_log.md); [S7 pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
+
 > **2026-09-12 S6 authenticated rehearsal update:** The operator restored the ignored
 > local credential and approved the 5,806-player × ten-period synthetic benchmark,
 > confirming both other importers would remain idle. Actual Google write/readback
@@ -1088,9 +1137,18 @@ Phase 2B planning delivery did not authorize implementation or deployment. S6 pr
 | S4B | [Versioned Exports and Delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md) |
 | S5A (accepted, merged; archived) | [Private Intake and Admin Controls](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) |
 | S5B (accepted, merged; archived) | [Endpoint Config and Recovery Integration](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) |
-| S6 | [Release Readiness and Controlled Activation](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) |
+| S6 (evidence archived) | [Release Readiness and Controlled Activation](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) |
+| S7 (next; approval pending) | [Integration Contract and Implementation Planning](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) |
 
 
 ## Historical S4B validation follow-up - 2026-09-11
 
 S4B is accepted and merged; the current closeout record and archived pack supersede historical review-pending text. The remaining synthetic multi-period component test is complete. Track the [named follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) for completed S5B integration and open S6 operational interruption, shared-quota throughput and capacity gates. The S6 gates remain explicit acceptance work, not permission to execute future packs or activate routing.
+
+## Post-S6 active navigation
+
+- [Settled integration requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md)
+- [Closeout and next-slice carry-forward manifest](../reference/kvk_source_migration/post_s6_handoff_log.md)
+- [S7 task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md)
+- [S7 starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md)
+- [Archived S6 evidence pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md)

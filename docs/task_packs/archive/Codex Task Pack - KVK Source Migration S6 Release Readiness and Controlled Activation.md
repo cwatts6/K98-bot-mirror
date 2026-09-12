@@ -1,5 +1,10 @@
 # Codex Task Pack — KVK Source Migration S6 Release Readiness and Controlled Activation
 
+> **Archived 2026-09-12: S6 evidence delivery is merged and operator accepted.**
+> This pack is retained history, not executable instructions. Public routing and
+> residual release gates remain open; no activation is claimed.
+> Next: [S7 planning](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md). Exact closeout: [handoff](../../reference/kvk_source_migration/post_s6_handoff_log.md).
+
 > **2026-09-12 PR #272 routing review correction:** Public runtime routing is an
 > OPEN implementation prerequisite. The current code does not consume
 > SourceRouting.Enabled to switch ordinary readers to V2. The routing-row update
@@ -55,7 +60,7 @@
 > Current 2026-09-12: explicit S6 G3 approved documentation/evidence preparation only.
 > Prepared release evidence; stop at G4, with OPS01/PERF01/CAP01 open and G5 operator-owned.
 > Historical prepared/pending wording below is retained as the original template, not current status.
-> See [canonical S6 delivery](../reference/kvk_source_migration/release_evidence_log.md).
+> See [canonical S6 delivery](../../reference/kvk_source_migration/release_evidence_log.md).
 
 
 ## 1. Task Header
@@ -70,9 +75,9 @@
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -170,8 +175,8 @@ in implementation-plan section 4; final name must be recorded before authoring a
 - `docs/reference/kvk_source_migration/phase_2_implementation_plan.md`
 - `docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md`
 - `docs/reference/local_sql_development.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/KVK Source Migration - Programme Pack.md`
 - `docs/task_packs/README.md`
 - `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
@@ -254,7 +259,7 @@ preparation. End with slice status and next required gate.
 
 ## Required S4B operational evidence handoff - 2026-09-11
 
-Read the [named follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups). Carry **S6-OPS01, S6-PERF01 and S6-CAP01** as explicit open activation gates into both planned release documents. Owner: S6 readiness author for the plan/evidence, Chris Watts for operational approval and acceptance.
+Read the [named follow-up register](../../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups). Carry **S6-OPS01, S6-PERF01 and S6-CAP01** as explicit open activation gates into both planned release documents. Owner: S6 readiness author for the plan/evidence, Chris Watts for operational approval and acceptance.
 
 - [ ] S6-OPS01: prepare exact disposable targets and process-interruption points for private writes, Viewer grants and current-pointer updates. Require durable phase/fence/receipt, external readback, quarantine/uncertainty handling and no duplicate publication after restart.
 - [ ] S6-PERF01: agree acceptable duration/cadence and shared request budget before measuring representative multipart synthetic uploads and complete readbacks. Record player/period volumes, actual API counts, bytes/cells, elapsed time and quota/retry outcomes; account for other service-account consumers without running production operations.
@@ -267,7 +272,7 @@ S6 remains documentation-only through G3. Prepare concrete reviewable rehearsal 
 ## S5B accepted closeout and S6 entry - 2026-09-12
 
 S5B is complete, accepted, successfully smoke tested and merged (#271/#578). Read the
-[archived S5B delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md).
+[archived S5B delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md).
 Local mirror main/origin main is 85f303f6bd82bdc9a5cfc2d713da5480e1fa694a, synchronized from
 production merge c7e063f02ebe8287a584d0054ea14f91a0c0ecc6 and containing review fix e5bbd8f7.
 SQL main is 44afa315dd6cbfe9fec101f2a39a62e534f5b583. These are entry anchors, not instructions
@@ -314,9 +319,9 @@ changed. Documentation remains local and uncommitted for S6 carry-forward; no PR
 
 This dated record supersedes the historical G3-pending/prepared-only text above.
 **Evidence preparation delivered; stopped at G4. Activation is not ready; G5 is operator-owned.**
-The [canonical S6 evidence log](../reference/kvk_source_migration/release_evidence_log.md)
+The [canonical S6 evidence log](../../reference/kvk_source_migration/release_evidence_log.md)
 contains the complete exact manifest, historical test/security identities, actual validation and gaps.
-The [release readiness and rollback packet](../reference/kvk_source_migration/release_readiness_and_rollback.md)
+The [release readiness and rollback packet](../../reference/kvk_source_migration/release_readiness_and_rollback.md)
 contains proposed operations only, with unbound live values and explicit stop conditions.
 
 ### 1. Summary

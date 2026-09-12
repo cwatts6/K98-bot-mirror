@@ -1,5 +1,39 @@
 # KVK Source Migration — Phase 2A synthetic acceptance scenarios
 
+## Current delivery and next slice — 2026-09-12 post-S6 closeout
+
+**S6 evidence/rehearsal delivered, accepted and merged; feature activation remains blocked.**
+Mirror [#272](https://github.com/cwatts6/K98-bot-mirror/pull/272) merged at
+19:20:50 UTC as `016df1e61c8017556a7e8ba8374d31375aebfb74`; production-repository
+[#579](https://github.com/cwatts6/k98-bot/pull/579) merged at 19:21:34 UTC as
+`a8c9c515066ca6ef079120b76dd160e3389badab` (reviewed/final head
+`b9c84751d3cc1deaba0a5772ab45d89263fcb398`). Mirror review fix `fa1f4733` records
+the missing public routing consumer. Bot local main/origin main is
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`; SQL main/origin main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both were clean at this update's entry.
+
+Operator reports merged and deployed locally, with nothing pushed to production.
+GitHub confirms the production-repository merge above; **no production runtime or
+bot-machine deployment, source activation, or fresh post-merge smoke is claimed**.
+Local deployment is operator-attested; exact running process/config was not checked.
+
+All preceding slices remain accepted. S6-OPS01/PERF01/CAP01 retain their open
+operational components; accepted measured evidence is not pending reapproval.
+The newly agreed requirements are fixed source per KVK for all affected outputs,
+matched-pair public publication, confirmed reuse of an unchanged correction
+counterpart, import-triggered serialized/latest-pending exports, export-only
+recovery, retained input/publication history and safe output reuse after each KVK.
+These are requirements, not claims of implemented behavior.
+
+**Next: S7 Integration Contract and Implementation Planning**, documentation/read-only
+scope after explicit S7 approval. Do not rerun predecessors or start later packs.
+Carry every path in the post-S6 handoff manifest into the next separately authorized
+slice PR, including both S6 archive move sides. No Git publication, SQL/provider
+execution, restart, production promotion or activation is authorized by this update.
+Earlier dated blocks below are historical and do not select the next task.
+
+[Settled requirements](post_s6_integration_requirements.md); [handoff and exact manifest](post_s6_handoff_log.md); [S7 pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
+
 2026-09-09. Proposed executable-test requirements for G2 review, **not test implementation or
 passing runtime evidence**. All player/kingdom/camp identities and numbers below are synthetic.
 Source coverage counts in the evidence log are observations, not fixtures or universal constants.
@@ -141,3 +175,54 @@ Worked arithmetic is document evidence only; actual safe document check results 
 [validation log](phase_2_evidence_and_validation_log.md). Optional real aggregate revision samples
 can follow; no unavailable later fight or final overall report is required to review these cases.
 **Stop at G2.**
+
+## Post-S6 acceptance additions — required, not executed
+
+These supplement the original T01–T70 evidence without changing historical results.
+S7 assigns exact test files; later implementation validates these at its own revisions.
+
+| ID | Scenario and required outcome |
+|---|---|
+| S7-T01 | Fixed legacy/new source selected before KVK; cross-source import and mid-KVK change rejected; restart retains choice |
+| S7-T02 | Every affected ordinary public output selects chosen source; no diagnostic injection required; disable/unavailable never silently changes season source |
+| S7-T03 | Player-first and aggregate-first acceptance both wait; only compatible complete pair advances public publication and export intent |
+| S7-T04 | Wrong KVK/period/coverage/revision pairing fails closed; adjacent upload time cannot pair reports |
+| S7-T05 | One-side correction reuses exact counterpart only with validity confirmation; original input remains immutable; no extra player ScanID for aggregate/semantic duplicates |
+| S7-T06 | Failed/missing second upload leaves last complete eligible output with honest age/pending state; first-ever pair shows waiting; stale endpoint config cannot leave old final labelled current |
+| S7-T07 | B0/no-fight/overall/config-only paths have explicit compatible rules; no fabricated aggregate or fight-sum overall; authorized EndScanID14 yields14−10 without extra correction command |
+| S7-T08 | Complete publication and export intent commit atomically; kill before/after commit cannot lose or duplicate eligible work |
+| S7-T09 | New complete B/C arrive during export A: A finishes, latest C follows; B inputs/publication persist although its pending export was coalesced |
+| S7-T10 | New-source, all-KVK and scan-data automatic/manual callers across processes cannot perform conflicting writes; pacing, fairness and SQL/provider lock boundaries are verified |
+| S7-T11 | Restart/worker loss/late completion preserve pinned generation and durable queue; uncertain grant/pointer outcome blocks unsafe advancement and survives restart |
+| S7-T12 | Admin export-only queues without import/recalculation; repeated request is idempotent; unauthorized user rejected; existing running/confirmed status is explicit |
+| S7-T13 | Damaged confirmed output rebuild is separately explicit and audited; does not counterfeit import/publication history or bypass uncertainty reconciliation |
+| S7-T14 | Rollover fences old-season writers, resets stale tabs safely, reuses eligible pool and preserves input/publication/receipt history; current/quarantined uncertain files cannot be silently reused |
+| S7-T15 | Capacity/receipt exhaustion leaves current output intact; no evidence truncation; no assumption that initial pool size is a lifetime guarantee |
+| S7-T16 | Full consumer matrix includes caches, scheduled/indirect readers and live stale views; daily SCANORDER/claim ownership and authoritative aggregate precision remain unchanged |
+
+All cases above are planned coverage only. Existing S6 measurements are retained at
+their exact tested revisions; no new runtime test pass is asserted by this amendment.
+
+## S7 contract traceability — planning delivered, tests not executed
+
+S7 documentation/read-only approval is recorded. See the
+[exact S7-T01–T16 test allocation](integration_implementation_manifests.md#8-test-plan-with-actual-outcomes)
+and [complete contract](integration_contract_and_consumer_matrix.md). Existing T01–T70
+results remain accepted at their tested revisions. Public behavior amendments are:
+
+- T36: incomplete overall remains privately inspectable; public overall waits for its
+  separate matched overall report or labels a previously complete output as previous.
+- T40: final aggregate alone cannot advance ordinary public selection; stream acceptance
+  remains independent, paired public eligibility is separate. No generic final-unavailable
+  substitute bypasses normal matched combat publication.
+- T49/T51: candidate association is an explicit sealed update, not whichever two selected
+  stream revisions happen to be latest; public CAS prevents stale builders.
+- T58: never-started stale pending export is coalesced; already running A finishes before
+  latest complete pending C. Destination/epoch fencing prevents late older overwrite.
+- T66: a fixed new-source season disables to unavailable/labelled previous output, never
+  changes source to legacy. Historical legacy seasons retain their own choice.
+- T68–T70: matched counterparts gate public selection while exact 11−10, 12−10, 13−10
+  and authorized 14−10 remain unchanged. Counterpart validity can be confirmed in the
+  normal endpoint/config action; no second player correction command is introduced.
+
+These are future implementation assertions, not fresh passes or predecessor reapproval.

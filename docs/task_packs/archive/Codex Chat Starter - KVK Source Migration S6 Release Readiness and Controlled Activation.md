@@ -1,5 +1,10 @@
 # Codex Chat Starter — KVK Source Migration S6 Release Readiness and Controlled Activation
 
+> **Archived 2026-09-12: S6 evidence delivery is merged and operator accepted.**
+> This pack is retained history, not executable instructions. Public routing and
+> residual release gates remain open; no activation is claimed.
+> Next: [S7 planning](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md). Exact closeout: [handoff](../../reference/kvk_source_migration/post_s6_handoff_log.md).
+
 > **2026-09-12 S6 authenticated rehearsal update:** The operator restored the ignored
 > local credential and approved the 5,806-player × ten-period synthetic benchmark,
 > confirming both other importers would remain idle. Actual Google write/readback
@@ -31,7 +36,7 @@
 > Current 2026-09-12: explicit S6 G3 approved documentation/evidence preparation only.
 > Prepared release evidence; stop at G4, with OPS01/PERF01/CAP01 open and G5 operator-owned.
 > Historical prepared/pending wording below is retained as the original template, not current status.
-> See [canonical S6 delivery](../reference/kvk_source_migration/release_evidence_log.md).
+> See [canonical S6 delivery](../../reference/kvk_source_migration/release_evidence_log.md).
 
 
 Prepared 2026-09-09 during Phase 2B. **Not executed; S6 G3 pending.**
@@ -58,13 +63,13 @@ use Changes at exact separate repo targets, Deep off; no standard/deep scan or a
 
 ## Required carried-forward validation
 
-Read the [S4B follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) and this pack's 2026-09-11 handoff appendix. Track S6-OPS01, S6-PERF01 and S6-CAP01 explicitly through acceptance. Preserve exact evidence and unresolved gates. This reminder does not approve execution or expand the pack's operation/file permissions.
+Read the [S4B follow-up register](../../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) and this pack's 2026-09-11 handoff appendix. Track S6-OPS01, S6-PERF01 and S6-CAP01 explicitly through acceptance. Preserve exact evidence and unresolved gates. This reminder does not approve execution or expand the pack's operation/file permissions.
 
 
 ## S5B accepted closeout and S6 entry - 2026-09-12
 
 S5B is complete, accepted, successfully smoke tested and merged (#271/#578). Read the
-[archived S5B delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md).
+[archived S5B delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md).
 Local mirror main/origin main is 85f303f6bd82bdc9a5cfc2d713da5480e1fa694a, synchronized from
 production merge c7e063f02ebe8287a584d0054ea14f91a0c0ecc6 and containing review fix e5bbd8f7.
 SQL main is 44afa315dd6cbfe9fec101f2a39a62e534f5b583. These are entry anchors, not instructions

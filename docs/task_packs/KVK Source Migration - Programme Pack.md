@@ -1,5 +1,54 @@
 # KVK Source Migration — Programme Pack
 
+## Current status — S7 approved; S8A pack prepared, 2026-09-12
+
+Chris Watts approved the S7 contract and exact implementation manifests, then authorized
+preparation of the next pack and starter. The approved technical direction includes initial
+account serialization, durable legacy snapshots with worker affinity where needed, and the
+stated quarantine/reserve allowance. Settled S7 decisions are not reopened.
+
+**Next: S8A SQL Foundation, after separate file-implementation authorization.**
+[Task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md); [implementation starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md).
+Preparation is documentation-only. No S8A SQL/runtime/config implementation, database
+execution, Git publication or activation is authorized by this status. Preserve the full
+27-path Bot carry-forward union, including both S6 archive move sides and both S7 outputs;
+SQL implementation belongs in its own repository and review. Historical status blocks below
+retain their original evidence; this latest status supersedes pending S7 review wording.
+
+## Current delivery and next slice — 2026-09-12 post-S6 closeout
+
+**S6 evidence/rehearsal delivered, accepted and merged; feature activation remains blocked.**
+Mirror [#272](https://github.com/cwatts6/K98-bot-mirror/pull/272) merged at
+19:20:50 UTC as `016df1e61c8017556a7e8ba8374d31375aebfb74`; production-repository
+[#579](https://github.com/cwatts6/k98-bot/pull/579) merged at 19:21:34 UTC as
+`a8c9c515066ca6ef079120b76dd160e3389badab` (reviewed/final head
+`b9c84751d3cc1deaba0a5772ab45d89263fcb398`). Mirror review fix `fa1f4733` records
+the missing public routing consumer. Bot local main/origin main is
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`; SQL main/origin main remains
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Both were clean at this update's entry.
+
+Operator reports merged and deployed locally, with nothing pushed to production.
+GitHub confirms the production-repository merge above; **no production runtime or
+bot-machine deployment, source activation, or fresh post-merge smoke is claimed**.
+Local deployment is operator-attested; exact running process/config was not checked.
+
+All preceding slices remain accepted. S6-OPS01/PERF01/CAP01 retain their open
+operational components; accepted measured evidence is not pending reapproval.
+The newly agreed requirements are fixed source per KVK for all affected outputs,
+matched-pair public publication, confirmed reuse of an unchanged correction
+counterpart, import-triggered serialized/latest-pending exports, export-only
+recovery, retained input/publication history and safe output reuse after each KVK.
+These are requirements, not claims of implemented behavior.
+
+**Next: S7 Integration Contract and Implementation Planning**, documentation/read-only
+scope after explicit S7 approval. Do not rerun predecessors or start later packs.
+Carry every path in the post-S6 handoff manifest into the next separately authorized
+slice PR, including both S6 archive move sides. No Git publication, SQL/provider
+execution, restart, production promotion or activation is authorized by this update.
+Earlier dated blocks below are historical and do not select the next task.
+
+[Settled requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md); [handoff and exact manifest](../reference/kvk_source_migration/post_s6_handoff_log.md); [S7 pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
+
 > **2026-09-12 S6 authenticated rehearsal update:** The operator restored the ignored
 > local credential and approved the 5,806-player × ten-period synthetic benchmark,
 > confirming both other importers would remain idle. Actual Google write/readback
@@ -151,10 +200,10 @@ retained as history; accepted slices stay closed and S5A/S5B/S6 retain separate 
 | Bot remote supplied by operator | `cwatts6/K98-bot-mirror` |
 | SQL working copy | `C:\K98-bot-SQL-Server` |
 | SQL remote supplied by operator | `cwatts6/K98-bot-SQL-Server` |
-| Current stage | S1/S2A/S2B/S3A/S3B/S4A complete and merged; S4B next, separate G3 pending |
-| One-pass implementation approved | S1/S2A/S2B delivered; no successor approval |
-| Runtime, SQL, configuration or deployment changes approved | S2B SQL and named disposable validation completed; no production deployment or activation |
-| Current permitted output | S4A documentation/archive closeout; S4B implementation requires separate G3 |
+| Current stage | S1–S5B accepted; S6 evidence merged/accepted; S7 integration planning is next |
+| One-pass implementation approved | Current documentation refresh only; S7 execution and subsequent implementation require their own approval |
+| Runtime, SQL, configuration or deployment changes approved | No new runtime/SQL/live action; local deployment operator-reported, production runtime unverified and activation incomplete |
+| Current permitted output | Post-S6 closeout, archive/link repairs, settled requirements and next S7 pack/starter |
 
 The operator reports both working copies and their Git repositories are synced. Codex must verify their actual branches, commit IDs and working-tree state rather than assume a branch name or deployed version. This pack was prepared from the supplied discussion, source assessment and task template; it does **not** certify that the current code or production SQL has already been audited.
 
@@ -252,7 +301,7 @@ Record scan start in UTC independently of import time. Validate the suffix parse
 
 Two independently uploaded sources must not accidentally obtain or share their window identity merely because they arrive consecutively. Conversely, source observations at different times must not be presented as a simultaneous scan without an approved mapping. Explain how both streams can resolve the same logical window using the existing conventions.
 
-## 6. Programme phases
+## 6. Original programme phases — historical roadmap
 
 | Phase | Scope and deliverable | Exit condition | Execution status |
 |---|---|---|---|
@@ -261,6 +310,8 @@ Two independently uploaded sources must not accidentally obtain or share their w
 | **3 — Persistence and new ingestion** | Implement only approved persistence/metadata changes and separate player/aggregate ingestion using established validation/admission. Leave new publication disabled; preserve old importer. | Offline/isolated tests and contract checks pass; idempotency, correction, rollback and source isolation demonstrated. | Planned; split SQL/bot PRs as supported by audit. |
 | **4 — Processing and downstream reporting** | Apply approved window/roster rules; publish source-aware datasets through audited DAL/services; adapt every affected report, command, embed/card, export and cache. | Consumer matrix closed; exact and precision-aware checks pass; historical/legacy regressions pass; no unexpected public output. | Planned. |
 | **5 — Controlled release and close-out** | Approved deployment sequence, private/shadow evidence, operator smoke, controlled source activation and recovery rehearsal; update runbooks and programme status. | Operator accepts results; legacy fallback limits documented; no unresolved critical data-integrity issue. | Planned. |
+
+The original status column below is historical; the post-S6 amendment and current delivery block govern actual progress. The S1–S6 slices implemented parts of these phases; S7–S11 close integration and release gaps.
 
 The audit may recommend smaller implementation slices or a different ordering. Update this roadmap with rationale after approval. Do not generate speculative migration scripts or runnable later-phase tasks before the relevant decisions are settled.
 
@@ -495,3 +546,50 @@ is authorized by this delivery. S6 prepares readiness evidence and stops at sepa
 ## Historical S4B validation handoff - 2026-09-11
 
 S4B-MP01 component coverage is complete; S4B remains local for review. The [follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) assigns S5B-REC01 to integration acceptance and S6-OPS01/S6-PERF01/S6-CAP01 to explicit pre-activation evidence. Future packs and starters carry those IDs. Next sequence remains S4B review/closeout, then separately approved S5A, S5B and S6; nothing advances automatically. Include the four additionally updated S5B/S6 pack/starter paths in the eventual S4B documentation handoff alongside all original thirteen documents/fifteen paths.
+
+## Post-S6 delivery amendment — current sequence
+
+The original programme Phase 2 produced the architecture/implementation plan;
+its Phase 3 covers ingestion/persistence, Phase 4 downstream consumers, and Phase 5
+release. S1–S6 are the later delivery slices across those responsibilities, not a
+second sequence to restart at Phase 3. The routing gap belongs to downstream
+integration before release. The following slice names are planning identifiers;
+none grants runtime or operational approval. S7 will refine/split exact PR boundaries
+where evidence warrants, preserving accepted S1–S6 outputs.
+
+| Slice | Required result | Dependency / exit |
+|---|---|---|
+| S1–S5B | Accepted foundations, adapters, exports, intake and recovery/config integration | Remain delivered/accepted; existing tests are retained at their actual revisions |
+| S6 | Accepted synthetic release evidence and documented blockers | Archived as evidence delivery only; OPS01/PERF01/CAP01 and missing public routing are not closed |
+| S7 — Integration Contract and Implementation Planning | Complete consumer/caller matrix; fixed-source, pair/correction, queue/recovery and rollover contracts; exact Bot/SQL/test/security manifests | Next bounded documentation slice; use settled S7-D01–D09, stop for design/implementation approval |
+| S8 — Season Source and Matched Publication Integration | Durable immutable source choice, validated pair identity/counterpart reuse, atomic eligible publication and export intent; no partial public update | S7-approved manifests; separate SQL and Bot review targets/PRs where schema changes are needed; offline/disposable evidence only when authorized |
+| S9 — Public Reader Integration | Every affected ordinary report/card/command/export/cache consumes the fixed source and complete pinned publication; unavailable/stale states and no silent source fallback | S8 contracts; close the complete consumer matrix, including scheduled and indirect callers; routing remains off pending release |
+| S10 — Export Coordination and Operator Recovery | Shared conflict protection across three consumers, durable latest-pending queue, safe manual export/rebuild, bounded pool and season rollover | S8/S9 contracts; split queue and operator/rollover PRs if needed after S7 scope; common manual/automatic admission and restart proof |
+| S11 — Controlled Release and Acceptance | Integrate new evidence with retained S6 measurements; verify actual deployed SQL/config/consumers, authorize exact activation/rollback and perform operator smoke | S8–S10 accepted plus updated OPS01/PERF01/CAP01; separate exact G4 operations and G5 acceptance |
+
+S7 is not another general source audit: use the existing C01–C65 matrix and exact
+implementation as the starting point, and trace the missing connections. It must
+identify all affected outputs under D02 while preserving source-independent daily
+SCANORDER/claim ownership, authoritative aggregate/overall semantics, frozen B0,
+UTC and exact endpoint/deduplication contracts. Do not add general reliability WS1
+work unless a concrete required dependency is evidenced and separately scoped.
+
+The S6 benchmark remains 5,806 synthetic players × ten fight periods, two parts,
+37m 29s export including full readback (991 export calls; no recorded HTTP errors),
+plus 92.281s generation load. The operator accepted it. It is not a load test of the
+future shared queue, public consumers or production process. Repeat only affected
+scenarios when new implementation justifies it; do not rerun predecessors by default.
+
+### Carried gates after decisions
+
+| Gate | Accepted evidence / settled decision | Remaining work and owner |
+|---|---|---|
+| S6-OPS01 | Synthetic private recovery, pointer acknowledgment-loss reconciliation, grant uncertainty and safe blocking measured/accepted | S8–S10 implement new state transitions; S11 accepts their interruption/restart/rollback evidence. Retain both uncertain rehearsal publications without blind retry/reclaim. Chris Watts owns exact operational disposition. |
+| S6-PERF01 | Benchmark accepted; import-triggered exports normally 1–2/day, peak 2–3/day; no hard duration cap; finish current then latest pending | S7 designs and S10 proves common admission/pacing/fairness across all relevant callers/processes; S11 accepts runtime behavior. No fixed scheduled cadence question remains. |
+| S6-CAP01 | Multipart/ACL/receipt/insufficient-slot evidence accepted; no old spreadsheet archive required after KVK; input/publication history retained | S7 sizes active/staging/quarantine/reserve; S10 implements safe rollover and stale-writer fencing; S11 accepts. No retention-horizon question for old spreadsheet archives remains. |
+| Public routing prerequisite | PR #272 finding confirmed and documentation corrected | S7 maps all consumers; S8/S9 implement source choice and ordinary-reader selection; S11 verifies deployed behavior. A routing-row update alone is not activation. |
+
+Engineering open items belong in S7 outputs with owners and exact evidence, not as
+repeated product questions. The requirements amendment supersedes public partial
+publication, mid-KVK source fallback and mandatory old-spreadsheet archival wording.
+Independent private input acceptance and historical publication/audit retention remain.

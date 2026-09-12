@@ -694,10 +694,10 @@ This continuation changes only `tests/test_kvk_source_delivery.py` and the follo
 - `docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md`
 - `docs/task_packs/Codex Chat Starter - KVK Source Migration S4B Versioned Exports and Delivery.md`
 - `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/Codex Task Pack - KVK Source Migration S4B Versioned Exports and Delivery.md`
 - `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/KVK Source Migration - Programme Pack.md`
 - `docs/task_packs/README.md`
 
@@ -705,8 +705,8 @@ The eventual separately authorized S4B PR must preserve the original thirteen-do
 
 - `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
 - `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 
 Total documentation handoff: **seventeen logical documents / nineteen physical paths**, alongside the unchanged nine-Python-file S4B implementation manifest. This is a documentation-only expansion authorized by the current request, not permission to implement another slice or stage unrelated files.
 
