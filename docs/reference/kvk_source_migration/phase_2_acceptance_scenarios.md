@@ -189,7 +189,7 @@ S7 assigns exact test files; later implementation validates these at its own rev
 | S7-T04 | Wrong KVK/period/coverage/revision pairing fails closed; adjacent upload time cannot pair reports |
 | S7-T05 | One-side correction reuses exact counterpart only with validity confirmation; original input remains immutable; no extra player ScanID for aggregate/semantic duplicates |
 | S7-T06 | Failed/missing second upload leaves last complete eligible output with honest age/pending state; first-ever pair shows waiting; stale endpoint config cannot leave old final labelled current |
-| S7-T07 | B0/no-fight/overall/config-only paths have explicit compatible rules; no fabricated aggregate or fight-sum overall; authorized EndScanID14 yields14−10 without extra correction command |
+| S7-T07 | B0/no-fight/overall/config-only paths have explicit compatible rules; no fabricated aggregate or fight-sum overall; authorized EndScanID 14 yields 14−10 without extra correction command |
 | S7-T08 | Complete publication and export intent commit atomically; kill before/after commit cannot lose or duplicate eligible work |
 | S7-T09 | New complete B/C arrive during export A: A finishes, latest C follows; B inputs/publication persist although its pending export was coalesced |
 | S7-T10 | New-source, all-KVK and scan-data automatic/manual callers across processes cannot perform conflicting writes; pacing, fairness and SQL/provider lock boundaries are verified |

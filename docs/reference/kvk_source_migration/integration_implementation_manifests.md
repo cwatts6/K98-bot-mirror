@@ -444,7 +444,7 @@ dead-code deletion or new dependency is proposed. No unrelated actionable debt i
 | S7-T03 | S8B/C | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_source_upload_route.py` | Both upload orders; first side cannot select publicly/enqueue; exact complete UpdateID |
 | S7-T04 | S8A/B | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_source_sql_integration.py` | Wrong source/KVK/period/coverage/roster/config/revision; SQL scoped FKs and stale CAS |
 | S7-T05 | S8B/C | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_source_import_view.py`; `tests/test_kvk_source_import_dal.py` | Explicit retained counterpart/actor, semantic alias/correction replay; no extra aggregate ScanID |
-| S7-T06 | S8B/S9A | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_public_routing.py`; `tests/test_kvk_source_recovery.py` | Failed second side preserves previous label; first pair waiting; desired14 old13 not current final |
+| S7-T06 | S8B/S9A | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_public_routing.py`; `tests/test_kvk_source_recovery.py` | Failed second side preserves previous label; first pair waiting; desired 14 old 13 not current final |
 | S7-T07 | S8B | `tests/test_kvk_source_pairs.py`; `tests/test_kvk_source_window_resolver.py`; `tests/test_kvk_source_config_service.py` | B0, no-fight absent members, separate overall, config-only and 11/12/13/14 exact sequence |
 | S7-T08 | S8A/B | `tests/test_kvk_source_sql_integration.py`; `tests/test_kvk_source_pairs.py` | Kill before/after complete-selection/intent commit and lost acknowledgment |
 | S7-T09 | S10A/B | `tests/test_kvk_export_coordination.py`; `tests/test_kvk_export_sql_integration.py` | Immutable running A then latest C; B history retained; fairness ticket not reset |

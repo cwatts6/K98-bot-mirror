@@ -1138,7 +1138,8 @@ Phase 2B planning delivery did not authorize implementation or deployment. S6 pr
 | S5A (accepted, merged; archived) | [Private Intake and Admin Controls](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md) |
 | S5B (accepted, merged; archived) | [Endpoint Config and Recovery Integration](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S5B%20Endpoint%20Config%20and%20Recovery%20Integration.md) |
 | S6 (evidence archived) | [Release Readiness and Controlled Activation](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) | [Starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) |
-| S7 (next; approval pending) | [Integration Contract and Implementation Planning](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) |
+| S7 (complete; contract/manifests approved) | [Integration Contract and Implementation Planning](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md) |
+| S8A (next implementation slice; SQL PR #80 under review, disposable checks passed) | [SQL Foundation](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) | [Starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) |
 
 
 ## Historical S4B validation follow-up - 2026-09-11
@@ -1152,3 +1153,6 @@ S4B is accepted and merged; the current closeout record and archived pack supers
 - [S7 task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md)
 - [S7 starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md)
 - [Archived S6 evidence pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md)
+
+- [Approved S7 contract](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md) and [implementation manifests](../reference/kvk_source_migration/integration_implementation_manifests.md)
+- [S8A task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) and [starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md); [SQL PR #80](https://github.com/cwatts6/K98-bot-SQL-Server/pull/80). S7 is complete. Further SQL execution, deployment and S8B remain separately gated.

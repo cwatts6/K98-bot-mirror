@@ -52,7 +52,7 @@ manifests, then bring back only evidenced remaining design tradeoffs.
 
 Preserve B0, UTC scan start, semantic deduplication, independent authoritative
 aggregates/overall, daily SCANORDER and exact endpoints: 11−10, 12−10, 13−10 then
-authorized EndScanID14 permits14−10 without another correction command. No public
+authorized EndScanID 14 permits 14−10 without another correction command. No public
 routing exists merely because SourceRouting.Enabled can be updated. Carry
 S6-OPS01/PERF01/CAP01 and retained uncertain publications with exact evidence.
 
