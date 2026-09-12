@@ -1,5 +1,9 @@
 # Codex Task Pack — KVK Source Migration S5B Endpoint Config and Recovery Integration
 
+> Archived 2026-09-12: S5B completed, accepted, smoke tested and merged (#271/#578).
+> Historical execution record only; pending approvals and next-slice language below are dated history.
+> Current handover is the active S6 pack/starter; do not re-execute this slice.
+
 ## 1. Task Header
 
 - Prepared 2026-09-09; owner Chris Watts; Phase 2B specification.
@@ -12,9 +16,9 @@
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -179,7 +183,7 @@ preparation. End with slice status and next required gate.
 
 ## Required S4B handoff checks - 2026-09-11
 
-Read the [named follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) before S5B implementation. **S5B-REC01 is required for S5B acceptance**, not optional debt. S4B-MP01 supplies component-level synthetic multi-period coverage; it does not prove this worker/caller wiring.
+Read the [named follow-up register](../../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) before S5B implementation. **S5B-REC01 is required for S5B acceptance**, not optional debt. S4B-MP01 supplies component-level synthetic multi-period coverage; it does not prove this worker/caller wiring.
 
 - [ ] Prove default-off startup, one worker registration, bounded off-event-loop calls and clean cancellation.
 - [ ] Prove a committed endpoint request survives importer return error and resumes after restart using disposable SQL.
@@ -196,7 +200,7 @@ S5A is accepted, successfully smoke tested (operator reported) and merged in mir
 bot #577. Local pulls are complete at mirror main `90aea74c93c6aad2c890d1783ff53f109cc7bf8a` and
 production/main `dd69666a04daa47d6d596e694aff024a02417144`; SQL remains
 `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. No bot-machine pull or deployment occurred.
-Read the [archived S5A delivery](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md), including its smoke-evidence limits and final complete Changes review.
+Read the [archived S5A delivery](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S5A%20Private%20Intake%20and%20Admin%20Controls.md), including its smoke-evidence limits and final complete Changes review.
 S3B/S4B/S5A are accepted prerequisites, not tasks to re-execute. This closeout is not S5B G3.
 
 Start S5B in a new chat using its starter only with explicit S5B G3. First confirm fresh repo state,
@@ -233,8 +237,8 @@ Production promotion, when separately authorized, must carry the same documentat
 - `docs/task_packs/Codex Chat Starter - KVK Source Migration S5A Private Intake and Admin Controls.md`
 - `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5A Private Intake and Admin Controls.md`
 - `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5A Private Intake and Admin Controls.md`
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
 
 The PR summary must state S5A accepted/smoke-tested/merged with operator-attested smoke limits,
 local pulls complete, bot-machine untouched, routing disabled and S5B-REC01/S6 gates explicitly open
@@ -670,3 +674,24 @@ SQL repo remains clean at 44afa315dd6cbfe9fec101f2a39a62e534f5b583: separate no-
 No production SQL, real import/export, Discord action, restart, deployment, activation or merge.
 This follow-up targets production PR 578 only; mirror PR 271 has not been updated by this follow-up.
 Mirror synchronization remains a handover item so a later mirror promotion does not lose this fix.
+
+
+### Accepted and merged S5B closeout - 2026-09-12
+
+Operator confirms review complete, successful smoke acceptance, all PRs merged and local pulls
+complete; no changes pulled to the bot machine. GitHub independently confirms mirror #271 merged
+13:49:41 UTC as 65c535dce831d0840f1a047b9c58f29c562df3df and production #578 merged 13:50:14 UTC
+as c7e063f02ebe8287a584d0054ea14f91a0c0ecc6. Production included e5bbd8f7; the later mirror sync
+85f303f6bd82bdc9a5cfc2d713da5480e1fa694a includes that fix and tests, verified against production/main.
+This closes the earlier mirror synchronization handover item. SQL main remains clean at
+44afa315dd6cbfe9fec101f2a39a62e534f5b583. S5B-REC01 is accepted and closed.
+
+Recorded smoke/test/security evidence above remains dated to its actual runs; successful smoke
+acceptance does not imply post-merge, live provider or bot-machine execution. No runtime test is
+rerun for this documentation-only closeout. Prior pending approvals and gaps are historical when
+superseded by later accepted evidence. S6-OPS01/PERF01/CAP01 remain open G4 evidence gates.
+
+The completed pack/starter are archived, with relative links repaired and historical evidence retained.
+S6 starts separately after its own G3 approval and must include the exact pending documentation
+carry-forward manifest in its eventual PR. No new task, commit, push, PR, SQL or runtime action is
+performed by this closeout. Documentation validation and security-routing skip are recorded in S6.

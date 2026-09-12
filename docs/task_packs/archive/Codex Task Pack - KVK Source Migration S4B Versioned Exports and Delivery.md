@@ -693,18 +693,18 @@ This continuation changes only `tests/test_kvk_source_delivery.py` and the follo
 - `docs/reference/kvk_source_migration/phase_2_implementation_plan.md`
 - `docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md`
 - `docs/task_packs/Codex Chat Starter - KVK Source Migration S4B Versioned Exports and Delivery.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
 - `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/Codex Task Pack - KVK Source Migration S4B Versioned Exports and Delivery.md`
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
 - `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/KVK Source Migration - Programme Pack.md`
 - `docs/task_packs/README.md`
 
 The eventual separately authorized S4B PR must preserve the original thirteen-document/fifteen-physical-path manifest, including both sides of both S4A archive renames, and add these four explicitly authorized documentation paths:
 
-- `docs/task_packs/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
-- `docs/task_packs/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
+- `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S5B Endpoint Config and Recovery Integration.md`
 - `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 - `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md`
 

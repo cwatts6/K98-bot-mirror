@@ -1,23 +1,79 @@
 # KVK Source Migration — Decision and Evidence Register
 
-## Current KVK delivery status - S5B review, 2026-09-12
+> **2026-09-12 S6 authenticated rehearsal update:** The operator restored the ignored
+> local credential and approved the 5,806-player × ten-period synthetic benchmark,
+> confirming both other importers would remain idle. Actual Google write/readback
+> and local K98DEV rehearsal evidence now supersedes the earlier credential blocker.
+> S6-OPS01, S6-PERF01 and S6-CAP01 remain OPEN for operator acceptance and the exact
+> unresolved operational gates recorded in the latest appendix of both release
+> documents and the S6 pack. No production activation or G5 acceptance is claimed.
 
-**S5B implementation and disposable SQL validation are complete; PR review is in progress.**
-Mirror [#271](https://github.com/cwatts6/K98-bot-mirror/pull/271) and production
-[#578](https://github.com/cwatts6/k98-bot/pull/578) are open. S5B G3 and the bounded DAL/request-chain
-amendments were approved. The branch includes endpoint transaction hooks, default-off recovery,
-immutable input reload, caller integration and the review fixes recorded in the S5B task pack.
-S3B/S4B/S5A remain accepted prerequisites; no predecessor or later pack is reopened.
 
-The approved local K98DEV database K98_S5B_Disposable_20260912 is retained as synthetic evidence.
-S5B-REC01 has caller/lifecycle and disposable SQL recovery evidence; it is not an unrun prerequisite.
-The task pack records dated test outcomes and exact Changes reviews, including subsequent fixes.
-Historical test/scan figures below are not fresh validation of this PR head.
+> **2026-09-12 S6 output-provisioning update:** Separate S6 output creation was
+> approved and completed: one private index and eight private slots, owner and
+> service-account Editor metadata verified. Operator expectation is 2–3 exports/day,
+> with no fixed maximum duration. Code review found no common lock across S6,
+> all-KVK export and scan-data import. Runtime Google rehearsal is currently blocked
+> by the missing configured local service-account key; no provider interruption or
+> representative-load pass is claimed. All three S6 gates remain OPEN. See the latest
+> provisioning appendix in the two release documents and S6 pack.
 
-No merge, bot-machine update, restart, production SQL execution, real import/export, Discord action,
-deployment or activation is performed by this status update. Recovery/intake defaults and source
-routing remain disabled. S6-OPS01/PERF01/CAP01 and G4 remain separate future evidence/approval gates.
-SQL repository remains at 44afa315dd6cbfe9fec101f2a39a62e534f5b583 with no S5B schema changes.
+
+> **2026-09-12 S6 rehearsal update:** Chris Watts subsequently approved a local
+> K98DEV database and beginning rehearsal. Synthetic local SQL/process checks passed
+> in `K98_S6_Disposable_20260912`; no production activation occurred.
+> S6-OPS01, S6-PERF01 and S6-CAP01 remain OPEN pending provider evidence and operator
+> acceptance. Earlier G3-only/no-rehearsal statements below describe the retained
+> preparation checkpoint, not the subsequent local rehearsal. See the dated
+> rehearsal appendix in both S6 release documents for exact outcomes and gaps.
+
+
+## Current S6 evidence preparation - 2026-09-12
+
+**S6 G3 approved for documentation/evidence preparation only; stopped at G4.**
+All preceding slices remain accepted; S5B-REC01 is closed. S6-OPS01, S6-PERF01 and
+S6-CAP01 remain OPEN until separately authorized measurements and Chris Watts's acceptance.
+G4 exact-operation approval and G5 acceptance remain operator-owned. No rehearsal, bot-machine
+update, SQL operation, real import/export, Discord action, restart, deployment or activation.
+The exact 18-path S6 documentation delivery includes all 16 pending closeout paths and both
+S5B archive move sides. Eventual PR Files changed verification and promotion remain separately
+authorized gates. Historical status blocks below retain their original dated evidence;
+their pending/next-slice wording does not reopen accepted slices or authorize execution.
+
+[Readiness and rollback](release_readiness_and_rollback.md); [Canonical S6 evidence and delivery](release_evidence_log.md).
+
+
+## Current KVK delivery status - S5B closeout, 2026-09-12
+
+**S5B is complete, operator accepted, successfully smoke tested and merged.**
+Mirror [#271](https://github.com/cwatts6/K98-bot-mirror/pull/271) merged at 13:49:41 UTC as
+`65c535dce831d0840f1a047b9c58f29c562df3df`; production
+[#578](https://github.com/cwatts6/k98-bot/pull/578) merged at 13:50:14 UTC as
+`c7e063f02ebe8287a584d0054ea14f91a0c0ecc6` on 2026-09-12, including final fix `e5bbd8f7`.
+Local mirror main/origin main is `85f303f6bd82bdc9a5cfc2d713da5480e1fa694a`, synchronized from
+that production merge; the final recovery fix and tests match production/main. This closes the
+prior mirror synchronization handover item. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry. Local pulls are complete. The operator confirms
+**no changes have been pulled to the bot machine**; repository merge is not runtime deployment.
+
+Smoke acceptance is operator-reported and supported by recorded local import smoke and synthetic
+recovery/transaction checks, not a fresh post-merge or bot-machine smoke. Final review-fix evidence:
+186 focused tests passed, including five disposable SQL cases on local K98DEV database
+`K98_S5B_Disposable_20260912`; split full suite 4,084 passed / 39 skipped, operational logs unchanged.
+Imports, registration (36 top-level / 101 grouped), architecture, deferred-items, routing, lint/type
+and staged secret checks passed. Production CI passed. Exact Changes review, Deep off,
+`cf5a25c1-f9c6-431b-a2c6-fa9dba1716a7` completed with zero findings; earlier exact-slice evidence is
+retained in the archived S5B pack. Historical results are not fresh tests of this closeout patch.
+
+**Next: S6 Release Readiness and Controlled Activation in a new chat, after explicit S6 G3.**
+All preceding slices remain accepted; S5B-REC01 is closed by accepted caller/lifecycle and disposable
+SQL recovery evidence. S6 prepares documentation only and stops for separate G4 operational approval.
+S6-OPS01, S6-PERF01 and S6-CAP01 remain open pre-activation evidence gates. G5 acceptance remains
+operator-owned. The prepared S6 pack/starter require every pending closeout documentation change,
+both S5B archive move sides and repaired links in the eventual separately authorized S6 PR.
+No S6 execution or new chat is started by this closeout. Preserve all retained synthetic databases
+and review evidence. Source routing and intake/recovery defaults remain disabled; no bot-machine
+update, restart, production SQL, real import/export, Discord action, deployment or activation here.
 
 ## Historical KVK delivery status - S5A closeout, 2026-09-12
 
@@ -425,6 +481,6 @@ configuration, permission, data-access or deployment effect. SQL repository: sep
 Runtime pytest/smoke/registration reruns are skipped for this Markdown-only closeout.
 
 
-## S4B remaining-validation ownership - 2026-09-11
+## Historical S4B remaining-validation ownership - 2026-09-11
 
 The operator approved recording S5B/S6 acceptance checks and completing S4B-MP01 now. The [authoritative follow-up register](phase_2_implementation_plan.md#s4b-follow-ups) names S4B-MP01 (synthetic multi-period component integration complete), S5B-REC01 (worker/caller integration open), and S6-OPS01/S6-PERF01/S6-CAP01 (operational interruption, shared-quota throughput and retention/recovery capacity evidence open before activation). Exact results and scope limits are in the latest [S4B delivery appendix](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md). Future packs/starters now require these checks; no future slice or operational action was executed. S4B remains local for review; no merge or activation is claimed.
