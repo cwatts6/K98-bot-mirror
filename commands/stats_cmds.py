@@ -82,6 +82,72 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     )
 
     @kvk_admin_group.command(
+        name="source",
+        description="Private source receipts and administrative approvals",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.00")
+    @safe_command
+    @track_usage()
+    async def kvk_source(
+        ctx,
+        action: str = discord.Option(
+            str,
+            "Source action",
+            choices=["status", "resume", "accept", "finalize", "correct", "configure"],
+        ),
+        receipt: str = discord.Option(str, "Your private source receipt UUID"),
+        expected_revision: str = discord.Option(
+            str, "Current source revision UUID for finalize/correct", required=False, default=None
+        ),
+        expected_revision_version: int = discord.Option(
+            int, "Current source revision version", required=False, default=None, min_value=1
+        ),
+        roster_correction: bool = discord.Option(
+            bool, "Configure: review a new B0 roster version", required=False, default=False
+        ),
+    ):
+        from kvk.services.new_source_admin_service import access_from_config, configured_service
+        from ui.views.kvk_source_import_view import (
+            KvkSourceImportView,
+            current_actor,
+            report_failure,
+            send_receipt,
+        )
+
+        try:
+            access = access_from_config()
+            actor = await current_actor(ctx, access)
+            access.authorize(actor, action)
+            if roster_correction and action != "configure":
+                raise ValueError("Roster correction is an explicit configure option.")
+            if not await safe_defer(ctx, ephemeral=True):
+                return
+            service = await asyncio.to_thread(configured_service)
+            row = await asyncio.to_thread(service.receipt, actor, receipt, action)
+            if roster_correction:
+                row = await asyncio.to_thread(service.roster_preview, actor, receipt)
+            view = None
+            if action != "status":
+                selected_action = (
+                    row["payload"].get("proposal", {}).get("action", "accept")
+                    if action == "resume"
+                    else action
+                )
+                access.authorize(actor, selected_action)
+                view = KvkSourceImportView(
+                    service,
+                    row,
+                    action=selected_action,
+                    expected_revision=expected_revision,
+                    expected_revision_version=expected_revision_version,
+                    roster_correction=roster_correction,
+                )
+            await send_receipt(getattr(ctx, "interaction", ctx), service, row, view)
+        except Exception as exc:
+            await report_failure(getattr(ctx, "interaction", ctx), exc)
+
+    @kvk_admin_group.command(
         name="test_export",
         description="🧪 Admin: Test KVK Google Sheets export without performing an import",
         guild_ids=[GUILD_ID],

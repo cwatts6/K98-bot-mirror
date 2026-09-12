@@ -143,6 +143,7 @@ from upload_routes.fallback_queue_route import (
 from upload_routes.honor_route import HonorRouteDeps, handle_honor_upload
 from upload_routes.inventory_route import InventoryRouteDeps, handle_inventory_upload
 from upload_routes.kvk_all_route import KvkAllRouteDeps, handle_kvk_all_upload
+from upload_routes.kvk_source_route import handle_configured_kvk_source_upload
 from upload_routes.mge_results_route import MgeResultsRouteDeps, handle_mge_results_upload
 from upload_routes.player_location_route import (
     PlayerLocationRouteDeps,
@@ -516,6 +517,9 @@ async def on_error(event_method, *args, **kwargs):
 @bot.event
 async def on_message(message: discord.Message):
     if not bot.user or message.author.id == bot.user.id:
+        return
+
+    if await handle_configured_kvk_source_upload(message):
         return
 
     # MGE Task G: route DM attachment messages to active MGE DM sessions

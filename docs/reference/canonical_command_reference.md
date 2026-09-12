@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=36 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=36
+primary=36 grouped_subcommands_detected=101 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=36
 ```
 
 Grouped command summary:
@@ -31,7 +31,7 @@ Grouped command summary:
 | `/honor` | 1 |
 | `/inventory` | 2 |
 | `/kvk` | 4 |
-| `/kvk_admin` | 7 |
+| `/kvk_admin` | 8 |
 | `/location` | 2 |
 | `/me` | 8 |
 | `/mge` | 6 |
@@ -189,6 +189,7 @@ Legend:
 | Registry | `/registry bulk_export` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry bulk export. |
 | Registry | `/registry bulk_import_dryrun` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry import preview. |
 | Registry | `/registry bulk_import` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry import apply. |
+| Stats/KVK | `/kvk_admin source` | `commands/stats_cmds.py` | Grouped | Fresh guild membership; configured uploader role or existing admin; owner-bound receipts; finalize/correct/configure admin-only | Ephemeral; intake receipts in the configured private channel | Standard | S5A default-off private controls | Required action: status, resume, accept, finalize, correct or configure; required receipt UUID; optional expected_revision and expected_revision_version for explicit source revision approval. No activation action. |
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
@@ -507,3 +508,37 @@ Phase 2J removal/restart/resync smoke was operator accepted on 2026-09-09. The s
 24 ops children without test_embed; 36/100 totals and sync/cache update are logged. Existing-command
 behaviour and successful cache validation are operator reported. #261/#568 merges and final
 main/deployed-SHA verification remain pending; see archived Phase 2J delivery evidence.
+
+
+## KVK Source Migration S5A private controls
+
+Current local declared inventory: 36 top-level commands, 101 grouped subcommands, eight under
+`/kvk_admin`. Historical counts above remain historical. Existing command decorators are unchanged.
+The source subcommand uses the same version/safety/usage wrappers and explicit fresh-membership
+checks to permit configured uploaders in the private intake channel. Only ADMIN_USER_ID may
+finalize, correct or configure; that admin may also resume in the existing notify channel.
+Receipts remain owner/guild/source-bound without an administrator ownership bypass.
+
+Upload one XLSX (maximum 20 MiB). Known names supply only proposed metadata. For an unknown
+filename, supply the KVK number alone as the message caption. Prepare metadata, inspect the
+private receipt, then confirm within five minutes. Unknown scan times require explicit UTC
+scan-start input; never use upload time. Aggregate coverage and as-of values are explicit.
+An expired view can be resumed with `/kvk_admin source action:resume receipt:<UUID>`; prepare
+again when its durable confirmation expires. Status reports the accepted source revision and
+version needed by finalization/correction. Repeated accepted confirmations return their receipt.
+
+Use configure with your accepted B0 player receipt. Initial onboarding collects one period,
+its exact endpoints/coverage, the complete camp map, coefficient strings and effective UTC.
+For an existing period, configure changes only StartScanID/EndScanID; leave coverage/map/weights
+empty. Either endpoint may change, supplied end must be >= start, and the approval records a
+pending endpoint request without a second correction command. Ordinary configuration cannot replace B0.
+For an explicit roster correction, first accept an authorized correction of the original B0
+observation, then use configure with `roster_correction:true` and that receipt. Review the
+added/removed/changed counts and every affected publication UUID. The plan must list each UUID
+once as `UUID | retain`; with no selected publications, leave it empty. Confirm with an audit
+reason to append a new roster version. The durable private provenance retains the exact member
+diff; published diagnostics show counts. Existing configurations and historical publications stay
+pinned; adopting the new roster in a publication requires its own reviewed correction.
+This option adds no command child: `/kvk_admin` has eight children; every group remains at most 25.
+Acceptance, configuration approval, publication and external delivery are separate states.
+S5A does not start S5B background recovery, publish reports, export files or activate serving.

@@ -147,3 +147,22 @@ python scripts/smoke_imports.py
 - Redact tokens and credentials in logs, diagnostics, and PR output.
 - Use least-privilege SQL and Google credentials.
 - Keep credential files readable only by the bot service user where possible.
+
+
+## KVK source private intake (S5A)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| KVK_SOURCE_INTAKE_ENABLED | false | Enables private admission and manual receipt controls only. Does not activate serving. |
+| KVK_SOURCE_RECOVERY_ENABLED | false | Reserved for separately approved S5B worker integration; no worker is registered by S5A. |
+| KVK_SOURCE_CHANNEL_ID | 0 | Dedicated private intake channel; must differ from every legacy upload and monitored fallback channel. |
+| KVK_SOURCE_UPLOADER_ROLE_IDS | empty | Explicit guild uploader role IDs; fresh membership is checked in handlers and callbacks. |
+| KVK_SOURCE_ARTIFACT_ROOT | unset | Absolute private service-owned directory outside Git for content-addressed originals. |
+
+No real channel, role, root or enabling flag is supplied by this change. Disabled intake creates
+no directory or connection and preserves legacy routing. Verify channel membership/ACLs and
+private-root filesystem permissions before enabling. Existing GUILD_ID and ADMIN_USER_ID define
+the guild/admin boundary; ordinary uploaders cannot finalize/correct/configure. The existing
+NOTIFY_CHANNEL_ID is also allowed for that admin's private command responses. SourceRouting.Enabled
+is independent and remains off. Keep originals and receipts when disabling intake; no cleanup
+or retained-database deletion is part of rollback.

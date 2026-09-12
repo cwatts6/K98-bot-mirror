@@ -189,7 +189,8 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     assert "dispatch_test" in grouped["prekvk"]
     assert len(grouped["prekvk"]) == 3
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 100
+    assert sum(len(commands) for commands in grouped.values()) == 101
+    assert all(len(commands) <= 25 for commands in grouped.values())
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" not in names

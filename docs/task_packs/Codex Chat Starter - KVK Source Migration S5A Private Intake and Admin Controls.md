@@ -20,3 +20,15 @@ Use exact file/test/security manifests; report canonical delivery with actual ou
 No pull/reset/merge/push/PR, production SQL, real imports/exports, Discord actions, restarts,
 deployment or activation. No private player data or credentials in Git. Required security reviews
 use Changes at exact separate repo targets, Deep off; no standard/deep scan or automatic new task.
+
+
+S4B is accepted, successfully synthetic-smoke tested and merged (#269/#576); local pulls are complete.
+No changes have been pulled to the bot machine. Read the archived S4B final evidence and preserve all
+pending S4B closeout documents, including untracked Markdown and both archive rename sides. When an
+S5A PR is separately authorized, include the pack's full exact documentation carry-forward manifest,
+repaired links and delivery evidence alongside the approved S5A code/test manifest. S5B-REC01 and
+S6-OPS01/PERF01/CAP01 remain open; they do not block mocked S5A work. Use mocks/fake destinations unless
+an exact disposable SQL target and operations are explicitly authorized. Preserve retained databases.
+Either endpoint may change; supplied EndScanID >= StartScanID. Equal endpoints mean zero supported
+fight scores for all B0 members, with aggregates not applicable. Distinct scans increase both ScanID
+and UTC; ordinary missing values remain explicit. Routing remains disabled; no bot-machine action.

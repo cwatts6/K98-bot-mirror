@@ -1,5 +1,7 @@
 # Codex Chat Starter — KVK Source Migration S4B Versioned Exports and Delivery
 
+> Archived after accepted S4B smoke and merges #269/#576 on 2026-09-11. Historical execution instructions below are not active authorization. S5A is next, with separate G3 approval. No bot-machine deployment.
+
 Refreshed 2026-09-10 after S4A merged closeout. **Not executed; S4B G3 pending.**
 Use this only when approving this slice; G2 alone does not approve implementation.
 
@@ -37,4 +39,4 @@ use Changes at exact separate repo targets, Deep off; no standard/deep scan or a
 
 ## Current continuation status - 2026-09-11
 
-S4B G3 implementation and the approved adapter follow-ups are locally delivered, not merged/activated. Read the latest S4B pack evidence rather than replaying the historical entry prompt. S4B-MP01 now has synthetic multi-period delivery coverage. Preserve the [follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups): S5B-REC01 and S6-OPS01/S6-PERF01/S6-CAP01 remain open in their owning packs. The eventual separately authorized PR must include the original thirteen-document/fifteen-path manifest plus both S5B and S6 task packs/starters: seventeen documents/nineteen physical paths. No PR, merge, future-slice execution or activation is authorized by this status note.
+S4B G3 implementation and the approved adapter follow-ups are locally delivered, not merged/activated. Read the latest S4B pack evidence rather than replaying the historical entry prompt. S4B-MP01 now has synthetic multi-period delivery coverage. Preserve the [follow-up register](../../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups): S5B-REC01 and S6-OPS01/S6-PERF01/S6-CAP01 remain open in their owning packs. The eventual separately authorized PR must include the original thirteen-document/fifteen-path manifest plus both S5B and S6 task packs/starters: seventeen documents/nineteen physical paths. No PR, merge, future-slice execution or activation is authorized by this status note.

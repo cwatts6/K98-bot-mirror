@@ -14,6 +14,79 @@ def test_normalize_sheet_name_uses_default_for_blank_values() -> None:
     assert kvk_admin_service.normalize_sheet_name("  Custom  ", "Default") == "Custom"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action", ["status", "resume", "accept", "finalize", "correct", "configure", "roster"]
+)
+async def test_source_group_registers_real_options_and_private_service_handoff(monkeypatch, action):
+    roster_mode = action == "roster"
+    action = "configure" if roster_mode else action
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock
+
+    from commands import stats_cmds
+    from kvk.services import new_source_admin_service as source
+    from tests.test_kvk_source_admin import ACCESS
+    from tests.test_kvk_source_import_view import interaction
+
+    groups = []
+    bot = SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kw: lambda fn: fn
+    )
+    monkeypatch.setattr(stats_cmds, "track_usage", lambda: lambda fn: fn)
+    stats_cmds.register_stats(bot)
+    group = next(g for g in groups if g.name == "kvk_admin")
+    command = next(c for c in group.subcommands if c.name == "source")
+    options = {o["name"]: o for o in command.to_dict()["options"]}
+    assert [choice["value"] for choice in options["action"]["choices"]] == list(source.ACTIONS)
+    assert options["receipt"]["required"]
+    assert options["expected_revision_version"]["type"] == 4
+    assert options["roster_correction"]["type"] == 5
+    assert len(options) <= 25
+    assert command.callback.__version__ == "v1.00"
+    assert len(group.subcommands) == 8
+    row = {
+        "AttemptID": "00000000-0000-4000-8000-000000000001",
+        "ActorID": "10",
+        "Status": "received",
+        "payload": {"version": 1, "candidate": {}},
+    }
+    service = SimpleNamespace(
+        access=ACCESS,
+        receipt=Mock(return_value=row),
+        roster_preview=Mock(return_value=row),
+        summary=lambda r: "Private receipt",
+    )
+    monkeypatch.setattr(source, "access_from_config", lambda: ACCESS)
+    monkeypatch.setattr(source, "configured_service", lambda: service)
+    monkeypatch.setattr(stats_cmds, "safe_defer", AsyncMock(return_value=True))
+    inter = interaction()
+    inter.data = {
+        "options": [
+            {"name": "action", "type": 3, "value": action},
+            {"name": "receipt", "type": 3, "value": row["AttemptID"]},
+        ]
+    }
+    if roster_mode:
+        inter.data["options"].append({"name": "roster_correction", "type": 5, "value": True})
+    ctx = SimpleNamespace(
+        user=inter.user,
+        guild=inter.guild,
+        channel=inter.channel,
+        interaction=inter,
+        command=command,
+    )
+    await command._invoke(ctx)
+    service.receipt.assert_called_once()
+    assert service.receipt.call_args.args[1:] == (row["AttemptID"], action)
+    reply = inter.response.send_message.call_args
+    assert reply.kwargs["ephemeral"] is True
+    assert reply.kwargs["allowed_mentions"].to_dict() == {"parse": []}
+    if roster_mode:
+        service.roster_preview.assert_called_once()
+        assert reply.kwargs["view"].roster_correction
+
+
 def test_extract_count_preserves_zero_meta_count() -> None:
     result = kvk_admin_service.KvkCacheRefreshResult(
         main=kvk_admin_service.KvkCacheBuildOutcome(

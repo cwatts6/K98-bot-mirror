@@ -518,3 +518,29 @@ async def test_kvk_all_route_post_ingest_send_failure_completes_import_audit():
     complete_events = [event for event in audit_events if event[0] == "complete"]
     assert complete_events[-1][2]["external_batch_id"] == "13:6"
     assert complete_events[-1][2]["rows_written"] == 10
+
+
+def test_new_source_route_precedes_every_legacy_upload_route():
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path("DL_bot.py").read_text(encoding="utf-8"))
+    listener = next(
+        n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "on_message"
+    )
+    calls = [
+        n.func.id
+        for n in ast.walk(listener)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id.startswith("handle_")
+    ]
+    # Compare source locations rather than ast.walk breadth-first ordering.
+    route_lines = {
+        n.func.id: n.lineno
+        for n in ast.walk(listener)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in calls
+    }
+    assert route_lines["handle_configured_kvk_source_upload"] < min(
+        line for name, line in route_lines.items() if name != "handle_configured_kvk_source_upload"
+    )

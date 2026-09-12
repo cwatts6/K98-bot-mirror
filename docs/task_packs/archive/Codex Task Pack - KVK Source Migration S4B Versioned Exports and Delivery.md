@@ -1,5 +1,7 @@
 # Codex Task Pack — KVK Source Migration S4B Versioned Exports and Delivery
 
+> Archived after accepted S4B smoke and merges #269/#576 on 2026-09-11. Historical execution instructions below are not active authorization. S5A is next, with separate G3 approval. No bot-machine deployment.
+
 ## Current S4B entry handoff — 2026-09-10
 
 **S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
@@ -8,7 +10,7 @@ Local mirror `main` is `7baf92c7badc3f40006841046825a788bc823373`; local `produc
 S4A pack/starter are archived. **Next: S4B Versioned Exports and Delivery in a new chat, with separate S4B G3 approval.** S4B's pack requires all pending closeout documents and both archive rename sides in its eventual separately authorized PR. Prior S3B closeout documents were included in the merged S4A PRs.
 Source routing remains disabled. No bot-machine update/restart, SQL deployment, live imports/exports, Discord action or activation is needed for S4B local development. Use mocks/fake destinations unless a disposable SQL target and exact operations are explicitly authorized first; preserve retained S2A/S2B/S3B databases. Historical prerequisite wording below does not reopen completed slices.
 
-Read the [archived S4A final evidence](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) before edits. S3B/S4A prerequisites are accepted. **S4B G3 remains pending; no S4B implementation has started.** Reverify branches/HEADs/remotes/status at entry and preserve this pending documentation.
+Read the [archived S4A final evidence](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4A%20Shared%20Reports%20and%20Cards.md) before edits. S3B/S4A prerequisites are accepted. **S4B G3 remains pending; no S4B implementation has started.** Reverify branches/HEADs/remotes/status at entry and preserve this pending documentation.
 
 ### Required carried-forward documentation in the eventual S4B PR
 
@@ -40,9 +42,9 @@ The operator requires this complete thirteen-document closeout manifest (fifteen
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -716,7 +718,7 @@ No new application/test/document paths. Only private temporary preservation evid
 
 One new parameterized test, `test_multi_period_delivery_uses_changed_anchor_and_deduplicates`, covers each of two fights changing in turn. The real generation loader, delivery orchestration, DeliveryRepository.claim decision and Google transport are composed with injected SQL I/O and fake Google storage. The test checks unchanged-anchor rejection before remote calls, successful changed-anchor publication, an increasing fence, unchanged period facts, both fights in ALL_WINDOWS, missing overall explicitly not_received, changed metric output, exact remote manifest/current pointer, retained previous workbook and zero additional calls after receipt reload/repeat. Input order does not change the generation key.
 
-The documentation assigns stable check IDs, owners, closure evidence and approval gates in the [follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups), then links them from current entry points, evidence registers, programme pack and affected task packs/starters. All prior Markdown bytes, pending closeout edits and archive moves are preserved.
+The documentation assigns stable check IDs, owners, closure evidence and approval gates in the [follow-up register](../../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups), then links them from current entry points, evidence registers, programme pack and affected task packs/starters. All prior Markdown bytes, pending closeout edits and archive moves are preserved.
 
 ### 5. SQL Changes
 
@@ -934,3 +936,35 @@ Push the reviewed delta to the existing mirror and production PR branches, reply
 S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open under their existing approval gates. Preclaim receipt admission does not close real allocation, retained-final/quarantine capacity, process-interruption, integration or shared-quota throughput acceptance. S4B-MP01 remains complete.
 
 Final packaging: both exact staged manifests passed Ruff, Pyright, hardcoded-secret, merge-conflict, file-size and logging checks. Deferred-document validation and Git whitespace checks passed. Black API checks passed; the CLI retains its documented stall skip. Automatic whitespace/EOF/line-ending rewriting hooks were skipped to preserve prior Markdown bytes. All three mirror/production files are byte-identical.
+
+
+## Current KVK delivery status - S4B closeout, 2026-09-11
+
+**S4B is complete, operator accepted, successfully synthetic-smoke tested and merged.**
+Mirror [#269](https://github.com/cwatts6/K98-bot-mirror/pull/269) merged at 21:06:11 UTC as
+`39c93df39485d796fd66881e47562da112886da1`; private bot [#576](https://github.com/cwatts6/k98-bot/pull/576)
+merged at 21:06:38 UTC as `63fcb392385fd2ccad78801cbd4f8bd70f426cc3` on 2026-09-11.
+Local mirror main/origin main is `64f6b058c224e749ece334d66cdf0efc81bd983d` (synchronized from the private merge);
+local production/main matches that private merge. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry; local pulls are complete. The operator confirms **no bot-machine pull**.
+
+The archived S4B pack retains actual real-SDK/disposable-SQL synthetic smoke: private recovery,
+public Viewer publication, fresh-client reconciliation/deduplication and retired-slot reuse succeeded.
+These are historical bounded smoke results, not a post-merge live rerun. Final review-fix validation:
+150 focused tests passed; full suites passed in both checkouts with 3,940 passed / 34 skipped
+(production 166.93s, mirror 168.50s), operational logs unchanged. Imports and registration 36/100 passed.
+Separate exact Changes reviews, Deep off, completed with zero findings; both review comments were resolved.
+Production quality and secret CI passed. Earlier incomplete smoke attempts remain historical evidence.
+
+**Next: S5A Private Intake and Admin Controls in a new chat, after explicit S5A G3 approval.**
+S1/S3B/S4A/S4B prerequisites are accepted. Start with fresh repo/contract checks and preserve this pending
+closeout documentation. The S5A pack requires its exact documentation carry-forward manifest, both sides
+of both S4B archive moves, repaired links and this evidence in its eventual separately authorized PR.
+No S5A implementation or new chat was started by this closeout.
+
+S4B-MP01 is complete. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open under their named gates;
+they do not block mocked S5A development and are not closed by S4B smoke. Source routing remains disabled.
+No bot-machine update/restart, deployment, production SQL, real import/export or Discord action is authorized.
+Use mocks/fake destinations; any disposable SQL target and exact operations require explicit authorization.
+Preserve all retained predecessor and S4B disposable databases. Historical prerequisite wording below is
+retained as history; accepted slices stay closed and S5A/S5B/S6 retain separate approval gates.

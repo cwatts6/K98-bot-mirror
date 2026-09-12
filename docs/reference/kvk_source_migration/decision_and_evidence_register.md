@@ -1,30 +1,36 @@
 # KVK Source Migration — Decision and Evidence Register
 
-## Current KVK delivery status - 2026-09-10
+## Current KVK delivery status - S4B closeout, 2026-09-11
 
-**S1 is accepted and merged** through mirror PR #263 and production PR #570. Its archived
-200-test smoke and restart/startup evidence remain historical S1 results.
+**S4B is complete, operator accepted, successfully synthetic-smoke tested and merged.**
+Mirror [#269](https://github.com/cwatts6/K98-bot-mirror/pull/269) merged at 21:06:11 UTC as
+`39c93df39485d796fd66881e47562da112886da1`; private bot [#576](https://github.com/cwatts6/k98-bot/pull/576)
+merged at 21:06:38 UTC as `63fcb392385fd2ccad78801cbd4f8bd70f426cc3` on 2026-09-11.
+Local mirror main/origin main is `64f6b058c224e749ece334d66cdf0efc81bd983d` (synchronized from the private merge);
+local production/main matches that private merge. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry; local pulls are complete. The operator confirms **no bot-machine pull**.
 
-**S2A is complete, operator accepted and merged.** SQL [PR #78](https://github.com/cwatts6/K98-bot-SQL-Server/pull/78)
-merged as `845a25fe66b1d2365fb38720390b4dadf50baa67`; mirror
-[PR #264](https://github.com/cwatts6/K98-bot-mirror/pull/264) merged as
-`9fc0255dbaa0cbcb80c63c563657dad90bd5bcec` on 2026-09-10. Review fixes passed 401 static
-assertions and 96 disposable SQL rejection cases, with twelve-table rollback verified.
+The archived S4B pack retains actual real-SDK/disposable-SQL synthetic smoke: private recovery,
+public Viewer publication, fresh-client reconciliation/deduplication and retired-slot reuse succeeded.
+These are historical bounded smoke results, not a post-merge live rerun. Final review-fix validation:
+150 focused tests passed; full suites passed in both checkouts with 3,940 passed / 34 skipped
+(production 166.93s, mirror 168.50s), operational logs unchanged. Imports and registration 36/100 passed.
+Separate exact Changes reviews, Deep off, completed with zero findings; both review comments were resolved.
+Production quality and secret CI passed. Earlier incomplete smoke attempts remain historical evidence.
 
-**S2B is complete, accepted and merged:** SQL #79, mirror #265 and private bot #572
-merged on 2026-09-10. Final validation passed 265 static assertions and 144 disposable SQL
-rejections with 25-table rollback; the seven-file review-fix Changes scan found zero issues.
-**S3A is complete, smoke accepted and merged.** Mirror #266 merged at 11:28:48 UTC
-(`3154997fa2dfc124da75ee35dca79463c3196a43`); private bot #573 merged at 11:29:18 UTC
-(`140fc89765b1d6ec8418ac6f6d039e575419c29e`) on 2026-09-10. At the S3A checkpoint, local mirror main was
-`9d08b3bf9e7cac6c95db1c4a120c8bf0aad7475f` after synchronization; SQL main remains
-`44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Operator smoke passed 77 tests with operational
-logs unchanged and registration 36/100 without drift. The S3A pack/starter are archived.
-**S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
-Operator candidate smoke on `055b9590e1114661ff0369c7815fbbea82661454` passed imports, registration **36/100** without drift/duplicates, **134 focused tests in 11.97s**, and **3,810 full-suite tests with 34 skipped in 134.19s**. Both pytest runs left operational logs unchanged. This closes the S4A full-suite gap; earlier stalls and passes remain historical evidence, not a post-merge rerun.
-Local mirror `main` is `7baf92c7badc3f40006841046825a788bc823373`; local `production/main` is `021fc7adc9952ab07d21517e8e47f3966c285f7a`; SQL `main` remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. Bot and SQL checkouts were clean at closeout entry. Local pulls are complete, per operator and local refs; **nothing has been pulled to the bot machine**.
-S4A pack/starter are archived. **Next: S4B Versioned Exports and Delivery in a new chat, with separate S4B G3 approval.** S4B's pack requires all pending closeout documents and both archive rename sides in its eventual separately authorized PR. Prior S3B closeout documents were included in the merged S4A PRs.
-Source routing remains disabled. No bot-machine update/restart, SQL deployment, live imports/exports, Discord action or activation is needed for S4B local development. Use mocks/fake destinations unless a disposable SQL target and exact operations are explicitly authorized first; preserve retained S2A/S2B/S3B databases. Historical prerequisite wording below does not reopen completed slices.
+**Next: S5A Private Intake and Admin Controls in a new chat, after explicit S5A G3 approval.**
+S1/S3B/S4A/S4B prerequisites are accepted. Start with fresh repo/contract checks and preserve this pending
+closeout documentation. The S5A pack requires its exact documentation carry-forward manifest, both sides
+of both S4B archive moves, repaired links and this evidence in its eventual separately authorized PR.
+No S5A implementation or new chat was started by this closeout.
+
+S4B-MP01 is complete. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open under their named gates;
+they do not block mocked S5A development and are not closed by S4B smoke. Source routing remains disabled.
+No bot-machine update/restart, deployment, production SQL, real import/export or Discord action is authorized.
+Use mocks/fake destinations; any disposable SQL target and exact operations require explicit authorization.
+Preserve all retained predecessor and S4B disposable databases. Historical prerequisite wording below is
+retained as history; accepted slices stay closed and S5A/S5B/S6 retain separate approval gates.
+
 
 
 **Date:** 2026-09-07. **Version:** 1.0. **Status:** Planning baseline; current-code validation pending Codex Phase 1.
@@ -371,4 +377,4 @@ Runtime pytest/smoke/registration reruns are skipped for this Markdown-only clos
 
 ## S4B remaining-validation ownership - 2026-09-11
 
-The operator approved recording S5B/S6 acceptance checks and completing S4B-MP01 now. The [authoritative follow-up register](phase_2_implementation_plan.md#s4b-follow-ups) names S4B-MP01 (synthetic multi-period component integration complete), S5B-REC01 (worker/caller integration open), and S6-OPS01/S6-PERF01/S6-CAP01 (operational interruption, shared-quota throughput and retention/recovery capacity evidence open before activation). Exact results and scope limits are in the latest [S4B delivery appendix](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md). Future packs/starters now require these checks; no future slice or operational action was executed. S4B remains local for review; no merge or activation is claimed.
+The operator approved recording S5B/S6 acceptance checks and completing S4B-MP01 now. The [authoritative follow-up register](phase_2_implementation_plan.md#s4b-follow-ups) names S4B-MP01 (synthetic multi-period component integration complete), S5B-REC01 (worker/caller integration open), and S6-OPS01/S6-PERF01/S6-CAP01 (operational interruption, shared-quota throughput and retention/recovery capacity evidence open before activation). Exact results and scope limits are in the latest [S4B delivery appendix](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md). Future packs/starters now require these checks; no future slice or operational action was executed. S4B remains local for review; no merge or activation is claimed.

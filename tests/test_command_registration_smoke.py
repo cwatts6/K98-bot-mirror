@@ -149,7 +149,8 @@ def test_register_commands_smoke(monkeypatch):
     ops_options = registered_groups["ops"]["options"]
     assert len(ops_options) == 24
     assert "test_embed" not in {option["name"] for option in ops_options}
-    assert sum(len(group.get("options", [])) for group in registered_groups.values()) == 100
+    assert sum(len(group.get("options", [])) for group in registered_groups.values()) == 101
+    assert all(len(group.get("options", [])) <= 25 for group in registered_groups.values())
     assert "test_embed" in {option["name"] for option in registered_groups["kvk_admin"]["options"]}
     assert "dispatch_test" in {option["name"] for option in registered_groups["prekvk"]["options"]}
     assert "ark" in registered_top_level

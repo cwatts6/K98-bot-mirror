@@ -1,5 +1,37 @@
 # Local SQL development environment
 
+## Current KVK delivery status - S4B closeout, 2026-09-11
+
+**S4B is complete, operator accepted, successfully synthetic-smoke tested and merged.**
+Mirror [#269](https://github.com/cwatts6/K98-bot-mirror/pull/269) merged at 21:06:11 UTC as
+`39c93df39485d796fd66881e47562da112886da1`; private bot [#576](https://github.com/cwatts6/k98-bot/pull/576)
+merged at 21:06:38 UTC as `63fcb392385fd2ccad78801cbd4f8bd70f426cc3` on 2026-09-11.
+Local mirror main/origin main is `64f6b058c224e749ece334d66cdf0efc81bd983d` (synchronized from the private merge);
+local production/main matches that private merge. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry; local pulls are complete. The operator confirms **no bot-machine pull**.
+
+The archived S4B pack retains actual real-SDK/disposable-SQL synthetic smoke: private recovery,
+public Viewer publication, fresh-client reconciliation/deduplication and retired-slot reuse succeeded.
+These are historical bounded smoke results, not a post-merge live rerun. Final review-fix validation:
+150 focused tests passed; full suites passed in both checkouts with 3,940 passed / 34 skipped
+(production 166.93s, mirror 168.50s), operational logs unchanged. Imports and registration 36/100 passed.
+Separate exact Changes reviews, Deep off, completed with zero findings; both review comments were resolved.
+Production quality and secret CI passed. Earlier incomplete smoke attempts remain historical evidence.
+
+**Next: S5A Private Intake and Admin Controls in a new chat, after explicit S5A G3 approval.**
+S1/S3B/S4A/S4B prerequisites are accepted. Start with fresh repo/contract checks and preserve this pending
+closeout documentation. The S5A pack requires its exact documentation carry-forward manifest, both sides
+of both S4B archive moves, repaired links and this evidence in its eventual separately authorized PR.
+No S5A implementation or new chat was started by this closeout.
+
+S4B-MP01 is complete. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open under their named gates;
+they do not block mocked S5A development and are not closed by S4B smoke. Source routing remains disabled.
+No bot-machine update/restart, deployment, production SQL, real import/export or Discord action is authorized.
+Use mocks/fake destinations; any disposable SQL target and exact operations require explicit authorization.
+Preserve all retained predecessor and S4B disposable databases. Historical prerequisite wording below is
+retained as history; accepted slices stay closed and S5A/S5B/S6 retain separate approval gates.
+
+
 ## S4A completed closeout — 2026-09-10
 
 **S4A is complete, operator smoke accepted and merged.** Mirror [#268](https://github.com/cwatts6/K98-bot-mirror/pull/268) merged on 2026-09-10 at 16:12:39 UTC as `eba04639eced51e368d6fc7036284f25640ce871`; private bot [#575](https://github.com/cwatts6/k98-bot/pull/575) merged at 16:13:04 UTC as `021fc7adc9952ab07d21517e8e47f3966c285f7a`.
