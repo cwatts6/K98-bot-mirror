@@ -22,11 +22,12 @@ def snapshot_config_import(cursor, windows, *, actor=None, provenance=None):
 
     if not bot_config.KVK_SOURCE_RECOVERY_ENABLED:
         return ()
+    import pandas as pd
+
     from kvk.dal.new_source_recovery_dal import snapshot_import
 
     records = []
     for record in windows.to_dict("records"):
-        import pandas as pd
 
         row = {"WindowName": str(record["WindowName"])}
         for key in ("KVK_NO", "StartScanID", "EndScanID"):
@@ -309,13 +310,64 @@ class RecoveryWorker:
                     logger.warning("Source recovery stopped error=%s", type(exc).__name__)
 
 
+def parse_export_registrations(value, *, protected_file_ids=()):
+    """Validate operator configuration before opening SQL or credentials."""
+    from kvk.services.new_source_export_service import SheetsRegistration
+
+    try:
+        records = json.loads(value)
+    except (TypeError, ValueError):
+        raise ValueError("Export registrations must be a JSON array.") from None
+    if not isinstance(records, list) or len(records) > 8:
+        raise ValueError("At most eight explicit export registrations are supported.")
+    result, used = [], set(protected_file_ids)
+    required = {"kvk_no", "index_file_id", "slot_file_ids", "owner_email", "service_account_email"}
+    for record in records:
+        if (
+            not isinstance(record, dict)
+            or not required <= record.keys()
+            or record.keys() - required - {"audience"}
+        ):
+            raise ValueError("Export registration fields do not match the documented schema.")
+        season = record["kvk_no"]
+        if type(season) is not int or not 1 <= season <= 2147483647:
+            raise ValueError("Explicit export KVK is required.")
+        slots = record["slot_file_ids"]
+        if (
+            not isinstance(slots, list)
+            or not 2 <= len(slots) <= 16
+            or any(not isinstance(x, str) for x in slots)
+        ):
+            raise ValueError("Register two to sixteen workbook slot IDs.")
+        if any(
+            not isinstance(record[k], str)
+            for k in ("index_file_id", "owner_email", "service_account_email")
+        ):
+            raise ValueError("Export identity fields must be strings.")
+        registration = SheetsRegistration(
+            record["index_file_id"],
+            tuple(slots),
+            record["owner_email"],
+            record["service_account_email"],
+            record.get("audience", "private"),
+        )
+        ids = {registration.index_file_id, *registration.slot_file_ids}
+        if used.intersection(ids):
+            raise ValueError(
+                "Export workbooks must be distinct and cannot use protected workbooks."
+            )
+        used.update(ids)
+        result.append((season, registration))
+    return tuple(result)
+
+
 def configured_recovery():
     import bot_config
     from constants import ALL_KVK_SHEET_ID, CREDENTIALS_FILE, KVK_SHEET_ID
     from kvk.dal.new_source_admin_dal import configured_connection
     from kvk.dal.new_source_delivery_dal import DeliveryRepository, Destination
     from kvk.dal.new_source_recovery_dal import RecoveryDAL
-    from kvk.services.new_source_export_service import GoogleSheetsTransport, SheetsRegistration
+    from kvk.services.new_source_export_service import GoogleSheetsTransport
     from kvk.services.new_source_publication_service import PublicationService
 
     def connect():
@@ -323,26 +375,17 @@ def configured_recovery():
         connection.timeout = 30
         return connection
 
+    protected = tuple(x for x in (KVK_SHEET_ID, ALL_KVK_SHEET_ID) if x)
+    registrations = parse_export_registrations(
+        bot_config.KVK_SOURCE_EXPORT_REGISTRATIONS, protected_file_ids=protected
+    )
     dal = RecoveryDAL(connect)
     dal.check_schema()
     repository = DeliveryRepository(connect)
-    registrations = json.loads(bot_config.KVK_SOURCE_EXPORT_REGISTRATIONS)
-    if not isinstance(registrations, list) or len(registrations) > 8:
-        raise ValueError("At most eight explicit export registrations are supported.")
     targets = []
-    for record in registrations:
+    for season, registration in registrations:
         from google.oauth2.service_account import Credentials
 
-        season = record["kvk_no"]
-        if type(season) is not int or not 1 <= season <= 2147483647:
-            raise ValueError("Explicit export KVK is required.")
-        registration = SheetsRegistration(
-            record["index_file_id"],
-            tuple(record["slot_file_ids"]),
-            record["owner_email"],
-            record["service_account_email"],
-            record.get("audience", "private"),
-        )
         destination = Destination("sheets", registration.index_file_id)
         credentials = Credentials.from_service_account_file(
             CREDENTIALS_FILE,
@@ -355,7 +398,7 @@ def configured_recovery():
             credentials=credentials,
             registration=registration,
             reuse_guard=repository.slot_reusable,
-            protected_file_ids=tuple(x for x in (KVK_SHEET_ID, ALL_KVK_SHEET_ID) if x),
+            protected_file_ids=protected,
         )
         targets.append(ExportTarget(season, destination, transport))
     if len({t.destination for t in targets}) != len(targets):

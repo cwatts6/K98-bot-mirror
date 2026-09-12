@@ -337,3 +337,64 @@ def test_recovery_caller_composes_s4b_multi_period_delivery(monkeypatch, changed
     component.test_multi_period_delivery_uses_changed_anchor_and_deduplicates(
         monkeypatch, changed_period
     )
+
+
+def export_record():
+    return dict(
+        kvk_no=1,
+        index_file_id="synthetic_index",
+        slot_file_ids=["synthetic_slot_a", "synthetic_slot_b"],
+        owner_email="owner@example.invalid",
+        service_account_email="bot@synthetic.iam.gserviceaccount.com",
+    )
+
+
+def test_registration_parser_default_and_explicit_schema():
+    import json
+
+    assert recovery.parse_export_registrations("[]") == ()
+    result = recovery.parse_export_registrations(json.dumps([export_record()]))
+    assert result[0][0] == 1 and result[0][1].audience == "private"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        dict(kvk_no=True),
+        dict(slot_file_ids="abc"),
+        dict(slot_file_ids=["one"]),
+        dict(slot_file_ids=[str(i) for i in range(17)]),
+        dict(owner_email=None),
+        dict(audience="unknown"),
+        dict(extra="unsupported"),
+        dict(index_file_id="bad id"),
+    ],
+)
+def test_registration_parser_rejects_malformed_records(change):
+    import json
+
+    with pytest.raises(ValueError):
+        recovery.parse_export_registrations(json.dumps([dict(export_record(), **change)]))
+
+
+def test_registration_parser_rejects_shared_and_protected_workbooks():
+    import json
+
+    row = export_record()
+    with pytest.raises(ValueError):
+        recovery.parse_export_registrations(json.dumps([row, row]))
+    with pytest.raises(ValueError):
+        recovery.parse_export_registrations(
+            json.dumps([row]), protected_file_ids=[row["index_file_id"]]
+        )
+
+
+def test_invalid_registration_fails_before_sql_or_credentials(monkeypatch):
+    from kvk.dal import new_source_recovery_dal
+
+    monkeypatch.setattr(bot_config, "KVK_SOURCE_EXPORT_REGISTRATIONS", "not json")
+    sql = Mock(side_effect=AssertionError("Must validate before SQL"))
+    monkeypatch.setattr(new_source_recovery_dal.RecoveryDAL, "check_schema", sql)
+    with pytest.raises(ValueError, match="JSON"):
+        recovery.configured_recovery()
+    sql.assert_not_called()

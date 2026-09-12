@@ -1036,7 +1036,14 @@ def register_admin(bot: ext_commands.Bot) -> None:
             try:
                 # Offload the synchronous import to a process/thread to avoid blocking
                 success, report = await run_proc_config_import_offload(
-                    dry_run=False, prefer_process=True
+                    dry_run=False,
+                    prefer_process=True,
+                    source_actor=f"discord:{ctx.user.id}",
+                    source_provenance={
+                        "trigger": "ops.import_proc_config",
+                        "guild_id": str(ctx.guild.id),
+                        "interaction_id": str(ctx.interaction.id),
+                    },
                 )
             except Exception as e:
                 logger.exception("[COMMAND] /import_proc_config crashed")

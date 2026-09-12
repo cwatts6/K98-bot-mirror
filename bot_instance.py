@@ -2043,7 +2043,10 @@ async def full_startup_sequence():
                         if callable(globals().get("run_proc_config_import_offload")):
                             try:
                                 ok, report = await run_proc_config_import_offload(
-                                    dry_run=False, prefer_process=True, meta={"trigger": "startup"}
+                                    dry_run=False,
+                                    prefer_process=True,
+                                    meta={"trigger": "startup"},
+                                    source_provenance={"trigger": "startup"},
                                 )
                                 logger.warning(
                                     "[PROC_IMPORT] Background import END (success=%s) report_keys=%s",
@@ -2059,7 +2062,9 @@ async def full_startup_sequence():
 
                         # Fallback: run the legacy blocking import in a thread/executor
                         try:
-                            res = await run_blocking(run_proc_config_import)
+                            res = await run_blocking(
+                                run_proc_config_import, source_provenance={"trigger": "startup"}
+                            )
                             # res may be (bool, report) or similar
                             if isinstance(res, tuple):
                                 ok = res[0]

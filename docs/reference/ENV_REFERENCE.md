@@ -154,7 +154,7 @@ python scripts/smoke_imports.py
 | Variable | Default | Meaning |
 |---|---|---|
 | KVK_SOURCE_INTAKE_ENABLED | false | Enables private admission and manual receipt controls only. Does not activate serving. |
-| KVK_SOURCE_RECOVERY_ENABLED | false | Reserved for separately approved S5B worker integration; no worker is registered by S5A. |
+| KVK_SOURCE_RECOVERY_ENABLED | false | Enables the S5B recovery worker; independent of serving activation. See recovery configuration below. |
 | KVK_SOURCE_CHANNEL_ID | 0 | Dedicated private intake channel; must differ from every legacy upload and monitored fallback channel. |
 | KVK_SOURCE_UPLOADER_ROLE_IDS | empty | Explicit guild uploader role IDs; fresh membership is checked in handlers and callbacks. |
 | KVK_SOURCE_ARTIFACT_ROOT | unset | Absolute private service-owned directory outside Git for content-addressed originals. |
@@ -166,3 +166,45 @@ the guild/admin boundary; ordinary uploaders cannot finalize/correct/configure. 
 NOTIFY_CHANNEL_ID is also allowed for that admin's private command responses. SourceRouting.Enabled
 is independent and remains off. Keep originals and receipts when disabling intake; no cleanup
 or retained-database deletion is part of rollback.
+
+## KVK source recovery (S5B)
+
+| Variable | Default | Contract |
+|---|---|---|
+| KVK_SOURCE_RECOVERY_INTERVAL_SECONDS | 30 | Integer seconds, 1-300 inclusive. |
+| KVK_SOURCE_RECOVERY_BATCH_SIZE | 8 | Integer periods per worker batch, 1-32 inclusive. |
+| KVK_SOURCE_EXPORT_REGISTRATIONS | [] | JSON array of zero to eight explicit registrations, validated before SQL or credential access. Empty means no automatic export destination. |
+
+KVK_SOURCE_RECOVERY_ENABLED defaults false. Enabling it registers one off-event-loop worker;
+it does not enable SourceRouting or authorize Discord publication. Invalid interval/batch bounds
+fail registration. Invalid export configuration fails closed before opening SQL/credentials;
+the worker records the exception type and retries on its interval. Validate the configuration
+before separately authorized activation; do not infer permission to enable it from this example.
+
+Synthetic JSON example (all identifiers are placeholders):
+
+```json
+[{"kvk_no":1,"index_file_id":"synthetic_index","slot_file_ids":["synthetic_slot_a","synthetic_slot_b"],"owner_email":"owner@example.invalid","service_account_email":"bot@synthetic.iam.gserviceaccount.com","audience":"private"}]
+```
+
+Required keys are kvk_no, index_file_id, slot_file_ids, owner_email and service_account_email.
+Only audience is optional; unknown keys are rejected. kvk_no is an integer 1-2147483647
+(booleans are rejected). IDs are strings matching `[A-Za-z0-9_-]{3,128}`. Each registration
+requires 2-16 slot IDs; the index and every slot must be distinct across the entire configuration
+and cannot equal KVK_SHEET_ID or ALL_KVK_SHEET_ID. The durable receipt size may require fewer
+slots; S4B returns setup-required if the registration plus quarantine exceeds receipt capacity.
+
+owner_email must be a nonempty string containing @. service_account_email must end in
+`.iam.gserviceaccount.com` and differ from the owner. Runtime provider checks verify actual
+ownership and editor permissions; syntax validation does not establish ownership.
+audience defaults to `private`; the only other value is `public_viewer`, which requires explicit
+operator approval for that audience. Use dedicated pre-provisioned My Drive workbooks. Existing
+S4B permission, protected-file, manifest, receipt and quarantine checks still apply.
+Credentials come from the existing CREDENTIALS_FILE reference; never put keys or tokens in
+this JSON or Git. An empty registration list loads no export credentials. No workbook discovery,
+creation, automatic Discord send or uncertain/private-slot reclamation is authorized here.
+
+When MAINT_SPEC_ALLOWLIST is explicitly configured, permit the exact callable
+`proc_config_import:run_proc_config_import_payload` for process-mode ProcConfig imports.
+The worker still enforces its configured allowlist; this change does not broaden it automatically.
+Thread mode preserves the same actor/provenance without using the process callable allowlist.

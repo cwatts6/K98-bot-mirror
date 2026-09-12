@@ -1168,19 +1168,39 @@ def run_proc_config_import(
 # ---------------------------------------------------------------------------
 # Phase 3: Offload wrapper (async) — allow safe invocation from async code
 # ---------------------------------------------------------------------------
+def run_proc_config_import_payload(payload):
+    """Process-worker adapter: reconstruct keyword arguments from one JSON payload."""
+    if (
+        not isinstance(payload, dict)
+        or set(payload) - {"dry_run", "source_actor", "source_provenance"}
+        or type(payload.get("dry_run")) is not bool
+    ):
+        raise ValueError("Invalid ProcConfig worker payload.")
+    return run_proc_config_import(**payload)
+
+
 async def run_proc_config_import_offload(
-    dry_run: bool = False, *, prefer_process: bool = True, meta: dict | None = None
+    dry_run: bool = False,
+    *,
+    prefer_process: bool = True,
+    meta: dict | None = None,
+    source_actor: str | None = None,
+    source_provenance: dict | None = None,
 ) -> tuple[bool, dict]:
     """
     Async wrapper to run run_proc_config_import in an isolated worker (preferred)
     or thread fallback. Tries, in order:
       1) file_utils.run_maintenance_with_isolation (preferred)
-      2) file_utils.start_callable_offload
-      3) file_utils.run_blocking_in_thread
-      4) asyncio.to_thread (last resort)
+      2) file_utils.run_blocking_in_thread
+      3) asyncio.to_thread (last resort)
 
     Returns the (success_bool, report_dict) tuple that run_proc_config_import returns.
     """
+    call_kwargs = {}
+    if source_actor is not None:
+        call_kwargs["source_actor"] = source_actor
+    if source_provenance is not None:
+        call_kwargs["source_provenance"] = dict(source_provenance)
     try:
         # For testability: if the test/module has explicitly set module-level names, respect them
         # (even if they are None). Only import from file_utils if the name is NOT present in globals().
@@ -1194,16 +1214,6 @@ async def run_proc_config_import_offload(
             except Exception:
                 run_maintenance_with_isolation = None
 
-        if "start_callable_offload" in globals():
-            start_callable_offload = globals()["start_callable_offload"]
-        else:
-            try:
-                from file_utils import start_callable_offload as _sco  # type: ignore
-
-                start_callable_offload = _sco
-            except Exception:
-                start_callable_offload = None
-
         if "run_blocking_in_thread" in globals():
             run_blocking_in_thread = globals()["run_blocking_in_thread"]
         else:
@@ -1215,39 +1225,45 @@ async def run_proc_config_import_offload(
                 run_blocking_in_thread = None
 
         # 1) run_maintenance_with_isolation: expects a callable and returns result (or (result, meta))
-        if run_maintenance_with_isolation is not None:
+        if prefer_process and run_maintenance_with_isolation is not None:
             res = await run_maintenance_with_isolation(
-                run_proc_config_import,
-                dry_run,
+                run_proc_config_import_payload,
+                [dict(dry_run=dry_run, **call_kwargs)],
                 name="proc_config_import",
                 prefer_process=prefer_process,
                 meta=meta or {},
             )
-            # Return whatever the isolation helper returned
-            return res
+            # The process helper wraps the JSON-decoded importer tuple in worker metadata.
+            if isinstance(res, (tuple, list)) and len(res) == 2:
+                result = res[0] if isinstance(res[0], (tuple, list)) else res
+                if len(result) == 2 and type(result[0]) is bool and isinstance(result[1], dict):
+                    return result[0], result[1]
+            # Do not retry an unknown process result: the transaction may have committed.
+            return False, {
+                "success": False,
+                "errors": [
+                    "ProcConfig worker outcome unavailable; inspect durable state before retrying."
+                ],
+            }
 
-        # 2) start_callable_offload: start a subprocess/task and await its completion
-        if start_callable_offload is not None:
-            res = await start_callable_offload(
-                run_proc_config_import,
-                dry_run,
-                name="proc_config_import",
-                prefer_process=prefer_process,
-                meta=meta or {},
-            )
-            return res
+        # The legacy start_callable_offload helper is synchronous, returns a process
+        # handle and cannot carry keyword arguments. Use the thread fallback instead.
 
         # 3) run_blocking_in_thread: offload to thread
         if run_blocking_in_thread is not None:
             res = await run_blocking_in_thread(
-                run_proc_config_import, dry_run, name="proc_config_import", meta=meta or {}
+                run_proc_config_import,
+                dry_run,
+                name="proc_config_import",
+                meta=meta or {},
+                **call_kwargs,
             )
             return res
 
         # 4) fallback to asyncio.to_thread
         import asyncio as _asyncio
 
-        res = await _asyncio.to_thread(run_proc_config_import, dry_run)
+        res = await _asyncio.to_thread(run_proc_config_import, dry_run, **call_kwargs)
         return res
     except Exception:
         logger.exception("[IMPORT] run_proc_config_import_offload failed")

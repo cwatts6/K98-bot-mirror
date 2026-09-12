@@ -511,3 +511,58 @@ no-change review decision remains valid. Bot HEAD remains
 No PR, pull/reset/merge/push, production SQL, real import/export, Discord action, restart,
 deployment, activation or later pack was performed. Stop for S5B review with the disposable
 integration gap closed; retain the database and all historical evidence.
+
+## PR #271 review response - 2026-09-12
+
+The operator authorized action, review and replies for all three inline comments. This bounded
+follow-up adds `commands/admin_cmds.py`, `tests/test_proc_config_import_offload.py` and
+`docs/reference/ENV_REFERENCE.md` to the S5B modify manifest for these comments only.
+No SQL/shared-helper/later-slice implementation is included; file_utils.py and maintenance_worker.py
+remain unchanged.
+
+- Hoisted pandas import out of the row loop, retaining the default-off early return.
+- Manual imports pass the authenticated Discord actor, guild, interaction and trigger; startup
+  imports record the system trigger. The process adapter carries one typed JSON payload and
+  reconstructs keyword arguments because the existing worker dispatch is positional. Explicit
+  thread mode uses the direct thread helper; the incompatible legacy process-handle fallback is
+  not used. Nested worker results preserve importer failure, and unknown outcomes do not replay.
+- Documented all three recovery variables, exact JSON keys/types/bounds, synthetic example,
+  dedicated/protected workbook rules, audience and credentials, receipt-capacity limits and the
+  conditional exact MAINT_SPEC_ALLOWLIST entry. Configuration is validated before SQL/credentials.
+  Shared workbook IDs, protected IDs, malformed fields and unsupported keys fail closed.
+
+Fresh final focused validation: 180 passed in 16.51 seconds, including all three approved disposable
+SQL cases on retained K98_S5B_Disposable_20260912. Actual serialization/worker dispatch is tested
+in-process with a synthetic importer; process result transport is mocked. Explicit thread and
+asyncio fallbacks, actor/provenance, failed importer result and malformed export configuration
+are covered. An initial full run exposed test-order leakage from a prior worker test's imported
+fake normalizer; this new test now explicitly binds the real dependency and restricted allowlist.
+The combined maintenance/offload regression passed 24 tests in 3.77 seconds. No shared test or
+runtime helper was changed to hide the failure.
+
+Architecture, deferred, security-routing, exact-path selector, smoke imports and registration
+passed (36 top-level / 101 grouped; no drift/duplicates). Applicable pre-commit code checks passed;
+formatting-only hook corrections are included. Final staged checks and full-suite result follow below.
+
+Security: Changes, Deep off, final seven-file fix patch over
+87ec2e825f670628284b30c2987256bd2277e845; completed/read-back scan
+`a7fba7aa-53ea-4ddc-bc86-f9c7e9ac42e8`, digest
+`codex-security-snapshot/v1:sha256:ec2985fdcfe7d4e14bda24b65ecbc60d8f8c96d6d5d50787ae94ba3cc1f7835c`.
+Zero findings; four runtime files and supporting tests/docs reviewed. Independent architecture
+review confirmed the helper-contract fixes. Tool-reported scan usage: 693,721 tokens (689,024
+cached input), rollout accounting. Earlier scan b6ab46fa-4d44-48c1-9db5-b018962c0d55 retained the
+initial helper-contract gaps and is not the final gate. The only post-scan changes are documentation
+of the allowlist/evidence and test dependency isolation; no runtime/security-control changes.
+Those exact documentation/test-harness changes were reviewed with a no-runtime-change scan skip.
+The initial S5B review remains evidence for the preceding commit; this scan covers its fix delta.
+
+SQL repository remains unchanged at 44afa315dd6cbfe9fec101f2a39a62e534f5b583: separate no-change skip.
+Real configured allowlist, production/operator parity and provider/capacity evidence remain S6/G4.
+No credentials, private player data, production SQL, real imports/exports, Discord operations,
+merge, deployment, activation or later-pack execution. No new deferred optimisation item.
+
+Final full-suite rerun: **4,080 passed, 37 skipped in 160.78 seconds**; operational logs unchanged.
+The three S5B SQL cases passed separately in the 180-test focused run. One earlier full run
+failed the now-isolated worker test; another paused near dashboard tests and was interrupted.
+The final verbose run completed without failures; no unrelated dashboard code was changed.
+Final staged pre-commit checks, including secret scanning and registration, passed.
