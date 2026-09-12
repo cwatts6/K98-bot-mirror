@@ -1,19 +1,26 @@
 # KVK Source Migration — Phase 2B implementation plan
 
-## Current status — S7 approved; S8A pack prepared, 2026-09-12
+## Current status — S8A implemented; PR review in progress, 2026-09-12
 
-Chris Watts approved the S7 contract and exact implementation manifests, then authorized
-preparation of the next pack and starter. The approved technical direction includes initial
-account serialization, durable legacy snapshots with worker affinity where needed, and the
-stated quarantine/reserve allowance. Settled S7 decisions are not reopened.
+S7's contract and manifests are approved; settled decisions remain closed. S8A SQL
+files are implemented in [SQL PR #80](https://github.com/cwatts6/K98-bot-SQL-Server/pull/80).
+Static validation and the separately approved six-script disposable checks passed.
+The subsequent deployment-runner input fix passed offline checks and its exact
+Changes security review; that new runner path has not been executed against SQL Server.
 
-**Next: S8A SQL Foundation, after separate file-implementation authorization.**
-[Task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md); [implementation starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md).
-Preparation is documentation-only. No S8A SQL/runtime/config implementation, database
-execution, Git publication or activation is authorized by this status. Preserve the full
-27-path Bot carry-forward union, including both S6 archive move sides and both S7 outputs;
-SQL implementation belongs in its own repository and review. Historical status blocks below
-retain their original evidence; this latest status supersedes pending S7 review wording.
+**Next: finish S8A review and repository promotion/merge checks, then separately scope S8B.**
+Do not repeat S7 planning or request the already-granted S8A file-implementation approval.
+The [S8A pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) retains its original implementation scope and gates as history.
+Any further SQL execution requires separate exact target, backup/row-preview and operation
+approval. Bot runtime/config work, S8B implementation, deployment and activation remain gated.
+SourceRouting.Enabled alone does not implement public routing.
+
+Preserve all 27 Bot carry-forward paths, including both S6 archive move sides and both S7
+outputs. Bot mirror PR #273 and production PR #580 are separate from SQL PR #80; verify
+actual Files changed, including previous_filename, before merge. S1–S6 evidence remains
+accepted; retain S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases
+and files. Local deployment is operator-attested, not production runtime deployment or a
+fresh post-merge smoke. Earlier dated blocks are historical and do not select the next task.
 
 ## S7 planning delivery — 2026-09-12
 
@@ -25,7 +32,7 @@ separately authorized. S7-D01–D09 are settled; no predecessor evidence is reop
 Latest S7 status supersedes earlier planning-approval-pending wording only.
 
 
-## Current delivery and next slice — 2026-09-12 post-S6 closeout
+## Historical delivery — 2026-09-12 post-S6 closeout
 
 **S6 evidence/rehearsal delivered, accepted and merged; feature activation remains blocked.**
 Mirror [#272](https://github.com/cwatts6/K98-bot-mirror/pull/272) merged at
@@ -50,8 +57,8 @@ counterpart, import-triggered serialized/latest-pending exports, export-only
 recovery, retained input/publication history and safe output reuse after each KVK.
 These are requirements, not claims of implemented behavior.
 
-**Next: S7 Integration Contract and Implementation Planning**, documentation/read-only
-scope after explicit S7 approval. Do not rerun predecessors or start later packs.
+**S7 planning is complete and approved; S8A is implemented and under review.**
+Follow the current status above; do not rerun predecessors or start later implementation packs.
 Carry every path in the post-S6 handoff manifest into the next separately authorized
 slice PR, including both S6 archive move sides. No Git publication, SQL/provider
 execution, restart, production promotion or activation is authorized by this update.
