@@ -205,6 +205,13 @@ class RecoveryService:
         endpoint = (
             request is not None and old_config is not None and old_config != config.version_id
         )
+        # Applied requests are history, not the actor of later same-config work.
+        # A still-pending request remains attached until its endpoint completes.
+        action_request = (
+            request
+            if request and (endpoint or request["RequestState"] in ("pending", "requested"))
+            else None
+        )
         version = selected["SelectionVersion"] if selected else 0
         action_id = str(
             uuid5(
@@ -214,7 +221,7 @@ class RecoveryService:
                         candidate.snapshot.publication_id,
                         version,
                         (data["routing"] or {}).get("RoutingVersion", 0),
-                        str(request["RequestID"]) if request else None,
+                        str(action_request["RequestID"]) if action_request else None,
                     )
                 ),
             )
@@ -229,10 +236,10 @@ class RecoveryService:
             action_id=action_id,
             expected_selection_version=version,
             expected_routing_version=(data["routing"] or {}).get("RoutingVersion", 0),
-            actor=request["Actor"] if request else "system:kvk_source_recovery",
-            reason=request["Reason"] if request else "Recover accepted source inputs",
+            actor=action_request["Actor"] if action_request else "system:kvk_source_recovery",
+            reason=action_request["Reason"] if action_request else "Recover accepted source inputs",
             action_type="endpoint_update" if endpoint else "publish",
-            request_id=str(request["RequestID"]) if request else None,
+            request_id=str(action_request["RequestID"]) if action_request else None,
             destinations=destinations,
         )
         from kvk.services.new_source_export_service import ExportSelection

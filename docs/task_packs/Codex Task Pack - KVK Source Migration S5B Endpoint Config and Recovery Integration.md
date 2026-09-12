@@ -566,3 +566,51 @@ The three S5B SQL cases passed separately in the 180-test focused run. One earli
 failed the now-isolated worker test; another paused near dashboard tests and was interrupted.
 The final verbose run completed without failures; no unrelated dashboard code was changed.
 Final staged pre-commit checks, including secret scanning and registration, passed.
+
+
+## PR #271 second review response - 2026-09-12
+
+Addressed the two further comments within the existing S5B manifest:
+
+- Process-mode results above 900 serialized characters now use a bounded status envelope,
+  preserving the authoritative success Boolean, explicit failure indication and a persisted-report
+  path when it fits. The full importer report remains in the existing report/logging mechanism.
+  This avoids the unchanged worker's default 1,000-character telemetry truncation. Two tests use
+  the real worker result emitter with large success/failure reports and verify wrapper results.
+  Configuring a worker cutoff below this envelope is outside the default guarantee; preserve the
+  documented default or a larger cutoff. No automatic replay or shared-worker change was added.
+- Applied same-config requests no longer supply actor/reason/RequestID to subsequent ordinary
+  publications. These use system:kvk_source_recovery. Actual endpoint transitions and still-pending
+  endpoint completion retain request context. A disposable SQL regression proves that a later live
+  scan creates a system publish action with no request ID and leaves AppliedPublicationID unchanged.
+
+Changed files: proc_config_import.py, kvk/services/new_source_recovery_service.py,
+tests/test_proc_config_import_offload.py, tests/test_kvk_source_config_hook.py and this evidence append.
+No new manifest path, SQL repository change, provider operation or later-slice work.
+
+Focused seven-file suite on the approved retained local K98_S5B_Disposable_20260912 database:
+**183 passed, zero skipped, in 14.63 seconds**, including four SQL integration cases.
+Architecture/deferred/security-routing validators, test selector, smoke imports and command
+registration passed (36 top-level / 101 grouped; no drift/duplicates). Applicable pre-commit
+formatting/lint/type checks passed. Final staged secret check and suite outcomes follow below.
+
+Changes review, Deep off: completed/read-back scan 5b415d65-f28b-4dc8-a043-87e206ff1a2d,
+four-file task-only patch over 964893c5e20688ac826209af4f964838fd1f943e; snapshot digest
+codex-security-snapshot/v1:sha256:f3fd00516c094a3a8c6a15e86ad9a22d193c1133106e11aa4a3eead75ca22e9f.
+Two runtime inventory files plus both supporting test files reviewed, zero findings.
+Independent architecture review found no blocker. Tool-reported rollout usage: 1,179,705 tokens,
+including 1,137,152 cached input tokens. Evidence-only append has a documentation-only scan skip.
+SQL remains clean at 44afa315dd6cbfe9fec101f2a39a62e534f5b583: separate no-change skip.
+Retain prior scans and historical test evidence; this scan covers only the latest fix delta.
+
+The combined full run stalled in the unrelated dashboard timeout test area with an asyncio
+wait recorded by faulthandler. No dashboard code was changed. The entire dashboard test file
+passed separately: 36 passed in 1.99 seconds, operational logs unchanged. The rest of the suite
+is run separately to preserve complete test coverage; this is not a claim that the stalled
+single-process invocation passed. No new unrelated refactor or optimisation was implemented.
+No merge, production push/SQL, real import/export, Discord action, deployment or activation.
+
+Final remaining-suite result: **4,046 passed, 38 skipped in 163.58 seconds**, operational logs
+unchanged. With the 36 separately passed dashboard tests, all suite tests were covered across
+two runs: **4,082 passed and 38 skipped**. The four S5B SQL cases passed separately in the
+183-test focused run. Final staged pre-commit, including secret scanning, passed.

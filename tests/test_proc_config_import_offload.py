@@ -212,3 +212,44 @@ async def test_explicit_thread_bypasses_lossy_maintenance_special_case(monkeypat
         dry_run=True, prefer_process=False, source_actor="discord:123"
     ) == (True, {})
     target.assert_called_once_with(True, source_actor="discord:123")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("success", [True, False])
+async def test_large_process_report_survives_real_worker_emission(monkeypatch, capfd, success):
+    import json
+
+    import file_utils
+    import maintenance_worker
+
+    report = {
+        "success": success,
+        "tables": [{"rows": 100, "detail": "synthetic" * 300}] * 8,
+        "errors": [] if success else ["failure" * 1000],
+        "manifest_path": "synthetic-report.json",
+    }
+    monkeypatch.setattr(pci, "run_proc_config_import", lambda **kw: (success, report))
+    monkeypatch.setattr(maintenance_worker, "_MAX_RESULT_SNIPPET", 1000)
+    result = pci.run_proc_config_import_payload({"dry_run": True})
+    maintenance_worker._print_result_json(
+        "proc_config_import:run_proc_config_import_payload", "success", result=result
+    )
+    emitted = json.loads(capfd.readouterr().out.strip().splitlines()[-1])
+    assert "result_summary" not in emitted
+    assert emitted["result"][0] is success
+    assert emitted["result"][1]["manifest_path"] == "synthetic-report.json"
+    assert len(json.dumps(emitted["result"])) <= 900
+
+    async def subprocess(*args, **kwargs):
+        return emitted["result"], emitted
+
+    monkeypatch.setattr(file_utils, "run_maintenance_subprocess", subprocess)
+    monkeypatch.setattr(
+        pci,
+        "run_maintenance_with_isolation",
+        file_utils.run_maintenance_with_isolation,
+        raising=False,
+    )
+    actual = await pci.run_proc_config_import_offload(dry_run=True)
+    assert actual[0] is success and actual[1]["report_summary"]
+    assert bool(actual[1]["errors"]) is (not success)

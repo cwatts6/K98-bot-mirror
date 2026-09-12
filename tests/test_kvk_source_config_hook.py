@@ -352,3 +352,49 @@ def test_disposable_two_imports_before_recovery(s5b_database):
     final = load_snapshot(connect, kvk_no=season, period_id=config.period_id)
     assert final["is_current"] and final["publication"]["EndScanID"] == 3
     assert service.recover_period(season, config.period_id) is None
+
+
+def test_disposable_applied_request_does_not_own_later_publication(s5b_database):
+    from kvk.dal.new_source_import_dal import SourceImportDAL, transaction
+    from kvk.services.new_source_publication_service import PublicationService
+    from tests.test_kvk_source_sql_integration import accepted_event, seed_config
+
+    connect, season, store = s5b_database
+    importer = SourceImportDAL(connect, store)
+    b0 = accepted_event(importer, season, 1, store)
+    accepted_event(importer, season, 2, store)
+    accepted_event(importer, season, 3, store)
+    config = seed_config(connect, season, b0)
+    service = recovery.RecoveryService(dal.RecoveryDAL(connect), PublicationService(connect))
+    service.recover_period(season, config.period_id)
+    with transaction(connect) as cursor:
+        request_ids = dal.snapshot_import(
+            cursor,
+            [dict(KVK_NO=season, WindowName="Fight", StartScanID=1, EndScanID=None)],
+            actor="synthetic-admin",
+            origin="admin",
+            provenance={},
+            requested_utc=datetime.now(UTC).replace(microsecond=0),
+        )
+    transition = service.recover_period(season, config.period_id)
+    accepted_event(importer, season, 4, store)
+    later = service.recover_period(season, config.period_id)
+    with transaction(connect) as cursor:
+        cursor.execute(
+            "SELECT Actor,Reason,RequestID,ActionType FROM KVK.SourceAction WHERE NewPublicationID=?",
+            later.publication_id,
+        )
+        action = cursor.fetchone()
+        assert tuple(action) == (
+            "system:kvk_source_recovery",
+            "Recover accepted source inputs",
+            None,
+            "publish",
+        )
+        cursor.execute(
+            "SELECT RequestState,AppliedPublicationID FROM KVK.SourceConfigRequest WHERE RequestID=?",
+            request_ids[0],
+        )
+        state, applied = cursor.fetchone()
+        assert state == "applied" and str(applied).lower() == transition.publication_id.lower()
+    assert service.recover_period(season, config.period_id) is None

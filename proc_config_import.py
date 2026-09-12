@@ -1176,7 +1176,26 @@ def run_proc_config_import_payload(payload):
         or type(payload.get("dry_run")) is not bool
     ):
         raise ValueError("Invalid ProcConfig worker payload.")
-    return run_proc_config_import(**payload)
+    success, report = run_proc_config_import(**payload)
+    # The maintenance worker treats its result as telemetry and summarizes values
+    # above 1,000 characters. Keep the authoritative status below that default.
+    if len(json.dumps((success, report), default=str)) <= 900:
+        return success, report
+    summary = {
+        "success": success,
+        "report_summary": True,
+        "errors": (
+            []
+            if success
+            else ["ProcConfig import reported errors; inspect the persisted import report."]
+        ),
+    }
+    persisted = report.get("persisted_to") or report.get("manifest_path")
+    if isinstance(persisted, str):
+        summary["manifest_path"] = persisted
+        if len(json.dumps((success, summary))) > 900:
+            summary.pop("manifest_path")
+    return success, summary
 
 
 async def run_proc_config_import_offload(
