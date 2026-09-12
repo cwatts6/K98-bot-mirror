@@ -1,5 +1,13 @@
 # Codex Task Pack — KVK Source Migration S6 Release Readiness and Controlled Activation
 
+> **2026-09-12 PR #272 routing review correction:** Public runtime routing is an
+> OPEN implementation prerequisite. The current code does not consume
+> SourceRouting.Enabled to switch ordinary readers to V2. The routing-row update
+> below is only a conditional design and must not run until a separately approved,
+> reviewed, deployed and accepted public routing consumer exists. Synthetic
+> rehearsal acceptance does not close this gap or establish activation readiness.
+
+
 > **2026-09-12 mirror PR authorization:** Chris Watts explicitly approved committing,
 > pushing and opening the complete documentation-only draft PR in K98-bot-mirror.
 > This supersedes the preceding pending-PR-permission statements. No merge,
@@ -1251,3 +1259,37 @@ bytes, 174 local links and 13 fragments. This update changes documentation only;
 the existing runtime-test and separate-repository security skip decisions remain
 applicable. No SQL, Google, Discord, Git publication or production action is part
 of this approval record. Preserve all disposable databases and retained outputs.
+
+## PR 272 review correction — missing public routing consumer
+
+Review comment 3996906362 is valid. At reviewed bot commit
+`758d6be163026f0299c05c3ad0bf2c4517c55932`, routing-row access in
+`kvk/dal/new_source_config_dal.py:13–28` and
+`kvk/dal/new_source_admin_dal.py:494–498` provides locking/onboarding, not public
+read dispatch. `stats_alerts/embeds/kvk.py:154–185` selects V2 only with explicit
+diagnostic source_selection; ordinary requests retain the legacy path.
+
+A successful SourceRouting.Enabled update alone cannot activate public V2 readers.
+The readiness sequence and transaction preconditions now explicitly stop until a
+separately approved, reviewed, deployed and accepted routing consumer covers all
+intended public readers. Require ordinary-request enable/disable behavior, pinned
+routing/selection versions, unavailable/stale/capability handling, cache/restart
+behavior and rollback tests bound to the deployed consumer revision. This is an
+implementation gap, not merely missing deployment evidence or an activation helper.
+No runtime implementation is included or authorized by this documentation correction.
+S6-OPS01/PERF01/CAP01 and all retained uncertainty remain as previously recorded;
+this additional prerequisite cannot be discharged by their synthetic measurements.
+
+Copilot reviewed 16/16 files and generated no inline comments, but requested final
+human review of the large evidence record. That requirement remains: operator
+rehearsal acceptance is recorded, while independent remote reviewers cannot verify
+local disposable databases, runtime JSON artifacts or every historical claim from
+the PR alone. Hashes identify retained artifacts; they do not substitute for access
+and inspection. No independent review or full release acceptance is invented.
+
+Validation for this correction: Markdown-only; no runtime tests or predecessor
+rehearsals rerun. Recheck local links, the complete 18-path PR manifest, staged
+whitespace, architecture/deferred/security-routing and staged secrets. Security
+routing remains documentation-only skip for the exact Bot review-fix diff; SQL
+remains unchanged at 44afa315dd6cbfe9fec101f2a39a62e534f5b583. No activation,
+merge, production promotion, SQL execution or Google operation is performed.

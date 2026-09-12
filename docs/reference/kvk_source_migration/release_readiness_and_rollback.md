@@ -1,5 +1,13 @@
 # KVK Source Migration S6 release readiness and rollback
 
+> **2026-09-12 PR #272 routing review correction:** Public runtime routing is an
+> OPEN implementation prerequisite. The current code does not consume
+> SourceRouting.Enabled to switch ordinary readers to V2. The routing-row update
+> below is only a conditional design and must not run until a separately approved,
+> reviewed, deployed and accepted public routing consumer exists. Synthetic
+> rehearsal acceptance does not close this gap or establish activation readiness.
+
+
 > **2026-09-12 mirror PR authorization:** Chris Watts explicitly approved committing,
 > pushing and opening the complete documentation-only draft PR in K98-bot-mirror.
 > This supersedes the preceding pending-PR-permission statements. No merge,
@@ -109,6 +117,25 @@ Publish only redacted counts/status and evidence references here, never player r
 
 ## 3. Verified local capabilities and proposed release sequence
 
+**Blocking implementation prerequisite — runtime routing consumer is absent.**
+At the reviewed bot revision `758d6be163026f0299c05c3ad0bf2c4517c55932`,
+`kvk/dal/new_source_config_dal.py:13–28` locks the routing row for configuration,
+and `kvk/dal/new_source_admin_dal.py:494–498` creates disabled onboarding rows.
+Neither dispatches public reads. `stats_alerts/embeds/kvk.py:154–185` reaches V2
+only through an explicit diagnostic `source_selection`; its ordinary path remains
+legacy. Setting `SourceRouting.Enabled=1` therefore does not activate public V2
+readers. The synthetic export and diagnostic results do not prove public routing.
+
+Before any activation transaction, require a separately scoped, approved, reviewed
+and deployed runtime routing implementation covering every intended public consumer.
+Its evidence must demonstrate ordinary report/card requests selecting the approved
+V2 generation when enabled, preserving approved legacy behavior when disabled,
+pinning routing/selection versions for a request, rejecting unavailable/stale or
+incompatible source state, and handling cache invalidation/restart and rollback.
+Bind the implementation revision and tests to the consumer capability manifest;
+explicit diagnostic injection or a SQL flag readback cannot satisfy this gate.
+This documentation PR does not authorize that implementation or close this blocker.
+
 Source contracts were checked statically at the entry revisions, using authoritative SQL snapshots.
 Deploy reviewed migrations in order, only if live migration history proves them absent and the
 operator approves that exact target/operation; never redeploy merely because this list exists:
@@ -141,7 +168,9 @@ Proposed sequence, each step subject to exact G4 authorization:
 5. Accept OPS01/PERF01/CAP01 measurements and the full consumer capability manifest. Reconcile
    all destination fences/receipts and unresolved writes. Confirm restore/rollback paths, then
    refresh routing/selection/config versions for the activation transaction review.
-6. Obtain the separate activation decision for the exact filled preview below. Perform only that
+6. Stop unless the runtime routing consumer prerequisite above has been implemented,
+   reviewed, deployed and accepted for every intended public reader. Only then obtain
+   the separate activation decision for the exact filled preview below. Perform only that
    approved operation, independently read back the committed outcome, and monitor the agreed
    observation window. Chris Watts alone grants G5. A rehearsal approval is not activation approval.
 
@@ -164,6 +193,11 @@ capability from a nonempty database string. The following is the precise transac
 contract. Exact literal values, audit record and transaction text remain a G4 binding prerequisite;
 any new executable helper requires a separately approved bounded implementation manifest.
 
+**This is a conditional routing-state transaction design, not a working activation
+procedure for the current code.** The missing public runtime routing consumer in
+section 3 blocks execution. A successful row update alone cannot switch readers
+or establish activation, even if its SQL predicates and audit requirements pass.
+
 Inputs: approved exact server/database; SourceKey=`snapshot_report_v1`; KVK_NO; displayed PeriodID;
 expected disabled routing version R; expected selection version S/publication P; expected desired
 and selected config C; publication manifest hash H; accepted capability version V and private
@@ -171,6 +205,9 @@ capability evidence hash; actual approving actor A and approval UTC. **All live 
 
 1. Before connecting, verify G4 covers this exact operation and evidence fingerprint, all three S6
    gates are accepted, and backups/consumer/permission evidence matches the intended environment.
+   Require the separately reviewed public routing implementation, deployed revision,
+   ordinary-reader enable/disable tests and accepted capability manifest from section 3.
+   If absent, stop without issuing this transaction.
 2. Assert server/database identity and schema/migration parity. Begin an explicit transaction with
    XACT_ABORT enabled. Acquire the existing transaction-owned exclusive application lock
    `kvk-source:snapshot_report_v1:<KVK_NO>` with the existing 10,000 ms timeout; negative lock
@@ -186,8 +223,9 @@ capability evidence hash; actual approving actor A and approval UTC. **All live 
    if absent, use selected publication config. Require desired C equals selected C. Abort for
    pending desired endpoint or any stale version; older historical pending links alone are not
    the latest desired config. Revalidate pinned inputs/roster/map/weights and stream labels.
-5. Match the reviewed consumer capability manifest to V and the deployed revisions. A SQL schema
-   probe alone is insufficient. Planned single-row assignment in `KVK.SourceRouting`:
+5. Match the reviewed consumer capability manifest to V and the deployed routing-consumer
+   revisions. A SQL schema probe alone is insufficient. Only after that implementation
+   prerequisite is satisfied, the proposed routing-state assignment in `KVK.SourceRouting` is:
    `DisplayPeriodID=approved PeriodID`, `Enabled=1`, `RoutingVersion=R+1`,
    `CapabilitiesVersion=V`, `ApprovedBy=A`, `ApprovedUTC=approved UTC`.
    Predicate: exact KVK_NO, SourceKey, Enabled=0 and RoutingVersion=R. Require @@ROWCOUNT=1.
@@ -1149,3 +1187,37 @@ bytes, 174 local links and 13 fragments. This update changes documentation only;
 the existing runtime-test and separate-repository security skip decisions remain
 applicable. No SQL, Google, Discord, Git publication or production action is part
 of this approval record. Preserve all disposable databases and retained outputs.
+
+## PR 272 review correction — missing public routing consumer
+
+Review comment 3996906362 is valid. At reviewed bot commit
+`758d6be163026f0299c05c3ad0bf2c4517c55932`, routing-row access in
+`kvk/dal/new_source_config_dal.py:13–28` and
+`kvk/dal/new_source_admin_dal.py:494–498` provides locking/onboarding, not public
+read dispatch. `stats_alerts/embeds/kvk.py:154–185` selects V2 only with explicit
+diagnostic source_selection; ordinary requests retain the legacy path.
+
+A successful SourceRouting.Enabled update alone cannot activate public V2 readers.
+The readiness sequence and transaction preconditions now explicitly stop until a
+separately approved, reviewed, deployed and accepted routing consumer covers all
+intended public readers. Require ordinary-request enable/disable behavior, pinned
+routing/selection versions, unavailable/stale/capability handling, cache/restart
+behavior and rollback tests bound to the deployed consumer revision. This is an
+implementation gap, not merely missing deployment evidence or an activation helper.
+No runtime implementation is included or authorized by this documentation correction.
+S6-OPS01/PERF01/CAP01 and all retained uncertainty remain as previously recorded;
+this additional prerequisite cannot be discharged by their synthetic measurements.
+
+Copilot reviewed 16/16 files and generated no inline comments, but requested final
+human review of the large evidence record. That requirement remains: operator
+rehearsal acceptance is recorded, while independent remote reviewers cannot verify
+local disposable databases, runtime JSON artifacts or every historical claim from
+the PR alone. Hashes identify retained artifacts; they do not substitute for access
+and inspection. No independent review or full release acceptance is invented.
+
+Validation for this correction: Markdown-only; no runtime tests or predecessor
+rehearsals rerun. Recheck local links, the complete 18-path PR manifest, staged
+whitespace, architecture/deferred/security-routing and staged secrets. Security
+routing remains documentation-only skip for the exact Bot review-fix diff; SQL
+remains unchanged at 44afa315dd6cbfe9fec101f2a39a62e534f5b583. No activation,
+merge, production promotion, SQL execution or Google operation is performed.
