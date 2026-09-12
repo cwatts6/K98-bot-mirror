@@ -1,5 +1,7 @@
 # Codex Task Pack — KVK Source Migration S5A Private Intake and Admin Controls
 
+> Archived after accepted S5A smoke (operator reported) and merges #270/#577 on 2026-09-12. Historical approvals/instructions below are not active authorization. S5B is next under separate G3. No bot-machine update or deployment.
+
 ## 1. Task Header
 
 - Prepared 2026-09-09; owner Chris Watts; Phase 2B specification.
@@ -12,9 +14,9 @@
 
 Read current AGENTS.md, README-DEV.md, docs/reference/README.md and its required core references,
 the canonical task template, root/applicable SECURITY.md and relevant skills. Then read the
-[approved contract](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md),
-[70 scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
+[approved contract](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md),
+[70 scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), latest programme/
 register updates and this pack. User decisions override historical missing-B0/G2-pending wording.
 For SQL-facing work read authoritative SQL instructions, sql_schema/README.md, migrations/README.md,
 SQL_DATA_MIGRATION_GUARDRAILS and exact relevant snapshots. No inferred schema from Python alone.
@@ -190,7 +192,7 @@ Local main is synchronized at `64f6b058c224e749ece334d66cdf0efc81bd983d`; produc
 No changes have been pulled to the bot machine, per operator. S1/S3B/S4A/S4B prerequisites are accepted.
 S5A is ready for a new-chat scope/implementation handoff with explicit S5A G3; this docs request does
 not supply that approval. Fresh execution must recheck refs, dirty files and authoritative contracts.
-Use the [archived S4B evidence](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md).
+Use the [archived S4B evidence](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md).
 Final review fixes passed 150 focused tests and 3,940 full-suite tests with 34 skipped in each checkout,
 operational logs unchanged. Historical successful real-SDK synthetic smoke is retained separately;
 no post-merge live smoke or deployment is claimed. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open.
@@ -724,3 +726,52 @@ the exact 16 execution files and all 15 documentation paths, including both S4B 
 Runtime/test bytes remain identical to the sealed Changes target; existing passing validation and
 security evidence apply. This acceptance/authorization note changes documentation only.
 Production promotion, merge, deployment, activation and later packs remain separately gated.
+
+
+## Final S5A closeout and archive evidence - 2026-09-12
+
+**S5A is complete, operator accepted, successfully smoke tested (operator reported) and merged.**
+Mirror [#270](https://github.com/cwatts6/K98-bot-mirror/pull/270) merged at 08:53:35 UTC as
+`c78823d5ae6852b251b2ea6dbc35fa2b4af7e42c`; private bot [#577](https://github.com/cwatts6/k98-bot/pull/577)
+merged at 08:54:15 UTC as `dd69666a04daa47d6d596e694aff024a02417144` on 2026-09-12.
+Local mirror main/origin main is `90aea74c93c6aad2c890d1783ff53f109cc7bf8a` (synchronized from that private merge);
+local production/main matches the private merge. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry; local pulls are complete. **No changes have been pulled
+to the bot machine**, as explicitly confirmed by the operator. Repository promotion is not deployment.
+
+Successful S5A smoke is operator-attested; its detailed environment, commands and transcript were not
+supplied in this closeout. Do not infer live SQL, real provider/Discord execution or a bot-machine smoke.
+Recorded deterministic evidence remains 162 focused tests and 4,033 full tests passed / 34 skipped,
+operational logs unchanged, import smoke passed, and registration 36 top-level / 101 grouped.
+Every command group is <=25 children (kvk_admin 8; largest ops 24). Exact Changes review, Deep off,
+scan `541665eb-2d37-4e14-8ce9-038329bf9653` has complete coverage and zero findings. Earlier gaps
+remain historical in the archived S5A delivery; these tests/reviews are not fresh closeout reruns.
+
+**Next: S5B Endpoint Config and Recovery Integration in a new chat, after explicit S5B G3 approval.**
+S3B/S4B/S5A prerequisites are accepted. The S5B pack/starter are prepared; no S5B implementation or new
+chat is started by this closeout. Recheck both repos and preserve the exact pending documentation
+carry-forward manifest in S5B, including both S5A archive move sides and repaired links.
+Use mocks/fake destinations until an exact disposable SQL target and operations are explicitly
+authorized. S5B's required transaction/recovery SQL evidence remains a separate execution prerequisite;
+full S5B acceptance cannot substitute mocks for that requirement. Preserve all retained databases.
+
+S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open. S5A smoke does not close them. Source routing remains
+disabled; intake/recovery defaults remain false. No bot-machine action, deployment or activation is
+performed here. Historical statuses below are dated evidence, not instructions to rerun accepted slices.
+
+
+This documentation-only closeout archives the completed S5A pack/starter and repairs navigation.
+Its exact 15-path delta must accompany the eventual separately authorized S5B PR. Earlier
+review-pending, no-PR and no-promotion statements describe their original times and are superseded
+by verified merges above. The smoke result is operator-reported; no detailed transcript was supplied.
+No runtime changes, SQL operations or bot-machine actions were performed during this closeout.
+
+Closeout validation: exact 15-path Markdown-only manifest verified (13 present documents and two
+deleted archive-source paths); all 131 relative links resolve. The complete original S5A delivery
+body is retained, allowing only relative-link rebasing, an archive banner and this appended evidence.
+Architecture passed with zero changed Python files; deferred validation passed for all 13 present
+Markdown files; security routing passed with zero errors/warnings; exact-path test selection and
+Git whitespace checks passed. Runtime pytest/import/registration reruns are skipped for this purely
+documentary status/link/archive delta. Security has a docs-only skip; SQL has a separate no-change
+skip. No new scan, commit, push, PR or S5B task was created. Pending documents remain local for the
+eventual separately authorized S5B PR, including both archive rename sides.

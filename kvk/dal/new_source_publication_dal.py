@@ -559,6 +559,15 @@ class PublicationDAL:
                 )
                 old = one(cursor)
                 if action_type == "endpoint_update":
+                    from kvk.dal.new_source_recovery_dal import endpoint_chain
+
+                    chain = endpoint_chain(
+                        requests, str(old["ConfigVersionID"]), str(candidate["ConfigVersionID"])
+                    )
+                    if str(chain[-1]["RequestID"]) != request_id:
+                        raise SourceConflict(
+                            "Endpoint chain does not end at the requested version."
+                        )
                     cursor.execute(
                         "SELECT RosterID,MappingDigest,WeightDigest FROM KVK.SourceConfigVersion WHERE ConfigVersionID=?",
                         old["ConfigVersionID"],
@@ -572,7 +581,7 @@ class PublicationDAL:
                     if (
                         old_config != new_config
                         or (
-                            request["OldStartScanID"] == request["NewStartScanID"]
+                            chain[0]["OldStartScanID"] == request["NewStartScanID"]
                             and old["StartRevisionID"] != candidate["StartRevisionID"]
                         )
                         or candidate["StartScanID"] != request["NewStartScanID"]
@@ -580,7 +589,6 @@ class PublicationDAL:
                             old["EndScanID"] == candidate["EndScanID"]
                             and old["EndRevisionID"] != candidate["EndRevisionID"]
                         )
-                        or str(old["ConfigVersionID"]) != str(request["BaseConfigVersionID"])
                     ):
                         raise SourceConflict(
                             "Endpoint authority cannot change unrequested start, roster, map or weights."

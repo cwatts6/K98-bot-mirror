@@ -1,6 +1,37 @@
 # Local SQL development environment
 
-## Current KVK delivery status - S4B closeout, 2026-09-11
+## Current KVK delivery status - S5A closeout, 2026-09-12
+
+**S5A is complete, operator accepted, successfully smoke tested (operator reported) and merged.**
+Mirror [#270](https://github.com/cwatts6/K98-bot-mirror/pull/270) merged at 08:53:35 UTC as
+`c78823d5ae6852b251b2ea6dbc35fa2b4af7e42c`; private bot [#577](https://github.com/cwatts6/k98-bot/pull/577)
+merged at 08:54:15 UTC as `dd69666a04daa47d6d596e694aff024a02417144` on 2026-09-12.
+Local mirror main/origin main is `90aea74c93c6aad2c890d1783ff53f109cc7bf8a` (synchronized from that private merge);
+local production/main matches the private merge. SQL main remains `44afa315dd6cbfe9fec101f2a39a62e534f5b583`.
+Both repositories were clean at closeout entry; local pulls are complete. **No changes have been pulled
+to the bot machine**, as explicitly confirmed by the operator. Repository promotion is not deployment.
+
+Successful S5A smoke is operator-attested; its detailed environment, commands and transcript were not
+supplied in this closeout. Do not infer live SQL, real provider/Discord execution or a bot-machine smoke.
+Recorded deterministic evidence remains 162 focused tests and 4,033 full tests passed / 34 skipped,
+operational logs unchanged, import smoke passed, and registration 36 top-level / 101 grouped.
+Every command group is <=25 children (kvk_admin 8; largest ops 24). Exact Changes review, Deep off,
+scan `541665eb-2d37-4e14-8ce9-038329bf9653` has complete coverage and zero findings. Earlier gaps
+remain historical in the archived S5A delivery; these tests/reviews are not fresh closeout reruns.
+
+**Next: S5B Endpoint Config and Recovery Integration in a new chat, after explicit S5B G3 approval.**
+S3B/S4B/S5A prerequisites are accepted. The S5B pack/starter are prepared; no S5B implementation or new
+chat is started by this closeout. Recheck both repos and preserve the exact pending documentation
+carry-forward manifest in S5B, including both S5A archive move sides and repaired links.
+Use mocks/fake destinations until an exact disposable SQL target and operations are explicitly
+authorized. S5B's required transaction/recovery SQL evidence remains a separate execution prerequisite;
+full S5B acceptance cannot substitute mocks for that requirement. Preserve all retained databases.
+
+S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open. S5A smoke does not close them. Source routing remains
+disabled; intake/recovery defaults remain false. No bot-machine action, deployment or activation is
+performed here. Historical statuses below are dated evidence, not instructions to rerun accepted slices.
+
+## Historical S4B closeout - 2026-09-11
 
 **S4B is complete, operator accepted, successfully synthetic-smoke tested and merged.**
 Mirror [#269](https://github.com/cwatts6/K98-bot-mirror/pull/269) merged at 21:06:11 UTC as

@@ -1,6 +1,8 @@
 # Codex Chat Starter — KVK Source Migration S5A Private Intake and Admin Controls
 
-Prepared 2026-09-09 during Phase 2B. **Not executed; S5A G3 pending.**
+> Archived after accepted S5A smoke (operator reported) and merges #270/#577 on 2026-09-12. Historical approvals/instructions below are not active authorization. S5B is next under separate G3. No bot-machine update or deployment.
+
+Prepared 2026-09-09 during Phase 2B. **Historical starter; S5A is complete and archived.**
 Use this only when approving this slice; G2 alone does not approve implementation.
 
 ---

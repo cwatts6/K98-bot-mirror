@@ -132,6 +132,10 @@ async def _send_stats_update_embed(
 
 async def send_stats_update_embed(bot: Any, timestamp: str, is_kvk: bool, is_test: bool = False):
     """Publish once through the existing selectors and return per-attempt evidence."""
+    if not is_test:
+        from kvk.services.new_source_recovery_service import wake_recovery
+
+        wake_recovery()
     return await _send_stats_update_embed(
         bot, timestamp, is_kvk, is_test=is_test, return_outcome=True
     )

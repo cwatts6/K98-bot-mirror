@@ -11,10 +11,16 @@ logger = logging.getLogger(__name__)
 MAX_BYTES = 20 * 1024 * 1024
 
 
+def configured_recovery_intake():
+    from kvk.services.new_source_recovery_service import RecoveryIntakeAdapter
+
+    return RecoveryIntakeAdapter(configured_service())
+
+
 @dataclass(frozen=True)
 class KvkSourceRouteDeps:
     access: object
-    service_factory: object = configured_service
+    service_factory: object = configured_recovery_intake
     offload: object = asyncio.to_thread
 
 

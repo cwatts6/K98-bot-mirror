@@ -579,7 +579,9 @@ def _validate_sheet_schemas(sheet) -> tuple[bool, list[str]]:
 # ---------------------------------------------------------------------------
 # Main import entrypoint (modified to use write_df_to_staging_and_upsert)
 # ---------------------------------------------------------------------------
-def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
+def run_proc_config_import(
+    dry_run: bool = False, *, source_actor: str | None = None, source_provenance: dict | None = None
+) -> tuple[bool, dict]:
     global last_import_report
     load_dotenv()
 
@@ -921,6 +923,13 @@ def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
                 report["tables"]["KVK.KVK_CampMap"] = res
                 if res.get("status") != "ok":
                     raise RuntimeError(f"KVK_CampMap write failed: {res.get('error')}")
+
+                # Durable endpoint intent shares this transaction, including rollback.
+                from kvk.services.new_source_recovery_service import snapshot_config_import
+
+                snapshot_config_import(
+                    cursor, df_win, actor=source_actor, provenance=source_provenance
+                )
 
                 # Commit transaction
                 try:

@@ -25,3 +25,21 @@ use Changes at exact separate repo targets, Deep off; no standard/deep scan or a
 ## Required carried-forward validation
 
 Read the [S4B follow-up register](../reference/kvk_source_migration/phase_2_implementation_plan.md#s4b-follow-ups) and this pack's 2026-09-11 handoff appendix. Track S5B-REC01 and the S4B-MP01 component-test handoff explicitly through acceptance. Preserve exact evidence and unresolved gates. This reminder does not approve execution or expand the pack's operation/file permissions.
+
+
+## S5A accepted handoff - 2026-09-12
+
+S5A is accepted, successfully smoke tested (operator reported) and merged (#270/#577); local pulls
+are complete and no changes have been pulled to the bot machine. Read the archived S5A delivery
+linked from the S5B pack; preserve the exact 15-path documentation carry-forward manifest, including
+untracked Markdown, both S5A archive rename sides and repaired links. Include it alongside the
+approved S5B execution manifest in any separately authorized PR and later authorized promotion.
+
+This starter is prepared for a new chat; S5B G3 is still pending until the operator actually grants it.
+Use mocks/fake destinations unless an exact disposable SQL target and operations are authorized;
+required transaction-hook SQL evidence remains mandatory for acceptance. Preserve retained databases.
+Either endpoint may change; supplied EndScanID >= StartScanID. Equal endpoints mean zero supported
+fight scores for all B0 members and aggregates not applicable. Distinct scans increase ScanID and
+UTC; ordinary missingness stays explicit. Keep daily SCANORDER separate and every command group
+within 25 children. S5B-REC01 and S6-OPS01/PERF01/CAP01 remain open. Routing stays disabled;
+no bot-machine action, restart, deployment or activation. Do not automatically execute another pack.

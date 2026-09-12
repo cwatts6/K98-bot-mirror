@@ -1783,6 +1783,10 @@ async def _run_ready_queue_lifecycle() -> None:
 
 
 async def _run_ready_runtime_services() -> None:
+    from kvk.services.new_source_recovery_service import register_recovery
+
+    register_recovery(task_monitor)
+
     # Start heartbeat now that the loop is running
     try:
         os.makedirs(LOG_DIR, exist_ok=True)
