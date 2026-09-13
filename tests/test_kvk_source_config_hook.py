@@ -439,3 +439,33 @@ def test_disposable_numeric_text_recovery_preserves_publication(s5b_database):
         result_values(player) for player in expected.snapshot.calculation.players
     ]
     assert actual["players"][0]["kp_t4_t5"] == 200
+
+
+def test_s8c_snapshot_retains_tokens_before_legacy_float_coercion(monkeypatch):
+    from kvk.services.new_source_config_service import source_weight_tokens
+
+    monkeypatch.setattr(bot_config, "KVK_SOURCE_INTAKE_ENABLED", True)
+    source = pd.DataFrame(
+        [dict(KVK_NO="16", WeightT4X="1.000000000001", WeightT5Y="2", WeightDeadsZ="3")]
+    )
+    tokens = source_weight_tokens(source)
+    pci._coerce_float(source, ["WeightT4X", "WeightT5Y", "WeightDeadsZ"])
+    assert tokens == {16: ["1.000000000001", "2", "3"]}
+    assert not isinstance(source.iloc[0]["WeightT4X"], str)
+
+
+def test_s8c_configuration_capture_does_not_invent_attestation(monkeypatch):
+    from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+
+    monkeypatch.setattr(bot_config, "KVK_SOURCE_INTAKE_ENABLED", True)
+    monkeypatch.setattr(bot_config, "KVK_SOURCE_RECOVERY_ENABLED", False)
+    capture = Mock()
+    monkeypatch.setattr(SourceAdminReviewDAL, "snapshot_import", capture)
+    cursor = Mock()
+    assert (
+        recovery.snapshot_config_import(cursor, windows(), source_weights={16: ["1", "2", "3"]})
+        == ()
+    )
+    assert capture.call_args.args == (cursor, {16: ["1", "2", "3"]})
+    assert "authorized" not in capture.call_args.kwargs
+    cursor.execute.assert_not_called()

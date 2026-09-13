@@ -99,3 +99,23 @@ def test_no_fight_rejects_aggregate_in_service_and_model():
             StreamState.LIVE,
             StreamState.LIVE,
         )
+
+
+def test_s8c_player_weight_correction_does_not_recalculate_supplied_aggregates():
+    from tests.test_kvk_source_reporting_models import snapshot
+
+    original = snapshot()
+    base = original.calculation.selection
+    changed_config = replace(
+        base.config,
+        version_id="reviewed-config-2",
+        weights=replace(base.config.weights, version_id="weights-2", x_source="99"),
+    )
+    changed = calculate_period(
+        resolve_window(changed_config, (base.start, base.end)), worked_calculation_inputs()[0]
+    )
+    corrected = replace(original, requested_config=changed_config, calculation=changed)
+    assert corrected.aggregate is original.aggregate
+    assert corrected.calculation.players[0].metric("dkp") != original.calculation.players[0].metric(
+        "dkp"
+    )

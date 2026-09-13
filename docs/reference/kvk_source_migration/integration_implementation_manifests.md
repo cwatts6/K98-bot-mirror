@@ -1,21 +1,22 @@
 # S7 exact implementation manifests and delivery
 
-## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
+## Current status — S8B complete; S8C next, 2026-09-13
 
-S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
-The operator confirms successful smoke acceptance and local pulls; **no changes have
-been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
-scripts; the later runner input fix has offline validation only. No fresh post-merge
-SQL run, production runtime deployment or activation is claimed.
+S8B is complete, operator accepted, successfully smoke tested and delivered through merged
+production #581 and SQL #81. Local pulls are complete; **no changes have been pulled to the
+bot machine**. Mirror #274 is closed without a merge record; its delivered content is verified
+in synchronized mirror main. See the [canonical closeout and exact carry-forward manifest](s8b_closeout_and_s8c_handoff.md)
+for merge/content proof, final offline tests and the distinct historical disposable/runner evidence.
+No fresh post-merge SQL or bot-machine smoke, deployment or activation is claimed.
 
-**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
-Use the [S8B pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
-Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](s8a_closeout_and_s8b_handoff.md).
-Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
-requires exact target/backup/row-preview/operation approval; S8B implementation needs its
-own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
-alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
-retained databases/files remain preserved. Earlier dated sections are historical evidence.
+**Next: S8C Intake and Admin Pairing UX in a new chat, initial review/scope only.**
+Use the [S8C pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+The eventual separately authorized S8C Bot PR must include all closeout documentation and both
+sides of both S8B archive moves, checking actual filename and previous_filename; SQL delivery-log
+carry-forward is separate. S7 decisions and predecessor acceptance remain settled. S9 public
+routing and S10 export coordination remain later work; SourceRouting.Enabled alone is insufficient.
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+Earlier dated scope/approval/next-slice statements are historical and do not reopen accepted work.
 
 2026-09-12. **S7 documentation/read-only work only; stop for contract/manifests review.**
 The [contract and complete consumer matrix](integration_contract_and_consumer_matrix.md)
@@ -540,3 +541,80 @@ worker affinity where needed, and one-generation quarantine/reserve allowance.
 Completed-documentation review uses k98-pr-review for the local delta, not promotion readiness.
 No runtime readiness or PR merge verdict can substitute for contract review, future security
 reviews, actual deployed parity or Files changed verification after a PR is separately authorized.
+
+
+## S8C approved implementation amendment - 2026-09-13
+
+The operator approved the revised scope and implementation plan in this task. This supersedes
+S8C's initial-review-only selection; S7 decisions and completed S8B acceptance remain settled.
+The original 13 paths remain mandatory. Approved additional paths support durable non-file
+reviews, later within-season window assignment and reviewed post-use configuration corrections.
+No S9/S10 work, public activation, SQL execution, provider writes, Discord operation, bot-machine
+pull/restart/deployment, predecessor operation or Git publication is authorized.
+
+### Exact Bot implementation union (39 paths)
+
+| Action | Path |
+|---|---|
+| Modify | `commands/stats_cmds.py` |
+| Modify | `ui/views/kvk_source_import_view.py` |
+| Modify | `upload_routes/kvk_source_route.py` |
+| Modify | `upload_routes/kvk_all_route.py` |
+| Modify | `kvk/services/new_source_admin_service.py` |
+| Modify | `kvk/dal/new_source_admin_dal.py` |
+| Modify | `proc_config_import.py` |
+| Modify | `docs/reference/canonical_command_reference.md` |
+| Modify | `tests/test_kvk_source_admin.py` |
+| Modify | `tests/test_kvk_source_import_view.py` |
+| Modify | `tests/test_kvk_source_upload_route.py` |
+| Modify | `tests/test_kvk_all_upload_route.py` |
+| Modify | `tests/test_kvk_source_config_hook.py` |
+| Modify | `kvk/models/source_integration.py` |
+| Modify | `kvk/models/new_source_reporting.py` |
+| Modify | `kvk/services/new_source_parser.py` |
+| Modify | `kvk/services/new_source_config_service.py` |
+| Modify | `kvk/dal/new_source_config_dal.py` |
+| Modify | `kvk/services/new_source_recovery_service.py` |
+| Modify | `kvk/dal/new_source_recovery_dal.py` |
+| Modify | `kvk/services/source_update_service.py` |
+| Modify | `kvk/dal/source_update_dal.py` |
+| Modify | `kvk/services/new_source_window_resolver.py` |
+| Modify | `kvk/services/new_source_calculation.py` |
+| Modify | `kvk/services/new_source_publication_service.py` |
+| Modify | `kvk/dal/new_source_publication_dal.py` |
+| Modify | `tests/test_kvk_new_source_parser.py` |
+| Modify | `tests/test_kvk_source_config_service.py` |
+| Modify | `tests/test_kvk_source_recovery.py` |
+| Modify | `tests/test_kvk_source_pairs.py` |
+| Modify | `tests/test_kvk_source_window_resolver.py` |
+| Modify | `tests/test_kvk_source_calculation.py` |
+| Modify | `tests/test_kvk_source_publication.py` |
+| Modify | `tests/test_kvk_source_reporting_models.py` |
+| Modify | `tests/test_kvk_source_sql_integration.py` |
+| Create | `kvk/services/source_admin_review_service.py` |
+| Create | `kvk/dal/source_admin_review_dal.py` |
+| Create | `tests/test_kvk_source_admin_review.py` |
+| Modify | `tests/test_kvk_admin_service.py` |
+
+Add all 30 physical documentation paths in the S8B closeout section 3, including both archive
+origins and both destinations and the S8C pack/starter. The complete Bot union is **69 paths**.
+An eventual separately authorized PR must verify actual `filename` AND `previous_filename`
+against this union or supply individual merged-content proof; local counts alone are not proof.
+No PR or remote Files changed verification is claimed by local implementation.
+
+### Separate SQL union (6 paths)
+
+| Action | Path |
+|---|---|
+| Create | `migrations/20260913_002_kvk_source_admin_reviews.sql` |
+| Create | `sql_schema/KVK.SourceAdminReview.Table.sql` |
+| Create | `validation/kvk_source/s8c_admin_reviews.sql` |
+| Create | `deploy/Test-KvkSourceAdminReviewContracts.ps1` |
+| Modify | `docs/SQL_DELIVERY_LOG.md` |
+| Modify | `migrations/README.md` |
+
+These are SQL-repository paths only and must never enter the Bot PR. Authoring is approved;
+execution/deployment and SQL publication require separate authorization. ReviewSequence orders
+configuration snapshots only; it is not a scan ID or SCANORDER allocator.
+
+The existing command registration regression test is included because its required-receipt assertion must change for approved setup and attachment actions. This adds one directly affected test path to the approved feature scope.

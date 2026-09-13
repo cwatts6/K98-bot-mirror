@@ -24,6 +24,11 @@ class SourceUpdateService:
 
     def publish(self, update_id):
         update = self.dal.resume_endpoint(update_id)
+        if update["UpdateState"] == "superseded":
+            update = self.dal.replay_target(update_id)
+            if update["UpdateState"] != "selected":
+                return None
+            update_id = update["UpdateID"]
         if update["UpdateState"] == "selected":
             return self.dal.selected_result(update_id)
         if update["UpdateState"] != "ready":
@@ -36,7 +41,7 @@ class SourceUpdateService:
         if (
             previous
             and previous.config.version_id != config.version_id
-            and confirmed_action != "configure"
+            and confirmed_action not in ("configure", "correct")
         ):
             chain = endpoint_chain(data["requests"], previous.config.version_id, config.version_id)
             first, request = chain[0], chain[-1]

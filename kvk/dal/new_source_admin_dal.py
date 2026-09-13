@@ -81,14 +81,68 @@ class SourceAdminDAL:
         with transaction(self.connect) as cursor:
             return self._receipt(cursor, receipt_id, actor, guild_id)
 
+    def baseline_configuration(self, kvk_no, *, cursor=None):
+        from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+
+        def read(current):
+            lock_scope(current, kvk_no)
+            current.execute(
+                "SELECT TOP (1) RosterID FROM KVK.SourceRoster WHERE SourceKey=? AND KVK_NO=?",
+                SOURCE_KEY,
+                kvk_no,
+            )
+            if one(current):
+                return None
+            return SourceAdminReviewDAL.imported_configuration(current, kvk_no)
+
+        if cursor is not None:
+            return read(cursor)
+        with transaction(self.connect) as current:
+            return read(current)
+
+    def imported_configuration(self, kvk_no, *, cursor=None):
+        from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+
+        if cursor is not None:
+            return SourceAdminReviewDAL.imported_configuration(cursor, kvk_no)
+        return SourceAdminReviewDAL(self.connect).configuration(kvk_no)
+
+    def cancel(self, receipt_id, actor, guild_id, expected_version):
+        with transaction(self.connect) as cursor:
+            row = self._receipt(cursor, receipt_id, actor, guild_id)
+            payload = row["payload"]
+            if payload.get("cancelled") and expected_version in (
+                payload["version"],
+                payload["version"] - 1,
+            ):
+                return row
+            self._version(row, expected_version)
+            payload["cancelled"] = True
+            payload["history"].append(
+                {"version": expected_version, "action": "cancel", "outcome": payload.get("outcome")}
+            )
+            payload["version"] += 1
+            self._save(
+                cursor,
+                row,
+                payload,
+                row["Status"],
+                row["ObservationRevisionID"],
+                row["AggregateRevisionID"],
+            )
+            return self._receipt(cursor, receipt_id, actor, guild_id)
+
     def create_receipt(self, *, artifact, admission, filename, kvk_no, payload):
         with transaction(self.connect) as cursor:
             lock_scope(cursor, kvk_no)
+            from kvk.dal.season_source_dal import require_source
+
+            require_source(cursor, kvk_no, SOURCE_KEY, onboarding=True)
             SourceImportDAL(self.connect, self.artifacts)._artifact(
                 cursor, artifact, admission.received_utc.replace(tzinfo=None)
             )
             cursor.execute(
-                "SELECT AttemptID,ActorID,ArtifactHash FROM KVK.SourceImportAttempt "
+                "SELECT AttemptID,ActorID,ArtifactHash,KVK_NO,ChannelID FROM KVK.SourceImportAttempt "
                 "WITH (UPDLOCK,HOLDLOCK) WHERE GuildID=? AND MessageID=? AND AttachmentID=? AND ActionKey=?",
                 admission.guild_id,
                 admission.message_id,
@@ -100,6 +154,8 @@ class SourceAdminDAL:
                 if (
                     existing["ActorID"] != admission.actor
                     or bytes(existing["ArtifactHash"]).hex() != artifact.sha256
+                    or existing["KVK_NO"] != kvk_no
+                    or existing["ChannelID"] != admission.channel_id
                 ):
                     raise SourceConflict("Upload replay conflicts with its original receipt.")
                 return self._receipt(
@@ -152,6 +208,10 @@ class SourceAdminDAL:
             row = self._receipt(cursor, receipt_id, actor, guild_id)
             self._version(row, expected_version)
             payload = row["payload"]
+            if payload.get("cancelled"):
+                raise SourceConflict(
+                    "This pending receipt was cancelled; accepted inputs remain retained."
+                )
             if payload.get("proposal") == proposal and row["Status"] == "validated":
                 return row
             payload.setdefault("history", []).append(
@@ -264,6 +324,10 @@ class SourceAdminDAL:
             self._version(row, expected_version)
             if row["payload"].get("outcome"):
                 return row
+            if row["payload"].get("cancelled"):
+                raise SourceConflict(
+                    "This pending receipt was cancelled; accepted inputs remain retained."
+                )
             if row["Status"] != "validated":
                 raise SourceConflict("Prepare and review this receipt before confirmation.")
             proposal = row["payload"]["proposal"]
@@ -497,6 +561,18 @@ class SourceAdminDAL:
                 "INSERT KVK.SourceRouting (SourceKey,KVK_NO,Enabled,RoutingVersion) VALUES (?,?,0,1)",
                 SOURCE_KEY,
                 kvk_no,
+            )
+        from kvk.dal.season_source_dal import SeasonSourceDAL, require_source
+
+        choice = require_source(cursor, kvk_no, SOURCE_KEY, onboarding=True)
+        if choice["SeasonState"] == "planned":
+            SeasonSourceDAL(lambda: _BorrowedConnection(cursor)).transition(
+                kvk_no,
+                "open",
+                expected_version=choice["SeasonVersion"],
+                actor=actor,
+                reason="Administrator confirmed B0 configuration; source serving remains disabled",
+                authorized=True,
             )
         return {
             "config_id": config_id,

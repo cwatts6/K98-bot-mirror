@@ -148,6 +148,19 @@ def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> P
     if config.period_kind == PeriodKind.OVERALL and selection.start != b0:
         raise ValueError("Overall player arithmetic must start at exact B0.")
     roster = _rows(b0, selection)
+    if config.roster_members is not None:
+        members = config.roster_members
+        if (
+            not isinstance(members, tuple)
+            or not members
+            or len({governor for governor, _ in members}) != len(members)
+            or any(
+                governor not in roster or roster[governor].kingdom != kingdom
+                for governor, kingdom in members
+            )
+        ):
+            raise ValueError("Approved roster must be a unique subset of original B0 evidence.")
+        roster = {governor: roster[governor] for governor, _ in members}
     starts = _rows(selection.start, selection)
     ends = _rows(selection.end, selection)
     if not roster or len(roster) > 50_000:
@@ -251,4 +264,9 @@ def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> P
         len(eligible - ends.keys()),
         len((starts.keys() | ends.keys()) - eligible),
         tuple(coverage),
+        calculation_version=(
+            "snapshot_report_calculation_v2"
+            if config.roster_members is not None
+            else "snapshot_report_calculation_v1"
+        ),
     )

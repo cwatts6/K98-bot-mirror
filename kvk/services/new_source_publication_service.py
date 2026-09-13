@@ -49,6 +49,7 @@ class PublicationService:
             and selection.end.logical_scan_id <= selection.start.logical_scan_id
         ):
             raise ValueError("Selected combat scan ID must increase with UTC.")
+        # The configuration carries its approved roster; B0 facts themselves stay intact.
         calculation = calculate_period(selection, b0)
         aggregate_state = (
             StreamState(aggregate.report.metadata.candidate.report_state.value)

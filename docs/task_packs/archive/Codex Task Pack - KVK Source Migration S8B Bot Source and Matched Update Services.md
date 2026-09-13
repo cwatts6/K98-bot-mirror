@@ -1,5 +1,7 @@
 # KVK Source Migration S8B — Bot Source and Matched Update Services
 
+> Archived 2026-09-13: S8B is complete, operator smoke accepted and merged in production #581 / SQL #81. This file retains historical instructions and evidence; do not execute it as a new task. Use the [S8C starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [closeout](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md). No bot-machine pull occurred.
+
 ## 1. Task header and authority
 
 Prepared 2026-09-13 for Chris Watts. Type: bounded Bot DAL/service integration.
@@ -14,13 +16,13 @@ Read current AGENTS.md, README-DEV.md, docs/reference/README.md and all indexed 
 engineering, execution, testing, skills/refactor and deferred-optimisation standards.
 Read root/applicable SECURITY.md as context and use security routing.
 
-- [Canonical S7/S8A closeout and exact documentation carry-forward](../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md)
-- [Approved integration contract and C01–C65 consumer matrix](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md)
-- [Approved exact implementation/test manifests](../reference/kvk_source_migration/integration_implementation_manifests.md), especially S8B and S7-T01–T08
-- [Architecture and EndScanID amendment](../reference/kvk_source_migration/phase_2_contract_and_architecture.md)
-- [Acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
-- [Post-S6 requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md) and [retained handoff](../reference/kvk_source_migration/post_s6_handoff_log.md)
-- [S6 evidence](../reference/kvk_source_migration/release_evidence_log.md), [readiness](../reference/kvk_source_migration/release_readiness_and_rollback.md) and archived S7/S8A packs linked from the closeout
+- [Canonical S7/S8A closeout and exact documentation carry-forward](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md)
+- [Approved integration contract and C01–C65 consumer matrix](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md)
+- [Approved exact implementation/test manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md), especially S8B and S7-T01–T08
+- [Architecture and EndScanID amendment](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md)
+- [Acceptance scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
+- [Post-S6 requirements](../../reference/kvk_source_migration/post_s6_integration_requirements.md) and [retained handoff](../../reference/kvk_source_migration/post_s6_handoff_log.md)
+- [S6 evidence](../../reference/kvk_source_migration/release_evidence_log.md), [readiness](../../reference/kvk_source_migration/release_readiness_and_rollback.md) and archived S7/S8A packs linked from the closeout
 
 Read authoritative SQL instructions, migrations/README.md, docs/SQL_DELIVERY_LOG.md,
 SQL_DATA_MIGRATION_GUARDRAILS.md and the five S8A snapshots plus all referenced legacy/new
@@ -79,7 +81,7 @@ carry-forward in section 5 is additional and mandatory.
 
 ## 5. Required documentation carry-forward and PR verification
 
-The exact physical-path list in [closeout section 3](../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md#3-exact-documentation-carry-forward-manifest)
+The exact physical-path list in [closeout section 3](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md#3-exact-documentation-carry-forward-manifest)
 is part of this task's file manifest, including this pack/starter, updated references and
 both source deletion and archive destination for each of the four S7/S8A moves.
 Preserve every path when branching; do not discard the local closeout because it is not

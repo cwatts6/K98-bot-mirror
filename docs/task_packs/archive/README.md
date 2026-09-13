@@ -1,21 +1,22 @@
 # Archived Task Packs
 
-## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
+## Current status — S8B complete; S8C next, 2026-09-13
 
-S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
-The operator confirms successful smoke acceptance and local pulls; **no changes have
-been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
-scripts; the later runner input fix has offline validation only. No fresh post-merge
-SQL run, production runtime deployment or activation is claimed.
+S8B is complete, operator accepted, successfully smoke tested and delivered through merged
+production #581 and SQL #81. Local pulls are complete; **no changes have been pulled to the
+bot machine**. Mirror #274 is closed without a merge record; its delivered content is verified
+in synchronized mirror main. See the [canonical closeout and exact carry-forward manifest](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md)
+for merge/content proof, final offline tests and the distinct historical disposable/runner evidence.
+No fresh post-merge SQL or bot-machine smoke, deployment or activation is claimed.
 
-**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
-Use the [S8B pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
-Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md).
-Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
-requires exact target/backup/row-preview/operation approval; S8B implementation needs its
-own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
-alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
-retained databases/files remain preserved. Earlier dated sections are historical evidence.
+**Next: S8C Intake and Admin Pairing UX in a new chat, initial review/scope only.**
+Use the [S8C pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+The eventual separately authorized S8C Bot PR must include all closeout documentation and both
+sides of both S8B archive moves, checking actual filename and previous_filename; SQL delivery-log
+carry-forward is separate. S7 decisions and predecessor acceptance remain settled. S9 public
+routing and S10 export coordination remain later work; SourceRouting.Enabled alone is insufficient.
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+Earlier dated scope/approval/next-slice statements are historical and do not reopen accepted work.
 
 ## Historical delivery — 2026-09-12 post-S6 closeout
 
@@ -42,7 +43,7 @@ counterpart, import-triggered serialized/latest-pending exports, export-only
 recovery, retained input/publication history and safe output reuse after each KVK.
 These are requirements, not claims of implemented behavior.
 
-**S7/S8A are complete and merged; S8B is next.**
+**Historical next-slice selection: S8B followed S7/S8A; current next slice is S8C above.**
 Follow the current status above; do not rerun predecessors or start later implementation packs.
 Carry every path in the post-S6 handoff manifest into the next separately authorized
 slice PR, including both S6 archive move sides. No Git publication, SQL/provider
@@ -668,5 +669,13 @@ archival does not remove code, databases or worktrees and does not authorize dep
 ## S7/S8A accepted closeout and S8B active navigation — 2026-09-13
 
 S7 and S8A packs/starters are archived; approved contracts and evidence remain active references.
-Next: [S8B task pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [new-chat starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md), review/scope first.
+Next: [S8B task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [new-chat starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md), review/scope first.
 [Merge/smoke limits and exact mandatory carry-forward manifest](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md).
+
+## S8B closeout / S8C active navigation
+
+- [S8C task pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) — initial review/scope only.
+- [S8C new-chat starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+- [S8B closeout and exact next-PR documentation manifest](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md).
+- [Archived S8B task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+- [Archived S8B starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).

@@ -153,6 +153,10 @@ def endpoint_chain(requests, base, desired):
         if len(matches) != 1:
             raise SourceConflict("Incomplete endpoint request chain.")
         row = matches[0]
+        if json.loads(row.get("ProvenanceJson", "{}")).get("configuration_review"):
+            raise SourceConflict(
+                "A configuration correction cannot supply endpoint-only authority."
+            )
         if chain and (
             row["SourceKey"],
             row["KVK_NO"],
@@ -315,6 +319,11 @@ class RecoveryDAL:
             if weight
             else None
         )
+        cursor.execute(
+            "SELECT GovernorID,b0_kingdom FROM KVK.SourceRosterMember WHERE RosterID=? ORDER BY GovernorID",
+            config["RosterID"],
+        )
+        membership = tuple((r["GovernorID"], r["b0_kingdom"]) for r in rows(cursor))
         return WindowConfig(
             identity,
             season,
@@ -330,10 +339,11 @@ class RecoveryDAL:
             mapping,
             weights,
             _utc(config["CoverageEndUTC"]),
+            roster_members=membership,
         )
 
     @staticmethod
-    def _observation(cursor, revision):
+    def _observation(cursor, revision, assigned_period=None):
         cursor.execute(
             "SELECT r.*,s.LogicalScanID FROM KVK.SourceObservationRevision r "
             "JOIN KVK.SourceLogicalScan s ON s.ObservationID=r.ObservationID WHERE r.RevisionID=?",
@@ -361,7 +371,11 @@ class RecoveryDAL:
             str(record["ObservationID"]),
             str(revision),
             prepared,
-            metadata.scope.period_keys,
+            (
+                tuple(sorted(set((*metadata.scope.period_keys, assigned_period))))
+                if assigned_period
+                else metadata.scope.period_keys
+            ),
         )
 
     def load_inputs(self, season, period, *, update=None):
@@ -392,7 +406,12 @@ class RecoveryDAL:
                 if requests and str(requests[0]["DesiredConfigVersionID"]) == identity
                 else None
             )
-            b0 = self._observation(cursor, config.b0_revision_id)
+            from kvk.dal.source_update_dal import has_period_assignment
+
+            assigned_period = (
+                config.period_key if update and has_period_assignment(update) else None
+            )
+            b0 = self._observation(cursor, config.b0_revision_id, assigned_period)
             if update is None:
                 # Read only required endpoints and latest associated interim, not every full scan.
                 cursor.execute(
@@ -432,13 +451,23 @@ class RecoveryDAL:
             previous = None
             if old:
                 old_config = self._config(cursor, str(old["ConfigVersionID"]), season, period)
+                cursor.execute(
+                    "SELECT TOP (1) u.* FROM KVK.SourceExportIntentPublication v JOIN KVK.SourceUpdate u ON u.UpdateID=v.UpdateID WHERE v.PublicationID=? ORDER BY v.PublicSelectionVersion",
+                    old["PublicationID"],
+                )
+                old_update = one(cursor)
+                old_assignment = (
+                    old_config.period_key
+                    if old_update and has_period_assignment(old_update)
+                    else None
+                )
                 start = (
-                    self._observation(cursor, old["StartRevisionID"])
+                    self._observation(cursor, old["StartRevisionID"], old_assignment)
                     if old["StartRevisionID"]
                     else None
                 )
                 end = (
-                    self._observation(cursor, old["EndRevisionID"])
+                    self._observation(cursor, old["EndRevisionID"], old_assignment)
                     if old["EndRevisionID"]
                     else None
                 )
@@ -497,8 +526,8 @@ class RecoveryDAL:
                 events = {
                     event.logical_scan_id: event
                     for event in (
-                        self._observation(cursor, update["StartRevisionID"]),
-                        self._observation(cursor, update["EndRevisionID"]),
+                        self._observation(cursor, update["StartRevisionID"], assigned_period),
+                        self._observation(cursor, update["EndRevisionID"], assigned_period),
                     )
                 }
                 if previous and previous.config.version_id != config.version_id:

@@ -39,7 +39,9 @@ async def test_source_group_registers_real_options_and_private_service_handoff(m
     command = next(c for c in group.subcommands if c.name == "source")
     options = {o["name"]: o for o in command.to_dict()["options"]}
     assert [choice["value"] for choice in options["action"]["choices"]] == list(source.ACTIONS)
-    assert options["receipt"]["required"]
+    assert not options["receipt"]["required"]
+    assert options["file_1"]["type"] == options["file_2"]["type"] == 11
+    assert not options["review"]["required"]
     assert options["expected_revision_version"]["type"] == 4
     assert options["roster_correction"]["type"] == 5
     assert len(options) <= 25

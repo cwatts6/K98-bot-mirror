@@ -95,7 +95,7 @@ def publication_results(cursor, publication_id):
     return rows(cursor)
 
 
-def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
+def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True, assigned_update=None):
     """Bind supplied immutable S3A input objects to the accepted SQL facts/config."""
     from dataclasses import asdict
 
@@ -224,6 +224,8 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
         config.roster_id,
     )
     membership = [(r["GovernorID"], r["b0_kingdom"]) for r in rows(cursor)]
+    if config.roster_members is not None and tuple(membership) != config.roster_members:
+        raise SourceConflict("Candidate configuration roster differs from retained approval.")
     if membership != [(p.governor_id, p.b0_kingdom) for p in snapshot.calculation.players]:
         raise SourceConflict("Candidate does not match frozen B0 membership.")
     for role, event in enumerate(
@@ -251,6 +253,16 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True):
         ):
             raise SourceConflict("Candidate observation binding differs from accepted input.")
         accepted_periods = json.loads(accepted["MetadataJson"])["scope"]["period_keys"]
+        if assigned_update is not None:
+            from kvk.dal.source_update_dal import has_period_assignment
+
+            if has_period_assignment(assigned_update) and (
+                assigned_update["ConfigVersionID"] == config.version_id
+                and assigned_update["PeriodID"] == config.period_id
+                and event.revision_id
+                in (assigned_update["StartRevisionID"], assigned_update["EndRevisionID"])
+            ):
+                accepted_periods = [*accepted_periods, config.period_key]
         if role != 0 and (
             config.period_key not in accepted_periods
             or not set(event.period_keys).issubset(accepted_periods)

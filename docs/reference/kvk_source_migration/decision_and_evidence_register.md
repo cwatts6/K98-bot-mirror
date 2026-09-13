@@ -1,21 +1,22 @@
 # KVK Source Migration — Decision and Evidence Register
 
-## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
+## Current status — S8B complete; S8C next, 2026-09-13
 
-S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
-The operator confirms successful smoke acceptance and local pulls; **no changes have
-been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
-scripts; the later runner input fix has offline validation only. No fresh post-merge
-SQL run, production runtime deployment or activation is claimed.
+S8B is complete, operator accepted, successfully smoke tested and delivered through merged
+production #581 and SQL #81. Local pulls are complete; **no changes have been pulled to the
+bot machine**. Mirror #274 is closed without a merge record; its delivered content is verified
+in synchronized mirror main. See the [canonical closeout and exact carry-forward manifest](s8b_closeout_and_s8c_handoff.md)
+for merge/content proof, final offline tests and the distinct historical disposable/runner evidence.
+No fresh post-merge SQL or bot-machine smoke, deployment or activation is claimed.
 
-**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
-Use the [S8B pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
-Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](s8a_closeout_and_s8b_handoff.md).
-Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
-requires exact target/backup/row-preview/operation approval; S8B implementation needs its
-own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
-alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
-retained databases/files remain preserved. Earlier dated sections are historical evidence.
+**Next: S8C Intake and Admin Pairing UX in a new chat, initial review/scope only.**
+Use the [S8C pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+The eventual separately authorized S8C Bot PR must include all closeout documentation and both
+sides of both S8B archive moves, checking actual filename and previous_filename; SQL delivery-log
+carry-forward is separate. S7 decisions and predecessor acceptance remain settled. S9 public
+routing and S10 export coordination remain later work; SourceRouting.Enabled alone is insufficient.
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+Earlier dated scope/approval/next-slice statements are historical and do not reopen accepted work.
 
 ## Historical delivery — 2026-09-12 post-S6 closeout
 
@@ -42,7 +43,7 @@ counterpart, import-triggered serialized/latest-pending exports, export-only
 recovery, retained input/publication history and safe output reuse after each KVK.
 These are requirements, not claims of implemented behavior.
 
-**S7/S8A are complete and merged; S8B is next.**
+**Historical next-slice selection: S8B followed S7/S8A; current next slice is S8C above.**
 Follow the current status above; do not rerun predecessors or start later implementation packs.
 Carry every path in the post-S6 handoff manifest into the next separately authorized
 slice PR, including both S6 archive move sides. No Git publication, SQL/provider
@@ -535,3 +536,37 @@ Runtime pytest/smoke/registration reruns are skipped for this Markdown-only clos
 ## Historical S4B remaining-validation ownership - 2026-09-11
 
 The operator approved recording S5B/S6 acceptance checks and completing S4B-MP01 now. The [authoritative follow-up register](phase_2_implementation_plan.md#s4b-follow-ups) names S4B-MP01 (synthetic multi-period component integration complete), S5B-REC01 (worker/caller integration open), and S6-OPS01/S6-PERF01/S6-CAP01 (operational interruption, shared-quota throughput and retention/recovery capacity evidence open before activation). Exact results and scope limits are in the latest [S4B delivery appendix](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S4B%20Versioned%20Exports%20and%20Delivery.md). Future packs/starters now require these checks; no future slice or operational action was executed. S4B remains local for review; no merge or activation is claimed.
+
+
+## Approved S8C intake and configuration amendment - 2026-09-13
+
+- Support one file then counterpart, two files in one message, and existing grouped-command
+  intake with two optional attachments. Either file order is valid; receiving two files is not
+  counterpart attestation. Structure supplies a format suggestion; filenames are optional hints.
+- Confirm season before durable file receipt. Default to the baseline season (otherwise imported
+  setup); allow explicit override before receipt creation. Accepted source/season cannot switch.
+- Confirm actual scan-start UTC, reporting coverage/as-of and finality. Never substitute upload
+  time or infer counterpart validity from names, order or equal timestamps.
+- Missing/invalid imported kingdoms/camps/weights blocks B0 acceptance, retaining the private
+  receipt and original. Review imported configuration, Check again, or cancel pending work.
+  Initial configuration approval opens the fixed season for matched updates, never public routing.
+- Retain valid scans without reporting selection. Scans 15/16 may remain unused after 10-14;
+  later assigning 17-18 selects 18-17 using explicit configuration/update authority. Original
+  file metadata, facts, IDs and season are unchanged. Configured starts may be unknown initially.
+- Approved within-season map/weight/scope corrections create new versions. Original B0 evidence
+  bounds eligibility. Player weights affect player DKP/ranking only. Supplied kingdom/camp totals
+  and DKP remain authoritative, and overall remains independent. Incompatible aggregates leave
+  the previous complete result selected and the configuration pending until compatible evidence.
+- Configuration confirmation may explicitly attest displayed retained counterparts. Unattended
+  imports persist original decimal tokens and pending desired intent without that attestation.
+  The exact sealed update still validates source/season/period/config/roster/coverage and CAS.
+- Cancel stops pending work without deleting receipts, accepted revisions, publications or files.
+  SQL reviews persist ownership, channel, expiry, payload hash, versions and outcomes across restart.
+  A semantic duplicate returns its retained target outcome rather than issuing another selection.
+- Export consumes a completed selected result; export execution does not recalculate. S9 routing
+  and S10 export coordination remain outside S8C; SourceRouting.Enabled alone is insufficient.
+
+The approved 69-path Bot and separate 6-path SQL unions are recorded in the implementation
+manifest. Retain B0, UTC starts, semantic deduplication, no-fight, daily SCANORDER, exact
+11-10 / 12-10 / final 13-10 then authorized 14-10, sealed inputs, atomic complete selection and
+full-vector intent, and the legacy season-admission lock through recomputation.

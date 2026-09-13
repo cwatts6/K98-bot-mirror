@@ -542,3 +542,36 @@ pinned; adopting the new roster in a publication requires its own reviewed corre
 This option adds no command child: `/kvk_admin` has eight children; every group remains at most 25.
 Acceptance, configuration approval, publication and external delivery are separate states.
 S5A does not start S5B background recovery, publish reports, export files or activate serving.
+
+
+## S8C private source intake (implementation; activation separately gated)
+
+`/kvk_admin source` remains the existing grouped command; registration remains 36 top-level /
+101 grouped. Actions: `status`, `resume`, `accept`, `finalize`, `correct`, `configure`,
+`choose_source`, `match_update`, `cancel`. Receipt is required only for receipt actions.
+Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_1`, `file_2`.
+
+- `choose_source`: review an imported season, fixed source and reason, then confirm. This does
+  not require an artifact or B0. An upload never chooses or switches a season's source.
+- Upload one/two XLSX files in the private source channel, or use `accept` with attachments.
+  Confirm/change season, then review each file's kind and actual UTC metadata. Unlabelled files
+  need explicit metadata; upload time is never used. Missing baseline configuration blocks
+  acceptance and permits Check again or cancellation. Original files remain retained.
+- `configure receipt:<B0 receipt>`: initialise a window from accepted B0. Kingdoms/camps/weights
+  are imported; provide the period/label and UTC coverage. Start/end scan IDs may be pending.
+- `configure kvk_no:<season>`: review imported changes across existing source windows. The
+  before/after review identifies affected base updates and retained counterpart revisions.
+  Typing `VALID` requests explicit counterpart validity attestation, confirmed on the full review.
+  Incompatible aggregates remain pending; kingdom/camp totals and DKP stay supplied authority.
+- `match_update`: review exact period, player end scan, aggregate revision and coverage/as-of.
+  The configured start is loaded automatically. Reuse needs explicit retained counterpart
+  validity and a reason. The confirmation displays the durable UpdateID and exact versions.
+  Use `match_update update_id:<UUID>` to attach a later side to a waiting update. Its original
+  owner, season, window, coverage, configuration and authority remain fixed; sealed updates
+  cannot be reopened. Accepted scans can remain unassigned indefinitely; a reporting match is optional.
+- `resume review:<UUID>` reloads durable review state. `status update_id:<UUID>` shows a matched
+  update. `cancel` with a receipt/review stops pending work, retaining accepted inputs and files.
+  Receipt/review ownership and original channel are checked again at every action.
+
+Controls remain default-off. New-source SQL migration must precede revised intake rollout.
+No public routing, export coordinator, deployment or activation is provided by this command.

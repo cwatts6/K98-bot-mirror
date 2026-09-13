@@ -36,7 +36,9 @@ def test_sealed_update_loads_each_endpoint_once(monkeypatch):
         key: SimpleNamespace(logical_scan_id=index)
         for index, key in enumerate(("b0", "start", "end"))
     }
-    loader._observation = Mock(side_effect=lambda _, revision: events[revision])
+    loader._observation = Mock(
+        side_effect=lambda _, revision, assigned_period=None: events[revision]
+    )
     result = loader.load_inputs(
         16,
         "p",
@@ -50,9 +52,9 @@ def test_sealed_update_loads_each_endpoint_once(monkeypatch):
         ),
     )
     assert loader._observation.call_args_list == [
-        call(cursor, "b0"),
-        call(cursor, "start"),
-        call(cursor, "end"),
+        call(cursor, "b0", None),
+        call(cursor, "start", None),
+        call(cursor, "end", None),
     ]
     assert result["observations"] == (events["start"], events["end"])
     assert result["b0"] is events["b0"]

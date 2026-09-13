@@ -44,6 +44,13 @@ class MemoryRepository:
             "revision": None,
         }
         self.calls = []
+        self.baseline_setup = None  # Existing-onboarded fixture; baseline tests opt into setup.
+
+    def baseline_configuration(self, kvk_no, *, cursor=None):
+        return deepcopy(self.baseline_setup)
+
+    def imported_configuration(self, kvk_no, *, cursor=None):
+        return deepcopy(self.baseline_setup)
 
     def create_receipt(self, *, artifact, admission, filename, kvk_no, payload):
         for row in self.receipts.values():
@@ -519,7 +526,9 @@ def test_onboarding_rejects_roster_growth_or_unmapped_b0_before_writes(monkeypat
 
 
 def test_real_onboarding_sql_is_parameterized_and_keeps_routing_disabled(monkeypatch):
-    from kvk.dal import new_source_admin_dal as module
+    from kvk.dal import new_source_admin_dal as module, season_source_dal as seasons
+
+    monkeypatch.setattr(seasons, "require_source", lambda *a, **k: {"SeasonState": "open"})
 
     cursor = Mock()
     row_answers = iter([[], [{"GovernorID": 1001, "kingdom": 101, "power": 1}]])
@@ -929,3 +938,46 @@ def test_reviewed_endpoint_request_composes_interim_final_and_replacement(rig):
     )
     assert publisher.dal.select_publication.call_args.kwargs["action_type"] == "endpoint_update"
     assert publisher.dal.select_publication.call_args.kwargs["request_id"] == "request"
+
+
+def test_s8c_baseline_gate_preserves_pending_receipt_until_configured(rig):
+    from tests.test_kvk_source_admin_review import configuration
+
+    service, repo = rig
+    repo.baseline_setup = configuration()
+    repo.baseline_setup["mapping"] = []
+    row = upload(service)
+    with pytest.raises(SourceConflict, match="kingdoms and camps"):
+        prepare(service, row)
+    assert repo.receipts[row["AttemptID"]]["Status"] == "received"
+    assert not repo.accepted
+    repo.baseline_setup = configuration()
+    approved = prepare(service, row)
+    accepted = service.confirm(ADMIN, row["AttemptID"], approved["payload"]["version"])
+    assert accepted["ObservationRevisionID"]
+
+
+def test_s8c_baseline_confirm_rejects_configuration_changed_after_preview(rig):
+    from tests.test_kvk_source_admin_review import configuration
+
+    service, repo = rig
+    repo.baseline_setup = configuration()
+    row = prepare(service, upload(service))
+    repo.baseline_setup["weights"][0] = "9"
+    with pytest.raises(SourceConflict, match="configuration changed"):
+        service.confirm(ADMIN, row["AttemptID"], row["payload"]["version"])
+    assert not repo.accepted
+
+
+def test_s8c_season_override_is_explicit_before_receipt_acceptance(rig):
+    service, repo = rig
+    row = service.stage_upload(
+        ADMIN,
+        filename="kvk16_players_20260905T1526Z.xlsx",
+        content=player_bytes(),
+        message_id=55,
+        attachment_id=66,
+        season=17,
+    )
+    assert row["KVK_NO"] == 17 and row["Status"] == "received"
+    assert not repo.accepted

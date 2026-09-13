@@ -3,9 +3,9 @@
 import asyncio
 from dataclasses import dataclass
 import logging
-import re
 
 from kvk.services.new_source_admin_service import access_from_config, configured_service
+from kvk.services.source_admin_review_service import configured_review_service
 
 logger = logging.getLogger(__name__)
 MAX_BYTES = 20 * 1024 * 1024
@@ -22,6 +22,7 @@ class KvkSourceRouteDeps:
     access: object
     service_factory: object = configured_recovery_intake
     offload: object = asyncio.to_thread
+    review_factory: object = configured_review_service
 
 
 async def handle_kvk_source_upload(message, deps):
@@ -32,45 +33,34 @@ async def handle_kvk_source_upload(message, deps):
         return False
     import discord
 
-    from ui.views.kvk_source_import_view import KvkSourceImportView, current_actor
+    from ui.views.kvk_source_import_view import SourceUploadStartView, current_actor
 
     try:
         actor = await current_actor(message, access)
         access.authorize(actor, upload=True)
-        if len(message.attachments) != 1:
-            raise ValueError("One workbook per confirmation.")
-        attachment = message.attachments[0]
-        if (
-            not attachment.filename.lower().endswith(".xlsx")
-            or not 0 < attachment.size <= MAX_BYTES
+        if not 1 <= len(message.attachments) <= 2 or len(
+            {a.id for a in message.attachments}
+        ) != len(message.attachments):
+            raise ValueError("Upload one or two distinct workbooks.")
+        if any(
+            not a.filename.lower().endswith(".xlsx") or not 0 < a.size <= MAX_BYTES
+            for a in message.attachments
         ):
-            raise ValueError("One bounded XLSX workbook is required.")
-        content = await attachment.read()
-        if not 0 < len(content) <= MAX_BYTES:
-            raise ValueError("Attachment exceeds the supported size.")
-        actor = await current_actor(message, access)
-        access.authorize(actor, upload=True)
-        caption = (getattr(message, "content", "") or "").strip()
-        season = int(caption) if re.fullmatch(r"[1-9][0-9]{0,9}", caption) else None
-        service = await deps.offload(deps.service_factory)
-        row = await deps.offload(
-            service.stage_upload,
-            actor,
-            filename=attachment.filename,
-            content=content,
-            message_id=message.id,
-            attachment_id=attachment.id,
-            season=season,
-        )
+            raise ValueError("Each attachment must be an XLSX workbook up to 20 MiB.")
+        review = await deps.offload(deps.review_factory)
+        season = await deps.offload(review.default_season, actor)
         await message.channel.send(
-            service.summary(row),
-            view=KvkSourceImportView(service, row),
+            f"Review season {season or '(select season)'} before intake. Both upload orders are supported. "
+            "Missing baseline configuration will block acceptance. Source setup uses /kvk_admin source choose_source.",
+            view=SourceUploadStartView(
+                access, actor, message.attachments, message.id, deps.service_factory, season
+            ),
             allowed_mentions=discord.AllowedMentions.none(),
         )
     except Exception as exc:
         logger.info("KVK source upload rejected message=%s type=%s", message.id, type(exc).__name__)
         await message.channel.send(
-            "Source upload was not completed. Use one XLSX file up to 20 MiB in the configured private channel with an authorized role. For filenames without a KVK number, enter the KVK number as the caption. Resume an existing receipt after an uncertain response.",
+            "Source upload review was not started. Use one or two distinct XLSX files up to 20 MiB each in the configured private channel with an authorized role. Check source setup; resume retained receipts after an uncertain response.",
             allowed_mentions=discord.AllowedMentions.none(),
         )
     return True

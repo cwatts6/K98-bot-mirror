@@ -136,6 +136,7 @@ class WindowConfig:
     weights: FrozenWeights | None
     closes_at_utc: datetime | None = None
     source_key: str = SOURCE_KEY
+    roster_members: tuple[tuple[int, int], ...] | None = None
 
     @property
     def is_no_fight(self) -> bool:

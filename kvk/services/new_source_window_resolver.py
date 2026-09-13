@@ -36,6 +36,7 @@ def _validate_change(
         "period_kind",
         "label",
         "roster_id",
+        "roster_members",
         "b0_revision_id",
         "map_version_id",
         "mapping",

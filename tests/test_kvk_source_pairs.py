@@ -347,7 +347,13 @@ def test_duplicate_identity_is_durably_superseded(prior_state, aggregate_first):
     assert all(retained[k] == prior[k] for k in dal.INPUT_COLUMNS)
     assert retained["ConfirmationJson"] == waiting["ConfirmationJson"]
     assert service.associate(uid(99), expected_version=2, authorized=True, **second) == retained
-    assert SourceUpdateService(store.connect).publish(uid(99)) is None
+    replay = SourceUpdateService(store.connect)
+    replay.dal.selected_result = Mock(return_value="retained outcome")
+    assert replay.publish(uid(99)) == ("retained outcome" if prior_state == "selected" else None)
+    if prior_state == "selected":
+        replay.dal.selected_result.assert_called_once_with(uid(1))
+    else:
+        replay.dal.selected_result.assert_not_called()
     assert store.state["updates"][uid(1)] == before_prior
     assert store.state["selections"] == before_selection
     assert not store.state["publications"] and not store.state["intents"]

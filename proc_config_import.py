@@ -830,6 +830,9 @@ def run_proc_config_import(
 
                 # KVK_DKPWeights
                 df_weights = _read_sheet_to_df(sheet, KVK_SHEET_ID, WEIGHTS_RANGE_NAME)
+                from kvk.services.new_source_config_service import source_weight_tokens
+
+                source_weights = source_weight_tokens(df_weights)
                 if not df_weights.empty:
                     required = ["KVK_NO", "WeightT4X", "WeightT5Y", "WeightDeadsZ"]
                     missing = [c for c in required if c not in df_weights.columns]
@@ -928,7 +931,11 @@ def run_proc_config_import(
                 from kvk.services.new_source_recovery_service import snapshot_config_import
 
                 snapshot_config_import(
-                    cursor, df_win, actor=source_actor, provenance=source_provenance
+                    cursor,
+                    df_win,
+                    actor=source_actor,
+                    provenance=source_provenance,
+                    source_weights=source_weights,
                 )
 
                 # Commit transaction

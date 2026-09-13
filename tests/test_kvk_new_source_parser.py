@@ -28,6 +28,18 @@ from kvk.schemas.new_source_schema import (
 from kvk.services.new_source_parser import parse_aggregate_workbook, parse_player_workbook
 
 
+def test_unlabelled_workbook_kind_uses_bounded_structure():
+    from kvk.schemas.new_source_schema import SourceKind
+    from kvk.services.new_source_parser import inspect_workbook_kind
+
+    assert inspect_workbook_kind(player_bytes()) == SourceKind.PLAYERS
+    assert inspect_workbook_kind(aggregate_bytes()) == SourceKind.AGGREGATE
+    with pytest.raises(SourceValidationError):
+        inspect_workbook_kind(b"corrupt")
+    with pytest.raises(SourceValidationError, match="compressed"):
+        inspect_workbook_kind(player_bytes(), ParseLimits(max_compressed_bytes=1))
+
+
 def player(content, limits=ParseLimits()):
     return parse_player_workbook(content, metadata(), limits)
 

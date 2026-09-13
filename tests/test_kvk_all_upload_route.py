@@ -544,3 +544,16 @@ def test_new_source_route_precedes_every_legacy_upload_route():
     assert route_lines["handle_configured_kvk_source_upload"] < min(
         line for name, line in route_lines.items() if name != "handle_configured_kvk_source_upload"
     )
+
+
+@pytest.mark.asyncio
+async def test_missing_fixed_source_guides_setup_without_export():
+    deps, sent, _, _, exports = _deps(
+        offload_result={
+            "success": False,
+            "error": "Season source setup is required before admission.",
+        }
+    )
+    assert await route.handle_kvk_all_upload(_message(), deps)
+    assert "/kvk_admin source choose_source" in sent[-1][2]["Error"]
+    assert not exports

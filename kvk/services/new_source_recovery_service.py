@@ -15,14 +15,23 @@ _worker = None
 _worker_loop = None
 
 
-def snapshot_config_import(cursor, windows, *, actor=None, provenance=None):
+def snapshot_config_import(cursor, windows, *, actor=None, provenance=None, source_weights=None):
     import bot_config
 
-    if not bot_config.KVK_SOURCE_RECOVERY_ENABLED:
+    if not bot_config.KVK_SOURCE_RECOVERY_ENABLED and not bot_config.KVK_SOURCE_INTAKE_ENABLED:
         return ()
     import pandas as pd
 
     from kvk.dal.new_source_recovery_dal import snapshot_import
+
+    if bot_config.KVK_SOURCE_INTAKE_ENABLED and source_weights is not None:
+        from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+
+        SourceAdminReviewDAL.snapshot_import(
+            cursor, source_weights, now=datetime.now(UTC).replace(microsecond=0)
+        )
+    if not bot_config.KVK_SOURCE_RECOVERY_ENABLED:
+        return ()
 
     records = []
     for record in windows.to_dict("records"):

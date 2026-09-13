@@ -38,3 +38,16 @@ def test_pending_and_no_fight_endpoints_preserved():
     )
     with pytest.raises(PermissionError):
         request_endpoint_update(None, authorized=False)
+
+
+def test_s8c_unattended_configuration_cannot_gain_review_authority():
+    from unittest.mock import Mock
+
+    import pytest
+
+    from kvk.services.new_source_config_service import request_configuration_update
+
+    cursor = Mock()
+    with pytest.raises(PermissionError):
+        request_configuration_update(cursor, authorized=False, review_id="untrusted", snapshot={})
+    cursor.execute.assert_not_called()

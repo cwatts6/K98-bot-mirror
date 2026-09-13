@@ -28,6 +28,18 @@ def request(old, new):
     )
 
 
+def test_unused_scans_remain_outside_later_exact_window():
+    _, start, _, end = worked_calculation_inputs()
+    start, end = replace(start, logical_scan_id=17), replace(end, logical_scan_id=18)
+    config = replace(calculation_config(), start_scan_id=17, end_scan_id=18)
+    selection = resolve_window(config, (end, start))
+    assert (selection.start.logical_scan_id, selection.end.logical_scan_id) == (17, 18)
+    # Intake has no resolver/publication side effect; period association is separate from file facts.
+    unassigned = replace(start, period_keys=())
+    with pytest.raises(ValueError, match="period"):
+        resolve_window(config, (unassigned, end))
+
+
 def test_exact_final_uses_event_time_when_end_id_is_lower_than_start():
     b0, start, _, end = worked_calculation_inputs()
     end = replace(end, logical_scan_id=9)

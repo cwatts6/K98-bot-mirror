@@ -423,7 +423,13 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         "Filename": attachment.filename,
                         "Channel": f"#{message.channel.name} ({message.channel.id})",
                         "Uploader": f"{message.author} ({message.author.id})",
-                        "Error": result.get("error"),
+                        "Error": (
+                            str(result.get("error"))
+                            + " Use /kvk_admin source choose_source for explicit season setup; an upload never chooses or switches the source."
+                            if "Season source setup is required before admission."
+                            in str(result.get("error"))
+                            else result.get("error")
+                        ),
                         "Sheet": result.get("sheet", "unknown"),
                     },
                     0xE74C3C,

@@ -495,6 +495,19 @@ def _metadata(metadata, kind):
         )
 
 
+def inspect_workbook_kind(content: bytes, limits: ParseLimits = ParseLimits()) -> SourceKind:
+    """Suggest a format using the same bounded XLSX reader as final validation."""
+    with _workbook(content, limits) as (workbook, _):
+        if workbook.sheetnames == [PLAYER_SHEET]:
+            return SourceKind.PLAYERS
+        if (
+            set(workbook.sheetnames) == {KINGDOM_SHEET, CAMP_SHEET}
+            and len(workbook.sheetnames) == 2
+        ):
+            return SourceKind.AGGREGATE
+        _reject("schema_sheets", "Upload either the player Scan workbook or both aggregate tabs.")
+
+
 def parse_player_workbook(
     content: bytes,
     metadata: ValidatedSourceMetadata,

@@ -9,6 +9,32 @@ from kvk.models.new_source_reporting import require_utc
 SOURCES = frozenset(("legacy_full_data", "snapshot_report_v1"))
 SEASON_STATES = ("planned", "open", "closing", "closed")
 EXPORT_SCHEMA = "kvk-complete-vector-v1"
+REVIEW_KINDS = frozenset(("choose_source", "intake", "match_update", "configuration"))
+
+
+def review_payload(value):
+    """Canonical bounded review data; no attachment bytes or floating point authority."""
+    import json
+
+    def check(item):
+        if isinstance(item, float):
+            raise ValueError("Review decimals must retain their source text.")
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if not isinstance(key, str):
+                    raise ValueError("Review keys must be text.")
+                check(child)
+        elif isinstance(item, (list, tuple)):
+            for child in item:
+                check(child)
+
+    if not isinstance(value, dict):
+        raise ValueError("Review payload must be an object.")
+    check(value)
+    text = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    if len(text.encode("utf-16-le")) > 65536:
+        raise ValueError("Review exceeds the durable payload limit.")
+    return text
 
 
 def identity(value: str) -> str:

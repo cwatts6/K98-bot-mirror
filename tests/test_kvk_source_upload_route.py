@@ -36,7 +36,12 @@ async def test_unmatched_route_has_no_side_effects(case):
     if case == "no_attachment":
         msg.attachments = []
     factory = Mock(side_effect=AssertionError("must not initialize"))
-    assert await handle_kvk_source_upload(msg, KvkSourceRouteDeps(access, factory)) is False
+    assert (
+        await handle_kvk_source_upload(
+            msg, KvkSourceRouteDeps(access, factory, review_factory=review_factory)
+        )
+        is False
+    )
     factory.assert_not_called()
     msg.guild.fetch_member.assert_not_called()
 
@@ -65,7 +70,12 @@ async def test_recognized_invalid_source_never_falls_through_or_downloads(case):
     if case == "bot":
         msg.author.bot = True
     factory = Mock()
-    assert await handle_kvk_source_upload(msg, KvkSourceRouteDeps(access, factory)) is True
+    assert (
+        await handle_kvk_source_upload(
+            msg, KvkSourceRouteDeps(access, factory, review_factory=review_factory)
+        )
+        is True
+    )
     factory.assert_not_called()
     msg.attachments[0].read.assert_not_called()
     assert msg.channel.send.call_args.kwargs["allowed_mentions"].to_dict() == {"parse": []}
@@ -76,7 +86,9 @@ async def test_role_loss_during_download_rejects_before_persistence():
     msg = message()
     msg.guild.fetch_member.side_effect = [msg.author, SimpleNamespace(id=11, roles=[])]
     factory = Mock()
-    assert await handle_kvk_source_upload(msg, KvkSourceRouteDeps(ACCESS, factory))
+    assert await handle_kvk_source_upload(
+        msg, KvkSourceRouteDeps(ACCESS, factory, review_factory=review_factory)
+    )
     factory.assert_not_called()
 
 
@@ -89,25 +101,40 @@ async def test_false_advertised_size_and_download_failure_are_consumed():
         else:
             msg.attachments[0].read.return_value = content
         factory = Mock()
-        assert await handle_kvk_source_upload(msg, KvkSourceRouteDeps(ACCESS, factory))
+        assert await handle_kvk_source_upload(
+            msg, KvkSourceRouteDeps(ACCESS, factory, review_factory=review_factory)
+        )
         factory.assert_not_called()
         assert "private field" not in str(msg.channel.send.call_args)
 
 
+def review_factory():
+    return SimpleNamespace(default_season=Mock(return_value=16))
+
+
 @pytest.mark.asyncio
-async def test_success_creates_one_owner_view_off_event_loop(monkeypatch):
+@pytest.mark.parametrize("count", [1, 2])
+async def test_success_offers_season_review_before_any_download(monkeypatch, count):
     import ui.views.kvk_source_import_view as views
 
     msg = message()
-    row = {"AttemptID": "receipt"}
-    service = SimpleNamespace(
-        stage_upload=Mock(return_value=row), summary=lambda row: "Receipt only"
-    )
+    if count == 2:
+        msg.attachments.append(
+            SimpleNamespace(
+                id=201, filename="other.xlsx", size=3, read=AsyncMock(return_value=b"other")
+            )
+        )
+    service = Mock()
     view = Mock(return_value="view")
-    monkeypatch.setattr(views, "KvkSourceImportView", view)
+    monkeypatch.setattr(views, "SourceUploadStartView", view)
     offload = AsyncMock(side_effect=lambda fn, *args, **kwargs: fn(*args, **kwargs))
-    assert await handle_kvk_source_upload(msg, KvkSourceRouteDeps(ACCESS, lambda: service, offload))
+    assert await handle_kvk_source_upload(
+        msg, KvkSourceRouteDeps(ACCESS, service, offload, review_factory)
+    )
     assert offload.await_count == 2
-    assert service.stage_upload.call_args.kwargs["season"] == 16
-    view.assert_called_once_with(service, row)
+    service.assert_not_called()
+    for attachment in msg.attachments:
+        attachment.read.assert_not_called()
+    assert view.call_args.args[-1] == 16
+    assert len(view.call_args.args[2]) == count
     assert msg.channel.send.call_args.kwargs["view"] == "view"

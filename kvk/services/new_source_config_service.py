@@ -44,3 +44,40 @@ def confirm_endpoint_pair(
             authorized=True,
         )
     return update
+
+
+def request_configuration_update(cursor, *, authorized, review_id, snapshot, **request):
+    """Only a durable, explicitly approved review can extend endpoint-only authority."""
+    if authorized is not True:
+        raise PermissionError("Explicit configuration review is required.")
+    return snapshot_endpoint_request(
+        cursor, review_id=review_id, reviewed_configuration=snapshot, **request
+    )
+
+
+def source_weight_tokens(frame):
+    """Capture text before the legacy float coercion; never reverse-engineer precision."""
+    import bot_config
+
+    if not bot_config.KVK_SOURCE_INTAKE_ENABLED or frame.empty:
+        return None
+    from decimal import Decimal
+
+    import pandas as pd
+
+    result = {}
+    for row in frame.to_dict("records"):
+        raw_season = row["KVK_NO"]
+        if pd.isna(raw_season) or not str(raw_season).strip():
+            continue
+        season = int(raw_season)
+        tokens = [row[key] for key in ("WeightT4X", "WeightT5Y", "WeightDeadsZ")]
+        if (
+            season in result
+            or not 1 <= season <= 2147483647
+            or isinstance(raw_season, bool)
+            or Decimal(str(raw_season)) != season
+        ):
+            raise ValueError("Source weights require one row per integer season.")
+        result[season] = tokens
+    return result

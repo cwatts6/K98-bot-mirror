@@ -103,7 +103,8 @@ async def test_timeout_retains_receipt_and_never_mutates_service():
 async def test_modal_limits_and_no_confirmation_before_preparation():
     view, service = make_view()
     meta, config = SourceMetadataModal(view), SourceConfigurationModal(view)
-    assert len(meta.children) == len(config.children) == 5
+    assert len(meta.children) == 5
+    assert len(config.children) == 3  # Imported map/weights are displayed, not retyped.
     assert all(item.max_length <= 4000 for item in (*meta.children, *config.children))
     view.row["Status"] = "received"
     fresh = KvkSourceImportView(service, view.row)
@@ -122,3 +123,24 @@ async def test_roster_mode_requires_its_own_review_and_survives_resume():
     resumed = KvkSourceImportView(service, view.row, action="configure")
     assert resumed.roster_correction
     assert not resumed.confirm_button.disabled
+
+
+@pytest.mark.asyncio
+async def test_setup_and_pair_modals_fit_discord_limits_and_preserve_update_id():
+    from tests.test_kvk_source_admin import ADMIN
+    from ui.views.kvk_source_import_view import (
+        SourceChoiceModal,
+        SourceConfigurationReviewModal,
+        SourcePairModal,
+    )
+
+    service = SimpleNamespace(access=ACCESS)
+    pair = SourcePairModal(service, ADMIN, 16, update_id="waiting-update")
+    assert pair.update_id == "waiting-update"
+    for modal in (
+        SourceChoiceModal(service, ADMIN, 16),
+        SourceConfigurationReviewModal(service, ADMIN, 16),
+        pair,
+    ):
+        assert len(modal.children) <= 5
+        assert all(len(item.label) <= 45 for item in modal.children)

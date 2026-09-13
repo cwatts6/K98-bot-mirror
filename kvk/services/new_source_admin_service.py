@@ -1,6 +1,6 @@
 """Private source intake policy. Durable receipts are authoritative; views are disposable."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 import hashlib
 import json
@@ -12,13 +12,33 @@ from uuid import UUID
 from kvk.dal.new_source_import_dal import Admission, SourceConflict, canonical
 from kvk.models.new_source_observation import CampMapping, MetadataConfirmation, SourceScope
 from kvk.models.new_source_reporting import FrozenWeights, require_utc
-from kvk.schemas.new_source_schema import INT_MAX, ReportState, SourceKind, TimePrecision
+from kvk.schemas.new_source_schema import (
+    INT_MAX,
+    ReportState,
+    SourceKind,
+    SourceValidationError,
+    TimePrecision,
+)
 from kvk.services.new_source_artifact_store import ArtifactStore, StoredArtifact
 from kvk.services.new_source_metadata import parse_filename_metadata, validate_source_metadata
-from kvk.services.new_source_parser import parse_aggregate_workbook, parse_player_workbook
+from kvk.services.new_source_parser import (
+    inspect_workbook_kind,
+    parse_aggregate_workbook,
+    parse_player_workbook,
+)
 
 logger = logging.getLogger(__name__)
-ACTIONS = ("status", "resume", "accept", "finalize", "correct", "configure")
+ACTIONS = (
+    "status",
+    "resume",
+    "accept",
+    "finalize",
+    "correct",
+    "configure",
+    "choose_source",
+    "match_update",
+    "cancel",
+)
 CONFIRM_SECONDS = 300
 
 
@@ -77,7 +97,10 @@ class SourceAccess:
         )
         if actor.channel_id not in channels:
             raise PermissionError("Use the private source intake or an authorized admin channel.")
-        if action not in ACTIONS or (action in ("finalize", "correct", "configure") and not admin):
+        if action not in ACTIONS or (
+            action in ("finalize", "correct", "configure", "choose_source", "match_update")
+            and not admin
+        ):
             raise PermissionError("This action requires the configured KVK administrator.")
         if not admin and not actor.role_ids.intersection(self.uploader_roles):
             raise PermissionError("The source uploader role is required.")
@@ -137,20 +160,34 @@ class SourceAdminService:
         self.access.authorize(actor, action)
         key = str(UUID(str(receipt_id)))
         row = self.repository.read_receipt(key, str(actor.user_id), str(actor.guild_id))
+        if row["ChannelID"] != str(actor.channel_id):
+            raise PermissionError("Resume this receipt in its original private channel.")
         candidate = (
             row["payload"].get("proposal", {}).get("candidate", row["payload"].get("candidate", {}))
         )
         row["current_context"] = self.repository.context(row["KVK_NO"], candidate)
+        if action != "cancel":
+            self._configuration_hint(row)
         return row
+
+    def _configuration_hint(self, row):
+        try:
+            row["imported_configuration"] = self.repository.imported_configuration(row["KVK_NO"])
+        except SourceConflict as exc:
+            # A failed setup check must not hide the retained receipt or prevent cancellation.
+            row["configuration_diagnostic"] = str(exc)
 
     def stage_upload(self, actor, *, filename, content, message_id, attachment_id, season=None):
         self.access.authorize(actor, upload=True)
         if not filename.lower().endswith(".xlsx"):
             raise ValueError("Source intake supports XLSX workbooks only.")
         candidate = parse_filename_metadata(filename)
-        kvk_no = candidate.kvk_no or positive(season)
-        if season is not None and positive(season) != kvk_no:
-            raise ValueError("Caption KVK conflicts with the filename.")
+        try:
+            candidate = replace(candidate, kind=inspect_workbook_kind(content))
+        except SourceValidationError:
+            # Retain the bounded original receipt; final parsing still rejects it.
+            pass
+        kvk_no = positive(season) if season is not None else positive(candidate.kvk_no)
         artifact = self.artifacts.persist_artifact(content)
         admission = Admission(
             str(actor.guild_id),
@@ -162,13 +199,15 @@ class SourceAdminService:
             "Private upload receipt",
             self.now(),
         )
-        return self.repository.create_receipt(
+        row = self.repository.create_receipt(
             artifact=artifact,
             admission=admission,
             filename=filename,
             kvk_no=kvk_no,
             payload={"version": 1, "candidate": _wire(asdict(candidate)), "history": []},
         )
+        self._configuration_hint(row)
+        return row
 
     def _metadata(self, row, fields, actor, reason, *, saved_guard=None):
         candidate = parse_filename_metadata(row["OriginalFilename"])
@@ -268,6 +307,17 @@ class SourceAdminService:
                     "Supply the current source revision and revision version for this action."
                 )
         prepared, _ = self._prepared(row, metadata, mapping)
+        baseline_setup = None
+        if metadata.candidate.kind == SourceKind.PLAYERS:
+            baseline_setup = self.repository.baseline_configuration(row["KVK_NO"])
+            if baseline_setup is not None:
+                from kvk.services.source_admin_review_service import validated_configuration
+
+                imported_map = validated_configuration(baseline_setup)
+                if tuple(sorted(k for k, _, _ in imported_map.entries)) != metadata.scope.kingdoms:
+                    raise SourceConflict(
+                        "Baseline kingdom scope must match the imported configuration."
+                    )
         if (
             metadata.candidate.kind == SourceKind.AGGREGATE
             and guard["config"]
@@ -291,6 +341,7 @@ class SourceAdminService:
             "expires": (self.now() + timedelta(seconds=CONFIRM_SECONDS)).isoformat(),
             "count": count,
             "digest": prepared.digest.sha256,
+            "baseline_configuration": baseline_setup,
         }
         return self.repository.prepare(
             receipt_id, str(actor.user_id), str(actor.guild_id), version, proposal
@@ -314,20 +365,30 @@ class SourceAdminService:
             or not 0 < len(label) <= 40
         ):
             raise ValueError("Enter a valid period key and a label of at most 40 characters.")
-        start, end = positive(start), positive(end) if end else None
-        if end is not None and end < start:
+        start, end = positive(start) if start else None, positive(end) if end else None
+        if end is not None and start is not None and end < start:
             raise ValueError("EndScanID must be greater than or equal to StartScanID.")
         if period.startswith("no_fight:") and start != end:
             raise ValueError("A no-fight window requires equal endpoints.")
         candidate = {"kind": "players", "period_key": period}
         guard = self.repository.context(row["KVK_NO"], candidate)
         spec = {"period_key": period, "label": label, "start": start, "end": end}
+        imported_configuration = None
         if guard["config"]:
             if mapping.strip() or weights.strip() or coverage.strip():
                 raise ValueError(
                     "Endpoint updates retain the approved map, weights and coverage; leave those fields empty."
                 )
         else:
+            if not mapping.strip() and not weights.strip():
+                from kvk.services.source_admin_review_service import validated_configuration
+
+                imported_configuration = self.repository.imported_configuration(row["KVK_NO"])
+                validated_configuration(imported_configuration)
+                mapping = "\n".join(f"{k}|{c}|{n}" for k, c, n in imported_configuration["mapping"])
+                weights = "|".join(
+                    [*imported_configuration["weights"], imported_configuration["effective"]]
+                )
             begin, finish = (x.strip() for x in coverage.split("|"))
             begin, finish = utc_text(begin), utc_text(finish) if finish else None
             if finish and finish < begin:
@@ -373,6 +434,7 @@ class SourceAdminService:
             "reason": reason,
             "receipt_id": receipt_id,
             "b0_revision": b0_revision,
+            "imported_configuration": imported_configuration,
             "expires": (self.now() + timedelta(seconds=CONFIRM_SECONDS)).isoformat(),
         }
         return self.repository.prepare(
@@ -448,6 +510,12 @@ class SourceAdminService:
             if self.now() >= utc_text(saved["expires"]):
                 raise SourceConflict("Confirmation expired; resume and prepare it again.")
             if saved["action"] == "configure":
+                if (
+                    saved.get("imported_configuration") is not None
+                    and self.repository.imported_configuration(locked["KVK_NO"], cursor=cursor)
+                    != saved["imported_configuration"]
+                ):
+                    raise SourceConflict("Imported configuration changed; review it again.")
                 if saved.get("mode") == "roster":
                     return self.repository.correct_roster(
                         cursor,
@@ -472,6 +540,14 @@ class SourceAdminService:
                 locked, saved["fields"], actor, saved["reason"], saved_guard=saved["guard"]
             )
             prepared, artifact = self._prepared(locked, metadata, mapping)
+            if metadata.candidate.kind == SourceKind.PLAYERS:
+                current_setup = self.repository.baseline_configuration(
+                    locked["KVK_NO"], cursor=cursor
+                )
+                if current_setup != saved.get("baseline_configuration"):
+                    raise SourceConflict(
+                        "Baseline configuration changed; Check again and review it."
+                    )
             if prepared.digest.sha256 != saved["digest"]:
                 raise SourceConflict("Prepared original changed; confirmation cannot proceed.")
             action_key = (
@@ -525,6 +601,12 @@ class SourceAdminService:
         )
         return result
 
+    def cancel(self, actor, receipt_id, version):
+        row = self.receipt(actor, receipt_id, "cancel")
+        return self.repository.cancel(
+            row["AttemptID"], str(actor.user_id), str(actor.guild_id), version
+        )
+
     @staticmethod
     def summary(row):
         payload = row["payload"]
@@ -535,6 +617,12 @@ class SourceAdminService:
             f"KVK {row['KVK_NO']} | version {payload['version']}",
             f"State: {outcome['state'] if outcome else row['Status']}",
         ]
+        if payload.get("cancelled"):
+            lines.append(
+                "Pending work cancelled; any accepted revisions and original files remain retained."
+            )
+        if row.get("configuration_diagnostic"):
+            lines.append(row["configuration_diagnostic"])
         candidate = proposal.get("candidate", payload.get("candidate", {}))
         for key in (
             "kind",

@@ -1,6 +1,8 @@
 # S8B new-chat starter — Bot Source and Matched Update Services
 
-> **S8B validated, 2026-09-13:** Approved implementation and gap closure are complete locally. The exact approved disposable SQL packet passed backup/actual restore, migration preview/apply/rerun and all **50 SQL cases**; final offline suite **4,139 passed / 57 skipped**. See the [execution evidence](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md#approved-disposable-execution-results--2026-09-13). The operator accepted these results and approved separate Bot mirror and SQL PR publication; merge, production promotion, deployment and activation remain separately gated. Earlier scope-only and unexecuted status below is historical; do not re-request settled S7, implementation or completed disposable-execution approvals.
+> Archived 2026-09-13: S8B is complete, operator smoke accepted and merged in production #581 / SQL #81. This file retains historical instructions and evidence; do not execute it as a new task. Use the [S8C starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [closeout](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md). No bot-machine pull occurred.
+
+> **Historical S8B pre-publication checkpoint, 2026-09-13:** Approved implementation and gap closure are complete locally. The exact approved disposable SQL packet passed backup/actual restore, migration preview/apply/rerun and all **50 SQL cases**; final offline suite **4,139 passed / 57 skipped**. See the [execution evidence](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md#approved-disposable-execution-results--2026-09-13). The operator accepted these results and approved separate Bot mirror and SQL PR publication; merge, production promotion, deployment and activation remain separately gated. Earlier scope-only and unexecuted status below is historical; do not re-request settled S7, implementation or completed disposable-execution approvals.
 
 Prepared 2026-09-13. Paste the following into a new chat. This selects review/scope only;
 it does not start implementation or authorize operations. S7 decisions stay approved.
@@ -10,7 +12,7 @@ it does not start implementation or authorize operations. S7 decisions stay appr
 Please begin **S8B Bot Source and Matched Update Services, initial review/scope only**, following
 [this task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and the approved S7 contract/manifests.
 Read current AGENTS/core references, authoritative SQL, architecture/EndScanID amendment,
-[closeout and exact carry-forward manifest](../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md) and retained S6 evidence.
+[closeout and exact carry-forward manifest](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md) and retained S6 evidence.
 
 S7/S8A are complete, smoke accepted and merged (#273/#580 and SQL #80); local pulls are complete.
 No changes have been pulled to the bot machine. Distinguish operator smoke acceptance, the

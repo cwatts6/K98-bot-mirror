@@ -259,3 +259,16 @@ def test_no_fight_retains_not_applicable_aggregate():
         StreamState.FINAL,
     )
     assert report.period_state == StreamState.FINAL
+
+
+def test_s8c_roster_selection_is_frozen_and_does_not_change_aggregate_authority():
+    from dataclasses import FrozenInstanceError, replace
+
+    import pytest
+
+    from tests.kvk_source_fixtures import calculation_config
+
+    config = replace(calculation_config(), roster_members=((1001, 101),))
+    with pytest.raises(FrozenInstanceError):
+        config.roster_members = ((9999, 101),)
+    assert config.mapping == calculation_config().mapping

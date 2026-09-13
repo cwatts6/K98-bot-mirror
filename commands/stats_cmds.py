@@ -15,7 +15,7 @@ from bot_config import (
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
 from core.discord_embed_limits import require_valid_embed_payload
-from core.interaction_safety import safe_command, safe_defer
+from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from core.operator_diagnostic_payloads import (
     safe_diagnostic_content as _safe_diagnostic_error,
 )
@@ -94,9 +94,21 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         action: str = discord.Option(
             str,
             "Source action",
-            choices=["status", "resume", "accept", "finalize", "correct", "configure"],
+            choices=[
+                "status",
+                "resume",
+                "accept",
+                "finalize",
+                "correct",
+                "configure",
+                "choose_source",
+                "match_update",
+                "cancel",
+            ],
         ),
-        receipt: str = discord.Option(str, "Your private source receipt UUID"),
+        receipt: str = discord.Option(
+            str, "Your private source receipt UUID", required=False, default=None
+        ),
         expected_revision: str = discord.Option(
             str, "Current source revision UUID for finalize/correct", required=False, default=None
         ),
@@ -105,6 +117,26 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         ),
         roster_correction: bool = discord.Option(
             bool, "Configure: review a new B0 roster version", required=False, default=False
+        ),
+        kvk_no: int = discord.Option(
+            int, "Season for setup or pairing", required=False, default=None, min_value=1
+        ),
+        source: str = discord.Option(
+            str,
+            "Fixed source",
+            choices=["snapshot_report_v1", "legacy_full_data"],
+            required=False,
+            default="snapshot_report_v1",
+        ),
+        review: str = discord.Option(str, "Durable review UUID", required=False, default=None),
+        update_id: str = discord.Option(
+            str, "Durable matched UpdateID for status", required=False, default=None
+        ),
+        file_1: discord.Attachment = discord.Option(
+            discord.Attachment, "First workbook", required=False, default=None
+        ),
+        file_2: discord.Attachment = discord.Option(
+            discord.Attachment, "Second workbook", required=False, default=None
         ),
     ):
         from kvk.services.new_source_admin_service import access_from_config, configured_service
@@ -121,10 +153,85 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             access.authorize(actor, action)
             if roster_correction and action != "configure":
                 raise ValueError("Roster correction is an explicit configure option.")
+            from kvk.services.source_admin_review_service import configured_review_service
+            from ui.views.kvk_source_import_view import (
+                SourceChoiceModal,
+                SourceConfigurationReviewModal,
+                SourcePairModal,
+                SourceReviewView,
+                SourceUploadStartView,
+            )
+
+            interaction = getattr(ctx, "interaction", ctx)
+            review_service = configured_review_service()
+            if action == "choose_source":
+                await interaction.response.send_modal(
+                    SourceChoiceModal(review_service, actor, kvk_no, source)
+                )
+                return
+            if action == "match_update" and not review:
+                await interaction.response.send_modal(
+                    SourcePairModal(review_service, actor, kvk_no, update_id=update_id)
+                )
+                return
+            if action == "configure" and not receipt and not review:
+                await interaction.response.send_modal(
+                    SourceConfigurationReviewModal(review_service, actor, kvk_no)
+                )
+                return
             if not await safe_defer(ctx, ephemeral=True):
                 return
+            if file_1 or file_2:
+                attachments = tuple(a for a in (file_1, file_2) if a is not None)
+                access.authorize(actor, upload=True)
+                if any(
+                    not a.filename.lower().endswith(".xlsx") or not 0 < a.size <= 20 * 1024 * 1024
+                    for a in attachments
+                ):
+                    raise ValueError("Attach XLSX workbooks up to 20 MiB each.")
+                if len({a.id for a in attachments}) != len(attachments):
+                    raise ValueError("Choose distinct attachments.")
+                season = kvk_no or await asyncio.to_thread(review_service.default_season, actor)
+                await send_ephemeral(
+                    interaction,
+                    "Confirm the season before accepting these source files.",
+                    view=SourceUploadStartView(
+                        access, actor, attachments, interaction.id, configured_service, season
+                    ),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                return
+            if review:
+                row = await asyncio.to_thread(review_service.read, actor, review)
+                if action == "cancel":
+                    row = await asyncio.to_thread(
+                        review_service.cancel, actor, review, row["Version"]
+                    )
+                await send_receipt(
+                    interaction,
+                    review_service,
+                    row,
+                    SourceReviewView(review_service, row) if action != "status" else None,
+                )
+                return
+            if update_id:
+                text = await asyncio.to_thread(review_service.update_status, actor, update_id)
+                await send_ephemeral(
+                    interaction, text, allowed_mentions=discord.AllowedMentions.none()
+                )
+                return
+            if not receipt:
+                raise ValueError(
+                    "Supply a receipt/review UUID, attach files, or choose setup/pairing."
+                )
             service = await asyncio.to_thread(configured_service)
             row = await asyncio.to_thread(service.receipt, actor, receipt, action)
+            if action == "cancel":
+                row = await asyncio.to_thread(
+                    service.cancel, actor, receipt, row["payload"]["version"]
+                )
+                await send_receipt(interaction, service, row)
+                return
             if roster_correction:
                 row = await asyncio.to_thread(service.roster_preview, actor, receipt)
             view = None

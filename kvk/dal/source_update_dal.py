@@ -45,10 +45,50 @@ def load_update(cursor, update_id):
     return row
 
 
+def has_period_assignment(update):
+    """Explicit assignment is scoped to the sealed tuple; original metadata is untouched."""
+    evidence = json.loads(update["ConfirmationJson"])
+    return bool(evidence.get("reason")) and evidence.get("period_assignment") == {
+        "period_id": update["PeriodID"],
+        "config_version_id": update["ConfigVersionID"],
+        "start_scan_id": update["StartScanID"],
+        "end_scan_id": update["EndScanID"],
+        "actor": update["ConfirmedBy"],
+    }
+
+
+def configuration_review_authorized(cursor, update):
+    proof = json.loads(update["ConfirmationJson"])
+    review_id = proof.get("configuration_review")
+    if not review_id:
+        return False
+    if proof.get("action") != "correct" or not update.get("RequestID"):
+        raise SourceConflict("Configuration correction lacks explicit update authority.")
+    cursor.execute(
+        "SELECT a.ActorID,a.ReviewKind,a.ReviewState,r.ProvenanceJson FROM KVK.SourceAdminReview a JOIN KVK.SourceConfigRequest r ON r.KVK_NO=a.KVK_NO WHERE a.ReviewID=? AND a.KVK_NO=? AND r.RequestID=? AND r.PeriodID=? AND r.DesiredConfigVersionID=? AND r.RequestState<>'rejected'",
+        identity(review_id),
+        update["KVK_NO"],
+        update["RequestID"],
+        update["PeriodID"],
+        update["ConfigVersionID"],
+    )
+    review = one(cursor)
+    if (
+        not review
+        or review["ActorID"] != update["ConfirmedBy"]
+        or review["ReviewKind"] != "configuration"
+        or review["ReviewState"] not in ("pending", "completed")
+        or json.loads(review["ProvenanceJson"]).get("configuration_review") != review_id
+    ):
+        raise SourceConflict("Configuration correction does not match its durable admin review.")
+    return True
+
+
 def validate_update(cursor, update, *, complete=False, sealed=False):
     """Validate relationships not established by the static scoped foreign keys."""
     if update["SourceKey"] != SOURCE_KEY:
         raise SourceConflict("Unknown update source.")
+    configuration_authority = configuration_review_authorized(cursor, update)
     cursor.execute(
         "SELECT c.RosterID,c.MappingDigest,r.B0RevisionID,w.StartScanID,w.EndScanID,p.PeriodKind,p.CoverageStartUTC,p.CoverageEndUTC "
         "FROM KVK.SourceConfigVersion c JOIN KVK.SourceRoster r ON r.RosterID=c.RosterID "
@@ -194,7 +234,9 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
         # the exact confirmed base to remain current.
         if not selected or selected["UpdateID"] not in (base["UpdateID"], update["UpdateID"]):
             raise SourceConflict("Counterpart confirmation base is stale.")
-        if any(base[k] != update[k] for k in ("SourceKey", "KVK_NO", "PeriodID", "RosterID")):
+        if any(base[k] != update[k] for k in ("SourceKey", "KVK_NO", "PeriodID")) or (
+            base["RosterID"] != update["RosterID"] and not configuration_authority
+        ):
             raise SourceConflict("Counterpart has incompatible season, period or roster.")
         if counterpart not in (
             base["StartRevisionID"],
@@ -232,7 +274,9 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
         event = one(cursor)
         if not event or event["LogicalScanID"] != update[role + "ScanID"]:
             raise SourceConflict("Logical scan and observation revision do not match.")
-        if update["PeriodKey"] not in json.loads(event["MetadataJson"])["scope"]["period_keys"]:
+        if update["PeriodKey"] not in json.loads(event["MetadataJson"])["scope"][
+            "period_keys"
+        ] and not has_period_assignment(update):
             raise SourceConflict("Observation is not associated with this period.")
         if (
             not sealed
@@ -340,7 +384,7 @@ def validate_sealed_snapshot(cursor, snapshot, b0, update_id, expected_version):
     validate_update(cursor, update, complete=True, sealed=True)
     # Full immutable fact/count/config verification stays in the existing validator.
     # Selection freshness is governed by the explicit tuple above, never global MAX.
-    validate_snapshot_inputs(cursor, snapshot, b0, require_selected=False)
+    validate_snapshot_inputs(cursor, snapshot, b0, require_selected=False, assigned_update=update)
     return update
 
 
@@ -351,6 +395,30 @@ class SourceUpdateDAL:
     def read(self, update_id):
         with transaction(self.connect) as cursor:
             return load_update(cursor, update_id)
+
+    def replay_target(self, update_id):
+        """Resolve persisted semantic supersession without inventing a new update."""
+        with transaction(self.connect) as cursor:
+            row = load_update(cursor, update_id)
+            if row["UpdateState"] != "superseded":
+                return row
+            cursor.execute(
+                "SELECT * FROM KVK.SourceUpdate WHERE SourceKey=? AND KVK_NO=? AND PeriodID=? AND ContentHash=? AND UpdateState IN ('ready','selected')",
+                SOURCE_KEY,
+                row["KVK_NO"],
+                row["PeriodID"],
+                row["ContentHash"],
+            )
+            target = one(cursor)
+            if (
+                target is None
+                and json.loads(row["ConfirmationJson"]).get("action") == "configure"
+                and row["BaseUpdateID"]
+            ):
+                target = load_update(cursor, row["BaseUpdateID"])
+            if target is None:
+                raise SourceConflict("Superseded update has no retained matching outcome.")
+            return target
 
     def selected_result(self, update_id):
         with transaction(self.connect) as cursor:

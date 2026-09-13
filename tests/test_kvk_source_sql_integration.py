@@ -1568,3 +1568,70 @@ def test_s8b_complete_commit_loss_fresh_client_readback(database, after):
     assert recovered.commit_sequence == 1
     assert SourceUpdateService(connect).publish(update["UpdateID"]) == recovered
     assert set(complete_rows(connect, season).values()) == {1}
+
+
+@pytest.fixture
+def s8c_review_connection():
+    # Separate target and opt-in: the retained S8B 50-case evidence is never reused as S8C evidence.
+    if os.environ.get("KVK_S8C_SQL_ENABLE") != "1":
+        pytest.skip("Separate S8C disposable SQL execution approval required.")
+    server, name = os.environ.get("KVK_S8C_SQL_SERVER"), os.environ.get("KVK_S8C_SQL_DATABASE")
+    if (
+        server not in (r"9SX2VF4\K98DEV", r"localhost\K98DEV")
+        or not name
+        or not name.startswith("K98_S8C_Disposable_")
+        or not name.replace("_", "").isalnum()
+        or os.environ.get("KVK_S8C_SQL_APPROVED_TARGET") != f"{server}|{name}"
+    ):
+        pytest.fail("Refusing an unapproved S8C disposable target.")
+    import pyodbc
+
+    connection = pyodbc.connect(
+        "DRIVER={ODBC Driver 17 for SQL Server};SERVER=lpc:"
+        + server
+        + ";DATABASE="
+        + name
+        + ";Trusted_Connection=yes;TrustServerCertificate=yes",
+        autocommit=False,
+        timeout=10,
+    )
+    try:
+        actual = (
+            connection.cursor()
+            .execute("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')),DB_NAME()")
+            .fetchone()
+        )
+        if tuple(actual) != (r"9SX2VF4\K98DEV", name):
+            pytest.fail("S8C connected target differs from authorization.")
+        yield connection
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.mark.parametrize("fault", ["state", "empty_owner", "bad_json", "oversize", "expiry"])
+def test_s8c_review_schema_rejects_invalid_state(s8c_review_connection, fault):
+    import pyodbc
+
+    state, actor, payload, expires = "pending", "synthetic", "{}", "2000-01-02"
+    if fault == "state":
+        state = "completed"
+    if fault == "empty_owner":
+        actor = ""
+    if fault == "bad_json":
+        payload = "broken"
+    if fault == "oversize":
+        payload = '{"value":"' + "x" * 40000 + '"}'
+    if fault == "expiry":
+        expires = "1999-12-31"
+    cursor = s8c_review_connection.cursor()
+    with pytest.raises(pyodbc.Error):
+        cursor.execute(
+            "INSERT KVK.SourceAdminReview (ReviewID,KVK_NO,ReviewKind,ActorID,GuildID,ChannelID,Version,ReviewState,PayloadJson,PayloadHash,CreatedUTC,ExpiresUTC) VALUES (?,2000000001,'choose_source',?,'synthetic','synthetic',1,?,?,?,'2000-01-01',?)",
+            str(uuid4()),
+            actor,
+            state,
+            payload,
+            bytes(32),
+            expires,
+        )

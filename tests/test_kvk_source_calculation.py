@@ -17,6 +17,28 @@ from tests.kvk_source_fixtures import (
 )
 
 
+def test_reviewed_roster_subset_uses_original_b0_without_mutating_it():
+    b0, start, _, end = worked_calculation_inputs()
+    original = b0.observation
+    config = replace(calculation_config(), roster_members=((1001, 101),))
+    result = calculate_period(resolve_window(config, (start, end)), b0)
+    assert [p.governor_id for p in result.players] == [1001]
+    assert result.players[0].metric("dkp").value == 1800
+    assert result.eligible_count == 1
+    assert result.calculation_version == "snapshot_report_calculation_v2"
+    assert b0.observation is original and len(original.rows) == 4
+
+
+@pytest.mark.parametrize(
+    "members", [(), ((9999, 101),), ((1001, 999),), ((1001, 101), (1001, 101))]
+)
+def test_configuration_cannot_fabricate_baseline_members_or_attribution(members):
+    b0, start, _, end = worked_calculation_inputs()
+    config = replace(calculation_config(), roster_members=members)
+    with pytest.raises(ValueError, match="original B0"):
+        calculate_period(resolve_window(config, (start, end)), b0)
+
+
 def test_t21_t26_exact_endpoints_roster_and_metric_cohorts():
     b0, start, middle, end = worked_calculation_inputs()
     config = calculation_config()
