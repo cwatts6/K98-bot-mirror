@@ -1,7 +1,7 @@
 """Recovery caller, typed reload and lifecycle tests using synthetic state only."""
 
 import asyncio
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from threading import Event, get_ident
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -12,8 +12,7 @@ import bot_config
 from kvk.dal.new_source_import_dal import SourceConflict, canonical
 from kvk.dal.new_source_recovery_dal import _metadata, _row, endpoint_chain
 from kvk.services import new_source_recovery_service as recovery
-from kvk.services.new_source_publication_service import PublicationService
-from tests.kvk_source_fixtures import calculation_config, worked_calculation_inputs
+from tests.kvk_source_fixtures import worked_calculation_inputs
 
 
 def test_typed_rows_roundtrip_preserves_decimals_and_missingness():
@@ -166,120 +165,30 @@ def test_acceptance_wake_only_after_confirm(monkeypatch):
     assert wake.call_count == 1
 
 
-def test_recovery_builds_normal_interim_and_deduplicates_selected():
-    b0, start, middle, _ = worked_calculation_inputs()
-    config = calculation_config(end_scan_id=None)
-    publisher = PublicationService(Mock())
-    publisher.dal = Mock()
-    publisher.dal.build_candidate.return_value = {"Generation": 1}
-    publisher.dal.select_publication.return_value = {"NewSelectionVersion": 1}
+def test_recovery_discovers_explicit_updates_only(monkeypatch):
+    from kvk.services import source_update_service
+
+    paired = Mock()
+    monkeypatch.setattr(source_update_service, "SourceUpdateService", lambda connect: paired)
     dal = Mock()
-    # Use canonical UUIDs for actual ExportSelection construction.
-    config = replace(config, period_id="00000000-0000-0000-0000-000000000001")
-    data = dict(
-        config=config,
-        observations=(start, middle),
-        b0=b0,
-        previous=None,
-        aggregate=None,
-        request=None,
-        requests=[],
-        selected=None,
-        routing=None,
-    )
-    dal.load_inputs.return_value = data
-    service = recovery.RecoveryService(dal, publisher)
-    result = service.recover_period(config.kvk_no, config.period_id)
-    snapshot = publisher.dal.build_candidate.call_args.args[0]
-    assert snapshot.calculation.selection.end.logical_scan_id == 11
-    assert snapshot.player_state.value == "live"
-    data["selected"] = dict(PublicationID=result.publication_id, SelectionVersion=1)
-    assert service.recover_period(config.kvk_no, config.period_id) is None
-    assert publisher.dal.select_publication.call_count == 1
+    dal.ready_updates.return_value = [{"UpdateID": "first"}, {"UpdateID": "second"}]
+    worker = recovery.RecoveryService(dal, Mock())
+    assert worker.recover_period(16, "period") is paired.publish.return_value
+    assert [call.args[0] for call in paired.publish.call_args_list] == ["first", "second"]
+    dal.load_inputs.assert_not_called()
+    dal.ready_updates.return_value = []
+    assert worker.recover_period(16, "period") is None
 
 
-def test_interim_final_pending_and_authorized_replacement_sequence():
-    from datetime import timedelta
-
-    b0, start, eleven, thirteen = worked_calculation_inputs()
-
-    def event(source, number, delta):
-        metadata = source.observation.metadata
-        return replace(
-            source,
-            logical_scan_id=number,
-            observation_id=f"observation-{number}",
-            revision_id=f"revision-{number}",
-            observation=replace(
-                source.observation,
-                metadata=replace(
-                    metadata,
-                    candidate=replace(
-                        metadata.candidate, scan_start_utc=metadata.candidate.scan_start_utc + delta
-                    ),
-                ),
-            ),
-        )
-
-    twelve = event(eleven, 12, timedelta(hours=12))
-    fourteen = event(thirteen, 14, timedelta(days=1))
-    config = replace(calculation_config(), period_id="00000000-0000-0000-0000-000000000001")
-    data = dict(
-        config=config,
-        observations=(start, eleven),
-        b0=b0,
-        previous=None,
-        aggregate=None,
-        request=None,
-        requests=[],
-        selected=None,
-        routing=None,
-    )
-    publisher = PublicationService(Mock())
-    publisher.dal = Mock()
-    publisher.dal.build_candidate.return_value = {"Generation": 1}
-    stored = []
-
-    def select(**kwargs):
-        version = len(stored) + 1
-        snapshot = publisher.dal.build_candidate.call_args.args[0]
-        stored.append(snapshot)
-        data["selected"] = dict(PublicationID=snapshot.publication_id, SelectionVersion=version)
-        data["previous"] = snapshot.calculation.selection
-        return {"NewSelectionVersion": version}
-
-    publisher.dal.select_publication.side_effect = select
-    dal = Mock()
-    dal.load_inputs.return_value = data
-    service = recovery.RecoveryService(dal, publisher)
-
-    def run():
-        return service.recover_period(config.kvk_no, config.period_id)
-
-    run()
-    data["observations"] = (start, eleven, twelve)
-    run()
-    data["observations"] = (start, eleven, twelve, thirteen)
-    run()
-    assert [
-        (s.calculation.selection.end.logical_scan_id, s.player_state.value) for s in stored
-    ] == [(11, "live"), (12, "live"), (13, "final")]
-    req = request(config.version_id, "desired-14", 13, 14, period=config.period_id)
-    req["KVK_NO"] = config.kvk_no
-    data.update(
-        config=replace(config, version_id="desired-14", end_scan_id=14), request=req, requests=[req]
-    )
-    run()
-    assert stored[-1].calculation.selection.endpoint_pending
-    assert stored[-1].player_state.value == "live"
-    assert stored[-1].calculation.selection.end.logical_scan_id == 13
-    data["observations"] = (*data["observations"], fourteen)
-    run()
-    assert stored[-1].player_state.value == "corrected_final"
-    assert stored[-1].calculation.selection.end.logical_scan_id == 14
-    assert run() is None and len(stored) == 5
-    assert all(len(s.calculation.players) == 4 for s in stored)
-    assert all(s.aggregate is None for s in stored)
+def test_recovery_does_not_deliver_after_pair_failure(monkeypatch):
+    worker = recovery.RecoveryService(Mock(), Mock(), Mock(), (Mock(),))
+    worker.dal.periods.return_value = [(16, "period")]
+    worker.recover_period = Mock(side_effect=SourceConflict("stale pair"))
+    deliver = Mock()
+    monkeypatch.setattr(recovery, "deliver_current_exports", deliver)
+    worker.run_batch(Event())
+    deliver.assert_not_called()
+    assert worker.after == (16, "period")
 
 
 def test_closed_loop_wake_cannot_break_committed_confirm(monkeypatch):
@@ -306,57 +215,16 @@ def test_batch_advances_past_failed_period_and_stops_cooperatively():
 
 def test_automatic_discord_recovery_is_refused():
     target = recovery.ExportTarget(1, SimpleNamespace(kind="discord"), Mock())
-    with pytest.raises(ValueError, match="Discord"):
+    with pytest.raises(ValueError, match="S10"):
         recovery.deliver_current_exports(Mock(), Mock(), (target,), 1)
 
 
-@pytest.mark.parametrize("changed_period", [0, 1])
-def test_recovery_caller_composes_s4b_multi_period_delivery(monkeypatch, changed_period):
-    """Reuse S4B-MP01's full synthetic SQL/Google assertions through the S5B caller."""
-    import json
-
-    import kvk.services.new_source_export_service as exports
-    import tests.test_kvk_source_delivery as component
-
-    direct = component.deliver_export
-
-    def through_recovery(**args):
-        # Keep the component's explicit stale-anchor rejection as a direct negative check.
-        if args["selection"] not in args["generation"].selections:
-            return direct(**args)
-        repository = args["repository"]
-        stored = repository.claims.get(args["destination"])
-        if (
-            stored
-            and stored.state == "confirmed"
-            and stored.selection == args["selection"]
-            and json.loads(stored.receipt)["export_key"] != args["generation"].key
-        ):
-            return direct(**args)
-        dal = SimpleNamespace(
-            connect=Mock(), selections=lambda season: args["generation"].selections
-        )
-
-        # Fresh repository instances in MP01 load durable rows using its actual claim DAL.
-        def read(selection, destination):
-            if stored and stored.selection == selection:
-                return stored
-            # Let the real claim path perform final receipt reconciliation/deduplication.
-            return None
-
-        repository.read_receipt = read
-        monkeypatch.setattr(exports, "load_sheets_generation", lambda **kw: args["generation"])
-        target = recovery.ExportTarget(
-            args["selection"].kvk_no, args["destination"], args["transport"]
-        )
-        return recovery.deliver_current_exports(
-            dal, repository, (target,), target.kvk_no, changed=args["selection"]
-        )[0]
-
-    monkeypatch.setattr(component, "deliver_export", through_recovery)
-    component.test_multi_period_delivery_uses_changed_anchor_and_deduplicates(
-        monkeypatch, changed_period
-    )
+@pytest.mark.parametrize("kind", ["sheets", "file"])
+def test_recovery_component_export_bypass_is_refused(kind):
+    target = recovery.ExportTarget(16, SimpleNamespace(kind=kind), Mock())
+    with pytest.raises(SourceConflict, match="S10"):
+        recovery.deliver_current_exports(Mock(), Mock(), (target,), 16)
+    target.transport.assert_not_called()
 
 
 def export_record():

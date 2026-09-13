@@ -37,15 +37,18 @@ from tests.kvk_source_fixtures import MAPPING, metadata, player_bytes, player_ro
 
 @pytest.fixture
 def database(tmp_path):
-    server = os.environ.get("KVK_S3B_SQL_SERVER")
-    name = os.environ.get("KVK_S3B_SQL_DATABASE")
-    if not server and not name:
-        pytest.skip("Explicit S3B disposable SQL target required.")
+    server = os.environ.get("KVK_S8B_SQL_SERVER")
+    name = os.environ.get("KVK_S8B_SQL_DATABASE")
+    if os.environ.get("KVK_S8B_SQL_ENABLE") != "1":
+        pytest.skip("Separate S8B disposable SQL execution approval required.")
     if (
         server not in (r"9SX2VF4\K98DEV", r"localhost\K98DEV")
-        or name != "K98_S3B_Disposable_20260910"
+        or not name
+        or not name.startswith("K98_S8B_Disposable_")
+        or not name.replace("_", "").isalnum()
+        or os.environ.get("KVK_S8B_SQL_APPROVED_TARGET") != f"{server}|{name}"
     ):
-        pytest.fail("Refusing a non-authorized S3B SQL target.")
+        pytest.fail("Refusing an unapproved S8B SQL target.")
     import pyodbc
 
     def connect():
@@ -67,9 +70,23 @@ def database(tmp_path):
         conn.rollback()
         return conn
 
-    # Each test owns a distinct synthetic season; committed evidence remains in S3B only.
+    # Each test owns a distinct synthetic season; committed evidence remains in the separately approved S8B database.
     season = 1000000 + int(uuid4().hex[:7], 16)
-    store = ArtifactStore(Path(tempfile.mkdtemp(prefix="k98-s3b-originals-")))
+    store = ArtifactStore(Path(tempfile.mkdtemp(prefix="k98-s8b-originals-")))
+    from kvk.services.season_source_service import SeasonSourceService
+
+    choices = SeasonSourceService(connect)
+    choices.choose(
+        season,
+        SOURCE_KEY,
+        actor="synthetic",
+        reason="S8B fixture",
+        provenance={"test": "S8B"},
+        authorized=True,
+    )
+    choices.transition(
+        season, "open", expected_version=1, actor="synthetic", reason="S8B fixture", authorized=True
+    )
     return connect, season, store
 
 
@@ -103,7 +120,7 @@ def admission(key=None, **changes):
         "accept",
         "synthetic-operator",
         "synthetic-channel",
-        "synthetic S3B validation",
+        "synthetic S8B validation",
         datetime.now(UTC).replace(microsecond=0),
         **changes,
     )
@@ -121,16 +138,27 @@ def accepted_event(dal, season, number, store):
     )
 
 
-def seed_config(connect, season, b0, *, start=1, end=3):
+def seed_config(
+    connect,
+    season,
+    b0,
+    *,
+    start=1,
+    end=3,
+    sequence=1,
+    period_key="fight:pass4",
+    period_kind=PeriodKind.FIGHT,
+):
     config_id, roster_id, period_id = (str(uuid4()) for _ in range(3))
     utc = datetime(2000, 1, 1)
     h = digest({"synthetic": season})
     with transaction(connect) as cur:
         cur.execute(
-            "INSERT KVK.SourceRoster (RosterID,SourceKey,KVK_NO,RosterVersion,B0RevisionID,ScopeDigest,MemberDigest,MemberCount,ApprovedUTC,ApprovedBy,Reason,ProvenanceJson) VALUES (?,?,?,1,?,?,?,?,?,'synthetic','fixture','{}')",
+            "INSERT KVK.SourceRoster (RosterID,SourceKey,KVK_NO,RosterVersion,B0RevisionID,ScopeDigest,MemberDigest,MemberCount,ApprovedUTC,ApprovedBy,Reason,ProvenanceJson) VALUES (?,?,?,?,?,?,?,?,?,'synthetic','fixture','{}')",
             roster_id,
             SOURCE_KEY,
             season,
+            sequence,
             b0.revision_id,
             h,
             h,
@@ -148,19 +176,22 @@ def seed_config(connect, season, b0, *, start=1, end=3):
                 1,
             )
         cur.execute(
-            "INSERT KVK.SourcePeriod VALUES (?,?,?,'fight:pass4','fight',?,?,?)",
+            "INSERT KVK.SourcePeriod VALUES (?,?,?,?,?,?,?,?)",
             period_id,
             SOURCE_KEY,
             season,
+            period_key,
+            period_kind.value,
             b0.scan_start_utc.replace(tzinfo=None),
             None,
             utc,
         )
         cur.execute(
-            "INSERT KVK.SourceConfigVersion VALUES (?,?,?,1,?,?,?,?,?,?,'synthetic','fixture','{}')",
+            "INSERT KVK.SourceConfigVersion VALUES (?,?,?,?,?,?,?,?,?,?,'synthetic','fixture','{}')",
             config_id,
             SOURCE_KEY,
             season,
+            sequence,
             roster_id,
             h,
             h,
@@ -169,13 +200,14 @@ def seed_config(connect, season, b0, *, start=1, end=3):
             utc,
         )
         cur.execute(
-            "INSERT KVK.SourceWindowConfig VALUES (?,?,?,'Fight',1,?,?,NULL,?,'fight:pass4')",
+            "INSERT KVK.SourceWindowConfig VALUES (?,?,?,'Fight',1,?,?,NULL,?,?)",
             config_id,
             SOURCE_KEY,
             season,
             start,
             end,
             utc,
+            period_key,
         )
         for kingdom, camp, name in MAPPING.entries:
             cur.execute(
@@ -197,7 +229,9 @@ def seed_config(connect, season, b0, *, start=1, end=3):
         )
         cur.execute("INSERT KVK.SourceScanBinding VALUES (?,?,?,1)", config_id, SOURCE_KEY, season)
         cur.execute(
-            "INSERT KVK.SourceRouting (SourceKey,KVK_NO,RoutingVersion) VALUES (?,?,1)",
+            "IF NOT EXISTS (SELECT 1 FROM KVK.SourceRouting WHERE SourceKey=? AND KVK_NO=?) INSERT KVK.SourceRouting (SourceKey,KVK_NO,RoutingVersion) VALUES (?,?,1)",
+            SOURCE_KEY,
+            season,
             SOURCE_KEY,
             season,
         )
@@ -205,8 +239,8 @@ def seed_config(connect, season, b0, *, start=1, end=3):
         config_id,
         season,
         period_id,
-        "fight:pass4",
-        PeriodKind.FIGHT,
+        period_key,
+        period_kind,
         "Fight",
         start,
         end,
@@ -263,7 +297,7 @@ def test_candidate_visibility_cas_endpoint_request_and_restart(database):
                 expected_routing_version=1,
                 actor="synthetic",
                 reason="CAS fixture",
-                destinations=(("file", "synthetic-output"),),
+                destinations=(),
             )
         except SourceConflict:
             return None
@@ -493,13 +527,13 @@ def publication_action(version=0, **changes):
         expected_routing_version=1,
         actor="synthetic",
         reason="failure boundary",
-        destinations=(("file", "synthetic-only"),),
+        destinations=(),
         **changes,
     )
 
 
 @pytest.mark.parametrize("after", [False, True])
-def test_t48_publication_commit_readback_and_outbox_once(database, after):
+def test_t48_private_publication_commit_readback_without_delivery(database, after):
     connect, season, store = database
     dal = SourceImportDAL(connect, store)
     b0 = accepted_event(dal, season, 1, store)
@@ -521,7 +555,7 @@ def test_t48_publication_commit_readback_and_outbox_once(database, after):
             "SELECT COUNT(*) FROM KVK.SourceDelivery WHERE PublicationID=?",
             candidate.snapshot.publication_id,
         )
-        assert cur.fetchone()[0] == 1
+        assert cur.fetchone()[0] == 0
 
 
 def test_t47_failed_candidate_and_t49_newer_input_fence(database):
@@ -1029,47 +1063,40 @@ def test_authorized_start_and_end_changes(new_start, new_end, database):
 
 
 @pytest.mark.parametrize("old_state", ["confirmed", "claimed", "uncertain", "failed"])
-def test_review_rollback_reconciles_existing_delivery_and_fences_old_worker(database, old_state):
+def test_s8b_refuses_direct_delivery_without_touching_retained_receipts(database, old_state):
     connect, season, store = database
     dal = SourceImportDAL(connect, store)
     b0 = accepted_event(dal, season, 1, store)
     end = accepted_event(dal, season, 2, store)
     config = seed_config(connect, season, b0, end=3)
     service = PublicationService(connect)
-    old = service.build_candidate(config=config, observations=(b0, end), b0=b0)
-    destinations = tuple((kind, "synthetic-destination") for kind in ("file", "sheets", "discord"))
-    action = publication_action()
-    action["destinations"] = destinations
-    service.select_publication(old, **action)
+    candidate = service.build_candidate(config=config, observations=(b0, end), b0=b0)
+    service.select_publication(candidate, **publication_action())
+    receipt_utc = datetime(2026, 9, 13, tzinfo=UTC)
     with transaction(connect) as cur:
         cur.execute(
-            "UPDATE KVK.SourceDelivery SET DeliveryState=?,AttemptCount=2,Fence=7,OwnerID=?,Receipt='synthetic-receipt',ClaimedUTC=SYSUTCDATETIME(),ConfirmedUTC=CASE WHEN ?='confirmed' THEN SYSUTCDATETIME() ELSE NULL END,UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=?",
+            "INSERT KVK.SourceDelivery (PublicationID,SourceKey,KVK_NO,PeriodID,DestinationKind,DestinationID,DeliveryState,AttemptCount,Fence,Receipt,OwnerID,ClaimedUTC,ConfirmedUTC,CreatedUTC,UpdatedUTC) VALUES (?,?,?,?,'file','synthetic',?,2,7,'retained',?,?,?,?,?)",
+            candidate.snapshot.publication_id,
+            SOURCE_KEY,
+            season,
+            config.period_id,
             old_state,
             str(uuid4()),
-            old_state,
-            old.snapshot.publication_id,
+            receipt_utc,
+            receipt_utc if old_state == "confirmed" else None,
+            receipt_utc,
+            receipt_utc,
         )
-    newer = accepted_event(dal, season, 3, store)
-    new = service.build_candidate(config=config, observations=(b0, end, newer), b0=b0)
-    service.select_publication(new, **publication_action(1))
-    rollback = publication_action(2, action_type="rollback", admin_authorized=True)
-    rollback["destinations"] = destinations
-    service.select_publication(old, **rollback)
-    service.select_publication(old, **rollback)
+    action = publication_action(1, action_type="rollback", admin_authorized=True)
+    action["destinations"] = (("file", "synthetic"),)
+    with pytest.raises(SourceConflict, match="S10"):
+        service.select_publication(candidate, **action)
     with transaction(connect) as cur:
         cur.execute(
-            "SELECT DeliveryState,Fence,AttemptCount,Receipt,ConfirmedUTC FROM KVK.SourceDelivery WHERE PublicationID=?",
-            old.snapshot.publication_id,
+            "SELECT DeliveryState,Fence,AttemptCount,Receipt FROM KVK.SourceDelivery WHERE PublicationID=?",
+            candidate.snapshot.publication_id,
         )
-        assert [tuple(row) for row in cur.fetchall()] == [
-            ("uncertain", 8, 2, "synthetic-receipt", None)
-        ] * 3
-        cur.execute(
-            "UPDATE KVK.SourceDelivery SET UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=? AND Fence=7",
-            old.snapshot.publication_id,
-        )
-        cur.execute("SELECT @@ROWCOUNT")
-        assert cur.fetchone()[0] == 0
+        assert tuple(cur.fetchone()) == (old_state, 7, 2, "retained")
 
 
 @pytest.mark.parametrize(
@@ -1084,11 +1111,11 @@ def test_review_action_replay_rejects_changed_scope(database, changed):
     service = PublicationService(connect)
     candidate = service.build_candidate(config=config, observations=(b0, end), b0=b0)
     action = publication_action()
-    action["destinations"] = (("file", "first"), ("file", "second"))
+    action["destinations"] = ()
     service.select_publication(candidate, **action)
     equivalent = {
         **action,
-        "destinations": (("file", "second"), ("file", "first"), ("file", "first")),
+        "destinations": (),
     }
     assert service.select_publication(candidate, **equivalent)["NewSelectionVersion"] == 1
     changed_values = {
@@ -1097,7 +1124,7 @@ def test_review_action_replay_rejects_changed_scope(database, changed):
         "expected_routing_version": 2,
         "destinations": (("file", "third"),),
     }
-    with pytest.raises(SourceConflict, match="replay"):
+    with pytest.raises(SourceConflict, match=r"replay|S10"):
         service.select_publication(candidate, **{**action, changed: changed_values[changed]})
     assert (
         load_snapshot(connect, kvk_no=season, period_id=config.period_id)["selection"][
@@ -1136,3 +1163,408 @@ def test_review_rejects_forged_observation_period_scope(database, restricted_sca
     with transaction(connect) as cur:
         cur.execute("SELECT COUNT(*) FROM KVK.SourcePublication WHERE KVK_NO=?", season)
         assert cur.fetchone()[0] == 0
+
+
+def sealed_fixture(
+    database, *, no_fight=False, sequence=1, period_key="fight:pass4", period_kind=PeriodKind.FIGHT
+):
+    from kvk.models.source_integration import AggregateRevision, PlayerRevisions, UpdateContext
+    from kvk.services.new_source_parser import parse_aggregate_workbook
+    from kvk.services.season_source_service import SeasonSourceService
+    from kvk.services.source_update_service import SourceUpdateService
+    from tests.kvk_source_fixtures import aggregate_bytes
+
+    connect, season, store = database
+    imports = SourceImportDAL(connect, store)
+    b0 = accepted_event(imports, season, 1, store)
+    end = b0 if no_fight else accepted_event(imports, season, 2, store)
+    config = seed_config(
+        connect,
+        season,
+        b0,
+        end=1 if no_fight else 3,
+        sequence=sequence,
+        period_key=period_key,
+        period_kind=period_kind,
+    )
+    report = None
+    if not no_fight:
+        original = metadata(aggregate=True)
+        coverage = {
+            "coverage_start_utc": b0.scan_start_utc,
+            "coverage_end_utc": end.scan_start_utc,
+            "as_of_utc": end.scan_start_utc,
+        }
+        candidate = replace(original.candidate, kvk_no=season, **coverage)
+        meta = replace(
+            original,
+            candidate=candidate,
+            confirmation=replace(original.confirmation, values=tuple(coverage.items())),
+            scope=replace(original.scope, kvk_no=season),
+        )
+        content = aggregate_bytes(token=str(season))
+        prepared = parse_aggregate_workbook(content, meta, MAPPING)
+        report = imports.accept_aggregate(prepared, store.persist_artifact(content), admission())
+    choice = SeasonSourceService(connect).read(season)
+    context = UpdateContext(
+        update_id=str(uuid4()),
+        kvk_no=season,
+        period_id=config.period_id,
+        period_key=config.period_key,
+        choice_id=choice["ChoiceID"],
+        config_version_id=config.version_id,
+        roster_id=config.roster_id,
+        coverage_start_utc=b0.scan_start_utc,
+        coverage_end_utc=end.scan_start_utc,
+        as_of_utc=end.scan_start_utc,
+        update_kind="no_fight" if no_fight else "fight",
+        actor="synthetic",
+        confirmed_utc=datetime.now(UTC).replace(microsecond=0),
+        confirmation_json="{}",
+    )
+    service = SourceUpdateService(connect)
+    update = service.create(context, authorized=True)
+    update = service.associate(
+        context.update_id,
+        expected_version=update["Version"],
+        player=PlayerRevisions(
+            b0.logical_scan_id, end.logical_scan_id, b0.revision_id, end.revision_id
+        ),
+        aggregate=AggregateRevision(report.identity_id, report.revision_id) if report else None,
+        authorized=True,
+    )
+    return service, update
+
+
+def test_s8b_two_builders_replay_one_complete_intent(database):
+    from kvk.services.source_update_service import SourceUpdateService
+
+    connect, season, _ = database
+    service, update = sealed_fixture(database)
+
+    def publish():
+        try:
+            return SourceUpdateService(connect).publish(update["UpdateID"])
+        except SourceConflict:
+            return SourceUpdateService(connect).publish(update["UpdateID"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: publish(), range(2)))
+    assert results[0] == results[1]
+    assert service.publish(update["UpdateID"]) == results[0]
+    with transaction(connect) as cur:
+        cur.execute("SELECT COUNT(*) FROM KVK.SourceCompleteSelection WHERE KVK_NO=?", season)
+        assert cur.fetchone()[0] == 1
+        cur.execute("SELECT COUNT(*) FROM KVK.SourceExportIntent WHERE KVK_NO=?", season)
+        assert cur.fetchone()[0] == 1
+        cur.execute("SELECT COUNT(*) FROM KVK.SourceDelivery WHERE KVK_NO=?", season)
+        assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.parametrize(
+    "marker", ["INSERT KVK.SourceExportIntent (", "INSERT KVK.SourceExportIntentPublication"]
+)
+def test_s8b_complete_pointer_intent_vector_rollback(database, marker):
+    connect, season, _ = database
+    service, update = sealed_fixture(database)
+    service.publisher.dal.connect = lambda: StatementFault(connect(), marker)
+    with pytest.raises(OSError):
+        service.publish(update["UpdateID"])
+    with transaction(connect) as cur:
+        for table in (
+            "SourceCompleteSelection",
+            "SourceExportIntent",
+            "SourceExportIntentPublication",
+            "SourceAction",
+        ):
+            cur.execute("SELECT COUNT(*) FROM KVK." + table + " WHERE KVK_NO=?", season)
+            assert cur.fetchone()[0] == 0
+        cur.execute("SELECT UpdateState FROM KVK.SourceUpdate WHERE UpdateID=?", update["UpdateID"])
+        assert cur.fetchone()[0] == "ready"
+    service.publisher.dal.connect = connect
+    assert service.publish(update["UpdateID"]).commit_sequence == 1
+
+
+@pytest.mark.parametrize("opposing", [False, True])
+def test_s8b_two_connection_fixed_choice_race(database, opposing):
+    from kvk.services.season_source_service import SeasonSourceService
+
+    connect, _, _ = database
+    season = 1000000 + int(uuid4().hex[:7], 16)
+
+    def choose(source):
+        try:
+            return SeasonSourceService(connect).choose(
+                season,
+                source,
+                actor="synthetic",
+                reason="race",
+                provenance={"test": "race"},
+                authorized=True,
+            )
+        except SourceConflict:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(choose, (SOURCE_KEY, "legacy_full_data" if opposing else SOURCE_KEY))
+        )
+    if opposing:
+        assert sum(r is not None for r in results) == 1
+    else:
+        assert results[0]["ChoiceID"] == results[1]["ChoiceID"]
+
+
+def prepared_selection(service, update):
+    """Build and persist the candidate, retaining its exact selection CAS arguments."""
+    select = service.publisher.select_publication
+    service.publisher.select_publication = lambda candidate, **action: {
+        "complete": (candidate, action)
+    }
+    try:
+        return service.publish(update["UpdateID"])
+    finally:
+        service.publisher.select_publication = select
+
+
+def complete_rows(connect, season):
+    with transaction(connect) as cur:
+        result = {}
+        for table in (
+            "SourceCompleteSelection",
+            "SourceExportIntent",
+            "SourceExportIntentPublication",
+            "SourceAction",
+        ):
+            cur.execute("SELECT COUNT(*) FROM KVK." + table + " WHERE KVK_NO=?", season)
+            result[table] = cur.fetchone()[0]
+        return result
+
+
+def test_s8b_no_fight_in_existing_fight_period_selects_zero_members_and_replays(database):
+    from kvk.services.source_update_service import SourceUpdateService
+
+    connect, season, _ = database
+    service, update = sealed_fixture(database, no_fight=True)
+    assert (update["PeriodKind"], update["UpdateKind"]) == ("fight", "no_fight")
+    candidate, action = prepared_selection(service, update)
+    players = candidate.snapshot.calculation.players
+    assert len(players) == 2 and all(p.metric("dkp").value == 0 for p in players)
+    assert candidate.snapshot.aggregate is None
+    assert candidate.snapshot.player_state.value == "not_applicable"
+    result = service.publisher.select_publication(candidate, **action)["complete"]
+    assert SourceUpdateService(connect).publish(update["UpdateID"]) == result
+    assert complete_rows(connect, season) == dict(
+        SourceCompleteSelection=1,
+        SourceExportIntent=1,
+        SourceExportIntentPublication=1,
+        SourceAction=1,
+    )
+    with transaction(connect) as cur:
+        cur.execute(
+            "SELECT PeriodKind,PeriodKey FROM KVK.SourcePeriod WHERE PeriodID=?", update["PeriodID"]
+        )
+        assert tuple(cur.fetchone()) == ("fight", "fight:pass4")
+
+
+@pytest.mark.parametrize("fault", ["classification", "mode", "unequal", "aggregate"])
+def test_s8b_sql_rejects_invalid_no_fight_shape(database, fault):
+    import pyodbc
+
+    connect, _, _ = database
+    _, update = sealed_fixture(database)
+    # Direct SQL is intentional here: prove constraints independently of DAL guards.
+    changes = {
+        "classification": "PeriodKind='overall'",
+        "mode": "UpdateKind='overall'",
+        "unequal": "UpdateKind='no_fight',AggregateReportID=NULL,AggregateRevisionID=NULL",
+        "aggregate": "UpdateKind='no_fight',EndScanID=StartScanID,EndRevisionID=StartRevisionID",
+    }
+    with pytest.raises(pyodbc.IntegrityError):
+        with transaction(connect) as cur:
+            cur.execute(
+                "UPDATE KVK.SourceUpdate SET " + changes[fault] + " WHERE UpdateID=?",
+                update["UpdateID"],
+            )
+    with transaction(connect) as cur:
+        cur.execute(
+            "SELECT PeriodKind,UpdateKind FROM KVK.SourceUpdate WHERE UpdateID=?",
+            update["UpdateID"],
+        )
+        assert tuple(cur.fetchone()) == ("fight", "fight")
+
+
+class StatementGate:
+    """Pause one real writer after its season lock; observe the other entering its lock."""
+
+    def __init__(self, connection, *, reached, release=None):
+        self.connection, self.reached, self.release = connection, reached, release
+
+    def __getattr__(self, name):
+        return getattr(self.connection, name)
+
+    def cursor(self):
+        cursor, gate = self.connection.cursor(), self
+
+        class Cursor:
+            def __getattr__(self, name):
+                return getattr(cursor, name)
+
+            def execute(self, statement, *args):
+                marker = "SELECT * FROM KVK.SourceRouting" if gate.release else "sp_getapplock"
+                if marker in statement:
+                    gate.reached.set()
+                    if gate.release and not gate.release.wait(25):
+                        raise TimeoutError("Synthetic writer gate was not released")
+                cursor.execute(statement, *args)
+                return self
+
+        return Cursor()
+
+
+def ordered_writers(connect, first, second):
+    """Two dedicated connections overlap while the first owns the common season lock."""
+    held, entered, release = Event(), Event(), Event()
+    first_connect = lambda: StatementGate(connect(), reached=held, release=release)
+    second_connect = lambda: StatementGate(connect(), reached=entered)
+    with ThreadPoolExecutor(2) as pool:
+        a = pool.submit(first, first_connect)
+        try:
+            assert held.wait(15), "first writer did not reach its post-season-lock gate"
+            b = pool.submit(second, second_connect)
+            assert entered.wait(5), "second writer did not enter its season-lock call"
+            assert not b.done()
+        finally:
+            release.set()
+        return a.result(timeout=30), b.result(timeout=30)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_s8b_simultaneous_periods_preserve_complete_vector(database, reverse):
+    connect, season, _ = database
+    a, ua = sealed_fixture(database)
+    b, ub = sealed_fixture(
+        database,
+        no_fight=True,
+        sequence=2,
+        period_key="no_fight:baseline",
+        period_kind=PeriodKind.NO_FIGHT,
+    )
+    ca, aa = prepared_selection(a, ua)
+    cb, ab = prepared_selection(b, ub)
+    selections = [(ca, aa), (cb, ab)]
+    if reverse:
+        selections.reverse()
+    operations = [
+        lambda factory, c=c, action=action: PublicationService(factory).select_publication(
+            c, **action
+        )["complete"]
+        for c, action in selections
+    ]
+    first, second = ordered_writers(connect, *operations)
+    assert (first.commit_sequence, second.commit_sequence) == (1, 2)
+    with transaction(connect) as cur:
+        cur.execute(
+            "SELECT UpdateID,PublicationID,PublicSelectionVersion,ConfigVersionID FROM KVK.SourceExportIntentPublication WHERE IntentID=?",
+            first.intent_id,
+        )
+        retained = tuple(cur.fetchone())
+        cur.execute(
+            "SELECT UpdateID,PublicationID,PublicSelectionVersion,ConfigVersionID FROM KVK.SourceExportIntentPublication WHERE IntentID=?",
+            second.intent_id,
+        )
+        members = [tuple(r) for r in cur.fetchall()]
+        assert len(members) == 2 and retained in members
+        assert {str(r[0]).lower() for r in members} == {ua["UpdateID"], ub["UpdateID"]}
+    assert complete_rows(connect, season) == dict(
+        SourceCompleteSelection=2,
+        SourceExportIntent=2,
+        SourceExportIntentPublication=3,
+        SourceAction=2,
+    )
+
+
+def endpoint_request(connect, update):
+    with transaction(connect) as cur:
+        cur.execute("BEGIN TRANSACTION")
+        request = snapshot_endpoint_request(
+            cur,
+            kvk_no=update["KVK_NO"],
+            period_id=update["PeriodID"],
+            base_config_id=update["ConfigVersionID"],
+            new_end_scan_id=4,
+            actor="synthetic",
+            reason="S8B config race",
+            requested_utc=datetime.now(UTC).replace(microsecond=0),
+            origin="authorized_import",
+            provenance={"test": "S8B race"},
+        )
+        cur.execute("COMMIT TRANSACTION")
+        return request
+
+
+def test_s8b_config_change_rejects_prebuilt_candidate_without_partial_selection(database):
+    connect, season, _ = database
+    service, update = sealed_fixture(database)
+    candidate, action = prepared_selection(service, update)
+    endpoint_request(connect, update)
+    with pytest.raises(SourceConflict):
+        service.publisher.select_publication(candidate, **action)
+    assert all(n == 0 for n in complete_rows(connect, season).values())
+    assert service.dal.read(update["UpdateID"])["UpdateState"] == "ready"
+
+
+@pytest.mark.parametrize("config_first", [False, True])
+def test_s8b_config_and_other_period_selection_share_lock_order(database, config_first):
+    connect, season, _ = database
+    _, fight = sealed_fixture(database)
+    service, other = sealed_fixture(
+        database,
+        no_fight=True,
+        sequence=2,
+        period_key="no_fight:baseline",
+        period_kind=PeriodKind.NO_FIGHT,
+    )
+    candidate, action = prepared_selection(service, other)
+    select = lambda factory: PublicationService(factory).select_publication(candidate, **action)
+    configure = lambda factory: endpoint_request(factory, fight)
+    ordered_writers(connect, *((configure, select) if config_first else (select, configure)))
+    assert complete_rows(connect, season)["SourceCompleteSelection"] == 1
+    with transaction(connect) as cur:
+        cur.execute("SELECT COUNT(*) FROM KVK.SourceConfigRequest WHERE KVK_NO=?", season)
+        assert cur.fetchone()[0] == 1
+
+
+def test_s8b_season_lock_timeout_leaves_no_partial_selection(database):
+    import pyodbc
+
+    from kvk.dal.new_source_import_dal import lock_scope
+
+    connect, season, _ = database
+    service, update = sealed_fixture(database)
+    candidate, action = prepared_selection(service, update)
+    with transaction(connect) as cur:
+        lock_scope(cur, season)
+        with ThreadPoolExecutor(1) as pool:
+            future = pool.submit(service.publisher.select_publication, candidate, **action)
+            with pytest.raises(pyodbc.Error, match="Source transaction lock unavailable"):
+                future.result(timeout=20)
+    assert all(n == 0 for n in complete_rows(connect, season).values())
+    assert service.publish(update["UpdateID"]).commit_sequence == 1
+
+
+@pytest.mark.parametrize("after", [False, True])
+def test_s8b_complete_commit_loss_fresh_client_readback(database, after):
+    from kvk.services.source_update_service import SourceUpdateService
+
+    connect, season, _ = database
+    service, update = sealed_fixture(database)
+    candidate, action = prepared_selection(service, update)
+    faulted = PublicationService(lambda: CommitFault(connect(), after=after))
+    with pytest.raises(UncertainCommit):
+        faulted.select_publication(candidate, **action)
+    assert set(complete_rows(connect, season).values()) == {int(after)}
+    recovered = SourceUpdateService(connect).publish(update["UpdateID"])
+    assert recovered.commit_sequence == 1
+    assert SourceUpdateService(connect).publish(update["UpdateID"]) == recovered
+    assert set(complete_rows(connect, season).values()) == {1}

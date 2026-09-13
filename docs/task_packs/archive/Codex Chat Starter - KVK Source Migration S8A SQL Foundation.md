@@ -1,5 +1,9 @@
 # KVK Source Migration S8A — chat starter
 
+> **Archived 2026-09-13: S7/S8A complete, smoke accepted and merged.**
+> Retained preparation and approval text below is history, not instructions to execute.
+> [Closeout and limits](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md); [next S8B pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+
 Prepared 2026-09-12. **Not invoked by creation.** S7 contract and manifests are approved;
 only preparation of this starter/pack is currently authorized. The text below is the
 future file-implementation authorization for the operator to send deliberately.

@@ -11,6 +11,29 @@ from kvk.services.new_source_window_resolver import resolve_window
 from tests.kvk_source_fixtures import calculation_config, worked_calculation_inputs
 
 
+def test_direct_component_delivery_is_blocked_before_sql():
+    from unittest.mock import Mock
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.dal.new_source_publication_dal import PublicationDAL
+
+    connect = Mock()
+    with pytest.raises(SourceConflict, match="S10"):
+        PublicationDAL(connect).select_publication(
+            kvk_no=16,
+            period_id="period",
+            publication_id="publication",
+            action_id="action",
+            expected_selection_version=0,
+            expected_routing_version=0,
+            actor="operator",
+            reason="test",
+            destinations=(("file", "target"),),
+            validate_inputs=Mock(),
+        )
+    connect.assert_not_called()
+
+
 def test_storage_preserves_zero_missing_and_exact_decimal():
     b0, start, _, end = worked_calculation_inputs()
     result = calculate_period(resolve_window(calculation_config(), (start, end)), b0)

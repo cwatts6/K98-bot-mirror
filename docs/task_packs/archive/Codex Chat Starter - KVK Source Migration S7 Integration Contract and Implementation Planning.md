@@ -1,32 +1,31 @@
 # KVK Source Migration S7 — chat starter
 
-## Current status — S8A implemented; PR review in progress, 2026-09-12
+> **Archived 2026-09-13: S7/S8A complete, smoke accepted and merged.**
+> Retained preparation and approval text below is history, not instructions to execute.
+> [Closeout and limits](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md); [next S8B pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
 
-S7's contract and manifests are approved; settled decisions remain closed. S8A SQL
-files are implemented in [SQL PR #80](https://github.com/cwatts6/K98-bot-SQL-Server/pull/80).
-Static validation and the separately approved six-script disposable checks passed.
-The subsequent deployment-runner input fix passed offline checks and its exact
-Changes security review; that new runner path has not been executed against SQL Server.
+## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
 
-**Next: finish S8A review and repository promotion/merge checks, then separately scope S8B.**
-Do not repeat S7 planning or request the already-granted S8A file-implementation approval.
-The [S8A pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) retains its original implementation scope and gates as history.
-Any further SQL execution requires separate exact target, backup/row-preview and operation
-approval. Bot runtime/config work, S8B implementation, deployment and activation remain gated.
-SourceRouting.Enabled alone does not implement public routing.
+S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
+The operator confirms successful smoke acceptance and local pulls; **no changes have
+been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
+scripts; the later runner input fix has offline validation only. No fresh post-merge
+SQL run, production runtime deployment or activation is claimed.
 
-Preserve all 27 Bot carry-forward paths, including both S6 archive move sides and both S7
-outputs. Bot mirror PR #273 and production PR #580 are separate from SQL PR #80; verify
-actual Files changed, including previous_filename, before merge. S1–S6 evidence remains
-accepted; retain S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases
-and files. Local deployment is operator-attested, not production runtime deployment or a
-fresh post-merge smoke. Earlier dated blocks are historical and do not select the next task.
+**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
+Use the [S8B pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md).
+Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
+requires exact target/backup/row-preview/operation approval; S8B implementation needs its
+own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
+alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
+retained databases/files remain preserved. Earlier dated sections are historical evidence.
 
 > S7 documentation/read-only approval was supplied and the planning outputs are
 > delivered for review. This retained starter is not permission to execute S8–S11.
-> [Contract](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md);
-> [exact manifests](../reference/kvk_source_migration/integration_implementation_manifests.md);
-> [validation](../reference/kvk_source_migration/post_s6_handoff_log.md#s7-documentation-delivery-and-validation).
+> [Contract](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md);
+> [exact manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md);
+> [validation](../../reference/kvk_source_migration/post_s6_handoff_log.md#s7-documentation-delivery-and-validation).
 
 
 Prepared 2026-09-12. Not invoked by creation. Use after explicit S7 planning approval.

@@ -1,26 +1,21 @@
 # Local SQL development environment
 
-## Current status — S8A implemented; PR review in progress, 2026-09-12
+## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
 
-S7's contract and manifests are approved; settled decisions remain closed. S8A SQL
-files are implemented in [SQL PR #80](https://github.com/cwatts6/K98-bot-SQL-Server/pull/80).
-Static validation and the separately approved six-script disposable checks passed.
-The subsequent deployment-runner input fix passed offline checks and its exact
-Changes security review; that new runner path has not been executed against SQL Server.
+S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
+The operator confirms successful smoke acceptance and local pulls; **no changes have
+been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
+scripts; the later runner input fix has offline validation only. No fresh post-merge
+SQL run, production runtime deployment or activation is claimed.
 
-**Next: finish S8A review and repository promotion/merge checks, then separately scope S8B.**
-Do not repeat S7 planning or request the already-granted S8A file-implementation approval.
-The [S8A pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8A%20SQL%20Foundation.md) retains its original implementation scope and gates as history.
-Any further SQL execution requires separate exact target, backup/row-preview and operation
-approval. Bot runtime/config work, S8B implementation, deployment and activation remain gated.
-SourceRouting.Enabled alone does not implement public routing.
-
-Preserve all 27 Bot carry-forward paths, including both S6 archive move sides and both S7
-outputs. Bot mirror PR #273 and production PR #580 are separate from SQL PR #80; verify
-actual Files changed, including previous_filename, before merge. S1–S6 evidence remains
-accepted; retain S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases
-and files. Local deployment is operator-attested, not production runtime deployment or a
-fresh post-merge smoke. Earlier dated blocks are historical and do not select the next task.
+**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
+Use the [S8B pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](kvk_source_migration/s8a_closeout_and_s8b_handoff.md).
+Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
+requires exact target/backup/row-preview/operation approval; S8B implementation needs its
+own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
+alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
+retained databases/files remain preserved. Earlier dated sections are historical evidence.
 
 ## Historical delivery — 2026-09-12 post-S6 closeout
 
@@ -47,14 +42,14 @@ counterpart, import-triggered serialized/latest-pending exports, export-only
 recovery, retained input/publication history and safe output reuse after each KVK.
 These are requirements, not claims of implemented behavior.
 
-**S7 planning is complete and approved; S8A is implemented and under review.**
+**S7/S8A are complete and merged; S8B is next.**
 Follow the current status above; do not rerun predecessors or start later implementation packs.
 Carry every path in the post-S6 handoff manifest into the next separately authorized
 slice PR, including both S6 archive move sides. No Git publication, SQL/provider
 execution, restart, production promotion or activation is authorized by this update.
 Earlier dated blocks below are historical and do not select the next task.
 
-[Settled requirements](kvk_source_migration/post_s6_integration_requirements.md); [handoff and exact manifest](kvk_source_migration/post_s6_handoff_log.md); [S7 pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
+[Settled requirements](kvk_source_migration/post_s6_integration_requirements.md); [handoff and exact manifest](kvk_source_migration/post_s6_handoff_log.md); [S7 pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
 
 > **2026-09-12 S6 authenticated rehearsal update:** The operator restored the ignored
 > local credential and approved the 5,806-player × ten-period synthetic benchmark,

@@ -16,6 +16,8 @@ class Candidate:
     snapshot: ReportSnapshotV2
     b0: object
     generation: int
+    update_id: str | None = None
+    update_version: int | None = None
 
 
 class PublicationService:
@@ -32,6 +34,7 @@ class PublicationService:
         previous=None,
         endpoint_change=None,
         publication_id=None,
+        sealed_update=None,
     ):
         validate_endpoint_order(config)
         if config.is_no_fight and aggregate is not None:
@@ -84,24 +87,52 @@ class PublicationService:
             aggregate_state,
             period_state,
         )
-        stored = self.dal.build_candidate(
-            snapshot, validate_inputs=lambda cursor: validate_snapshot_inputs(cursor, snapshot, b0)
-        )
+
+        def validate(cursor):
+            if sealed_update is None:
+                return validate_snapshot_inputs(cursor, snapshot, b0)
+            from kvk.dal.source_update_dal import validate_sealed_snapshot
+
+            return validate_sealed_snapshot(
+                cursor, snapshot, b0, sealed_update["UpdateID"], sealed_update["Version"]
+            )
+
+        stored = self.dal.build_candidate(snapshot, validate_inputs=validate)
         return Candidate(
-            replace(snapshot, generation=stored["Generation"]), b0, stored["Generation"]
+            replace(snapshot, generation=stored["Generation"]),
+            b0,
+            stored["Generation"],
+            sealed_update["UpdateID"] if sealed_update else None,
+            sealed_update["Version"] if sealed_update else None,
         )
 
     def select_publication(self, candidate, **action):
         config = candidate.snapshot.calculation.selection.config
-        return self.dal.select_publication(
-            kvk_no=config.kvk_no,
-            period_id=config.period_id,
-            publication_id=candidate.snapshot.publication_id,
-            validate_inputs=lambda cursor: validate_snapshot_inputs(
+
+        def validate(cursor):
+            if candidate.update_id:
+                from kvk.dal.source_update_dal import validate_sealed_snapshot
+
+                return validate_sealed_snapshot(
+                    cursor,
+                    candidate.snapshot,
+                    candidate.b0,
+                    candidate.update_id,
+                    candidate.update_version,
+                )
+            return validate_snapshot_inputs(
                 cursor,
                 candidate.snapshot,
                 candidate.b0,
                 require_selected=action.get("action_type") != "rollback",
-            ),
+            )
+
+        return self.dal.select_publication(
+            kvk_no=config.kvk_no,
+            period_id=config.period_id,
+            publication_id=candidate.snapshot.publication_id,
+            update_id=candidate.update_id,
+            expected_update_version=candidate.update_version,
+            validate_inputs=validate,
             **action,
         )

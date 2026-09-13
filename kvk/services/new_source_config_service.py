@@ -20,3 +20,27 @@ def request_endpoint_update(cursor, *, authorized: bool, **request):
     if authorized is not True:
         raise PermissionError("Authorized configuration import is required.")
     return snapshot_endpoint_request(cursor, **request)
+
+
+def confirm_endpoint_pair(
+    service, context, *, authorized, player=None, aggregate=None, counterpart_revision_id=None
+):
+    """Bind separately supplied pair attestation to existing endpoint authority.
+
+    The unattended config importer never calls this or manufactures confirmation.
+    A pending exact slot may be recorded in context.confirmation_json.pending_player;
+    arrival resumes using the durable SourceConfigRequest without another command.
+    """
+    if authorized is not True or context.request_id is None:
+        raise PermissionError("Confirmed endpoint request and pair authority are required.")
+    update = service.create(context, authorized=True)
+    if player is not None or aggregate is not None:
+        return service.associate(
+            update["UpdateID"],
+            expected_version=update["Version"],
+            player=player,
+            aggregate=aggregate,
+            counterpart_revision_id=counterpart_revision_id,
+            authorized=True,
+        )
+    return update

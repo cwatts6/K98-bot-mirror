@@ -339,10 +339,14 @@ class PublicationDAL:
         manifest = result_digest(result_rows)
         with transaction(self.connect) as cursor:
             routing, selected, requests = locked_period(cursor, config.kvk_no, config.period_id)
+            verified_update = validate_inputs(cursor)
             current = desired_config(cursor, selected, requests)
-            if current is not None and current != config.version_id:
+            display_change = (
+                verified_update
+                and json.loads(verified_update["ConfirmationJson"]).get("action") == "configure"
+            )
+            if current is not None and current != config.version_id and not display_change:
                 raise SourceConflict("Candidate configuration is stale.")
-            validate_inputs(cursor)
             publication_id = snapshot.publication_id
             cursor.execute(
                 "SELECT * FROM KVK.SourcePublication WHERE PublicationID=?", publication_id
@@ -464,26 +468,44 @@ class PublicationDAL:
         request_id=None,
         destinations=(),
         admin_authorized=False,
+        update_id=None,
+        expected_update_version=None,
+        expected_public_version=None,
+        expected_season_version=None,
         validate_inputs,
     ):
-        if action_type not in ("publish", "endpoint_update", "correct", "finalize", "rollback"):
+        if action_type not in (
+            "publish",
+            "endpoint_update",
+            "correct",
+            "finalize",
+            "rollback",
+            "configure",
+        ):
             raise ValueError("Unsupported publication action.")
-        if action_type in ("correct", "finalize", "rollback") and not admin_authorized:
+        if action_type in ("correct", "finalize", "rollback", "configure") and not admin_authorized:
             raise PermissionError("Administrative publication authority required.")
         if not actor.strip() or len(actor) > 128 or not reason.strip() or len(reason) > 1024:
             raise ValueError("Publication actor and reason required.")
         destinations = tuple(sorted(set(destinations)))
-        if any(
-            kind not in ("discord", "sheets", "file")
-            or not target.strip()
-            or target != target.strip()
-            or len(target) > 128
-            for kind, target in destinations
+        if destinations:
+            raise SourceConflict(
+                "S8B selections retain export intent; direct delivery needs the S10 coordinator."
+            )
+        if update_id is not None and any(
+            type(v) is not int or v < 0
+            for v in (expected_update_version, expected_public_version, expected_season_version)
         ):
-            raise ValueError("Invalid delivery destination identity.")
-        action_scope = canonical(
-            {"routing_version": expected_routing_version, "destinations": destinations}
-        )
+            raise ValueError("Complete selection requires explicit expected versions.")
+        scope = {"routing_version": expected_routing_version, "destinations": destinations}
+        if update_id is not None:
+            scope.update(
+                update_id=update_id,
+                update_version=expected_update_version,
+                public_version=expected_public_version,
+                season_version=expected_season_version,
+            )
+        action_scope = canonical(scope)
         with transaction(self.connect) as cursor:
             routing, selection, requests = locked_period(cursor, kvk_no, period_id)
             cursor.execute("SELECT * FROM KVK.SourceAction WHERE ActionID=?", action_id)
@@ -511,7 +533,30 @@ class PublicationDAL:
                     action_scope,
                 ):
                     raise SourceConflict("Action replay differs from durable outcome.")
+                if update_id:
+                    from kvk.dal.source_update_dal import read_complete_result
+
+                    prior["complete"] = read_complete_result(
+                        cursor, update_id, publication_id, expected_public_version + 1
+                    )
                 return prior
+            from kvk.dal.season_source_dal import require_source
+
+            choice = require_source(
+                cursor, kvk_no, SOURCE_KEY, expected_version=expected_season_version
+            )
+            if update_id:
+                from kvk.dal.source_update_dal import load_update
+
+                bound_update = load_update(cursor, update_id)
+                if (bound_update["KVK_NO"], bound_update["PeriodID"], bound_update["ChoiceID"]) != (
+                    kvk_no,
+                    period_id,
+                    choice["ChoiceID"],
+                ):
+                    raise SourceConflict(
+                        "Complete update scope differs from the locked season/period."
+                    )
             version = selection["SelectionVersion"] if selection else 0
             if (
                 version != expected_selection_version
@@ -530,7 +575,7 @@ class PublicationDAL:
                 raise SourceConflict("Only complete same-period candidates can be selected.")
             desired = desired_config(cursor, selection, requests)
             if (
-                action_type != "rollback"
+                action_type not in ("rollback", "configure")
                 and desired is not None
                 and str(candidate["ConfigVersionID"]) != desired
             ):
@@ -597,6 +642,7 @@ class PublicationDAL:
                     "correct",
                     "rollback",
                     "endpoint_update",
+                    "configure",
                 ):
                     if (
                         str(old["StartRevisionID"]),
@@ -643,29 +689,6 @@ class PublicationDAL:
                 reason,
                 action_scope,
             )
-            for kind, destination in sorted(set(destinations)):
-                if action_type == "rollback":
-                    # Reconcile the previous external receipt rather than blindly resend.
-                    # Preserve receipt/attempt history and invalidate any old worker fence.
-                    # Pending is restricted to fence=0 by the accepted S2B CHECK.
-                    cursor.execute(
-                        "UPDATE KVK.SourceDelivery SET DeliveryState='uncertain',Fence=Fence+1,ConfirmedUTC=NULL,UpdatedUTC=SYSUTCDATETIME() WHERE PublicationID=? AND DestinationKind=? AND DestinationID=? AND DeliveryState<>'pending'",
-                        publication_id,
-                        kind,
-                        destination,
-                    )
-                cursor.execute(
-                    "IF NOT EXISTS (SELECT 1 FROM KVK.SourceDelivery WHERE PublicationID=? AND DestinationKind=? AND DestinationID=?) INSERT KVK.SourceDelivery (PublicationID,SourceKey,KVK_NO,PeriodID,DestinationKind,DestinationID,DeliveryState,AttemptCount,Fence,CreatedUTC,UpdatedUTC) VALUES (?,?,?,?,?,?,'pending',0,0,SYSUTCDATETIME(),SYSUTCDATETIME())",
-                    publication_id,
-                    kind,
-                    destination,
-                    publication_id,
-                    SOURCE_KEY,
-                    kvk_no,
-                    period_id,
-                    kind,
-                    destination,
-                )
             if (
                 request
                 and candidate["StartScanID"] == request["NewStartScanID"]
@@ -679,5 +702,19 @@ class PublicationDAL:
                     publication_id,
                     request_id,
                 )
+            complete_result = None
+            if update_id:
+                from kvk.dal.source_update_dal import commit_complete, load_update
+
+                complete_result = commit_complete(
+                    cursor,
+                    update=load_update(cursor, update_id),
+                    publication_id=publication_id,
+                    expected_public_version=expected_public_version,
+                    expected_update_version=expected_update_version,
+                )
             cursor.execute("SELECT * FROM KVK.SourceAction WHERE ActionID=?", action_id)
-            return one(cursor)
+            result = one(cursor)
+            if complete_result is not None:
+                result["complete"] = complete_result
+            return result

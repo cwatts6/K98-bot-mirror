@@ -65,6 +65,12 @@ UUID_COLUMNS = frozenset(
         "ActionID",
         "StartRevisionID",
         "EndRevisionID",
+        "ChoiceID",
+        "UpdateID",
+        "BaseUpdateID",
+        "CounterpartRevisionID",
+        "IntentID",
+        "SupersededByIntentID",
         "OwnerID",
     )
 )
@@ -118,6 +124,9 @@ def lock_scope(cursor, kvk_no: int):
         "IF @r<0 THROW 51400,'Source transaction lock unavailable',1;",
         f"kvk-source:{SOURCE_KEY}:{kvk_no}",
     )
+    from kvk.dal.season_source_dal import lock_season
+
+    lock_season(cursor, kvk_no, read=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +285,9 @@ class SourceImportDAL:
         utc = admission.received_utc.replace(tzinfo=None)
         with transaction(self.connect) as cursor:
             lock_scope(cursor, c.kvk_no)
+            from kvk.dal.season_source_dal import require_source
+
+            require_source(cursor, c.kvk_no, SOURCE_KEY, onboarding=True)
             self._artifact(cursor, artifact, utc)
             replay = self._replay(cursor, prepared, artifact, admission, False)
             cursor.execute(
@@ -473,6 +485,9 @@ class SourceImportDAL:
         utc = admission.received_utc.replace(tzinfo=None)
         with transaction(self.connect) as cursor:
             lock_scope(cursor, c.kvk_no)
+            from kvk.dal.season_source_dal import require_source
+
+            require_source(cursor, c.kvk_no, SOURCE_KEY)
             self._artifact(cursor, artifact, utc)
             replay = self._replay(cursor, prepared, artifact, admission, True)
             cursor.execute(

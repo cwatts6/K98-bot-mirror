@@ -7,10 +7,8 @@ import hashlib
 import json
 import logging
 import threading
-from uuid import NAMESPACE_URL, uuid5
 
 from kvk.dal.new_source_import_dal import SourceConflict, canonical
-from kvk.models.new_source_reporting import EndpointChange
 
 logger = logging.getLogger(__name__)
 _worker = None
@@ -93,58 +91,8 @@ class ExportTarget:
 
 
 def deliver_current_exports(dal, repository, targets, season, *, changed=None):
-    """Pick the changed anchor from durable receipts, including after worker restart."""
-    from kvk.services.new_source_delivery_service import deliver_export
-    from kvk.services.new_source_export_service import load_sheets_generation
-
-    outcomes = []
-    for target in targets:
-        if target.kvk_no != season:
-            continue
-        if target.destination.kind == "discord":
-            raise ValueError("Recovery never automatically posts Discord messages.")
-        selections = dal.selections(season)
-        if not selections:
-            continue
-        repository.check_selections(selections)
-        generation = load_sheets_generation(connect=dal.connect, selections=selections)
-        receipts = [(s, repository.read_receipt(s, target.destination)) for s in selections]
-        # A confirmed anchor for an older combined generation cannot claim the new key.
-        matching = [
-            s
-            for s, r in receipts
-            if r
-            and r.state == "confirmed"
-            and r.receipt
-            and json.loads(r.receipt).get("export_key") == generation.key
-        ]
-        if matching:
-            # A completed combined receipt covers every included unchanged selection too.
-            anchor = matching[0]
-            outcomes.append(
-                deliver_export(
-                    generation=generation,
-                    selection=anchor,
-                    destination=target.destination,
-                    repository=repository,
-                    transport=target.transport,
-                )
-            )
-            continue
-        pending = [s for s, r in receipts if r is None or r.state != "confirmed"]
-        anchor = changed if changed in pending else (pending[0] if pending else None)
-        if anchor is None:
-            raise SourceConflict("No changed delivery anchor for this generation.")
-        outcomes.append(
-            deliver_export(
-                generation=generation,
-                selection=anchor,
-                destination=target.destination,
-                repository=repository,
-                transport=target.transport,
-            )
-        )
-    return tuple(outcomes)
+    """Compatibility boundary: S8B retains intents until the S10 worker is installed."""
+    raise SourceConflict("Automatic export execution requires the S10 coordinator.")
 
 
 class RecoveryService:
@@ -154,99 +102,22 @@ class RecoveryService:
         self.after = (0, "")
 
     def recover_period(self, season, period):
-        data = self.dal.load_inputs(season, period)
-        config, previous, request = data["config"], data["previous"], data["request"]
-        change = None
-        if previous and previous.config.version_id != config.version_id:
-            if not request:
-                raise SourceConflict("Changed configuration has no endpoint request.")
-            # Validate chain in storage again under the publication CAS lock.
-            from kvk.dal.new_source_recovery_dal import endpoint_chain
+        from kvk.services.source_update_service import SourceUpdateService
 
-            chain = endpoint_chain(data["requests"], previous.config.version_id, config.version_id)
-            first, last = chain[0], chain[-1]
-            change = EndpointChange(
-                str(last["RequestID"]),
-                period,
-                previous.config.version_id,
-                config.version_id,
-                first["OldEndScanID"],
-                last["NewEndScanID"],
-                last["Actor"],
-                last["Reason"],
-                first["OldStartScanID"],
-                last["NewStartScanID"],
-            )
-            # A rapid round trip has authority but no net endpoint change. S3A's resolver
-            # intentionally rejects a no-op transition; evaluate the exact desired slots.
-            if (previous.config.start_scan_id, previous.config.end_scan_id) == (
-                config.start_scan_id,
-                config.end_scan_id,
-            ):
-                previous, change = None, None
-        elif (
-            previous
-            and previous.player_state.value not in ("final", "corrected_final")
-            and previous.endpoint_change is None
-        ):
-            previous = None  # Live input revisions are allowed to advance normally.
-        candidate = self.publisher.build_candidate(
-            config=config,
-            observations=data["observations"],
-            b0=data["b0"],
-            aggregate=data["aggregate"],
-            previous=previous,
-            endpoint_change=change,
-        )
-        selected = data["selected"]
-        if selected and str(selected["PublicationID"]) == candidate.snapshot.publication_id:
-            return None
-        old_config = data["previous"].config.version_id if data["previous"] else None
-        endpoint = (
-            request is not None and old_config is not None and old_config != config.version_id
-        )
-        # Applied requests are history, not the actor of later same-config work.
-        # A still-pending request remains attached until its endpoint completes.
-        action_request = (
-            request
-            if request and (endpoint or request["RequestState"] in ("pending", "requested"))
-            else None
-        )
-        version = selected["SelectionVersion"] if selected else 0
-        action_id = str(
-            uuid5(
-                NAMESPACE_URL,
-                canonical(
-                    (
-                        candidate.snapshot.publication_id,
-                        version,
-                        (data["routing"] or {}).get("RoutingVersion", 0),
-                        str(action_request["RequestID"]) if action_request else None,
-                    )
-                ),
-            )
-        )
-        destinations = tuple(
-            (t.destination.kind, t.destination.destination_id)
-            for t in self.targets
-            if t.kvk_no == season
-        )
-        action = self.publisher.select_publication(
-            candidate,
-            action_id=action_id,
-            expected_selection_version=version,
-            expected_routing_version=(data["routing"] or {}).get("RoutingVersion", 0),
-            actor=action_request["Actor"] if action_request else "system:kvk_source_recovery",
-            reason=action_request["Reason"] if action_request else "Recover accepted source inputs",
-            action_type="endpoint_update" if endpoint else "publish",
-            request_id=str(action_request["RequestID"]) if action_request else None,
-            destinations=destinations,
-        )
-        from kvk.services.new_source_export_service import ExportSelection
-
-        return ExportSelection(
-            season, period, candidate.snapshot.publication_id, action["NewSelectionVersion"]
-        )
+        updates = self.dal.ready_updates(season, period)
+        service = SourceUpdateService(self.dal.connect)
+        result = None
+        for update in updates:
+            try:
+                result = service.publish(update["UpdateID"])
+            except SourceConflict:
+                logger.warning(
+                    "Source update remains pending kvk=%s period=%s update=%s",
+                    season,
+                    period,
+                    update["UpdateID"],
+                )
+        return result
 
     def run_batch(self, stop, limit=8):
         periods = self.dal.periods(self.after, limit)
@@ -256,9 +127,8 @@ class RecoveryService:
         for season, period in periods:
             if stop.is_set():
                 break
-            changed = None
             try:
-                changed = self.recover_period(season, period)
+                self.recover_period(season, period)
             except Exception as exc:
                 logger.warning(
                     "Source recovery pending kvk=%s period=%s error=%s",
@@ -266,15 +136,8 @@ class RecoveryService:
                     period,
                     type(exc).__name__,
                 )
-            if self.delivery_repository is not None and not stop.is_set():
-                try:
-                    deliver_current_exports(
-                        self.dal, self.delivery_repository, self.targets, season, changed=changed
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Source export recovery pending kvk=%s error=%s", season, type(exc).__name__
-                    )
+            # S8B commits durable full-vector intents. S10 owns provider admission
+            # and execution; never deliver raw component selections from this worker.
             self.after = (season, period)
 
 
@@ -370,11 +233,9 @@ def parse_export_registrations(value, *, protected_file_ids=()):
 
 def configured_recovery():
     import bot_config
-    from constants import ALL_KVK_SHEET_ID, CREDENTIALS_FILE, KVK_SHEET_ID
+    from constants import ALL_KVK_SHEET_ID, KVK_SHEET_ID
     from kvk.dal.new_source_admin_dal import configured_connection
-    from kvk.dal.new_source_delivery_dal import DeliveryRepository, Destination
     from kvk.dal.new_source_recovery_dal import RecoveryDAL
-    from kvk.services.new_source_export_service import GoogleSheetsTransport
     from kvk.services.new_source_publication_service import PublicationService
 
     def connect():
@@ -383,34 +244,12 @@ def configured_recovery():
         return connection
 
     protected = tuple(x for x in (KVK_SHEET_ID, ALL_KVK_SHEET_ID) if x)
-    registrations = parse_export_registrations(
+    parse_export_registrations(
         bot_config.KVK_SOURCE_EXPORT_REGISTRATIONS, protected_file_ids=protected
     )
     dal = RecoveryDAL(connect)
     dal.check_schema()
-    repository = DeliveryRepository(connect)
-    targets = []
-    for season, registration in registrations:
-        from google.oauth2.service_account import Credentials
-
-        destination = Destination("sheets", registration.index_file_id)
-        credentials = Credentials.from_service_account_file(
-            CREDENTIALS_FILE,
-            scopes=[
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/spreadsheets",
-            ],
-        )
-        transport = GoogleSheetsTransport.from_credentials(
-            credentials=credentials,
-            registration=registration,
-            reuse_guard=repository.slot_reusable,
-            protected_file_ids=protected,
-        )
-        targets.append(ExportTarget(season, destination, transport))
-    if len({t.destination for t in targets}) != len(targets):
-        raise ValueError("Each source export destination must be registered once.")
-    return RecoveryService(dal, PublicationService(connect), repository, tuple(targets))
+    return RecoveryService(dal, PublicationService(connect))
 
 
 def register_recovery(task_monitor, *, factory=None):

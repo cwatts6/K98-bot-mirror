@@ -1,5 +1,22 @@
 # KVK Source Migration — post-S6 integration requirements
 
+## Current status — S7/S8A complete and merged; S8B next, 2026-09-13
+
+S7's approved contract/manifests and S8A's SQL foundation are complete and merged.
+The operator confirms successful smoke acceptance and local pulls; **no changes have
+been pulled to the bot machine**. Retained S8A evidence includes six successful disposable
+scripts; the later runner input fix has offline validation only. No fresh post-merge
+SQL run, production runtime deployment or activation is claimed.
+
+**Next: start S8B Bot Source and Matched Update Services in a new chat, review/scope first.**
+Use the [S8B pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+Read the [canonical closeout, merge evidence and exact S8B carry-forward manifest](s8a_closeout_and_s8b_handoff.md).
+Do not reopen settled S7 decisions or repeat S8A implementation. Further SQL execution
+requires exact target/backup/row-preview/operation approval; S8B implementation needs its
+own approval after scope review. Public routing remains S9 work; SourceRouting.Enabled
+alone does not implement it. S6-OPS01/PERF01/CAP01, both uncertain publications and all
+retained databases/files remain preserved. Earlier dated sections are historical evidence.
+
 ## S7 planning delivery — 2026-09-12
 
 Chris Watts approved S7 documentation/read-only work in the task starter. The
@@ -136,4 +153,4 @@ and credible effort estimates per slice. Bring back only a demonstrated business
 tradeoff or incompatible domain exception; do not re-ask the nine settled decisions.
 
 See the amended [implementation plan](phase_2_implementation_plan.md) and the
-[next S7 task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).
+[next S7 task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md).

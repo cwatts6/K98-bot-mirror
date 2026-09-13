@@ -275,8 +275,34 @@ def scan_ts_within_kvk_details(con: pyodbc.Connection, scan_ts_naive: dt.datetim
         )
         return bool(cur.fetchone())
     except Exception:
-        logger.exception("[KVK] Pre-check using KVK_Details failed (allowing ingest).")
-        return True
+        logger.exception("[KVK] KVK_Details pre-check failed; admission refused.")
+        raise
+
+
+def admit_legacy(cursor, scan_ts_naive, *, expected_season=None):
+    """Mirror the authoritative ingest procedure's exact date/descending-KVK resolution."""
+    from kvk.dal.new_source_import_dal import SourceConflict, lock_scope
+    from kvk.dal.season_source_dal import require_source
+
+    query = (
+        "SELECT TOP (1) KVK_NO FROM dbo.KVK_Details {hint} "
+        "WHERE ?>=KVK_REGISTRATION_DATE AND ?<=KVK_END_DATE ORDER BY KVK_NO DESC"
+    )
+    cursor.execute(query.format(hint="WITH (READCOMMITTEDLOCK)"), scan_ts_naive, scan_ts_naive)
+    row = cursor.fetchone()
+    if row is None:
+        raise SourceConflict("Scan timestamp has no configured legacy season.")
+    season = int(row[0])
+    if expected_season is not None and season != expected_season:
+        raise SourceConflict("Legacy season resolution changed during intake.")
+    lock_scope(cursor, season)
+    require_source(cursor, season, "legacy_full_data")
+    # Keep the resolution stable through the stored procedure's accepted writes.
+    cursor.execute(query.format(hint="WITH (UPDLOCK,HOLDLOCK)"), scan_ts_naive, scan_ts_naive)
+    guarded = cursor.fetchone()
+    if guarded is None or int(guarded[0]) != season:
+        raise SourceConflict("Legacy season resolution changed before admission.")
+    return season
 
 
 def _first_scalar(cursor: Any) -> Any:
@@ -327,6 +353,9 @@ def ingest_prepared_import(
             }
 
     token = str(uuid.uuid4())
+    scan_ts_utc = ensure_aware_utc(scan_ts_utc)
+    scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
+    admitted_season = admit_legacy(cur, scan_ts_naive)
     stage_rows_started = time.perf_counter()
     stage_rows = rows_for_stage(token, df)
     stage_rows_ms = (time.perf_counter() - stage_rows_started) * 1000.0
@@ -422,6 +451,7 @@ def ingest_prepared_import(
     cur = con.cursor()
     ingest_started = time.perf_counter()
     try:
+        admit_legacy(cur, scan_ts_naive, expected_season=admitted_season)
         cur.execute(
             CALL_INGEST_SQL,
             (
@@ -442,6 +472,7 @@ def ingest_prepared_import(
         if not rows:
             raise RuntimeError("Ingest returned no outputs.")
     except Exception as exc:
+        con.rollback()
         ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
         context = {
             "scan_ts_naive": str(scan_ts_naive),
@@ -483,10 +514,14 @@ def ingest_prepared_import(
             pass
         raise
     kvk_no, scan_id, row_count = rows[0]
+    if int(kvk_no) != admitted_season:
+        con.rollback()
+        raise RuntimeError("Ingest returned a different season than the guarded admission.")
     con.commit()
 
     cur = con.cursor()
     recompute_started = time.perf_counter()
+    admit_legacy(cur, scan_ts_naive, expected_season=admitted_season)
     cur.execute(RECOMPUTE_SQL, kvk_no)
     con.commit()
     recompute_ms = (time.perf_counter() - recompute_started) * 1000.0

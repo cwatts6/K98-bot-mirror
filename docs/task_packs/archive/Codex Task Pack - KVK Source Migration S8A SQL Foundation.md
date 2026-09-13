@@ -1,5 +1,9 @@
 # KVK Source Migration S8A — SQL Foundation
 
+> **Archived 2026-09-13: S7/S8A complete, smoke accepted and merged.**
+> Retained preparation and approval text below is history, not instructions to execute.
+> [Closeout and limits](../../reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md); [next S8B pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md).
+
 ## 1. Summary and authority
 
 Prepared 2026-09-12 for Chris Watts. S7's contract and exact implementation manifests
@@ -18,14 +22,14 @@ Read current instructions in both repositories, Bot README-DEV, the reference in
 its required engineering, execution, testing, skills/refactor and deferred-optimisation
 standards. Read applicable SECURITY.md as policy context, not scan authorization. Then read:
 
-- [Approved integration contract and consumer matrix](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md)
-- [Approved exact manifests](../reference/kvk_source_migration/integration_implementation_manifests.md), especially S8A and SQL object contracts
-- [Architecture and EndScanID amendment](../reference/kvk_source_migration/phase_2_contract_and_architecture.md)
-- [Phase 2 implementation plan](../reference/kvk_source_migration/phase_2_implementation_plan.md)
-- [Post-S6 requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md)
-- [Acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
-- [Handoff and approval record](../reference/kvk_source_migration/post_s6_handoff_log.md)
-- [S6 evidence](../reference/kvk_source_migration/release_evidence_log.md), [readiness](../reference/kvk_source_migration/release_readiness_and_rollback.md), [archived pack](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) and [archived starter](archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md)
+- [Approved integration contract and consumer matrix](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md)
+- [Approved exact manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md), especially S8A and SQL object contracts
+- [Architecture and EndScanID amendment](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md)
+- [Phase 2 implementation plan](../../reference/kvk_source_migration/phase_2_implementation_plan.md)
+- [Post-S6 requirements](../../reference/kvk_source_migration/post_s6_integration_requirements.md)
+- [Acceptance scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
+- [Handoff and approval record](../../reference/kvk_source_migration/post_s6_handoff_log.md)
+- [S6 evidence](../../reference/kvk_source_migration/release_evidence_log.md), [readiness](../../reference/kvk_source_migration/release_readiness_and_rollback.md), [archived pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md) and [archived starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S6%20Release%20Readiness%20and%20Controlled%20Activation.md)
 
 In `C:\K98-bot-SQL-Server`, read `migrations/README.md`,
 `docs/SQL_DATA_MIGRATION_GUARDRAILS.md`, `docs/SQL_DELIVERY_LOG.md`, migration-runner

@@ -56,6 +56,10 @@ def require_schema(cursor):
         "CROSS JOIN KVK.SourceObservation o"
     )
     cursor.fetchall()
+    cursor.execute(
+        "SELECT TOP (0) s.ChoiceID,u.UpdateID,c.PublicSelectionVersion,i.IntentID,v.ConfigVersionID FROM KVK.SeasonSource s CROSS JOIN KVK.SourceUpdate u CROSS JOIN KVK.SourceCompleteSelection c CROSS JOIN KVK.SourceExportIntent i CROSS JOIN KVK.SourceExportIntentPublication v"
+    )
+    cursor.fetchall()
 
 
 def current_config(cursor, kvk_no, period_id, selection, requests):
@@ -244,6 +248,17 @@ class RecoveryDAL:
         with transaction(self.connect) as cursor:
             require_schema(cursor)
 
+    def ready_updates(self, season, period):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT u.* FROM KVK.SourceUpdate u JOIN KVK.SeasonSource s ON s.KVK_NO=u.KVK_NO AND s.ChoiceID=u.ChoiceID "
+                "WHERE u.SourceKey=? AND u.KVK_NO=? AND u.PeriodID=? AND u.UpdateState IN ('ready','waiting_player') AND s.SeasonState='open' ORDER BY u.ConfirmedUTC,u.UpdateID",
+                SOURCE_KEY,
+                season,
+                period,
+            )
+            return rows(cursor)
+
     def periods(self, after=(0, ""), limit=8):
         if type(limit) is not int or not 1 <= limit <= 32:
             raise ValueError("Invalid recovery batch size.")
@@ -349,10 +364,21 @@ class RecoveryDAL:
             metadata.scope.period_keys,
         )
 
-    def load_inputs(self, season, period):
+    def load_inputs(self, season, period, *, update=None):
         with transaction(self.connect) as cursor:
             routing, selected, requests = locked_period(cursor, season, period)
             identity = current_config(cursor, season, period, selected, requests)
+            if update and json.loads(update["ConfirmationJson"]).get("action") == "configure":
+                from kvk.dal.source_update_dal import validate_update
+
+                validate_update(cursor, update, complete=True, sealed=True)
+                identity = update["ConfigVersionID"]
+            if update and (
+                identity != update["ConfigVersionID"]
+                or update["KVK_NO"] != season
+                or update["PeriodID"] != period
+            ):
+                raise SourceConflict("Sealed update no longer matches desired scope/configuration.")
             config = self._config(cursor, identity, season, period)
             old = None
             if selected:
@@ -367,39 +393,48 @@ class RecoveryDAL:
                 else None
             )
             b0 = self._observation(cursor, config.b0_revision_id)
-            # Read only required endpoints and latest associated interim, not every full scan.
-            cursor.execute(
-                "SELECT TOP (1) r.RevisionID FROM KVK.SourceLogicalScan s "
-                "JOIN KVK.SourceObservation o ON o.ObservationID=s.ObservationID "
-                "JOIN KVK.SourceObservationRevision r ON r.RevisionID=o.SelectedRevisionID "
-                "WHERE s.SourceKey=? AND s.KVK_NO=? AND s.LogicalScanID>? "
-                "AND (? IS NULL OR s.LogicalScanID<=?) AND (? IS NULL OR o.ScanStartUTC<=?) "
-                "AND EXISTS (SELECT 1 FROM OPENJSON(r.MetadataJson,'$.scope.period_keys') WHERE value=?) "
-                "ORDER BY o.ScanStartUTC DESC",
-                SOURCE_KEY,
-                season,
-                config.start_scan_id,
-                config.end_scan_id,
-                config.end_scan_id,
-                config.closes_at_utc.replace(tzinfo=None) if config.closes_at_utc else None,
-                config.closes_at_utc.replace(tzinfo=None) if config.closes_at_utc else None,
-                config.period_key,
-            )
-            latest = one(cursor)
-            cursor.execute(
-                "SELECT o.SelectedRevisionID FROM KVK.SourceLogicalScan s JOIN KVK.SourceObservation o "
-                "ON o.ObservationID=s.ObservationID WHERE s.SourceKey=? AND s.KVK_NO=? AND s.LogicalScanID IN (?,?)",
-                SOURCE_KEY,
-                season,
-                config.start_scan_id,
-                config.end_scan_id,
-            )
-            revisions = {str(r["SelectedRevisionID"]) for r in rows(cursor)}
-            if latest:
-                revisions.add(str(latest["RevisionID"]))
-            events = {
-                e.logical_scan_id: e for e in (self._observation(cursor, r) for r in revisions)
-            }
+            if update is None:
+                # Read only required endpoints and latest associated interim, not every full scan.
+                cursor.execute(
+                    "SELECT TOP (1) r.RevisionID FROM KVK.SourceLogicalScan s "
+                    "JOIN KVK.SourceObservation o ON o.ObservationID=s.ObservationID "
+                    "JOIN KVK.SourceObservationRevision r ON r.RevisionID=o.SelectedRevisionID "
+                    "WHERE s.SourceKey=? AND s.KVK_NO=? AND s.LogicalScanID>? "
+                    "AND (? IS NULL OR s.LogicalScanID<=?) AND (? IS NULL OR o.ScanStartUTC<=?) "
+                    "AND EXISTS (SELECT 1 FROM OPENJSON(r.MetadataJson,'$.scope.period_keys') WHERE value=?) "
+                    "ORDER BY o.ScanStartUTC DESC",
+                    SOURCE_KEY,
+                    season,
+                    config.start_scan_id,
+                    config.end_scan_id,
+                    config.end_scan_id,
+                    config.closes_at_utc.replace(tzinfo=None) if config.closes_at_utc else None,
+                    config.closes_at_utc.replace(tzinfo=None) if config.closes_at_utc else None,
+                    config.period_key,
+                )
+                latest = one(cursor)
+                cursor.execute(
+                    "SELECT o.SelectedRevisionID FROM KVK.SourceLogicalScan s JOIN KVK.SourceObservation o "
+                    "ON o.ObservationID=s.ObservationID WHERE s.SourceKey=? AND s.KVK_NO=? AND s.LogicalScanID IN (?,?)",
+                    SOURCE_KEY,
+                    season,
+                    config.start_scan_id,
+                    config.end_scan_id,
+                )
+                revisions = {str(r["SelectedRevisionID"]) for r in rows(cursor)}
+                if latest:
+                    revisions.add(str(latest["RevisionID"]))
+                events = {
+                    e.logical_scan_id: e for e in (self._observation(cursor, r) for r in revisions)
+                }
+            else:
+                events = {
+                    event.logical_scan_id: event
+                    for event in (
+                        self._observation(cursor, update["StartRevisionID"]),
+                        self._observation(cursor, update["EndRevisionID"]),
+                    )
+                }
             previous = None
             if old:
                 old_config = self._config(cursor, str(old["ConfigVersionID"]), season, period)
@@ -464,14 +499,28 @@ class RecoveryDAL:
                     old["PlayerState"] not in ("final", "corrected_final", "not_applicable"),
                     prior_change,
                 )
+            if update:
+                events = {
+                    event.logical_scan_id: event
+                    for event in (
+                        self._observation(cursor, update["StartRevisionID"]),
+                        self._observation(cursor, update["EndRevisionID"]),
+                    )
+                }
+                if previous and previous.config.version_id != config.version_id:
+                    for event in (previous.start, previous.end):
+                        if event:
+                            events.setdefault(event.logical_scan_id, event)
             aggregate = None
             if not config.is_no_fight:
                 cursor.execute(
                     "SELECT r.* FROM KVK.SourceAggregateReport f JOIN KVK.SourceAggregateRevision r "
-                    "ON r.RevisionID=f.SelectedRevisionID WHERE f.SourceKey=? AND f.KVK_NO=? AND f.PeriodKey=?",
+                    "ON r.ReportID=f.ReportID WHERE f.SourceKey=? AND f.KVK_NO=? AND f.PeriodKey=? AND r.RevisionID="
+                    + ("?" if update else "f.SelectedRevisionID"),
                     SOURCE_KEY,
                     season,
                     config.period_key,
+                    *((update["AggregateRevisionID"],) if update else ()),
                 )
                 record = one(cursor)
                 if record:
@@ -502,6 +551,15 @@ class RecoveryDAL:
                     aggregate = AggregateSelection(
                         str(record["ReportID"]), str(record["RevisionID"]), report
                     )
+            cursor.execute("SELECT SeasonVersion FROM KVK.SeasonSource WHERE KVK_NO=?", season)
+            choice = one(cursor)
+            cursor.execute(
+                "SELECT PublicSelectionVersion FROM KVK.SourceCompleteSelection WHERE SourceKey=? AND KVK_NO=? AND PeriodID=?",
+                SOURCE_KEY,
+                season,
+                period,
+            )
+            complete = one(cursor)
             return dict(
                 config=config,
                 observations=tuple(events.values()),
@@ -512,6 +570,8 @@ class RecoveryDAL:
                 requests=requests,
                 selected=selected,
                 routing=routing,
+                season_version=choice["SeasonVersion"] if choice else None,
+                public_version=complete["PublicSelectionVersion"] if complete else 0,
             )
 
     def selections(self, season):
@@ -519,7 +579,7 @@ class RecoveryDAL:
 
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT PeriodID,PublicationID,SelectionVersion FROM KVK.SourceSelection WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
+                "SELECT PeriodID,PublicationID,PublicSelectionVersion AS SelectionVersion FROM KVK.SourceCompleteSelection WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
                 SOURCE_KEY,
                 season,
             )

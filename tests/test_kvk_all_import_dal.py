@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import Any, cast
+from unittest.mock import Mock
 
 import pandas as pd
+import pytest
 
 from kvk.dal import kvk_all_import_dal as dal
 from kvk.schemas.kvk_all_schema import (
@@ -12,6 +14,49 @@ from kvk.schemas.kvk_all_schema import (
     validate_full_data_columns,
 )
 from kvk.services.kvk_all_import_service import KvkAllPreparedImport
+
+
+def test_source_rejection_happens_before_staging(monkeypatch):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    connection = MockConnection()
+    monkeypatch.setattr(
+        dal, "admit_legacy", Mock(side_effect=SourceConflict("source setup required"))
+    )
+    with pytest.raises(SourceConflict):
+        dal.ingest_prepared_import(
+            con=connection,
+            prepared=_prepared_frame(),
+            content=b"abc",
+            source_filename="test.xlsx",
+            uploader_id=1,
+            scan_ts_utc=dt.datetime(2026, 9, 13, tzinfo=dt.UTC),
+        )
+    assert connection.commit_calls == 0
+    assert not connection.cursors[0].executemany_calls
+
+
+def test_legacy_resolver_rechecks_exact_season_after_guard(monkeypatch):
+    from kvk.dal import new_source_import_dal, season_source_dal
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    cursor = Mock()
+    cursor.fetchone.side_effect = [(16,), (17,)]
+    source = Mock()
+    monkeypatch.setattr(new_source_import_dal, "lock_scope", Mock())
+    monkeypatch.setattr(season_source_dal, "require_source", source)
+    with pytest.raises(SourceConflict, match="changed"):
+        dal.admit_legacy(cursor, dt.datetime(2026, 9, 13))
+    source.assert_called_once_with(cursor, 16, "legacy_full_data")
+    assert "ORDER BY KVK_NO DESC" in cursor.execute.call_args.args[0]
+    assert "HOLDLOCK" in cursor.execute.call_args.args[0]
+
+
+def test_legacy_date_precheck_never_allows_sql_failure():
+    connection = Mock()
+    connection.cursor.side_effect = OSError("offline")
+    with pytest.raises(OSError):
+        dal.scan_ts_within_kvk_details(connection, dt.datetime(2026, 9, 13))
 
 
 def _prepared_frame() -> KvkAllPreparedImport:
@@ -81,6 +126,9 @@ class MockConnection:
         self.cursors.append(cursor)
         return cursor
 
+    def rollback(self) -> None:
+        pass
+
     def commit(self) -> None:
         self.commit_calls += 1
 
@@ -99,6 +147,7 @@ def test_rows_for_stage_uses_declared_column_order() -> None:
 
 def test_ingest_prepared_import_call_shape(monkeypatch) -> None:
     connection = MockConnection()
+    monkeypatch.setattr(dal, "admit_legacy", lambda *args, **kwargs: 13)
     monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(dal.uuid, "uuid4", lambda: "token-1")
 
@@ -143,6 +192,7 @@ def test_ingest_prepared_import_call_shape(monkeypatch) -> None:
 
 def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatch) -> None:
     connection = MockConnection()
+    monkeypatch.setattr(dal, "admit_legacy", lambda *args, **kwargs: 13)
     monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(dal.uuid, "uuid4", lambda: "token-2")
 
@@ -231,6 +281,7 @@ def test_ingest_prepared_import_records_proc_failure_and_keeps_stage_rows(
             return cursor
 
     connection = FailureConnection()
+    monkeypatch.setattr(dal, "admit_legacy", lambda *args, **kwargs: 13)
     monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(dal.uuid, "uuid4", lambda: "token-3")
 

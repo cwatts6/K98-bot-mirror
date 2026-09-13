@@ -3,7 +3,7 @@
 > **Archived 2026-09-12: S6 evidence delivery is merged and operator accepted.**
 > This pack is retained history, not executable instructions. Public routing and
 > residual release gates remain open; no activation is claimed.
-> Next: [S7 planning](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md). Exact closeout: [handoff](../../reference/kvk_source_migration/post_s6_handoff_log.md).
+> Next: [S7 planning](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md). Exact closeout: [handoff](../../reference/kvk_source_migration/post_s6_handoff_log.md).
 
 > **2026-09-12 PR #272 routing review correction:** Public runtime routing is an
 > OPEN implementation prerequisite. The current code does not consume

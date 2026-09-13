@@ -16,12 +16,18 @@ def locked_period(cursor, kvk_no, period_id):
     cursor.execute("SELECT * FROM KVK.SourceRouting WITH (UPDLOCK,HOLDLOCK) WHERE KVK_NO=?", kvk_no)
     routing = one(cursor)
     cursor.execute(
-        "SELECT * FROM KVK.SourceSelection WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? AND PeriodID=?",
+        "SELECT * FROM KVK.SourceSelection WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
         SOURCE_KEY,
         kvk_no,
-        period_id,
     )
-    selection = one(cursor)
+    selections = rows(cursor)
+    selection = next((r for r in selections if str(r["PeriodID"]) == str(period_id)), None)
+    cursor.execute(
+        "SELECT * FROM KVK.SourceCompleteSelection WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
+        SOURCE_KEY,
+        kvk_no,
+    )
+    cursor.fetchall()
     cursor.execute(
         "SELECT r.*,c.ConfigVersion FROM KVK.SourceConfigRequest r WITH (UPDLOCK,HOLDLOCK) JOIN KVK.SourceConfigVersion c ON c.ConfigVersionID=r.DesiredConfigVersionID WHERE r.SourceKey=? AND r.KVK_NO=? AND r.PeriodID=? AND r.RequestState<>'rejected' ORDER BY c.ConfigVersion DESC",
         SOURCE_KEY,
@@ -33,14 +39,16 @@ def locked_period(cursor, kvk_no, period_id):
 
 
 def desired_config(cursor, selection, requests):
-    if requests:
-        return str(requests[0]["DesiredConfigVersionID"])
     if selection:
         cursor.execute(
-            "SELECT ConfigVersionID FROM KVK.SourcePublication WHERE PublicationID=?",
+            "SELECT p.ConfigVersionID,c.ConfigVersion FROM KVK.SourcePublication p JOIN KVK.SourceConfigVersion c ON c.ConfigVersionID=p.ConfigVersionID WHERE p.PublicationID=?",
             selection["PublicationID"],
         )
-        return str(one(cursor)["ConfigVersionID"])
+        selected = one(cursor)
+        if not requests or selected["ConfigVersion"] > requests[0]["ConfigVersion"]:
+            return str(selected["ConfigVersionID"])
+    if requests:
+        return str(requests[0]["DesiredConfigVersionID"])
     return None
 
 
@@ -75,6 +83,9 @@ def snapshot_endpoint_request(
     if cursor.fetchone()[0] < 1:
         raise ValueError("Endpoint requests require the caller's active transaction.")
     _, selection, requests = locked_period(cursor, kvk_no, period_id)
+    from kvk.dal.season_source_dal import require_source
+
+    require_source(cursor, kvk_no, SOURCE_KEY)
     cursor.execute(
         "SELECT c.*,w.StartScanID,w.EndScanID,p.PeriodKind,p.PeriodKey FROM KVK.SourceConfigVersion c JOIN KVK.SourceWindowConfig w ON w.ConfigVersionID=c.ConfigVersionID JOIN KVK.SourcePeriod p ON p.SourceKey=w.SourceKey AND p.KVK_NO=w.KVK_NO AND p.PeriodKey=w.PeriodKey WHERE c.SourceKey=? AND c.KVK_NO=? AND c.ConfigVersionID=? AND p.PeriodID=?",
         SOURCE_KEY,
