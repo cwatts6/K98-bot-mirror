@@ -469,3 +469,36 @@ def test_s8c_configuration_capture_does_not_invent_attestation(monkeypatch):
     assert capture.call_args.args == (cursor, {16: ["1", "2", "3"]})
     assert "authorized" not in capture.call_args.kwargs
     cursor.execute.assert_not_called()
+
+
+@pytest.mark.parametrize("missing", ["KVK_NO", "WeightT4X", "WeightT5Y", "WeightDeadsZ"])
+def test_import_weights_missing_columns_reports_friendly_error_before_capture(
+    monkeypatch, tmp_path, missing
+):
+    from kvk.services import new_source_config_service as config
+
+    conn = fake_import(monkeypatch, tmp_path)
+    monkeypatch.setattr(bot_config, "KVK_SOURCE_INTAKE_ENABLED", True)
+    original_read = pci._read_sheet_to_df
+    frame = pd.DataFrame(
+        [
+            {
+                key: "1"
+                for key in ("KVK_NO", "WeightT4X", "WeightT5Y", "WeightDeadsZ")
+                if key != missing
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        pci,
+        "_read_sheet_to_df",
+        lambda sheet, sid, rng: (
+            frame if rng.startswith("KVK_DKPWeights") else original_read(sheet, sid, rng)
+        ),
+    )
+    capture = Mock(side_effect=AssertionError("Capture must follow column validation"))
+    monkeypatch.setattr(config, "source_weight_tokens", capture)
+    ok, report = pci.run_proc_config_import()
+    assert not ok and conn.rolled_back and not conn.committed
+    assert "KVK_DKPWeights missing columns" in str(report) and missing in str(report)
+    capture.assert_not_called()

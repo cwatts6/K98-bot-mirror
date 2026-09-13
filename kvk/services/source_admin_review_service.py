@@ -339,7 +339,7 @@ class SourceAdminReviewService:
             return dict(
                 state="complete selected" if result else update["UpdateState"],
                 update_id=context.update_id,
-                selected_update_id=update["UpdateID"] if result else None,
+                selected_update_id=result.update_id if result else None,
                 result=asdict(result) if result else None,
             )
 

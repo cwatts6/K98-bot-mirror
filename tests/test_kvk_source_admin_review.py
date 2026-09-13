@@ -449,3 +449,36 @@ def test_changed_configuration_is_rejected_before_any_request(monkeypatch):
             ADMIN, locked, Mock(), Mock()
         )
     request.assert_not_called()
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_confirmation_reports_retained_target_for_semantic_duplicate(monkeypatch, complete):
+    from kvk.models.source_integration import CompleteSelectionResult
+    import kvk.services.source_admin_review_service as module
+
+    repo = Reviews()
+    repo.connect = Mock()
+    service = SourceAdminReviewService(ACCESS, repo, lambda: NOW)
+    row = pair(service)
+    requested = row["payload"]["context"]["update_id"]
+    target = str(uuid4())
+    result = (
+        CompleteSelectionResult(target, str(uuid4()), 3, str(uuid4()), 2, "hash")
+        if complete
+        else None
+    )
+    updates = Mock()
+    updates.create.return_value = dict(UpdateID=requested, Version=1)
+    updates.associate.return_value = dict(UpdateID=requested, Version=2, UpdateState="superseded")
+    updates.publish.return_value = result
+    monkeypatch.setattr(module, "SourceAdminReviewDAL", lambda _: repo)
+    monkeypatch.setattr(module, "SourceUpdateService", lambda _: updates)
+    repo.finish = lambda *args, **kwargs: dict(
+        outcome=kwargs["operation"](row, Mock(), repo.connect)
+    )
+    outcome = service.confirm(ADMIN, row["ReviewID"], 1)["outcome"]
+    assert outcome["update_id"] == requested
+    assert outcome["selected_update_id"] == (target if complete else None)
+    assert outcome["state"] == ("complete selected" if complete else "superseded")
+    if complete:
+        assert outcome["result"]["update_id"] == target

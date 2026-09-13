@@ -174,3 +174,18 @@ S8A's separate six-script evidence. No S8C SQL execution, Discord/provider opera
 promotion, bot-machine action, deployment or activation is authorized by PR creation. PR file
 verification must cover all 69 Bot physical paths using filename and previous_filename, and the
 six separate SQL paths. Runtime SQL and operator journey evidence remain outstanding.
+
+### S8C PR review corrections
+
+Addressed the two Bot review findings: selected_update_id now comes from the retained complete
+selection result while update_id preserves the requested identity; weights column validation now
+precedes original-token capture, which still runs before coercion. Regression coverage includes
+retained-target/no-result outcomes and each missing required weights column. Full offline suite:
+4,208 passed / 62 skipped in 135.31s, production operational logs unchanged; focused review/config
+checks: 53 passed / 5 skipped. Follow-up Changes security review
+43ab3fde-0947-4cec-b320-1200fa1a3e63 completed with zero findings, Deep off, against PR head
+54c7f2087c91cae8c2d6fd527487625a180cd77f. Prior full S8C review remains separate evidence.
+SQL review fixes align forward-fix-only metadata, NOCOUNT and Unicode fixture literals. Separate
+SQL Changes review 1f23bee6-0463-4fa7-9eff-6b11a538270f completed with zero findings, Deep off,
+against 2f419bfbee3124e5bb88b6b94c9768164d431c15; 13 SQL text-only checks pass. No SQL executed.
+The exact 69-path Bot and 6-path SQL unions remain unchanged; retained S8B/S8A evidence is distinct.

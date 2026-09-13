@@ -832,12 +832,13 @@ def run_proc_config_import(
                 df_weights = _read_sheet_to_df(sheet, KVK_SHEET_ID, WEIGHTS_RANGE_NAME)
                 from kvk.services.new_source_config_service import source_weight_tokens
 
-                source_weights = source_weight_tokens(df_weights)
+                source_weights = None
                 if not df_weights.empty:
                     required = ["KVK_NO", "WeightT4X", "WeightT5Y", "WeightDeadsZ"]
                     missing = [c for c in required if c not in df_weights.columns]
                     if missing:
                         raise RuntimeError(f"KVK_DKPWeights missing columns: {missing}")
+                    source_weights = source_weight_tokens(df_weights)
                     _coerce_int(df_weights, ["KVK_NO"])
                     _coerce_float(df_weights, ["WeightT4X", "WeightT5Y", "WeightDeadsZ"])
                     df_weights = df_weights[required].dropna(subset=["KVK_NO"])
