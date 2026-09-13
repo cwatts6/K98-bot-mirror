@@ -621,3 +621,30 @@ Bot ef9cf7e4-f388-4e8b-9f64-dfaba85f13b1 (09:54:50 UTC), SQL
 format error was corrected within the same scan; no review source or finding was changed.
 Final evidence/status-only Markdown changes have a documented security skip. The shared-session
 SQL runner path is offline-validated only; no new SQL execution or production deployment occurred.
+
+## Production PR #581 review follow-up
+
+The operator authorized action, replies and resolution of both review threads. Legacy ingest now
+holds its transaction-owned season mutex through recomputation and commits raw/baseline and
+derived outputs together. Closing cannot invalidate an already-admitted generation between those
+steps; new admissions still require an open season. Recompute failure rolls back the generation
+and records a distinct failure diagnostic while retaining staged input. Authoritative SQL inspection
+confirmed the ingest procedure's nested transaction and recompute's lack of transaction boundaries;
+this follow-up does not change SQL or execute a SQL connection.
+
+Sealed recovery initializes an empty event dictionary and loads the exact confirmed endpoints in
+the existing final block, removing discarded duplicate reads. Synthetic regressions cover success,
+closing during ingest, recompute rollback, rejection after closing and one load per endpoint.
+The focused 43-test run and pre-commit checks pass. Architecture, deferred, security-routing,
+smoke imports and registration (36 primary / 101 grouped) pass.
+
+Changes review 3a6bdc33-cf7c-4e41-88d2-bbdab251a8a4 against mirror a3b48295 sealed with zero
+findings. Test-only formatting after snapshot creation is recorded; runtime patch bytes did not
+change. Final evidence-only Markdown has a documented security skip. Preserve the exact 51-path
+Bot manifest and separate SQL delivery-log carry-forward. Historical smoke, disposable SQL and
+offline runner evidence remain distinct; no new live SQL or deployment evidence is claimed.
+
+Fresh follow-up full offline validation: 4,152 passed / 57 skipped in 169.69 seconds, with all
+four production operational logs unchanged. Output is retained as k98-pr581-full-tests.txt in the
+local temporary evidence directory. An earlier sandbox run stalled and was stopped; only this
+completed run is acceptance evidence.

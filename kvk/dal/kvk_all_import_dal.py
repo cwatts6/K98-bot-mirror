@@ -450,6 +450,7 @@ def ingest_prepared_import(
 
     cur = con.cursor()
     ingest_started = time.perf_counter()
+    failure_type = "ingest_procedure_failed"
     try:
         admit_legacy(cur, scan_ts_naive, expected_season=admitted_season)
         cur.execute(
@@ -471,6 +472,16 @@ def ingest_prepared_import(
         ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
         if not rows:
             raise RuntimeError("Ingest returned no outputs.")
+        kvk_no, scan_id, row_count = rows[0]
+        if int(kvk_no) != admitted_season:
+            raise RuntimeError("Ingest returned a different season than the guarded admission.")
+        # Keep the admitted season's transaction lock through recomputation. A
+        # lifecycle transition must not strand committed raw rows with stale outputs.
+        cur = con.cursor()
+        recompute_started = time.perf_counter()
+        failure_type = "recompute_procedure_failed"
+        cur.execute(RECOMPUTE_SQL, kvk_no)
+        recompute_ms = (time.perf_counter() - recompute_started) * 1000.0
     except Exception as exc:
         con.rollback()
         ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
@@ -488,7 +499,7 @@ def ingest_prepared_import(
         diagnostic_id = record_ingest_diagnostic(
             con,
             status="failed",
-            diagnostic_type="ingest_procedure_failed",
+            diagnostic_type=failure_type,
             ingest_token=token,
             source_filename=source_filename,
             file_hash_hex=file_hash_hex,
@@ -513,18 +524,7 @@ def ingest_prepared_import(
         except Exception:
             pass
         raise
-    kvk_no, scan_id, row_count = rows[0]
-    if int(kvk_no) != admitted_season:
-        con.rollback()
-        raise RuntimeError("Ingest returned a different season than the guarded admission.")
     con.commit()
-
-    cur = con.cursor()
-    recompute_started = time.perf_counter()
-    admit_legacy(cur, scan_ts_naive, expected_season=admitted_season)
-    cur.execute(RECOMPUTE_SQL, kvk_no)
-    con.commit()
-    recompute_ms = (time.perf_counter() - recompute_started) * 1000.0
 
     cur = con.cursor()
     negative_count_started = time.perf_counter()

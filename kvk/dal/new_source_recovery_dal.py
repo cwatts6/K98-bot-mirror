@@ -428,13 +428,7 @@ class RecoveryDAL:
                     e.logical_scan_id: e for e in (self._observation(cursor, r) for r in revisions)
                 }
             else:
-                events = {
-                    event.logical_scan_id: event
-                    for event in (
-                        self._observation(cursor, update["StartRevisionID"]),
-                        self._observation(cursor, update["EndRevisionID"]),
-                    )
-                }
+                events = {}
             previous = None
             if old:
                 old_config = self._config(cursor, str(old["ConfigVersionID"]), season, period)

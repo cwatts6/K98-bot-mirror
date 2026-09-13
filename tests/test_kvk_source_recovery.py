@@ -1,10 +1,11 @@
 """Recovery caller, typed reload and lifecycle tests using synthetic state only."""
 
 import asyncio
+from contextlib import nullcontext
 from dataclasses import asdict
 from threading import Event, get_ident
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -13,6 +14,49 @@ from kvk.dal.new_source_import_dal import SourceConflict, canonical
 from kvk.dal.new_source_recovery_dal import _metadata, _row, endpoint_chain
 from kvk.services import new_source_recovery_service as recovery
 from tests.kvk_source_fixtures import worked_calculation_inputs
+
+
+def test_sealed_update_loads_each_endpoint_once(monkeypatch):
+    from kvk.dal import new_source_recovery_dal as dal
+
+    cursor = Mock()
+    monkeypatch.setattr(dal, "transaction", lambda _: nullcontext(cursor))
+    monkeypatch.setattr(dal, "locked_period", lambda *_: (None, None, []))
+    monkeypatch.setattr(dal, "current_config", lambda *_: "c")
+    monkeypatch.setattr(dal, "one", Mock(side_effect=[{"SeasonVersion": 2}, None]))
+    loader = dal.RecoveryDAL(Mock())
+    loader._config = Mock(
+        return_value=SimpleNamespace(
+            version_id="c",
+            b0_revision_id="b0",
+            is_no_fight=True,
+        )
+    )
+    events = {
+        key: SimpleNamespace(logical_scan_id=index)
+        for index, key in enumerate(("b0", "start", "end"))
+    }
+    loader._observation = Mock(side_effect=lambda _, revision: events[revision])
+    result = loader.load_inputs(
+        16,
+        "p",
+        update=dict(
+            ConfigVersionID="c",
+            KVK_NO=16,
+            PeriodID="p",
+            ConfirmationJson="{}",
+            StartRevisionID="start",
+            EndRevisionID="end",
+        ),
+    )
+    assert loader._observation.call_args_list == [
+        call(cursor, "b0"),
+        call(cursor, "start"),
+        call(cursor, "end"),
+    ]
+    assert result["observations"] == (events["start"], events["end"])
+    assert result["b0"] is events["b0"]
+    assert result["previous"] is None
 
 
 def test_typed_rows_roundtrip_preserves_decimals_and_missingness():

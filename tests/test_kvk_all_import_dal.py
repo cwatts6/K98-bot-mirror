@@ -187,7 +187,78 @@ def test_ingest_prepared_import_call_shape(monkeypatch) -> None:
     assert result["ingest_ms"] >= 0
     assert result["recompute_ms"] >= 0
     assert result["negative_count_ms"] >= 0
-    assert connection.commit_calls == 3
+    assert connection.commit_calls == 2
+
+
+@pytest.mark.parametrize("recompute_fails", [False, True])
+def test_admitted_ingest_keeps_lock_until_recompute_finishes(monkeypatch, recompute_fails):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    state = dict(locked=False, closing=False, close_requested=False, raw=False, output=False)
+    committed = []
+
+    class Cursor(MockCursor):
+        def execute(self, sql, params=None):
+            if sql == dal.CALL_INGEST_SQL:
+                assert state["locked"]
+                state.update(raw=True, close_requested=True)
+            elif sql == dal.RECOMPUTE_SQL:
+                assert state["locked"] and not state["closing"]
+                assert state["raw"] and not committed
+                if recompute_fails:
+                    raise RuntimeError("synthetic recompute failure")
+                state["output"] = True
+            return super().execute(sql, params)
+
+    class Connection(MockConnection):
+        def cursor(self):
+            cursor = Cursor()
+            self.cursors.append(cursor)
+            return cursor
+
+        def commit(self):
+            if state["raw"]:
+                committed.append((state["raw"], state["output"]))
+            state.update(raw=False, output=False, locked=False)
+            state["closing"] = state["close_requested"]
+            super().commit()
+
+        def rollback(self):
+            state.update(raw=False, output=False, locked=False)
+            state["closing"] = state["close_requested"]
+
+    def admit(*args, **kwargs):
+        if state["closing"]:
+            raise SourceConflict("season closing")
+        state["locked"] = True
+        return 13
+
+    admission = Mock(side_effect=admit)
+    monkeypatch.setattr(dal, "admit_legacy", admission)
+    monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args: True)
+    connection = Connection()
+    kwargs = dict(
+        con=connection,
+        prepared=_prepared_frame(),
+        content=b"abc",
+        source_filename="test.xlsx",
+        uploader_id=1,
+        scan_ts_utc=dt.datetime(2026, 9, 13, tzinfo=dt.UTC),
+    )
+    if recompute_fails:
+        with pytest.raises(RuntimeError, match="synthetic recompute failure"):
+            dal.ingest_prepared_import(**kwargs)
+        assert committed == []
+        diagnostic = connection.cursors[-1].executed[0]
+        assert diagnostic[1][1] == "recompute_procedure_failed"
+    else:
+        assert dal.ingest_prepared_import(**kwargs)["success"]
+        assert committed == [(True, True)]
+    assert admission.call_count == 2
+    assert state["closing"]
+    with pytest.raises(SourceConflict, match="season closing"):
+        dal.ingest_prepared_import(**kwargs)
+    assert not connection.cursors[-1].executemany_calls
 
 
 def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatch) -> None:
