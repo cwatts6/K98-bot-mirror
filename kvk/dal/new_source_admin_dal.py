@@ -132,12 +132,15 @@ class SourceAdminDAL:
             )
             return self._receipt(cursor, receipt_id, actor, guild_id)
 
-    def create_receipt(self, *, artifact, admission, filename, kvk_no, payload):
+    def create_receipt(self, *, content, admission, filename, kvk_no, payload):
         with transaction(self.connect) as cursor:
             lock_scope(cursor, kvk_no)
             from kvk.dal.season_source_dal import require_source
 
             require_source(cursor, kvk_no, SOURCE_KEY, onboarding=True)
+            # Keep admission locked through persistence: rejected setup/lifecycle checks
+            # must not leave an original without a receipt. Never delete shared originals.
+            artifact = self.artifacts.persist_artifact(content)
             SourceImportDAL(self.connect, self.artifacts)._artifact(
                 cursor, artifact, admission.received_utc.replace(tzinfo=None)
             )

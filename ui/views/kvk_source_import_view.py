@@ -152,15 +152,6 @@ class SourceConfigurationModal(discord.ui.Modal):
         self.coverage = discord.ui.InputText(
             label="Initial only: coverage start UTC | end UTC", required=False, max_length=100
         )
-        self.mapping = discord.ui.InputText(
-            label="Initial only: kingdom | camp ID | camp name",
-            style=discord.InputTextStyle.long,
-            required=False,
-            max_length=4000,
-        )
-        self.weights = discord.ui.InputText(
-            label="Initial only: X | Y | Z | effective UTC", required=False, max_length=450
-        )
         self.reason = discord.ui.InputText(label="Configuration approval reason", max_length=512)
         # Kingdoms/camps/weights are read from kvk_list by the service, not retyped here.
         for item in (self.window, self.coverage, self.reason):

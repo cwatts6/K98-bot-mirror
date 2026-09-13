@@ -34,7 +34,8 @@ FIELDS = {
 class MemoryRepository:
     """Fake destination for S5A policy tests, not evidence of SQL concurrency."""
 
-    def __init__(self):
+    def __init__(self, artifacts):
+        self.artifacts = artifacts
         self.receipts, self.accepted = {}, {}
         self.guard = {
             "period": None,
@@ -52,7 +53,8 @@ class MemoryRepository:
     def imported_configuration(self, kvk_no, *, cursor=None):
         return deepcopy(self.baseline_setup)
 
-    def create_receipt(self, *, artifact, admission, filename, kvk_no, payload):
+    def create_receipt(self, *, content, admission, filename, kvk_no, payload):
+        artifact = self.artifacts.persist_artifact(content)
         for row in self.receipts.values():
             if (
                 row["MessageID"] == admission.message_id
@@ -145,8 +147,8 @@ class MemoryRepository:
 
 @pytest.fixture
 def rig(tmp_path):
-    repo = MemoryRepository()
     store = ArtifactStore(tmp_path)
+    repo = MemoryRepository(store)
     service = SourceAdminService(ACCESS, repo, store, now=lambda: NOW)
     return service, repo
 
@@ -455,6 +457,71 @@ def test_dal_receipt_owner_predicate_and_borrowed_connection():
     connection.close()
     assert connection.cursor() is cursor
     cursor.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("state", [None, "wrong_source", "closing", "closed", "planned", "open"])
+def test_upload_source_admission_precedes_artifact_write(tmp_path, monkeypatch, state):
+    from kvk.dal import new_source_admin_dal as module, season_source_dal
+
+    cursor = Mock()
+    cursor.fetchone.return_value = None
+    connection = Mock(autocommit=False)
+    connection.cursor.return_value = cursor
+    choice = (
+        None
+        if state is None
+        else {
+            "SourceKey": "legacy_full_data" if state == "wrong_source" else "snapshot_report_v1",
+            "SeasonState": state,
+        }
+    )
+    admission_checked = False
+
+    def locked_choice(current, season, *, read=True):
+        nonlocal admission_checked
+        assert current is cursor and season == 16
+        assert any("sp_getapplock" in call.args[0] for call in cursor.execute.call_args_list)
+        admission_checked = read
+        return choice
+
+    monkeypatch.setattr(season_source_dal, "lock_season", locked_choice)
+    store = ArtifactStore(tmp_path)
+    original_persist = store.persist_artifact
+
+    def persist(content):
+        assert admission_checked
+        connection.commit.assert_not_called()
+        connection.close.assert_not_called()
+        return original_persist(content)
+
+    write = Mock(side_effect=persist)
+    monkeypatch.setattr(store, "persist_artifact", write)
+    dal = module.SourceAdminDAL(lambda: connection, store)
+    retained = {"AttemptID": "receipt", "KVK_NO": 16}
+    monkeypatch.setattr(dal, "_receipt", Mock(return_value=retained))
+    monkeypatch.setattr(dal, "imported_configuration", Mock(return_value=None))
+    monkeypatch.setattr(module.SourceImportDAL, "_artifact", Mock())
+    service = SourceAdminService(ACCESS, dal, store, now=lambda: NOW)
+
+    if state in ("planned", "open"):
+        assert upload(service) is retained
+        write.assert_called_once()
+        assert len(list(tmp_path.iterdir())) == 1
+        assert any(
+            "INSERT KVK.SourceImportAttempt" in call.args[0]
+            for call in cursor.execute.call_args_list
+        )
+        connection.commit.assert_called_once()
+        connection.rollback.assert_not_called()
+    else:
+        with pytest.raises(SourceConflict):
+            upload(service)
+        write.assert_not_called()
+        assert list(tmp_path.iterdir()) == []
+        assert not any("INSERT " in call.args[0] for call in cursor.execute.call_args_list)
+        connection.commit.assert_not_called()
+        connection.rollback.assert_called_once()
+    connection.close.assert_called_once()
 
 
 @pytest.mark.parametrize("failure", [None, "operation", "commit"])

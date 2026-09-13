@@ -188,7 +188,6 @@ class SourceAdminService:
             # Retain the bounded original receipt; final parsing still rejects it.
             pass
         kvk_no = positive(season) if season is not None else positive(candidate.kvk_no)
-        artifact = self.artifacts.persist_artifact(content)
         admission = Admission(
             str(actor.guild_id),
             str(message_id),
@@ -200,7 +199,7 @@ class SourceAdminService:
             self.now(),
         )
         row = self.repository.create_receipt(
-            artifact=artifact,
+            content=content,
             admission=admission,
             filename=filename,
             kvk_no=kvk_no,
