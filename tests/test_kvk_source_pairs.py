@@ -318,6 +318,64 @@ def test_both_orders_wait_then_seal_and_replay_without_generation(aggregate_firs
     assert not store.state["publications"] and not store.state["intents"]
 
 
+@pytest.mark.parametrize("prior_state", ["ready", "selected"])
+@pytest.mark.parametrize("aggregate_first", [False, True])
+def test_duplicate_identity_is_durably_superseded(prior_state, aggregate_first):
+    prior = update_record(UpdateState=prior_state)
+    waiting = update_record(
+        UpdateID=uid(99),
+        **dict.fromkeys(dal.INPUT_COLUMNS),
+        UpdateState="waiting_player",
+        Version=1,
+    )
+    store = PairStore(prior)
+    store.state["updates"][uid(99)] = waiting
+    if prior_state == "selected":
+        store.state["selections"][uid(2)] = dict(UpdateID=uid(1))
+    before_selection = deepcopy(store.state["selections"])
+    before_prior = deepcopy(prior)
+    service = dal.SourceUpdateDAL(store.connect)
+    player = dict(player=PlayerRevisions(10, 11, uid(10), uid(11)))
+    aggregate = dict(aggregate=AggregateRevision(uid(20), uid(21)))
+    first, second = (aggregate, player) if aggregate_first else (player, aggregate)
+    service.associate(uid(99), expected_version=1, authorized=True, **first)
+    result = service.associate(uid(99), expected_version=2, authorized=True, **second)
+    assert result == before_prior
+    retained = dal.SourceUpdateDAL(store.connect).read(uid(99))
+    assert retained["UpdateState"] == "superseded" and retained["Version"] == 3
+    assert retained["ContentHash"] == prior["ContentHash"]
+    assert all(retained[k] == prior[k] for k in dal.INPUT_COLUMNS)
+    assert retained["ConfirmationJson"] == waiting["ConfirmationJson"]
+    assert service.associate(uid(99), expected_version=2, authorized=True, **second) == retained
+    assert SourceUpdateService(store.connect).publish(uid(99)) is None
+    assert store.state["updates"][uid(1)] == before_prior
+    assert store.state["selections"] == before_selection
+    assert not store.state["publications"] and not store.state["intents"]
+
+
+def test_duplicate_finalization_failure_preserves_waiting_identity():
+    prior = update_record()
+    waiting = update_record(
+        UpdateID=uid(99),
+        AggregateReportID=None,
+        AggregateRevisionID=None,
+        UpdateState="waiting_aggregate",
+        Version=2,
+    )
+    store = PairStore(prior)
+    store.state["updates"][uid(99)] = waiting
+    before = deepcopy(store.state)
+    store.fail_on = "UPDATE KVK.SourceUpdate SET StartScanID"
+    with pytest.raises(RuntimeError, match="injected"):
+        dal.SourceUpdateDAL(store.connect).associate(
+            uid(99),
+            expected_version=2,
+            aggregate=AggregateRevision(uid(20), uid(21)),
+            authorized=True,
+        )
+    assert store.state == before
+
+
 @pytest.mark.parametrize("fault", ["wrong_scan", "stale_revision", "missing_tab"])
 def test_binding_and_both_tab_failures_preserve_accepted_update(fault):
     record = update_record()
@@ -706,7 +764,10 @@ def test_older_ready_update_cannot_regress_selected_endpoint():
 @pytest.mark.parametrize(
     "changed", [None, "RosterID", "MappingDigest", "WeightDigest", "StartScanID"]
 )
-def test_display_configuration_reuses_exact_inputs_and_rejects_numerical_changes(changed):
+@pytest.mark.parametrize("window_name", ["Old", "Reviewed name"])
+def test_display_configuration_reuses_exact_inputs_and_rejects_numerical_changes(
+    changed, window_name
+):
     prior = update_record(UpdateID=uid(90), UpdateState="selected")
     new = update_record(
         ConfigVersionID=uid(91), BaseUpdateID=uid(90), CounterpartRevisionID=uid(21)
@@ -735,22 +796,44 @@ def test_display_configuration_reuses_exact_inputs_and_rejects_numerical_changes
         EndScanID=13,
         WindowName="Old",
     )
-    new_config = dict(
-        old_config, ConfigVersionID=uid(91), ConfigVersion=2, WindowName="Reviewed name"
-    )
+    new_config = dict(old_config, ConfigVersionID=uid(91), ConfigVersion=2, WindowName=window_name)
     if changed:
         new_config[changed] = "different"
+
+    original_route = store.route
 
     def route(sql, args):
         if sql.startswith("SELECT c.ConfigVersionID,c.ConfigVersion"):
             return [old_config, new_config]
-        return store.route(sql, args)
+        if sql.startswith("SELECT WindowName"):
+            return [dict(WindowName=config["WindowName"]) for config in (old_config, new_config)]
+        return original_route(sql, args)
 
     if changed:
         with pytest.raises(SourceConflict, match="Display-only"):
             dal.validate_update(Cursor(route), new, complete=True)
     else:
         dal.validate_update(Cursor(route), new, complete=True)
+        store.route = route
+        store.state["updates"][uid(1)] = dict(
+            new,
+            AggregateReportID=None,
+            AggregateRevisionID=None,
+            CounterpartRevisionID=None,
+            UpdateState="waiting_aggregate",
+        )
+        service = dal.SourceUpdateDAL(store.connect)
+        result = service.associate(
+            uid(1),
+            expected_version=3,
+            aggregate=AggregateRevision(uid(20), uid(21)),
+            counterpart_revision_id=uid(21),
+            authorized=True,
+        )
+        retained = service.read(uid(1))
+        assert retained["UpdateState"] == ("superseded" if window_name == "Old" else "ready")
+        assert result["UpdateID"] == (uid(90) if window_name == "Old" else uid(1))
+        assert retained["Version"] == 4
 
 
 def test_tampered_unchanged_period_hash_rolls_back_complete_pointer():

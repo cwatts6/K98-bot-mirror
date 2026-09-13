@@ -585,3 +585,39 @@ operations. Preserve all earlier evidence and verify actual PR filename plus pre
 for every path, including the four archive origin/destination pairs. SQL delivery-log carry-forward
 remains exclusively in the SQL PR. Source/test bytes are unchanged from accepted validation and
 final Changes reviews; these acceptance/status edits have a documentation-only security skip.
+
+
+## PR review actions — Bot #274 and SQL #81
+
+The operator authorized checking, fixing, publishing, replying to and resolving actionable review
+comments. The Bot P2 duplicate-identity finding was confirmed: complete semantic duplicates and
+unchanged display-configuration requests now persist their exact attached inputs/hash with
+UpdateState=superseded and a CAS version increment before returning the prior result. Original
+identity reads expose the terminal state, recovery excludes it, and no new publication/intent is
+created. Confirmation/base provenance and the existing SQL shape checks are preserved. Failed
+finalization rolls back without losing the original waiting identity.
+
+The SQL P1 deployment-runner finding was confirmed. A hash-checked exact-target/exact-migration
+S8B input path supplies #S8BNoFightApproval on the migration connection and rejects preview mode
+before execution. The existing runner records Applied only after success and Failed on rejection.
+A shared session executor retains the S8A wrapper/guard. Offline tests exercise actual runner
+parameter gates, pending guard and application/history loop with fake connections and history.
+No new live SQL or predecessor operation was run for this review fix.
+
+Bot delivery remains exactly 20 source/test plus31 documentation physical paths. The SQL delivery
+is explicitly extended for this requested fix from four to six paths, adding
+Deploy-SqlMigration.ps1 and Test-S8AMigrationInputs.ps1 under deploy. All original SQL paths,
+including the complete delivery-log carry-forward, remain exclusively in SQL PR #81.
+Historical accepted 50-case SQL evidence remains valid for its recorded source hash; it is not
+claimed as execution of these later review fixes. Fresh focused/offline/security evidence follows.
+
+
+PR-fix validation: 48 focused pair tests passed; full offline suite **4,149 passed /57 skipped
+in147.77 seconds**, four operational logs unchanged. Architecture, deferred, routing, smoke,
+registration and Ruff passed. SQL S8A/S8B offline runner regressions passed with mock connections.
+Separate Changes reviews, Deep off, sealed and read back with zero findings and complete coverage:
+Bot ef9cf7e4-f388-4e8b-9f64-dfaba85f13b1 (09:54:50 UTC), SQL
+33e0bcba-9127-45a8-95d5-b2fa26e048f2 (09:55:32 UTC). The SQL draft's initial uppercase coverage-ID
+format error was corrected within the same scan; no review source or finding was changed.
+Final evidence/status-only Markdown changes have a documented security skip. The shared-session
+SQL runner path is offline-validated only; no new SQL execution or production deployment occurred.

@@ -556,6 +556,7 @@ class SourceUpdateDAL:
                 else ("waiting_aggregate" if proposed["StartRevisionID"] else "waiting_player")
             )
             content_hash = update_hash(proposed)
+            duplicate = None
             if complete:
                 if json.loads(proposed["ConfirmationJson"]).get("action") == "configure":
                     base = load_update(cursor, proposed["BaseUpdateID"])
@@ -566,17 +567,20 @@ class SourceUpdateDAL:
                     )
                     names = rows(cursor)
                     if len(names) == 2 and names[0]["WindowName"] == names[1]["WindowName"]:
-                        return base
-                cursor.execute(
-                    "SELECT * FROM KVK.SourceUpdate WHERE SourceKey=? AND KVK_NO=? AND PeriodID=? AND ContentHash=? AND UpdateState IN ('ready','selected')",
-                    SOURCE_KEY,
-                    proposed["KVK_NO"],
-                    proposed["PeriodID"],
-                    content_hash,
-                )
-                duplicate = one(cursor)
+                        duplicate = base
+                if duplicate is None:
+                    cursor.execute(
+                        "SELECT * FROM KVK.SourceUpdate WHERE SourceKey=? AND KVK_NO=? AND PeriodID=? AND ContentHash=? AND UpdateState IN ('ready','selected')",
+                        SOURCE_KEY,
+                        proposed["KVK_NO"],
+                        proposed["PeriodID"],
+                        content_hash,
+                    )
+                    duplicate = one(cursor)
                 if duplicate:
-                    return duplicate
+                    # Retain this identity and its confirmed inputs, but stop recovery
+                    # from rediscovering a request already satisfied by another update.
+                    state = "superseded"
             for scan in (proposed["StartScanID"], proposed["EndScanID"]):
                 if scan is not None:
                     cursor.execute(
@@ -603,7 +607,7 @@ class SourceUpdateDAL:
             result = one(cursor)
             if not result:
                 raise SourceConflict("Association CAS lost.")
-            return result
+            return duplicate if duplicate is not None else result
 
 
 def commit_complete(
