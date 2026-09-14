@@ -1,0 +1,573 @@
+"""Deterministic 1702x924 renderer for private personal period performance."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import date, timedelta
+from io import BytesIO
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+from core import visual_contract, visual_text
+from player_self_service.stats_models import (
+    PersonalStatsPayload,
+    StatsMetricSummary,
+    StatsMode,
+)
+
+WIDTH = 1702
+HEIGHT = 924
+_BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_stats.png"
+_TEXT = visual_contract.TEXT
+_MUTED = visual_contract.MUTED
+_BLUE = visual_contract.BLUE
+_GOLD = visual_contract.GOLD
+_AMBER = visual_contract.AMBER
+_SHADOW = visual_contract.SHADOW
+_SERIES = ((91, 200, 255, 255), (255, 196, 78, 255), (102, 232, 160, 255))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderedStatsCard:
+    filename: str
+    image_bytes: bytes
+    width: int = WIDTH
+    height: int = HEIGHT
+
+
+def _clean(value: object, *, missing: str = "—") -> str:
+    text = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+    return text or missing
+
+
+def _font_text(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    value: object,
+    *,
+    width: int,
+    size: int,
+    min_size: int = 12,
+    fill: tuple[int, int, int, int] = _TEXT,
+    bold: bool = False,
+    right_align: bool = False,
+    centre_align: bool = False,
+) -> None:
+    cleaned = _clean(value)
+    font = visual_text.fit_font(
+        draw, cleaned, max_width=max(1, width), size=size, min_size=min_size, bold=bold
+    )
+    fitted = visual_text.fit_text_to_width(
+        draw, cleaned, width=max(1, width), base_font=font, bold=bold
+    )
+    draw_x = xy[0]
+    if right_align:
+        draw_x += width - visual_text.text_width(draw, fitted, font=font, bold=bold)
+    elif centre_align:
+        draw_x += (width - visual_text.text_width(draw, fitted, font=font, bold=bold)) // 2
+    visual_text.draw_text(
+        draw,
+        (draw_x + 2, xy[1] + 2),
+        fitted,
+        font=font,
+        fill=_SHADOW,
+        bold=bold,
+    )
+    visual_text.draw_text(
+        draw,
+        (draw_x, xy[1]),
+        fitted,
+        font=font,
+        fill=fill,
+        bold=bold,
+        embedded_color=True,
+    )
+
+
+def _compact(value: int | float | None, *, signed: bool = False) -> str:
+    return visual_contract.format_compact_number(value, signed=signed)
+
+
+def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None:
+    visual_contract.draw_panel(draw, box)
+
+
+def _state_colour(state: str) -> tuple[int, int, int, int]:
+    return visual_contract.state_colour(state)
+
+
+def _state_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
+    visual_contract.draw_state_pill(draw, state)
+
+
+def _coverage_text(payload: PersonalStatsPayload) -> str:
+    coverage = payload.coverage
+    if payload.scope_type.value == "all_linked":
+        label = (
+            f"Stats {coverage.stats_account_days}/{coverage.expected_account_days} • "
+            f"Activity {coverage.activity_account_days}/{coverage.expected_account_days} • "
+            f"Forts {coverage.fort_account_days}/{coverage.expected_account_days} account-days"
+        )
+    else:
+        label = (
+            f"Stats {coverage.stats_reporting_dates}/{coverage.expected_dates} • "
+            f"Activity {coverage.activity_account_days}/{coverage.expected_dates} • "
+            f"Forts {coverage.fort_account_days}/{coverage.expected_dates} days"
+        )
+    complete_coverage = (
+        coverage.stats_account_days == coverage.expected_account_days
+        and coverage.activity_account_days == coverage.expected_account_days
+        and coverage.fort_account_days == coverage.expected_account_days
+    )
+    if payload.state.value == "PARTIAL" and complete_coverage:
+        return f"{label} • Source values incomplete"
+    return label
+
+
+def _paste_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> None:
+    visual_contract.paste_core_avatar(canvas, avatar_bytes)
+
+
+def _metric_box(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    label: str,
+    metric: StatsMetricSummary,
+    *,
+    context: str | None = None,
+    signed: bool = True,
+) -> None:
+    _panel(draw, box)
+    x0, y0, x1, y1 = box
+    height = y1 - y0
+    spacious = height >= 150
+    label_size = 22 if spacious else 20
+    value_size = 50 if spacious else 43
+    helper_size = 17 if spacious else 15
+    _font_text(
+        draw,
+        (x0 + 18, y0 + 12),
+        label.upper(),
+        width=x1 - x0 - 36,
+        size=label_size,
+        min_size=16,
+        fill=_BLUE,
+        bold=True,
+    )
+    _font_text(
+        draw,
+        (x0 + 18, y0 + 43),
+        _compact(metric.total, signed=signed),
+        width=x1 - x0 - 36,
+        size=value_size,
+        min_size=29,
+        bold=True,
+    )
+    average = metric.average_per_reporting_day
+    helper = context or (
+        "No reporting days"
+        if average is None
+        else f"Avg {_compact(average, signed=True)}/reporting day • "
+        f"{metric.reporting_days}/{metric.expected_days} days"
+    )
+    _font_text(
+        draw,
+        (x0 + 18, y1 - 34),
+        helper,
+        width=x1 - x0 - 36,
+        size=helper_size,
+        min_size=12,
+        fill=_MUTED,
+        bold=True,
+    )
+
+
+def _marker(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    colour: tuple[int, int, int, int],
+    marker_index: int,
+) -> None:
+    if marker_index % 3 == 0:
+        draw.ellipse((x - 4, y - 4, x + 4, y + 4), fill=colour, outline=_TEXT)
+    elif marker_index % 3 == 1:
+        draw.rectangle((x - 4, y - 4, x + 4, y + 4), fill=colour, outline=_TEXT)
+    else:
+        draw.polygon(((x, y - 5), (x - 5, y + 4), (x + 5, y + 4)), fill=colour)
+
+
+def _axis_tick_dates(start_date: date, end_date: date, *, maximum: int = 5) -> tuple[date, ...]:
+    day_span = (end_date - start_date).days
+    if day_span < 0:
+        raise ValueError("Chart end date cannot precede its start date")
+    if day_span == 0:
+        return (start_date,)
+    tick_count = min(maximum, day_span + 1)
+    return tuple(
+        start_date + timedelta(days=round(index * day_span / (tick_count - 1)))
+        for index in range(tick_count)
+    )
+
+
+def _draw_chart(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    title: str,
+    series: Iterable[tuple[str, StatsMetricSummary]],
+    *,
+    start_date: date,
+    end_date: date,
+) -> None:
+    _panel(draw, box)
+    x0, y0, x1, y1 = box
+    _font_text(draw, (x0 + 18, y0 + 11), title, width=x1 - x0 - 36, size=21, fill=_BLUE, bold=True)
+    series_list = list(series)
+    all_points = [point for _, metric in series_list for point in metric.daily]
+    chart_left, chart_top = x0 + 50, y0 + 60
+    chart_right, chart_bottom = x1 - 22, y1 - 48
+
+    day_span = (end_date - start_date).days
+
+    def x_for(reporting_date: date) -> int:
+        if day_span == 0:
+            return (chart_left + chart_right) // 2
+        offset = (reporting_date - start_date).days
+        return int(chart_left + offset * (chart_right - chart_left) / day_span)
+
+    for tick_date in _axis_tick_dates(start_date, end_date):
+        tick_x = x_for(tick_date)
+        draw.line((tick_x, chart_top, tick_x, chart_bottom), fill=(91, 190, 255, 38), width=1)
+        _font_text(
+            draw,
+            (tick_x - 44, chart_bottom + 8),
+            f"{tick_date:%d %b}",
+            width=88,
+            size=14,
+            min_size=11,
+            fill=_MUTED,
+            centre_align=True,
+        )
+
+    for index, (label, _metric) in enumerate(series_list):
+        colour = _SERIES[index % len(_SERIES)]
+        legend_x = x0 + 17 + index * max(145, (x1 - x0 - 34) // max(1, len(series_list)))
+        _marker(draw, legend_x, y0 + 39, colour, index)
+        _font_text(
+            draw,
+            (legend_x + 12, y0 + 28),
+            label,
+            width=170,
+            size=16,
+            min_size=11,
+            fill=_TEXT,
+            bold=True,
+        )
+
+    if not all_points:
+        _font_text(
+            draw,
+            (chart_left, chart_top + 32),
+            "No valid exact-day points for this period.",
+            width=chart_right - chart_left,
+            size=17,
+            fill=_MUTED,
+        )
+    else:
+        values = [point.value for point in all_points]
+        low, high = min(0, min(values)), max(0, max(values))
+        if low == high:
+            low -= 1
+            high += 1
+        span = high - low
+
+        def y_for(value: int) -> int:
+            return int(chart_bottom - (value - low) * (chart_bottom - chart_top) / span)
+
+        zero_y = y_for(0)
+        draw.line((chart_left, zero_y, chart_right, zero_y), fill=(220, 230, 245, 155), width=2)
+        _font_text(draw, (x0 + 12, zero_y - 9), "0", width=32, size=14, min_size=11, fill=_MUTED)
+        for index, (label, metric) in enumerate(series_list):
+            colour = _SERIES[index % len(_SERIES)]
+            coords = [(x_for(point.reporting_date), y_for(point.value)) for point in metric.daily]
+            if len(coords) > 1:
+                draw.line(coords, fill=colour, width=3)
+            for x, y in coords:
+                _marker(draw, x, y, colour, index)
+
+
+def _data_refresh_text(payload: PersonalStatsPayload) -> str:
+    refreshed = visual_contract.format_utc_datetime(payload.data_refreshed_at_utc)
+    return f"Data refreshed {refreshed}"
+
+
+def _header(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    payload: PersonalStatsPayload,
+    mode: StatsMode,
+    display_name: str,
+    avatar_bytes: bytes | None,
+) -> None:
+    _paste_avatar(canvas, avatar_bytes)
+    _font_text(draw, (270, 48), "PERIOD PERFORMANCE", width=730, size=42, min_size=30, bold=True)
+    _font_text(
+        draw, (270, 103), display_name, width=730, size=31, min_size=20, fill=_GOLD, bold=True
+    )
+    scope_label = payload.scope_label
+    if payload.scope_type.value == "all_linked":
+        scope_label = f"All Linked • {payload.coverage.requested_governors} governors"
+    _font_text(
+        draw,
+        (270, 149),
+        scope_label,
+        width=730,
+        size=27,
+        min_size=18,
+        fill=_TEXT,
+        bold=True,
+    )
+    _state_badge(draw, payload.state.value)
+    _font_text(
+        draw,
+        (1010, 117),
+        f"{mode.label} • {payload.period.label}",
+        width=595,
+        size=24,
+        min_size=17,
+        fill=_BLUE,
+        bold=True,
+        right_align=True,
+    )
+    _font_text(
+        draw,
+        (1010, 151),
+        f"{payload.window.start_date:%d %b %Y} — {payload.window.end_date:%d %b %Y}",
+        width=595,
+        size=20,
+        min_size=15,
+        bold=True,
+        right_align=True,
+    )
+    coverage_colour = (
+        _state_colour(payload.state.value) if payload.state.value == "PARTIAL" else _MUTED
+    )
+    _font_text(
+        draw,
+        (1010, 181),
+        _coverage_text(payload),
+        width=595,
+        size=17,
+        min_size=11,
+        fill=coverage_colour,
+        bold=True,
+        right_align=True,
+    )
+    _font_text(
+        draw,
+        (1010, 207),
+        _data_refresh_text(payload),
+        width=595,
+        size=14,
+        min_size=10,
+        fill=_MUTED,
+        right_align=True,
+    )
+
+
+def _overview(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
+    metrics = payload.metrics
+    end_date = metrics.period_end_date
+    power_context = (
+        f"End {_compact(metrics.period_end_power)} • {end_date:%d %b}"
+        if metrics.period_end_power is not None and end_date
+        else "Period-end Power unavailable"
+    )
+    troop_context = (
+        f"End {_compact(metrics.period_end_troop_power)} • {end_date:%d %b}"
+        if metrics.period_end_troop_power is not None and end_date
+        else "Period-end Troop Power unavailable"
+    )
+    _metric_box(
+        draw, (95, 230, 820, 392), "Power change", metrics.power_change, context=power_context
+    )
+    _metric_box(
+        draw,
+        (850, 230, 1605, 392),
+        "Troop Power change",
+        metrics.troop_power_change,
+        context=troop_context,
+    )
+    boxes = (
+        (95, 420, 575, 575),
+        (610, 420, 1090, 575),
+        (1125, 420, 1605, 575),
+        (95, 603, 575, 758),
+        (610, 603, 1090, 758),
+        (1125, 603, 1605, 758),
+    )
+    for box, label, metric in zip(
+        boxes,
+        ("RSS gathered", "Helps", "Forts total", "Kill Points", "T4+T5 kills", "Deads"),
+        (
+            metrics.rss_gathered,
+            metrics.helps,
+            metrics.forts_total,
+            metrics.kill_points,
+            metrics.t4_t5_kills,
+            metrics.deads,
+        ),
+        strict=True,
+    ):
+        _metric_box(draw, box, label, metric)
+
+
+def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
+    metrics = payload.metrics
+    boxes = tuple(
+        (95 + column * 515, 230 + row * 140, 575 + column * 515, 350 + row * 140)
+        for row in range(2)
+        for column in range(3)
+    )
+    activity = (
+        ("RSS gathered", metrics.rss_gathered),
+        ("RSS assisted", metrics.rss_assisted),
+        ("Helps", metrics.helps),
+        ("Build activity", metrics.build_activity),
+        ("Tech donations", metrics.tech_donations),
+        ("Forts total", metrics.forts_total),
+    )
+    for box, (label, metric) in zip(boxes, activity, strict=True):
+        _metric_box(draw, box, label, metric)
+    _draw_chart(
+        draw,
+        (95, 514, 825, 792),
+        "RSS DAILY TREND",
+        (("Gathered", metrics.rss_gathered), ("Assisted", metrics.rss_assisted)),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
+    )
+    _draw_chart(
+        draw,
+        (850, 514, 1605, 792),
+        "FORT DAILY TREND",
+        (
+            ("Total", metrics.forts_total),
+            ("Launched", metrics.forts_launched),
+            ("Joined", metrics.forts_joined),
+        ),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
+    )
+
+
+def _combat(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
+    metrics = payload.metrics
+    boxes = tuple(
+        (95 + column * 515, 230 + row * 140, 575 + column * 515, 350 + row * 140)
+        for row in range(2)
+        for column in range(3)
+    )
+    combat = (
+        ("Kill Points gained", metrics.kill_points),
+        ("T4 kills gained", metrics.t4_kills),
+        ("T5 kills gained", metrics.t5_kills),
+        ("T4+T5 combined", metrics.t4_t5_kills),
+        ("Deads gained", metrics.deads),
+        ("Healed Troops gained", metrics.healed_troops),
+    )
+    for box, (label, metric) in zip(boxes, combat, strict=True):
+        _metric_box(draw, box, label, metric)
+    _draw_chart(
+        draw,
+        (95, 514, 1605, 792),
+        "COMBAT DAILY TREND",
+        (
+            ("T4+T5", metrics.t4_t5_kills),
+            ("Deads", metrics.deads),
+            ("Healed", metrics.healed_troops),
+        ),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
+    )
+
+
+def render_personal_stats_card(
+    payload: PersonalStatsPayload,
+    *,
+    mode: StatsMode,
+    display_name: str,
+    avatar_bytes: bytes | None = None,
+) -> RenderedStatsCard:
+    with Image.open(_BACKGROUND) as source:
+        if source.size != (WIDTH, HEIGHT):
+            raise ValueError(f"Stats backdrop must be {WIDTH}x{HEIGHT}; got {source.size}")
+        if source.mode == "RGBA" and source.getextrema()[3] != (255, 255):
+            raise ValueError("Stats backdrop must be fully opaque")
+        canvas = source.convert("RGBA")
+    try:
+        overlay = Image.new("RGBA", canvas.size, (0, 4, 14, 76))
+        try:
+            composited = Image.alpha_composite(canvas, overlay)
+        finally:
+            overlay.close()
+        canvas.close()
+        canvas = composited
+        draw = ImageDraw.Draw(canvas, "RGBA")
+        _header(canvas, draw, payload, mode, display_name, avatar_bytes)
+        if mode is StatsMode.OVERVIEW:
+            _overview(draw, payload)
+        elif mode is StatsMode.ACTIVITY:
+            _activity(draw, payload)
+        elif mode is StatsMode.COMBAT:
+            _combat(draw, payload)
+        else:
+            raise ValueError(f"Unsupported stats mode: {mode!r}")
+        if payload.duplicate_id_warning:
+            _font_text(
+                draw,
+                (95, 802),
+                "Review warning: duplicate linked Governor IDs were deduplicated.",
+                width=1120,
+                size=15,
+                min_size=12,
+                fill=_AMBER,
+                bold=True,
+            )
+        _font_text(
+            draw,
+            (95, 845),
+            "Private period activity • Missing source rows are not treated as zero",
+            width=1050,
+            size=18,
+            min_size=12,
+            fill=_MUTED,
+            bold=True,
+        )
+        _font_text(
+            draw,
+            (1325, 845),
+            f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}",
+            width=280,
+            size=16,
+            min_size=10,
+            fill=_MUTED,
+            bold=True,
+        )
+        stream = BytesIO()
+        try:
+            rgb = canvas.convert("RGB")
+            try:
+                rgb.save(stream, format="PNG", optimize=True)
+            finally:
+                rgb.close()
+            return RenderedStatsCard(
+                filename=f"me_stats_{payload.discord_user_id}.png",
+                image_bytes=stream.getvalue(),
+            )
+        finally:
+            stream.close()
+    finally:
+        canvas.close()
