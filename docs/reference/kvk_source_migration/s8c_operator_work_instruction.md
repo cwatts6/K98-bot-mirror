@@ -4,8 +4,10 @@
 No repeat is required. This instruction is retained for reference; see the
 [operator acceptance record](s8c_folder_intake_smoke_evidence.md#operator-walkthrough-accepted--2026-09-14).
 
-**Who:** Chris, on the local development PC.  
-**Allow:** approximately 15–20 minutes.  
+**Who:** Chris, on the local development PC.
+
+**Allow:** approximately 15–20 minutes.
+
 **What you are checking:** you can submit the prepared test files, review their details, explicitly
 confirm acceptance, inspect a saved pair and cancel a pending upload.
 
