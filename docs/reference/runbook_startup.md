@@ -184,3 +184,9 @@ python scripts/smoke_imports.py
 python scripts/validate_command_registration.py
 python scripts/config_self_test.py
 ```
+
+## S10B shared export startup boundary
+
+The ready lifecycle calls register_exports. EXPORT_COORDINATION_ENABLED defaults false; production composition also refuses admission when the flag is true because S10C adapters and deployment attestations are not present. Startup does not open export SQL, credentials, provider clients or create spool directories through this path. Recovery completion only wakes durable export discovery.
+
+An explicitly injected worker discovers committed intents in bounded pages and claims the oldest eligible account ticket using SQL owner/fence/version CAS over the full ordered resource set. Running A keeps its pinned vector when B arrives. A blocked/uncertain resource cannot be released by observing a terminal job state. Before any future activation, separately verify external account consumers, pool registrations, storage permissions and the retained S6/S8/S11 gates. No activation is authorized by this documentation.

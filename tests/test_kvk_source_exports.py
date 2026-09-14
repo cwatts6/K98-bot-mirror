@@ -302,3 +302,17 @@ def test_load_compact_periods_preserves_separate_overall_and_order():
         row["period_key"] == "overall" and row["publication_id"] == second.publication_id
         for row in records(actual, "KVK_Windows")
     )
+
+
+def test_s10b_intent_loader_keeps_running_generation_after_new_selection(monkeypatch):
+    from kvk.dal import new_source_delivery_dal
+    from kvk.services.new_source_export_service import load_intent_generation
+
+    selected, snapshot = export_input()
+    loader = Mock(return_value=({"VectorHash": b"a" * 32}, ((selected, snapshot),)))
+    monkeypatch.setattr(new_source_delivery_dal, "load_intent_export_snapshots", loader)
+    generation = load_intent_generation(connect=None, intent_id="intent-a", expected_hash=b"a" * 32)
+    assert generation.selections == (selected,)
+    loader.assert_called_once_with(connect=None, intent_id="intent-a")
+    with pytest.raises(SourceConflict, match="digest"):
+        load_intent_generation(connect=None, intent_id="intent-a", expected_hash=b"b" * 32)

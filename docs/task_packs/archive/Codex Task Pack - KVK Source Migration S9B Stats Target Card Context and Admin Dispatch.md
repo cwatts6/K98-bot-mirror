@@ -1,5 +1,9 @@
 # KVK Source Migration S9B — Stats/Target Card Context and Grouped Admin Source Dispatch
 
+> Archived after S9B repository delivery: mirror #277, production #584 and SQL #84 merged.
+> No bot-machine pull, deployment or activation. Current authority: [S9B closeout / S10A handoff](../../reference/kvk_source_migration/s9b_closeout_and_s10a_handoff.md).
+> Scope, approval and execution statements below are historical records, not new authorization.
+
 ## S9B implementation authorization — 2026-09-14
 
 The operator approved the initial review and implementation plan with the two exact path
@@ -18,12 +22,12 @@ SQL's two pending documentation paths remain a separate SQL PR in the same deliv
 Prepared 2026-09-14. **Initial review/scope only; S9B implementation is not authorized.**
 The operator approved the S9A documentation closeout, archive moves and this S9B task preparation.
 Do not create another task automatically. Review current AGENTS/core references, the
-[S9A closeout](../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), [approved S7 contract/consumer matrix](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md),
-[exact implementation manifests](../reference/kvk_source_migration/integration_implementation_manifests.md),
-[architecture and EndScanID amendment](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md),
-[post-S6 requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md), retained S6 evidence,
-and [S8C execution/operator evidence](../reference/kvk_source_migration/s8c_folder_intake_smoke_evidence.md).
+[S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), [approved S7 contract/consumer matrix](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md),
+[exact implementation manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md),
+[architecture and EndScanID amendment](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[acceptance scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md),
+[post-S6 requirements](../../reference/kvk_source_migration/post_s6_integration_requirements.md), retained S6 evidence,
+and [S8C execution/operator evidence](../../reference/kvk_source_migration/s8c_folder_intake_smoke_evidence.md).
 Read authoritative SQL and repository guidance (including AGENTS if present) in C:/K98-bot-SQL-Server without connecting to a database.
 S7 decisions and predecessor acceptance remain settled. Do not re-ask them.
 
@@ -62,7 +66,7 @@ The approved S7 runtime/test scope is exactly these **22 existing Bot paths**, v
 
 This table is the implementation boundary, not the complete delivery manifest. The initial complete union is **56 physical Bot paths** (22 runtime/test + 34 documentation),
 before approved amendments. The eventual Bot PR must also include **every exact pending Bot documentation path** in the
-[closeout carry-forward manifest](../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), including this pack, the starter, closeout,
+[closeout carry-forward manifest](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), including this pack, the starter, closeout,
 updated evidence/work instruction and both old/new paths of both S9A archive moves.
 The operator has approved this documentation grouping; do not create a standalone closeout PR
 or seek renewed approval for carrying these documents. Refresh the exact union after approved
@@ -172,7 +176,7 @@ Approved implementation with both exact amendments is complete locally. Full off
 **4,333 passed / 62 skipped**, operational logs unchanged. Changes security review
 `d9f0f04f-dfd6-4ffe-a5fa-f7194b15cfb6`: zero findings, Deep off. Architecture, deferred/routing
 validators, imports, registration, visual inspection and whole-change review completed.
-See the [S9B implementation record in the closeout](../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md)
+See the [S9B implementation record in the closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md)
 for exact manifest, hashes, test mapping, scan artifacts, limitations and retained evidence.
 All work is unstaged/uncommitted. Publication remains separately authorized; Bot58 and separate
 SQL2 delivery grouping is settled. No bot-machine, SQL, provider or live Discord operation occurred.

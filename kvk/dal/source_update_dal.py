@@ -848,6 +848,56 @@ def commit_complete(
     )
 
 
+def read_export_intent(cursor, intent_id):
+    """Verify a historical full vector without consulting mutable current pointers.
+
+    S10B reads this under a short transaction. Intent membership and publication
+    facts remain immutable when another update wins current selection.
+    """
+    from types import SimpleNamespace
+
+    from kvk.dal.source_routing_dal import validate_complete
+
+    cursor.execute("SELECT * FROM KVK.SourceExportIntent WHERE IntentID=?", identity(intent_id))
+    intent = one(cursor)
+    if not intent or intent["ExportSchemaVersion"] != EXPORT_SCHEMA:
+        raise SourceConflict("Unsupported or missing immutable export intent.")
+    cursor.execute("SELECT * FROM KVK.SeasonSource WHERE KVK_NO=?", intent["KVK_NO"])
+    season = one(cursor)
+    if not season or (season["SourceKey"], season["ChoiceID"]) != (
+        intent["SourceKey"],
+        intent["ChoiceID"],
+    ):
+        raise SourceConflict("Export intent fixed season choice differs.")
+    cursor.execute(
+        "SELECT v.PeriodID,v.UpdateID,v.PublicationID,v.PublicSelectionVersion,v.ConfigVersionID,p.ManifestHash "
+        "FROM KVK.SourceExportIntentPublication v JOIN KVK.SourcePublication p ON p.PublicationID=v.PublicationID "
+        "WHERE v.IntentID=? AND v.SourceKey=? AND v.KVK_NO=? ORDER BY v.PeriodID",
+        intent["IntentID"],
+        intent["SourceKey"],
+        intent["KVK_NO"],
+    )
+    vector = rows(cursor)
+    if not vector or digest(
+        [{**r, "ManifestHash": bytes(r["ManifestHash"]).hex()} for r in vector]
+    ) != bytes(intent["VectorHash"]):
+        raise SourceConflict("Immutable export vector hash or membership differs.")
+    for member in vector:
+        update = load_update(cursor, member["UpdateID"])
+        cursor.execute(
+            "SELECT * FROM KVK.SourcePublication WHERE PublicationID=?", member["PublicationID"]
+        )
+        publication = one(cursor)
+        read = SimpleNamespace(
+            kvk_no=intent["KVK_NO"], period_id=member["PeriodID"], choice_id=intent["ChoiceID"]
+        )
+        selection = dict(member, SourceKey=intent["SourceKey"], KVK_NO=intent["KVK_NO"])
+        validate_complete(read, selection, update, publication)
+        if member["ConfigVersionID"] != publication["ConfigVersionID"]:
+            raise SourceConflict("Pinned export configuration differs.")
+    return intent, vector
+
+
 def read_complete_result(cursor, update_id, publication_id, public_version):
     cursor.execute(
         "SELECT TOP (1) i.IntentID,i.CommitSequence,i.VectorHash FROM KVK.SourceExportIntent i "

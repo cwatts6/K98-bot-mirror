@@ -1,5 +1,8 @@
 # S9A closeout and S9B handoff
 
+> Current handoff: **S9B repository-delivered; not deployed**. See [S9B closeout / S10A scope and exact documentation carry-forward](s9b_closeout_and_s10a_handoff.md).
+> Retained evidence and historical approvals below remain intact; no predecessor rerun or live operation is authorized.
+
 ## Delivered state — 2026-09-14
 
 **S9A implementation, review and repository delivery are complete.** The operator reports all
@@ -98,8 +101,8 @@ Separate SQL carry-forward is exactly `docs/SQL_DELIVERY_LOG.md` and `migrations
 separate SQL-repository PR during the S9B delivery cycle. They must never enter the Bot PR.
 This grouping does not authorize implementation, staging, commit, push, PR creation or SQL execution.
 
-- [S9B task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md)
-- [S9B starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md)
+- [S9B task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md)
+- [S9B starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md)
 - [Archived S9A task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md)
 - [Archived S9A starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md)
 

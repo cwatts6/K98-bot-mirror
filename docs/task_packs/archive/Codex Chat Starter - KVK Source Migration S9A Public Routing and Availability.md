@@ -1,8 +1,11 @@
 # S9A starter — Public Routing and Availability
 
+> Current handoff: **S9B repository-delivered; not deployed**. See [S9B closeout / S10A scope and exact documentation carry-forward](../../reference/kvk_source_migration/s9b_closeout_and_s10a_handoff.md).
+> Retained evidence and historical approvals below remain intact; no predecessor rerun or live operation is authorized.
+
 > Archived 2026-09-14 after merged mirror #276, production #583 and SQL #83.
 > This document preserves the S9A scope, approvals and execution/review history.
-> Current authority: [S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md) and [S9B scope pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
+> Current authority: [S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md) and [S9B scope pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
 > Earlier prospective instructions below are historical, not renewed authorization.
 
 

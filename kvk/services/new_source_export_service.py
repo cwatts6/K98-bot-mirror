@@ -199,6 +199,16 @@ def load_generation(*, connect, selections, snapshot_loader=None):
     return build_generation(tuple((s, loader(connect=connect, selection=s)) for s in chosen))
 
 
+def load_intent_generation(*, connect, intent_id, expected_hash):
+    """Read pinned complete publications; a newer selected B cannot retarget A."""
+    from kvk.dal.new_source_delivery_dal import load_intent_export_snapshots
+
+    intent, inputs = load_intent_export_snapshots(connect=connect, intent_id=intent_id)
+    if bytes(intent["VectorHash"]) != expected_hash:
+        raise SourceConflict("Job input digest differs from immutable intent.")
+    return build_generation(inputs)
+
+
 def _facts(envelope, meta, context, kind):
     aggregate = kind != "player"
     items = (
@@ -600,6 +610,8 @@ class GoogleSheetsTransport:
         rows_per_request=500,
         request_pacer=None,
         retry_sleep=time.sleep,
+        request_guard=None,
+        plan_callback=None,
     ):
         if not isinstance(registration, SheetsRegistration) or not callable(reuse_guard):
             raise ValueError("Explicit registration and durable reuse guard are required.")
@@ -614,6 +626,8 @@ class GoogleSheetsTransport:
         self._retained = {}
         self._request_pacer = request_pacer or (lambda: None)
         self._retry_sleep = retry_sleep
+        self._request_guard = request_guard
+        self._plan_callback = plan_callback
         self.last_error = None
         self.quarantined = frozenset()
         self._verified = set()
@@ -669,9 +683,14 @@ class GoogleSheetsTransport:
         # Only idempotent GET requests retry. Mutations always execute exactly once.
         for attempt in range(3):
             self._request_pacer()
+            if self._request_guard is not None:
+                self._request_guard(request)
             try:
                 return request.execute(num_retries=0)
             except Exception as exc:
+                feedback = getattr(self._request_pacer, "rejected", None)
+                if feedback is not None:
+                    feedback(exc, attempt=attempt)
                 status = getattr(getattr(exc, "resp", None), "status", None)
                 if (
                     getattr(request, "method", None) != "GET"
@@ -681,6 +700,10 @@ class GoogleSheetsTransport:
                     self.last_error = google_error_details(request, exc)
                     raise
                 self._retry_sleep(2**attempt)
+            finally:
+                completed = getattr(self._request_pacer, "completed", None)
+                if completed is not None:
+                    completed()
 
     def _mutate(self, request):
         from kvk.services.new_source_delivery_service import (
@@ -984,10 +1007,20 @@ class GoogleSheetsTransport:
                     "Retain current, final and referenced generations. Create dedicated workbooks, "
                     "grant the registered service account Editor access and register their file IDs."
                 )
+            if self._plan_callback is not None:
+                planned = dict(bound_parts)
+                planned.update(zip(missing, available[: len(missing)], strict=True))
+                self._plan_callback(
+                    index, [planned[str(i)] for i in range(len(layout))], layout, manifest
+                )
             for part, file in zip(missing, available[: len(missing)], strict=True):
                 file = self._private_file(file)
                 self._bind(destination, key, file, "generation", manifest, int(part))
                 bound_parts[part] = self._get(file["id"])
+        elif self._plan_callback is not None:
+            self._plan_callback(
+                index, [bound_parts[str(i)] for i in range(len(layout))], layout, manifest
+            )
         chosen = [bound_parts[str(i)] for i in range(len(layout))]
         for part, (file, pieces) in enumerate(zip(chosen, layout, strict=True)):
             self._private_file(self._get(file["id"]))

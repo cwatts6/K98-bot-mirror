@@ -208,3 +208,17 @@ When MAINT_SPEC_ALLOWLIST is explicitly configured, permit the exact callable
 `proc_config_import:run_proc_config_import_payload` for process-mode ProcConfig imports.
 The worker still enforces its configured allowlist; this change does not broaden it automatically.
 Thread mode preserves the same actor/provenance without using the process callable allowlist.
+
+## S10B shared export worker configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| EXPORT_COORDINATION_ENABLED | false | Registers no production worker until S10C shared adapters and deployment attestations exist. The flag alone cannot authorize admission. |
+| EXPORT_SNAPSHOT_ROOT | unset | Explicit pre-provisioned absolute private spool directory outside Git; no automatic directory creation or cleanup. |
+| EXPORT_STORAGE_OWNER | unset | Stable registered storage owner, bounded ASCII identity; another owner cannot read or claim its spool. |
+
+S10B provides dependency-injected DAL/worker composition and a pinned new-source Sheets delivery path. Production registration deliberately remains closed even when the flag is true. No existing legacy/manual provider entry point is rerouted in this slice; shared producer integration is S10C. SourceRouting.Enabled is not an activation gate.
+
+ExportSnapshotStore validates the root, opaque keys, byte limits, length and SHA256 before use. Provision the root with private operating-system permissions; storage ownership is an affinity identity, not an ACL substitute. Spool receipt registration follows exclusive write, fsync and readback. No retained spool is deleted by the worker.
+
+Durable pacing also checkpoints a full policy interval after each actual provider completion. A lost checkpoint retains claims for reconciliation; reservation timing alone cannot permit a delayed request burst.

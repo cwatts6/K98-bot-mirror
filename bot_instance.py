@@ -1467,6 +1467,9 @@ async def _graceful_teardown():
         return
     _shutdown_once.set()
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
+    from services.export_coordination_service import stop_export_admission
+
+    stop_export_admission()
 
     # Diagnostic sends must finish their reservation finalizers before client teardown.
     try:
@@ -1784,8 +1787,10 @@ async def _run_ready_queue_lifecycle() -> None:
 
 async def _run_ready_runtime_services() -> None:
     from kvk.services.new_source_recovery_service import register_recovery
+    from services.export_coordination_service import register_exports
 
     register_recovery(task_monitor)
+    register_exports(task_monitor)
 
     # Start heartbeat now that the loop is running
     try:

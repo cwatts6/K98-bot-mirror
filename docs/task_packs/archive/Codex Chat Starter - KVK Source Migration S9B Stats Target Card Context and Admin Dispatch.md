@@ -1,5 +1,9 @@
 # S9B chat starter — initial review/scope only
 
+> Archived after S9B repository delivery: mirror #277, production #584 and SQL #84 merged.
+> No bot-machine pull, deployment or activation. Current authority: [S9B closeout / S10A handoff](../../reference/kvk_source_migration/s9b_closeout_and_s10a_handoff.md).
+> Scope, approval and execution statements below are historical records, not new authorization.
+
 ## S9B implementation authorization — 2026-09-14
 
 The operator approved the initial review and implementation plan with the two exact path
@@ -14,7 +18,7 @@ SQL's two pending documentation paths remain a separate SQL PR in the same deliv
 
 
 Please begin **S9B Stats/Target Card Context and Grouped Admin Source Dispatch, initial review/scope only**
-using [the task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md), [S9A closeout](../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), current AGENTS/core references,
+using [the task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md), [S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md), current AGENTS/core references,
 approved S7 contract/manifests, authoritative SQL, architecture/EndScanID amendment and retained S6
 and S8C execution/operator evidence. S9A mirror #276, production #583 and SQL #83 are merged and
 locally pulled; no changes have been pulled to the bot machine.

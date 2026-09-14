@@ -68,6 +68,60 @@ def load_export_snapshot(*, connect, selection):
     return {"envelope": envelope, "metadata": meta, "weights": weights}
 
 
+def load_intent_export_snapshots(*, connect, intent_id):
+    """S10B full-vector export input, independent of current component selection."""
+    from types import SimpleNamespace
+
+    from kvk.dal.new_source_reporting_dal import load_complete_snapshot
+    from kvk.dal.source_update_dal import load_update, read_export_intent
+    from kvk.services.new_source_export_service import ExportSelection
+
+    with transaction(connect) as cursor:
+        intent, vector = read_export_intent(cursor, intent_id)
+        reads = []
+        for member in vector:
+            update = load_update(cursor, member["UpdateID"])
+            reads.append(
+                SimpleNamespace(
+                    available=True,
+                    source_key=SOURCE_KEY,
+                    kvk_no=intent["KVK_NO"],
+                    choice_id=intent["ChoiceID"],
+                    period_id=member["PeriodID"],
+                    update_id=member["UpdateID"],
+                    update_version=update["Version"],
+                    publication_id=member["PublicationID"],
+                    public_selection_version=member["PublicSelectionVersion"],
+                    selected_config_id=member["ConfigVersionID"],
+                    desired_config_id=member["ConfigVersionID"],
+                    roster_id=update["RosterID"],
+                    availability="current",
+                    reason="pinned_export_intent",
+                )
+            )
+    inputs = []
+    for read in reads:
+        envelope = load_complete_snapshot(connect, read=read)
+        metadata = fetch_source_report_metadata(connect, envelope)
+        with transaction(connect) as cursor:
+            cursor.execute(
+                "SELECT WeightT4XSource,WeightT5YSource,WeightDeadsZSource,EffectiveFromUTC FROM KVK.SourceWeightConfig WHERE ConfigVersionID=? AND SourceKey=? AND KVK_NO=?",
+                read.selected_config_id,
+                SOURCE_KEY,
+                read.kvk_no,
+            )
+            weights = one(cursor)
+        inputs.append(
+            (
+                ExportSelection(
+                    read.kvk_no, read.period_id, read.publication_id, read.public_selection_version
+                ),
+                {"envelope": envelope, "metadata": metadata, "weights": weights},
+            )
+        )
+    return intent, tuple(inputs)
+
+
 def _selected(cursor, selection):
     _, selected, requests = locked_period(cursor, selection.kvk_no, selection.period_id)
     if (

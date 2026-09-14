@@ -1,23 +1,28 @@
 # KVK Source Migration — post-S6 closeout and S7 handoff
 
-## Current status — S9A delivered; S9B scope next, 2026-09-14
+## Current status — S10A accepted and merged; S10B scope next, 2026-09-14
 
-S9A repository delivery is complete: mirror #276, production-repository #583 and SQL #83 are
-merged and locally pulled. Exact file/rename and local blob checks verified the delivered
-**58 physical Bot paths and two SQL documentation paths**. Final S9A offline evidence is
-**4,290 passed / 62 skipped**; it is not a new post-merge execution or production measurement.
-See [S9A closeout and exact pending documentation manifest](s9a_closeout_and_s9b_handoff.md) for anchors, evidence and delivery rules.
-The completed S9A pack/starter are archived. Next is **S9B Stats/Target Card Context and Grouped
-Admin Source Dispatch, initial review/scope only**: [task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
-The eventual separately authorized S9B Bot PR must carry every pending documentation path in
-that closeout, including both sides of both S9A archive moves, alongside its approved runtime/test
-manifest. SQL delivery-log and migration-README updates belong in a separate SQL PR in that cycle.
-S8C disposable SQL/folder smoke and Chris's seven local operator checks remain accepted evidence;
-S8B accepted smoke/50 cases and offline runner history remain distinct from S8A six-script evidence.
-No bot-machine pull/restart, live Discord acceptance, deployment or activation is claimed or authorized.
-S10 export coordination remains later work. Preserve S6-OPS01/PERF01/CAP01, both uncertain
-publications and all retained databases/files. Earlier dated instructions below are historical
-and do not authorize execution or select the next slice.
+S10A SQL #85 is merged and locally pulled at `3776dfa6b0892a8800d236fdf111c4d2f93c3813`.
+All five disposable fixture modes, 76 unique cases in install and constraints, direct apply/rerun,
+backup/actual restore and final preservation checks passed; final CI passed. Results accepted.
+No changes have been pulled to the bot machine; no production SQL deployment or activation.
+S9B mirror #277, production #584 and SQL #84 remain delivered. Bot comparison anchors are unchanged.
+
+Next: **S10B Shared Export Coordination Worker and Durable Budget, initial review/scope only**.
+Use the [S10B task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md).
+The [S10A closeout and exact carry-forward manifest](s10a_implementation_and_s10b_handoff.md) controls delivery.
+Completed S10A and S9B packs/starters are archived; retained execution/operator evidence stays available.
+Every pending Bot document and archive destination belongs in the eventual S10B implementation PR.
+Check exact filename AND previous_filename, with explicit absent-at-base proof for never-committed
+S10A source paths. No standalone documentation PR or repository mixing; grouping is settled.
+Both mandatory SQL delivery documents were included and merged in SQL #85.
+
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+S8B accepted smoke/50-case and actual-restore evidence remains distinct from offline runner history,
+S8A six-script evidence and S8C seven local checks; S8C is not live Discord acceptance.
+No S10B implementation, Git publication, runtime execution, deployment, activation or automatic new task
+is authorized by this closeout. SourceRouting.Enabled alone never enables source activation.
+Earlier dated checkpoints below are historical.
 
 
 ## Historical S8B closeout status — 2026-09-13

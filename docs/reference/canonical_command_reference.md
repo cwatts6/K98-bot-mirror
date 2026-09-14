@@ -1,6 +1,9 @@
 # Canonical Command Reference
 
-Last updated: 2026-09-09
+> Current handoff: **S9B repository-delivered; not deployed**. See [S9B closeout / S10A scope and exact documentation carry-forward](kvk_source_migration/s9b_closeout_and_s10a_handoff.md).
+> Retained evidence and historical approvals below remain intact; no predecessor rerun or live operation is authorized.
+
+Last updated: 2026-09-14
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use

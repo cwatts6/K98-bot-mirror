@@ -1,6 +1,9 @@
 # Work instruction: check the S8C local intake
 
-> Retained S8B/S8C reference, 2026-09-14: S9A repository delivery is now complete.
+> Current handoff: **S9B repository-delivered; not deployed**. See [S9B closeout / S10A scope and exact documentation carry-forward](s9b_closeout_and_s10a_handoff.md).
+> Retained evidence and historical approvals below remain intact; no predecessor rerun or live operation is authorized.
+
+> Retained S8B/S8C reference, 2026-09-14: S9B repository delivery is now complete.
 > See [S9A closeout / S9B scope and pending documentation delivery](s9a_closeout_and_s9b_handoff.md).
 > Historical execution/operator evidence and limits below remain intact; this update does not
 > request a rerun or claim live Discord acceptance, bot-machine deployment or activation.

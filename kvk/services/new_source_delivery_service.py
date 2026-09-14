@@ -253,6 +253,136 @@ def deliver_export(
             )
 
 
+def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, stop):
+    """S10B Sheets path: pinned vector, durable attempts, no SQL around requests.
+
+    This requires an admitted claim and a privately composed transport. Production
+    composition remains disabled until shared S10C adapters/deployment gates exist.
+    Existing Discord delivery and historical SourceDelivery receipt bytes are untouched.
+    """
+    from types import SimpleNamespace
+
+    from kvk.dal.new_source_import_dal import canonical, digest
+    from kvk.services.new_source_export_service import GoogleSheetsTransport, load_intent_generation
+
+    if not isinstance(transport, GoogleSheetsTransport) or job["ConsumerKind"] != "new_source":
+        raise ValueError("Coordinated new-source Sheets transport required.")
+    registration = transport.registration
+    destinations = tuple(sorted((registration.index_file_id, *registration.slot_file_ids)))
+    if digest(destinations) != bytes(job["DestinationSetHash"]):
+        raise SourceConflict("Transport registration differs from admitted destinations.")
+    dal.authorize(claim)
+    generation = transport.prepare_generation(
+        load_intent_generation(
+            connect=connect, intent_id=job["IntentID"], expected_hash=bytes(job["InputHash"])
+        )
+    )
+    from kvk.dal.new_source_delivery_dal import Destination
+
+    destination = Destination("sheets", registration.index_file_id)
+    attempt_id = None
+    parts = []
+
+    def guard(request):
+        if stop.is_set():
+            raise InterruptedError("Export admission stopped.")
+        dal.authorize(claim, mutation=getattr(request, "method", None) != "GET")
+
+    def plan(index, files, layout, manifest):
+        nonlocal attempt_id, parts
+        if attempt_id is not None:
+            raise SourceConflict("An attempt plan cannot be replaced.")
+        properties = transport._execute(
+            transport.sheets.spreadsheets().get(
+                spreadsheetId=index["id"], fields="sheets.properties"
+            )
+        )["sheets"]
+        if len(properties) != 1 or properties[0]["properties"]["title"] != "Sheet1":
+            raise SourceConflict("Registered index shape differs.")
+        grid = properties[0]["properties"]["gridProperties"]
+        parts = [
+            dict(
+                file_id=index["id"],
+                role="index",
+                manifest_hash=digest({"export_key": generation.key, "fence": claim.fence}).hex(),
+                grids=1,
+                rows=1,
+                cells=grid["rowCount"] * grid["columnCount"],
+            )
+        ]
+        for number, (file, pieces) in enumerate(zip(files, layout, strict=True)):
+            directory_rows = sum(map(len, layout)) + 1 if number == 0 else 0
+            parts.append(
+                dict(
+                    file_id=file["id"],
+                    role="generation",
+                    manifest_hash=digest({"pieces": pieces, "manifest": manifest}).hex(),
+                    grids=len(pieces) + int(number == 0),
+                    rows=sum(p["rows"] for p in pieces) + directory_rows,
+                    cells=sum(max(2, p["rows"] + 1) * p["columns"] for p in pieces)
+                    + directory_rows * 5,
+                )
+            )
+        attempt_id = dal.begin_attempt(
+            claim, {"export_key": generation.key, "tables": manifest}, parts
+        )
+
+    transport._request_pacer, transport._request_guard, transport._plan_callback = (
+        budget,
+        guard,
+        plan,
+    )
+    # No automatic slot reuse until S10D/E supplies durable pool/disposition authority.
+    transport.reuse_guard = lambda *_: False
+    manifest = generation.manifest()
+    transport.ensure_private(destination, generation.key, manifest)
+    if attempt_id is None:
+        raise SourceConflict("Provider preparation did not retain an attempt.")
+    for item in generation.tables:
+        transport.write_range(
+            destination,
+            generation.key,
+            item.name,
+            "A1",
+            item.raw_values(),
+            value_input_option="RAW",
+        )
+    if transport.verify(destination, generation.key) != manifest:
+        raise SourceConflict("Exact private manifest readback failed.")
+    # Check every generation ACL rather than inferring private verification from
+    # successful writes. The previous index may legitimately remain public.
+    if any(
+        any(p.get("type") == "anyone" for p in transport._get(part["file_id"])["permissions"])
+        for part in parts[1:]
+    ):
+        raise SourceConflict("Generation is not private.")
+    dal.verified(claim, attempt_id)
+    dal.publication_pending(claim, attempt_id)
+    remote = transport.publish_current(destination, generation.key, claim.fence)
+    probe = SimpleNamespace(
+        receipt=canonical({"export_key": generation.key}),
+        fence=claim.fence,
+        selection=generation.selections[0],
+    )
+    state, _ = transport.reconcile(destination, probe)
+    actual_files = [
+        registration.index_file_id,
+        *(f["id"] for f in transport._files(destination, generation.key)),
+    ]
+    if state != "confirmed" or actual_files != [p["file_id"] for p in parts]:
+        raise RemoteOutcomeUnknown("Publication readback differs from the admitted attempt.")
+    receipt = dict(
+        export_key=generation.key,
+        fence=claim.fence,
+        attempt_id=attempt_id,
+        files=actual_files,
+        audience=registration.audience,
+        remote_id=remote,
+    )
+    dal.confirm(claim, attempt_id, receipt)
+    return receipt
+
+
 def deliver_discord(
     *,
     selection,

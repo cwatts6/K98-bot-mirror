@@ -807,6 +807,67 @@ def google_delivery():
     return args, repo, api
 
 
+@pytest.mark.parametrize("public", [False, True])
+def test_s10b_pinned_worker_records_parts_before_mutation_and_reads_publication(
+    monkeypatch, public
+):
+    from dataclasses import replace
+    from threading import Event
+    from types import SimpleNamespace
+
+    from kvk.dal.new_source_import_dal import digest
+    from kvk.services import new_source_export_service
+    from kvk.services.new_source_delivery_service import deliver_coordinated_export
+
+    args, repo, api = google_delivery()
+    transport = args["transport"]
+    if public:
+        transport.registration = replace(transport.registration, audience="public_viewer")
+    original = args["generation"]
+    monkeypatch.setattr(new_source_export_service, "load_intent_generation", lambda **_: original)
+    claim = SimpleNamespace(fence=10)
+    job = dict(
+        ConsumerKind="new_source",
+        IntentID="intent-a",
+        InputHash=b"a" * 32,
+        DestinationSetHash=digest(tuple(sorted(("fake-index", "fake-1", "fake-2")))),
+    )
+    dal = Mock()
+    retained = {}
+
+    def authorize(*_, mutation=False):
+        if mutation:
+            assert retained.get("attempt")
+        return job
+
+    def begin(_, manifest, parts):
+        assert not any(
+            method in {"update", "delete", "batchUpdate", "create"} for _, method, _ in api.calls
+        )
+        retained.update(attempt="attempt-a", manifest=manifest, parts=parts)
+        # B arrives after A's durable claim. A must not consult the new selection.
+        repo.selected = replace(repo.selected, selection_version=99)
+        return "attempt-a"
+
+    dal.authorize.side_effect = authorize
+    dal.begin_attempt.side_effect = begin
+    receipt = deliver_coordinated_export(
+        job=job,
+        claim=claim,
+        dal=dal,
+        transport=transport,
+        connect=None,
+        budget=lambda: None,
+        stop=Event(),
+    )
+    assert receipt["export_key"] == original.key
+    assert receipt["files"] == ["fake-index", "fake-1"]
+    assert len(retained["parts"]) == 2
+    assert retained["manifest"]["tables"] == original.manifest()
+    dal.confirm.assert_called_once_with(claim, "attempt-a", receipt)
+    assert api.values[("fake-index", "Sheet1")][0][:2] == [original.key, "10"]
+
+
 def test_registered_google_adapter_initializes_twelve_tabs_without_creating_files():
     args, repo, api = google_delivery()
     outcome = deliver_export(**args)
@@ -1707,3 +1768,30 @@ def test_registration_receipt_exact_utf16_capacity_before_claim(extra):
             deliver_export(**args)
         repo.claim.assert_called_once()
     assert api.calls == []
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_s10b_provider_completion_checkpoint_follows_actual_request(fails):
+    args, _, _ = google_delivery()
+    transport = args["transport"]
+    events = []
+    pacer = Mock(side_effect=lambda: events.append("reserve"))
+    pacer.completed.side_effect = lambda: events.append("complete")
+    transport._request_pacer = pacer
+    transport._request_guard = lambda _: events.append("guard")
+    request = Mock(method="POST")
+
+    def execute(**_):
+        events.append("provider")
+        if fails:
+            raise RuntimeError("synthetic failure")
+        return {"ok": True}
+
+    request.execute.side_effect = execute
+    if fails:
+        with pytest.raises(RuntimeError):
+            transport._execute(request)
+    else:
+        assert transport._execute(request) == {"ok": True}
+    assert events == ["reserve", "guard", "provider", "complete"]
+    request.execute.assert_called_once_with(num_retries=0)

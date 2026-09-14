@@ -100,8 +100,8 @@ class ExportTarget:
 
 
 def deliver_current_exports(dal, repository, targets, season, *, changed=None):
-    """Compatibility boundary: S8B retains intents until the S10 worker is installed."""
-    raise SourceConflict("Automatic export execution requires the S10 coordinator.")
+    """No raw component delivery: durable complete intents belong to the coordinator."""
+    raise SourceConflict("Automatic export execution requires admitted S10 complete intents.")
 
 
 class RecoveryService:
@@ -147,6 +147,9 @@ class RecoveryService:
                 )
             # S8B commits durable full-vector intents. S10 owns provider admission
             # and execution; never deliver raw component selections from this worker.
+            from services.export_coordination_service import wake_exports
+
+            wake_exports()
             self.after = (season, period)
 
 

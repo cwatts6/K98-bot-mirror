@@ -332,3 +332,30 @@ def test_invalid_registration_fails_before_sql_or_credentials(monkeypatch):
     with pytest.raises(ValueError, match="JSON"):
         recovery.configured_recovery()
     sql.assert_not_called()
+
+
+def test_s10b_default_off_and_missing_adapters_cannot_activate(monkeypatch):
+    from services.export_coordination_service import register_exports
+
+    monitor, factory = Mock(), Mock()
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", False)
+    assert register_exports(monitor, factory=factory) is None
+    monitor.create.assert_not_called()
+    factory.assert_not_called()
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
+    monitor.is_running.return_value = False
+    assert register_exports(monitor) is None
+    monitor.create.assert_not_called()
+
+
+def test_s10b_pair_recovery_only_wakes_durable_export_discovery(monkeypatch):
+    from services import export_coordination_service
+
+    wake = Mock()
+    monkeypatch.setattr(export_coordination_service, "wake_exports", wake)
+    dal = Mock()
+    dal.periods.return_value = [(16, "period")]
+    service = recovery.RecoveryService(dal, Mock())
+    monkeypatch.setattr(service, "recover_period", Mock())
+    service.run_batch(Event())
+    wake.assert_called_once()
