@@ -206,7 +206,11 @@ def load_intent_generation(*, connect, intent_id, expected_hash):
     intent, inputs = load_intent_export_snapshots(connect=connect, intent_id=intent_id)
     if bytes(intent["VectorHash"]) != expected_hash:
         raise SourceConflict("Job input digest differs from immutable intent.")
-    return build_generation(inputs)
+    periods = []
+    for selection, snapshot in inputs:
+        periods.append(compact_sheets_generation(build_generation(((selection, snapshot),))))
+        del snapshot
+    return _combine_sheets_periods(periods)
 
 
 def _facts(envelope, meta, context, kind):
@@ -514,6 +518,15 @@ def load_sheets_generation(*, connect, selections, snapshot_loader=None):
         )
         for s in chosen
     ]
+    return _combine_sheets_periods(periods)
+
+
+def _combine_sheets_periods(periods):
+    """Merge only compact periods, retaining canonical order and independent overall."""
+    periods = sorted(periods, key=lambda p: (p.selections[0].kvk_no, p.selections[0].period_id))
+    chosen = tuple(s for p in periods for s in p.selections)
+    if not chosen or len({(s.kvk_no, s.period_id) for s in chosen}) != len(chosen):
+        raise ValueError("Explicit unique selections required.")
     # Per-period canonical output inserts unavailable overall placeholders. Keep those
     # only when no requested period supplies an actual overall publication.
     overall_seasons = {

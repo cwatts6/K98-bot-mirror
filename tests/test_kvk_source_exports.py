@@ -316,3 +316,99 @@ def test_s10b_intent_loader_keeps_running_generation_after_new_selection(monkeyp
     loader.assert_called_once_with(connect=None, intent_id="intent-a")
     with pytest.raises(SourceConflict, match="digest"):
         load_intent_generation(connect=None, intent_id="intent-a", expected_hash=b"b" * 32)
+
+
+@pytest.mark.parametrize("include_overall", [False, True])
+def test_intent_periods_release_raw_inputs_before_next_read(monkeypatch, include_overall):
+    from contextlib import contextmanager
+    from uuid import UUID
+    import weakref
+
+    from kvk.dal import new_source_delivery_dal as dal, new_source_reporting_dal, source_update_dal
+    from kvk.services import new_source_export_service as service
+
+    selections = tuple(
+        ExportSelection(16, str(UUID(int=i * 2 + 1)), str(UUID(int=i * 2 + 2)), 7)
+        for i in range(10)
+    )
+
+    def snapshot(selection):
+        _, value = export_input(overall=include_overall and selection == selections[-1])
+        value["envelope"]["period_id"] = selection.period_id
+        value["envelope"]["publication"]["PublicationID"] = selection.publication_id
+        return value
+
+    expected = service.load_sheets_generation(
+        connect=None, selections=selections, snapshot_loader=lambda **kw: snapshot(kw["selection"])
+    )
+    intent = {"VectorHash": b"a" * 32, "KVK_NO": 16, "ChoiceID": "choice-a"}
+    vector = [
+        dict(
+            PeriodID=s.period_id,
+            PublicationID=s.publication_id,
+            PublicSelectionVersion=7,
+            UpdateID=s.period_id,
+            ConfigVersionID="c1",
+        )
+        for s in reversed(selections)
+    ]
+    depth = 0
+    events, retained = [], []
+
+    @contextmanager
+    def transaction(_):
+        nonlocal depth
+        depth += 1
+        try:
+            yield Mock()
+        finally:
+            depth -= 1
+
+    class Envelope(dict):
+        pass
+
+    def load_snapshot(_, *, read):
+        assert depth == 0
+        assert all(ref() is None for ref in retained), "previous raw envelope retained"
+        assert events.count("read") == events.count("compact")
+        selected = ExportSelection(read.kvk_no, read.period_id, read.publication_id, 7)
+        envelope = Envelope(snapshot(selected)["envelope"])
+        retained.append(weakref.ref(envelope))
+        events.append("read")
+        return envelope
+
+    compact = service.compact_sheets_generation
+
+    def compact_period(generation):
+        assert depth == 0
+        assert len(generation.selections) == 1
+        result = compact(generation)
+        events.append("compact")
+        return result
+
+    monkeypatch.setattr(dal, "transaction", transaction)
+    monkeypatch.setattr(source_update_dal, "read_export_intent", lambda *_: (intent, vector))
+    monkeypatch.setattr(
+        source_update_dal, "load_update", lambda *_: {"Version": 1, "RosterID": "b0"}
+    )
+    monkeypatch.setattr(new_source_reporting_dal, "load_complete_snapshot", load_snapshot)
+    monkeypatch.setattr(
+        dal,
+        "fetch_source_report_metadata",
+        lambda _, e: snapshot(
+            ExportSelection(16, e["period_id"], e["publication"]["PublicationID"], 7)
+        )["metadata"],
+    )
+    monkeypatch.setattr(dal, "one", lambda _: snapshot(selections[0])["weights"])
+    monkeypatch.setattr(service, "compact_sheets_generation", compact_period)
+    actual = service.load_intent_generation(
+        connect=None, intent_id="intent-a", expected_hash=b"a" * 32
+    )
+    assert actual == expected
+    assert actual.key == expected.key
+    assert events == ["read", "compact"] * 10
+    assert all(ref() is None for ref in retained)
+    events.clear()
+    with pytest.raises(SourceConflict, match="digest"):
+        service.load_intent_generation(connect=None, intent_id="intent-a", expected_hash=b"b" * 32)
+    assert events == []  # Mismatched intent rejected before any publication payload read.

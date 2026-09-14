@@ -69,12 +69,10 @@ def load_export_snapshot(*, connect, selection):
 
 
 def load_intent_export_snapshots(*, connect, intent_id):
-    """S10B full-vector export input, independent of current component selection."""
+    """Return pinned intent metadata and lazy snapshots, with no transaction over iteration."""
     from types import SimpleNamespace
 
-    from kvk.dal.new_source_reporting_dal import load_complete_snapshot
     from kvk.dal.source_update_dal import load_update, read_export_intent
-    from kvk.services.new_source_export_service import ExportSelection
 
     with transaction(connect) as cursor:
         intent, vector = read_export_intent(cursor, intent_id)
@@ -99,7 +97,13 @@ def load_intent_export_snapshots(*, connect, intent_id):
                     reason="pinned_export_intent",
                 )
             )
-    inputs = []
+    return intent, _iter_intent_export_snapshots(connect, reads)
+
+
+def _iter_intent_export_snapshots(connect, reads):
+    from kvk.dal.new_source_reporting_dal import load_complete_snapshot
+    from kvk.services.new_source_export_service import ExportSelection
+
     for read in reads:
         envelope = load_complete_snapshot(connect, read=read)
         metadata = fetch_source_report_metadata(connect, envelope)
@@ -111,15 +115,14 @@ def load_intent_export_snapshots(*, connect, intent_id):
                 read.kvk_no,
             )
             weights = one(cursor)
-        inputs.append(
-            (
-                ExportSelection(
-                    read.kvk_no, read.period_id, read.publication_id, read.public_selection_version
-                ),
-                {"envelope": envelope, "metadata": metadata, "weights": weights},
-            )
+        yield (
+            ExportSelection(
+                read.kvk_no, read.period_id, read.publication_id, read.public_selection_version
+            ),
+            {"envelope": envelope, "metadata": metadata, "weights": weights},
         )
-    return intent, tuple(inputs)
+        # The consumer compacts and releases this period before asking for the next.
+        del envelope, metadata, weights
 
 
 def _selected(cursor, selection):
