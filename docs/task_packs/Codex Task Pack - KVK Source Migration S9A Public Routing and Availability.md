@@ -220,3 +220,34 @@ S8B accepted smoke/50-case/actual-restore evidence and offline runner history re
 S8A six-script evidence. S6-OPS01/PERF01/CAP01, both uncertain publications and all retained
 databases, originals, backups and external evidence are preserved. No predecessor execution was
 repeated. The next delivery or operational action requires its own authorization.
+
+## PR review follow-up — 2026-09-14
+
+The operator subsequently authorized PR creation and action/replies/resolution for review comments.
+Bot mirror PR #276 and separate SQL documentation PR #83 are open for review; earlier uncommitted
+statements above describe the prior local checkpoint, not their present publication status.
+
+Bot review comment 4003710837 correctly identified that the empty-data guard also skipped explicit
+legacy-source reports carrying provenance. The guard now preserves empty legacy sends while still
+blocking routing/new-source unavailability and retaining the fresh authority check before send.
+The ordinary dispatch regression reproduced the failure before the fix and verifies two legacy
+embeds, the existing mention behavior and one daily claim; disabled new-source output remains blocked.
+Focused regression tests: **82 passed**. Full offline/log-isolation run: **4,290 passed, 62 skipped**,
+179.54 seconds; production operational logs unchanged. Architecture, deferred-item, security-routing,
+selector, imports and registration checks passed; command surface remains 36 top-level / 101 grouped.
+
+Narrow Changes review `72bb84e5-f375-4bc8-9399-87079602b116` completed with **zero findings**, Deep off,
+against Bot PR head `a3ca95b8cc3041c8a495e4f7fad0c2abbefbe6b2`; reviewed snapshot digest
+`6593f363c8aae88119c7f540ae2cb5cd4abcc811db4a6ed4d834eb394842612c`.
+The one changed runtime file and its regression test were reviewed with supporting authority checks.
+This evidence-only Markdown addendum follows the scan; reviewed Python is unchanged. Daybreak was
+granted (Daybreak Blue); workbench telemetry reports 1,327,607 total tokens, including 1,269,248 cached
+input tokens. Canonical artifacts remain under the local scan directory ending
+`a3ca95b8cc3041c8a495e4f7fad0c2abbefbe6b2_20260914T091637Z_7a0xz9fz`.
+
+SQL review comments 4003671388 and 4003671443 are addressed in the existing two SQL documentation
+paths: the unrun statement is explicitly scoped to the original repository-delivery checkpoint and
+links to the later disposable-execution addendum. Publication wording now records SQL PR #83.
+The static documentation-path check and staged hygiene/secrets checks passed; the independent
+documentation-only security skip remains applicable. No SQL or predecessor execution occurred.
+The Bot58/SQL2 exact delivery manifests and all operational/retained-evidence boundaries remain intact.

@@ -94,8 +94,8 @@ async def test_interface_does_not_duplicate_prekvk_daily_claim(monkeypatch) -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("disabled", [True, False])
-async def test_ordinary_source_dispatch_preserves_daily_claim_owner(monkeypatch, disabled):
+@pytest.mark.parametrize("source_state", ["new_disabled", "new_complete", "legacy_empty"])
+async def test_ordinary_source_dispatch_preserves_daily_claim_owner(monkeypatch, source_state):
     from unittest.mock import AsyncMock
 
     from stats_alerts.embeds import kvk
@@ -103,7 +103,19 @@ async def test_ordinary_source_dispatch_preserves_daily_claim_owner(monkeypatch,
 
     store = RoutingStore()
     store.install(monkeypatch)
+    disabled = source_state == "new_disabled"
     store.routing["Enabled"] = not disabled
+    if source_state == "legacy_empty":
+        from kvk.dal import kvk_reporting_dal
+
+        store.choice["SourceKey"] = "legacy_full_data"
+
+        def empty_legacy_rows(kvk_no, our_kingdom, *, read):
+            assert kvk_no == 16 and read.availability == "legacy"
+            return {}
+
+        monkeypatch.setattr(kvk_reporting_dal, "fetch_allkingdom_reporting_rows", empty_legacy_rows)
+        monkeypatch.setattr(kvk, "get_latest_honor_top", AsyncMock(return_value=[]))
     monkeypatch.setattr(
         kvk,
         "get_latest_kvk_metadata_sql",
@@ -128,3 +140,7 @@ async def test_ordinary_source_dispatch_preserves_daily_claim_owner(monkeypatch,
     assert result.attempts[-1].outcome == ("skipped" if disabled else "sent")
     if not disabled:
         assert claims == [(("kvk",), {"max_per_day": 3})]
+    if source_state == "legacy_empty":
+        assert result.attempts[-1].data == "empty_or_unavailable"
+        assert len(channel.send.call_args.kwargs["embeds"]) == 2
+        assert channel.send.call_args.kwargs["content"] == "@everyone"

@@ -661,7 +661,11 @@ async def send_kvk_embed(
     preview = await build_kvk_preview(timestamp)
     if _delivery:
         _delivery.update(data="available" if preview.available else "empty_or_unavailable")
-    if preview.routing_unavailable or (preview.public_read is not None and not preview.available):
+    if preview.routing_unavailable or (
+        preview.public_read is not None
+        and preview.public_read["availability"] != "legacy"
+        and not preview.available
+    ):
         if _delivery:
             _delivery.skip("source_unavailable")
         return
