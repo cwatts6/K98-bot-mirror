@@ -2,7 +2,7 @@
 
 > Superseded handoff checkpoint, 2026-09-14: S10A is accepted, SQL #85 merged and locally
 > pulled; no bot-machine pull. Use the [S10A closeout/current exact S10B manifest](s10a_implementation_and_s10b_handoff.md#s10a-final-closeout-and-s10b-delivery-manifest--2026-09-14).
-> The historical39-path list below is preserved; current delivery includes the S10A archives
+> The historical 39-path list below is preserved; current delivery includes the S10A archives
 > and S10B pack/starter, with explicit absent-at-base exceptions for never-committed S10A sources.
 
 

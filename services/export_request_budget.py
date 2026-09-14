@@ -1,6 +1,6 @@
 """Durable Google pacing. Reservations commit before any wait or provider request."""
 
-from datetime import UTC, datetime
+from datetime import UTC
 from email.utils import parsedate_to_datetime
 import math
 import time
@@ -16,13 +16,13 @@ def retry_delay(value, *, attempt=0):
     try:
         delay = float(value)
     except (TypeError, ValueError):
-        # HTTP dates use a UTC observation only to derive a duration. The DAL adds
-        # that duration to server UTC, which remains the persisted time authority.
+        # Preserve absolute HTTP dates; only SQL server UTC may turn one into a
+        # bounded duration. A skewed bot wall clock must not shorten cooldown.
         try:
             date = parsedate_to_datetime(value)
             if date.tzinfo is None:
                 return fallback
-            delay = (date - datetime.now(UTC)).total_seconds()
+            return date.astimezone(UTC)
         except (TypeError, ValueError, OverflowError):
             return fallback
     return min(3600, max(1, delay)) if math.isfinite(delay) else fallback
@@ -59,7 +59,10 @@ class RequestBudget:
         status = getattr(response, "status", None)
         if status in (429, 503):
             header = response.get("retry-after") if hasattr(response, "get") else None
-            self.dal.extend_cooldown(self.account_key, retry_delay(header, attempt=attempt))
+            try:
+                self.dal.extend_cooldown(self.account_key, retry_delay(header, attempt=attempt))
+            except Exception as exc:
+                raise BudgetCompletionUnknown("Provider cooldown requires reconciliation.") from exc
 
     def completed(self):
         # Account admission remains held until this checkpoint commits. Starting

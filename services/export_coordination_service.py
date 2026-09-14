@@ -36,7 +36,7 @@ class ExportCoordinator:
         self.last_account = ""
 
     def discover(self):
-        intents = self.dal.pending_intents(after=self.after)
+        intents = self.dal.pending_intents(after=self.after, registrations=self.registrations)
         if not intents:
             self.after = (0, 0)
         for intent in intents:

@@ -8,7 +8,7 @@ these transitions or establish provider truth.
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import re
@@ -119,6 +119,7 @@ class Claim:
     fence: int
     version: int
     resources: tuple[tuple[str, int], ...]
+    intent_id: str | None = None
 
 
 def _job(cursor, job_id):
@@ -180,16 +181,33 @@ class ExportCoordinationDAL:
             _mutex(cursor, "account:" + account)
             yield cursor
 
-    def pending_intents(self, limit=32, *, after=(0, 0)):
+    def pending_intents(self, limit=32, *, after=(0, 0), registrations=()):
         if type(limit) is not int or not 1 <= limit <= 128:
             raise ValueError("Bounded discovery required.")
+        if len(registrations) > 8:
+            raise ValueError("At most eight explicit registrations are supported.")
+        eligibility = "i.IntentState IN ('pending','waiting_destination')"
+        parameters = []
+        if registrations:
+            # Exclude already materialized history while preserving missing
+            # registration work after a restart partway through fan-out.
+            eligibility = (
+                "i.IntentState NOT IN ('blocked','coalesced') AND EXISTS (SELECT 1 FROM (VALUES "
+                + ",".join("(?,?,?,?)" for _ in registrations)
+                + ") r(KVK_NO,AccountKey,PoolEpoch,DestinationSetHash) WHERE r.KVK_NO=i.KVK_NO "
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ExportJob j WHERE j.IntentID=i.IntentID "
+                "AND j.AccountKey=r.AccountKey AND j.PoolEpoch=r.PoolEpoch AND j.DestinationSetHash=r.DestinationSetHash AND j.RepairID IS NULL))"
+            )
+            for r in registrations:
+                parameters.extend((r.kvk_no, r.account, r.epoch, digest(r.destinations)))
         with transaction(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (?) i.* FROM KVK.SourceExportIntent i "
-                "WHERE i.IntentState IN ('pending','waiting_destination','materialized') "
+                "WHERE " + eligibility + " "
                 "AND (i.KVK_NO>? OR (i.KVK_NO=? AND i.CommitSequence>?)) "
                 "ORDER BY i.KVK_NO,i.CommitSequence",
                 limit,
+                *parameters,
                 after[0],
                 after[0],
                 after[1],
@@ -200,6 +218,8 @@ class ExportCoordinationDAL:
         if not isinstance(spec, JobSpec):
             raise ValueError("Validated immutable job specification required.")
         with self._account(spec.account) as cursor:
+            if spec.intent_id is not None:
+                _mutex(cursor, "intent:" + spec.intent_id)
             # Replay uniqueness includes exact NULL season/epoch/repair tuples.
             cursor.execute(
                 "SELECT JobID FROM dbo.ExportJob WITH (UPDLOCK,HOLDLOCK) "
@@ -228,6 +248,8 @@ class ExportCoordinationDAL:
                     spec.storage_owner,
                 ):
                     raise SourceConflict("Replay cannot replace immutable inputs or storage.")
+                if spec.intent_id is not None:
+                    self._sync_intent(cursor, spec.intent_id)
                 return row
             if spec.repair_id is not None:
                 raise SourceConflict("New repair admission requires the S10E authority workflow.")
@@ -324,6 +346,7 @@ class ExportCoordinationDAL:
                     "INSERT dbo.ExportJobResource (JobID,ResourceKey) VALUES (?,?)", job_id, key
                 )
             for old in pending:
+                _mutex(cursor, "intent:" + old["IntentID"])
                 _cas(
                     cursor,
                     "UPDATE dbo.ExportJob SET State='coalesced',SupersededByJobID=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() "
@@ -332,7 +355,48 @@ class ExportCoordinationDAL:
                     old["JobID"],
                     old["Version"],
                 )
+                self._sync_intent(cursor, old["IntentID"])
+            if spec.intent_id is not None:
+                self._sync_intent(cursor, spec.intent_id)
             return _job(cursor, job_id)
+
+    def _sync_intent(self, cursor, intent_id):
+        """Aggregate registered jobs under the intent mutex, in their transaction."""
+        cursor.execute(
+            "SELECT IntentState,SupersededByIntentID FROM KVK.SourceExportIntent WITH (UPDLOCK,HOLDLOCK) WHERE IntentID=?",
+            intent_id,
+        )
+        intent = one(cursor)
+        if not intent:
+            raise SourceConflict("Source intent disappeared during its job transition.")
+        if intent["IntentState"] == "blocked":
+            return
+        cursor.execute(
+            "SELECT j.State,s.IntentID AS SuccessorIntentID FROM dbo.ExportJob j LEFT JOIN dbo.ExportJob s ON s.JobID=j.SupersededByJobID WHERE j.IntentID=?",
+            intent_id,
+        )
+        jobs = rows(cursor)
+        if not jobs:
+            raise SourceConflict("Materialized intent requires a durable job.")
+        state, successor = "materialized", None
+        if all(j["State"] == "confirmed" for j in jobs):
+            state = "confirmed"
+        elif all(j["State"] == "coalesced" for j in jobs):
+            successors = {identity(j["SuccessorIntentID"]) for j in jobs}
+            if len(successors) == 1:
+                state, successor = "coalesced", successors.pop()
+        if (state, successor) == (intent["IntentState"], intent["SupersededByIntentID"]):
+            return
+        _cas(
+            cursor,
+            "UPDATE KVK.SourceExportIntent SET IntentState=?,SupersededByIntentID=? OUTPUT inserted.IntentID WHERE IntentID=? AND IntentState=? AND (SupersededByIntentID=? OR (SupersededByIntentID IS NULL AND CAST(? AS uniqueidentifier) IS NULL))",
+            state,
+            successor,
+            intent_id,
+            intent["IntentState"],
+            intent["SupersededByIntentID"],
+            intent["SupersededByIntentID"],
+        )
 
     def accounts(self):
         with transaction(self.connect) as cursor:
@@ -431,12 +495,16 @@ class ExportCoordinationDAL:
                         resource["Version"],
                     )
                     claimed.append((resource["ResourceKey"], result["Version"]))
-                return Claim(job["JobID"], account, owner, fence, version, tuple(claimed))
+                return Claim(
+                    job["JobID"], account, owner, fence, version, tuple(claimed), job["IntentID"]
+                )
             return None
 
     @contextmanager
     def _owned(self, claim):
         with self._account(claim.account) as cursor:
+            if claim.intent_id is not None:
+                _mutex(cursor, "intent:" + claim.intent_id)
             for key, version in claim.resources:
                 _mutex(cursor, key)
                 cursor.execute(
@@ -453,6 +521,8 @@ class ExportCoordinationDAL:
                 ) != (claim.job_id, claim.owner_id, claim.fence, version, None):
                     raise SourceConflict("Resource owner/fence/version changed or blocked.")
             job = _job(cursor, claim.job_id)
+            if job and job.get("IntentID") != claim.intent_id:
+                raise SourceConflict("Claim intent identity differs.")
             if not job or (
                 job["AccountKey"],
                 job["OwnerID"],
@@ -764,6 +834,8 @@ class ExportCoordinationDAL:
                     claim.owner_id,
                     claim.fence,
                 )
+        if claim.intent_id is not None:
+            self._sync_intent(cursor, claim.intent_id)
 
     def reserve_request(self, account):
         with transaction(self.connect) as cursor:
@@ -856,12 +928,20 @@ class ExportCoordinationDAL:
             )
 
     def extend_cooldown(self, account, seconds):
-        if not isinstance(seconds, (int, float)) or not 0 < seconds <= 3600:
+        absolute = isinstance(seconds, datetime)
+        if absolute and seconds.tzinfo is None:
+            raise ValueError("HTTP-date cooldown must include a timezone.")
+        if not absolute and (not isinstance(seconds, (int, float)) or not 0 < seconds <= 3600):
             raise ValueError("Bounded cooldown required.")
         with transaction(self.connect) as cursor:
             _mutex(cursor, "budget:" + account)
             cursor.execute("SELECT CAST(SYSUTCDATETIME() AS datetime2(3)) AS NowUTC")
             now = one(cursor)["NowUTC"]
+            if absolute:
+                seconds = min(
+                    3600,
+                    max(1, (seconds.astimezone(UTC).replace(tzinfo=None) - now).total_seconds()),
+                )
             cursor.execute(
                 "SELECT * FROM dbo.ExportRequestBudget WITH (UPDLOCK,HOLDLOCK) WHERE AccountKey=? AND BudgetKind='google_request'",
                 account,

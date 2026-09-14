@@ -397,6 +397,8 @@ def test_running_a_is_untouched_while_b_coalesces_to_c_with_original_ticket(monk
         batches=[[], [], [pending]],
     )
     dal = scripted(monkeypatch, cursor)
+    sync = Mock()
+    monkeypatch.setattr(dal, "_sync_intent", sync)
     monkeypatch.setattr(
         source_update_dal,
         "read_export_intent",
@@ -408,6 +410,10 @@ def test_running_a_is_untouched_while_b_coalesces_to_c_with_original_ticket(monk
         ),
     )
     dal.enqueue(request)
+    assert [call.args[1] for call in sync.call_args_list] == [
+        pending["IntentID"],
+        request.intent_id,
+    ]
     updates = [(q, values) for q, values in cursor.calls if q.startswith("UPDATE dbo.ExportJob")]
     assert len(updates) == 1 and updates[0][1][1:] == (pending_id, 2)
     assert "OwnerID IS NULL AND Fence=0" in updates[0][0]
@@ -591,3 +597,121 @@ def test_budget_uncertainty_blocks_resources_without_attempt(monkeypatch):
     dal.fail(claim, retain_claims=True)
     assert not any("ActiveJobID=NULL" in q for q, _ in cursor.calls)
     assert any("BlockedReason='Outcome requires reconciliation'" in q for q, _ in cursor.calls)
+
+
+@pytest.mark.parametrize(
+    "state,jobs,expected",
+    [
+        ("waiting_destination", [{"State": "ready", "SuccessorIntentID": None}], "materialized"),
+        ("materialized", [{"State": "confirmed", "SuccessorIntentID": None}], "confirmed"),
+        (
+            "materialized",
+            [
+                {"State": "running", "SuccessorIntentID": None},
+                {"State": "confirmed", "SuccessorIntentID": None},
+            ],
+            None,
+        ),
+    ],
+)
+def test_intent_transition_aggregates_registered_jobs_with_state_cas(
+    monkeypatch, state, jobs, expected
+):
+    intent_id = str(uuid4())
+    singles = [{"IntentState": state, "SupersededByIntentID": None}]
+    if expected:
+        singles.append({"IntentID": intent_id})
+    cursor = Cursor(singles=singles, batches=[jobs])
+    dal = scripted(monkeypatch, cursor)
+    dal._sync_intent(cursor, intent_id)
+    updates = [(q, a) for q, a in cursor.calls if q.startswith("UPDATE")]
+    if expected:
+        assert updates[0][1] == (expected, None, intent_id, state, None, None)
+        assert "AND IntentState=?" in updates[0][0]
+    else:
+        assert updates == []
+
+
+def test_coalesced_intent_retains_exact_successor_and_immutable_vector(monkeypatch):
+    old, new = str(uuid4()), str(uuid4())
+    cursor = Cursor(
+        singles=[{"IntentState": "materialized", "SupersededByIntentID": None}, {"IntentID": old}],
+        batches=[[{"State": "coalesced", "SuccessorIntentID": new}]],
+    )
+    dal = scripted(monkeypatch, cursor)
+    dal._sync_intent(cursor, old)
+    query, args = cursor.calls[-1]
+    assert args == ("coalesced", new, old, "materialized", None, None)
+    assert "VectorHash=" not in query and "PublicationID=" not in query
+
+
+def test_discovery_filters_materialized_history_but_recovers_missing_registration(monkeypatch):
+    from services.export_coordination_service import ExportRegistration
+
+    registration = ExportRegistration(16, "acct", 2, ("file-a",))
+    cursor = Cursor(batches=[[]])
+    dal = scripted(monkeypatch, cursor)
+    assert dal.pending_intents(registrations=(registration,)) == []
+    query, args = cursor.calls[-1]
+    assert "NOT EXISTS (SELECT 1 FROM dbo.ExportJob" in query
+    assert "j.IntentID=i.IntentID" in query and "j.AccountKey=r.AccountKey" in query
+    assert (
+        "j.PoolEpoch=r.PoolEpoch" in query and "j.DestinationSetHash=r.DestinationSetHash" in query
+    )
+    assert "i.IntentState NOT IN ('blocked','coalesced')" in query
+    assert args == (32, 16, "acct", 2, digest(("file-a",)), 0, 0, 0)
+
+
+def test_terminal_job_updates_intent_in_the_same_owned_transaction(monkeypatch):
+    intent_id = str(uuid4())
+    claim = Claim("job", "acct", "owner", 2, 3, (("account:acct", 1),), intent_id)
+    cursor = Cursor(singles=[{"Version": 4}, {"Version": 2}])
+    dal = scripted(monkeypatch, cursor)
+    sync = Mock()
+    monkeypatch.setattr(dal, "_sync_intent", sync)
+    dal._finish(cursor, claim, {"Version": 3}, "confirmed", release=True)
+    sync.assert_called_once_with(cursor, intent_id)
+
+
+@pytest.mark.parametrize("offset,expected", [(240, 240), (-300, 1), (7200, 3600)])
+def test_http_date_uses_sql_utc_despite_host_clock_skew(monkeypatch, offset, expected):
+    from datetime import UTC
+    from email.utils import format_datetime
+
+    from services import export_request_budget
+
+    sql_now = datetime(2026, 9, 14, 12)
+    deadline = (sql_now + timedelta(seconds=offset)).replace(tzinfo=UTC)
+    # Neither a fast nor a slow local wall clock participates in parsing.
+    monkeypatch.setattr(export_request_budget.time, "time", lambda: 0)
+    parsed = retry_delay(format_datetime(deadline, usegmt=True))
+    assert parsed == deadline
+    cursor = Cursor(
+        singles=[{"NowUTC": sql_now}, {"CooldownUntilUTC": None, "Version": 7}, {"Version": 8}]
+    )
+    dal = scripted(monkeypatch, cursor)
+    dal.extend_cooldown("acct", parsed)
+    assert cursor.calls[-1][1] == (sql_now + timedelta(seconds=expected), "acct", 7)
+
+
+def test_retry_after_http_date_reaches_dal_without_local_duration():
+    from datetime import UTC
+
+    response = type("Response", (dict,), {"status": 429})(
+        {"retry-after": "Mon, 14 Sep 2026 12:04:00 GMT"}
+    )
+    dal = Mock()
+    RequestBudget(dal, "acct").rejected(SimpleNamespace(resp=response))
+    dal.extend_cooldown.assert_called_once_with("acct", datetime(2026, 9, 14, 12, 4, tzinfo=UTC))
+
+
+def test_uncertain_retry_after_checkpoint_cannot_release_read_only_claim():
+    from services.export_request_budget import BudgetCompletionUnknown
+
+    response = type("Response", (dict,), {"status": 503})(
+        {"retry-after": "Mon, 14 Sep 2026 12:04:00 GMT"}
+    )
+    dal = Mock()
+    dal.extend_cooldown.side_effect = SourceConflict("unconfirmed cooldown")
+    with pytest.raises(BudgetCompletionUnknown, match="cooldown"):
+        RequestBudget(dal, "acct").rejected(SimpleNamespace(resp=response))
