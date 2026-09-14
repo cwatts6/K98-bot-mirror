@@ -1,0 +1,12 @@
+-- verify_calendar_task7_failure_retry_safety.sql
+-- Validate failure/retry did not corrupt state
+-- 1) no partial destructive wipe patterns
+-- 2) source tables still populated/coherent
+-- 3) EventInstances remains queryable/consistent after failed attempts
+
+-- Example checks:
+-- SELECT COUNT(*) FROM dbo.EventRecurringRules;
+-- SELECT COUNT(*) FROM dbo.EventOneOffEvents;
+-- SELECT COUNT(*) FROM dbo.EventOverrides;
+-- SELECT COUNT(*) FROM dbo.EventInstances;
+-- Add project-specific integrity queries used in prior task scripts.
