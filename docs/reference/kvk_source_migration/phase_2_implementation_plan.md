@@ -1,19 +1,23 @@
 # KVK Source Migration — Phase 2B implementation plan
 
-## Current status — S8C delivered; S9A next, 2026-09-13
+## Current status — S9A delivered; S9B scope next, 2026-09-14
 
-S8C code review and repository delivery are complete: mirror #275, production-repository #582
-and SQL #82 are merged; local pulls are verified. Final offline tests: **4,214 passed / 62 skipped**.
-Approved S8C disposable SQL and simulated folder intake smoke passed; see the linked S8C closeout
-for exact coverage. No bot-machine pull, live Discord smoke, deployment or activation is claimed.
-See [S8C closeout and exact documentation carry-forward](s8c_closeout_and_s9a_handoff.md) for hashes and evidence distinctions.
-Completed S8C pack/starter are archived. **Next implementation: S9A Public Routing and Availability,
-initial review/scope only**; use the [pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md).
-S8C disposable SQL/intake smoke remains separately target-and-operation gated before enablement;
-this does not reopen approved S7 decisions or completed predecessor acceptance.
-SourceRouting.Enabled alone does not implement public routing. S9B cards and S10 exports remain
-later slices. Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained files/databases.
-Earlier dated instructions below are historical and do not authorize execution or select the next slice.
+S9A repository delivery is complete: mirror #276, production-repository #583 and SQL #83 are
+merged and locally pulled. Exact file/rename and local blob checks verified the delivered
+**58 physical Bot paths and two SQL documentation paths**. Final S9A offline evidence is
+**4,290 passed / 62 skipped**; it is not a new post-merge execution or production measurement.
+See [S9A closeout and exact pending documentation manifest](s9a_closeout_and_s9b_handoff.md) for anchors, evidence and delivery rules.
+The completed S9A pack/starter are archived. Next is **S9B Stats/Target Card Context and Grouped
+Admin Source Dispatch, initial review/scope only**: [task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
+The eventual separately authorized S9B Bot PR must carry every pending documentation path in
+that closeout, including both sides of both S9A archive moves, alongside its approved runtime/test
+manifest. SQL delivery-log and migration-README updates belong in a separate SQL PR in that cycle.
+S8C disposable SQL/folder smoke and Chris's seven local operator checks remain accepted evidence;
+S8B accepted smoke/50 cases and offline runner history remain distinct from S8A six-script evidence.
+No bot-machine pull/restart, live Discord acceptance, deployment or activation is claimed or authorized.
+S10 export coordination remains later work. Preserve S6-OPS01/PERF01/CAP01, both uncertain
+publications and all retained databases/files. Earlier dated instructions below are historical
+and do not authorize execution or select the next slice.
 
 
 ## Historical S8B closeout status — 2026-09-13

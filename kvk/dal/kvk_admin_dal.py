@@ -52,6 +52,65 @@ ORDER BY CASE WHEN w.StartScanID IS NULL THEN 1 ELSE 0 END, w.WindowName;
 RECOMPUTE_SQL = "EXEC KVK.sp_KVK_Recompute_Windows @KVK_NO=?;"
 
 
+def read_admin_source(kvk_no, *, connect=None):
+    from kvk.dal.new_source_import_dal import SourceConflict, lock_scope, transaction
+    from kvk.dal.season_source_dal import lock_season
+
+    with transaction(connect or get_conn_with_retries) as cursor:
+        resolved = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
+        lock_scope(cursor, resolved)
+        choice = lock_season(cursor, resolved)
+        if not choice:
+            raise SourceConflict("Season source setup is unavailable.")
+        return choice
+
+
+def fetch_source_windows(kvk_no, *, connect=None):
+    """Private metadata snapshot only; no results, calculation or selection writes."""
+    from kvk.dal.new_source_import_dal import SourceConflict, lock_scope, rows, transaction
+    from kvk.dal.season_source_dal import lock_season
+
+    with transaction(connect or get_conn_with_retries) as cursor:
+        lock_scope(cursor, kvk_no)
+        choice = lock_season(cursor, kvk_no)
+        if not choice or choice["SourceKey"] != "snapshot_report_v1":
+            raise SourceConflict("Source diagnostic scope changed.")
+        cursor.execute(
+            "SELECT p.PeriodID,p.PeriodKey,p.PeriodKind,w.WindowName,w.StartScanID,w.EndScanID,"
+            "c.UpdateID,c.PublicationID,c.PublicSelectionVersion,"
+            "pub.StartScanID AS SelectedStartScanID,pub.EndScanID AS SelectedEndScanID,"
+            "pub.ConfigVersionID AS SelectedConfigVersionID,w.ConfigVersionID AS DesiredConfigVersionID,"
+            "pub.PeriodState,pub.BuildState,pub.EligibleCount AS RowCount,"
+            "pending.UpdateID AS PendingUpdateID,pending.UpdateState AS PendingUpdateState,"
+            "o1.ScanStartUTC AS StartTS,o2.ScanStartUTC AS EndTS "
+            "FROM KVK.SourcePeriod p "
+            "LEFT JOIN KVK.SourceCompleteSelection c ON c.SourceKey=p.SourceKey AND c.KVK_NO=p.KVK_NO AND c.PeriodID=p.PeriodID "
+            "LEFT JOIN KVK.SourcePublication pub ON pub.PublicationID=c.PublicationID "
+            "LEFT JOIN KVK.SourceConfigVersion selected_config ON selected_config.ConfigVersionID=pub.ConfigVersionID "
+            "OUTER APPLY (SELECT TOP(1) r.DesiredConfigVersionID FROM KVK.SourceConfigRequest r "
+            "JOIN KVK.SourceConfigVersion v ON v.ConfigVersionID=r.DesiredConfigVersionID "
+            "WHERE r.SourceKey=p.SourceKey AND r.KVK_NO=p.KVK_NO AND r.PeriodID=p.PeriodID "
+            "AND r.RequestState<>'rejected' AND v.ConfigVersion>COALESCE(selected_config.ConfigVersion,0) "
+            "ORDER BY v.ConfigVersion DESC) desired "
+            "LEFT JOIN KVK.SourceWindowConfig w ON w.SourceKey=p.SourceKey AND w.KVK_NO=p.KVK_NO "
+            "AND w.PeriodKey=p.PeriodKey AND w.ConfigVersionID=COALESCE(desired.DesiredConfigVersionID,pub.ConfigVersionID) "
+            "OUTER APPLY (SELECT TOP(1) u.UpdateID,u.UpdateState FROM KVK.SourceUpdate u "
+            "WHERE u.SourceKey=p.SourceKey AND u.KVK_NO=p.KVK_NO AND u.PeriodID=p.PeriodID "
+            "AND u.UpdateState IN ('waiting_player','waiting_aggregate','ready') "
+            "AND (w.ConfigVersionID IS NULL OR u.ConfigVersionID=w.ConfigVersionID) "
+            "AND ((c.UpdateID IS NULL AND u.BaseUpdateID IS NULL) OR u.BaseUpdateID=c.UpdateID) "
+            "ORDER BY u.ConfirmedUTC DESC,u.UpdateID) pending "
+            "LEFT JOIN KVK.SourceObservationRevision r1 ON r1.RevisionID=pub.StartRevisionID "
+            "LEFT JOIN KVK.SourceObservation o1 ON o1.ObservationID=r1.ObservationID "
+            "LEFT JOIN KVK.SourceObservationRevision r2 ON r2.RevisionID=pub.EndRevisionID "
+            "LEFT JOIN KVK.SourceObservation o2 ON o2.ObservationID=r2.ObservationID "
+            "WHERE p.SourceKey=? AND p.KVK_NO=? ORDER BY p.PeriodKey",
+            choice["SourceKey"],
+            kvk_no,
+        )
+        return rows(cursor)
+
+
 def fetch_source_report_metadata(connect, envelope):
     """Enrich S3B's pinned read using immutable IDs only; never reselect inputs.
 
@@ -156,14 +215,17 @@ def resolve_kvk_no(kvk_no: int | None = None) -> int:
 
 
 def recompute_windows(kvk_no: int | None = None) -> int:
-    """Run the KVK window recompute procedure and return the resolved KVK number."""
-    with get_conn_with_retries() as conn:
-        with conn.cursor() as cursor:
-            resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
-            logger.info("[KVK ADMIN] recomputing windows kvk_no=%s", resolved_kvk)
-            cursor.execute(RECOMPUTE_SQL, (resolved_kvk,))
-            conn.commit()
-            return resolved_kvk
+    """Keep fixed legacy admission locked through EXEC and its single commit."""
+    from kvk.dal.new_source_import_dal import lock_scope, transaction
+    from kvk.dal.season_source_dal import require_source
+
+    with transaction(get_conn_with_retries) as cursor:
+        resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
+        lock_scope(cursor, resolved_kvk)
+        require_source(cursor, resolved_kvk, "legacy_full_data")
+        logger.info("[KVK ADMIN] recomputing windows kvk_no=%s", resolved_kvk)
+        cursor.execute(RECOMPUTE_SQL, (resolved_kvk,))
+    return resolved_kvk
 
 
 def fetch_recent_scans(kvk_no: int | None, limit: int) -> tuple[int, list[dict[str, Any]]]:

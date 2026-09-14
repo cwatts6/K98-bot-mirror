@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from io import BytesIO
 import logging
 
 import discord
 
-from kvk.models.kvk_stats_card import KvkStatsCardPayload, RenderedKvkStatsCard
+from core.interaction_safety import send_ephemeral
+from kvk.models.kvk_stats_card import (
+    KvkStatsCardPayload,
+    RenderedKvkStatsCard,
+    card_context_label,
+)
 from kvk.rendering.kvk_stats_card_renderer import render_kvk_more_stats_card
+from kvk.services.kvk_stats_card_service import require_card_current
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +41,13 @@ def _line(label: str, value: str) -> str:
 
 
 def _overall_rank_text(payload: KvkStatsCardPayload) -> str:
+    if payload.source_context is not None:
+        source = payload.source_context
+        return (
+            f"#{source['rank']} / {source['population']} (usable frozen B0 cohort)"
+            if source.get("available")
+            else "Unavailable"
+        )
     if not payload.overall_kvk_rank:
         return "TBC"
     value = f"#{payload.overall_kvk_rank}"
@@ -53,6 +67,27 @@ def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         description=f"{payload.display_kvk_label} | {payload.display_mode}",
         color=discord.Color.blurple(),
     )
+    embed.add_field(
+        name="Independent KVK statistics",
+        value=(
+            f"Kills: {_compact(payload.kills_gain)} / {_compact(payload.kill_target)}\n"
+            f"Deads: {_compact(payload.deads)} / {_compact(payload.dead_target)}\n"
+            f"KP: {_compact(payload.kp_gain)} | KVK rank: {payload.kvk_rank or 'N/A'}"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Combat and matchmaking",
+        value=(
+            f"MM power: {_compact(payload.matchmaking_power)} | Kingdom rank: {payload.kingdom_rank or 'N/A'}\n"
+            f"Healed: {_compact(payload.healed)} | KP loss: {_compact(payload.kp_loss)}\n"
+            f"Tanking: {_pct(payload.tanking_score_percent)} | Acclaim: {_compact(payload.acclaim)}\n"
+            f"Power change: {_compact(payload.power_loss)}"
+        ),
+        inline=False,
+    )
+    if card_context_label(payload):
+        embed.add_field(name="Source context", value=card_context_label(payload), inline=False)
     embed.add_field(
         name="KVK Overall Rank",
         value=_overall_rank_text(payload),
@@ -94,6 +129,19 @@ def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     return embed
 
 
+async def require_card_destination(context, *, user=None):
+    """Recheck the current actor's access immediately before context-bearing output."""
+    channel = getattr(context, "channel", None)
+    guild = getattr(channel, "guild", None) or getattr(context, "guild", None)
+    if guild is None:
+        return
+    user = user or context.user
+    member = await guild.fetch_member(user.id)
+    permissions = channel.permissions_for(member)
+    if not permissions.view_channel or not permissions.send_messages:
+        raise PermissionError("Card destination permission changed.")
+
+
 class KvkStatsCardView(discord.ui.View):
     def __init__(
         self,
@@ -101,14 +149,42 @@ class KvkStatsCardView(discord.ui.View):
         payload: KvkStatsCardPayload,
         rendered: RenderedKvkStatsCard,
         timeout: float = 300.0,
+        owner_id: int | None = None,
     ) -> None:
         super().__init__(timeout=timeout)
-        self.payload = payload
+        self.owner_id = owner_id
+        self.guild_id = None
+        self.channel_id = None
+        self._expired = False
+        self.payload = deepcopy(payload)
+        self._bound_payload = deepcopy(payload)
         self._image_bytes = rendered.image_bytes.getvalue()
         self._filename = rendered.filename
         self._more_stats_bytes: bytes | None = None
         self._more_stats_filename: str | None = None
         self.message: discord.Message | None = None
+
+    async def _authorize(self, interaction):
+        if self.payload != self._bound_payload:
+            raise PermissionError("Card inputs changed; request a new card.")
+        if self._expired or self.is_finished() or interaction.user.id != self.owner_id:
+            raise PermissionError("This card is expired or belongs to another user.")
+        if self.message is None or getattr(interaction.message, "id", None) != self.message.id:
+            raise PermissionError("Card message changed.")
+        if interaction.channel_id != self.channel_id or interaction.guild_id != self.guild_id:
+            raise PermissionError("Card destination changed.")
+        await require_card_destination(interaction)
+        await require_card_current(self.payload)
+
+    async def interaction_check(self, interaction):
+        try:
+            await self._authorize(interaction)
+            return True
+        except Exception:
+            await send_ephemeral(
+                interaction, "This card is stale or unavailable. Request a new card."
+            )
+            return False
 
     def _file(self) -> discord.File:
         return discord.File(BytesIO(self._image_bytes), filename=self._filename)
@@ -129,6 +205,8 @@ class KvkStatsCardView(discord.ui.View):
 
     async def _edit_host_message(self, interaction: discord.Interaction, **kwargs) -> None:
         await self._defer_interaction(interaction)
+        if not await self.interaction_check(interaction):
+            return
         message = getattr(interaction, "message", None)
         if message is not None:
             self.message = message
@@ -148,6 +226,8 @@ class KvkStatsCardView(discord.ui.View):
 
     async def _show_more_stats(self, interaction: discord.Interaction) -> None:
         await self._defer_interaction(interaction)
+        if not await self.interaction_check(interaction):
+            return
         try:
             if self._more_stats_bytes is None or self._more_stats_filename is None:
                 rendered = await asyncio.to_thread(render_kvk_more_stats_card, self.payload)
@@ -189,6 +269,7 @@ class KvkStatsCardView(discord.ui.View):
         await self._show_more_stats(interaction)
 
     async def on_timeout(self) -> None:
+        self._expired = True
         for item in self.children:
             item.disabled = True
         try:

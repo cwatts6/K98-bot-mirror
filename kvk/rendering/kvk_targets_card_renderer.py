@@ -385,7 +385,12 @@ def render_kvk_targets_card(
         draw, payload.next_action, max_width=970, size=27, min_size=18, bold=True
     )
     _draw_text(
-        draw, (74, 558), payload.next_action, fill=_note_color(payload), font=action_font, bold=True
+        draw,
+        (74, 558),
+        payload.next_action,
+        fill=_note_color(payload),
+        font=action_font,
+        bold=True,
     )
 
     footer_parts = []
@@ -397,6 +402,19 @@ def render_kvk_targets_card(
     footer_font = _fit_font(draw, footer, max_width=1040, size=17, min_size=13, bold=True)
     footer_x = WIDTH - 52 - _text_width(draw, footer, footer_font, bold=True)
     _draw_text(draw, (footer_x, 610), footer, fill=MUTED, font=footer_font, bold=True)
+
+    from kvk.models.kvk_stats_card import card_context_label
+
+    label = card_context_label(payload)
+    if label:
+        extended = Image.new("RGB", (WIDTH, HEIGHT + 56), (18, 24, 35))
+        extended.paste(canvas, (0, 0))
+        canvas = extended
+        context_draw = ImageDraw.Draw(canvas)
+        context_font = _fit_font(
+            context_draw, label, max_width=WIDTH - 64, size=20, min_size=14, bold=True
+        )
+        _draw_text(context_draw, (32, HEIGHT + 16), label, fill=TEXT, font=context_font, bold=True)
 
     buf = BytesIO()
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)

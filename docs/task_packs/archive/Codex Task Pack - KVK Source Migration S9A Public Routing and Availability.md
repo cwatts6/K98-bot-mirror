@@ -1,19 +1,25 @@
 # KVK Source Migration S9A — Public Routing and Availability
 
+> Archived 2026-09-14 after merged mirror #276, production #583 and SQL #83.
+> This document preserves the S9A scope, approvals and execution/review history.
+> Current authority: [S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md) and [S9B scope pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
+> Earlier prospective instructions below are historical, not renewed authorization.
+
+
 ## Authority and required reading
 
 Prepared 2026-09-13 for initial review/scope only. S8C implementation and code review are delivered
 through merged mirror #275, production #582 and SQL #82; local pulls are complete. No S9A
 implementation, new task, SQL execution, activation or deployment is authorized by this pack.
-Read current AGENTS/core references, [S8C closeout](../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md),
-[approved S7 contract/consumer matrix](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md),
-[exact manifests](../reference/kvk_source_migration/integration_implementation_manifests.md),
-[architecture/EndScanID amendment](../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
-[acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), and retained S6 evidence.
+Read current AGENTS/core references, [S8C closeout](../../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md),
+[approved S7 contract/consumer matrix](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md),
+[exact manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md),
+[architecture/EndScanID amendment](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md),
+[acceptance scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md), and retained S6 evidence.
 Read authoritative SQL definitions and repository guidance in C:/K98-bot-SQL-Server, without connecting.
 Read the archived S8C pack for the approved season, pairing and post-use configuration decisions.
 S8C disposable SQL and automated folder smoke passed; the operator completed all seven local
-walkthrough checks on 2026-09-14. Read the [execution and operator evidence](../reference/kvk_source_migration/s8c_folder_intake_smoke_evidence.md).
+walkthrough checks on 2026-09-14. Read the [execution and operator evidence](../../reference/kvk_source_migration/s8c_folder_intake_smoke_evidence.md).
 This does not claim live Discord acceptance, bot-machine delivery or production activation.
 
 ## Objective and exact initial boundary
@@ -94,7 +100,7 @@ to implement S9A or create/publish PRs now.
 The eventual separately authorized S9A Bot PR must include the complete union of:
 
 - The exact 20 S9A implementation paths above and any separately approved scope amendments.
-- All **38 physical Bot paths** in the [S8C closeout manifest](../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md):
+- All **38 physical Bot paths** in the [S8C closeout manifest](../../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md):
   36 documentation paths plus the two already completed smoke-tool/test paths below. The manifest
   includes this S9A pack/starter, both sides of both S8C archive moves, smoke evidence and work instruction.
 - Any further S9A closeout outputs explicitly added to the exact delivery manifest during the slice.

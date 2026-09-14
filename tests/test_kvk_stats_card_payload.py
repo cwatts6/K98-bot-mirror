@@ -138,3 +138,48 @@ def test_source_context_does_not_populate_legacy_rank_fields():
     context = _build_context({"source_context": {"available": True, "rank": 1, "population": 4}})
     assert context.overall_kvk_rank is None
     assert context.overall_kvk_total_governors is None
+
+
+@pytest.mark.asyncio
+async def test_context_suppression_preserves_every_independent_payload_field():
+    from dataclasses import replace
+
+    from kvk.services.kvk_stats_card_service import suppress_card_context
+    from tests.test_kvk_stats_card_views import _payload
+
+    payload = _payload()
+    safe = suppress_card_context(payload, reason="stale")
+    assert (
+        replace(
+            safe,
+            kingdom=payload.kingdom,
+            camp_name=payload.camp_name,
+            overall_kvk_rank=payload.overall_kvk_rank,
+            overall_kvk_total_governors=payload.overall_kvk_total_governors,
+            overall_kvk_top_percent=payload.overall_kvk_top_percent,
+            source_context=payload.source_context,
+        )
+        == payload
+    )
+
+
+def test_stale_source_rank_population_never_render_as_current():
+    from dataclasses import replace
+
+    from kvk.rendering.kvk_stats_card_renderer import (
+        _overall_kvk_rank_context,
+        _overall_kvk_rank_value,
+    )
+    from tests.test_kvk_stats_card_views import _payload
+
+    payload = replace(
+        _payload(),
+        source_context={
+            "available": False,
+            "reason": "configuration_pending",
+            "rank": 1,
+            "population": 99,
+        },
+    )
+    assert _overall_kvk_rank_value(payload) == "N/A"
+    assert _overall_kvk_rank_context(payload) == "Context unavailable"

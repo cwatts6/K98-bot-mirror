@@ -9,6 +9,8 @@ pytestmark = pytest.mark.asyncio
 
 
 class _Context:
+    source_context = None
+    source_read = None
     kvk_name = "Tides of War"
     camp_name = "Wind"
 
@@ -297,3 +299,46 @@ async def test_targets_payload_preserves_historical_denominators_and_minimum_kil
     assert dkp.comparison_target == 100
     assert dkp.percent == 120.0
     assert payload.min_kill_target == 25
+
+
+async def test_ordinary_targets_keep_publication_history_and_metrics_across_context_states(
+    monkeypatch,
+):
+    from dataclasses import replace
+
+    from tests.test_kvk_source_card_context import CardStore
+
+    store = CardStore()
+    store.install(monkeypatch)
+    monkeypatch.setattr(service, "get_kvk_fighting_context_today", lambda: {"kvk_no": 16})
+    meta = {**_publication_meta(), "KVK_NO": 16}
+    row = _target_row("1001", kvk_no=16, kill_target=200, dkp_target=500)
+    monkeypatch.setattr(service.kvk_targets_dal, "fetch_target_entry", lambda *_: (row, meta))
+    monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_: None)
+
+    async def history():
+        return {"1001": {"T4&T5_Kills": 100, "Kill Target": 150, "DKP_SCORE": 300}}
+
+    monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", history)
+    monkeypatch.setattr(
+        service,
+        "load_stat_row",
+        lambda _: {"GovernorID": "1001", "GovernorName": "Player", "DKP_SCORE": 9999},
+    )
+    current = await service.build_kvk_targets_card_payload("1001")
+    assert current.source_context["available"] and current.camp_name
+    store.routing["Enabled"] = False
+    disabled = await service.build_kvk_targets_card_payload("1001")
+    assert not disabled.source_context["available"] and disabled.camp_name is None
+    assert (
+        replace(
+            disabled,
+            source_context=current.source_context,
+            source_read=current.source_read,
+            camp_name=current.camp_name,
+            generated_at_utc=current.generated_at_utc,
+        )
+        == current
+    )
+    assert current.metrics[0].current == 100 and current.metrics[0].target == 200
+    assert current.target_source_scan == 1059

@@ -9,11 +9,40 @@ from file_utils import cursor_row_to_dict, get_conn_with_retries
 logger = logging.getLogger(__name__)
 
 
-def fetch_source_card_report(*, connect, kvk_no, period_id):
-    """Read the source publication, without invoking legacy rank SQL."""
-    from kvk.dal.new_source_reporting_dal import load_snapshot
+def resolve_card_read(kvk_no, *, connect=None):
+    """Find overall by its unique season key, never by the display fight or MAX scan."""
+    from dataclasses import replace
 
-    return load_snapshot(connect, kvk_no=kvk_no, period_id=period_id)
+    from kvk.dal.new_source_import_dal import one, transaction
+    from kvk.dal.source_routing_dal import resolve_season_read
+    from kvk.models.source_integration import SeasonRead
+    from kvk.schemas.new_source_schema import SOURCE_KEY
+
+    read = SeasonRead(kvk_no)
+    try:
+        with transaction(connect or get_conn_with_retries) as cursor:
+            cursor.execute("SELECT KVK_NAME FROM dbo.KVK_Details WHERE KVK_NO=?", kvk_no)
+            details = one(cursor) or {}
+            cursor.execute(
+                "SELECT PeriodID FROM KVK.SourcePeriod WHERE SourceKey=? AND KVK_NO=? "
+                "AND PeriodKey='overall' AND PeriodKind='overall'",
+                SOURCE_KEY,
+                kvk_no,
+            )
+            period = one(cursor)
+        read = resolve_season_read(
+            kvk_no, period_id=period["PeriodID"] if period else None, connect=connect
+        )
+        if read.source_key == SOURCE_KEY and not period:
+            read = replace(
+                read, availability="unavailable", reason="overall_missing", period_id=None
+            )
+        return read, details.get("KVK_NAME")
+    except Exception as exc:
+        logger.warning(
+            "card_authority_unavailable kvk_no=%s error_type=%s", kvk_no, type(exc).__name__
+        )
+        return replace(read, reason="authority_unavailable"), None
 
 
 def fetch_kvk_stats_card_context(

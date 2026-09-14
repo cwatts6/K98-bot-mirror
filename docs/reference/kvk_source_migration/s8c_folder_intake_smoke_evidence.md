@@ -1,5 +1,11 @@
 # S8C approved disposable SQL and folder intake evidence
 
+> Retained S8B/S8C reference, 2026-09-14: S9A repository delivery is now complete.
+> See [S9A closeout / S9B scope and pending documentation delivery](s9a_closeout_and_s9b_handoff.md).
+> Historical execution/operator evidence and limits below remain intact; this update does not
+> request a rerun or claim live Discord acceptance, bot-machine deployment or activation.
+
+
 **For the hands-on walkthrough, use the [step-by-step work instruction](s8c_operator_work_instruction.md).**
 This file records technical evidence; you do not need to follow its execution records.
 

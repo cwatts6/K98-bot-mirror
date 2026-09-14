@@ -106,7 +106,7 @@ async def test_post_targets_falls_back_to_embed_when_card_disabled(monkeypatch):
 
     result = await posting.post_kvk_targets_output(interaction, "1", ephemeral=True)
 
-    assert result is payload
+    assert result.metrics == payload.metrics and result.camp_name is None
     assert followup.sent
     assert followup.sent[0]["ephemeral"] is True
     assert followup.sent[0]["embed"].title == "KVK Targets - Gov"
@@ -162,7 +162,7 @@ async def test_send_or_edit_rewinds_file_before_followup_after_edit_failure():
 
 
 async def test_channel_output_uses_same_payload_for_public_image(monkeypatch):
-    payload = _payload()
+    payload = replace(_payload(), camp_name=None)
     channel = DummyChannel()
     acknowledgement_edits = []
 
@@ -294,3 +294,39 @@ async def test_fallback_embed_missing_publication_is_unverified():
     warning = next(field for field in embed.fields if field.name == "Publication Warning")
     assert "Do not treat" in warning.value
     assert "provenance could not be verified" not in warning.value
+
+
+async def test_target_edit_retry_revalidates_complete_selection(monkeypatch):
+    from kvk.services.kvk_stats_card_service import load_kvk_stats_card_context
+    from tests.test_kvk_source_card_context import CardStore
+
+    store = CardStore()
+    store.install(monkeypatch)
+    context = await load_kvk_stats_card_context(16, "1001")
+    payload = replace(
+        _payload(),
+        kvk_no=16,
+        source_read=context.source_read,
+        source_context=context.source_context,
+        camp_name=context.camp_name,
+    )
+    followup = DummyFollowup()
+
+    class ChangedMessage(DummyMessage):
+        async def edit(self, **kwargs):
+            store.selection["PublicSelectionVersion"] += 1
+            raise RuntimeError("edit failed")
+
+    interaction = SimpleNamespace(message=ChangedMessage(), followup=followup)
+
+    async def build(_):
+        return payload
+
+    async def render(*args, **kwargs):
+        return DummyFile()
+
+    monkeypatch.setattr(posting, "build_kvk_targets_card_payload", build)
+    monkeypatch.setattr(posting, "_render_targets_file", render)
+    result = await posting.post_kvk_targets_output(interaction, "1001", ephemeral=True)
+    assert result.metrics == payload.metrics and result.camp_name is None
+    assert len(followup.sent) == 1 and "file" not in followup.sent[0]

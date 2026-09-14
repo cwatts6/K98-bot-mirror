@@ -109,83 +109,37 @@ def test_extract_count_preserves_zero_meta_count() -> None:
     assert "Player stats cache refreshed (0 records)" in message
 
 
-def test_run_export_test_shapes_metadata(monkeypatch) -> None:
-    monkeypatch.setattr(kvk_admin_service, "resolve_kvk_no", lambda kvk_no=None: 99)
+@pytest.mark.parametrize("source", ["legacy_full_data", "snapshot_report_v1"])
+@pytest.mark.parametrize("method", ["run_export_test", "run_export_all"])
+def test_exports_reject_without_invoking_runner(monkeypatch, source, method):
+    from unittest.mock import Mock
 
-    def fake_runner(*args):
-        assert args[4] == 99
-        return {
-            "primary": {
-                "written_tabs": ["A", "B"],
-                "skipped_tabs": ["Empty"],
-                "spreadsheet_url": "https://example.invalid/sheet",
-            },
-            "additional": {
-                "PASS4": {
-                    "created": True,
-                    "written_tabs": ["P4"],
-                    "spreadsheet_url": "https://example.invalid/pass4",
-                }
-            },
-        }
+    from kvk.dal.new_source_import_dal import SourceConflict
 
-    result = kvk_admin_service.run_export_test(
-        kvk_no=0,
-        sheet_name="KVK",
-        server="server",
-        database="database",
-        username="user",
-        password="pass",
-        credentials_file="creds.json",
-        create_primary=True,
-        export_pass4=True,
-        export_altar=False,
-        export_pass7=False,
-        runner=fake_runner,
+    monkeypatch.setattr(
+        kvk_admin_service.kvk_admin_dal,
+        "read_admin_source",
+        lambda _: {"KVK_NO": 16, "SourceKey": source},
     )
-
-    assert result.kvk_no == 99
-    assert result.sheet_name == "KVK"
-    assert result.duration_seconds >= 0
-    assert [section.name for section in result.sections] == ["Primary result", "PASS4"]
-    assert "Written: 2" in result.sections[0].lines
-
-
-def test_run_export_all_resolves_kvk_and_invokes_runner(monkeypatch) -> None:
-    monkeypatch.setattr(kvk_admin_service, "resolve_kvk_no", lambda kvk_no=None: 42)
-    captured = {}
-
-    def fake_runner(*args):
-        captured["args"] = args
-        return True
-
-    result = kvk_admin_service.run_export_all(
-        kvk_no=0,
-        sheet_name="KVK",
-        server="server",
-        database="database",
-        username="user",
-        password="pass",
-        credentials_file="creds.json",
-        alert_channel="channel",
-        event_loop="loop",
-        runner=fake_runner,
+    runner = Mock(side_effect=AssertionError("No provider execution"))
+    kwargs = dict(
+        kvk_no=16,
+        sheet_name="synthetic",
+        server="unused",
+        database="unused",
+        username="unused",
+        password="unused",
+        credentials_file="unused",
+        runner=runner,
     )
-
-    assert result.kvk_no == 42
-    assert result.sheet_name == "KVK"
-    assert result.ok is True
-    assert captured["args"] == (
-        "server",
-        "database",
-        "user",
-        "pass",
-        42,
-        "KVK",
-        "creds.json",
-        "channel",
-        "loop",
+    kwargs.update(
+        dict(create_primary=True, export_pass4=True, export_altar=True, export_pass7=True)
+        if method == "run_export_test"
+        else dict(alert_channel=None, event_loop=None)
     )
+    with pytest.raises(SourceConflict, match="No export started"):
+        getattr(kvk_admin_service, method)(**kwargs)
+    runner.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -313,8 +267,14 @@ def test_window_preview_sql_brackets_rowcount_alias() -> None:
 
 
 def test_recompute_kvk_windows_returns_resolved_kvk_and_duration(monkeypatch) -> None:
+    monkeypatch.setattr(
+        kvk_admin_service.kvk_admin_dal,
+        "read_admin_source",
+        lambda n: {"KVK_NO": n or 16, "SourceKey": "legacy_full_data"},
+    )
+
     def fake_recompute(kvk_no: int | None = None) -> int:
-        assert kvk_no == 0
+        assert kvk_no == 16
         return 17
 
     monkeypatch.setattr(kvk_admin_service.kvk_admin_dal, "recompute_windows", fake_recompute)
@@ -326,6 +286,11 @@ def test_recompute_kvk_windows_returns_resolved_kvk_and_duration(monkeypatch) ->
 
 
 def test_list_recent_scans_clamps_limit_and_formats_message(monkeypatch) -> None:
+    monkeypatch.setattr(
+        kvk_admin_service.kvk_admin_dal,
+        "read_admin_source",
+        lambda n: {"KVK_NO": n or 16, "SourceKey": "legacy_full_data"},
+    )
     captured = {}
 
     def fake_fetch(kvk_no: int | None, limit: int):
@@ -354,6 +319,11 @@ def test_list_recent_scans_clamps_limit_and_formats_message(monkeypatch) -> None
 
 
 def test_load_window_preview_detects_bad_ranges_and_formats_table(monkeypatch) -> None:
+    monkeypatch.setattr(
+        kvk_admin_service.kvk_admin_dal,
+        "read_admin_source",
+        lambda n: {"KVK_NO": n or 16, "SourceKey": "legacy_full_data"},
+    )
     rows = [
         {
             "WindowName": "Pass 4",
@@ -418,3 +388,93 @@ def test_window_preview_table_respects_discord_field_limit() -> None:
     assert table.startswith("```\n")
     assert table.endswith("\n```")
     assert "table lines not shown" in table
+
+
+def test_new_source_recompute_inspects_without_legacy_write(monkeypatch):
+    from unittest.mock import Mock
+
+    dal = kvk_admin_service.kvk_admin_dal
+    monkeypatch.setattr(
+        dal, "read_admin_source", lambda _: {"KVK_NO": 16, "SourceKey": "snapshot_report_v1"}
+    )
+    monkeypatch.setattr(dal, "fetch_source_windows", lambda _: [{"PeriodKey": "overall"}])
+    write = Mock(side_effect=AssertionError("No recompute"))
+    monkeypatch.setattr(dal, "recompute_windows", write)
+    result = kvk_admin_service.recompute_kvk_windows(16)
+    assert result.inspection_only and len(result.rows) == 1
+    write.assert_not_called()
+
+
+def test_new_source_scans_preserve_unused_registry_and_do_not_load_legacy(monkeypatch):
+    from unittest.mock import Mock
+
+    dal = kvk_admin_service.kvk_admin_dal
+    monkeypatch.setattr(
+        dal, "read_admin_source", lambda _: {"KVK_NO": 16, "SourceKey": "snapshot_report_v1"}
+    )
+    rows = [dict(ScanID=7, ScanTimestampUTC="2026-09-01T12:34:56Z", TimePrecision="second")]
+    monkeypatch.setattr(dal, "fetch_source_recent_scans", lambda connect, kvk, limit: rows)
+    legacy = Mock(side_effect=AssertionError("No legacy scans"))
+    monkeypatch.setattr(dal, "fetch_recent_scans", legacy)
+    result = kvk_admin_service.list_recent_scans(16, 200)
+    assert result.limit == 100 and result.rows == rows
+    text = kvk_admin_service.format_recent_scans_message(result)
+    assert "unused" in text and "12:34:56Z" in text
+    legacy.assert_not_called()
+
+
+def test_private_preview_detects_same_config_pending_update_and_stale_response(monkeypatch):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    dal = kvk_admin_service.kvk_admin_dal
+    monkeypatch.setattr(
+        dal, "read_admin_source", lambda _: {"KVK_NO": 16, "SourceKey": "snapshot_report_v1"}
+    )
+    rows = [
+        dict(
+            PeriodKey="overall",
+            PublicationID="pub",
+            SelectedConfigVersionID="config",
+            DesiredConfigVersionID="config",
+            PendingUpdateID="pending",
+            PendingUpdateState="waiting_aggregate",
+        )
+    ]
+    monkeypatch.setattr(dal, "fetch_source_windows", lambda _: rows.copy())
+    result = kvk_admin_service.load_window_preview(16)
+    assert "previous / waiting_aggregate" in kvk_admin_service.format_window_preview_table(result)
+    kvk_admin_service.require_admin_result_current(result)
+    rows = [{**rows[0], "PendingUpdateID": "replacement"}]
+    with pytest.raises(SourceConflict, match="selection changed"):
+        kvk_admin_service.require_admin_result_current(result)
+
+
+@pytest.mark.parametrize("source", ["legacy_full_data", "snapshot_report_v1"])
+def test_recompute_dal_holds_admission_to_commit_and_rejects_new_source(monkeypatch, source):
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from tests.test_kvk_source_card_context import CardStore
+
+    dal = kvk_admin_service.kvk_admin_dal
+
+    class Store(CardStore):
+        def route(self, sql, args, connection):
+            if "sp_KVK_Recompute_Windows" in sql:
+                assert connection not in self.closed
+                self.events.append((connection, sql, args))
+                return []
+            return super().route(sql, args, connection)
+
+    store = Store()
+    store.choice["SourceKey"] = source
+    store.install(monkeypatch)
+    monkeypatch.setattr(dal, "get_conn_with_retries", store.connect)
+    monkeypatch.setattr(dal, "resolve_current_kvk_no_from_cursor", lambda *_: 16)
+    if source == "legacy_full_data":
+        assert dal.recompute_windows(16) == 16
+    else:
+        with pytest.raises(SourceConflict):
+            dal.recompute_windows(16)
+    assert any("sp_KVK_Recompute_Windows" in sql for _, sql, _ in store.events) == (
+        source == "legacy_full_data"
+    )
+    assert store.closed == {1}

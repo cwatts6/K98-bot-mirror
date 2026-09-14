@@ -62,6 +62,8 @@ class KvkTargetsCardPayload:
     publication_version: int | None = None
     publication_signature: str | None = None
     warnings: tuple[str, ...] = field(default_factory=tuple)
+    source_context: dict | None = None
+    source_read: dict | None = None
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property

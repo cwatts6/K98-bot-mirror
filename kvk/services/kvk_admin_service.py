@@ -69,6 +69,8 @@ class KvkEmbedTestContext:
 class KvkRecomputeResult:
     kvk_no: int
     duration_seconds: float
+    inspection_only: bool = False
+    rows: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,7 @@ class KvkRecentScansResult:
     kvk_no: int
     limit: int
     rows: list[dict[str, Any]]
+    source_key: str = "legacy_full_data"
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,7 @@ class KvkWindowPreviewResult:
     rows: list[dict[str, Any]]
     bad_ranges: list[dict[str, Any]]
     generated_at_utc: datetime
+    source_key: str = "legacy_full_data"
 
 
 def resolve_kvk_no(kvk_no: int | None = None) -> int:
@@ -109,29 +113,7 @@ def run_export_test(
     export_pass7: bool,
     runner: Callable[..., dict[str, Any] | Any],
 ) -> KvkExportTestResult:
-    resolved_kvk = resolve_kvk_no(kvk_no) if not kvk_no else int(kvk_no)
-    started = time.perf_counter()
-    raw_meta = runner(
-        server,
-        database,
-        username,
-        password,
-        resolved_kvk,
-        sheet_name,
-        credentials_file,
-        create_primary,
-        export_pass4,
-        export_altar,
-        export_pass7,
-    )
-    meta = raw_meta if isinstance(raw_meta, dict) else {}
-    return KvkExportTestResult(
-        kvk_no=resolved_kvk,
-        sheet_name=sheet_name,
-        duration_seconds=time.perf_counter() - started,
-        meta=meta,
-        sections=_build_export_test_sections(meta),
-    )
+    reject_uncoordinated_export(kvk_no)
 
 
 def run_export_all(
@@ -147,21 +129,17 @@ def run_export_all(
     event_loop: Any,
     runner: Callable[..., bool],
 ) -> KvkExportAllResult:
-    resolved_kvk = resolve_kvk_no(kvk_no) if not kvk_no else int(kvk_no)
-    ok = bool(
-        runner(
-            server,
-            database,
-            username,
-            password,
-            resolved_kvk,
-            sheet_name,
-            credentials_file,
-            alert_channel,
-            event_loop,
-        )
+    reject_uncoordinated_export(kvk_no)
+
+
+def reject_uncoordinated_export(kvk_no):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    choice = kvk_admin_dal.read_admin_source(kvk_no)
+    raise SourceConflict(
+        f"KVK {choice['KVK_NO']} ({choice['SourceKey']}): export unavailable; "
+        "coordinated export admission is not implemented. No export started."
     )
-    return KvkExportAllResult(kvk_no=resolved_kvk, sheet_name=sheet_name, ok=ok)
 
 
 async def refresh_stats_caches(
@@ -203,7 +181,12 @@ def load_embed_test_context(
 
 def recompute_kvk_windows(kvk_no: int | None = None) -> KvkRecomputeResult:
     started = time.perf_counter()
-    resolved_kvk = kvk_admin_dal.recompute_windows(kvk_no)
+    choice = kvk_admin_dal.read_admin_source(kvk_no)
+    resolved_kvk = choice["KVK_NO"]
+    if choice["SourceKey"] == "snapshot_report_v1":
+        rows = kvk_admin_dal.fetch_source_windows(resolved_kvk)
+        return KvkRecomputeResult(resolved_kvk, time.perf_counter() - started, True, tuple(rows))
+    resolved_kvk = kvk_admin_dal.recompute_windows(resolved_kvk)
     return KvkRecomputeResult(
         kvk_no=resolved_kvk,
         duration_seconds=time.perf_counter() - started,
@@ -212,12 +195,26 @@ def recompute_kvk_windows(kvk_no: int | None = None) -> KvkRecomputeResult:
 
 def list_recent_scans(kvk_no: int | None = None, limit: int = 20) -> KvkRecentScansResult:
     bounded_limit = max(1, min(int(limit), 100))
-    resolved_kvk, rows = kvk_admin_dal.fetch_recent_scans(kvk_no, bounded_limit)
-    return KvkRecentScansResult(kvk_no=resolved_kvk, limit=bounded_limit, rows=rows)
+    choice = kvk_admin_dal.read_admin_source(kvk_no)
+    resolved_kvk = choice["KVK_NO"]
+    if choice["SourceKey"] == "snapshot_report_v1":
+        from file_utils import get_conn_with_retries
+
+        rows = kvk_admin_dal.fetch_source_recent_scans(
+            get_conn_with_retries, resolved_kvk, bounded_limit
+        )
+    else:
+        resolved_kvk, rows = kvk_admin_dal.fetch_recent_scans(resolved_kvk, bounded_limit)
+    return KvkRecentScansResult(resolved_kvk, bounded_limit, rows, choice["SourceKey"])
 
 
 def load_window_preview(kvk_no: int | None = None) -> KvkWindowPreviewResult:
-    resolved_kvk, rows = kvk_admin_dal.fetch_window_preview(kvk_no)
+    choice = kvk_admin_dal.read_admin_source(kvk_no)
+    resolved_kvk = choice["KVK_NO"]
+    if choice["SourceKey"] == "snapshot_report_v1":
+        rows = kvk_admin_dal.fetch_source_windows(resolved_kvk)
+    else:
+        resolved_kvk, rows = kvk_admin_dal.fetch_window_preview(resolved_kvk)
     bad_ranges = [
         row
         for row in rows
@@ -230,7 +227,23 @@ def load_window_preview(kvk_no: int | None = None) -> KvkWindowPreviewResult:
         rows=rows,
         bad_ranges=bad_ranges,
         generated_at_utc=datetime.now(UTC),
+        source_key=choice["SourceKey"],
     )
+
+
+def require_admin_result_current(result):
+    """Never send private source metadata after its inspected selection changed."""
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    source_key = getattr(result, "source_key", None) or (
+        "snapshot_report_v1" if result.inspection_only else "legacy_full_data"
+    )
+    choice = kvk_admin_dal.read_admin_source(result.kvk_no)
+    if choice["SourceKey"] != source_key:
+        raise SourceConflict("Diagnostic source changed; request a new inspection.")
+    if source_key == "snapshot_report_v1" and not isinstance(result, KvkRecentScansResult):
+        if list(result.rows) != kvk_admin_dal.fetch_source_windows(result.kvk_no):
+            raise SourceConflict("Diagnostic selection changed; request a new inspection.")
 
 
 def load_source_diagnostic(*, action, connect, kvk_no, period_id=None, limit=20):
@@ -427,6 +440,13 @@ def _export_meta_lines(ss_meta: dict[str, Any]) -> list[str]:
 
 
 def format_recent_scans_message(result: KvkRecentScansResult) -> str:
+    if result.source_key == "snapshot_report_v1":
+        lines = [f"KVK {result.kvk_no} - retained snapshot scans (including unused scans)"]
+        lines.extend(
+            f"Scan {r['ScanID']} | start UTC {r['ScanTimestampUTC']} | precision {r['TimePrecision']}"
+            for r in result.rows
+        )
+        return "\n".join(lines)
     lines = [
         "```",
         f"{'ScanID':>6}  {'Scan UTC':19}  {'Rows':>6}  {'Imported UTC':19}  Source",
@@ -444,6 +464,32 @@ def format_recent_scans_message(result: KvkRecentScansResult) -> str:
 
 
 def format_window_preview_table(result: KvkWindowPreviewResult) -> str:
+    if result.source_key == "snapshot_report_v1":
+        lines = ["Snapshot source; private metadata only (not public serving acceptance)"]
+        for row in result.rows:
+            state = (
+                "waiting pair"
+                if not row.get("PublicationID")
+                else (
+                    "previous / config pending"
+                    if row.get("DesiredConfigVersionID") != row.get("SelectedConfigVersionID")
+                    else (
+                        f"previous / {row['PendingUpdateState']}"
+                        if row.get("PendingUpdateID")
+                        else "selected complete metadata"
+                    )
+                )
+            )
+            lines.extend(
+                [
+                    f"{row.get('WindowName') or row['PeriodKey']} | {state}",
+                    f"Requested {row.get('StartScanID')} to {row.get('EndScanID')}; selected {row.get('SelectedStartScanID')} to {row.get('SelectedEndScanID')}",
+                    f"UTC {row.get('StartTS')} to {row.get('EndTS')}",
+                    f"Update {row.get('UpdateID')} | publication {row.get('PublicationID')}",
+                    f"Pending Update {row.get('PendingUpdateID')} | build {row.get('BuildState')}",
+                ]
+            )
+        return _bounded_code_block(lines, max_chars=DISCORD_EMBED_FIELD_VALUE_LIMIT)
     header = f"{'Window':20} {'Start':>8} {'End':>8} {'#Scans':>7} {'Rows':>7}"
     lines = [header, "-" * len(header)]
     for row in result.rows:

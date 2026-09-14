@@ -101,3 +101,87 @@ async def test_kvk_preview_real_pycord_invocation(monkeypatch, case, mode, selec
         assert execute.call_args.kwargs["action"] == ("run" if mode == "defaults" else mode)
         assert execute.call_args.kwargs["token"] == (None if mode == "defaults" else "a" * 32)
         assert replies[0].kwargs["allowed_mentions"].to_dict() == {"parse": []}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "name", ["recompute", "list_scans", "window_preview", "test_export", "export_all"]
+)
+@pytest.mark.parametrize("permitted", [True, False])
+async def test_grouped_admin_dispatch_uses_fresh_permissions(monkeypatch, name, permitted):
+    from datetime import UTC, datetime
+    from unittest.mock import AsyncMock, Mock
+
+    import bot_config
+    from commands import stats_cmds
+    import decoraters
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.services import kvk_admin_service as service
+
+    monkeypatch.setattr(bot_config, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 40)
+    monkeypatch.setattr(decoraters, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(decoraters, "NOTIFY_CHANNEL_ID", 40)
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: types.SimpleNamespace(log=AsyncMock()))
+    monkeypatch.setattr(stats_cmds, "GUILD_ID", 10)
+    groups = []
+    bot = types.SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kw: lambda fn: fn, loop=None
+    )
+    stats_cmds.register_stats(bot)
+    group = next(g for g in groups if g.name == "kvk_admin")
+    assert len(group.subcommands) <= 25
+    command = next(c for c in group.subcommands if c.name == name)
+    user = types.SimpleNamespace(id=30)
+    guild = types.SimpleNamespace(id=10, fetch_member=AsyncMock(return_value=user))
+    channel = types.SimpleNamespace(
+        id=40,
+        parent_id=None,
+        permissions_for=lambda _: types.SimpleNamespace(view_channel=True, send_messages=permitted),
+    )
+    response = types.SimpleNamespace(
+        is_done=lambda: False, defer=AsyncMock(), send_message=AsyncMock()
+    )
+    followup = types.SimpleNamespace(send=AsyncMock())
+    interaction = types.SimpleNamespace(
+        user=user,
+        guild=guild,
+        channel=channel,
+        response=response,
+        followup=followup,
+        edit_original_response=AsyncMock(),
+        data={"options": []},
+    )
+    ctx = types.SimpleNamespace(
+        user=user,
+        guild=guild,
+        channel=channel,
+        interaction=interaction,
+        followup=followup,
+        command=command,
+        bot=bot,
+    )
+    monkeypatch.setattr(stats_cmds, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(service, "resolve_kvk_no", lambda _: 16)
+    monkeypatch.setattr(service, "require_admin_result_current", Mock())
+    methods = {
+        "recompute": ("recompute_kvk_windows", service.KvkRecomputeResult(16, 0, True, ())),
+        "list_scans": (
+            "list_recent_scans",
+            service.KvkRecentScansResult(16, 20, [], "snapshot_report_v1"),
+        ),
+        "window_preview": (
+            "load_window_preview",
+            service.KvkWindowPreviewResult(16, [], [], datetime.now(UTC), "snapshot_report_v1"),
+        ),
+        "test_export": ("run_export_test", None),
+        "export_all": ("run_export_all", None),
+    }
+    method, result = methods[name]
+    execute = Mock(return_value=result)
+    if name in {"test_export", "export_all"}:
+        execute.side_effect = SourceConflict("Export admission unavailable; no export started.")
+    monkeypatch.setattr(service, method, execute)
+    await command._invoke(ctx)
+    assert execute.call_count == int(permitted)
+    assert guild.fetch_member.await_count >= 1

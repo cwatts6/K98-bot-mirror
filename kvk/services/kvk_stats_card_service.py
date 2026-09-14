@@ -124,6 +124,7 @@ def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
     raw = raw or {}
     return KvkStatsCardContext(
         source_context=raw.get("source_context"),
+        source_read=raw.get("source_read"),
         kvk_name=_str_from_variants(raw, ["kvk_name", "KVK_NAME"], default="") or None,
         kingdom=_int_from_variants(raw, ["kingdom", "Kingdom"], default=0) or None,
         camp_id=_int_from_variants(raw, ["camp_id", "campid", "CampID"], default=0) or None,
@@ -143,40 +144,115 @@ def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
 async def load_kvk_stats_card_context(
     kvk_no: int | None, governor_id: str, *, source_period_id=None, connect=None
 ) -> KvkStatsCardContext:
-    if source_period_id is not None:
-        from kvk.services.new_source_reporting_service import card_context, load_report_v2
+    from file_utils import get_conn_with_retries
+    from kvk.services.new_source_reporting_service import card_context, load_complete_report
 
-        if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+    if type(kvk_no) is not int or not 1 <= kvk_no <= 2147483647:
+        if source_period_id is not None:
             raise ValueError("Explicit source card context requires a positive SQL KVK number.")
-        if connect is None:
-            raise ValueError("Explicit source context requires a connection provider.")
-        report = await asyncio.to_thread(
-            load_report_v2,
-            connect=connect,
-            kvk_no=kvk_no,
-            period_id=source_period_id,
-            our_kingdom=0,
-            snapshot_loader=kvk_stats_card_dal.fetch_source_card_report,
-        )
-        source = card_context(report, governor_id)
-        display = await asyncio.to_thread(
-            kvk_stats_card_dal.fetch_kvk_stats_card_context,
-            kvk_no,
-            governor_id,
-            include_overall_rank=False,
-            connect=connect,
-        )
-        return _build_context({**display, **source})
+        return KvkStatsCardContext(source_context={"available": False, "reason": "season_missing"})
+    read, name = await asyncio.to_thread(
+        kvk_stats_card_dal.resolve_card_read, kvk_no, connect=connect
+    )
+    source = {
+        "available": False,
+        "source_key": read.source_key,
+        "period": "overall",
+        "reason": read.reason,
+        "availability": read.availability,
+    }
+    base = dict(kvk_name=name, source_read=read.as_dict(), source_context=source)
     try:
-        raw = await asyncio.to_thread(
-            kvk_stats_card_dal.fetch_kvk_stats_card_context, kvk_no, governor_id
+        if source_period_id is not None and str(source_period_id).lower() != read.period_id:
+            raise ValueError("Card period must be the fixed season's overall period.")
+        if read.availability == "legacy":
+            raw = await asyncio.to_thread(
+                kvk_stats_card_dal.fetch_kvk_stats_card_context,
+                kvk_no,
+                governor_id,
+                connect=connect,
+            )
+            return _build_context({**raw, "source_read": read.as_dict()})
+        if read.availability != "current":
+            return _build_context(base)
+        report = await asyncio.to_thread(
+            load_complete_report, read, connect=connect or get_conn_with_retries, our_kingdom=0
         )
-    except Exception:
-        logger.exception(
-            "kvk_stats_card_context_load_failed kvk_no=%s governor_id=%s", kvk_no, governor_id
+        if report.get("period_kind") != "overall" or not report.get("is_current"):
+            raise ValueError("Current complete overall context is required.")
+        source.update(card_context(report, governor_id)["source_context"])
+        player = next(
+            (p for p in report["players"] if str(p["governor_id"]) == str(governor_id)), None
         )
-        raw = {}
-    return _build_context(raw)
+        source["reason"] = "complete" if source["available"] else "rank_unavailable"
+        source["cohort_available"] = player is not None
+        source["as_of_utc"] = report["player_end_utc"]
+        source["basis"] = "T4/T5 KP; usable frozen B0 cohort"
+        if player is None:
+            source["reason"] = "outside_frozen_cohort"
+        return _build_context(
+            {
+                **base,
+                "kingdom": player.get("kingdom") if player else None,
+                "camp_id": player.get("camp_id") if player else None,
+                "camp_name": player.get("camp_name") if player else None,
+            }
+        )
+    except Exception as exc:
+        logger.warning(
+            "card_context_unavailable kvk_no=%s error_type=%s", kvk_no, type(exc).__name__
+        )
+        source.update(available=False, reason="context_integrity_failed")
+        return _build_context(base)
+
+
+async def require_card_current(payload, *, connect=None):
+    """Validate exactly the saved overall identity, never the routing display period."""
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.models.source_integration import SeasonRead
+
+    source = getattr(payload, "source_context", None) or {}
+    if source.get("available") and not all(
+        source.get(key) for key in ("rank", "population", "as_of_utc")
+    ):
+        raise SourceConflict("Card source provenance is incomplete.")
+    saved = getattr(payload, "source_read", None)
+    if saved is None:
+        # An unbound compatibility payload may display independent numbers only.
+        if (
+            payload.camp_name
+            or getattr(payload, "overall_kvk_rank", None)
+            or (getattr(payload, "source_context", None) or {}).get("available")
+        ):
+            raise SourceConflict("Unbound card context; request a new card.")
+        return
+    read = SeasonRead(**saved)
+    if payload.kvk_no != read.kvk_no:
+        raise SourceConflict("Card season differs from its saved context.")
+    current, _ = await asyncio.to_thread(
+        kvk_stats_card_dal.resolve_card_read, read.kvk_no, connect=connect
+    )
+    if current != read or (read.available and not current.available):
+        raise SourceConflict("Card context changed; request a new card.")
+
+
+def suppress_card_context(payload, *, reason="suppressed"):
+    """Keep all independent values; make invalidated source fields unusable."""
+    from dataclasses import replace
+
+    changes = dict(
+        camp_name=None,
+        source_read=None,
+        source_context={"available": False, "reason": reason, "period": "overall"},
+    )
+    if isinstance(payload, KvkStatsCardPayload):
+        changes.update(
+            kingdom=None,
+            overall_kvk_rank=None,
+            overall_kvk_total_governors=None,
+            overall_kvk_top_percent=None,
+        )
+    return replace(payload, **changes)
 
 
 async def build_kvk_stats_card_payload(
@@ -257,6 +333,7 @@ async def build_kvk_stats_card_payload(
         kvk_no=kvk_no,
         kvk_name=context.kvk_name,
         source_context=context.source_context,
+        source_read=context.source_read,
         kingdom=context.kingdom,
         camp_name=context.camp_name,
         last_refresh=_date_display(row.get("LAST_REFRESH")),

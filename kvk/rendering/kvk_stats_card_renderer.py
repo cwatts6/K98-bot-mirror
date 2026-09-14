@@ -34,11 +34,7 @@ GOLD = (255, 211, 87)
 
 
 def _independent_context_payload(payload):
-    """Mobile cards cannot fit full source/period/cohort/as-of provenance.
-
-    Suppress the independent rank on both cards; retain the KS4 values/targets.
-    A separate text context can be rendered by callers supporting that contract.
-    """
+    """Keep legacy rank fields separate from the explicitly labelled source rank."""
     if payload.source_context is not None:
         return replace(
             payload,
@@ -286,12 +282,24 @@ def _main_rank_value(payload: KvkStatsCardPayload) -> str:
 
 
 def _overall_kvk_rank_value(payload: KvkStatsCardPayload) -> str:
+    if payload.source_context is not None:
+        rank = (
+            payload.source_context.get("rank") if payload.source_context.get("available") else None
+        )
+        return f"#{rank}" if rank else "N/A"
     if payload.overall_kvk_rank in (None, 0):
         return "TBC"
     return _rank_value(payload.overall_kvk_rank)
 
 
 def _overall_kvk_rank_context(payload: KvkStatsCardPayload) -> str | None:
+    if payload.source_context is not None:
+        population = (
+            payload.source_context.get("population")
+            if payload.source_context.get("available")
+            else None
+        )
+        return f"Frozen B0: {population}" if population else "Context unavailable"
     if payload.overall_kvk_rank in (None, 0):
         return None
     parts: list[str] = []
@@ -527,7 +535,9 @@ def render_kvk_stats_card(
         w=col_w,
         title="Tanking Score",
         value=_pct(payload.tanking_score_percent),
-        sub="Higher is better" if payload.tanking_score_percent is not None else "Not enough data",
+        sub=(
+            "Higher is better" if payload.tanking_score_percent is not None else "Not enough data"
+        ),
         color=PURPLE if payload.tanking_score_percent is not None else MUTED,
     )
     _metric(
@@ -551,6 +561,19 @@ def render_kvk_stats_card(
         font=footer_font,
         bold=True,
     )
+
+    from kvk.models.kvk_stats_card import card_context_label
+
+    label = card_context_label(payload)
+    if label:
+        extended = Image.new("RGB", (WIDTH, HEIGHT + 56), (18, 24, 35))
+        extended.paste(canvas, (0, 0))
+        canvas = extended
+        context_draw = ImageDraw.Draw(canvas)
+        context_font = _fit_font(
+            context_draw, label, max_width=WIDTH - 64, size=20, min_size=14, bold=True
+        )
+        _draw_text(context_draw, (32, HEIGHT + 16), label, fill=TEXT, font=context_font, bold=True)
 
     buf = BytesIO()
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -685,6 +708,19 @@ def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStats
     updated = f"Last updated {payload.last_refresh or 'unknown'}"
     footer_font = _fit_font(draw, updated, max_width=365, size=20, min_size=15, bold=True)
     _draw_text(draw, (775, 596), updated, fill=MUTED, font=footer_font, bold=True)
+    from kvk.models.kvk_stats_card import card_context_label
+
+    label = card_context_label(payload)
+    if label:
+        extended = Image.new("RGB", (WIDTH, HEIGHT + 56), (18, 24, 35))
+        extended.paste(canvas, (0, 0))
+        canvas = extended
+        context_draw = ImageDraw.Draw(canvas)
+        context_font = _fit_font(
+            context_draw, label, max_width=WIDTH - 64, size=20, min_size=14, bold=True
+        )
+        _draw_text(context_draw, (32, HEIGHT + 16), label, fill=TEXT, font=context_font, bold=True)
+
     buf = BytesIO()
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)
     buf.seek(0)

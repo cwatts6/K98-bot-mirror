@@ -1,5 +1,11 @@
 # S8C closeout and S9A handoff
 
+> Retained S8B/S8C reference, 2026-09-14: S9A repository delivery is now complete.
+> See [S9A closeout / S9B scope and pending documentation delivery](s9a_closeout_and_s9b_handoff.md).
+> Historical execution/operator evidence and limits below remain intact; this update does not
+> request a rerun or claim live Discord acceptance, bot-machine deployment or activation.
+
+
 ## Delivered state — 2026-09-13
 
 **S8C implementation, code review and repository delivery are complete.** The operator confirms
@@ -68,8 +74,8 @@ All six original mirror/SQL comments and both production comments were answered 
 ## What is next
 
 **Next implementation slice: S9A Public Routing and Availability, initial review/scope only.**
-Use the [S9A pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md)
-and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md).
+Use the [S9A pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md)
+and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md).
 The approved S7 plan specifies 20 S9A paths; S9B card work follows, then S10 export coordination
 and S11 integration evidence. No later implementation or automatic new task begins here.
 

@@ -34,6 +34,21 @@ logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
 
 
+async def _require_admin_action(ctx):
+    from bot_config import ADMIN_USER_ID, NOTIFY_CHANNEL_ID
+
+    if ctx.guild is None or ctx.guild.id != int(GUILD_ID) or ctx.user.id != int(ADMIN_USER_ID):
+        raise PermissionError("Admin action unavailable.")
+    if ctx.channel.id != int(NOTIFY_CHANNEL_ID) and getattr(ctx.channel, "parent_id", None) != int(
+        NOTIFY_CHANNEL_ID
+    ):
+        raise PermissionError("Admin destination changed.")
+    member = await ctx.guild.fetch_member(ctx.user.id)
+    permission = ctx.channel.permissions_for(member)
+    if not permission.view_channel or not permission.send_messages:
+        raise PermissionError("Admin permission changed.")
+
+
 def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
     """Split command output into Discord-safe complete-line chunks."""
     if len(content) <= max_chars:
@@ -110,7 +125,10 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             str, "Your private source receipt UUID", required=False, default=None
         ),
         expected_revision: str = discord.Option(
-            str, "Current source revision UUID for finalize/correct", required=False, default=None
+            str,
+            "Current source revision UUID for finalize/correct",
+            required=False,
+            default=None,
         ),
         expected_revision_version: int = discord.Option(
             int, "Current source revision version", required=False, default=None, min_value=1
@@ -259,7 +277,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="🧪 Admin: Test KVK Google Sheets export without performing an import",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -336,6 +354,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         try:
             # Run the test export in a thread (blocking IO / network)
+            await _require_admin_action(ctx)
             result = await asyncio.to_thread(
                 kvk_admin_service.run_export_test,
                 kvk_no=kvk_no,
@@ -583,7 +602,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="Export all-kingdom KVK tabs",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.05")
+    @versioned("v1.06")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -615,10 +634,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             return
 
         await ctx.followup.send(
-            f"Exporting KVK `{resolved_kvk_no}` to **{sheet_name}**...", ephemeral=True
+            f"Exporting KVK `{resolved_kvk_no}` requires coordinated admission; checking availability.",
+            ephemeral=True,
         )
 
         try:
+            await _require_admin_action(ctx)
             result = await asyncio.to_thread(
                 kvk_admin_service.run_export_all,
                 kvk_no=resolved_kvk_no,
@@ -656,7 +677,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="Recompute windowed outputs for the current KVK",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -666,9 +687,16 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
         try:
+            await _require_admin_action(ctx)
             result = await asyncio.to_thread(kvk_admin_service.recompute_kvk_windows, kvk_no)
+            await _require_admin_action(ctx)
+            await asyncio.to_thread(kvk_admin_service.require_admin_result_current, result)
             await ctx.followup.send(
-                f"✅ Recomputed KVK `{result.kvk_no}` in `{result.duration_seconds:.2f}s`.",
+                (
+                    f"KVK `{result.kvk_no}`: inspected {len(result.rows)} source periods; no recomputation or writes."
+                    if result.inspection_only
+                    else f"✅ Recomputed KVK `{result.kvk_no}` in `{result.duration_seconds:.2f}s`."
+                ),
                 ephemeral=True,
             )
         except Exception as e:
@@ -682,7 +710,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="List recent scans for a KVK",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -698,10 +726,14 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
         try:
+            await _require_admin_action(ctx)
             result = await asyncio.to_thread(kvk_admin_service.list_recent_scans, kvk_no, limit)
+            await _require_admin_action(ctx)
 
             chunks = _split_discord_content(kvk_admin_service.format_recent_scans_message(result))
             for chunk in chunks:
+                await _require_admin_action(ctx)
+                await asyncio.to_thread(kvk_admin_service.require_admin_result_current, result)
                 await ctx.followup.send(content=chunk, ephemeral=True)
         except Exception as e:
             await ctx.followup.send(
@@ -805,7 +837,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                     f"Message: https://discord.com/channels/{ctx.guild.id}/{destination.id}/{message_id}"
                 )
             await send_ephemeral(
-                ctx.interaction, "\n".join(lines), allowed_mentions=discord.AllowedMentions.none()
+                ctx.interaction,
+                "\n".join(lines),
+                allowed_mentions=discord.AllowedMentions.none(),
             )
         except Exception:
             logger.exception("[KVK PREVIEW] Command rejected or failed")
@@ -820,7 +854,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="Show KVK windows with scan edges, scan counts, and row counts",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.08")
+    @versioned("v1.09")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
@@ -830,7 +864,10 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
+        await _require_admin_action(ctx)
         result = await asyncio.to_thread(kvk_admin_service.load_window_preview, kvk_no)
+        await _require_admin_action(ctx)
+        await asyncio.to_thread(kvk_admin_service.require_admin_result_current, result)
         body = kvk_admin_service.format_window_preview_table(result)
 
         desc = (

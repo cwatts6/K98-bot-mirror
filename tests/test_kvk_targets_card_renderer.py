@@ -136,3 +136,31 @@ def test_targets_renderer_uses_historical_comparison_denominator(monkeypatch):
 
     assert rendered is not None
     assert "12M / 10M / 120%" in drawn_text
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_source_provenance_renders_with_independent_targets(available):
+    from kvk.models.kvk_stats_card import card_context_label
+
+    source = dict(
+        available=available,
+        reason="serving_disabled",
+        rank=3,
+        population=100,
+        as_of_utc="2026-09-14T10:00:00Z",
+        period="overall",
+    )
+    payload = replace(
+        _payload(),
+        governor_name="城主 — Žluťoučký",
+        source_context=source,
+        camp_name="Camp Ω" if available else None,
+    )
+    rendered = renderer.render_kvk_targets_card(payload)
+    assert Image.open(rendered.image_bytes).size == (1180, 696)
+    assert (
+        "frozen B0" in card_context_label(payload)
+        if available
+        else "disabled" in card_context_label(payload)
+    )
+    assert payload.metrics[0].target == 20_000_000

@@ -208,7 +208,9 @@ def _quote_for_last_performance(metrics: tuple[KvkTargetMetricProgress, ...]) ->
     return "Big reset needed. Show up early and fight for the kingdom."
 
 
-def _status_for_metrics(metrics: tuple[KvkTargetMetricProgress, ...]) -> tuple[str, str, str, str]:
+def _status_for_metrics(
+    metrics: tuple[KvkTargetMetricProgress, ...],
+) -> tuple[str, str, str, str]:
     actionable = [metric for metric in metrics if metric.has_target]
     if actionable and all(metric.is_complete for metric in actionable):
         return (
@@ -336,6 +338,8 @@ async def build_kvk_targets_presentation_input(
                     kvk_no=kvk_no or _int_from_variants(exemption, ["KVK_NO"], default=0) or None,
                     kvk_name=kvk_name,
                     camp_name=context.camp_name,
+                    source_context=context.source_context,
+                    source_read=context.source_read,
                     progress_state="exempt",
                     status_label="Exempt",
                     status_detail="This governor is exempt from KVK targets.",
@@ -359,6 +363,8 @@ async def build_kvk_targets_presentation_input(
                 kvk_no=kvk_no,
                 kvk_name=kvk_name,
                 camp_name=context.camp_name,
+                source_context=context.source_context,
+                source_read=context.source_read,
                 progress_state="no_target",
                 status_label="No target",
                 status_detail="No target row was found for this governor.",
@@ -412,6 +418,8 @@ async def build_kvk_targets_presentation_input(
             kvk_no=kvk_no or target_row.kvk_no,
             kvk_name=kvk_name,
             camp_name=context.camp_name,
+            source_context=context.source_context,
+            source_read=context.source_read,
             progress_state=target_state,
             status_label=label,
             status_detail=detail,

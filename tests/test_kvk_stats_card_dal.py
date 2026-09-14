@@ -85,3 +85,20 @@ def test_fetch_context_preserves_existing_context_when_rank_view_missing(monkeyp
     assert context["camp_name"] == "Wind"
     assert "overall_kvk_rank" not in context
     assert "kvk_stats_card_overall_rank_unavailable" in caplog.text
+
+
+def test_overall_lookup_is_season_bound_and_closes_before_authority(monkeypatch):
+    from tests.test_kvk_source_card_context import CardStore
+    from tests.test_kvk_source_pairs import uid
+
+    store = CardStore()
+    store.install(monkeypatch)
+    read, _ = kvk_stats_card_dal.resolve_card_read(16)
+    assert read.period_id == uid(2)
+    queries = [
+        (sql, args)
+        for _, sql, args in store.events
+        if "SELECT PeriodID FROM KVK.SourcePeriod" in sql
+    ]
+    assert queries and "KVK_NO=?" in queries[0][0] and 16 in queries[0][1]
+    assert 1 in store.closed and 2 in store.closed

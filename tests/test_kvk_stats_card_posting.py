@@ -19,30 +19,22 @@ class RejectsFilesChannel:
         return SimpleNamespace(id="message")
 
 
-async def test_post_kvk_stats_output_retries_legacy_embeds_without_file(monkeypatch):
+async def test_post_kvk_stats_output_fallback_contains_independent_values(monkeypatch):
     import commands.kvk_stats_card_posting as posting
 
     channel = RejectsFilesChannel()
-    ctx = SimpleNamespace(channel=channel)
-
     monkeypatch.setenv("KVK_STATS_CARD_ENABLED", "0")
-    monkeypatch.setattr(
-        posting,
-        "build_stats_embed",
-        lambda row, user: (["legacy-embed"], SimpleNamespace(fp=None)),
-    )
-
     posted, used = await posting.post_kvk_stats_output(
         bot=None,
-        ctx=ctx,
-        row={"GovernorID": "123"},
+        ctx=SimpleNamespace(channel=channel),
+        row={"GovernorID": "123", "T4&T5_Kills": 123, "Kill Target": 200},
         user=SimpleNamespace(id=1),
     )
-
-    assert posted is True
-    assert used == "orig_channel"
-    assert channel.sent[0]["files"]
-    assert channel.sent[1] == {"embeds": ["legacy-embed"]}
+    assert posted and used == "orig_channel"
+    assert len(channel.sent) == 1 and "files" not in channel.sent[0]
+    embed = channel.sent[0]["embeds"][0]
+    assert "123 / 200" in embed.fields[0].value
+    assert "suppressed" in next(f.value for f in embed.fields if f.name == "Source context")
 
 
 async def test_build_card_passes_discord_avatar_bytes_to_renderer(monkeypatch):
@@ -78,3 +70,28 @@ async def test_build_card_passes_discord_avatar_bytes_to_renderer(monkeypatch):
     assert result is not None
     assert captured["avatar_bytes"] == b"avatar-bytes"
     assert user.display_avatar.size == 128
+
+
+async def test_selection_change_during_stats_render_sends_only_independent_embed(monkeypatch):
+    import commands.kvk_stats_card_posting as posting
+    from tests.test_kvk_source_card_context import CardStore
+
+    store = CardStore()
+    store.install(monkeypatch)
+    channel = RejectsFilesChannel()
+
+    def render(payload, **kwargs):
+        assert payload.source_context["available"]
+        store.selection["PublicSelectionVersion"] += 1
+        return SimpleNamespace(filename="old.png", image_bytes=BytesIO(b"old context"))
+
+    monkeypatch.setattr(posting, "render_kvk_stats_card", render)
+    posted, _ = await posting.post_kvk_stats_output(
+        bot=None,
+        ctx=SimpleNamespace(channel=channel),
+        user=SimpleNamespace(id=1),
+        row={"GovernorID": "1001", "KVK_NO": 16, "T4&T5_Kills": 123},
+    )
+    assert posted and len(channel.sent) == 1
+    assert "files" not in channel.sent[0]
+    assert "123" in channel.sent[0]["embeds"][0].fields[0].value

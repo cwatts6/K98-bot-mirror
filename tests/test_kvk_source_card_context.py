@@ -4,9 +4,12 @@ from unittest.mock import Mock
 import pytest
 
 from kvk.dal import kvk_stats_card_dal
+from kvk.dal.new_source_import_dal import SourceConflict
 from kvk.models.kvk_stats_card import KvkStatsCardContext
 from kvk.services import kvk_stats_card_service
 from kvk.services.new_source_reporting_service import card_context
+from tests.test_kvk_public_routing import RoutingStore
+from tests.test_kvk_source_pairs import uid
 from tests.test_kvk_source_reporting import PERIOD, load_synthetic
 
 
@@ -21,75 +24,6 @@ def test_card_context_requires_independent_overall_and_current_config(monkeypatc
     assert context["as_of_utc"] == report["player_end_utc"]
     report["is_current"] = False
     assert not card_context(report, 1001)["source_context"]["available"]
-
-
-@pytest.mark.asyncio
-async def test_source_card_loader_bypasses_legacy_rank_queries(monkeypatch):
-    report, _, envelope, _ = load_synthetic(monkeypatch, overall=True)
-    monkeypatch.setattr(kvk_stats_card_dal, "fetch_source_card_report", lambda **kw: envelope)
-    display = Mock(
-        return_value=dict(kvk_name="Tides of War", kingdom=98, camp_id=1, camp_name="Wind")
-    )
-    monkeypatch.setattr(
-        kvk_stats_card_dal,
-        "fetch_kvk_stats_card_context",
-        display,
-    )
-    context = await kvk_stats_card_service.load_kvk_stats_card_context(
-        16, "1001", source_period_id=PERIOD, connect=Mock()
-    )
-    assert context.source_context["publication_id"] == report["publication_id"]
-    assert context.overall_kvk_rank is None
-    assert context.kvk_name == "Tides of War" and context.camp_name == "Wind"
-    assert display.call_args.kwargs["include_overall_rank"] is False
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("received", [True, False])
-async def test_source_card_preserves_display_and_renders_without_legacy_rank(monkeypatch, received):
-    from unittest.mock import MagicMock
-
-    from kvk.rendering.kvk_stats_card_renderer import (
-        render_kvk_more_stats_card,
-        render_kvk_stats_card,
-    )
-
-    report, _, envelope, _ = load_synthetic(monkeypatch, overall=True, received=received)
-    monkeypatch.setattr(kvk_stats_card_dal, "fetch_source_card_report", lambda **kw: envelope)
-    cursor = MagicMock()
-    display_rows = iter(
-        [{"KVK_NAME": "Tides of War"}, {"kingdom": 98, "campid": 1, "camp_name": "Wind"}]
-    )
-
-    def execute(query, params):
-        assert "vw_Player_Overall_KVK_Rank" not in query
-        assert "?" in query
-        row = next(display_rows)
-        cursor.description = [(key,) for key in row]
-        cursor.fetchone.return_value = tuple(row.values())
-
-    cursor.execute.side_effect = execute
-    conn = MagicMock()
-    conn.cursor.return_value = cursor
-    context = await kvk_stats_card_service.load_kvk_stats_card_context(
-        16, "1001", source_period_id=PERIOD, connect=lambda: conn
-    )
-    assert context.source_context["available"] == received
-    assert (context.kvk_name, context.kingdom, context.camp_id, context.camp_name) == (
-        "Tides of War",
-        98,
-        1,
-        "Wind",
-    )
-    conn.close.assert_called_once()
-    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
-        {"GovernorID": "1001", "KVK_NO": 16, "T4&T5_Kills": 123, "Kill Target": 200},
-        context=context,
-    )
-    assert payload.kills_gain == 123 and payload.kill_target == 200
-    assert payload.overall_kvk_rank is None
-    assert render_kvk_stats_card(payload) is not None
-    assert render_kvk_more_stats_card(payload) is not None
 
 
 @pytest.mark.asyncio
@@ -124,3 +58,148 @@ async def test_t60_ks4_values_targets_and_rank_stay_independent(monkeypatch):
     assert replace(new, source_context=None, generated_at_utc=old.generated_at_utc) == old
     assert new.kills_gain == 123 and new.kill_target == 200 and new.kvk_rank == 99
     assert new.overall_kvk_rank is None  # Safe for existing fallback renderers too.
+
+
+class CardStore(RoutingStore):
+    def __init__(self):
+        super().__init__(overall=True)
+        self.has_overall = True
+        self.routing["DisplayPeriodID"] = uid(99)  # A fight, never the card's overall.
+
+    def route(self, sql, args, connection):
+        if "SELECT KVK_NAME" in sql:
+            self.events.append((connection, sql, args))
+            return [{"KVK_NAME": "Tides of War"}]
+        if "SELECT PeriodID FROM KVK.SourcePeriod" in sql:
+            self.events.append((connection, sql, args))
+            assert "PeriodKind='overall'" in sql
+            return [{"PeriodID": uid(2)}] if self.has_overall else []
+        if "KVK.KVK_Player_Windowed" in sql or "vw_Player_Overall" in sql:
+            raise AssertionError("No legacy camp or rank fallback")
+        if "FROM KVK.SourcePlayerResult" in sql:
+            assert set(range(1, connection)).issubset(
+                self.closed
+            ), "Authority transaction retained during rows"
+        return super().route(sql, args, connection)
+
+    def install(self, monkeypatch):
+        super().install(monkeypatch)
+        import file_utils
+
+        monkeypatch.setattr(file_utils, "get_conn_with_retries", self.connect)
+        monkeypatch.setattr(kvk_stats_card_dal, "get_conn_with_retries", self.connect)
+
+
+@pytest.fixture
+def card_store(monkeypatch):
+    store = CardStore()
+    store.install(monkeypatch)
+    return store
+
+
+@pytest.mark.asyncio
+async def test_ordinary_card_uses_complete_overall_b0_without_injection(card_store):
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16, "T4&T5_Kills": 123, "Kill Target": 200}
+    )
+    assert payload.source_context["available"]
+    assert payload.source_read["period_id"] == uid(2)
+    assert payload.source_read["update_id"] == uid(1)
+    assert payload.camp_name and payload.kingdom
+    assert payload.kills_gain == 123 and payload.kill_target == 200
+    assert payload.overall_kvk_rank is None
+    await kvk_stats_card_service.require_card_current(payload)
+    assert not any("KVK_Player_Windowed" in sql for _, sql, _ in card_store.events)
+    # One immutable row load; revalidation only reads authority and metadata.
+    assert sum("SourcePlayerResult" in sql for _, sql, _ in card_store.events) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case,reason",
+    [
+        ("missing", "overall_missing"),
+        ("disabled", "serving_disabled"),
+        ("capability", "capability_unsupported"),
+        ("pair", "waiting_pair"),
+        ("choice", "season_choice_missing"),
+        ("stale", "configuration_pending"),
+    ],
+)
+async def test_ordinary_context_unavailable_preserves_numbers(card_store, case, reason):
+    if case == "missing":
+        card_store.has_overall = False
+    if case == "disabled":
+        card_store.routing["Enabled"] = False
+    if case == "capability":
+        card_store.routing["CapabilitiesVersion"] = "unsupported"
+    if case == "pair":
+        card_store.selection = None
+    if case == "choice":
+        card_store.choice = None
+    if case == "stale":
+        card_store.requested = dict(DesiredConfigVersionID=uid(40), ConfigVersion=2)
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16, "DKP_SCORE": 99, "DKP_Target": 500}
+    )
+    assert payload.source_context["reason"] == reason
+    assert not payload.source_context["available"] and payload.camp_name is None
+    assert payload.dkp == 99 and payload.dkp_target == 500
+    assert not any("SourcePlayerResult" in sql for _, sql, _ in card_store.events)
+
+
+@pytest.mark.asyncio
+async def test_card_revalidation_rejects_new_selection_without_retarget(card_store):
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16}
+    )
+    card_store.selection["PublicSelectionVersion"] += 1
+    with pytest.raises(SourceConflict, match="changed"):
+        await kvk_stats_card_service.require_card_current(payload)
+    assert payload.source_read["public_selection_version"] == 7
+
+
+@pytest.mark.asyncio
+async def test_card_missing_member_does_not_use_legacy_camp(card_store):
+    context = await kvk_stats_card_service.load_kvk_stats_card_context(16, "999999")
+    assert context.camp_name is None
+    assert context.source_context["reason"] == "outside_frozen_cohort"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["RoutingVersion", "Enabled", "CapabilitiesVersion"])
+async def test_card_saved_identity_rejects_routing_change(card_store, field):
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16}
+    )
+    card_store.routing[field] = {
+        "RoutingVersion": 99,
+        "Enabled": False,
+        "CapabilitiesVersion": "unsupported",
+    }[field]
+    with pytest.raises(SourceConflict):
+        await kvk_stats_card_service.require_card_current(payload)
+
+
+@pytest.mark.asyncio
+async def test_ordinary_legacy_card_keeps_legacy_context(monkeypatch, card_store):
+    card_store.choice["SourceKey"] = "legacy_full_data"
+    fetch = Mock(return_value={"camp_name": "Legacy camp", "overall_kvk_rank": 3})
+    monkeypatch.setattr(kvk_stats_card_dal, "fetch_kvk_stats_card_context", fetch)
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16}
+    )
+    assert payload.camp_name == "Legacy camp" and payload.overall_kvk_rank == 3
+    assert payload.source_context is None and payload.source_read["availability"] == "legacy"
+    await kvk_stats_card_service.require_card_current(payload)
+    fetch.assert_called_once()
+    assert not any("SourcePlayerResult" in sql for _, sql, _ in card_store.events)
+
+
+@pytest.mark.asyncio
+async def test_context_cannot_be_reused_for_another_season(card_store):
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16}
+    )
+    with pytest.raises(SourceConflict, match="season differs"):
+        await kvk_stats_card_service.require_card_current(replace(payload, kvk_no=17))

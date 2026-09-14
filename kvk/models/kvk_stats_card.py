@@ -15,6 +15,7 @@ class KvkStatsCardContext:
     overall_kvk_total_governors: int | None = None
     overall_kvk_top_percent: float | None = None
     source_context: dict | None = None
+    source_read: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class KvkStatsCardPayload:
     matchmaking_snapshot: dict[str, int] = field(default_factory=dict)
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
     source_context: dict | None = None
+    source_read: dict | None = None
 
     @property
     def display_kvk_label(self) -> str:
@@ -89,3 +91,20 @@ class KvkStatsCardPayload:
 class RenderedKvkStatsCard:
     filename: str
     image_bytes: BytesIO
+
+
+def card_context_label(payload):
+    source = payload.source_context
+    if source is None:
+        return "Legacy Full Data context" if payload.source_read else ""
+    if not source.get("available"):
+        reason = str(source.get("reason", "unavailable")).replace("_", " ")
+        if source.get("cohort_available"):
+            return f"Snapshot overall | frozen B0 camp | as of {source['as_of_utc']} | rank unavailable"
+        return f"Overall context unavailable: {reason}"
+    if not all(source.get(key) for key in ("rank", "population", "as_of_utc")):
+        return ""  # Unlabelled compatibility context cannot be sent by posting guards.
+    return (
+        f"Snapshot overall | T4/T5 KP | usable frozen B0 cohort | "
+        f"#{source['rank']} / {source['population']} | as of {source['as_of_utc']}"
+    )

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -78,8 +80,10 @@ def test_more_stats_embed_uses_payload_context():
 
     assert embed.title == "More KVK Stats - Card Tester"
     assert embed.description == "KVK 54 | Tides of War"
-    assert embed.fields[0].name == "KVK Overall Rank"
-    assert embed.fields[0].value == "#42\nTotal 8.7k / Top 0.5%"
+    assert (
+        next(f.value for f in embed.fields if f.name == "KVK Overall Rank")
+        == "#42\nTotal 8.7k / Top 0.5%"
+    )
     assert any(field.name == "Passes" for field in embed.fields)
 
 
@@ -95,6 +99,7 @@ async def test_stats_card_view_exposes_current_kvk_buttons_only():
 
 class _Response:
     def __init__(self, events: list[str] | None = None):
+        self.send_message = AsyncMock()
         self._done = False
         self.events = events if events is not None else []
 
@@ -109,6 +114,7 @@ class _Response:
 
 class _Message:
     def __init__(self):
+        self.id = 42
         self.edits = []
 
     async def edit(self, **kwargs):
@@ -116,7 +122,15 @@ class _Message:
 
 
 def _interaction(message: _Message, events: list[str] | None = None):
-    return SimpleNamespace(response=_Response(events), message=message)
+    return SimpleNamespace(
+        response=_Response(events),
+        message=message,
+        user=SimpleNamespace(id=1),
+        guild=None,
+        guild_id=None,
+        channel_id=2,
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
 
 
 @pytest.mark.asyncio
@@ -133,6 +147,11 @@ async def test_more_stats_button_prefers_rendered_card(monkeypatch):
     rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
     view = KvkStatsCardView(payload=_payload(), rendered=rendered)
     message = _Message()
+    view.message = message
+    view.owner_id = 1
+    view.channel_id = 2
+    view.payload = replace(view.payload, camp_name=None, overall_kvk_rank=None)
+    view._bound_payload = view.payload
 
     await view._show_more_stats(_interaction(message))
 
@@ -157,6 +176,11 @@ async def test_more_stats_button_defers_before_render(monkeypatch):
     rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
     view = KvkStatsCardView(payload=_payload(), rendered=rendered)
     message = _Message()
+    view.message = message
+    view.owner_id = 1
+    view.channel_id = 2
+    view.payload = replace(view.payload, camp_name=None, overall_kvk_rank=None)
+    view._bound_payload = view.payload
 
     await view._show_more_stats(_interaction(message, events))
 
@@ -171,8 +195,66 @@ async def test_more_stats_button_falls_back_to_embed_when_card_unavailable(monke
     rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
     view = KvkStatsCardView(payload=_payload(), rendered=rendered)
     message = _Message()
+    view.message = message
+    view.owner_id = 1
+    view.channel_id = 2
+    view.payload = replace(view.payload, camp_name=None, overall_kvk_rank=None)
+    view._bound_payload = view.payload
 
     await view._show_more_stats(_interaction(message))
 
     assert "files" not in message.edits[-1]
     assert message.edits[-1]["embeds"][0].title == "More KVK Stats - Card Tester"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["owner", "message", "channel", "guild", "expired", "inputs"])
+async def test_stats_buttons_reject_wrong_or_mutated_binding(case):
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered, owner_id=1)
+    message = _Message()
+    view.message = message
+    view.channel_id = 2
+    interaction = _interaction(message)
+    if case == "owner":
+        interaction.user.id = 3
+    if case == "message":
+        interaction.message = SimpleNamespace(id=99)
+    if case == "channel":
+        interaction.channel_id = 3
+    if case == "guild":
+        interaction.guild_id = 3
+    if case == "expired":
+        view._expired = True
+    if case == "inputs":
+        view.payload = replace(view.payload, kills_gain=999)
+    assert not await view.interaction_check(interaction)
+    assert not message.edits
+    interaction.response.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stats_buttons_recheck_permission_after_render(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    payload = replace(_payload(), camp_name=None, overall_kvk_rank=None)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main"))
+    view = KvkStatsCardView(payload=payload, rendered=rendered, owner_id=1)
+    message = _Message()
+    view.message = message
+    view.channel_id = 2
+    view.guild_id = 3
+    interaction = _interaction(message)
+    interaction.guild_id = 3
+    permissions = SimpleNamespace(view_channel=True, send_messages=True)
+    interaction.guild = SimpleNamespace(fetch_member=AsyncMock(return_value=interaction.user))
+    interaction.channel = SimpleNamespace(permissions_for=lambda _: permissions)
+
+    def render(_):
+        permissions.send_messages = False
+        return rendered
+
+    monkeypatch.setattr(views, "render_kvk_more_stats_card", render)
+    await view._show_more_stats(interaction)
+    assert not message.edits
+    assert interaction.guild.fetch_member.await_count == 2

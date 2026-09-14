@@ -7,10 +7,13 @@ import os
 
 import discord
 
+from kvk.models.kvk_stats_card import card_context_label
 from kvk.models.kvk_targets_card import KvkTargetsCardPayload
 from kvk.rendering.kvk_targets_card_renderer import render_kvk_targets_card
+from kvk.services.kvk_stats_card_service import require_card_current, suppress_card_context
 from kvk.services.kvk_targets_card_service import build_kvk_targets_card_payload
 from targets_embed import build_targets_fallback_embed
+from ui.views.kvk_stats_card_views import require_card_destination
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,11 @@ async def _send_followup(
     ephemeral: bool,
     file: discord.File | None = None,
     embed: discord.Embed | None = None,
+    payload: KvkTargetsCardPayload | None = None,
 ) -> None:
+    if payload is not None:
+        await require_card_destination(interaction)
+        await require_card_current(payload)
     if file is not None:
         file.reset(seek=True)
         await interaction.followup.send(file=file, ephemeral=ephemeral)
@@ -58,6 +65,7 @@ async def _send_or_edit(
     ephemeral: bool,
     file: discord.File | None = None,
     embed: discord.Embed | None = None,
+    payload: KvkTargetsCardPayload | None = None,
 ) -> None:
     message = getattr(interaction, "message", None)
     if message is not None:
@@ -68,6 +76,9 @@ async def _send_or_edit(
         if embed is not None:
             kwargs["embed"] = embed
         try:
+            if payload is not None:
+                await require_card_destination(interaction)
+                await require_card_current(payload)
             await message.edit(**kwargs)
             return
         except Exception:
@@ -75,7 +86,7 @@ async def _send_or_edit(
                 "kvk_targets_message_edit_failed falling_back_to_followup",
                 exc_info=True,
             )
-    await _send_followup(interaction, ephemeral=ephemeral, file=file, embed=embed)
+    await _send_followup(interaction, ephemeral=ephemeral, file=file, embed=embed, payload=payload)
 
 
 async def _render_targets_file(
@@ -137,14 +148,18 @@ async def post_kvk_targets_output(
                 interaction,
                 file=rendered_file,
                 ephemeral=ephemeral,
+                payload=payload,
             )
             return payload
     except Exception:
         logger.exception("kvk_targets_card_render_or_send_failed governor_id=%s", governor_id)
 
+    payload = suppress_card_context(payload)
+    embed = build_targets_fallback_embed(payload)
+    embed.add_field(name="Source context", value=card_context_label(payload), inline=False)
     await _send_or_edit(
         interaction,
-        embed=build_targets_fallback_embed(payload),
+        embed=embed,
         ephemeral=ephemeral,
     )
     return payload
@@ -163,13 +178,17 @@ async def post_kvk_targets_channel_output(
             user=getattr(interaction, "user", None),
         )
         if channel is not None and rendered_file is not None:
+            await require_card_destination(interaction)
+            await require_card_current(payload)
             await channel.send(file=rendered_file)
             await _acknowledge_public_post(interaction)
             return payload
     except Exception:
         logger.exception("kvk_targets_public_card_send_failed governor_id=%s", governor_id)
 
+    payload = suppress_card_context(payload)
     embed = build_targets_fallback_embed(payload)
+    embed.add_field(name="Source context", value=card_context_label(payload), inline=False)
     if channel is not None:
         try:
             await channel.send(embed=embed)

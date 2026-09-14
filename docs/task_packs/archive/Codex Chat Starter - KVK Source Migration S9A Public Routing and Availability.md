@@ -1,8 +1,14 @@
 # S9A starter — Public Routing and Availability
 
+> Archived 2026-09-14 after merged mirror #276, production #583 and SQL #83.
+> This document preserves the S9A scope, approvals and execution/review history.
+> Current authority: [S9A closeout](../../reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md) and [S9B scope pack](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9B%20Stats%20Target%20Card%20Context%20and%20Admin%20Dispatch.md).
+> Earlier prospective instructions below are historical, not renewed authorization.
+
+
 Please begin **S9A initial review/scope only** using
 [the task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S9A%20Public%20Routing%20and%20Availability.md),
-[the S8C closeout](../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md), current AGENTS/core
+[the S8C closeout](../../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md), current AGENTS/core
 references, approved S7 contract/manifests, authoritative SQL, architecture/EndScanID amendment and
 retained S6 evidence. S8C code review and repository delivery are complete: mirror #275, production
 #582 and SQL #82 merged, local pulls verified. Separately approved S8C disposable SQL and automated

@@ -1,5 +1,11 @@
 # S8B closeout and S8C handoff
 
+> Retained S8B/S8C reference, 2026-09-14: S9A repository delivery is now complete.
+> See [S9A closeout / S9B scope and pending documentation delivery](s9a_closeout_and_s9b_handoff.md).
+> Historical execution/operator evidence and limits below remain intact; this update does not
+> request a rerun or claim live Discord acceptance, bot-machine deployment or activation.
+
+
 > S8C is now delivered and archived. The [S8C closeout and S9A handoff](s8c_closeout_and_s9a_handoff.md) supersedes the next-slice/status directions below; retain the dated S8B/S8C evidence as history.
 
 ## 1. Accepted closeout and verified state — 2026-09-13
