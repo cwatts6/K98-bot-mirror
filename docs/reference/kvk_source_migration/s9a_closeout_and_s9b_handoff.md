@@ -320,3 +320,52 @@ Commit hooks and provider filename/previous_filename coverage are checked during
 and recorded in the PR descriptions. This evidence-only update has no runtime/security effect;
 the reviewed Python hashes remain unchanged. Merge, production promotion, deployment, activation
 and all live execution remain outside this authorization.
+
+
+### S9B PR review follow-up — 2026-09-14
+
+Bot mirror PR #277 review correctly identified incomplete independent stats fallback output.
+The follow-up reuses the existing independent three-embed formatter for history, personal bests,
+last-KVK summary, matchmaking snapshot and T4/T5 breakdowns. It discards the optional dial file,
+image and avatar, adds an explicit suppressed-source notice, and retains existing text-only
+fallback transport. The formatter does not consume camp or source overall-rank fields; the
+existing independent history cache remains separate from source authority. Regression coverage
+exercises disabled rendering, empty/failed rendering, stale selection and failed image send,
+with and without the existing fallback chain. No DAL, target or admin behavior changes.
+
+SQL PR #84 review identified missing companion links and stale prospective publication wording;
+its two documentation files are updated independently. Both PR manifests retain their exact paths.
+
+The optional banner extraction is deferred because it is a separate consistency refactor; the
+current review correction changes text fallback only and does not change the accepted card pixels.
+
+### Deferred Optimisation
+- Area: kvk/rendering/kvk_stats_card_renderer.py; kvk/rendering/kvk_targets_card_renderer.py
+- Type: refactor
+- Description: The three card renderers duplicate the 56px source-context footer composition.
+- Suggested Fix: Extract a shared banner compositor in a later focused renderer change and verify all three layouts with pixel/geometry regression checks.
+- Impact: low
+- Risk: low
+- Dependencies: Preserve current provenance labels, font fitting and accepted card geometry.
+
+
+Follow-up validation: **4,343 passed, 62 skipped**, 180.86 seconds through the full offline
+log-noise wrapper; production operational logs unchanged. Architecture/deferred/security-routing
+validators and test selection completed; command registration, Ruff, Black, Pyright and staged
+secrets checks passed. The hook normalized closeout Markdown line endings only. Local Markdown
+links and exact Bot58/SQL2 manifest checks pass; published file coverage is rechecked after push.
+
+Follow-up Changes scan **67b463d9-683c-44c6-951e-ab473a74c743** completed with zero findings,
+complete coverage, Deep off, against `e2c8d5f47b6d8d3f4ac552a1ddd28ce72a782e8b` plus the
+three-file review patch. Snapshot:
+`codex-security-snapshot/v1:sha256:67631f4e8d21b05435e2e3251c4792ae921164750a7c8f8f65d745510b3fae2a`.
+The initial S9B scan remains separate evidence for the preceding implementation; the original
+all-23-files-unchanged statement describes that earlier checkpoint. The follow-up changes only
+the posting module and its test among those Python paths. Their SHA256 values at review are
+`1492f321a6a1829d5ead5b1172a904057376793e0cc8e8e59ed9a847a68a695e` and
+`ec2ab24b70984490b1ec9858c27fcc6214f3b92abd431936653cfd15aa0b6fda` respectively.
+This final evidence paragraph is a documentation-only post-scan delta with no runtime/security
+effect and an explicit scan skip. Workbench telemetry reports 1,440,561 total tokens, including
+1,392,640 cached input tokens, across two threads; this is not a billing estimate.
+SQL review corrections retain the independent two-Markdown-file security skip; staged secrets,
+whitespace and local links passed without SQL execution. All prior operational limits remain.

@@ -8,6 +8,8 @@ import os
 import discord
 
 from commands.kvk_personal_posting import post_stats_message
+from embed_utils import build_stats_embed
+from kvk.models.kvk_stats_card import card_context_label
 from kvk.rendering.kvk_stats_card_renderer import render_kvk_stats_card
 from kvk.services.kvk_stats_card_service import (
     build_kvk_stats_card_payload,
@@ -16,7 +18,6 @@ from kvk.services.kvk_stats_card_service import (
 )
 from ui.views.kvk_stats_card_views import (
     KvkStatsCardView,
-    build_more_stats_embed,
     require_card_destination,
 )
 
@@ -91,10 +92,17 @@ async def post_kvk_stats_output(
 
     # No SQL-based legacy context, avatars or context-bearing file can escape on retry.
     safe_payload = suppress_card_context(payload)
-    safe_embed = build_more_stats_embed(safe_payload)
-    safe_embed.title = f"KVK Stats - {safe_payload.governor_name}"
-    safe_embed.set_footer(text="Independent stats retained. Request a new card for source context.")
-    embeds = [safe_embed]
+    # The existing text formatter retains independent history, MM and tier breakdowns.
+    # It does not consume camp/overall-rank context. Discard its optional dial attachment
+    # and avatar so retries contain only independent text and the suppression notice.
+    embeds, dial_file = await asyncio.to_thread(build_stats_embed, row, user)
+    if dial_file is not None:
+        dial_file.close()
+    for embed in embeds:
+        embed.set_image(url=None)
+        embed.set_thumbnail(url=None)
+    embeds[0].add_field(name="Source context", value=card_context_label(safe_payload), inline=False)
+    embeds[0].set_footer(text="Independent stats retained. Request a new card for source context.")
     if use_fallback_chain:
         return await post_stats_message(bot, ctx, embeds=embeds)
     if channel is None:
