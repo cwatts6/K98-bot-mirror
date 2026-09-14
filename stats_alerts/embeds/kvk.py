@@ -32,7 +32,7 @@ from stats_alerts.formatters import abbr
 from stats_alerts.honors import get_latest_honor_top
 from stats_alerts.kvk_meta import (
     get_kvk_metadata_sql,
-    get_latest_kvk_metadata,
+    get_latest_kvk_metadata as get_latest_kvk_metadata,  # retained compatibility export; not routing authority
     get_latest_kvk_metadata_sql,
 )
 
@@ -225,6 +225,7 @@ async def build_kvk_preview(
             False,
             f"KVK {selected_kvk} SQL metadata unavailable; no fallback or publication.",
             "",
+            routing_unavailable=True,
         )
 
     if meta_sql and (
@@ -232,40 +233,20 @@ async def build_kvk_preview(
     ):
         kvk_no = meta_sql["kvk_no"]
         kvk_name = meta_sql["kvk_name"]
-        start_dt, end_dt = meta_sql["start_date"], meta_sql["end_date"]
+        start_dt, end_dt = meta_sql.get("start_date"), meta_sql.get("end_date")
         try:
             kvk_date_range = f"{start_dt:%d %b} – {end_dt:%d %b}"
         except Exception:
             kvk_date_range = ""
         banner_url = KVK_BANNER_MAP.get((kvk_name or "KVK").lower(), None)
     else:
-        # sheets fallback (blocking) -> offload
-        try:
-            if run_blocking_in_thread is not None:
-                meta = await run_blocking_in_thread(
-                    get_latest_kvk_metadata,
-                    name="get_latest_kvk_metadata_sheets",
-                    meta={"caller": "stats_alerts.embeds.kvk.send_kvk_embed"},
-                )
-            else:
-                logger.debug(
-                    "[KVK EMBED] run_blocking_in_thread not available; using asyncio.to_thread fallback for get_latest_kvk_metadata (consider converting to run_blocking_in_thread)"
-                )
-                meta = await asyncio.to_thread(get_latest_kvk_metadata)
-        except Exception:
-            logger.exception("[KVK EMBED] get_latest_kvk_metadata (sheets) failed")
-            meta = None
-
-        if meta:
-            kvk_no = meta["kvk_no"]
-            kvk_name = meta["kvk_name"]
-            kvk_date_range = f"{meta['start_date']} – {meta['end_date']}"
-            banner_url = KVK_BANNER_MAP.get(kvk_name.lower(), None)
-        else:
-            kvk_no = "?"
-            kvk_name = "KVK"
-            kvk_date_range = ""
-            banner_url = None
+        return PreviewPayload(
+            [],
+            False,
+            "Authoritative KVK metadata unavailable; no source fallback.",
+            "",
+            routing_unavailable=True,
+        )
 
     # Load heavy all-kingdom blocks off-thread
     try:
@@ -283,20 +264,16 @@ async def build_kvk_preview(
             blocks = await asyncio.to_thread(load_allkingdom_blocks, kvk_no)
     except Exception:
         logger.exception("[KVK EMBED] Failed to load all kingdom blocks")
-        blocks = {
-            "players_by_kills": [],
-            "players_by_deads": [],
-            "players_by_dkp": [],
-            "kingdoms_by_kills": [],
-            "kingdoms_by_deads": [],
-            "kingdoms_by_dkp": [],
-            "camps_by_kills": [],
-            "camps_by_deads": [],
-            "camps_by_dkp": [],
-            "our_top_players": [],
-            "our_kingdom": [],
-            "our_camp": [],
-        }
+        return PreviewPayload(
+            [],
+            False,
+            "Authoritative report unavailable; no source fallback.",
+            "",
+            routing_unavailable=True,
+        )
+
+    if blocks.get("schema_version") == 2:
+        return build_source_preview(blocks)
 
     # Include KP and healed_troops in top lists where available - using 'kp_gain' instead of 'kp'
     players_kills = _fmt_top_list(
@@ -526,7 +503,10 @@ async def build_kvk_preview(
         detail += " Honor omitted for selected-KVK previews to avoid mixing seasons."
     elif available and not honor_top:
         detail += " Honor data is empty or unavailable."
-    return PreviewPayload(payload, available, detail, digest)
+    read = getattr(blocks, "read", None)
+    return PreviewPayload(
+        payload, available, detail, digest, public_read=read.as_dict() if read is not None else None
+    )
 
 
 def build_source_preview(report):
@@ -546,6 +526,9 @@ def build_source_preview(report):
     if report.get("schema_version") != 2:
         raise ValueError("Source renderer requires V2 metadata.")
     if report.get("publication_id") is None:
+        if "public_read" in report:
+            detail = f"KVK {report['kvk_no']}: {report['availability_reason']}; complete source report unavailable."
+            return PreviewPayload([], False, detail, "", public_read=report["public_read"])
         detail = (
             f"Source publication not_received; period {report.get('period_key')}; "
             f"requested configuration {report.get('requested_config_id')}; "
@@ -554,7 +537,11 @@ def build_source_preview(report):
         )
         detail = truncate_text(neutralize_discord_mentions(redact_diagnostic_text(detail)), 640)
         return PreviewPayload([], False, detail, "")
-    status = report["player_state"] if report["is_current"] else "retained; configuration pending"
+    status = (
+        report["player_state"]
+        if report["is_current"]
+        else "previous complete; " + report.get("availability_reason", "configuration pending")
+    )
     description = (
         f"Source: {report['source_key']} | {report['period_key']}\n"
         f"Players: {status}; {report['selected_start_scan_id']} → {report['selected_end_scan_id']}\n"
@@ -623,7 +610,7 @@ def build_source_preview(report):
     payload = [embed]
     require_valid_embed_payload(payload)
     digest = sha256(json.dumps([e.to_dict() for e in payload], sort_keys=True).encode()).hexdigest()
-    return PreviewPayload(payload, True, description, digest)
+    return PreviewPayload(payload, True, description, digest, public_read=report.get("public_read"))
 
 
 async def publish_kvk_preview(bot, channel, preview, message_id, before_send, check_destination):
@@ -642,6 +629,10 @@ async def publish_kvk_preview(bot, channel, preview, message_id, before_send, ch
         ):
             raise ValueError("Preview message identity mismatch")
     check_destination()
+    if preview.public_read is not None:
+        from kvk.services.source_routing_service import require_current_read
+
+        await asyncio.to_thread(require_current_read, preview.public_read)
     await before_send()
     check_destination()
     if message is not None:
@@ -670,9 +661,17 @@ async def send_kvk_embed(
     preview = await build_kvk_preview(timestamp)
     if _delivery:
         _delivery.update(data="available" if preview.available else "empty_or_unavailable")
+    if preview.routing_unavailable or (preview.public_read is not None and not preview.available):
+        if _delivery:
+            _delivery.skip("source_unavailable")
+        return
     content = "@everyone" if not is_test else None
     allowed_mentions = discord.AllowedMentions(everyone=(not is_test))
     try:
+        if preview.public_read is not None:
+            from kvk.services.source_routing_service import require_current_read
+
+            await asyncio.to_thread(require_current_read, preview.public_read)
         if _delivery and channel is not None:
             _delivery.enter(getattr(channel, "id", None))
         sent = await channel.send(

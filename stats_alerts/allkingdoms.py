@@ -1,4 +1,4 @@
-"""Compatibility wrapper for KVK all-kingdom reporting blocks."""
+"""Ordinary routing wrapper: legacy block shape or a metadata-bearing V2 envelope."""
 
 from __future__ import annotations
 

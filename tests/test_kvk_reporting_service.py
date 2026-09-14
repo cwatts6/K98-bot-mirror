@@ -33,14 +33,30 @@ def test_reporting_service_preserves_block_keys_and_adds_contribution_fields(mon
     }
     captured = {}
 
-    def fake_fetch(kvk_no: int, our_kingdom: int):
+    def fake_fetch(kvk_no: int, our_kingdom: int, *, read):
+        assert read.availability == "legacy"
         captured["args"] = (kvk_no, our_kingdom)
         return raw_blocks
 
     monkeypatch.setattr(
-        kvk_reporting_service.kvk_reporting_dal,
+        kvk_reporting_dal,
         "fetch_allkingdom_reporting_rows",
         fake_fetch,
+    )
+    from kvk.dal import source_routing_dal
+    from kvk.models.source_integration import SeasonRead
+
+    monkeypatch.setattr(
+        source_routing_dal,
+        "resolve_season_read",
+        lambda *a, **kw: SeasonRead(
+            12,
+            source_key="legacy_full_data",
+            choice_id="00000000-0000-0000-0000-000000000001",
+            season_version=1,
+            availability="legacy",
+            reason="legacy_source",
+        ),
     )
 
     blocks = kvk_reporting_service.load_allkingdom_reporting_blocks(12, our_kingdom=1198)

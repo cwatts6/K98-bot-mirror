@@ -1,5 +1,7 @@
 # S8C new-chat starter — Intake and Admin Pairing UX
 
+> Archived after merged S8C delivery on 2026-09-13. Initial instructions below are historical, not authority to restart S8C. See [S8C closeout](../../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md) for final evidence, remaining runtime gates and S9A scope-only handoff.
+
 Prepared 2026-09-13. Ready to paste into a new chat; initial review/scope only.
 
 ---
@@ -8,7 +10,7 @@ Please begin **S8C Intake and Admin Pairing UX, initial review/scope only**, fol
 [the S8C task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md)
 and the approved S7 contract/manifests. Read current AGENTS/core references, authoritative SQL,
 the architecture/EndScanID amendment, retained S6 evidence and
-[S8B closeout with exact S8C documentation carry-forward](../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md).
+[S8B closeout with exact S8C documentation carry-forward](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md).
 
 S8B is complete, operator accepted, successfully smoke tested and delivered through merged Bot
 production #581 and SQL #81; local pulls are complete. Mirror #274 is closed without a merge

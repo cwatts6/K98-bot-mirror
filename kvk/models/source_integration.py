@@ -134,3 +134,110 @@ class CompleteSelectionResult:
     intent_id: str
     commit_sequence: int
     vector_hash: str
+
+
+# Reader protocol only. A matching database string is necessary, not deployment approval.
+PUBLIC_REPORT_CAPABILITY = "kvk-public-report-v1"
+
+
+@dataclass(frozen=True, slots=True)
+class SeasonRead:
+    """One authoritative read identity; never a source-selection instruction."""
+
+    kvk_no: int
+    source_key: str | None = None
+    choice_id: str | None = None
+    season_version: int | None = None
+    routing_version: int | None = None
+    capabilities_version: str | None = None
+    period_id: str | None = None
+    update_id: str | None = None
+    update_version: int | None = None
+    publication_id: str | None = None
+    public_selection_version: int | None = None
+    selected_config_id: str | None = None
+    desired_config_id: str | None = None
+    roster_id: str | None = None
+    pending_update_id: str | None = None
+    pending_update_version: int | None = None
+    availability: str = "unavailable"
+    reason: str = "source_unavailable"
+
+    def __post_init__(self):
+        if type(self.kvk_no) is not int or not 1 <= self.kvk_no <= 2147483647:
+            raise ValueError("Invalid season read identity.")
+        if self.source_key is not None and self.source_key not in SOURCES:
+            raise ValueError("Invalid season read source.")
+        for name in (
+            "choice_id",
+            "period_id",
+            "update_id",
+            "publication_id",
+            "selected_config_id",
+            "desired_config_id",
+            "roster_id",
+            "pending_update_id",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, identity(value))
+        for name in (
+            "season_version",
+            "routing_version",
+            "update_version",
+            "public_selection_version",
+            "pending_update_version",
+        ):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 1):
+                raise ValueError("Invalid season read version.")
+        if self.availability not in {"unavailable", "legacy", "current", "previous_complete"}:
+            raise ValueError("Invalid season read availability.")
+        bounded_text(self.reason, 128)
+        if self.capabilities_version is not None:
+            bounded_text(self.capabilities_version, 64)
+        if self.available and (not self.choice_id or self.season_version is None):
+            raise ValueError("Available reads require an explicit season choice.")
+        if self.availability == "legacy" and self.source_key != "legacy_full_data":
+            raise ValueError("Legacy read requires the fixed legacy source.")
+        if self.availability in {"current", "previous_complete"} and (
+            self.source_key != "snapshot_report_v1"
+            or self.capabilities_version != PUBLIC_REPORT_CAPABILITY
+            or any(
+                getattr(self, name) is None
+                for name in (
+                    "routing_version",
+                    "period_id",
+                    "update_id",
+                    "update_version",
+                    "publication_id",
+                    "public_selection_version",
+                    "selected_config_id",
+                    "desired_config_id",
+                    "roster_id",
+                )
+            )
+        ):
+            raise ValueError("Public source reads require the complete selection identity.")
+
+    @property
+    def available(self):
+        return self.availability != "unavailable"
+
+    def as_dict(self):
+        from dataclasses import asdict
+
+        return asdict(self)
+
+    @property
+    def cache_key(self):
+        """Includes availability authority; independent caches never use this key."""
+        return (PUBLIC_REPORT_CAPABILITY, *self.as_dict().values())
+
+
+class LegacyReportingBlocks(dict):
+    """Preserve legacy block keys while carrying resolved provenance to the renderer."""
+
+    def __init__(self, blocks, read):
+        super().__init__(blocks)
+        self.read = read

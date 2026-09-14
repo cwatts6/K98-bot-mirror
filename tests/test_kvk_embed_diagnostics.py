@@ -289,3 +289,58 @@ async def test_source_preview_rejects_invalid_season_before_io(kvk_no):
             "unused", kvk_no=kvk_no, source_selection=selection, connect=connect
         )
     connect.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_public_preview_restart_pins_authority_and_refuses_reselection(tmp_path, monkeypatch):
+    from kvk.services import source_routing_service
+    from tests.test_kvk_public_routing import RoutingStore
+
+    store = RoutingStore()
+    store.install(monkeypatch)
+    repo, channel = PreviewRepository(tmp_path / "preview"), Channel()
+    monkeypatch.setattr(
+        kvk,
+        "get_kvk_metadata_sql",
+        lambda n: dict(kvk_no=n, kvk_name="Season", start_date=1, end_date=2),
+    )
+    monkeypatch.setattr(
+        kvk,
+        "get_latest_kvk_metadata_sql",
+        lambda: dict(kvk_no=16, kvk_name="Season", start_date=1, end_date=2),
+    )
+
+    async def build(**kwargs):
+        return await kvk.build_kvk_preview("test", **kwargs)
+
+    first = await run(repo, channel, build=build)
+    assert first.outcome == "sent"
+    saved = repo.open(10, 20, 30, first.session)
+    assert saved.manifest["version"] == 4
+    assert saved.manifest["public_read"]["public_selection_version"] == 7
+    same = await run(PreviewRepository(repo.root), channel, token=first.session, build=build)
+    assert same.outcome == "edited"
+    store.selection["PublicSelectionVersion"] = 8
+    stale = await run(repo, channel, token=first.session, build=build)
+    assert stale.outcome == "failed"
+    assert len(channel.sent) == len(channel.edits) == 1
+    assert repo.open(10, 20, 30, first.session).manifest == saved.manifest
+    # Saved status is observable even when SQL is unavailable.
+    monkeypatch.setattr(
+        source_routing_service,
+        "require_current_read",
+        Mock(side_effect=AssertionError("status accessed SQL")),
+    )
+    status = await run(repo, channel, token=first.session, action="status", build=build)
+    assert status.outcome == "status"
+
+
+@pytest.mark.asyncio
+async def test_missing_metadata_stops_before_sheets_or_send(monkeypatch):
+    monkeypatch.setattr(kvk, "get_latest_kvk_metadata_sql", lambda: None)
+    sheets = Mock(side_effect=AssertionError("Sheets consulted for source authority"))
+    monkeypatch.setattr(kvk, "get_latest_kvk_metadata", sheets)
+    channel = Channel()
+    await kvk.send_kvk_embed(None, channel, "test")
+    assert not channel.sent
+    sheets.assert_not_called()

@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from kvk.dal import kvk_reporting_dal
-
 logger = logging.getLogger(__name__)
 
 REPORTING_BLOCK_KEYS: tuple[str, ...] = (
@@ -76,16 +74,14 @@ def load_allkingdom_reporting_blocks(
     but the Discord embed phase intentionally does not render it.
     """
     resolved_kingdom = _resolve_our_kingdom(our_kingdom)
-    raw_blocks = kvk_reporting_dal.fetch_allkingdom_reporting_rows(
-        int(kvk_no),
-        resolved_kingdom,
-    )
-    blocks = _normalise_blocks(raw_blocks)
+    from kvk.services.source_routing_service import load_public_report
+
+    blocks = load_public_report(kvk_no, our_kingdom=resolved_kingdom)
     logger.info(
         "[KVK REPORTING] assembled blocks kvk_no=%s players=%d kingdoms=%d camps=%d",
         kvk_no,
-        len(blocks["players_by_kills"]),
-        len(blocks["kingdoms_by_kills"]),
-        len(blocks["camps_by_kills"]),
+        len(blocks.get("blocks", blocks).get("players_by_kills", [])),
+        len(blocks.get("blocks", blocks).get("kingdoms_by_kills", [])),
+        len(blocks.get("blocks", blocks).get("camps_by_kills", [])),
     )
     return blocks

@@ -103,6 +103,36 @@ class PreviewSession:
         _contained(self.repository.root, self.path / "session.lck")
         return FileLock(str(self.path / "session.lck"), timeout=5)
 
+    def bind_public_read(self, operation, read):
+        """Pin an ordinary report before sending; old receipts cannot acquire new authority."""
+        from kvk.models.source_integration import SeasonRead
+
+        with self._lock():
+            data = self.snapshot()
+            if not data["operations"] or data["operations"][-1]["token"] != operation:
+                raise DispatchUnavailable("Preview operation changed")
+            saved = self.manifest.get("public_read")
+            if saved is not None:
+                if read != saved:
+                    raise DispatchUnavailable(
+                        "Public report changed; retain session and create a new preview"
+                    )
+                return
+            if read is None:
+                return
+            parsed = SeasonRead(**read)
+            if not parsed.available:
+                return  # A waiting session has not yet published or acquired a result identity.
+            if self.manifest.get("source_selection") is not None or data["message_id"] is not None:
+                raise DispatchUnavailable("Existing preview cannot be retargeted to public routing")
+            if self.manifest.get("kvk_no", parsed.kvk_no) != parsed.kvk_no:
+                raise DispatchUnavailable("Public report season differs")
+            manifest = dict(
+                self.manifest, public_read=parsed.as_dict(), version=4, kvk_no=parsed.kvk_no
+            )
+            _write(self.path / "session.json", manifest)
+            self.manifest = manifest
+
     def begin(self, operation: str):
         with self.repository.lock(), self._lock():
             data = self.snapshot()
@@ -268,10 +298,10 @@ class PreviewRepository:
         _contained(self.root, path / "session.json")
         manifest = _read(path / "session.json")
         version = manifest.get("version")
-        if type(version) is not int or version not in {1, 2, 3}:
+        if type(version) is not int or version not in {1, 2, 3, 4}:
             raise DispatchUnavailable("Unsupported preview session version")
         selected = manifest.get("kvk_no")
-        if version in {2, 3}:
+        if version in {2, 3, 4}:
             if not _positive(selected) or selected > 2147483647:
                 raise DispatchUnavailable("Invalid saved KVK selection")
             if kvk_no is not None and kvk_no != selected:
@@ -286,6 +316,17 @@ class PreviewRepository:
                 raise DispatchUnavailable("Session source/publication cannot change")
         elif source_selection is not None or "source_selection" in manifest:
             raise DispatchUnavailable("Legacy session cannot be retargeted to a source publication")
+        if version == 4:
+            from kvk.models.source_integration import SeasonRead
+
+            try:
+                read = SeasonRead(**manifest["public_read"])
+                if not read.available or read.kvk_no != selected:
+                    raise ValueError("Invalid public selection")
+            except (ValueError, TypeError, KeyError, AttributeError) as exc:
+                raise DispatchUnavailable("Invalid saved public report identity") from exc
+        elif "public_read" in manifest:
+            raise DispatchUnavailable("Unsupported saved public report identity")
         expected = dict(
             version=version,
             kind="fighting_preview",

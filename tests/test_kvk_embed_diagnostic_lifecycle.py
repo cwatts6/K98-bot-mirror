@@ -299,3 +299,32 @@ async def test_invalid_selector_does_not_allocate(tmp_path, action, token):
             publish=AsyncMock(),
         )
     assert not repo.root.exists()
+
+
+@pytest.mark.parametrize("corruption", ["season", "source", "version", "extra_field"])
+def test_corrupted_public_authority_cannot_rehydrate(tmp_path, corruption):
+    import json
+
+    from kvk.dal.source_routing_dal import resolve_season_read
+    from stats_alerts.dispatch_reservations import DispatchUnavailable
+    from tests.test_kvk_public_routing import RoutingStore
+
+    store = RoutingStore()
+    read = resolve_season_read(16, connect=store.connect)
+    repo = sessions.PreviewRepository(tmp_path / "preview")
+    session = repo.open(10, 20, 30, kvk_no=16)
+    path = session.path / "session.json"
+    manifest = dict(session.manifest, version=4, public_read=read.as_dict())
+    if corruption == "season":
+        manifest["public_read"]["kvk_no"] = 17
+    elif corruption == "source":
+        manifest["public_read"]["source_key"] = "legacy_full_data"
+    elif corruption == "version":
+        manifest["public_read"]["public_selection_version"] = True
+    else:
+        manifest["public_read"]["arbitrary_publication"] = "bad"
+    path.write_text(json.dumps(manifest))
+    before = path.read_bytes()
+    with pytest.raises(DispatchUnavailable):
+        repo.open(10, 20, 30, session.token)
+    assert path.read_bytes() == before

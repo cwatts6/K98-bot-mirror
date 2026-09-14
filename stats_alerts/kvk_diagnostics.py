@@ -20,6 +20,8 @@ class PreviewPayload:
     available: bool
     detail: str
     digest: str
+    public_read: dict | None = None
+    routing_unavailable: bool = False
 
 
 class PreviewRunner(DiagnosticRunner):
@@ -93,6 +95,7 @@ class PreviewRunner(DiagnosticRunner):
                 preview = await build(kvk_no=selected, source_selection=dict(saved_source))
             else:
                 preview = await build(kvk_no=selected) if selected is not None else await build()
+            await _io(session.bind_public_read, operation, preview.public_read)
             if not preview.available:
                 await _io(session.transition, operation, "unavailable")
                 return outcome("unavailable", preview.detail, await _io(session.snapshot))

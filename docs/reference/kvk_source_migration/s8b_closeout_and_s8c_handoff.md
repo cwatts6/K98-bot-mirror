@@ -1,5 +1,7 @@
 # S8B closeout and S8C handoff
 
+> S8C is now delivered and archived. The [S8C closeout and S9A handoff](s8c_closeout_and_s9a_handoff.md) supersedes the next-slice/status directions below; retain the dated S8B/S8C evidence as history.
+
 ## 1. Accepted closeout and verified state — 2026-09-13
 
 **S8B is complete, operator accepted, successfully smoke tested and merged into production.**
@@ -57,8 +59,8 @@ The [S7/S8A closeout](s8a_closeout_and_s8b_handoff.md), approved contract/manife
 evidence remain active references; only completed S8B task pack/starter are newly archived.
 
 **S8C is ready to start in a new chat for initial review/scope only.** Use the
-[S8C task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md)
-and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+[S8C task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md)
+and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
 Its 13-path S7 boundary includes seven runtime, five test and one command-reference path.
 Scope approval is needed before S8C implementation; no new chat or implementation is started here.
 S7 decisions and S8B acceptance remain settled. S8C is intake/admin UX; S9 ordinary public routing

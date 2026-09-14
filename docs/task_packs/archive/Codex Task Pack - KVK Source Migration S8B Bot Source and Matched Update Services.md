@@ -1,6 +1,6 @@
 # KVK Source Migration S8B — Bot Source and Matched Update Services
 
-> Archived 2026-09-13: S8B is complete, operator smoke accepted and merged in production #581 / SQL #81. This file retains historical instructions and evidence; do not execute it as a new task. Use the [S8C starter](../Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [closeout](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md). No bot-machine pull occurred.
+> Archived 2026-09-13: S8B is complete, operator smoke accepted and merged in production #581 / SQL #81. This file retains historical instructions and evidence; do not execute it as a new task. Use the [S8C starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [closeout](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md). No bot-machine pull occurred.
 
 ## 1. Task header and authority
 

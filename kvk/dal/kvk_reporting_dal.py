@@ -232,9 +232,19 @@ def fetch_camp_summary(cursor: Any, kvk_no: int, camp_id: int) -> list[dict[str,
 
 
 def fetch_allkingdom_reporting_rows(
-    kvk_no: int, our_kingdom: int
+    kvk_no: int, our_kingdom: int, *, read=None
 ) -> dict[str, list[dict[str, Any]]]:
     """Fetch all raw row sets needed for the all-kingdom KVK report."""
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.dal.source_routing_dal import resolve_season_read
+
+    read = read or resolve_season_read(kvk_no)
+    if (
+        read.kvk_no != kvk_no
+        or read.availability != "legacy"
+        or read.source_key != "legacy_full_data"
+    ):
+        raise SourceConflict("Legacy reporting requires the fixed legacy season choice.")
     conn = get_conn_with_retries()
     with conn:
         cursor = conn.cursor()

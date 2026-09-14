@@ -169,6 +169,21 @@ def test_t70_pending_endpoint_never_current_final(monkeypatch):
     assert report["current_period_state"] == "missing_configuration"
 
 
+def test_private_component_adapter_remains_explicit_and_does_not_resolve_public_routing(
+    monkeypatch,
+):
+    from kvk.dal import source_routing_dal
+
+    monkeypatch.setattr(
+        source_routing_dal,
+        "resolve_season_read",
+        Mock(side_effect=AssertionError("private adapter routed publicly")),
+    )
+    report, _, _, _ = load_synthetic(monkeypatch, aggregate=False)
+    assert report["aggregate_state"] == "not_received"
+    assert "public_read" not in report
+
+
 def test_t36_t37_overall_stays_independent(monkeypatch):
     report, _, _, _ = load_synthetic(monkeypatch, overall=True, aggregate=False)
     assert report["period_key"] == "overall"

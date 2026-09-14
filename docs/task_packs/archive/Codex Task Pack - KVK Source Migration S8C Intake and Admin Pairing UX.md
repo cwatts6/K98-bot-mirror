@@ -1,5 +1,7 @@
 # KVK Source Migration S8C — Intake and Admin Pairing UX
 
+> Archived after merged S8C delivery on 2026-09-13. Initial instructions below are historical, not authority to restart S8C. See [S8C closeout](../../reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md) for final evidence, remaining runtime gates and S9A scope-only handoff.
+
 ## 1. Task header and authority
 
 Prepared 2026-09-13 for Chris Watts. Type: bounded Bot interaction integration.
@@ -18,13 +20,13 @@ Read current AGENTS.md, README-DEV.md, docs/reference/README.md and all indexed 
 execution, testing, skills/refactor and deferred-optimisation standards. Read root/applicable
 SECURITY.md as policy context. Then read:
 
-- [S8B closeout and exact S8C documentation carry-forward](../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md)
-- [Approved S7 contract and consumer matrix](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md), especially fixed source, matched updates, counterpart confirmation and C61/N09
-- [Approved manifests](../reference/kvk_source_migration/integration_implementation_manifests.md), S8C and S7-T01/T03/T05
-- [Architecture and EndScanID amendment](../reference/kvk_source_migration/phase_2_contract_and_architecture.md) and [acceptance scenarios](../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
-- [Archived S8B implementation, disposable and review evidence](archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md)
-- [Retained S6 evidence](../reference/kvk_source_migration/release_evidence_log.md), [readiness](../reference/kvk_source_migration/release_readiness_and_rollback.md), [post-S6 requirements](../reference/kvk_source_migration/post_s6_integration_requirements.md)
-- [Canonical command reference](../reference/canonical_command_reference.md); conditional helper and startup/recovery references where actual callers require them
+- [S8B closeout and exact S8C documentation carry-forward](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md)
+- [Approved S7 contract and consumer matrix](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md), especially fixed source, matched updates, counterpart confirmation and C61/N09
+- [Approved manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md), S8C and S7-T01/T03/T05
+- [Architecture and EndScanID amendment](../../reference/kvk_source_migration/phase_2_contract_and_architecture.md) and [acceptance scenarios](../../reference/kvk_source_migration/phase_2_acceptance_scenarios.md)
+- [Archived S8B implementation, disposable and review evidence](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8B%20Bot%20Source%20and%20Matched%20Update%20Services.md)
+- [Retained S6 evidence](../../reference/kvk_source_migration/release_evidence_log.md), [readiness](../../reference/kvk_source_migration/release_readiness_and_rollback.md), [post-S6 requirements](../../reference/kvk_source_migration/post_s6_integration_requirements.md)
+- [Canonical command reference](../../reference/canonical_command_reference.md); conditional helper and startup/recovery references where actual callers require them
 
 Read authoritative SQL repository instructions, migrations/README.md, SQL_DATA_MIGRATION_GUARDRAILS.md,
 docs/SQL_DELIVERY_LOG.md and relevant object definitions in C:\K98-bot-SQL-Server. Validate actual
@@ -68,7 +70,7 @@ test, SQL or config edits need an evidenced scope amendment before implementatio
 
 ## 5. Mandatory documentation delivery
 
-The complete physical-path manifest in [closeout section 3](../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md#3-exact-documentation-carry-forward-manifest)
+The complete physical-path manifest in [closeout section 3](../../reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md#3-exact-documentation-carry-forward-manifest)
 is an additional required part of S8C. Include every pending closeout/reference/index edit,
 both S8B archive source deletions AND both archive destinations, this pack/starter and the new
 closeout. Preserve local documentation when branching; pre-existing work is not an exclusion.
@@ -172,11 +174,11 @@ action, bot-machine pull, restart, deployment, activation, predecessor operation
 or new chat is authorized by this starter. Comparisons are not reset instructions.
 
 
-## Current S8C implementation authorization - 2026-09-13
+## Historical S8C implementation authorization - 2026-09-13
 
 The operator approved the revised scope and implementation plan. Implement the amended
-[contract](../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md) and
-[exact 69-path Bot / 6-path SQL manifests](../reference/kvk_source_migration/integration_implementation_manifests.md).
+[contract](../../reference/kvk_source_migration/integration_contract_and_consumer_matrix.md) and
+[exact 69-path Bot / 6-path SQL manifests](../../reference/kvk_source_migration/integration_implementation_manifests.md).
 This supersedes the initial-scope-only boundary above; all operational and Git-publication
 restrictions remain. Offline validation completed: 4,202 tests passed / 62 skipped, operational logs unchanged.
 No live SQL/provider/Discord or bot-machine evidence is claimed. Preserve all pending documentation and both sides of both S8B archive moves.

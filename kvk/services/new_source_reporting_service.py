@@ -138,6 +138,13 @@ def load_report_v2(
         raise SourceConflict(
             "Preview publication changed; retain this session and create a new one."
         )
+    return _build_report(connect, envelope, our_kingdom)
+
+
+def _build_report(connect, envelope, our_kingdom=None):
+    """Shared private/public formatting; the caller owns the selection authority."""
+    kvk_no, period_id = envelope["kvk_no"], envelope["period_id"]
+    publication = envelope.get("publication")
     report = dict(
         schema_version=2,
         source_key=SOURCE_KEY,
@@ -254,6 +261,20 @@ def load_report_v2(
             r["governor_id"]: (r["rank"], r["population"])
             for r in _ranked(players, "tier_kp", "governor_id")
         }
+    )
+    return report
+
+
+def load_complete_report(read, *, connect, our_kingdom):
+    """Format only the complete publication authorized for this public request."""
+    envelope = new_source_reporting_dal.load_complete_snapshot(connect, read=read)
+    report = _build_report(connect, envelope, our_kingdom)
+    report.update(
+        public_read=read.as_dict(),
+        availability=read.availability,
+        availability_reason=read.reason,
+        update_id=read.update_id,
+        public_selection_version=read.public_selection_version,
     )
     return report
 

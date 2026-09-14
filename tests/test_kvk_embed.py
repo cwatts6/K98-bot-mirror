@@ -58,6 +58,18 @@ def test_source_preview_renders_twelve_blocks_and_explicit_unavailable(monkeypat
     require_valid_embed_payload(preview.payload)
 
 
+def test_previous_complete_label_does_not_claim_desired_final(monkeypatch):
+    from stats_alerts.embeds.kvk import build_source_preview
+    from tests.test_kvk_source_reporting import load_synthetic
+
+    report, _, _, _ = load_synthetic(monkeypatch, desired_end=14)
+    report.update(availability_reason="configuration_pending")
+    preview = build_source_preview(report)
+    assert "Players: previous complete; configuration_pending; 10 → 13" in preview.detail
+    assert "Requested endpoints: 10 → 14" in preview.detail
+    assert "Players: final" not in preview.detail
+
+
 def test_source_preview_maximum_names_and_numbers_pack_complete_rows(monkeypatch):
     from decimal import Decimal
 

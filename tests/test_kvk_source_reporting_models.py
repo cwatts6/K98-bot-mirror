@@ -48,6 +48,34 @@ def snapshot(*, aggregate=True):
     )
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        dict(kvk_no=True),
+        dict(kvk_no=0),
+        dict(season_version=True),
+        dict(source_key="other"),
+        dict(choice_id="not-a-uuid"),
+        dict(availability="current"),
+        dict(availability="legacy", source_key="snapshot_report_v1"),
+    ],
+)
+def test_public_read_rejects_forged_or_incomplete_authority(changes):
+    from kvk.models.source_integration import SeasonRead
+
+    with pytest.raises((ValueError, TypeError)):
+        SeasonRead(**dict({"kvk_no": 16}, **changes))
+
+
+def test_public_read_is_immutable_and_roundtrips_without_sql():
+    from kvk.models.source_integration import SeasonRead
+
+    read = SeasonRead(16, reason="waiting_pair")
+    assert SeasonRead(**read.as_dict()) == read
+    with pytest.raises(FrozenInstanceError):
+        read.kvk_no = 17
+
+
 def test_t16_t35_t39_aggregate_values_precision_and_independent_timestamps():
     report = snapshot()
     source = report.aggregate.report

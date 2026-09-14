@@ -91,3 +91,40 @@ async def test_interface_does_not_duplicate_prekvk_daily_claim(monkeypatch) -> N
     )
 
     assert calls == ["prekvk"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled", [True, False])
+async def test_ordinary_source_dispatch_preserves_daily_claim_owner(monkeypatch, disabled):
+    from unittest.mock import AsyncMock
+
+    from stats_alerts.embeds import kvk
+    from tests.test_kvk_public_routing import RoutingStore
+
+    store = RoutingStore()
+    store.install(monkeypatch)
+    store.routing["Enabled"] = not disabled
+    monkeypatch.setattr(
+        kvk,
+        "get_latest_kvk_metadata_sql",
+        lambda: dict(kvk_no=16, kvk_name="Season", start_date=1, end_date=2),
+    )
+    channel = SimpleNamespace(id=20, guild=SimpleNamespace(id=10))
+    channel.send = AsyncMock(return_value=SimpleNamespace(id=100, channel=channel))
+    monkeypatch.setattr(interface, "is_kvk_fighting_open", lambda: True)
+    monkeypatch.setattr(interface, "clear_prekvk_message", AsyncMock())
+    monkeypatch.setattr(interface, "ks_mod", AsyncMock())
+    monkeypatch.setattr(interface, "sent_today_any", lambda _: False)
+    monkeypatch.setattr(interface, "read_counts_for", lambda *args: 0)
+    claims = []
+    monkeypatch.setattr(
+        interface, "claim_send", lambda *args, **kw: claims.append((args, kw)) or True
+    )
+    result = await interface.send_stats_update_embed(
+        SimpleNamespace(get_channel=lambda _: channel), "test", True
+    )
+    assert channel.send.await_count == (0 if disabled else 1)
+    assert len(claims) == (0 if disabled else 1)
+    assert result.attempts[-1].outcome == ("skipped" if disabled else "sent")
+    if not disabled:
+        assert claims == [(("kvk",), {"max_per_day": 3})]
