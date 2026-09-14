@@ -369,3 +369,18 @@ effect and an explicit scan skip. Workbench telemetry reports 1,440,561 total to
 1,392,640 cached input tokens, across two threads; this is not a billing estimate.
 SQL review corrections retain the independent two-Markdown-file security skip; staged secrets,
 whitespace and local links passed without SQL execution. All prior operational limits remain.
+
+
+### Production PR #584 review corrections — 2026-09-14
+
+Two production review comments are addressed on the mirror first, then applied as the exact
+file patch to the existing production branch. Disabled stats cards now pass an explicit empty
+context to the independent payload builder, avoiding source SQL/cohort loading. A guild card
+check with a missing/non-permission-capable channel raises PermissionError before member lookup;
+existing callers retain unavailable/suppressed output behavior. There is no permissive early return
+for malformed guild channels. Focused posting/view tests pass (32 cases), including three disabled
+flag values, three unavailable channel shapes, and an unavailable view interaction without edits.
+The four Python paths and this closeout already belong to the approved 58-path Bot manifest.
+No SQL paths or new command/export-coordinator behavior are introduced. Final validation and exact
+mirror/production patch equivalence are recorded in production PR #584 before review resolution.
+This is repository review work only; no merge, bot-machine pull, deployment or activation.

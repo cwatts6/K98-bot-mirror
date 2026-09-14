@@ -135,9 +135,12 @@ async def require_card_destination(context, *, user=None):
     guild = getattr(channel, "guild", None) or getattr(context, "guild", None)
     if guild is None:
         return
+    permissions_for = getattr(channel, "permissions_for", None)
+    if not callable(permissions_for):
+        raise PermissionError("Card destination is unavailable.")
     user = user or context.user
     member = await guild.fetch_member(user.id)
-    permissions = channel.permissions_for(member)
+    permissions = permissions_for(member)
     if not permissions.view_channel or not permissions.send_messages:
         raise PermissionError("Card destination permission changed.")
 

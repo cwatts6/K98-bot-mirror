@@ -258,3 +258,35 @@ async def test_stats_buttons_recheck_permission_after_render(monkeypatch):
     await view._show_more_stats(interaction)
     assert not message.edits
     assert interaction.guild.fetch_member.await_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "channel", [None, SimpleNamespace(), SimpleNamespace(permissions_for=None)]
+)
+async def test_card_destination_rejects_missing_permission_channel(channel):
+    from ui.views.kvk_stats_card_views import require_card_destination
+
+    guild = SimpleNamespace(fetch_member=AsyncMock())
+    context = SimpleNamespace(guild=guild, channel=channel, user=SimpleNamespace(id=1))
+    with pytest.raises(PermissionError, match="destination is unavailable"):
+        await require_card_destination(context)
+    guild.fetch_member.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_card_view_missing_channel_reports_unavailable_without_editing():
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered, owner_id=1)
+    message = _Message()
+    view.message = message
+    view.channel_id = 2
+    view.guild_id = 3
+    interaction = _interaction(message)
+    interaction.guild_id = 3
+    interaction.guild = SimpleNamespace(fetch_member=AsyncMock())
+    interaction.channel = None
+    assert not await view.interaction_check(interaction)
+    interaction.response.send_message.assert_awaited_once()
+    interaction.guild.fetch_member.assert_not_awaited()
+    assert not message.edits

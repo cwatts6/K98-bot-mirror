@@ -9,7 +9,7 @@ import discord
 
 from commands.kvk_personal_posting import post_stats_message
 from embed_utils import build_stats_embed
-from kvk.models.kvk_stats_card import card_context_label
+from kvk.models.kvk_stats_card import KvkStatsCardContext, card_context_label
 from kvk.rendering.kvk_stats_card_renderer import render_kvk_stats_card
 from kvk.services.kvk_stats_card_service import (
     build_kvk_stats_card_payload,
@@ -71,7 +71,8 @@ async def post_kvk_stats_output(
     use_fallback_chain: bool = False,
 ) -> tuple[bool, str]:
     """Use source-safe independent output whenever a card cannot be sent safely."""
-    payload = await build_kvk_stats_card_payload(row)
+    context = None if _card_enabled() else KvkStatsCardContext()
+    payload = await build_kvk_stats_card_payload(row, context=context)
     channel = getattr(ctx, "channel", None)
     try:
         card = await _build_card(row, user, payload=payload)

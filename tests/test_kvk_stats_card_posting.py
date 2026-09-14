@@ -142,7 +142,7 @@ async def test_fallback_preserves_history_and_tiers_without_source_context(
     payload = await build_kvk_stats_card_payload(row)
     payload = replace(payload, camp_name="FORBIDDEN CAMP", overall_kvk_rank=987654)
 
-    async def saved_payload(_row):
+    async def saved_payload(_row, **kwargs):
         return payload
 
     async def current(_payload):
@@ -205,3 +205,27 @@ async def test_fallback_preserves_history_and_tiers_without_source_context(
     for forbidden in ["FORBIDDEN", "987654", "attachment://", "thumbnail", "source_read"]:
         assert forbidden not in serialized
     assert payload.camp_name == "FORBIDDEN CAMP"  # Suppression never mutates the saved input.
+
+
+@pytest.mark.parametrize("flag", ["0", "false", "off"])
+async def test_disabled_cards_never_load_source_context(monkeypatch, flag):
+    from unittest.mock import AsyncMock
+
+    import commands.kvk_stats_card_posting as posting
+    import kvk.services.kvk_stats_card_service as service
+
+    load_context = AsyncMock(side_effect=AssertionError("disabled card must not query source"))
+    monkeypatch.setattr(service, "load_kvk_stats_card_context", load_context)
+    monkeypatch.setenv("KVK_STATS_CARD_ENABLED", flag)
+    channel = RejectsFilesChannel()
+    posted, used = await posting.post_kvk_stats_output(
+        bot=None,
+        ctx=SimpleNamespace(channel=channel),
+        row={"GovernorID": "123", "KVK_NO": 16, "T4&T5_Kills": 123, "Kill Target": 200},
+        user=SimpleNamespace(id=1, mention="<@1>"),
+    )
+    load_context.assert_not_awaited()
+    assert posted and used == "orig_channel"
+    assert len(channel.sent[0]["embeds"]) == 3
+    assert not channel.sent[0].get("files")
+    assert "123" in next(f.value for f in channel.sent[0]["embeds"][0].fields if "KILLS" in f.name)
