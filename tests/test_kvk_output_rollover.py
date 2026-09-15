@@ -641,3 +641,128 @@ def test_audited_clear_can_rebind_without_deleting_unrelated_app_properties():
     )
     assert api.files_data["fake-1"]["appProperties"]["unrelated"] == "keep"
     assert api.files_data["fake-1"]["appProperties"]["k98Generation"] == args["generation"].key
+
+
+@pytest.mark.parametrize("when", ["before_probe", "during_probe"])
+def test_rollover_closing_skips_new_retirement_and_allows_owned_delivery_to_drain(when):
+    from kvk.services.source_output_pool_service import retire_superseded_generations
+
+    s = retirement_snapshot_fixture()
+    if when == "before_probe":
+        s["pool"]["PoolState"] = "closing"
+    pools, transport, verifier = Mock(), Mock(), Mock()
+    pools.retirement_snapshot.return_value = s
+    pools.retire_generation.return_value = None
+    retire_superseded_generations(
+        pools=pools,
+        coordinator=Mock(),
+        claim=Mock(),
+        current_attempt_id="new",
+        transport=transport,
+        verifier=verifier,
+    )
+    assert verifier.call_count == (when == "during_probe")
+    transport.rollover_private.assert_not_called()
+    transport.rollover_clear.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "mismatch", [None, "PoolID", "AccountKey", "OldEpoch", "State", "Phase", "OwnerID"]
+)
+def test_retirement_owned_recognizes_only_the_exact_closing_reservation(monkeypatch, mismatch):
+    from kvk.dal import source_output_pool_dal as mod
+
+    coordinator, cursor = Mock(), Mock()
+    claim = SimpleNamespace(
+        account="acct",
+        resources=(("destination:index", 1), ("destination:a", 1), ("destination:b", 1)),
+    )
+    snapshot = retirement_snapshot_fixture()
+    snapshot["pool"].update(PoolState="closing", OwnerID="operation", IndexFileID="index")
+    operation = dict(
+        PoolID="pool",
+        AccountKey="acct",
+        OldEpoch=1,
+        State="closing",
+        Phase="draining",
+        OwnerID=None,
+    )
+    if mismatch:
+        operation[mismatch] = "different"
+
+    @contextmanager
+    def owned(_):
+        yield cursor, dict(ConsumerKind="new_source", AccountKey="acct", KVK_NO=16, PoolEpoch=1)
+
+    coordinator._owned = owned
+    coordinator._attempt.return_value = (
+        dict(Phase="publication_pending"),
+        [dict(Role="index", FileID="index")],
+    )
+    repository = mod.SourceOutputPoolDAL(Mock())
+    monkeypatch.setattr(mod, "one", lambda c: dict(PoolID="pool"))
+    monkeypatch.setattr(mod, "_mutex", lambda *a: None)
+    monkeypatch.setattr(repository, "_snapshot", lambda *a: snapshot)
+    monkeypatch.setattr(repository, "_operation", lambda *a: operation)
+    if mismatch:
+        with pytest.raises(SourceConflict, match="Closing reservation"):
+            repository.retirement_snapshot(coordinator, claim, "new")
+    else:
+        assert repository.retirement_snapshot(coordinator, claim, "new") == snapshot
+
+
+def test_rollover_start_during_retirement_probe_does_not_start_retirement(monkeypatch):
+    from copy import deepcopy
+
+    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+
+    snapshot = retirement_snapshot_fixture()
+    closing = deepcopy(snapshot)
+    closing["pool"].update(PoolState="closing", OwnerID="operation", Version=5, Fence=1)
+    proof = dict(
+        snapshot_hash=digest(snapshot).hex(),
+        writer_terminated=True,
+        current_pointer_verified=True,
+        no_live_references=True,
+        evidence_id="proof",
+        current_attempt_id="new",
+        old_attempt_id="old-attempt",
+    )
+    cursor = Mock()
+
+    @contextmanager
+    def owned(*a):
+        yield cursor, {}, closing
+
+    repository = SourceOutputPoolDAL(Mock())
+    monkeypatch.setattr(repository, "_retirement_owned", owned)
+    assert (
+        repository.retire_generation(Mock(), Mock(), "new", snapshot, "old-attempt", proof) is None
+    )
+    cursor.execute.assert_not_called()
+
+
+def test_already_started_retirement_clear_preserves_rollover_pool_owner_cas(monkeypatch):
+    from kvk.dal import source_output_pool_dal as mod
+
+    s = retirement_snapshot_fixture()
+    pool = s["pool"]
+    pool.update(PoolState="closing", OwnerID="rollover-reservation", Fence=1)
+    cursor = Mock()
+    monkeypatch.setattr(mod, "one", lambda c: dict(SequenceNo=1))
+    cas = Mock(return_value=dict(Version=5))
+    monkeypatch.setattr(mod, "_cas", cas)
+    mod.SourceOutputPoolDAL._retirement_event(
+        cursor,
+        pool,
+        s["slots"][0],
+        SimpleNamespace(owner_id="job-owner", fence=5),
+        dict(Actor="operator"),
+        "cleanup",
+        "clear",
+        dict(empty=True),
+    )
+    sql = cas.call_args.args[1]
+    assert "OwnerID=? OR (OwnerID IS NULL AND CAST(? AS uniqueidentifier) IS NULL)" in sql
+    assert cas.call_args.args[-2:] == ("rollover-reservation", "rollover-reservation")
+    assert "SET OwnerID=" not in sql and "Fence=Fence" not in sql

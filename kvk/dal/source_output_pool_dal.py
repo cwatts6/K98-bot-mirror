@@ -405,10 +405,28 @@ class SourceOutputPoolDAL:
                 raise SourceConflict("Retirement registration changed.")
             _mutex(cursor, "pool:" + str(pool["PoolID"]).lower())
             snapshot = self._snapshot(cursor, pool["PoolID"])
-            if (
-                snapshot["pool"]["PoolState"] not in {"active", "closing"}
-                or snapshot["pool"]["OwnerID"] is not None
-            ):
+            current_pool = snapshot["pool"]
+            if current_pool["PoolState"] == "closing" and current_pool["OwnerID"] is not None:
+                # Closing reserves the pool for rollover, but leaves this job's
+                # resource claim intact until owned delivery has drained.
+                operation = self._operation(cursor, current_pool["OwnerID"])
+                if not operation or (
+                    operation["PoolID"],
+                    operation["AccountKey"],
+                    operation["OldEpoch"],
+                    operation["State"],
+                    operation["Phase"],
+                    operation["OwnerID"],
+                ) != (
+                    current_pool["PoolID"],
+                    claim.account,
+                    current_pool["Epoch"],
+                    "closing",
+                    "draining",
+                    None,
+                ):
+                    raise SourceConflict("Closing reservation differs from the draining pool.")
+            elif current_pool["PoolState"] != "active" or current_pool["OwnerID"] is not None:
                 raise SourceConflict("Retirement pool ownership changed.")
             files = {snapshot["pool"]["IndexFileID"], *(s["FileID"] for s in snapshot["slots"])}
             owned_files = {
@@ -444,6 +462,10 @@ class SourceOutputPoolDAL:
             job,
             actual,
         ):
+            if actual["pool"].get("PoolState") == "closing":
+                # Rollover won the admission race while the independent probe ran.
+                # Leave historical cleanup to rollover and finish this owned export.
+                return None
             if actual != snapshot or old_attempt_id not in reusable_attempts(
                 actual, current_attempt_id
             ):
@@ -528,11 +550,13 @@ class SourceOutputPoolDAL:
         )
         pool["Version"] = _cas(
             cursor,
-            "UPDATE KVK.SourceOutputPool SET Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PoolID=? AND Version=? AND Epoch=? AND Fence=? AND OwnerID IS NULL AND PoolState IN ('active','closing')",
+            "UPDATE KVK.SourceOutputPool SET Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PoolID=? AND Version=? AND Epoch=? AND Fence=? AND (OwnerID=? OR (OwnerID IS NULL AND CAST(? AS uniqueidentifier) IS NULL)) AND PoolState IN ('active','closing')",
             pool["PoolID"],
             pool["Version"],
             pool["Epoch"],
             pool["Fence"],
+            pool.get("OwnerID"),
+            pool.get("OwnerID"),
         )["Version"]
         return event
 

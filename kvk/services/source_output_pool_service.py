@@ -215,6 +215,8 @@ def retire_superseded_generations(
 
     while True:
         snapshot = pools.retirement_snapshot(coordinator, claim, current_attempt_id)
+        if snapshot["pool"].get("PoolState") == "closing":
+            return  # Owned delivery drains; rollover owns subsequent retirement.
         candidates = reusable_attempts(snapshot, current_attempt_id)
         if not candidates:
             return
@@ -225,6 +227,8 @@ def retire_superseded_generations(
         retirement = pools.retire_generation(
             coordinator, claim, current_attempt_id, snapshot, old_attempt_id, proof
         )
+        if retirement is None:
+            return  # Admission closed while the verifier was reading.
         for member in retirement["slots"]:
             transport.rollover_private(member["file_id"])
             empty = transport.rollover_clear(member["file_id"])
