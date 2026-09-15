@@ -592,7 +592,7 @@ class LegacyExportRuntime:
         registered = json.loads(self.configuration)[row["ConsumerKind"]]
         if metadata["generation"].get("registration_sha256") != configuration_digest(registered):
             raise SnapshotUnavailable("Retained output registration differs from this runtime.")
-        return self.coordinator.enqueue(
+        job = self.coordinator.enqueue(
             JobSpec(
                 account=row["AccountKey"],
                 consumer=row["ConsumerKind"],
@@ -608,6 +608,7 @@ class LegacyExportRuntime:
             ),
             preparation_id=preparation_id,
         )
+        return str(job["JobID"])
 
     def validate_destination(self, *, kvk_no, sheet_name):
         scope = json.loads(self.configuration)["all_kvk"]

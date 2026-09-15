@@ -4,6 +4,20 @@
 
 ### PR review correction boundary — 2026-09-15
 
+Second review correction: submission now returns only the authoritative enqueued `JobID` string,
+and output planning rejects multiple logical spreadsheet registrations sharing a physical ID before
+consuming frames. Seven regression cases cover both consumers, captured/materialized receipts,
+early alias rejection and valid distinct destinations. The focused suite passed **106 tests** and
+the provider adapter suite passed **16 tests**; Ruff and architecture/deferred/security-routing
+validators passed. Test selection ran; the prior full suite and registration/import evidence remain
+retained, with focused tests selected for these two runtime edits. No SQL change or execution.
+Changes security review, Deep off, `9df134e0-ed0e-420a-bbab-196716faa809` completed with no findings
+or deferred candidates against working-tree base/head `a82f43cf31daeba8ef0271a47f1bd7bc0235eacc`,
+digest `codex-security-snapshot/v1:sha256:0ada2df9d44f85e045db8b2b9803f613f5e1a1336b123b87c8dcc7e12ef323fa`.
+This evidence-only paragraph was added after sealing; its documentation-only delta is excluded
+from another security scan because it changes no runtime, configuration, policy or trust boundary.
+The exact 83-identity Bot boundary and separate eight-path SQL boundary remain unchanged.
+
 The operator authorized action, responses and resolution for Bot PR #279 and separate SQL PR #86.
 The pending-export correction also modifies `admin_helpers.py` and
 `tests/test_admin_helpers_stats_delivery.py`, extending the exact Bot delivery union to **83 physical

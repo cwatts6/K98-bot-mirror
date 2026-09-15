@@ -3680,6 +3680,12 @@ def plan_legacy_outputs(scope, *, frames):
 
     from services.legacy_export_snapshot_service import OutputSection, SnapshotUnavailable
 
+    registered_ids = tuple(scope["spreadsheets"].values())
+    if len(registered_ids) != len(set(registered_ids)):
+        raise SnapshotUnavailable(
+            "Logical spreadsheet registrations alias the same destination ID."
+        )
+
     outputs, tables, by_grid = [], {}, {}
 
     class Sheet:

@@ -66,6 +66,52 @@ def test_later_failed_producer_invalidates_earlier_pipeline_capture(tmp_path):
         _captures.reset(token)
 
 
+@pytest.mark.parametrize("consumer,season", [("all_kvk", 7), ("scan_data", None)])
+@pytest.mark.parametrize("state", ["captured", "materialized"])
+def test_submission_returns_only_job_id_from_dal_job_row(tmp_path, consumer, season, state):
+    import json
+
+    runtime, dal = producer_runtime(tmp_path)
+    registration = dict(consumer=consumer, kvk_no=season, destinations=["file-a"])
+    runtime.configuration = json.dumps({consumer: registration})
+    preparation_id, job_id = str(uuid4()), uuid4()
+    sections = (OutputSection("data", ("id",), ((1,),)),)
+    output = LegacySnapshot.capture(
+        consumer=consumer,
+        preparation_id=preparation_id,
+        config=registration,
+        generation=dict(
+            completion="committed",
+            commit_identity="committed-A",
+            registration_sha256=configuration_digest(registration),
+            output_sha256=output_digest(sections),
+            config_sha256=configuration_digest(registration),
+        ),
+        provenance={},
+        sections=sections,
+    )
+    receipt = output.persist(runtime.store)
+    dal.read.return_value = dict(
+        AccountKey="acct",
+        StorageOwner=runtime.store.storage_owner,
+        State=state,
+        PreparationID=preparation_id,
+        ConsumerKind=consumer,
+        KVK_NO=season,
+        SpoolKey=receipt.key,
+        SpoolBytes=receipt.byte_count,
+        SpoolHash=bytes.fromhex(receipt.sha256),
+        Actor="operator",
+        Reason="test",
+    )
+    runtime.coordinator.enqueue.return_value = {"JobID": job_id, "ProvenanceJson": "internal-row"}
+    result = runtime.submit(consumer=consumer, kvk_no=season, preparation_id=preparation_id)
+    assert result == str(job_id)
+    assert isinstance(result, str) and "internal-row" not in result
+    runtime.coordinator.enqueue.assert_called_once()
+    assert runtime.coordinator.enqueue.call_args.kwargs["preparation_id"] == preparation_id
+
+
 @pytest.mark.parametrize(
     "changed", ["OwnerID", "Fence", "Version", "ActivePreparationID", "BlockedReason"]
 )
