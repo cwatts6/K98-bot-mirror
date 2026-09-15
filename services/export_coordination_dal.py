@@ -26,6 +26,36 @@ def bounded_json(value):
     return result
 
 
+def validate_confirmed_probe(snapshot, proof):
+    """Shared immutable publication validation for settlement and retirement recovery."""
+    job = snapshot["job"]
+    if (
+        proof.get("snapshot_hash") != digest(snapshot).hex()
+        or proof.get("writer_terminated") is not True
+        or not proof.get("evidence_id")
+        or proof.get("state") != "confirmed"
+        or len(snapshot["attempts"]) != 1
+    ):
+        raise SourceConflict("Exact confirmed publication and termination proof required.")
+    attempt = snapshot["attempts"][0]
+    pinned = json.loads(attempt["ManifestJson"])
+    receipt = proof.get("receipt")
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("export_key") != pinned["generation"]["export_key"]
+        or receipt.get("attempt_id") != attempt["AttemptID"]
+        or receipt.get("fence") != job["Fence"]
+        or receipt.get("files") != [p["FileID"] for p in snapshot["parts"]]
+        or receipt.get("audience") not in {"private", "public_viewer"}
+        or not receipt.get("remote_id")
+    ):
+        raise SourceConflict("Probe differs from byte-exact attempted identity.")
+    encoded = bounded_json(receipt)
+    if attempt["ReceiptJson"] is not None and attempt["ReceiptJson"] != encoded:
+        raise SourceConflict("An existing receipt must remain byte-exact.")
+    return encoded
+
+
 def account_identity(service_account, project):
     """Stable shared account/project namespace; never use a credential filename."""
     if not all(isinstance(v, str) and v and v == v.strip() for v in (service_account, project)):
@@ -1146,7 +1176,21 @@ class ExportCoordinationDAL:
         if len(pools) != 1:
             raise SourceConflict("Job has no unique current registered pool scope.")
         pool = SourceOutputPoolDAL._snapshot(cursor, pools[0]["PoolID"])
-        return _wire(dict(job=job, resources=resources, attempts=attempts, parts=parts, pool=pool))
+        cursor.execute(
+            "SELECT d.* FROM KVK.SourceOutputDisposition d JOIN KVK.SourceOutputSlot s ON s.LastDispositionID=d.DispositionID AND s.PoolID=d.PoolID AND s.FileID=d.FileID WHERE s.PoolID=? AND s.State='retired' ORDER BY d.SequenceNo",
+            pools[0]["PoolID"],
+        )
+        retirement_events = rows(cursor)
+        return _wire(
+            dict(
+                job=job,
+                resources=resources,
+                attempts=attempts,
+                parts=parts,
+                pool=pool,
+                retirement_events=retirement_events,
+            )
+        )
 
     def operator_snapshot(self, job_id):
         if not self.output_operations:
@@ -1166,6 +1210,11 @@ class ExportCoordinationDAL:
             raise SourceConflict(
                 "Exact termination and remote outcome evidence required; uncertainty remains blocked."
             )
+        from kvk.dal.source_output_pool_dal import pending_retirements
+
+        if any(s["State"] == "retired" for s in snapshot["pool"]["slots"]):
+            pending_retirements(snapshot)  # Validate journal before naming the required workflow.
+            raise SourceConflict("Complete explicit retirement recovery before releasing this job.")
         with self._account(job["AccountKey"]) as cursor:
             for resource in snapshot["resources"]:
                 _mutex(cursor, resource["ResourceKey"])
@@ -1204,22 +1253,8 @@ class ExportCoordinationDAL:
                 (),
                 job["IntentID"],
             )
-            receipt = proof.get("receipt")
             if proof["state"] == "confirmed":
-                pinned = json.loads(attempt["ManifestJson"])
-                if (
-                    not isinstance(receipt, dict)
-                    or receipt.get("export_key") != pinned["generation"]["export_key"]
-                    or receipt.get("attempt_id") != attempt["AttemptID"]
-                    or receipt.get("fence") != job["Fence"]
-                    or receipt.get("files") != [p["FileID"] for p in snapshot["parts"]]
-                    or receipt.get("audience") not in {"private", "public_viewer"}
-                    or not receipt.get("remote_id")
-                ):
-                    raise SourceConflict("Probe differs from byte-exact attempted identity.")
-                encoded = bounded_json(receipt)
-                if attempt["ReceiptJson"] is not None and attempt["ReceiptJson"] != encoded:
-                    raise SourceConflict("An existing receipt must remain byte-exact.")
+                encoded = validate_confirmed_probe(snapshot, proof)
                 _cas(
                     cursor,
                     "UPDATE dbo.ExportAttempt SET Phase='published',ReceiptJson=COALESCE(ReceiptJson,?),VerifiedUTC=COALESCE(VerifiedUTC,SYSUTCDATETIME()),PublishedUTC=COALESCE(PublishedUTC,SYSUTCDATETIME()),UpdatedUTC=SYSUTCDATETIME(),Version=Version+1 OUTPUT inserted.Version WHERE AttemptID=? AND Version=? AND OwnerID=? AND Fence=?",

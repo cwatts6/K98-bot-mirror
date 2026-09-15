@@ -44,6 +44,7 @@ class SourceExportOperatorService:
         rollover,
         generation_loader,
         reconciler,
+        retirement_recovery=None,
         now=time.monotonic,
     ):
         if not coordinator.output_operations:
@@ -54,6 +55,7 @@ class SourceExportOperatorService:
             generation_loader,
             reconciler,
         )
+        self.retirement_recovery = retirement_recovery
         self.now = now
         self._previews = {}
         self._lock = threading.RLock()
@@ -263,6 +265,14 @@ class SourceExportOperatorService:
         if snapshot["job"]["ConsumerKind"] != "new_source":
             raise SourceConflict("Use the owning consumer's reconciliation workflow.")
         proof = self.reconciler.probe(deepcopy(snapshot))
+        if any(s["State"] == "retired" for s in snapshot.get("pool", {}).get("slots", [])):
+            if self.retirement_recovery is None:
+                raise SourceConflict("Explicit retirement recovery adapter is not composed.")
+            self.retirement_recovery.resume(snapshot, proof, actor=str(actor.user_id))
+            # Recovery revoked its provider owner. Re-probe the fresh durable snapshot;
+            # never relabel a proof from before the clear/version changes.
+            snapshot = self.coordinator.operator_snapshot(str(UUID(str(job_id))))
+            proof = self.reconciler.probe(deepcopy(snapshot))
         # Provider reads and positive termination verification have returned before SQL.
         return self.coordinator.reconcile_operator(snapshot, proof, actor=str(actor.user_id))
 

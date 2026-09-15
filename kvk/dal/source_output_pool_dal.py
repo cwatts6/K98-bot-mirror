@@ -310,6 +310,88 @@ def reusable_attempts(snapshot, current_attempt_id):
     return result
 
 
+def pending_retirements(snapshot):
+    """Reconstruct unfinished clears from hashed append-only dispositions, never memory."""
+    pool = snapshot["pool"]["pool"]
+    job = snapshot["job"]
+    attempts = snapshot["attempts"]
+    if len(attempts) != 1:
+        raise SourceConflict("One exact publishing attempt required for retirement recovery.")
+    current = attempts[0]["AttemptID"]
+    events = {e["DispositionID"]: e for e in snapshot.get("retirement_events", [])}
+    result = []
+    for slot in snapshot["pool"]["slots"]:
+        if slot["State"] != "retired":
+            continue
+        event = events.get(slot["LastDispositionID"])
+        if not event:
+            raise SourceConflict("Retired slot has no durable retirement evidence.")
+        evidence = json.loads(event["EvidenceJson"])
+        if digest(evidence).hex() != event["EvidenceHash"]:
+            raise SourceConflict("Retirement evidence hash differs.")
+        # Other publishing jobs cannot adopt this retirement, even on the same pool.
+        if evidence.get("current_attempt_id") != current:
+            raise SourceConflict("Retired slot belongs to another publishing attempt.")
+        previous = evidence.get("previous_assignment", {})
+        proof = evidence.get("proof", {})
+        if (
+            (
+                event["PoolID"],
+                event["FileID"],
+                event["OldEpoch"],
+                event["NewEpoch"],
+                event["Action"],
+                event["OwnerID"],
+                event["Fence"],
+                event["ToSlotVersion"],
+            )
+            != (
+                pool["PoolID"],
+                slot["FileID"],
+                pool["Epoch"],
+                pool["Epoch"],
+                "retire",
+                job["OwnerID"],
+                job["Fence"],
+                slot["Version"],
+            )
+            or slot["OwnerID"] is not None
+            or slot["LastAction"] != "retire"
+            or any(
+                previous.get(k) != slot[k]
+                for k in ("FileID", "Epoch", "AssignmentID", "AttemptID", "PartNo", "Fence")
+            )
+            or previous.get("Version", -1) + 1 != slot["Version"]
+            or previous.get("State") != "active"
+            or previous.get("OwnerID") is not None
+            or proof.get("current_attempt_id") != current
+            or proof.get("old_attempt_id") != slot["AttemptID"]
+            or any(
+                proof.get(k) is not True
+                for k in ("writer_terminated", "current_pointer_verified", "no_live_references")
+            )
+            or not proof.get("evidence_id")
+        ):
+            raise SourceConflict("Retirement scope/assignment/owner evidence differs.")
+        result.append(
+            dict(
+                operation_id=event["OperationID"],
+                pool_id=pool["PoolID"],
+                epoch=pool["Epoch"],
+                current_attempt_id=current,
+                slots=[
+                    dict(
+                        file_id=slot["FileID"],
+                        version=slot["Version"],
+                        event=event["DispositionID"],
+                        evidence_hash=event["EvidenceHash"],
+                    )
+                ],
+            )
+        )
+    return result
+
+
 def assert_registration(cursor, *, account, kvk_no, epoch, destinations):
     cursor.execute(
         "SELECT p.* FROM KVK.SourceOutputPool p WHERE AccountKey=? AND ActiveKVK=? AND Epoch=?",
@@ -560,7 +642,9 @@ class SourceOutputPoolDAL:
         )["Version"]
         return event
 
-    def clear_retired_slot(self, coordinator, claim, retirement, member, evidence):
+    def clear_retired_slot(
+        self, coordinator, claim, retirement, member, evidence, *, recovery=False
+    ):
         if (
             evidence.get("file_id") != member["file_id"]
             or evidence.get("private") is not True
@@ -568,7 +652,8 @@ class SourceOutputPoolDAL:
             or not evidence.get("manifest_hash")
         ):
             raise SourceConflict("Exact private empty readback required.")
-        with self._retirement_owned(coordinator, claim, retirement["current_attempt_id"]) as (
+        owner = self._recovery_owned if recovery else self._retirement_owned
+        with owner(coordinator, claim, retirement["current_attempt_id"]) as (
             cursor,
             job,
             snapshot,
@@ -622,6 +707,145 @@ class SourceOutputPoolDAL:
                 slot["Fence"],
                 member["version"],
                 member["event"],
+            )
+
+    @contextmanager
+    def _recovery_owned(self, coordinator, claim, current_attempt_id):
+        with coordinator._owned(claim) as (cursor, job):
+            audit = json.loads(job["ProvenanceJson"]).get("retirement_recovery", {})
+            if (audit.get("state"), audit.get("attempt_id"), audit.get("version")) != (
+                "owned",
+                current_attempt_id,
+                claim.version,
+            ) or not audit.get("token"):
+                raise SourceConflict("Retirement recovery owner was revoked.")
+            _mutex(cursor, "pool:" + audit["pool_id"])
+            snapshot = coordinator._operator_snapshot(cursor, claim.job_id)
+            pool = snapshot["pool"]["pool"]
+            if (pool["PoolID"], pool["Epoch"], pool["RegistrationHash"]) != (
+                audit["pool_id"],
+                audit["epoch"],
+                audit["registration_hash"],
+            ) or pool["PoolState"] not in {"active", "closing"}:
+                raise SourceConflict("Recovery registration/epoch changed.")
+            if pool["PoolState"] == "closing":
+                operation = self._operation(cursor, pool["OwnerID"])
+                if (
+                    operation["PoolID"],
+                    operation["AccountKey"],
+                    operation["OldEpoch"],
+                    operation["State"],
+                    operation["Phase"],
+                    operation["OwnerID"],
+                ) != (pool["PoolID"], claim.account, pool["Epoch"], "closing", "draining", None):
+                    raise SourceConflict("Closing reservation changed during recovery.")
+            elif pool["OwnerID"] is not None:
+                raise SourceConflict("Recovery pool has another owner.")
+            yield cursor, job, snapshot["pool"]
+
+    def claim_retirement_recovery(self, coordinator, snapshot, proof, *, actor):
+        """Explicit nested owner after independent termination; never replays export."""
+        from services.export_coordination_dal import Claim, validate_confirmed_probe
+
+        validate_confirmed_probe(snapshot, proof)
+        pending = pending_retirements(snapshot)
+        job = snapshot["job"]
+        if (
+            not coordinator.output_operations
+            or not pending
+            or job["State"] not in {"uncertain", "running"}
+        ):
+            raise SourceConflict("Exact interrupted retirement required.")
+        if (
+            proof.get("retirement_outcomes_reconciled") is not True
+            or proof.get("no_delayed_retirement_effects") is not True
+        ):
+            raise SourceConflict("Reconcile all prior retirement requests before resuming clear.")
+        pool = snapshot["pool"]["pool"]
+        expected = {
+            "account:" + job["AccountKey"],
+            "destination:" + pool["IndexFileID"],
+            *("destination:" + s["FileID"] for s in snapshot["pool"]["slots"]),
+        }
+        if {r["ResourceKey"] for r in snapshot["resources"]} != expected:
+            raise SourceConflict("Recovery requires complete registered resource membership.")
+        with coordinator._account(job["AccountKey"]) as cursor:
+            for resource in snapshot["resources"]:
+                _mutex(cursor, resource["ResourceKey"])
+            _mutex(cursor, "pool:" + pool["PoolID"])
+            if coordinator._operator_snapshot(cursor, job["JobID"]) != snapshot:
+                raise SourceConflict("Retirement recovery snapshot changed.")
+            audit = json.loads(job["ProvenanceJson"])
+            recovery = dict(
+                token=str(uuid4()),
+                state="owned",
+                version=job["Version"] + 1,
+                attempt_id=snapshot["attempts"][0]["AttemptID"],
+                pool_id=pool["PoolID"],
+                epoch=pool["Epoch"],
+                registration_hash=pool["RegistrationHash"],
+                actor=actor,
+                proof=proof,
+            )
+            history = audit.setdefault("retirement_recoveries", [])
+            history.append(recovery)
+            audit["retirement_recovery"] = recovery
+            version = _cas(
+                cursor,
+                "UPDATE dbo.ExportJob SET State='running',ProvenanceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND OwnerID=? AND Fence=? AND State=?",
+                bounded_json(audit),
+                job["JobID"],
+                job["Version"],
+                job["OwnerID"],
+                job["Fence"],
+                job["State"],
+            )["Version"]
+            claimed = []
+            for r in snapshot["resources"]:
+                if (
+                    r["ActiveJobID"],
+                    r["OwnerID"],
+                    r["Fence"],
+                    r.get("ActivePreparationID"),
+                    r.get("ActiveOutputOperationID"),
+                ) != (job["JobID"], job["OwnerID"], job["Fence"], None, None):
+                    raise SourceConflict("Recovery cannot adopt another resource owner.")
+                v = _cas(
+                    cursor,
+                    "UPDATE dbo.ExportResource SET BlockedReason=NULL,Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID=? AND OwnerID=? AND Fence=? AND ActivePreparationID IS NULL AND ActiveOutputOperationID IS NULL",
+                    r["ResourceKey"],
+                    r["Version"],
+                    job["JobID"],
+                    job["OwnerID"],
+                    job["Fence"],
+                )["Version"]
+                claimed.append((r["ResourceKey"], v))
+            return Claim(
+                job["JobID"],
+                job["AccountKey"],
+                job["OwnerID"],
+                job["Fence"],
+                version,
+                tuple(claimed),
+                job["IntentID"],
+            )
+
+    def interrupt_retirement_recovery(self, coordinator, claim, attempt_id):
+        with self._recovery_owned(coordinator, claim, attempt_id) as (cursor, job, _):
+            coordinator._finish(cursor, claim, job, "uncertain", release=False)
+
+    def finish_retirement_recovery(self, coordinator, claim, attempt_id):
+        # Revoke the nested provider owner BEFORE taking a fresh read-only probe.
+        with self._recovery_owned(coordinator, claim, attempt_id) as (cursor, job, _):
+            if pending_retirements(coordinator._operator_snapshot(cursor, claim.job_id)):
+                raise SourceConflict("Retirement recovery has unfinished clears.")
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportJob SET State='uncertain',ProvenanceJson=JSON_MODIFY(ProvenanceJson,'$.retirement_recovery.state','complete'),Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND OwnerID=? AND Fence=? AND State='running'",
+                claim.job_id,
+                claim.version,
+                claim.owner_id,
+                claim.fence,
             )
 
     def choice(self, kvk_no):

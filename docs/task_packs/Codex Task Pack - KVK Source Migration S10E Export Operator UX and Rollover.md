@@ -412,3 +412,20 @@ Ordinary superseded generations are eligible for audited in-season retirement on
 After new-pointer readback and before job confirmation releases resources, append retirement intent under owner/fence/version CAS, privately clear/read back each exact slot, then append its clear disposition before freeing it at the same epoch. Preserve original attempt/part receipts, assignments and accepted inputs byte-for-byte. Failure retains owned delivery and incomplete retired slots for reconciliation; no blind cleanup resume. Completed clear removes only K98 provider labels, preserving unrelated application properties, and assignments use the cleared blank representation. Capacity continues to reserve final/referenced and incomplete retired representations.
 
 The delivery adapter now accepts an explicitly injected `retirement_verifier`; composition remains disabled until independent evidence producers and SQL/provider behavior are separately validated. Offline tests cover protected candidates, proof omissions, scoped CAS, provider/commit failures, repeated provisional two-part retirement, cleared-file rebinding and view callbacks. This does not authorize or prove installation, activation, provider execution, production promotion or bot-machine changes.
+
+### Interrupted retirement review correction — 2026-09-15
+
+`export_reconcile` now reconstructs incomplete per-slot retirement from the hashed,
+append-only disposition and exact original assignment/version. It requires an exact
+confirmed-publication probe, old/nested-writer termination and reconciliation of all
+prior retirement requests with no delayed effects. A durable, separately versioned
+nested recovery owner invalidates stale claims without rewriting original attempt,
+receipt, owner or fence identities. Recovery reads before any clear; an already-private
+empty file needs no further provider mutation. Unfinished clears remain reserved;
+failures require fresh explicit reconciliation, never an automatic export retry.
+
+Recovery revokes its provider owner before taking a fresh publication probe and only
+then settles/releases the job. Existing closing rollover reservations remain intact.
+The injected recovery adapter and independent proof producer remain deployment gates.
+This correction uses the existing S10A/D/E SQL contracts; no SQL repository delta,
+installation, provider/Discord execution or activation is authorized or claimed.

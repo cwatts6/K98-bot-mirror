@@ -1044,6 +1044,19 @@ class GoogleSheetsTransport:
                 fields="id",
             )
         )
+        result = self.retirement_readback(file_id, expected_sheet_id=fresh_id)
+        if result is None:
+            raise SourceConflict("Exact private empty manifest readback failed.")
+        return result
+
+    def retirement_readback(self, file_id, *, expected_sheet_id=None):
+        """Read only: distinguish a verified empty result from content still needing clear."""
+        if (
+            file_id not in self.registration.slot_file_ids
+            and file_id != self.registration.index_file_id
+        ):
+            raise SourceConflict("Readback file differs from registration.")
+        columns = 3 if file_id == self.registration.index_file_id else 1
         empty = self._execute(
             self.sheets.spreadsheets().get(spreadsheetId=file_id, includeGridData=True)
         )
@@ -1052,7 +1065,10 @@ class GoogleSheetsTransport:
         if (
             any(empty.get(k) for k in ("namedRanges", "developerMetadata", "dataSources"))
             or len(grids) != 1
-            or grids[0]["properties"].get("sheetId") != fresh_id
+            or (
+                expected_sheet_id is not None
+                and grids[0]["properties"].get("sheetId") != expected_sheet_id
+            )
             or grids[0]["properties"].get("title") != "Sheet1"
             or grids[0]["properties"].get("gridProperties", {}).get("rowCount") != 1
             or grids[0]["properties"].get("gridProperties", {}).get("columnCount") != columns
@@ -1066,13 +1082,13 @@ class GoogleSheetsTransport:
             or any(k.startswith("k98") for k in fresh.get("appProperties", {}))
             or fresh.get("description")
         ):
-            raise SourceConflict("Exact private empty manifest readback failed.")
+            return None
         return dict(
             file_id=file_id,
             private=True,
             empty=True,
             manifest_hash=digest(empty).hex(),
-            sheet_id=fresh_id,
+            sheet_id=grids[0]["properties"]["sheetId"],
         )
 
     def rollover_setup(self, file_id, old_kvk, new_kvk):

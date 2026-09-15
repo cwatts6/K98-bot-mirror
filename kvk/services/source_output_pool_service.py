@@ -233,3 +233,53 @@ def retire_superseded_generations(
             transport.rollover_private(member["file_id"])
             empty = transport.rollover_clear(member["file_id"])
             pools.clear_retired_slot(coordinator, claim, retirement, member, empty)
+
+
+class RetirementRecovery:
+    """Explicit reconciliation-only adapter; never runs from cadence or status."""
+
+    def __init__(self, *, pools, coordinator, transport_factory, budget_factory):
+        self.pools, self.coordinator = pools, coordinator
+        self.transport_factory, self.budget_factory = transport_factory, budget_factory
+
+    def resume(self, snapshot, proof, *, actor):
+        from kvk.dal.source_output_pool_dal import pending_retirements
+
+        pending = pending_retirements(snapshot)
+        claim = self.pools.claim_retirement_recovery(self.coordinator, snapshot, proof, actor=actor)
+        attempt_id = snapshot["attempts"][0]["AttemptID"]
+        try:
+            transport = self.transport_factory(snapshot)
+            from kvk.services.new_source_export_service import GoogleSheetsTransport
+
+            pool = snapshot["pool"]["pool"]
+            if (
+                not isinstance(transport, GoogleSheetsTransport)
+                or transport.registration.index_file_id != pool["IndexFileID"]
+                or set(transport.registration.slot_file_ids)
+                != {s["FileID"] for s in snapshot["pool"]["slots"]}
+            ):
+                raise SourceConflict("Recovery transport differs from exact registration.")
+            transport._request_pacer = self.budget_factory(claim.account)
+
+            def guard(request):
+                with self.pools._recovery_owned(self.coordinator, claim, attempt_id):
+                    pass
+
+            transport._request_guard = guard
+            # A fresh independent probe reconciled ALL former requests before admission.
+            # Each remaining slot is still reserved by its original durable retire event.
+            for retirement in pending:
+                for member in retirement["slots"]:
+                    empty = transport.retirement_readback(member["file_id"])
+                    if empty is None:
+                        empty = transport.rollover_clear(member["file_id"])
+                    self.pools.clear_retired_slot(
+                        self.coordinator, claim, retirement, member, empty, recovery=True
+                    )
+            self.pools.finish_retirement_recovery(self.coordinator, claim, attempt_id)
+        except BaseException:
+            self.pools.interrupt_retirement_recovery(self.coordinator, claim, attempt_id)
+            # Do not release, requeue export, or retry provider I/O. A fresh operator
+            # reconciliation must prove this nested owner terminated too.
+            raise

@@ -1,6 +1,6 @@
 """Offline pool capacity and provider-boundary failures; no live evidence."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -766,3 +766,332 @@ def test_already_started_retirement_clear_preserves_rollover_pool_owner_cas(monk
     assert "OwnerID=? OR (OwnerID IS NULL AND CAST(? AS uniqueidentifier) IS NULL)" in sql
     assert cas.call_args.args[-2:] == ("rollover-reservation", "rollover-reservation")
     assert "SET OwnerID=" not in sql and "Fence=Fence" not in sql
+
+
+def interrupted_retirement_fixture():
+    from copy import deepcopy
+
+    from kvk.dal.new_source_import_dal import canonical
+
+    pool = retirement_snapshot_fixture()
+    pool["pool"].update(
+        IndexFileID="fake-index", RegistrationHash="registration", PoolState="active", OwnerID=None
+    )
+    pool["slots"] = [dict(pool["slots"][0], FileID="fake-1")]
+    slot = pool["slots"][0]
+    prior = deepcopy(slot)
+    slot.update(State="retired", Version=4, LastDispositionID="retire-event", LastAction="retire")
+    evidence = dict(
+        previous_assignment=prior,
+        current_attempt_id="current",
+        proof=dict(
+            current_attempt_id="current",
+            old_attempt_id="old-attempt",
+            writer_terminated=True,
+            current_pointer_verified=True,
+            no_live_references=True,
+            evidence_id="retire-proof",
+        ),
+    )
+    event = dict(
+        DispositionID="retire-event",
+        OperationID="operation",
+        PoolID="pool",
+        FileID="fake-1",
+        OldEpoch=1,
+        NewEpoch=1,
+        Action="retire",
+        OwnerID="owner",
+        Fence=5,
+        ToSlotVersion=4,
+        EvidenceJson=canonical(evidence),
+        EvidenceHash=digest(evidence).hex(),
+    )
+    snapshot = dict(
+        pool=pool,
+        job=dict(
+            JobID="job",
+            AccountKey="acct",
+            OwnerID="owner",
+            Fence=5,
+            Version=8,
+            State="uncertain",
+            ConsumerKind="new_source",
+            IntentID="intent",
+            ProvenanceJson="{}",
+        ),
+        attempts=[
+            dict(
+                AttemptID="current",
+                ManifestJson=canonical(dict(generation=dict(export_key="key"))),
+                ReceiptJson=None,
+            )
+        ],
+        parts=[dict(FileID="fake-index"), dict(FileID="current-part")],
+        retirement_events=[event],
+        resources=[
+            dict(
+                ResourceKey=k,
+                ActiveJobID="job",
+                OwnerID="owner",
+                Fence=5,
+                Version=6,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+            )
+            for k in ("account:acct", "destination:fake-1", "destination:fake-index")
+        ],
+    )
+    proof = dict(
+        snapshot_hash=digest(snapshot).hex(),
+        writer_terminated=True,
+        evidence_id="fresh-proof",
+        state="confirmed",
+        retirement_outcomes_reconciled=True,
+        no_delayed_retirement_effects=True,
+        receipt=dict(
+            export_key="key",
+            attempt_id="current",
+            fence=5,
+            files=["fake-index", "current-part"],
+            audience="private",
+            remote_id="fake-index",
+        ),
+    )
+    return snapshot, proof
+
+
+@pytest.mark.parametrize(
+    "damage", [None, "hash", "owner", "epoch", "assignment", "version", "current", "missing"]
+)
+def test_restart_reconstructs_only_exact_retirement_journal(damage):
+    from kvk.dal.source_output_pool_dal import pending_retirements
+
+    snapshot, _ = interrupted_retirement_fixture()
+    if damage == "hash":
+        snapshot["retirement_events"][0]["EvidenceHash"] = "bad"
+    if damage == "owner":
+        snapshot["retirement_events"][0]["OwnerID"] = "other"
+    if damage == "epoch":
+        snapshot["pool"]["pool"]["Epoch"] = 2
+    if damage == "assignment":
+        snapshot["pool"]["slots"][0]["AssignmentID"] = "other"
+    if damage == "version":
+        snapshot["pool"]["slots"][0]["Version"] += 1
+    if damage == "current":
+        snapshot["attempts"][0]["AttemptID"] = "other"
+    if damage == "missing":
+        snapshot["retirement_events"] = []
+    if damage:
+        with pytest.raises(SourceConflict):
+            pending_retirements(snapshot)
+    else:
+        token = pending_retirements(snapshot)[0]
+        assert token["operation_id"] == "operation"
+        assert token["slots"] == [
+            dict(
+                file_id="fake-1",
+                version=4,
+                event="retire-event",
+                evidence_hash=snapshot["retirement_events"][0]["EvidenceHash"],
+            )
+        ]
+        snapshot["pool"]["slots"][0]["State"] = "free"
+        assert pending_retirements(snapshot) == []  # SQL clear committed before restart.
+
+
+@pytest.mark.parametrize(
+    "damage", [None, "stale", "receipt", "termination", "delayed", "membership", "owner"]
+)
+def test_recovery_claim_requires_positive_proof_and_exact_snapshot_cas(monkeypatch, damage):
+    from kvk.dal import source_output_pool_dal as mod
+
+    snapshot, proof = interrupted_retirement_fixture()
+    if damage == "receipt":
+        proof["receipt"]["fence"] = 4
+    if damage == "termination":
+        proof["writer_terminated"] = False
+    if damage == "delayed":
+        proof["no_delayed_retirement_effects"] = False
+    if damage == "membership":
+        snapshot["resources"].pop()
+    if damage == "owner":
+        snapshot["resources"][0]["OwnerID"] = "other"
+    if damage in {"membership", "owner"}:
+        proof["snapshot_hash"] = digest(snapshot).hex()
+    cursor = Mock()
+    coordinator = Mock(output_operations=True)
+    coordinator._account.return_value = nullcontext(cursor)
+    coordinator._operator_snapshot.return_value = {} if damage == "stale" else snapshot
+    monkeypatch.setattr(mod, "_mutex", lambda *a: None)
+    writes = []
+
+    def cas(c, sql, *args):
+        assert sql.count("?") == len(args)
+        writes.append((sql, args))
+        return dict(Version=9 if "ExportJob" in sql else 7)
+
+    monkeypatch.setattr(mod, "_cas", cas)
+    repo = mod.SourceOutputPoolDAL(Mock())
+    if damage:
+        with pytest.raises(SourceConflict):
+            repo.claim_retirement_recovery(coordinator, snapshot, proof, actor="admin")
+        if damage != "owner":
+            assert writes == []
+    else:
+        claim = repo.claim_retirement_recovery(coordinator, snapshot, proof, actor="admin")
+        assert claim.version == 9 and claim.owner_id == "owner" and claim.fence == 5
+        assert all(v == 7 for _, v in claim.resources)
+        audit = json.loads(writes[0][1][0])
+        assert audit["retirement_recovery"]["token"]
+        assert audit["retirement_recovery"]["proof"] == proof
+        assert all("ExportAttempt" not in sql and "SET Fence=" not in sql for sql, _ in writes)
+
+
+@pytest.mark.parametrize(
+    "already_empty,fail", [(True, None), (False, None), (False, "provider"), (True, "sql")]
+)
+def test_recovery_reads_before_clear_and_retains_failure_for_fresh_reconciliation(
+    monkeypatch, already_empty, fail
+):
+    from dataclasses import replace
+
+    from kvk.services.source_output_pool_service import RetirementRecovery
+    from tests.test_kvk_source_delivery import google_delivery
+
+    snapshot, proof = interrupted_retirement_fixture()
+    args, _, _ = google_delivery()
+    transport = args["transport"]
+    transport.registration = replace(transport.registration, slot_file_ids=("fake-1", "fake-2"))
+    snapshot["pool"]["slots"].append(dict(FileID="fake-2", State="free"))
+    trace = []
+    empty = dict(file_id="fake-1", private=True, empty=True, manifest_hash="exact")
+    transport.retirement_readback = Mock(
+        side_effect=lambda f: trace.append("read") or (empty if already_empty else None)
+    )
+    transport.rollover_clear = Mock(
+        side_effect=(
+            RuntimeError("lost ack")
+            if fail == "provider"
+            else lambda f: trace.append("clear") or empty
+        )
+    )
+    pools = Mock()
+    pools.claim_retirement_recovery.return_value = SimpleNamespace(account="acct")
+    pools._recovery_owned.return_value = nullcontext()
+    pools.clear_retired_slot.side_effect = (
+        RuntimeError("lost commit") if fail == "sql" else lambda *a, **kw: trace.append("commit")
+    )
+    pools.finish_retirement_recovery.side_effect = lambda *a: trace.append("revoke")
+    recovery = RetirementRecovery(
+        pools=pools,
+        coordinator=Mock(),
+        transport_factory=lambda s: transport,
+        budget_factory=lambda a: Mock(),
+    )
+    if fail:
+        with pytest.raises(RuntimeError):
+            recovery.resume(snapshot, proof, actor="admin")
+        pools.interrupt_retirement_recovery.assert_called_once()
+        pools.finish_retirement_recovery.assert_not_called()
+    else:
+        recovery.resume(snapshot, proof, actor="admin")
+        assert trace == (
+            ["read", "commit", "revoke"] if already_empty else ["read", "clear", "commit", "revoke"]
+        )
+        pools.interrupt_retirement_recovery.assert_not_called()
+        assert pools.clear_retired_slot.call_args.kwargs == {"recovery": True}
+
+
+def test_retirement_readback_of_lost_ack_is_read_only():
+    from tests.test_kvk_source_delivery import google_delivery
+
+    args, _, api = google_delivery()
+    transport = args["transport"]
+    transport._request_guard = lambda _: None
+    expected = transport.rollover_clear("fake-1")
+    transport._mutate = Mock(side_effect=AssertionError("readback must not mutate"))
+    assert transport.retirement_readback("fake-1") == expected
+    api.files_data["fake-1"]["description"] = "not empty"
+    assert transport.retirement_readback("fake-1") is None
+
+
+def test_plain_reconciliation_cannot_release_unfinished_retirement():
+    from services.export_coordination_dal import ExportCoordinationDAL
+
+    snapshot, proof = interrupted_retirement_fixture()
+    coordinator = ExportCoordinationDAL(Mock(), preparations=True, output_operations=True)
+    with pytest.raises(SourceConflict, match="explicit retirement recovery"):
+        coordinator.reconcile_operator(snapshot, proof, actor="admin")
+    coordinator.connect.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "case", ["valid", "revoked", "version", "epoch", "closing", "wrong_closing"]
+)
+def test_recovery_guard_rechecks_nested_owner_and_rollover_reservation(monkeypatch, case):
+    from kvk.dal import source_output_pool_dal as mod
+
+    snapshot, _ = interrupted_retirement_fixture()
+    audit = dict(
+        state="owned",
+        attempt_id="current",
+        version=9,
+        token="nested",
+        pool_id="pool",
+        epoch=1,
+        registration_hash="registration",
+    )
+    if case == "revoked":
+        audit["state"] = "complete"
+    if case == "version":
+        audit["version"] = 8
+    if case == "epoch":
+        snapshot["pool"]["pool"]["Epoch"] = 2
+    if "closing" in case:
+        snapshot["pool"]["pool"].update(PoolState="closing", OwnerID="rollover")
+    coordinator, cursor = Mock(), Mock()
+    coordinator._owned.return_value = nullcontext(
+        (cursor, dict(ProvenanceJson=json.dumps(dict(retirement_recovery=audit))))
+    )
+    coordinator._operator_snapshot.return_value = snapshot
+    repo = mod.SourceOutputPoolDAL(Mock())
+    repo._operation = Mock(
+        return_value=dict(
+            PoolID="pool",
+            AccountKey="acct",
+            OldEpoch=1,
+            State="closing",
+            Phase="draining",
+            OwnerID=None,
+        )
+    )
+    if case == "wrong_closing":
+        repo._operation.return_value["OwnerID"] = "another-worker"
+    monkeypatch.setattr(mod, "_mutex", lambda *a: None)
+    claim = SimpleNamespace(job_id="job", account="acct", version=9)
+    if case in {"valid", "closing"}:
+        with repo._recovery_owned(coordinator, claim, "current") as (_, _, pool):
+            assert pool == snapshot["pool"]
+    else:
+        with pytest.raises(SourceConflict), repo._recovery_owned(coordinator, claim, "current"):
+            pass
+
+
+def test_recovery_completion_revokes_provider_before_publication_reprobe(monkeypatch):
+    from kvk.dal import source_output_pool_dal as mod
+
+    snapshot, _ = interrupted_retirement_fixture()
+    cursor = Mock()
+    coordinator = Mock()
+    snapshot["pool"]["slots"][0]["State"] = "free"
+    coordinator._operator_snapshot.return_value = snapshot
+    repo = mod.SourceOutputPoolDAL(Mock())
+    repo._recovery_owned = Mock(return_value=nullcontext((cursor, {}, snapshot["pool"])))
+    writes = []
+    monkeypatch.setattr(mod, "_cas", lambda c, sql, *a: writes.append((sql, a)))
+    claim = SimpleNamespace(job_id="job", version=9, owner_id="owner", fence=5)
+    repo.finish_retirement_recovery(coordinator, claim, "current")
+    assert "State='uncertain'" in writes[0][0] and "'complete'" in writes[0][0]
+    assert writes[0][1] == ("job", 9, "owner", 5)
+    assert "ExportResource" not in writes[0][0]  # Claims retained until fresh settlement.

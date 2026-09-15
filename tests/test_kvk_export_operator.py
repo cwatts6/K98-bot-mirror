@@ -340,3 +340,29 @@ async def test_export_confirm_callback_real_authority_and_expiry(monkeypatch, se
     assert service.rollover.confirm.call_count == (case == "success")
     assert bool(control.confirm_button.disabled) == (case == "success")
     assert failure.await_count == (case not in {"success", "defer"})
+
+
+def test_operator_recovery_reprobes_after_owner_revocation(service, actor):
+    from tests.test_kvk_output_rollover import interrupted_retirement_fixture
+
+    before, proof = interrupted_retirement_fixture()
+    after = dict(job=dict(ConsumerKind="new_source"), pool=dict(slots=[]))
+    service.coordinator.operator_snapshot.side_effect = [before, after]
+    service.reconciler.probe.side_effect = [proof, {"fresh": True}]
+    service.retirement_recovery = Mock()
+    service.reconcile(actor, str(uuid4()))
+    service.retirement_recovery.resume.assert_called_once_with(before, proof, actor="1")
+    service.coordinator.reconcile_operator.assert_called_once_with(
+        after, {"fresh": True}, actor="1"
+    )
+
+
+def test_operator_retirement_requires_explicit_recovery_composition(service, actor):
+    from tests.test_kvk_output_rollover import interrupted_retirement_fixture
+
+    snapshot, proof = interrupted_retirement_fixture()
+    service.coordinator.operator_snapshot.return_value = snapshot
+    service.reconciler.probe.return_value = proof
+    with pytest.raises(SourceConflict, match="adapter is not composed"):
+        service.reconcile(actor, str(uuid4()))
+    service.coordinator.reconcile_operator.assert_not_called()
