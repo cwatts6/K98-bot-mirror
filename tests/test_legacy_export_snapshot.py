@@ -113,7 +113,15 @@ def test_submission_returns_only_job_id_from_dal_job_row(tmp_path, consumer, sea
 
 
 @pytest.mark.parametrize(
-    "changed", ["OwnerID", "Fence", "Version", "ActivePreparationID", "BlockedReason"]
+    "changed",
+    [
+        "OwnerID",
+        "Fence",
+        "Version",
+        "ActivePreparationID",
+        "ActiveOutputOperationID",
+        "BlockedReason",
+    ],
 )
 def test_preparation_authorization_requires_every_resource_cas_field(monkeypatch, changed):
     from unittest.mock import Mock

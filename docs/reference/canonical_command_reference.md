@@ -1,26 +1,55 @@
 # Canonical Command Reference
 
-## Current status — S10B merged and locally pulled; S10C scope next, 2026-09-14
+## S10E authored command changes — 2026-09-15
 
-S10B mirror #278 and production #585 are merged; local pulls are complete.
-**No changes have been pulled to the bot machine.** Repository delivery is not deployment or activation.
-Bot main/origin main: `8ae66da6e12b53781c5df0d46a8ee79314cecead`; production/main:
-`40c2e48111ebbe44d58d71269dea63a6dd9388b7`. SQL #85 remains accepted at
-`3776dfa6b0892a8800d236fdf111c4d2f93c3813`; no S10B SQL delta.
-Final retained offline validation: **4,433 passed / 66 skipped**; review fixes are in both repositories.
-See [S10B closeout and exact S10C documentation manifest](kvk_source_migration/s10b_closeout_and_s10c_handoff.md) for exact delivery/content proof and evidence boundaries.
+The approved local implementation extends `/kvk_admin source` v1.01 with `export`,
+`export_status`, `export_reconcile`, `export_rebuild`, `rollover_preview` and
+`rollover_confirm`. The group retains eight subcommands; the primary command surface
+retains 36 names. No top-level command or activation switch is added.
 
-Next: **S10C Legacy and Scan Export Adapters, initial review/scope only**: [task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md).
-Completed S10B pack/starter are archived; retained runbooks, databases, files and evidence stay available.
-Every pending Bot document and both S10B archive move sides must accompany the eventual S10C Bot implementation PR.
-Verify exact filename AND previous_filename or exact merged/absent-at-base proof; counts alone are insufficient.
-No standalone documentation PR or repository mixing. The two pending SQL documents stay in the next authorized SQL PR.
+| Action | Inputs and result |
+| --- | --- |
+| export | Season and optional exact registered index; pins the complete accepted intent and current registration. Exact confirmed work is a zero-provider, zero-materialization no-op. Only a proven pre-attempt failure can request audited retry of the same JobID. |
+| export_status | Read-only current pool/epoch, intent/job state, active OperationID/phase and a link only for confirmed, undamaged output in an active pool. No provider requests or enqueue. |
+| export_reconcile | Exact JobID or rollover OperationID in `job_id`. Independent termination and exact remote readback precede a short CAS transaction. Partial/uncertain evidence retains claims; no blind retry. |
+| export_rebuild | Exact confirmed JobID; reason modal and five-minute preview. Confirmed damage requires a fresh RepairID, exact original inputs and sufficient P/Q/R capacity. Original receipts and quarantined files remain retained. Damaged index or uncertain work stays blocked. |
+| rollover_preview | Old season, fixed target season in `new_kvk`, optional exact index and reason modal. Lists exact files/epochs; confirm within five minutes. |
+| rollover_confirm | Preview UUID in `review`, or the preview button. Rechecks actor/guild/channel/admin authority and pinned state. A committed OperationID or RepairID can be read after restart; unconfirmed previews expire on restart. |
 
-Preserve S6-OPS01/PERF01/CAP01 and both uncertain publications. S8A six scripts, S8B 50-case/actual-restore
-and offline-runner evidence, and S8C seven local checks remain distinct. No new live Discord evidence is claimed.
-This closeout authorizes no S10C implementation, Git publication, SQL/provider/Discord execution, real imports/exports,
-bot-machine pull/restart/deployment, activation, predecessor rerun or automatic new task.
-Earlier dated statuses and approvals below are historical; settled acceptance and grouping stay settled.
+All six actions require fresh admin authority, including button/modal callbacks; uploader
+permission alone is insufficient. Ordinary `/kvk_admin export_all` uses the same source-aware
+operator admission for a fixed new-source season. Legacy export behavior remains independent.
+
+These are authored, offline-tested flows. Production composition remains closed pending
+separate installation, registered-pool, writer-termination and S11 activation gates. See the
+[S10E task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+The earlier scope/closeout entries below remain historical evidence.
+
+## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+
+SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
+Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
+`aa1821adbde9ccda47797caa83b5d5a9958bfce9`. **No changes have been pulled to the bot machine.**
+S10D authoring, offline checks and Changes security review are complete; SQL installation and
+provider/Discord execution are not established. S10C remains source/static SQL evidence too.
+See [S10D closeout and exact carry-forward manifests](kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
+
+Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
+[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
+that closeout, this pack/starter and all required archive identities. Verify filename AND
+previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,
+repository mixing, manufactured implementation or renewed predecessor/grouping approval.
+Both SQL documents were delivered in #87; their new closeout edits stay in SQL for the next
+actual authorized SQL implementation PR. S10E scope must assess any genuine SQL delta separately.
+
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and every retained database/file.
+S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C seven local checks
+remain distinct; none is new live Discord or deployment evidence. Shutdown stops admission and
+drains owned delivery; uncertainty retains claims. No lease-age/job-state release.
+This documentation closeout authorizes no implementation, Git publication, SQL/provider/Discord
+execution, real import/export, bot-machine action, deployment, activation, predecessor rerun or
+new task. Earlier dated checkpoints are historical; the current closeout controls the next step.
 
 > Historical handoff: **S9B repository-delivered; not deployed**. See [S9B closeout / S10A scope and exact documentation carry-forward](kvk_source_migration/s9b_closeout_and_s10a_handoff.md).
 > Retained evidence and historical approvals below remain intact; no predecessor rerun or live operation is authorized.

@@ -22,6 +22,27 @@ NOW = datetime(2026, 9, 11, tzinfo=UTC)
 ADMIN = SourceActor(10, 20, 30, frozenset())
 UPLOADER = SourceActor(11, 20, 30, frozenset({40}))
 ACCESS = SourceAccess(True, 20, 30, 10, frozenset({40}), frozenset({31}))
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "export",
+        "export_status",
+        "export_reconcile",
+        "export_rebuild",
+        "rollover_preview",
+        "rollover_confirm",
+    ],
+)
+def test_source_export_authority_uses_admin_policy_and_fresh_config(action):
+    assert ACCESS.authorize(ADMIN, action) is True
+    with pytest.raises(PermissionError):
+        ACCESS.authorize(UPLOADER, action)
+    with pytest.raises(PermissionError):
+        replace(ACCESS, enabled=False).authorize(ADMIN, action)
+
+
 FIELDS = {
     "kind": "players",
     "period": "fight:pass4",

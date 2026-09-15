@@ -79,6 +79,42 @@ def test_daily_spool_and_null_replay_shape():
         replace(daily, kvk_no=16)
 
 
+def test_output_ownership_requires_preparations_and_capacity_planner():
+    with pytest.raises(ValueError, match="preparation"):
+        ExportCoordinationDAL(Mock(), output_operations=True)
+    dal = ExportCoordinationDAL(Mock(), preparations=True, output_operations=True)
+    with pytest.raises(SourceConflict, match="capacity"):
+        ExportCoordinator(dal, adapters={})
+
+
+def test_rollover_owned_resource_rejects_existing_job_token(monkeypatch):
+    claim = Claim("job", "acct", "owner", 2, 3, (("account:acct", 1),))
+    cursor = Mock()
+    dal = ExportCoordinationDAL(Mock(), preparations=True, output_operations=True)
+
+    @contextmanager
+    def account(_):
+        yield cursor
+
+    monkeypatch.setattr(dal, "_account", account)
+    monkeypatch.setattr(mod, "_mutex", lambda *args: None)
+    monkeypatch.setattr(
+        mod,
+        "one",
+        lambda c: dict(
+            ActiveJobID="job",
+            ActiveOutputOperationID="rollover",
+            OwnerID="owner",
+            Fence=2,
+            Version=1,
+            BlockedReason=None,
+        ),
+    )
+    with pytest.raises(SourceConflict, match="Resource owner"):
+        dal.authorize(claim)
+    assert not any(c.args[0].startswith("UPDATE") for c in cursor.execute.call_args_list)
+
+
 def test_spool_roundtrip_corruption_affinity_and_no_overwrite(tmp_path):
     store = ExportSnapshotStore(tmp_path, "worker-a")
     first = store.put(b"immutable A")
@@ -286,6 +322,28 @@ def test_coordinator_discovery_paginates_without_losing_retained_intents():
     assert coordinator.after == (16, 32)
     coordinator.discover()
     assert coordinator.after == (0, 0)
+
+
+def test_blocked_pool_preflight_does_not_skip_other_eligible_account_work():
+    dal = Mock(output_operations=True)
+    dal.pending_intents.return_value = []
+    dal.accounts.return_value = ["acct"]
+    dal.pending_source_jobs.return_value = [
+        dict(
+            JobID="blocked",
+            Version=1,
+            KVK_NO=16,
+            PoolEpoch=2,
+            destinations=["file"],
+            IntentID="intent",
+            InputHash=b"a" * 32,
+        )
+    ]
+    dal.claim_next.return_value = None
+    planner = Mock(side_effect=SourceConflict("capacity exhausted"))
+    ExportCoordinator(dal, adapters={}, output_planner=planner).run_batch(Event())
+    dal.claim_next.assert_called_once_with("acct", storage_owner=None)
+    dal.refresh_output_preflight.assert_not_called()
 
 
 def test_worker_checks_spool_before_adapter_and_preserves_failed_evidence():
@@ -671,6 +729,45 @@ def test_terminal_job_updates_intent_in_the_same_owned_transaction(monkeypatch):
     monkeypatch.setattr(dal, "_sync_intent", sync)
     dal._finish(cursor, claim, {"Version": 3}, "confirmed", release=True)
     sync.assert_called_once_with(cursor, intent_id)
+
+
+@pytest.mark.parametrize(
+    "latest,expected",
+    [
+        (None, "waiting_destination"),
+        ({"State": "ready", "SuccessorIntentID": None}, "materialized"),
+    ],
+)
+def test_intent_uses_each_current_registration_and_latest_repair(monkeypatch, latest, expected):
+    intent_id = str(uuid4())
+    pools = [
+        dict(PoolID="pool-a", IndexFileID="index-a", AccountKey="acct-a", Epoch=2),
+        dict(PoolID="pool-b", IndexFileID="index-b", AccountKey="acct-b", Epoch=4),
+    ]
+    cursor = Cursor(
+        singles=[
+            dict(IntentState="confirmed", SupersededByIntentID=None),
+            dict(State="confirmed", SuccessorIntentID=None),
+            latest,
+            dict(IntentID=intent_id),
+        ],
+        batches=[
+            [dict(State="confirmed", SuccessorIntentID=None)],
+            pools,
+            [dict(FileID="slot-a")],
+            [dict(FileID="slot-b")],
+        ],
+    )
+    dal = scripted(monkeypatch, cursor)
+    dal.output_operations = True
+    dal._sync_intent(cursor, intent_id)
+    updates = [(q, a) for q, a in cursor.calls if q.startswith("UPDATE")]
+    assert updates[0][1][0] == expected
+    queries = [q for q, _ in cursor.calls if q.startswith("SELECT TOP (1) j.State")]
+    assert len(queries) == 2 and all(
+        "j.PoolEpoch=? AND j.DestinationSetHash=?" in q and "ORDER BY j.EnqueueSequence DESC" in q
+        for q in queries
+    )
 
 
 @pytest.mark.parametrize("offset,expected", [(240, 240), (-300, 1), (7200, 3600)])

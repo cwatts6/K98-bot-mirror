@@ -11,7 +11,7 @@ import logging
 import threading
 
 from kvk.dal.new_source_import_dal import SourceConflict
-from services.export_coordination_dal import JobSpec
+from services.export_coordination_dal import JobSpec, bounded_json
 from services.export_request_budget import BudgetCompletionUnknown, RequestBudget
 from services.export_snapshot_store import SnapshotReceipt
 
@@ -29,9 +29,14 @@ class ExportRegistration:
 
 
 class ExportCoordinator:
-    def __init__(self, dal, *, adapters, registrations=(), storage=None):
+    def __init__(
+        self, dal, *, adapters, registrations=(), storage=None, output_planner=None, rollover=None
+    ):
         self.dal, self.adapters = dal, dict(adapters)
         self.registrations, self.storage = tuple(registrations), storage
+        self.output_planner, self.rollover = output_planner, rollover
+        if getattr(dal, "output_operations", False) is True and output_planner is None:
+            raise SourceConflict("S10E admission requires complete output capacity preflight.")
         self.after = (0, 0)
         self.last_account = ""
 
@@ -44,6 +49,15 @@ class ExportCoordinator:
                 if registration.kvk_no != intent["KVK_NO"]:
                     continue
                 try:
+                    provenance = "{}"
+                    if self.output_planner is not None:
+                        provenance = bounded_json(
+                            dict(
+                                output_preflight=self.output_planner(
+                                    intent["IntentID"], bytes(intent["VectorHash"]), registration
+                                )
+                            )
+                        )
                     self.dal.enqueue(
                         JobSpec(
                             account=registration.account,
@@ -55,6 +69,7 @@ class ExportCoordinator:
                             kvk_no=registration.kvk_no,
                             intent_id=intent["IntentID"],
                             epoch=registration.epoch,
+                            provenance=provenance,
                         )
                     )
                 except SourceConflict:
@@ -79,6 +94,25 @@ class ExportCoordinator:
                 return
             self.last_account = account
             try:
+                if self.rollover is not None:
+                    try:
+                        self.rollover.run_pending(account)
+                    except SourceConflict:
+                        logger.info("Rollover remains pending reconciliation account=%s", account)
+                if self.output_planner is not None:
+                    for job in self.dal.pending_source_jobs(account):
+                        registration = ExportRegistration(
+                            job["KVK_NO"], account, job["PoolEpoch"], tuple(job["destinations"])
+                        )
+                        try:
+                            proof = self.output_planner(
+                                job["IntentID"], bytes(job["InputHash"]), registration
+                            )
+                            self.dal.refresh_output_preflight(job["JobID"], job["Version"], proof)
+                        except SourceConflict:
+                            logger.info(
+                                "Source export preflight remains blocked job=%s", job["JobID"]
+                            )
                 claim = self.dal.claim_next(
                     account, storage_owner=self.storage.storage_owner if self.storage else None
                 )

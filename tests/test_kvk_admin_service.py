@@ -37,6 +37,40 @@ def test_legacy_manual_export_is_queued_without_calling_old_runner(monkeypatch):
     runner.assert_not_called()
 
 
+def test_ordinary_export_all_dispatches_new_source_to_operator_service(monkeypatch):
+    from unittest.mock import Mock
+
+    from kvk.services import source_export_operator_service as operator
+    from kvk.services.new_source_admin_service import SourceActor
+
+    actor = SourceActor(1, 2, 3, frozenset())
+    service = Mock()
+    service.export.return_value = dict(job_id="exact-source-job", state="confirmed")
+    monkeypatch.setattr(operator, "configured_operator_service", lambda: service)
+    monkeypatch.setattr(
+        kvk_admin_dal,
+        "read_admin_source",
+        lambda _: dict(KVK_NO=16, SourceKey="snapshot_report_v1"),
+    )
+    runner = Mock(side_effect=AssertionError("No legacy exporter"))
+    result = kvk_admin_service.run_export_all(
+        kvk_no=16,
+        sheet_name="legacy title",
+        server="",
+        database="",
+        username="",
+        password="",
+        credentials_file="",
+        alert_channel=None,
+        event_loop=None,
+        runner=runner,
+        actor=actor,
+    )
+    assert result.job_id == "exact-source-job" and result.ok is True
+    service.export.assert_called_once_with(actor, 16)
+    runner.assert_not_called()
+
+
 def test_normalize_sheet_name_uses_default_for_blank_values() -> None:
     assert kvk_admin_service.normalize_sheet_name("", "Default") == "Default"
     assert kvk_admin_service.normalize_sheet_name("  Custom  ", "Default") == "Custom"
@@ -73,7 +107,7 @@ async def test_source_group_registers_real_options_and_private_service_handoff(m
     assert options["expected_revision_version"]["type"] == 4
     assert options["roster_correction"]["type"] == 5
     assert len(options) <= 25
-    assert command.callback.__version__ == "v1.00"
+    assert command.callback.__version__ == "v1.01"
     assert len(group.subcommands) == 8
     row = {
         "AttemptID": "00000000-0000-4000-8000-000000000001",

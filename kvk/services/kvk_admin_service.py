@@ -129,9 +129,22 @@ def run_export_all(
     alert_channel: Any,
     event_loop: Any,
     runner: Callable[..., bool],
+    actor=None,
 ) -> KvkExportAllResult:
     from services.legacy_export_snapshot_service import _writer_runtime
 
+    if actor is not None:
+        choice = kvk_admin_dal.read_admin_source(kvk_no)
+        if choice["SourceKey"] == "snapshot_report_v1":
+            from kvk.services.source_export_operator_service import configured_operator_service
+
+            result = configured_operator_service().export(actor, choice["KVK_NO"])
+            return KvkExportAllResult(
+                choice["KVK_NO"],
+                "registered source export",
+                result["state"] == "confirmed",
+                result["job_id"],
+            )
     runtime = _writer_runtime()
     if runtime is None:
         reject_uncoordinated_export(kvk_no)

@@ -6,7 +6,7 @@ writers never acquire this admission lock. SQL constraints alone do not implemen
 these transitions or establish provider truth.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -172,9 +172,12 @@ def validate_parts(parts, destinations):
 
 
 class ExportCoordinationDAL:
-    def __init__(self, connect, *, preparations=False):
+    def __init__(self, connect, *, preparations=False, output_operations=False):
         self.connect = connect
         self.preparations = preparations
+        if output_operations and not preparations:
+            raise ValueError("Output operations require the complete preparation contract.")
+        self.output_operations = output_operations
 
     @contextmanager
     def _account(self, account):
@@ -215,10 +218,10 @@ class ExportCoordinationDAL:
             )
             return rows(cursor)
 
-    def enqueue(self, spec, *, preparation_id=None):
+    def enqueue(self, spec, *, preparation_id=None, _cursor=None, _repair_plan=None):
         if not isinstance(spec, JobSpec):
             raise ValueError("Validated immutable job specification required.")
-        with self._account(spec.account) as cursor:
+        with self._account(spec.account) if _cursor is None else nullcontext(_cursor) as cursor:
             preparation = None
             if preparation_id is not None:
                 if not self.preparations or spec.consumer == "new_source":
@@ -289,8 +292,40 @@ class ExportCoordinationDAL:
                 if spec.intent_id is not None:
                     self._sync_intent(cursor, spec.intent_id)
                 return row
-            if spec.repair_id is not None:
+            if spec.repair_id is not None and _repair_plan is None:
                 raise SourceConflict("New repair admission requires the S10E authority workflow.")
+            if self.output_operations and spec.consumer == "new_source":
+                from kvk.dal.source_output_pool_dal import assert_registration
+
+                pool = assert_registration(
+                    cursor,
+                    account=spec.account,
+                    kvk_no=spec.kvk_no,
+                    epoch=spec.epoch,
+                    destinations=spec.destinations,
+                )
+                proof = json.loads(spec.provenance).get("output_preflight", {})
+                if (
+                    proof.get("pool_id"),
+                    proof.get("pool_version"),
+                    proof.get("registration_hash"),
+                    proof.get("epoch"),
+                ) != (
+                    str(pool["PoolID"]).lower(),
+                    pool["Version"],
+                    bytes(pool["RegistrationHash"]).hex(),
+                    pool["Epoch"],
+                ):
+                    raise SourceConflict("Capacity preflight registration/version changed.")
+                if (
+                    type(proof.get("parts")) is not int
+                    or not 1 <= proof["parts"] <= 16
+                    or type(proof.get("required_files")) is not int
+                    or not 1 + 4 * proof["parts"]
+                    <= proof["required_files"]
+                    <= len(spec.destinations)
+                ):
+                    raise SourceConflict("Full P/Q/R capacity preflight required before admission.")
             if spec.consumer == "new_source":
                 from kvk.dal.season_source_dal import require_source
                 from kvk.dal.source_update_dal import read_export_intent
@@ -330,7 +365,14 @@ class ExportCoordinationDAL:
                         for r in rows(cursor)
                     ):
                         raise SourceConflict("New-source pool overlaps legacy/daily output.")
-            if self.preparations:
+            if self.output_operations:
+                cursor.execute(
+                    "SELECT ISNULL(MAX(Ticket),0)+1 AS Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=?) q",
+                    spec.account,
+                    spec.account,
+                    spec.account,
+                )
+            elif self.preparations:
                 cursor.execute(
                     "SELECT ISNULL(MAX(Ticket),0)+1 AS Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=?) q",
                     spec.account,
@@ -433,10 +475,42 @@ class ExportCoordinationDAL:
         jobs = rows(cursor)
         if not jobs:
             raise SourceConflict("Materialized intent requires a durable job.")
+        missing_registration = False
+        if self.output_operations:
+            cursor.execute(
+                "SELECT p.* FROM KVK.SourceOutputPool p JOIN KVK.SourceExportIntent i ON i.KVK_NO=p.ActiveKVK AND i.SourceKey=p.SourceKey AND i.ChoiceID=p.ChoiceID WHERE i.IntentID=? AND p.PoolState IN ('active','closing','blocked') ORDER BY p.RegistrationNo",
+                intent_id,
+            )
+            registered = rows(cursor)
+            current = []
+            for pool in registered:
+                cursor.execute(
+                    "SELECT FileID FROM KVK.SourceOutputSlot WHERE PoolID=? ORDER BY FileID",
+                    pool["PoolID"],
+                )
+                destinations = tuple(
+                    sorted((pool["IndexFileID"], *(r["FileID"] for r in rows(cursor))))
+                )
+                cursor.execute(
+                    "SELECT TOP (1) j.State,s.IntentID AS SuccessorIntentID FROM dbo.ExportJob j LEFT JOIN dbo.ExportJob s ON s.JobID=j.SupersededByJobID WHERE j.IntentID=? AND j.AccountKey=? AND j.PoolEpoch=? AND j.DestinationSetHash=? ORDER BY j.EnqueueSequence DESC,j.CreatedUTC DESC,j.JobID",
+                    intent_id,
+                    pool["AccountKey"],
+                    pool["Epoch"],
+                    digest(destinations),
+                )
+                latest = one(cursor)
+                if latest is None:
+                    missing_registration = True
+                else:
+                    current.append(latest)
+            if registered:
+                jobs = current
         state, successor = "materialized", None
-        if all(j["State"] == "confirmed" for j in jobs):
+        if missing_registration:
+            state = "waiting_destination"
+        elif jobs and all(j["State"] == "confirmed" for j in jobs):
             state = "confirmed"
-        elif all(j["State"] == "coalesced" for j in jobs):
+        elif jobs and all(j["State"] == "coalesced" for j in jobs):
             successors = {identity(j["SuccessorIntentID"]) for j in jobs}
             if len(successors) == 1:
                 state, successor = "coalesced", successors.pop()
@@ -456,9 +530,86 @@ class ExportCoordinationDAL:
     def accounts(self):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT DISTINCT AccountKey FROM dbo.ExportJob WHERE State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true') ORDER BY AccountKey"
+                "SELECT DISTINCT AccountKey FROM dbo.ExportJob WHERE State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')"
+                + (
+                    " UNION SELECT AccountKey FROM KVK.SourceOutputOperation WHERE State IN ('closing','ready')"
+                    if self.output_operations
+                    else ""
+                )
+                + " ORDER BY AccountKey"
             )
             return [r["AccountKey"] for r in rows(cursor)]
+
+    def pending_source_jobs(self, account):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT * FROM dbo.ExportJob WHERE AccountKey=? AND ConsumerKind='new_source' AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) ORDER BY EnqueueSequence,JobID",
+                account,
+            )
+            pending = rows(cursor)
+            for job in pending:
+                cursor.execute(
+                    "SELECT ResourceKey FROM dbo.ExportJobResource WHERE JobID=? AND ResourceKey LIKE 'destination:%' ORDER BY ResourceKey",
+                    job["JobID"],
+                )
+                job["destinations"] = tuple(
+                    r["ResourceKey"].removeprefix("destination:") for r in rows(cursor)
+                )
+            return pending
+
+    def refresh_output_preflight(self, job_id, expected_version, proof):
+        from kvk.dal.source_output_pool_dal import assert_registration
+
+        with transaction(self.connect) as cursor:
+            cursor.execute("SELECT AccountKey FROM dbo.ExportJob WHERE JobID=?", job_id)
+            scope = one(cursor)
+        if not scope:
+            raise SourceConflict("Pending job not found.")
+        with self._account(scope["AccountKey"]) as cursor:
+            job = _job(cursor, job_id)
+            cursor.execute(
+                "SELECT ResourceKey FROM dbo.ExportJobResource WHERE JobID=? AND ResourceKey LIKE 'destination:%' ORDER BY ResourceKey",
+                job_id,
+            )
+            destinations = tuple(
+                r["ResourceKey"].removeprefix("destination:") for r in rows(cursor)
+            )
+            pool = assert_registration(
+                cursor,
+                account=job["AccountKey"],
+                kvk_no=job["KVK_NO"],
+                epoch=job["PoolEpoch"],
+                destinations=destinations,
+            )
+            if (
+                proof.get("pool_id"),
+                proof.get("pool_version"),
+                proof.get("registration_hash"),
+                proof.get("epoch"),
+            ) != (
+                str(pool["PoolID"]).lower(),
+                pool["Version"],
+                bytes(pool["RegistrationHash"]).hex(),
+                pool["Epoch"],
+            ):
+                raise SourceConflict("Preflight no longer matches the pool.")
+            if (
+                type(proof.get("parts")) is not int
+                or not 1 <= proof["parts"] <= 16
+                or type(proof.get("required_files")) is not int
+                or not 1 + 4 * proof["parts"] <= proof["required_files"] <= len(destinations)
+            ):
+                raise SourceConflict("Capacity preflight failed.")
+            document = json.loads(job["ProvenanceJson"])
+            document["output_preflight"] = proof
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportJob SET ProvenanceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND ConsumerKind='new_source' AND State IN ('ready','failed') AND NOT EXISTS(SELECT 1 FROM dbo.ExportAttempt WHERE JobID=?)",
+                bounded_json(document),
+                job_id,
+                expected_version,
+                job_id,
+            )
 
     def claim_next(self, account, *, storage_owner=None):
         with self._account(account) as cursor:
@@ -489,11 +640,43 @@ class ExportCoordinationDAL:
                     not r
                     or r["ActiveJobID"] is not None
                     or r.get("ActivePreparationID") is not None
+                    or r.get("ActiveOutputOperationID") is not None
                     or r["BlockedReason"]
                     for r in resources
                 ):
                     continue
                 job = _job(cursor, candidate["JobID"])
+                if self.output_operations and job["ConsumerKind"] == "new_source":
+                    from kvk.dal.source_output_pool_dal import assert_registration
+
+                    try:
+                        pool = assert_registration(
+                            cursor,
+                            account=account,
+                            kvk_no=job["KVK_NO"],
+                            epoch=job["PoolEpoch"],
+                            destinations=tuple(
+                                k.removeprefix("destination:")
+                                for k in keys
+                                if k.startswith("destination:")
+                            ),
+                        )
+                    except SourceConflict:
+                        continue
+                    proof = json.loads(job["ProvenanceJson"]).get("output_preflight", {})
+                    if (proof.get("pool_version"), proof.get("registration_hash")) != (
+                        pool["Version"],
+                        bytes(pool["RegistrationHash"]).hex(),
+                    ):
+                        continue
+                if self.output_operations:
+                    cursor.execute(
+                        "SELECT TOP (1) OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready' AND EnqueueSequence<?",
+                        account,
+                        job["EnqueueSequence"],
+                    )
+                    if one(cursor):
+                        continue
                 if self.preparations:
                     cursor.execute(
                         "SELECT TOP (1) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending' AND EnqueueSequence<?",
@@ -555,7 +738,10 @@ class ExportCoordinationDAL:
                         cursor,
                         "UPDATE dbo.ExportResource SET ActiveJobID=?,OwnerID=?,Fence=?,Version=Version+1 "
                         "OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND BlockedReason IS NULL"
-                        + (" AND ActivePreparationID IS NULL" if self.preparations else ""),
+                        + (" AND ActivePreparationID IS NULL" if self.preparations else "")
+                        + (
+                            " AND ActiveOutputOperationID IS NULL" if self.output_operations else ""
+                        ),
                         job["JobID"],
                         owner,
                         fence,
@@ -580,13 +766,18 @@ class ExportCoordinationDAL:
                     key,
                 )
                 r = one(cursor)
-                if not r or (
-                    str(r["ActiveJobID"]).lower(),
-                    r["OwnerID"],
-                    r["Fence"],
-                    r["Version"],
-                    r["BlockedReason"],
-                ) != (claim.job_id, claim.owner_id, claim.fence, version, None):
+                if (
+                    not r
+                    or r.get("ActiveOutputOperationID") is not None
+                    or (
+                        str(r["ActiveJobID"]).lower(),
+                        r["OwnerID"],
+                        r["Fence"],
+                        r["Version"],
+                        r["BlockedReason"],
+                    )
+                    != (claim.job_id, claim.owner_id, claim.fence, version, None)
+                ):
                     raise SourceConflict("Resource owner/fence/version changed or blocked.")
             job = _job(cursor, claim.job_id)
             if job and job.get("IntentID") != claim.intent_id:
@@ -736,6 +927,10 @@ class ExportCoordinationDAL:
                     part["rows"],
                     part["cells"],
                 )
+            if self.output_operations and job["ConsumerKind"] == "new_source":
+                from kvk.dal.source_output_pool_dal import record_export_parts
+
+                record_export_parts(cursor, job, claim, attempt_id, parts, action="assign")
             return attempt_id
 
     def _attempt(self, cursor, claim, attempt_id):
@@ -848,6 +1043,10 @@ class ExportCoordinationDAL:
                 attempt_id,
                 attempt["Version"],
             )
+            if self.output_operations and job["ConsumerKind"] == "new_source":
+                from kvk.dal.source_output_pool_dal import finish_export_parts
+
+                finish_export_parts(cursor, claim, attempt_id)
             self._finish(cursor, claim, job, "confirmed", release=True)
 
     def fail(self, claim, *, retain_claims=False):
@@ -857,6 +1056,17 @@ class ExportCoordinationDAL:
             attempted = rows(cursor)
             for item in attempted:
                 attempt, parts = self._attempt(cursor, claim, item["AttemptID"])
+                if self.output_operations and job["ConsumerKind"] == "new_source":
+                    from kvk.dal.source_output_pool_dal import record_export_parts
+
+                    record_export_parts(
+                        cursor,
+                        job,
+                        claim,
+                        item["AttemptID"],
+                        json.loads(attempt["ManifestJson"])["parts"],
+                        action="quarantine",
+                    )
                 _cas(
                     cursor,
                     "UPDATE dbo.ExportAttempt SET Phase='uncertain',UpdatedUTC=SYSUTCDATETIME(),Version=Version+1 OUTPUT inserted.Version WHERE AttemptID=? AND Version=?",
@@ -910,6 +1120,300 @@ class ExportCoordinationDAL:
                 )
         if claim.intent_id is not None:
             self._sync_intent(cursor, claim.intent_id)
+
+    @staticmethod
+    def _operator_snapshot(cursor, job_id):
+        from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL, _wire
+
+        job = _job(cursor, job_id)
+        if not job or job["ConsumerKind"] != "new_source":
+            raise SourceConflict("Exact new-source JobID required.")
+        cursor.execute(
+            "SELECT r.* FROM dbo.ExportResource r JOIN dbo.ExportJobResource m ON m.ResourceKey=r.ResourceKey WHERE m.JobID=? ORDER BY r.ResourceKey",
+            job_id,
+        )
+        resources = rows(cursor)
+        from kvk.dal.new_source_delivery_dal import read_coordinated_receipts
+
+        attempts, parts = read_coordinated_receipts(cursor, job_id)
+        cursor.execute(
+            "SELECT p.PoolID FROM KVK.SourceOutputPool p JOIN dbo.ExportJobResource m ON m.ResourceKey=p.AccountResourceKey WHERE m.JobID=? AND p.ActiveKVK=? AND p.Epoch=? AND EXISTS(SELECT 1 FROM dbo.ExportJobResource d WHERE d.JobID=m.JobID AND d.ResourceKey='destination:'+CONVERT(varchar(128),p.IndexFileID))",
+            job_id,
+            job["KVK_NO"],
+            job["PoolEpoch"],
+        )
+        pools = rows(cursor)
+        if len(pools) != 1:
+            raise SourceConflict("Job has no unique current registered pool scope.")
+        pool = SourceOutputPoolDAL._snapshot(cursor, pools[0]["PoolID"])
+        return _wire(dict(job=job, resources=resources, attempts=attempts, parts=parts, pool=pool))
+
+    def operator_snapshot(self, job_id):
+        if not self.output_operations:
+            raise SourceConflict("S10E ownership contract is unavailable.")
+        with transaction(self.connect) as cursor:
+            return self._operator_snapshot(cursor, identity(job_id))
+
+    def reconcile_operator(self, snapshot, proof, *, actor):
+        job = snapshot["job"]
+        if (
+            not self.output_operations
+            or proof.get("snapshot_hash") != digest(snapshot).hex()
+            or proof.get("writer_terminated") is not True
+            or not proof.get("evidence_id")
+            or proof.get("state") not in {"confirmed", "absent", "damaged"}
+        ):
+            raise SourceConflict(
+                "Exact termination and remote outcome evidence required; uncertainty remains blocked."
+            )
+        with self._account(job["AccountKey"]) as cursor:
+            for resource in snapshot["resources"]:
+                _mutex(cursor, resource["ResourceKey"])
+            if self._operator_snapshot(cursor, job["JobID"]) != snapshot:
+                raise SourceConflict("Reconciliation snapshot changed.")
+            audit = json.loads(job["ProvenanceJson"])
+            history = audit.setdefault("reconciliations", [])
+            history.append(dict(actor=actor, proof=proof))
+            document = bounded_json(audit)
+            if job["State"] == "confirmed":
+                if proof["state"] not in {"confirmed", "damaged"}:
+                    raise SourceConflict("A retained confirmed receipt cannot become absent.")
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportJob SET ProvenanceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND State='confirmed'",
+                    document,
+                    job["JobID"],
+                    job["Version"],
+                )
+                return dict(job_id=job["JobID"], state=proof["state"])
+            if (
+                job["State"] not in {"uncertain", "running"}
+                or len(snapshot["attempts"]) != 1
+                or proof["state"] == "damaged"
+            ):
+                raise SourceConflict(
+                    "This state requires a separately scoped reconciliation decision."
+                )
+            attempt = snapshot["attempts"][0]
+            retained_claim = Claim(
+                job["JobID"],
+                job["AccountKey"],
+                job["OwnerID"],
+                job["Fence"],
+                job["Version"],
+                (),
+                job["IntentID"],
+            )
+            receipt = proof.get("receipt")
+            if proof["state"] == "confirmed":
+                pinned = json.loads(attempt["ManifestJson"])
+                if (
+                    not isinstance(receipt, dict)
+                    or receipt.get("export_key") != pinned["generation"]["export_key"]
+                    or receipt.get("attempt_id") != attempt["AttemptID"]
+                    or receipt.get("fence") != job["Fence"]
+                    or receipt.get("files") != [p["FileID"] for p in snapshot["parts"]]
+                    or receipt.get("audience") not in {"private", "public_viewer"}
+                    or not receipt.get("remote_id")
+                ):
+                    raise SourceConflict("Probe differs from byte-exact attempted identity.")
+                encoded = bounded_json(receipt)
+                if attempt["ReceiptJson"] is not None and attempt["ReceiptJson"] != encoded:
+                    raise SourceConflict("An existing receipt must remain byte-exact.")
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportAttempt SET Phase='published',ReceiptJson=COALESCE(ReceiptJson,?),VerifiedUTC=COALESCE(VerifiedUTC,SYSUTCDATETIME()),PublishedUTC=COALESCE(PublishedUTC,SYSUTCDATETIME()),UpdatedUTC=SYSUTCDATETIME(),Version=Version+1 OUTPUT inserted.Version WHERE AttemptID=? AND Version=? AND OwnerID=? AND Fence=?",
+                    encoded,
+                    attempt["AttemptID"],
+                    attempt["Version"],
+                    job["OwnerID"],
+                    job["Fence"],
+                )
+            else:
+                # Absence is terminal proof, not a momentarily missing pointer. Retain
+                # quarantined parts and the old attempt; a normal retry stays forbidden.
+                if proof.get("no_delayed_effect") is not True:
+                    raise SourceConflict("Absence requires proof of no delayed effect.")
+                from kvk.dal.source_output_pool_dal import record_export_parts
+
+                record_export_parts(
+                    cursor,
+                    dict(job, DestinationSetHash=bytes.fromhex(job["DestinationSetHash"])),
+                    retained_claim,
+                    attempt["AttemptID"],
+                    json.loads(attempt["ManifestJson"])["parts"],
+                    action="quarantine",
+                )
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportAttempt SET Phase='failed',UpdatedUTC=SYSUTCDATETIME(),Version=Version+1 OUTPUT inserted.Version WHERE AttemptID=? AND Version=? AND OwnerID=? AND Fence=?",
+                    attempt["AttemptID"],
+                    attempt["Version"],
+                    job["OwnerID"],
+                    job["Fence"],
+                )
+            state = "confirmed" if proof["state"] == "confirmed" else "failed"
+            from kvk.dal.source_output_pool_dal import settle_reconciled_parts
+
+            settle_reconciled_parts(
+                cursor, retained_claim, attempt["AttemptID"], confirmed=state == "confirmed"
+            )
+            for resource in snapshot["resources"]:
+                if (
+                    resource["ActiveJobID"],
+                    resource["OwnerID"],
+                    resource["Fence"],
+                    resource.get("ActivePreparationID"),
+                    resource.get("ActiveOutputOperationID"),
+                ) != (job["JobID"], job["OwnerID"], job["Fence"], None, None):
+                    raise SourceConflict("Reconciliation cannot release another owner.")
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportResource SET ActiveJobID=NULL,OwnerID=NULL,BlockedReason=NULL,Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND ActiveJobID=? AND OwnerID=? AND Fence=? AND Version=? AND ActivePreparationID IS NULL AND ActiveOutputOperationID IS NULL",
+                    resource["ResourceKey"],
+                    job["JobID"],
+                    job["OwnerID"],
+                    job["Fence"],
+                    resource["Version"],
+                )
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportJob SET State=?,ProvenanceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND OwnerID=? AND Fence=? AND State=?",
+                state,
+                document,
+                job["JobID"],
+                job["Version"],
+                job["OwnerID"],
+                job["Fence"],
+                job["State"],
+            )
+            self._sync_intent(cursor, job["IntentID"])
+            return dict(job_id=job["JobID"], state=state)
+
+    def repair_receipt(self, repair_id):
+        if not self.output_operations:
+            raise SourceConflict("S10E ownership contract is unavailable.")
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT JobID,State,ProvenanceJson FROM dbo.ExportJob WHERE RepairID=?",
+                identity(repair_id),
+            )
+            matches = rows(cursor)
+            if not matches:
+                return None
+            if len(matches) != 1:
+                raise SourceConflict("RepairID has ambiguous durable scope.")
+            row = matches[0]
+            plan = json.loads(row["ProvenanceJson"])["repair"]
+            return dict(
+                job_id=str(row["JobID"]).lower(),
+                repair_id=identity(repair_id),
+                state=row["State"],
+                actor=plan["actor"],
+                guild=plan["guild"],
+                channel=plan["channel"],
+            )
+
+    def admit_repair(self, repair_id, plan):
+        snapshot, proof = plan["snapshot"], plan["proof"]
+        original = snapshot["job"]
+        if (
+            not self.output_operations
+            or original["State"] != "confirmed"
+            or proof.get("state") != "damaged"
+            or proof.get("snapshot_hash") != digest(snapshot).hex()
+            or proof.get("writer_terminated") is not True
+            or not proof.get("evidence_id")
+        ):
+            raise SourceConflict("Confirmed damage and exact termination required for RepairID.")
+        repair_id = identity(repair_id)
+        with self._account(original["AccountKey"]) as cursor:
+            cursor.execute(
+                "SELECT JobID,ProvenanceJson FROM dbo.ExportJob WHERE RepairID=? AND AccountKey=?",
+                repair_id,
+                original["AccountKey"],
+            )
+            previous = one(cursor)
+            if previous:
+                if (
+                    json.loads(previous["ProvenanceJson"]).get("repair_plan_hash")
+                    != digest(plan).hex()
+                ):
+                    raise SourceConflict("Repair replay payload changed.")
+                return dict(
+                    job_id=str(previous["JobID"]).lower(),
+                    repair_id=repair_id,
+                    state="already_admitted",
+                )
+            for resource in snapshot["resources"]:
+                _mutex(cursor, resource["ResourceKey"])
+                if any(
+                    resource.get(k) is not None
+                    for k in (
+                        "ActiveJobID",
+                        "ActivePreparationID",
+                        "ActiveOutputOperationID",
+                        "OwnerID",
+                        "BlockedReason",
+                    )
+                ):
+                    raise SourceConflict("Repair must wait for every owning writer to drain.")
+            if self._operator_snapshot(cursor, original["JobID"]) != snapshot:
+                raise SourceConflict("Damage/registration snapshot changed; preview again.")
+            preflight = plan.get("output_preflight")
+            if not preflight:
+                raise SourceConflict("Repair requires complete pinned P/Q/R capacity preflight.")
+            provenance = dict(
+                output_preflight=preflight, repair_plan_hash=digest(plan).hex(), repair=plan
+            )
+            destinations = tuple(
+                sorted(
+                    r["ResourceKey"].removeprefix("destination:")
+                    for r in snapshot["resources"]
+                    if r["ResourceKey"].startswith("destination:")
+                )
+            )
+            spec = JobSpec(
+                account=original["AccountKey"],
+                consumer="new_source",
+                input_hash=bytes.fromhex(original["InputHash"]),
+                destinations=destinations,
+                actor=plan["actor"],
+                reason=plan["reason"],
+                kvk_no=original["KVK_NO"],
+                intent_id=original["IntentID"],
+                epoch=original["PoolEpoch"],
+                repair_id=repair_id,
+                provenance=bounded_json(provenance),
+            )
+            row = self.enqueue(spec, _cursor=cursor, _repair_plan=plan)
+            if len(snapshot["attempts"]) != 1:
+                raise SourceConflict("Repair requires one exact original attempt.")
+            from kvk.dal.source_output_pool_dal import record_export_parts
+
+            attempt = snapshot["attempts"][0]
+            old_claim = Claim(
+                original["JobID"],
+                original["AccountKey"],
+                original["OwnerID"],
+                original["Fence"],
+                original["Version"],
+                (),
+                original["IntentID"],
+            )
+            original_typed = dict(
+                original, DestinationSetHash=bytes.fromhex(original["DestinationSetHash"])
+            )
+            record_export_parts(
+                cursor,
+                original_typed,
+                old_claim,
+                attempt["AttemptID"],
+                json.loads(attempt["ManifestJson"])["parts"],
+                action="quarantine",
+                damage_proof=proof,
+            )
+            return dict(job_id=str(row["JobID"]).lower(), repair_id=repair_id, state=row["State"])
 
     def reserve_request(self, account):
         with transaction(self.connect) as cursor:

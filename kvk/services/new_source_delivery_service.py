@@ -280,12 +280,34 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
     from kvk.dal.new_source_delivery_dal import Destination
 
     destination = Destination("sheets", registration.index_file_id)
+    # Content identity stays immutable. An explicit RepairID gets a separate physical
+    # namespace, so damaged original files are never selected by their generation key.
+    delivery_key = (
+        digest({"content_key": generation.key, "repair_id": job["RepairID"]}).hex()
+        if job.get("RepairID")
+        else generation.key
+    )
+    if getattr(dal, "output_operations", False) is True:
+        from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+
+        pool_dal = SourceOutputPoolDAL(connect)
+        pool_id = pool_dal.resolve(job["KVK_NO"], registration.index_file_id)
+        pool = pool_dal.snapshot(pool_id)
+        transport.quarantined = frozenset(
+            s["FileID"] for s in pool["slots"] if s["State"] == "quarantined"
+        )
+        transport._registered_quarantine = True
+        setup = pool_dal.completed_setup(pool_id)
+        if setup:
+            from kvk.services.new_source_export_service import rollover_marker
+
+            transport._setup_marker = rollover_marker(setup["OldKVK"], setup["NewKVK"])
     attempt_id = None
     parts = []
 
     def guard(request):
-        if stop.is_set():
-            raise InterruptedError("Export admission stopped.")
+        # Shutdown closes admission. An already owned request/pacing chain drains;
+        # only durable ownership loss may stop it and retain uncertain claims.
         dal.authorize(claim, mutation=getattr(request, "method", None) != "GET")
 
     def plan(index, files, layout, manifest):
@@ -304,7 +326,7 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
             dict(
                 file_id=index["id"],
                 role="index",
-                manifest_hash=digest({"export_key": generation.key, "fence": claim.fence}).hex(),
+                manifest_hash=digest({"export_key": delivery_key, "fence": claim.fence}).hex(),
                 grids=1,
                 rows=1,
                 cells=grid["rowCount"] * grid["columnCount"],
@@ -324,7 +346,14 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
                 )
             )
         attempt_id = dal.begin_attempt(
-            claim, {"export_key": generation.key, "tables": manifest}, parts
+            claim,
+            {
+                "export_key": delivery_key,
+                "content_key": generation.key,
+                "repair_id": job.get("RepairID"),
+                "tables": manifest,
+            },
+            parts,
         )
 
     transport._request_pacer, transport._request_guard, transport._plan_callback = (
@@ -335,19 +364,19 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
     # No automatic slot reuse until S10D/E supplies durable pool/disposition authority.
     transport.reuse_guard = lambda *_: False
     manifest = generation.manifest()
-    transport.ensure_private(destination, generation.key, manifest)
+    transport.ensure_private(destination, delivery_key, manifest)
     if attempt_id is None:
         raise SourceConflict("Provider preparation did not retain an attempt.")
     for item in generation.tables:
         transport.write_range(
             destination,
-            generation.key,
+            delivery_key,
             item.name,
             "A1",
             item.raw_values(),
             value_input_option="RAW",
         )
-    if transport.verify(destination, generation.key) != manifest:
+    if transport.verify(destination, delivery_key) != manifest:
         raise SourceConflict("Exact private manifest readback failed.")
     # Check every generation ACL rather than inferring private verification from
     # successful writes. The previous index may legitimately remain public.
@@ -358,21 +387,21 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
         raise SourceConflict("Generation is not private.")
     dal.verified(claim, attempt_id)
     dal.publication_pending(claim, attempt_id)
-    remote = transport.publish_current(destination, generation.key, claim.fence)
+    remote = transport.publish_current(destination, delivery_key, claim.fence)
     probe = SimpleNamespace(
-        receipt=canonical({"export_key": generation.key}),
+        receipt=canonical({"export_key": delivery_key}),
         fence=claim.fence,
         selection=generation.selections[0],
     )
     state, _ = transport.reconcile(destination, probe)
     actual_files = [
         registration.index_file_id,
-        *(f["id"] for f in transport._files(destination, generation.key)),
+        *(f["id"] for f in transport._files(destination, delivery_key)),
     ]
     if state != "confirmed" or actual_files != [p["file_id"] for p in parts]:
         raise RemoteOutcomeUnknown("Publication readback differs from the admitted attempt.")
     receipt = dict(
-        export_key=generation.key,
+        export_key=delivery_key,
         fence=claim.fence,
         attempt_id=attempt_id,
         files=actual_files,

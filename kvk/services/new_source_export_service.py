@@ -8,7 +8,7 @@ import threading
 import time
 from typing import ClassVar
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.dal.new_source_import_dal import SourceConflict, digest
 from kvk.dal.new_source_publication_dal import RESULT_METRICS
 from kvk.rendering.new_source_export import ExportTable, table
 from kvk.schemas.new_source_schema import SOURCE_KEY
@@ -18,6 +18,10 @@ from kvk.services.kvk_export_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def rollover_marker(old_kvk, new_kvk):
+    return f"Season {old_kvk} ended. Season {new_kvk} setup; awaiting verified export."
 
 
 class GoogleRequestPacer:
@@ -892,6 +896,8 @@ class GoogleSheetsTransport:
     def _files(self, destination, key):
         found = []
         for id in self.registration.slot_file_ids:
+            if getattr(self, "_registered_quarantine", False) is True and id in self.quarantined:
+                continue
             file = self._get(id)
             if file.get("appProperties", {}).get("k98Generation") == key:
                 found.append(self._bound(destination, key, file, "generation"))
@@ -911,11 +917,14 @@ class GoogleSheetsTransport:
         return self._files(destination, key)[0]
 
     def _pointer(self, index):
-        return self._execute(
+        values = self._execute(
             self.sheets.spreadsheets()
             .values()
             .get(spreadsheetId=index["id"], range="Sheet1!A1:C1", valueRenderOption="FORMULA")
         ).get("values", [])
+        if getattr(self, "_setup_marker", None) and values == [[self._setup_marker]]:
+            return []
+        return values
 
     def _bind(self, destination, key, file, role, manifest, part=0):
         self._mutate(
@@ -949,8 +958,153 @@ class GoogleSheetsTransport:
             .values()
             .get(spreadsheetId=file["id"], range="Sheet1", valueRenderOption="FORMULA")
         )
-        if values.get("values"):
+        setup = (
+            file["id"] == self.registration.index_file_id
+            and getattr(self, "_setup_marker", None)
+            and values.get("values") == [[self._setup_marker]]
+        )
+        if values.get("values") and not setup:
             raise SourceConflict("Initial registration cannot overwrite existing workbook data.")
+
+    def rollover_private(self, file_id):
+        """Only the separately owned rollover adapter may invoke this mutation."""
+        if file_id not in (self.registration.index_file_id, *self.registration.slot_file_ids):
+            raise SourceConflict("Rollover file differs from exact registration.")
+        if self._request_guard is None:
+            raise SourceConflict("Durable rollover ownership is required.")
+        self._private_file(self._get(file_id))
+        return dict(file_id=file_id, private=True)
+
+    def rollover_clear(self, file_id):
+        """Replace all grids, remove names/metadata, then read back a private empty file.
+
+        A lost acknowledgment is uncertain. There is no mutation retry or operation
+        resume here; the durable caller retains ownership for reconciliation.
+        """
+        self.rollover_private(file_id)
+        book = self._execute(self.sheets.spreadsheets().get(spreadsheetId=file_id))
+        if book.get("dataSources"):
+            raise SourceConflict("Connected data sources require explicit retirement.")
+        sheets = book.get("sheets", [])
+        if not sheets:
+            raise SourceConflict("Spreadsheet has no verifiable grid identity.")
+        fresh_id = max(s["properties"]["sheetId"] for s in sheets) + 1
+        if fresh_id >= 2**31:
+            raise SourceConflict("Sheet identity exhausted; retire this file.")
+        from uuid import uuid4
+
+        columns = 3 if file_id == self.registration.index_file_id else 1
+
+        requests = [
+            dict(
+                addSheet=dict(
+                    properties=dict(
+                        sheetId=fresh_id,
+                        title="clear_" + uuid4().hex,
+                        gridProperties=dict(rowCount=1, columnCount=columns),
+                    )
+                )
+            )
+        ]
+        requests.extend(
+            dict(deleteNamedRange=dict(namedRangeId=r["namedRangeId"]))
+            for r in book.get("namedRanges", [])
+        )
+        requests.extend(
+            dict(
+                deleteDeveloperMetadata=dict(
+                    dataFilter=dict(developerMetadataLookup=dict(metadataId=r["metadataId"]))
+                )
+            )
+            for r in book.get("developerMetadata", [])
+        )
+        requests.extend(dict(deleteSheet=dict(sheetId=s["properties"]["sheetId"])) for s in sheets)
+        requests.append(
+            dict(
+                updateSheetProperties=dict(
+                    properties=dict(sheetId=fresh_id, title="Sheet1"), fields="title"
+                )
+            )
+        )
+        self._mutate(
+            self.sheets.spreadsheets().batchUpdate(
+                spreadsheetId=file_id, body=dict(requests=requests)
+            )
+        )
+        file = self._get(file_id)
+        self._mutate(
+            self.drive.files().update(
+                fileId=file_id,
+                body=dict(
+                    appProperties={
+                        k: None for k in file.get("appProperties", {}) if k.startswith("k98")
+                    },
+                    description="",
+                ),
+                fields="id",
+            )
+        )
+        empty = self._execute(
+            self.sheets.spreadsheets().get(spreadsheetId=file_id, includeGridData=True)
+        )
+        fresh = self._get(file_id)
+        grids = empty.get("sheets", [])
+        if (
+            any(empty.get(k) for k in ("namedRanges", "developerMetadata", "dataSources"))
+            or len(grids) != 1
+            or grids[0]["properties"].get("sheetId") != fresh_id
+            or grids[0]["properties"].get("title") != "Sheet1"
+            or grids[0]["properties"].get("gridProperties", {}).get("rowCount") != 1
+            or grids[0]["properties"].get("gridProperties", {}).get("columnCount") != columns
+            or any(k not in {"properties", "data"} for k in grids[0])
+            or any(
+                any(cell for cell in row.get("values", []))
+                for data in grids[0].get("data", [])
+                for row in data.get("rowData", [])
+            )
+            or any(p.get("type") == "anyone" for p in fresh["permissions"])
+            or any(k.startswith("k98") for k in fresh.get("appProperties", {}))
+            or fresh.get("description")
+        ):
+            raise SourceConflict("Exact private empty manifest readback failed.")
+        return dict(
+            file_id=file_id,
+            private=True,
+            empty=True,
+            manifest_hash=digest(empty).hex(),
+            sheet_id=fresh_id,
+        )
+
+    def rollover_setup(self, file_id, old_kvk, new_kvk):
+        if file_id != self.registration.index_file_id or self._request_guard is None:
+            raise SourceConflict("Exact owned index required for setup state.")
+        marker = rollover_marker(old_kvk, new_kvk)
+        self._mutate(
+            self.sheets.spreadsheets()
+            .values()
+            .update(
+                spreadsheetId=file_id,
+                range="Sheet1!A1",
+                valueInputOption="RAW",
+                body=dict(values=[[marker]]),
+            )
+        )
+        values = self._execute(
+            self.sheets.spreadsheets()
+            .values()
+            .get(spreadsheetId=file_id, range="Sheet1", valueRenderOption="FORMULA")
+        ).get("values", [])
+        file = self._get(file_id)
+        if values != [[marker]] or any(p.get("type") == "anyone" for p in file["permissions"]):
+            raise SourceConflict("Season-ended/setup private readback failed.")
+        return dict(
+            file_id=file_id,
+            private=True,
+            setup=True,
+            old_kvk=old_kvk,
+            new_kvk=new_kvk,
+            marker=marker,
+        )
 
     def ensure_private(self, destination, key, manifest):
         from kvk.services.new_source_delivery_service import DestinationSetupRequired
@@ -958,7 +1112,12 @@ class GoogleSheetsTransport:
         self._identity(destination, key)
         self.last_error = None
         self._verified.discard(key)
-        if self.quarantined.intersection(self.registration.slot_file_ids):
+        # Quarantined identities remain registered and consume Q capacity. They are
+        # excluded from candidate files; changing registration to hide them is unsafe.
+        if (
+            self.quarantined.intersection(self.registration.slot_file_ids)
+            and getattr(self, "_registered_quarantine", False) is not True
+        ):
             raise SourceConflict("Remove quarantined slots from destination registration.")
         if set(manifest) != {*KVK_EXPORT_SECTION_NAMES, "ALL_WINDOWS", "COMPARISONS"}:
             raise ValueError("Exactly twelve generation sections are required.")
@@ -969,7 +1128,9 @@ class GoogleSheetsTransport:
                 f"Register at least {2 * len(layout)} slots plus the index for current/staging reuse."
             )
         index = self._get(self.registration.index_file_id)
-        files = [self._get(id) for id in self.registration.slot_file_ids]
+        files = [
+            self._get(id) for id in self.registration.slot_file_ids if id not in self.quarantined
+        ]
         for f, role in [(index, "index"), *((f, "generation") for f in files)]:
             if f.get("appProperties"):
                 self._bound(destination, key, f, role)

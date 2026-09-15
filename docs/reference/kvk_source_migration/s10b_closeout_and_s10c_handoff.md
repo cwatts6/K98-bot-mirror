@@ -1,14 +1,41 @@
 # S10B closeout and S10C documentation handoff
 
-## Current delivery and next step — 2026-09-14
+## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+
+SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
+Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
+`aa1821adbde9ccda47797caa83b5d5a9958bfce9`. **No changes have been pulled to the bot machine.**
+S10D authoring, offline checks and Changes security review are complete; SQL installation and
+provider/Discord execution are not established. S10C remains source/static SQL evidence too.
+See [S10D closeout and exact carry-forward manifests](s10d_closeout_and_s10e_handoff.md).
+
+Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
+[task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
+that closeout, this pack/starter and all required archive identities. Verify filename AND
+previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,
+repository mixing, manufactured implementation or renewed predecessor/grouping approval.
+Both SQL documents were delivered in #87; their new closeout edits stay in SQL for the next
+actual authorized SQL implementation PR. S10E scope must assess any genuine SQL delta separately.
+
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and every retained database/file.
+S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C seven local checks
+remain distinct; none is new live Discord or deployment evidence. Shutdown stops admission and
+drains owned delivery; uncertainty retains claims. No lease-age/job-state release.
+This documentation closeout authorizes no implementation, Git publication, SQL/provider/Discord
+execution, real import/export, bot-machine action, deployment, activation, predecessor rerun or
+new task. Earlier dated checkpoints are historical; the current closeout controls the next step.
+
+
+## Historical S10B delivery and S10C next step — 2026-09-14
 
 **S10B code review and repository delivery are complete; merged changes are locally pulled. No
 changes have been pulled to the bot machine.** This records repository delivery, not deployment,
 activation, a new live smoke or closure of retained operational gates.
 
 Next is **S10C Legacy and Scan Export Adapters, initial review/scope only**:
-[task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md)
-and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md).
+[task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md)
+and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md).
 The operator requested this documentation closeout and archive preparation. No S10C implementation,
 new task, Git publication, SQL/provider/Discord operation, real import/export, bot-machine action,
 deployment, activation or predecessor rerun is authorized by this handoff.
@@ -84,7 +111,7 @@ provider truth. No predecessor execution was rerun or implied by merge.
 
 ## S10C boundary and preserved contracts
 
-The [S10C pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md)
+The [S10C pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md)
 reproduces the exact S7 **26-path** Bot source/test boundary. Review automatic/manual legacy and
 scan adapters, immutable multi-result snapshot capture with committed provenance, shared writer
 admission and actual gspread/google-api request pacing. Keep SQL session admission outside

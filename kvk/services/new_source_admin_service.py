@@ -38,6 +38,12 @@ ACTIONS = (
     "choose_source",
     "match_update",
     "cancel",
+    "export",
+    "export_status",
+    "export_reconcile",
+    "export_rebuild",
+    "rollover_preview",
+    "rollover_confirm",
 )
 CONFIRM_SECONDS = 300
 
@@ -98,7 +104,20 @@ class SourceAccess:
         if actor.channel_id not in channels:
             raise PermissionError("Use the private source intake or an authorized admin channel.")
         if action not in ACTIONS or (
-            action in ("finalize", "correct", "configure", "choose_source", "match_update")
+            action
+            in (
+                "finalize",
+                "correct",
+                "configure",
+                "choose_source",
+                "match_update",
+                "export",
+                "export_status",
+                "export_reconcile",
+                "export_rebuild",
+                "rollover_preview",
+                "rollover_confirm",
+            )
             and not admin
         ):
             raise PermissionError("This action requires the configured KVK administrator.")

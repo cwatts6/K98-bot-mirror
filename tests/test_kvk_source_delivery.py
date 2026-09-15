@@ -609,6 +609,8 @@ class GoogleMemoryAPI:
         self.fail_pointer = False
         self.fail_write = False
         self.next_sheet_id = 1
+        self.named_ranges = {}
+        self.metadata = {}
 
     def client(self, path=""):
         from types import SimpleNamespace
@@ -657,9 +659,12 @@ class GoogleMemoryAPI:
             if method == "update":
                 body = deepcopy(args["body"])
                 if "appProperties" in body:
-                    self.files_data[args["fileId"]].setdefault("appProperties", {}).update(
-                        body.pop("appProperties")
-                    )
+                    props = self.files_data[args["fileId"]].setdefault("appProperties", {})
+                    for key, value in body.pop("appProperties").items():
+                        if value is None:
+                            props.pop(key, None)
+                        else:
+                            props[key] = value
                 self.files_data[args["fileId"]].update(body)
                 return {"id": args["fileId"]}
             if method == "create":
@@ -692,18 +697,59 @@ class GoogleMemoryAPI:
         id = args["spreadsheetId"]
         if path == "/spreadsheets":
             if method == "get":
-                return {"sheets": [{"properties": deepcopy(p)} for p in self.grids[id].values()]}
+                grids = [{"properties": deepcopy(p)} for p in self.grids[id].values()]
+                if args.get("includeGridData"):
+                    for grid in grids:
+                        grid["data"] = [
+                            dict(
+                                rowData=[
+                                    dict(
+                                        values=[
+                                            dict(userEnteredValue=dict(stringValue=str(cell)))
+                                            for cell in row
+                                        ]
+                                    )
+                                    for row in self.values.get(
+                                        (id, grid["properties"]["title"]), []
+                                    )
+                                ]
+                            )
+                        ]
+                return dict(
+                    sheets=grids,
+                    namedRanges=deepcopy(self.named_ranges.get(id, [])),
+                    developerMetadata=deepcopy(self.metadata.get(id, [])),
+                )
             if method == "batchUpdate":
                 for req in args["body"]["requests"]:
                     if "addSheet" in req:
                         prop = deepcopy(req["addSheet"]["properties"])
-                        prop["sheetId"] = self.next_sheet_id
-                        self.next_sheet_id += 1
+                        prop.setdefault("sheetId", self.next_sheet_id)
+                        self.next_sheet_id = max(self.next_sheet_id, prop["sheetId"]) + 1
                         self.grids[id][prop["title"]] = prop
+                    elif "deleteNamedRange" in req:
+                        self.named_ranges[id] = [
+                            r
+                            for r in self.named_ranges.get(id, [])
+                            if r["namedRangeId"] != req["deleteNamedRange"]["namedRangeId"]
+                        ]
+                    elif "deleteDeveloperMetadata" in req:
+                        key = req["deleteDeveloperMetadata"]["dataFilter"][
+                            "developerMetadataLookup"
+                        ]["metadataId"]
+                        self.metadata[id] = [
+                            r for r in self.metadata.get(id, []) if r["metadataId"] != key
+                        ]
                     elif "updateSheetProperties" in req:
                         prop = req["updateSheetProperties"]["properties"]
-                        for grid in self.grids[id].values():
+                        for title, grid in list(self.grids[id].items()):
                             if grid["sheetId"] == prop["sheetId"]:
+                                if "title" in prop:
+                                    self.grids[id].pop(title)
+                                    grid["title"] = prop["title"]
+                                    self.grids[id][prop["title"]] = grid
+                                if "gridProperties" not in prop:
+                                    continue
                                 # Google validates shrink against the currently frozen rows.
                                 if prop["gridProperties"].get("rowCount", 1000) <= grid[
                                     "gridProperties"
@@ -808,8 +854,9 @@ def google_delivery():
 
 
 @pytest.mark.parametrize("public", [False, True])
+@pytest.mark.parametrize("repair", [False, True])
 def test_s10b_pinned_worker_records_parts_before_mutation_and_reads_publication(
-    monkeypatch, public
+    monkeypatch, public, repair
 ):
     from dataclasses import replace
     from threading import Event
@@ -851,6 +898,15 @@ def test_s10b_pinned_worker_records_parts_before_mutation_and_reads_publication(
 
     dal.authorize.side_effect = authorize
     dal.begin_attempt.side_effect = begin
+    if repair:
+        job["RepairID"] = "00000000-0000-4000-8000-000000000123"
+    stop = Event()
+    stop.set()  # Shutdown stops admission; this claim already owns delivery.
+    expected_key = (
+        digest(dict(content_key=original.key, repair_id=job["RepairID"])).hex()
+        if repair
+        else original.key
+    )
     receipt = deliver_coordinated_export(
         job=job,
         claim=claim,
@@ -858,14 +914,15 @@ def test_s10b_pinned_worker_records_parts_before_mutation_and_reads_publication(
         transport=transport,
         connect=None,
         budget=lambda: None,
-        stop=Event(),
+        stop=stop,
     )
-    assert receipt["export_key"] == original.key
+    assert receipt["export_key"] == expected_key
     assert receipt["files"] == ["fake-index", "fake-1"]
     assert len(retained["parts"]) == 2
     assert retained["manifest"]["tables"] == original.manifest()
+    assert retained["manifest"]["content_key"] == original.key
     dal.confirm.assert_called_once_with(claim, "attempt-a", receipt)
-    assert api.values[("fake-index", "Sheet1")][0][:2] == [original.key, "10"]
+    assert api.values[("fake-index", "Sheet1")][0][:2] == [expected_key, "10"]
 
 
 def test_registered_google_adapter_initializes_twelve_tabs_without_creating_files():

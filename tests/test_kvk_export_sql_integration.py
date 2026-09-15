@@ -16,6 +16,162 @@ from services.export_coordination_dal import ExportCoordinationDAL, JobSpec
 
 
 @pytest.fixture
+def s10e_pool_dal():
+    """S10E approval is independent of every predecessor gate; not run offline."""
+    if os.environ.get("K98_S10E_SQL_AUTHORIZED") != "S10E_EXACT_DISPOSABLE_OPERATIONS_APPROVED":
+        pytest.skip("S10E transactions not authorized; authored coverage only")
+    database = os.environ.get("K98_S10E_SQL_DATABASE", "")
+    server = os.environ.get("K98_S10E_SQL_SERVER", "")
+    if (
+        not re.fullmatch(r"K98_S10E_Disposable_[0-9]{8}_validation", database)
+        or server != "9SX2VF4\\K98DEV"
+    ):
+        pytest.fail("Exact separately prepared S10E target required")
+    if not all(
+        os.environ.get(k) for k in ("K98_S10E_BACKUP_EVIDENCE", "K98_S10E_RESTORE_EVIDENCE")
+    ):
+        pytest.fail("Backup and actual restore evidence required")
+    import pyodbc
+
+    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+
+    def connect():
+        connection = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};SERVER=lpc:localhost\\K98DEV;"
+            + f"DATABASE={database};Trusted_Connection=yes;",
+            autocommit=False,
+            timeout=5,
+        )
+        try:
+            cursor = connection.cursor()
+            cursor.execute("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(128)),DB_NAME()")
+            if tuple(cursor.fetchone()) != (server, database):
+                raise ValueError("Exact S10E server/database mismatch")
+            connection.commit()
+            return connection
+        except BaseException:
+            connection.close()
+            raise
+
+    return SourceOutputPoolDAL(connect)
+
+
+def test_s10e_two_connections_cannot_claim_one_ready_operation(s10e_pool_dal):
+    """Requires an explicitly seeded ready operation; preserves every resulting claim."""
+    from uuid import UUID
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+
+    operation_id = str(UUID(os.environ["K98_S10E_READY_OPERATION_ID"]))
+
+    def claim():
+        try:
+            return SourceOutputPoolDAL(s10e_pool_dal.connect).claim(operation_id)
+        except SourceConflict:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        claims = list(workers.map(lambda _: claim(), range(2)))
+    assert sum(c is not None for c in claims) == 1
+    winner = next(c for c in claims if c is not None)
+    assert SourceOutputPoolDAL(s10e_pool_dal.connect).authorize(winner)["State"] == "running"
+    # No cleanup release, lease expiry or provider execution.
+
+
+def test_s10e_stale_tokens_and_uncertainty_keep_every_resource(s10e_pool_dal):
+    """A distinct seeded case is required; retain claims as evidence after this test."""
+    from dataclasses import replace
+    from uuid import UUID
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    identifier = str(UUID(os.environ["K98_S10E_CAS_OPERATION_ID"]))
+    claim = s10e_pool_dal.claim(identifier)
+    assert claim is not None
+    before = s10e_pool_dal.operation_snapshot(identifier)
+    for stale in (
+        replace(claim, owner=str(uuid4())),
+        replace(claim, fence=claim.fence + 1),
+        replace(claim, version=claim.version + 1),
+        replace(claim, pool_version=claim.pool_version + 1),
+    ):
+        with pytest.raises(SourceConflict):
+            s10e_pool_dal.authorize(stale)
+    assert s10e_pool_dal.operation_snapshot(identifier) == before
+    s10e_pool_dal.uncertain(claim)
+    after = s10e_pool_dal.operation_snapshot(identifier)
+    assert after["operation"]["State"] == "uncertain"
+    assert after["resources"] == before["resources"]
+    with pytest.raises(SourceConflict):
+        s10e_pool_dal.claim(identifier)
+    assert s10e_pool_dal.operation_snapshot(identifier)["resources"] == before["resources"]
+
+
+def test_s10e_operation_blocks_daily_and_preparation_claims(s10e_pool_dal):
+    from uuid import UUID
+
+    from services.legacy_export_snapshot_dal import LegacySnapshotDAL
+
+    identifier = str(UUID(os.environ["K98_S10E_CONTENTION_OPERATION_ID"]))
+    claim = s10e_pool_dal.claim(identifier)
+    assert claim is not None
+    coordinator = ExportCoordinationDAL(
+        s10e_pool_dal.connect, preparations=True, output_operations=True
+    )
+    coordinator.enqueue(daily(claim.account, "s10e-" + uuid4().hex))
+    assert coordinator.claim_next(claim.account, storage_owner="synthetic:S10B") is None
+    preparer = LegacySnapshotDAL(s10e_pool_dal.connect, output_operations=True)
+    preparation = preparer.request(
+        account=claim.account,
+        consumer="scan_data",
+        kvk_no=None,
+        request={"fixture": str(uuid4())},
+        storage_owner="synthetic:S10E",
+        actor="fixture",
+        reason="S10E exclusive ownership case",
+    )
+    assert (
+        preparer.claim(
+            preparation,
+            account=claim.account,
+            storage_owner="synthetic:S10E",
+            stage="preflight",
+            resource_keys=("account:" + claim.account,),
+        )
+        is None
+    )
+    assert s10e_pool_dal.authorize(claim)["State"] == "running"
+
+
+def test_s10e_closing_ack_replay_preserves_plan_and_ticket(s10e_pool_dal):
+    from uuid import UUID
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+    from kvk.services.new_source_admin_service import SourceActor
+    from kvk.services.source_output_pool_service import checked_plan
+
+    pool_id = str(UUID(os.environ["K98_S10E_CONFIRM_POOL_ID"]))
+    target = int(os.environ["K98_S10E_CONFIRM_NEW_KVK"])
+    plan = checked_plan(
+        s10e_pool_dal.snapshot(pool_id),
+        s10e_pool_dal.choice(target),
+        actor=SourceActor(1, 2, 3, frozenset()),
+        reason="separately approved S10E closing replay fixture",
+    )
+    operation_id = str(uuid4())
+    first = s10e_pool_dal.confirm(operation_id, plan)
+    # Simulate caller losing the first acknowledgment and reconstructing its DAL.
+    restarted = SourceOutputPoolDAL(s10e_pool_dal.connect)
+    assert restarted.confirm(operation_id, plan) == first
+    assert restarted.snapshot(pool_id)["pool"]["PoolState"] == "closing"
+    with pytest.raises(SourceConflict):
+        restarted.confirm(operation_id, dict(plan, reason="changed replay"))
+    assert restarted.operation(operation_id)["EnqueueSequence"] == first["EnqueueSequence"]
+
+
+@pytest.fixture
 def s10c_preparation_dal():
     """Distinct, unexecuted S10C gate; S10B approval cannot enable these tests."""
     if os.environ.get("K98_S10C_SQL_AUTHORIZED") != "S10C_EXACT_DISPOSABLE_OPERATIONS_APPROVED":

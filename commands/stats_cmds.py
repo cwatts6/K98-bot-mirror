@@ -47,6 +47,7 @@ async def _require_admin_action(ctx):
     permission = ctx.channel.permissions_for(member)
     if not permission.view_channel or not permission.send_messages:
         raise PermissionError("Admin permission changed.")
+    return member
 
 
 def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
@@ -101,7 +102,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         description="Private source receipts and administrative approvals",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     async def kvk_source(
@@ -119,6 +120,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 "choose_source",
                 "match_update",
                 "cancel",
+                "export",
+                "export_status",
+                "export_reconcile",
+                "export_rebuild",
+                "rollover_preview",
+                "rollover_confirm",
             ],
         ),
         receipt: str = discord.Option(
@@ -156,6 +163,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         file_2: discord.Attachment = discord.Option(
             discord.Attachment, "Second workbook", required=False, default=None
         ),
+        index_file_id: str = discord.Option(
+            str, "Exact registered export index file ID", required=False, default=None
+        ),
+        job_id: str = discord.Option(
+            str,
+            "Exact JobID or rollover OperationID to reconcile; JobID to repair",
+            required=False,
+            default=None,
+        ),
+        new_kvk: int = discord.Option(
+            int, "Fixed target season for rollover", required=False, default=None, min_value=1
+        ),
     ):
         from kvk.services.new_source_admin_service import access_from_config, configured_service
         from ui.views.kvk_source_import_view import (
@@ -169,6 +188,41 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             access = access_from_config()
             actor = await current_actor(ctx, access)
             access.authorize(actor, action)
+            from kvk.services.source_export_operator_service import (
+                EXPORT_ACTIONS,
+                configured_operator_service,
+            )
+
+            if action in EXPORT_ACTIONS:
+                if any(
+                    (
+                        file_1,
+                        file_2,
+                        receipt,
+                        expected_revision,
+                        expected_revision_version,
+                        roster_correction,
+                        update_id,
+                    )
+                ):
+                    raise ValueError(
+                        "Export actions require exact export identities; remove intake options."
+                    )
+                from ui.views.kvk_source_export_view import dispatch_export
+
+                service = configured_operator_service()
+                await dispatch_export(
+                    ctx,
+                    service,
+                    actor,
+                    action,
+                    kvk_no=kvk_no,
+                    index_file_id=index_file_id,
+                    job_id=job_id,
+                    new_kvk=new_kvk,
+                    review=review,
+                )
+                return
             if roster_correction and action != "configure":
                 raise ValueError("Roster correction is an explicit configure option.")
             from kvk.services.source_admin_review_service import configured_review_service
@@ -639,7 +693,15 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         )
 
         try:
-            await _require_admin_action(ctx)
+            member = await _require_admin_action(ctx)
+            from kvk.services.new_source_admin_service import SourceActor
+
+            actor = SourceActor(
+                member.id,
+                ctx.guild.id,
+                ctx.channel.id,
+                frozenset(r.id for r in getattr(member, "roles", ())),
+            )
             result = await asyncio.to_thread(
                 kvk_admin_service.run_export_all,
                 kvk_no=resolved_kvk_no,
@@ -652,6 +714,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 alert_channel=ctx.channel,
                 event_loop=ctx.bot.loop,
                 runner=run_kvk_proc_exports_with_alerts,
+                actor=actor,
             )
         except Exception as e:
             logger.exception("[/kvk_admin export_all] export failed")

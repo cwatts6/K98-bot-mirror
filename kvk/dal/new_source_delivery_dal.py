@@ -19,6 +19,47 @@ from kvk.dal.new_source_reporting_dal import load_snapshot
 from kvk.schemas.new_source_schema import SOURCE_KEY
 
 
+def read_coordinated_receipts(cursor, job_id):
+    """Read exact attempt/part history without changing old receipt bytes or mapping it.
+
+    Corrupt or incomplete history is reconciliation evidence, never permission to
+    infer a FileID from URLs, descriptions, generation labels or row counts.
+    """
+    from kvk.dal.new_source_import_dal import digest
+
+    cursor.execute("SELECT * FROM dbo.ExportAttempt WHERE JobID=? ORDER BY AttemptNo", job_id)
+    attempts = rows(cursor)
+    parts = []
+    for attempt in attempts:
+        document = json.loads(attempt["ManifestJson"])
+        if digest(document) != bytes(attempt["ManifestHash"]):
+            raise SourceConflict("Retained attempt manifest hash differs.")
+        cursor.execute(
+            "SELECT * FROM dbo.ExportAttemptPart WHERE AttemptID=? ORDER BY PartNo",
+            attempt["AttemptID"],
+        )
+        members = rows(cursor)
+        actual = [
+            dict(
+                file_id=p["FileID"],
+                role=p["Role"],
+                manifest_hash=bytes(p["ManifestHash"]).hex(),
+                grids=p["GridCount"],
+                rows=p["RowCount"],
+                cells=p["CellCount"],
+            )
+            for p in members
+        ]
+        if (
+            len(members) != attempt["PartCount"]
+            or actual != document["parts"]
+            or [p["PartNo"] for p in members] != list(range(1, len(members) + 1))
+        ):
+            raise SourceConflict("Retained exact attempt membership differs.")
+        parts.extend(members)
+    return attempts, parts
+
+
 @dataclass(frozen=True)
 class Destination:
     kind: str

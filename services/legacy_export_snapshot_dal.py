@@ -24,8 +24,9 @@ class PreparationClaim:
 
 
 class LegacySnapshotDAL:
-    def __init__(self, connect):
+    def __init__(self, connect, *, output_operations=False):
         self.connect = connect
+        self.output_operations = output_operations
 
     def request(self, *, account, consumer, kvk_no, request, storage_owner, actor, reason):
         if consumer not in {"all_kvk", "scan_data", "config"}:
@@ -57,9 +58,16 @@ class LegacySnapshotDAL:
             if previous:
                 return str(previous["PreparationID"]).lower()
             cursor.execute(
-                "SELECT ISNULL(MAX(Ticket),0)+1 AS Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=?) q",
+                "SELECT ISNULL(MAX(Ticket),0)+1 AS Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=?"
+                + (
+                    " UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=?"
+                    if self.output_operations
+                    else ""
+                )
+                + ") q",
                 account,
                 account,
+                *((account,) if self.output_operations else ()),
             )
             ticket = one(cursor)["Ticket"]
             identifier = str(uuid4())
@@ -166,6 +174,7 @@ class LegacySnapshotDAL:
                 if (
                     resource["ActiveJobID"] is not None
                     or resource["ActivePreparationID"] is not None
+                    or resource.get("ActiveOutputOperationID") is not None
                     or resource["BlockedReason"]
                 ):
                     return None
@@ -183,9 +192,16 @@ class LegacySnapshotDAL:
                 raise SourceConflict("Preparation state/owner changed.")
             if stage == "preflight":
                 cursor.execute(
-                    "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending') q WHERE Ticket<?",
+                    "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"
+                    + (
+                        " UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready'"
+                        if self.output_operations
+                        else ""
+                    )
+                    + ") q WHERE Ticket<?",
                     account,
                     account,
+                    *((account,) if self.output_operations else ()),
                     preparation["EnqueueSequence"],
                 )
                 if one(cursor):
@@ -214,7 +230,8 @@ class LegacySnapshotDAL:
                 )
                 rv = _cas(
                     cursor,
-                    "UPDATE dbo.ExportResource SET ActivePreparationID=?,OwnerID=?,Fence=?,Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND ActivePreparationID IS NULL AND BlockedReason IS NULL",
+                    "UPDATE dbo.ExportResource SET ActivePreparationID=?,OwnerID=?,Fence=?,Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND ActivePreparationID IS NULL AND BlockedReason IS NULL"
+                    + (" AND ActiveOutputOperationID IS NULL" if self.output_operations else ""),
                     identifier,
                     owner,
                     fence,
@@ -232,14 +249,19 @@ class LegacySnapshotDAL:
                 "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) WHERE ResourceKey=?", key
             )
             r = one(cursor)
-            if not r or (
-                str(r["ActivePreparationID"]).lower(),
-                r["ActiveJobID"],
-                str(r["OwnerID"]).lower(),
-                r["Fence"],
-                r["Version"],
-                r["BlockedReason"],
-            ) != (claim.preparation_id, None, claim.owner, claim.fence, version, None):
+            if (
+                not r
+                or r.get("ActiveOutputOperationID") is not None
+                or (
+                    str(r["ActivePreparationID"]).lower(),
+                    r["ActiveJobID"],
+                    str(r["OwnerID"]).lower(),
+                    r["Fence"],
+                    r["Version"],
+                    r["BlockedReason"],
+                )
+                != (claim.preparation_id, None, claim.owner, claim.fence, version, None)
+            ):
                 raise SourceConflict("Preparation resource ownership changed.")
         cursor.execute(
             "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
