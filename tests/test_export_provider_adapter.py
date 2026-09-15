@@ -6,7 +6,7 @@ import pytest
 from services.export_provider_adapter import ProviderAdapter, ProviderOutcomeUnknown
 
 
-def delivery_fixture(*, wrong_grid=False, wrong_readback=False):
+def delivery_fixture(*, wrong_grid=False, wrong_readback=False, decimal_cells=False):
     import hashlib
     from threading import Event
     from uuid import uuid4
@@ -26,6 +26,30 @@ def delivery_fixture(*, wrong_grid=False, wrong_readback=False):
         destinations=["file-a"],
         outputs=[dict(section="data", file_id="file-a", tab="Data", grid_id=7, format_requests=[])],
     )
+    if decimal_cells:
+        from decimal import Decimal
+
+        import pandas as pd
+
+        from gsheet_module import plan_legacy_outputs
+
+        sections, config = plan_legacy_outputs(
+            dict(
+                consumer="scan_data",
+                spreadsheets={"Book": "file-a"},
+                grid_ids={"file-a": {"Data": 7}},
+                exports=[dict(sheet="Book", tab="Data", sort=0)],
+            ),
+            frames=[
+                pd.DataFrame(
+                    {
+                        "Weight": [Decimal("10.1234567890123456789"), Decimal("2.50")],
+                        "Name": ["ten", "two"],
+                    }
+                )
+            ],
+        )
+        assert sections[0].rows == (("2.50", "two"), ("10.1234567890123456789", "ten"))
     snapshot = LegacySnapshot.capture(
         consumer="scan_data",
         preparation_id=str(uuid4()),
@@ -86,7 +110,14 @@ def delivery_fixture(*, wrong_grid=False, wrong_readback=False):
                     },
                 )
             return self.request(
-                "GET", lambda: {"values": [["wrong"]] if wrong_readback else self.rows[:-1]}
+                "GET",
+                lambda: {
+                    "values": (
+                        [["wrong"]]
+                        if wrong_readback
+                        else (self.rows if decimal_cells else self.rows[:-1])
+                    )
+                },
             )
 
         def batchUpdate(self, **kwargs):
@@ -122,6 +153,14 @@ def test_complete_delivery_paces_every_request_and_confirms_exact_attempt():
     receipt = dal.confirm.call_args.args[2]
     assert receipt["attempt_id"] == "attempt-1" and receipt["fence"] == 9
     assert receipt["files"] == ["file-a"]
+
+
+def test_decimal_planning_snapshot_and_raw_delivery_preserve_exact_values():
+    worker, args, events = delivery_fixture(decimal_cells=True)
+    worker(*args)
+    args[2].verified.assert_called_once()
+    args[2].confirm.assert_called_once()
+    assert "PUT" in events
 
 
 def test_grid_conflict_is_detected_before_any_attempt_or_mutation():

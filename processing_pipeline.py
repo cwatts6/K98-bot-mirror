@@ -1,10 +1,11 @@
-﻿# processing_pipeline.py
+# processing_pipeline.py
 import asyncio
 import inspect
 import logging
 import os
 import time
 import traceback
+from typing import Literal
 
 from services.legacy_export_snapshot_service import collect_producer_captures
 
@@ -73,6 +74,23 @@ BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
 
 # Default trimming used when sending logs into embeds (kept small to avoid embed size issues)
 _EMBED_LOG_TRIM = int(os.getenv("EMBED_LOG_TRIM", str(_DEFAULT_MAX_LOG_EMBED_CHARS)))
+
+
+async def _run_proc_config_step(step_meta):
+    from services.legacy_export_snapshot_service import _writer_runtime
+
+    if _writer_runtime() is not None:
+        from proc_config_import import run_proc_config_import_offload
+
+        return await run_proc_config_import_offload(prefer_process=False, meta=step_meta)
+    return await run_maintenance_with_isolation(
+        "proc_import",
+        args=[],
+        timeout=PROC_IMPORT_TIMEOUT,
+        name="proc_import",
+        meta=step_meta,
+        prefer_process=(MAINT_WORKER_MODE == "process"),
+    )
 
 
 def _safe_trim(obj, n: int) -> str:
@@ -165,7 +183,7 @@ async def run_step(
 @collect_producer_captures
 async def execute_processing_pipeline(
     rank: int, *, seed: int, user, filename: str, channel_id: int, save_path: str | None = None
-) -> tuple[bool, bool, bool, bool, bool | None, str]:
+) -> tuple[bool, bool, bool, bool | Literal["pending"], bool | None, str]:
     """
     Orchestrates the file -> SQL -> Sheets processing pipeline.
 
@@ -592,23 +610,7 @@ async def execute_processing_pipeline(
                 )
             else:
                 try:
-                    from services.legacy_export_snapshot_service import _writer_runtime
-
-                    if _writer_runtime() is not None:
-                        from proc_config_import import run_proc_config_import_offload
-
-                        ok, out = await run_proc_config_import_offload(
-                            prefer_process=False, meta=step_meta
-                        )
-                    else:
-                        ok, out = await run_maintenance_with_isolation(
-                            "proc_import",
-                            args=[],
-                            timeout=PROC_IMPORT_TIMEOUT,
-                            name="proc_import",
-                            meta=step_meta,
-                            prefer_process=(MAINT_WORKER_MODE == "process"),
-                        )
+                    ok, out = await _run_proc_config_step(step_meta)
                     success_proc_import = bool(ok)
                     if not ok:
                         out_text = _safe_trim(out, 4000)
@@ -700,14 +702,7 @@ async def execute_processing_pipeline(
         else:
             # SQL step didn’t run; run ProcConfig normally (no headroom wait needed)
             try:
-                ok, out = await run_maintenance_with_isolation(
-                    "proc_import",
-                    args=[],
-                    timeout=PROC_IMPORT_TIMEOUT,
-                    name="proc_import",
-                    meta=step_meta,
-                    prefer_process=(MAINT_WORKER_MODE == "process"),
-                )
+                ok, out = await _run_proc_config_step(step_meta)
                 success_proc_import = bool(ok)
                 if not ok:
                     out_text = _safe_trim(out, 4000)
@@ -838,6 +833,9 @@ async def execute_processing_pipeline(
         )
         success_export, out_export = False, "Export crashed (see logs)."
 
+    if str(out_export).startswith("Queued export job "):
+        success_export = "pending"
+
     # 4) Warm caches after an export so commands/autocomplete feel snappy
     try:
         await warm_name_cache()
@@ -858,12 +856,12 @@ async def execute_processing_pipeline(
         {
             "Status": (
                 "Queued"
-                if str(out_export).startswith("Queued export job ")
+                if success_export == "pending"
                 else ("Success" if success_export else "Failure")
             ),
             "Log": out_export,
         },
-        bool(success_export),
+        None if success_export == "pending" else bool(success_export),
         user,
         notify_channel,
         context_field=context_field,
@@ -1021,7 +1019,13 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     )
 
     # Status icon based on archive/export results
-    if success_archive and success_export:
+    if success_export == "pending":
+        failed = any(
+            value is False
+            for value in (success_excel, success_archive, success_sql, success_proc_import)
+        )
+        status_icon = "🔴 Export pending; other step failed" if failed else "⏳ Export pending"
+    elif success_archive and success_export is True:
         status_icon = "🟢"
     elif success_archive or success_export:
         status_icon = "🟠"

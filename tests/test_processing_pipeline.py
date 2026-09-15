@@ -26,8 +26,40 @@ async def test_pipeline_keeps_queued_export_distinct_from_completion(monkeypatch
     result = await pp.execute_processing_pipeline(
         1, seed=1, user=AsyncMock(), filename="test.xlsx", channel_id=0, save_path=None
     )
-    assert result[3] is False
+    assert result[3] == "pending"
     assert any(call.args[1].get("Status") == "Queued" for call in sent.call_args_list)
+    assert (
+        next(call.args[2] for call in sent.call_args_list if call.args[1].get("Status") == "Queued")
+        is None
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sql_success", [True, False])
+async def test_both_proc_config_branches_keep_runtime_in_thread(monkeypatch, sql_success):
+    import proc_config_import
+    import processing_pipeline as pp
+    from services import legacy_export_snapshot_service as snapshots
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    monkeypatch.setattr(pp, "MAINT_WORKER_MODE", "process")
+    monkeypatch.setattr(snapshots, "_writer_runtime", lambda: object())
+    offload = AsyncMock(return_value=(True, "config captured"))
+    monkeypatch.setattr(proc_config_import, "run_proc_config_import_offload", offload)
+    isolated = AsyncMock(return_value=(True, "OK"))
+    monkeypatch.setattr(pp, "run_maintenance_with_isolation", isolated)
+
+    async def archive(*a, **k):
+        return True, "archive", {"excel": True, "archive": True, "sql": sql_success}
+
+    monkeypatch.setattr(pp, "run_stats_copy_archive", archive)
+    result = await pp.execute_processing_pipeline(
+        1, seed=1, user=AsyncMock(), filename="test.xlsx", channel_id=0, save_path=None
+    )
+    assert result[4] is True
+    offload.assert_awaited_once()
+    assert offload.call_args.kwargs["prefer_process"] is False
+    assert all(call.args[0] != "proc_import" for call in isolated.call_args_list)
 
 
 def _patch_lightweight_pipeline_boundaries(monkeypatch):
@@ -62,6 +94,33 @@ def _patch_lightweight_pipeline_boundaries(monkeypatch):
     monkeypatch.setattr("processing_pipeline.run_all_exports", lambda *a, **k: (True, "OK"))
     monkeypatch.setattr("processing_pipeline.warm_name_cache", fake_warm_cache)
     monkeypatch.setattr("processing_pipeline.warm_target_cache", fake_warm_cache)
+
+
+@pytest.mark.asyncio
+async def test_handler_preserves_pending_export_in_live_queue_and_summary(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    import processing_pipeline as pp
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    message = SimpleNamespace(channel=SimpleNamespace(id=-1), author="fixture-operator")
+    queue = {"jobs": [{"filename": "fixture.xlsx", "user": str(message.author)}]}
+    monkeypatch.setattr(pp, "live_queue", queue)
+    monkeypatch.setattr(pp, "live_queue_lock", asyncio.Lock())
+    monkeypatch.setattr(pp, "update_live_queue_embed", AsyncMock())
+    monkeypatch.setattr(pp, "prompt_admin_inputs", AsyncMock(return_value=(1, 1)))
+    monkeypatch.setattr(pp, "load_cached_input", lambda: {})
+    monkeypatch.setattr(
+        pp,
+        "execute_processing_pipeline",
+        AsyncMock(return_value=(True, True, True, "pending", True, "queued job")),
+    )
+    log = AsyncMock()
+    monkeypatch.setattr(pp, "log_processing_result", log)
+    await pp.handle_file_processing(AsyncMock(), message, "fixture.xlsx", None)
+    assert log.call_args.args[10] == "pending"
+    assert queue["jobs"][0]["status"].startswith("⏳ Export pending")
 
 
 @pytest.mark.asyncio

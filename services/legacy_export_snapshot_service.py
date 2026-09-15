@@ -467,20 +467,24 @@ class LegacyExportRuntime:
         if claim is None:
             self.dal.withdraw_unstarted(identifier)
             raise SnapshotUnavailable("Writer unavailable: SQL admission refused before execution.")
-        connection = self.dal.connect()
-        try:
-            connection.autocommit = True
-            guard = self.dal.session(claim, connection)
-            guard.__enter__()
-        except BaseException:
-            connection.close()
-            self.dal.uncertain(claim)
-            raise
         collection = _captures.get()
         if collection is not None:
             # Invalidate an earlier producer in this pipeline as soon as a later
             # writer starts. Its failure cannot silently select the older capture.
             collection.append((scope["consumer"], scope.get("kvk_no"), None))
+        connection = None
+        try:
+            connection = self.dal.connect()
+            connection.autocommit = True
+            guard = self.dal.session(claim, connection)
+            guard.__enter__()
+        except BaseException:
+            try:
+                self.dal.uncertain(claim)
+            finally:
+                if connection is not None:
+                    connection.close()
+            raise
         return WriterOwner(claim, connection, guard, kind)
 
     def authorize_writer(self, owner):

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 import datetime as _dt
+from decimal import Decimal
 import json
 import logging
 import os
@@ -3659,6 +3660,15 @@ __all__ = [
 ]
 
 
+def _raw_snapshot_cell(value):
+    # Convert only after numeric planning/sorting; RAW text preserves SQL decimal precision.
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError("Non-finite decimal cannot be exported.")
+        return format(value, "f")
+    return _coerce_cell_for_sheet(value)
+
+
 def plan_legacy_outputs(scope, *, frames):
     """Pure planning through existing transformations; every provider value is captured.
 
@@ -3820,7 +3830,9 @@ def plan_legacy_outputs(scope, *, frames):
         planned["additional_outputs"] = result
     return (
         tuple(
-            OutputSection(name, columns, tuple(tuple(row) for row in values))
+            OutputSection(
+                name, columns, tuple(tuple(_raw_snapshot_cell(v) for v in row) for row in values)
+            )
             for name, (columns, values) in tables.items()
         ),
         planned,

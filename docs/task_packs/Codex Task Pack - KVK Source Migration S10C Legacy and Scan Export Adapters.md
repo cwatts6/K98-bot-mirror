@@ -2,6 +2,35 @@
 
 ## Implementation approval and preparation checkpoint — 2026-09-14
 
+### PR review correction boundary — 2026-09-15
+
+The operator authorized action, responses and resolution for Bot PR #279 and separate SQL PR #86.
+The pending-export correction also modifies `admin_helpers.py` and
+`tests/test_admin_helpers_stats_delivery.py`, extending the exact Bot delivery union to **83 physical
+path identities** (81 PR entries when both archive source/destination pairs are represented as renames).
+These two paths accompany every previously mandated source/test/document/archive identity in the same
+Bot PR; no standalone documentation PR or repository mixing.
+
+The correction preserves Decimal precision as RAW text after numeric planning/sorting, marks failed
+writer connection/session setup explicitly uncertain, keeps both ProcConfig branches under runtime
+admission, and carries an explicit pending export result through telemetry, logs and live queue status.
+Pending delivery neither fabricates provider completion nor masks other failed processing steps.
+Both task README status banners move to the first block after their H1 without changing banner content.
+SQL PR #86 separately tightens pending ownership and Actor collation and validates inherited S10A
+resource columns/checks/indexes/FKs before first-install alteration/sealing. All SQL work is authoring
+and offline/static validation only; current S6/S8 evidence and all execution gates remain unchanged.
+
+Review-correction validation: **98 focused tests passed**, import smoke and registration passed
+(36 top-level commands, no drift), architecture/deferred/security-routing checks passed, and both
+README banner bodies were verified unchanged. SQL's static checker accepted the valid patch and
+rejected six deliberately corrupted contract variants; no SQL was executed.
+Separate correction Changes reviews, Deep off, completed with no reportable findings or deferred
+candidates: Bot `b1bd7b3b-26a7-466c-92c3-56ff810e4f64` at
+`codex-security-snapshot/v1:sha256:7889071e2e7feeac3b1b121b2d51539e6163629b002ff873628af12e6290fba5`,
+SQL `eeb8cf3a-d063-4c0c-ba7e-97caf5aab5a4` at
+`codex-security-snapshot/v1:sha256:19c735c6af83c989274ceff27251179534358bd3fca9856bc2c7d2c1e270868a`.
+This subsequent evidence-only text update is covered by a documentation-only security skip.
+
 The operator approved the expanded Bot scope and implementation direction after the initial
 review. This supersedes the initial-review-only authority below for Bot authoring and offline
 validation. Separate SQL authoring and offline/static validation were subsequently approved

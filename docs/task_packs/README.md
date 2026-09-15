@@ -1,8 +1,5 @@
 # Task Packs
 
-Current KVK task: [S10C Legacy and Scan Export Adapters](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md), initial review/scope only.
-Use its [starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md) and preserve the [mandatory pending documentation manifest](../reference/kvk_source_migration/s10b_closeout_and_s10c_handoff.md#exact-pending-bot-documentation-manifest) in the eventual S10C implementation PR. S10B is archived and repository-delivered, not pulled to the bot machine.
-
 ## Current status — S10B merged and locally pulled; S10C scope next, 2026-09-14
 
 S10B mirror #278 and production #585 are merged; local pulls are complete.
@@ -24,6 +21,9 @@ and offline-runner evidence, and S8C seven local checks remain distinct. No new 
 This closeout authorizes no S10C implementation, Git publication, SQL/provider/Discord execution, real imports/exports,
 bot-machine pull/restart/deployment, activation, predecessor rerun or automatic new task.
 Earlier dated statuses and approvals below are historical; settled acceptance and grouping stay settled.
+
+Current KVK task: [S10C Legacy and Scan Export Adapters](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md), initial review/scope only.
+Use its [starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md) and preserve the [mandatory pending documentation manifest](../reference/kvk_source_migration/s10b_closeout_and_s10c_handoff.md#exact-pending-bot-documentation-manifest) in the eventual S10C implementation PR. S10B is archived and repository-delivered, not pulled to the bot machine.
 
 ## Historical S10A closeout status — 2026-09-14
 

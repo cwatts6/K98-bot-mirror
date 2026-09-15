@@ -1,15 +1,5 @@
 # Archived Task Packs
 
-## S10B completed task documents — 2026-09-14
-
-- [S10B task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md)
-- [S10B starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md)
-
-Both are retained historical instructions after merged mirror #278 and production #585. The
-[S10B closeout](../../reference/kvk_source_migration/s10b_closeout_and_s10c_handoff.md) records exact
-delivery proof, open gates and both required archive move sides for the next S10C PR. No evidence
-or retained database/file was removed. These archives do not authorize a predecessor rerun.
-
 ## Current status — S10B merged and locally pulled; S10C scope next, 2026-09-14
 
 S10B mirror #278 and production #585 are merged; local pulls are complete.
@@ -31,6 +21,16 @@ and offline-runner evidence, and S8C seven local checks remain distinct. No new 
 This closeout authorizes no S10C implementation, Git publication, SQL/provider/Discord execution, real imports/exports,
 bot-machine pull/restart/deployment, activation, predecessor rerun or automatic new task.
 Earlier dated statuses and approvals below are historical; settled acceptance and grouping stay settled.
+
+## S10B completed task documents — 2026-09-14
+
+- [S10B task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md)
+- [S10B starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md)
+
+Both are retained historical instructions after merged mirror #278 and production #585. The
+[S10B closeout](../../reference/kvk_source_migration/s10b_closeout_and_s10c_handoff.md) records exact
+delivery proof, open gates and both required archive move sides for the next S10C PR. No evidence
+or retained database/file was removed. These archives do not authorize a predecessor rerun.
 
 ## Historical S10A closeout status — 2026-09-14
 

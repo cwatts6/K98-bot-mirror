@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 import logging
 import os
-from typing import Any
+from typing import Any, Literal
 
 import discord
 
@@ -109,7 +109,7 @@ async def log_processing_result(
     success_excel: bool | None,
     success_archive: bool | None,
     success_sql: bool | None,
-    success_export: bool | None,
+    success_export: bool | Literal["pending"] | None,
     success_proc_import: bool | None,
     combined_log: str,
     start_time: datetime,
@@ -124,7 +124,7 @@ async def log_processing_result(
         message: The discord.Message object if available (None for slash commands).
         filename: Name of processed file.
         rank, seed: Admin inputs.
-        success_*: Booleans or None for each processing step. None = step not attempted.
+        success_*: Booleans or None for each processing step. None = step not attempted; export also accepts "pending" for a durable queued job.
         combined_log: Path or content summary (not modified here).
         start_time: datetime when processing started (naive or aware; used as-is).
         summary_log_path: CSV path to append the summary row.
@@ -202,17 +202,23 @@ async def log_processing_result(
     except Exception:
         logger.exception("[LOG] Failed to append to summary log")
 
+    export_pending = success_export == "pending"
+
     # Determine embed metadata
     attempted: dict[str, bool | None] = {
         "Excel": success_excel,
         "Archive": success_archive,
         "SQL": success_sql,
-        "Export": success_export,
+        "Export": None if export_pending else success_export,
         "ProcConfig": success_proc_import,
     }
     attempted = {k: v for k, v in attempted.items() if v is not None}
 
-    if not attempted:
+    if export_pending and all(attempted.values()):
+        title = "⏳ Processing Awaiting Export"
+        color = 0xF1C40F
+        mention = None
+    elif not attempted:
         title = "⚠️ No Steps Run"
         color = 0x95A5A6
         mention = ADMIN_USER_MENTION
@@ -252,7 +258,7 @@ async def log_processing_result(
                     "Excel Success": str(success_excel),
                     "Archive Success": str(success_archive),
                     "SQL Success": str(success_sql),
-                    "Export Success": str(success_export),
+                    "Export Status" if export_pending else "Export Success": str(success_export),
                     "ProcConfig Import": str(success_proc_import),
                     "Duration": f"{duration:.1f} sec",
                 },
@@ -289,7 +295,16 @@ async def log_processing_result(
             logger.exception("[LOG] Failed to append to FAILED_LOG")
 
     # Post stats update embed if all steps succeeded (unchanged behavior)
-    if all([success_excel, success_archive, success_sql, success_export, success_proc_import]):
+    if all(
+        value is True
+        for value in [
+            success_excel,
+            success_archive,
+            success_sql,
+            success_export,
+            success_proc_import,
+        ]
+    ):
         is_kvk = is_currently_kvk()
         try:
             delivery = await send_stats_update_embed(

@@ -301,6 +301,29 @@ def test_success_without_completion_evidence_cannot_capture(tmp_path):
     assert dal.transition.call_count == 1
 
 
+@pytest.mark.parametrize("failure", ["connect", "session", "close"])
+def test_writer_setup_failure_marks_durable_claim_uncertain(tmp_path, failure):
+    from services.legacy_export_snapshot_service import _captures, use_runtime
+
+    runtime, dal = producer_runtime(tmp_path)
+    if failure == "connect":
+        dal.connect.side_effect = OSError("connect failed")
+    else:
+        dal.session.side_effect = OSError("session failed")
+        if failure == "close":
+            dal.connect.return_value.close.side_effect = OSError("close failed")
+    token = _captures.set([("all_kvk", 7, "older")])
+    try:
+        with use_runtime(runtime), pytest.raises(OSError):
+            runtime.begin_writer("all_kvk")
+        assert _captures.get()[-1] == ("all_kvk", 7, None)
+    finally:
+        _captures.reset(token)
+    dal.uncertain.assert_called_once_with(dal.claim.return_value)
+    dal.captured.assert_not_called()
+    runtime.capture.assert_not_called()
+
+
 @pytest.mark.parametrize("stage", ["preflight", "writing"])
 def test_refused_unstarted_operation_is_withdrawn_without_executing(tmp_path, stage):
     from services.legacy_export_snapshot_service import admitted_writer, use_runtime
