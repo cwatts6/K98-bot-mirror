@@ -139,7 +139,7 @@ def delivery_fixture(*, wrong_grid=False, wrong_readback=False, decimal_cells=Fa
     dal, budget = Mock(), Mock()
     dal.begin_attempt.return_value = "attempt-1"
     job = dict(ConsumerKind="scan_data", InputHash=hashlib.sha256(snapshot.payload).digest())
-    args = job, SimpleNamespace(fence=9), dal, budget, Event(), snapshot.payload
+    args = job, SimpleNamespace(fence=9, job_id="job-a"), dal, budget, Event(), snapshot.payload
     return LegacyProviderJob(lambda job: (sdk, sdk)), args, events
 
 
@@ -161,6 +161,87 @@ def test_decimal_planning_snapshot_and_raw_delivery_preserve_exact_values():
     args[2].verified.assert_called_once()
     args[2].confirm.assert_called_once()
     assert "PUT" in events
+
+
+@pytest.mark.parametrize("stop_at", ["claim", "cooldown", "clear"])
+def test_coordinator_drains_admitted_delivery_and_blocks_next_account(monkeypatch, stop_at):
+    from services import export_coordination_service as coordination
+    from services.export_request_budget import RequestBudget
+
+    worker, args, events = delivery_fixture()
+    job, claim, dal, _, stop, payload = args
+    job.update(SpoolKey="retained", SpoolBytes=len(payload), StorageOwner="local")
+    dal.pending_intents.return_value = []
+    dal.accounts.return_value = ["acct-a", "acct-b"]
+
+    def claim_next(*args, **kwargs):
+        if stop_at == "claim":
+            stop.set()
+        return claim
+
+    dal.claim_next.side_effect = claim_next
+    dal.authorize.return_value = job
+    dal.reserve_request.return_value = dict(WaitSeconds=1, ReservedUTC="server-slot")
+    dal.refresh_reservation.return_value = dict(WaitSeconds=0)
+    waits = []
+
+    def sleep(seconds):
+        waits.append(seconds)
+        if stop_at == "cooldown":
+            stop.set()
+
+    def completed(account):
+        if stop_at == "clear" and events == ["GET", "GET", "POST", "POST"]:
+            stop.set()
+
+    dal.complete_request.side_effect = completed
+    # Use the real reservation/wait/checkpoint implementation with offline sleep.
+    monkeypatch.setattr(
+        coordination, "RequestBudget", lambda *a, **kw: RequestBudget(*a, sleep=sleep, **kw)
+    )
+    storage = SimpleNamespace(storage_owner="local", read=Mock(return_value=payload))
+    service = coordination.ExportCoordinator(dal, adapters={"scan_data": worker}, storage=storage)
+    service.run_batch(stop)
+    assert stop.is_set()
+    assert events == ["GET", "GET", "POST", "POST", "PUT", "GET", "GET"]
+    assert waits == [1] * 7
+    assert dal.reserve_request.call_count == dal.refresh_reservation.call_count == 7
+    assert dal.complete_request.call_count == 7
+    assert dal.authorize.call_count == 15  # initial claim plus two guards per request
+    dal.verified.assert_called_once()
+    dal.publication_pending.assert_called_once()
+    dal.confirm.assert_called_once()
+    dal.fail.assert_not_called()
+    dal.claim_next.assert_called_once_with("acct-a", storage_owner="local")
+    service.run_batch(stop)
+    assert dal.pending_intents.call_count == 1
+
+
+def test_shutdown_drain_still_retains_unknown_completion():
+    from services.export_coordination_service import ExportCoordinator
+
+    worker, args, events = delivery_fixture()
+    job, claim, dal, _, stop, payload = args
+    job.update(SpoolKey="retained", SpoolBytes=len(payload), StorageOwner="local")
+    dal.pending_intents.return_value = []
+    dal.accounts.return_value = ["acct-a", "acct-b"]
+    dal.claim_next.return_value = claim
+    dal.authorize.return_value = job
+    dal.reserve_request.return_value = dict(WaitSeconds=0, ReservedUTC="server-slot")
+    dal.refresh_reservation.return_value = dict(WaitSeconds=0)
+
+    def completed(account):
+        if events == ["GET", "GET", "POST", "POST"]:
+            stop.set()
+            raise RuntimeError("Completion acknowledgement lost")
+
+    dal.complete_request.side_effect = completed
+    storage = SimpleNamespace(storage_owner="local", read=Mock(return_value=payload))
+    ExportCoordinator(dal, adapters={"scan_data": worker}, storage=storage).run_batch(stop)
+    assert events == ["GET", "GET", "POST", "POST"]
+    dal.fail.assert_called_once_with(claim, retain_claims=True)
+    dal.confirm.assert_not_called()
+    dal.claim_next.assert_called_once()
 
 
 def test_grid_conflict_is_detected_before_any_attempt_or_mutation():

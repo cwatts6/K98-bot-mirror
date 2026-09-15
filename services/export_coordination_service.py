@@ -115,7 +115,9 @@ class ExportCoordinator:
                     job,
                     claim,
                     self.dal,
-                    RequestBudget(self.dal, account, stop=stop),
+                    # Stop gates admission above, not an already owned delivery.
+                    # Its pacing/cooldown waits must drain through confirmation.
+                    RequestBudget(self.dal, account),
                     stop,
                     snapshot,
                 )

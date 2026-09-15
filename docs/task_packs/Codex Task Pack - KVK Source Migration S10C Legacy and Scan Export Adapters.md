@@ -4,6 +4,19 @@
 
 ### PR review correction boundary — 2026-09-15
 
+Production PR #586 shutdown correction: new discovery/account admissions stop at teardown, while
+an already claimed legacy/scan delivery drains through durable pacing/cooldown, full readback and
+confirmation. Request ownership guards and uncertain-result retention remain active. Four new
+offline cases cover stop at claim, during cooldown, after clear, and lost completion acknowledgement.
+Validation: **94 focused tests passed; 4,514 passed / 67 skipped in the full offline suite**;
+targeted log-noise validation preserved production logs; import smoke, command registration,
+architecture/deferred/security-routing and test selection passed. No SQL/schema delta or live
+execution. Mirror Changes review, Deep off, `80badb61-095f-4770-8620-0a26ea308bc2` completed with no
+findings/deferred candidates at base/head `786e60a314f383f46c01377d8b50dbc002c4afd2`, working-tree
+digest `codex-security-snapshot/v1:sha256:3249b10f1d66196a4580945568e11a39f376880ec8e2be3c421560d6f554c345`.
+This subsequent evidence-only paragraph has no runtime or policy effect and requires no additional
+security scan. All changed paths are already in the exact 83-identity Bot delivery manifest.
+
 Second review correction: submission now returns only the authoritative enqueued `JobID` string,
 and output planning rejects multiple logical spreadsheet registrations sharing a physical ID before
 consuming frames. Seven regression cases cover both consumers, captured/materialized receipts,

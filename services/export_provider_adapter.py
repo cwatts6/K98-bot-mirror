@@ -222,10 +222,9 @@ class LegacyProviderJob:
             destinations=destinations,
         )
 
-        def execute(request):
-            if stop.is_set():
-                raise InterruptedError("Export admission stopped.")
-            return adapter.execute(request)
+        # Admission has already succeeded. Graceful shutdown must drain this
+        # delivery through readback/confirmation, with every durable guard intact.
+        execute = adapter.execute
 
         audiences = {}
         grids = {}

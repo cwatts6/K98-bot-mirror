@@ -190,6 +190,6 @@ as additional Phase 6 slices.
 
 ## S10B shared export shutdown boundary
 
-Graceful teardown first stops new export admission. The worker checks the stop signal before discovery and each provider request. Cancellation waits for its offloaded thread, including repeated cancellation; it never detaches the thread to make a replacement eligible. Request budget waits occur outside SQL transactions.
+Graceful teardown first stops new export admission. The worker checks the stop signal before discovery and each account admission. An already claimed delivery drains through request pacing, cooldown waits, full readback and confirmation; the admission stop event does not interrupt its requests or budget waits. Every request still checks durable ownership before and after reservation and records its completion. Cancellation waits for the offloaded thread, including repeated cancellation; it never detaches the thread to make a replacement eligible. Request budget waits occur outside SQL transactions.
 
 A durable attempt precedes provider mutation. Interrupted/ambiguous attempts retain their resources, owner/fence and complete part records, with quarantine and an uncertain outcome. Even a process exit cannot establish remote absence. Authoritative reconciliation belongs to the later recovery workflow; do not release resources from job state alone, clear attempts, restart a blind write or delete retained files. A proved pre-attempt failure can release via the owned CAS and requires an explicit audited safe-retry request.
