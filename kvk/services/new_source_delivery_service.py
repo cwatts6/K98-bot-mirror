@@ -253,7 +253,9 @@ def deliver_export(
             )
 
 
-def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, stop):
+def deliver_coordinated_export(
+    *, job, claim, dal, transport, connect, budget, stop, retirement_verifier=None
+):
     """S10B Sheets path: pinned vector, durable attempts, no SQL around requests.
 
     This requires an admitted claim and a privately composed transport. Production
@@ -351,6 +353,7 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
                 "export_key": delivery_key,
                 "content_key": generation.key,
                 "repair_id": job.get("RepairID"),
+                "retain": transport._retained.get(generation.key, True),
                 "tables": manifest,
             },
             parts,
@@ -361,7 +364,7 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
         guard,
         plan,
     )
-    # No automatic slot reuse until S10D/E supplies durable pool/disposition authority.
+    # Only audited private-empty slots may be assigned; never relabel old content.
     transport.reuse_guard = lambda *_: False
     manifest = generation.manifest()
     transport.ensure_private(destination, delivery_key, manifest)
@@ -408,6 +411,17 @@ def deliver_coordinated_export(*, job, claim, dal, transport, connect, budget, s
         audience=registration.audience,
         remote_id=remote,
     )
+    if getattr(dal, "output_operations", False) is True:
+        from kvk.services.source_output_pool_service import retire_superseded_generations
+
+        retire_superseded_generations(
+            pools=pool_dal,
+            coordinator=dal,
+            claim=claim,
+            current_attempt_id=attempt_id,
+            transport=transport,
+            verifier=retirement_verifier,
+        )
     dal.confirm(claim, attempt_id, receipt)
     return receipt
 

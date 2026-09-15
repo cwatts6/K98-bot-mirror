@@ -580,3 +580,47 @@ def test_complete_result_capture_counts_empty_sections():
         LegacySnapshotDAL.capture_result_sets(Cursor(), ("data",))
     with pytest.raises(SnapshotUnavailable):
         LegacySnapshotDAL.capture_result_sets(Cursor(), ("data", "empty", "missing"))
+
+
+@pytest.mark.parametrize("operation_state", ["closing", "ready"])
+def test_earlier_rollover_blocks_later_preflight(monkeypatch, operation_state):
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    from services import legacy_export_snapshot_dal as module
+
+    cursor = Mock()
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "_mutex", lambda *a: None)
+    answers = iter(
+        [
+            dict(
+                ActiveJobID=None,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+                BlockedReason=None,
+            ),
+            dict(AccountKey="acct", StorageOwner="storage", State="pending", EnqueueSequence=9),
+            dict(Ticket=8, State=operation_state),
+        ]
+    )
+    monkeypatch.setattr(module, "one", lambda c: next(answers))
+    dal = LegacySnapshotDAL(Mock(), output_operations=True)
+    assert (
+        dal.claim(
+            str(uuid4()),
+            account="acct",
+            storage_owner="storage",
+            stage="preflight",
+            resource_keys=("account:acct",),
+        )
+        is None
+    )
+    sql = cursor.execute.call_args.args[0]
+    assert "State IN ('closing','ready')" in sql
+    assert not any(c.args[0].startswith("UPDATE") for c in cursor.execute.call_args_list)

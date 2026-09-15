@@ -1132,7 +1132,7 @@ class GoogleSheetsTransport:
             self._get(id) for id in self.registration.slot_file_ids if id not in self.quarantined
         ]
         for f, role in [(index, "index"), *((f, "generation") for f in files)]:
-            if f.get("appProperties"):
+            if any(k.startswith("k98") for k in f.get("appProperties", {})):
                 self._bound(destination, key, f, role)
             else:
                 self._empty(f)
@@ -1160,7 +1160,9 @@ class GoogleSheetsTransport:
         ):
             raise SourceConflict("Incomplete established generation requires reconciliation.")
         if missing:
-            available = [f for f in files if not f.get("appProperties")]
+            available = [
+                f for f in files if not any(k.startswith("k98") for k in f.get("appProperties", {}))
+            ]
             for candidate in files:
                 if len(available) >= len(missing):
                     break

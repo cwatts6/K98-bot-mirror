@@ -273,6 +273,43 @@ def settle_reconciled_parts(cursor, claim, attempt_id, *, confirmed):
         )
 
 
+def reusable_attempts(snapshot, current_attempt_id):
+    """Only explicitly unretained, exact confirmed assignments are candidates.
+
+    This is eligibility, not release authority. Independent termination/reference
+    evidence and private clear/readback are still required under the new job owner.
+    Older manifests without an explicit retention decision stay protected.
+    """
+    confirmed = {j["JobID"] for j in snapshot["jobs"] if j["State"] == "confirmed"}
+    result = []
+    for attempt in snapshot["attempts"]:
+        if attempt["AttemptID"] == current_attempt_id or attempt["JobID"] not in confirmed:
+            continue
+        document = json.loads(attempt["ManifestJson"])
+        if attempt["Phase"] != "published" or document["generation"].get("retain") is not False:
+            continue
+        slots = [s for s in snapshot["slots"] if s["AttemptID"] == attempt["AttemptID"]]
+        parts = [p for p in snapshot["parts"] if p["AttemptID"] == attempt["AttemptID"]]
+        receipt = json.loads(attempt["ReceiptJson"]) if attempt.get("ReceiptJson") else {}
+        if (
+            len(parts) != attempt["PartCount"]
+            or len(slots) != len(parts) - 1
+            or receipt.get("attempt_id") != attempt["AttemptID"]
+            or receipt.get("files") != [p["FileID"] for p in parts]
+            or receipt.get("export_key") != document["generation"]["export_key"]
+            or receipt.get("fence") != attempt["Fence"]
+            or not slots
+        ):
+            continue
+        exact = {(p["FileID"], p["PartNo"]) for p in parts if p["Role"] == "generation"}
+        if {(s["FileID"], s["PartNo"]) for s in slots} != exact:
+            continue
+        if any(s["State"] != "active" or s["OwnerID"] is not None for s in slots):
+            continue
+        result.append(attempt["AttemptID"])
+    return result
+
+
 def assert_registration(cursor, *, account, kvk_no, epoch, destinations):
     cursor.execute(
         "SELECT p.* FROM KVK.SourceOutputPool p WHERE AccountKey=? AND ActiveKVK=? AND Epoch=?",
@@ -346,6 +383,222 @@ class SourceOutputPoolDAL:
     def snapshot(self, pool_id):
         with transaction(self.connect) as cursor:
             return self._snapshot(cursor, str(UUID(str(pool_id))))
+
+    @contextmanager
+    def _retirement_owned(self, coordinator, claim, current_attempt_id):
+        with coordinator._owned(claim) as (cursor, job):
+            attempt, parts = coordinator._attempt(cursor, claim, current_attempt_id)
+            if job["ConsumerKind"] != "new_source" or attempt["Phase"] != "publication_pending":
+                raise SourceConflict("Retirement requires the exact publishing job owner.")
+            index = [p["FileID"] for p in parts if p["Role"] == "index"]
+            if len(index) != 1:
+                raise SourceConflict("Exact current index required.")
+            cursor.execute(
+                "SELECT PoolID FROM KVK.SourceOutputPool WHERE IndexFileID=? AND AccountKey=? AND ActiveKVK=? AND Epoch=?",
+                index[0],
+                job["AccountKey"],
+                job["KVK_NO"],
+                job["PoolEpoch"],
+            )
+            pool = one(cursor)
+            if not pool:
+                raise SourceConflict("Retirement registration changed.")
+            _mutex(cursor, "pool:" + str(pool["PoolID"]).lower())
+            snapshot = self._snapshot(cursor, pool["PoolID"])
+            if (
+                snapshot["pool"]["PoolState"] not in {"active", "closing"}
+                or snapshot["pool"]["OwnerID"] is not None
+            ):
+                raise SourceConflict("Retirement pool ownership changed.")
+            files = {snapshot["pool"]["IndexFileID"], *(s["FileID"] for s in snapshot["slots"])}
+            owned_files = {
+                k.removeprefix("destination:")
+                for k, _ in claim.resources
+                if k.startswith("destination:")
+            }
+            if files != owned_files:
+                raise SourceConflict("Retirement requires exact registered resource membership.")
+            yield cursor, job, snapshot
+
+    def retirement_snapshot(self, coordinator, claim, current_attempt_id):
+        with self._retirement_owned(coordinator, claim, current_attempt_id) as (_, _, snapshot):
+            return snapshot
+
+    def retire_generation(
+        self, coordinator, claim, current_attempt_id, snapshot, old_attempt_id, proof
+    ):
+        """Journal intent before provider I/O. Interrupted retirement stays reserved."""
+        if (
+            not isinstance(proof, dict)
+            or proof.get("snapshot_hash") != digest(snapshot).hex()
+            or proof.get("current_attempt_id") != current_attempt_id
+            or proof.get("old_attempt_id") != old_attempt_id
+            or proof.get("writer_terminated") is not True
+            or proof.get("current_pointer_verified") is not True
+            or proof.get("no_live_references") is not True
+            or not proof.get("evidence_id")
+        ):
+            raise SourceConflict("Exact termination and reference evidence required.")
+        with self._retirement_owned(coordinator, claim, current_attempt_id) as (
+            cursor,
+            job,
+            actual,
+        ):
+            if actual != snapshot or old_attempt_id not in reusable_attempts(
+                actual, current_attempt_id
+            ):
+                raise SourceConflict("Retirement snapshot or protected assignment changed.")
+            pool = actual["pool"]
+            operation_id = str(uuid4())
+            retired = []
+            for slot in actual["slots"]:
+                if slot["AttemptID"] != old_attempt_id:
+                    continue
+                evidence = dict(
+                    proof=proof, previous_assignment=slot, current_attempt_id=current_attempt_id
+                )
+                event = self._retirement_event(
+                    cursor, pool, slot, claim, job, operation_id, "retire", evidence
+                )
+                version = _cas(
+                    cursor,
+                    "UPDATE KVK.SourceOutputSlot SET State='retired',Version=Version+1,LastDispositionID=?,LastAction='retire',LastDispositionVersion=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PoolID=? AND FileID=? AND Epoch=? AND State='active' AND OwnerID IS NULL AND Fence=? AND Version=? AND AssignmentID=? AND AttemptID=? AND PartNo=?",
+                    event,
+                    pool["PoolID"],
+                    slot["FileID"],
+                    pool["Epoch"],
+                    slot["Fence"],
+                    slot["Version"],
+                    slot["AssignmentID"],
+                    old_attempt_id,
+                    slot["PartNo"],
+                )["Version"]
+                retired.append(
+                    dict(
+                        file_id=slot["FileID"],
+                        version=version,
+                        event=event,
+                        evidence_hash=digest(evidence).hex(),
+                    )
+                )
+            return dict(
+                operation_id=operation_id,
+                pool_id=pool["PoolID"],
+                epoch=pool["Epoch"],
+                current_attempt_id=current_attempt_id,
+                slots=retired,
+            )
+
+    @staticmethod
+    def _retirement_event(cursor, pool, slot, claim, job, operation_id, action, evidence):
+        event = str(uuid4())
+        cursor.execute(
+            "SELECT ISNULL(MAX(SequenceNo),0)+1 AS SequenceNo FROM KVK.SourceOutputDisposition WHERE PoolID=?",
+            pool["PoolID"],
+        )
+        sequence = one(cursor)["SequenceNo"]
+        cursor.execute(
+            "INSERT KVK.SourceOutputDisposition (DispositionID,OperationID,PoolID,SequenceNo,FileID,FileKind,ResourceKey,SlotFileID,IndexFileID,AccountKey,SourceKey,KVK_NO,ChoiceID,NewKVK_NO,NewChoiceID,OldEpoch,NewEpoch,Action,OwnerID,Fence,FromPoolVersion,ToPoolVersion,FromSlotVersion,ToSlotVersion,Actor,Reason,OccurredUTC,EvidenceHash,EvidenceJson) VALUES (?,?,?,?,?,'slot',?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSUTCDATETIME(),?,?)",
+            event,
+            operation_id,
+            pool["PoolID"],
+            sequence,
+            slot["FileID"],
+            "destination:" + slot["FileID"],
+            slot["FileID"],
+            pool["AccountKey"],
+            pool["SourceKey"],
+            pool["ActiveKVK"],
+            pool["ChoiceID"],
+            pool["ActiveKVK"],
+            pool["ChoiceID"],
+            pool["Epoch"],
+            pool["Epoch"],
+            action,
+            claim.owner_id,
+            claim.fence,
+            pool["Version"],
+            pool["Version"] + 1,
+            slot["Version"],
+            slot["Version"] + 1,
+            job["Actor"],
+            "Superseded unretained generation: " + action,
+            digest(evidence),
+            bounded_json(evidence),
+        )
+        pool["Version"] = _cas(
+            cursor,
+            "UPDATE KVK.SourceOutputPool SET Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PoolID=? AND Version=? AND Epoch=? AND Fence=? AND OwnerID IS NULL AND PoolState IN ('active','closing')",
+            pool["PoolID"],
+            pool["Version"],
+            pool["Epoch"],
+            pool["Fence"],
+        )["Version"]
+        return event
+
+    def clear_retired_slot(self, coordinator, claim, retirement, member, evidence):
+        if (
+            evidence.get("file_id") != member["file_id"]
+            or evidence.get("private") is not True
+            or evidence.get("empty") is not True
+            or not evidence.get("manifest_hash")
+        ):
+            raise SourceConflict("Exact private empty readback required.")
+        with self._retirement_owned(coordinator, claim, retirement["current_attempt_id"]) as (
+            cursor,
+            job,
+            snapshot,
+        ):
+            pool = snapshot["pool"]
+            slot = next((s for s in snapshot["slots"] if s["FileID"] == member["file_id"]), None)
+            if (pool["PoolID"], pool["Epoch"]) != (
+                retirement["pool_id"],
+                retirement["epoch"],
+            ) or not slot:
+                raise SourceConflict("Retirement pool/epoch changed.")
+            if (slot["State"], slot["OwnerID"], slot["Version"], slot["LastDispositionID"]) != (
+                "retired",
+                None,
+                member["version"],
+                member["event"],
+            ):
+                raise SourceConflict("Retired assignment/version changed; no automatic recovery.")
+            cursor.execute(
+                "SELECT EvidenceHash,OwnerID,Fence FROM KVK.SourceOutputDisposition WHERE DispositionID=? AND OperationID=? AND PoolID=? AND FileID=? AND Action='retire'",
+                member["event"],
+                retirement["operation_id"],
+                pool["PoolID"],
+                slot["FileID"],
+            )
+            event = one(cursor)
+            if not event or (
+                bytes(event["EvidenceHash"]).hex(),
+                str(event["OwnerID"]).lower(),
+                event["Fence"],
+            ) != (member["evidence_hash"], claim.owner_id, claim.fence):
+                raise SourceConflict("Retirement owner/evidence changed.")
+            cleared = self._retirement_event(
+                cursor,
+                pool,
+                slot,
+                claim,
+                job,
+                retirement["operation_id"],
+                "clear",
+                dict(retirement=member, readback=evidence),
+            )
+            _cas(
+                cursor,
+                "UPDATE KVK.SourceOutputSlot SET State='free',Fence=?,Version=Version+1,AssignmentID=NULL,AssignmentAction=NULL,AttemptID=NULL,PartNo=NULL,AssignmentVersion=NULL,LastDispositionID=?,LastAction='clear',LastDispositionVersion=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PoolID=? AND FileID=? AND Epoch=? AND State='retired' AND OwnerID IS NULL AND Fence=? AND Version=? AND LastDispositionID=?",
+                claim.fence,
+                cleared,
+                pool["PoolID"],
+                slot["FileID"],
+                pool["Epoch"],
+                slot["Fence"],
+                member["version"],
+                member["event"],
+            )
 
     def choice(self, kvk_no):
         if type(kvk_no) is not int or not 0 < kvk_no < 2**31:

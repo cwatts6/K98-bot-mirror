@@ -812,3 +812,27 @@ def test_uncertain_retry_after_checkpoint_cannot_release_read_only_claim():
     dal.extend_cooldown.side_effect = SourceConflict("unconfirmed cooldown")
     with pytest.raises(BudgetCompletionUnknown, match="cooldown"):
         RequestBudget(dal, "acct").rejected(SimpleNamespace(resp=response))
+
+
+@pytest.mark.parametrize("consumer", ["all_kvk", "scan_data"])
+@pytest.mark.parametrize("operation_state", ["closing", "ready"])
+def test_earlier_rollover_blocks_later_job_admission(monkeypatch, consumer, operation_state):
+    cursor = Cursor(
+        singles=[
+            dict(
+                ActiveJobID=None,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+                BlockedReason=None,
+            ),
+            {"OperationID": "older"},
+        ],
+        batches=[[{"JobID": "later"}], [{"ResourceKey": "account:acct"}]],
+    )
+    dal = scripted(monkeypatch, cursor)
+    dal.preparations = dal.output_operations = True
+    monkeypatch.setattr(mod, "_job", lambda *a: dict(ConsumerKind=consumer, EnqueueSequence=9))
+    assert dal.claim_next("acct") is None
+    query, args = cursor.calls[-1]
+    assert "State IN ('closing','ready')" in query and args == ("acct", 9)
+    assert not any(q.startswith("UPDATE") for q, _ in cursor.calls)

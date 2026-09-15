@@ -58,7 +58,7 @@ def capacity_for_snapshot(manifest, context, *, extra_quarantined=()):
     protected = {
         s["FileID"]
         for s in context["slots"]
-        if s["State"] == "active" and s["AttemptID"] != current
+        if s["State"] == "retired" or (s["State"] == "active" and s["AttemptID"] != current)
     } - quarantined
     return capacity(
         manifest,
@@ -199,3 +199,33 @@ class SourceOutputPlanner:
             parts=needed.current_parts,
             required_files=needed.required_files,
         )
+
+
+def retire_superseded_generations(
+    *, pools, coordinator, claim, current_attempt_id, transport, verifier
+):
+    """Runs after exact new-pointer readback, before the owning job is released.
+
+    Final/unknown retention and uncertain assignments remain protected. Failures
+    propagate to owned delivery, retaining claims and any incomplete retirement.
+    """
+    from copy import deepcopy
+
+    from kvk.dal.source_output_pool_dal import reusable_attempts
+
+    while True:
+        snapshot = pools.retirement_snapshot(coordinator, claim, current_attempt_id)
+        candidates = reusable_attempts(snapshot, current_attempt_id)
+        if not candidates:
+            return
+        if not callable(verifier):
+            raise SourceConflict("Independent retirement termination/reference verifier required.")
+        old_attempt_id = candidates[0]
+        proof = verifier(deepcopy(snapshot), current_attempt_id, old_attempt_id)
+        retirement = pools.retire_generation(
+            coordinator, claim, current_attempt_id, snapshot, old_attempt_id, proof
+        )
+        for member in retirement["slots"]:
+            transport.rollover_private(member["file_id"])
+            empty = transport.rollover_clear(member["file_id"])
+            pools.clear_retired_slot(coordinator, claim, retirement, member, empty)

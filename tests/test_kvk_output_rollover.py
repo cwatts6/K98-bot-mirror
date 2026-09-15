@@ -335,3 +335,309 @@ def test_clear_readback_contamination_cannot_be_accepted(contamination):
     api.execute = contaminated
     with pytest.raises(SourceConflict, match="empty manifest"):
         transport.rollover_clear("fake-1")
+
+
+def retirement_snapshot_fixture(*, retain=False):
+    from kvk.dal.new_source_import_dal import canonical
+
+    document = dict(generation=dict(export_key="old-key", retain=retain), parts=[])
+    return dict(
+        pool=dict(
+            PoolID="pool",
+            Epoch=1,
+            Version=4,
+            Fence=0,
+            AccountKey="acct",
+            SourceKey="snapshot_report_v1",
+            ActiveKVK=16,
+            ChoiceID="choice",
+        ),
+        jobs=[dict(JobID="old-job", State="confirmed")],
+        attempts=[
+            dict(
+                AttemptID="old-attempt",
+                JobID="old-job",
+                Phase="published",
+                Fence=2,
+                PartCount=3,
+                ManifestJson=canonical(document),
+                ReceiptJson=canonical(
+                    dict(
+                        attempt_id="old-attempt",
+                        export_key="old-key",
+                        fence=2,
+                        files=["index", "a", "b"],
+                    )
+                ),
+            )
+        ],
+        parts=[
+            dict(
+                AttemptID="old-attempt",
+                FileID=file,
+                PartNo=i + 1,
+                Role="index" if i == 0 else "generation",
+            )
+            for i, file in enumerate(["index", "a", "b"])
+        ],
+        slots=[
+            dict(
+                FileID=file,
+                AttemptID="old-attempt",
+                PartNo=i + 2,
+                State="active",
+                OwnerID=None,
+                Fence=2,
+                Version=3,
+                AssignmentID="assignment",
+                Epoch=1,
+            )
+            for i, file in enumerate(["a", "b"])
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "final",
+        "unknown",
+        "current",
+        "uncertain",
+        "quarantined",
+        "owned",
+        "retired",
+        "receipt",
+        "mapping",
+    ],
+)
+def test_retirement_never_releases_protected_or_uncertain_assignments(case):
+    from kvk.dal.source_output_pool_dal import reusable_attempts
+
+    s = retirement_snapshot_fixture(
+        retain=True if case == "final" else None if case == "unknown" else False
+    )
+    if case == "uncertain":
+        s["jobs"][0]["State"] = "uncertain"
+    if case in {"quarantined", "retired"}:
+        s["slots"][0]["State"] = case
+    if case == "owned":
+        s["slots"][0]["OwnerID"] = "old-writer"
+    if case == "receipt":
+        s["attempts"][0]["ReceiptJson"] = "{}"
+    if case == "mapping":
+        s["slots"][0]["PartNo"] = 99
+    assert reusable_attempts(s, "old-attempt" if case == "current" else "new-attempt") == []
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        "snapshot_hash",
+        "writer_terminated",
+        "current_pointer_verified",
+        "no_live_references",
+        "evidence_id",
+        "current_attempt_id",
+        "old_attempt_id",
+    ],
+)
+def test_retirement_requires_independent_exact_proof_before_sql(missing):
+    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+
+    s = retirement_snapshot_fixture()
+    proof = dict(
+        snapshot_hash=digest(s).hex(),
+        writer_terminated=True,
+        current_pointer_verified=True,
+        no_live_references=True,
+        evidence_id="proof",
+        current_attempt_id="new",
+        old_attempt_id="old-attempt",
+    )
+    del proof[missing]
+    connect = Mock(side_effect=AssertionError("No SQL without proof"))
+    with pytest.raises(SourceConflict, match="evidence"):
+        SourceOutputPoolDAL(connect).retire_generation(
+            Mock(), Mock(), "new", s, "old-attempt", proof
+        )
+    connect.assert_not_called()
+
+
+def test_retirement_appends_intent_then_clear_with_exact_cas_and_retained_receipts(monkeypatch):
+    from copy import deepcopy
+
+    from kvk.dal import source_output_pool_dal as mod
+
+    s = retirement_snapshot_fixture()
+    claim = SimpleNamespace(owner_id=str(uuid4()), fence=5)
+    job = dict(Actor="operator")
+    proof = dict(
+        snapshot_hash=digest(s).hex(),
+        writer_terminated=True,
+        current_pointer_verified=True,
+        no_live_references=True,
+        evidence_id="independent",
+        current_attempt_id="new",
+        old_attempt_id="old-attempt",
+    )
+    repository = mod.SourceOutputPoolDAL(Mock())
+    cursor = Mock()
+    snapshot = deepcopy(s)
+
+    @contextmanager
+    def owned(*args):
+        yield cursor, job, snapshot
+
+    monkeypatch.setattr(repository, "_retirement_owned", owned)
+    writes = []
+
+    def cas(c, sql, *args):
+        assert sql.count("?") == len(args)
+        writes.append((sql, args))
+        return dict(Version=5)
+
+    monkeypatch.setattr(mod, "_cas", cas)
+    monkeypatch.setattr(mod, "one", lambda c: dict(SequenceNo=1))
+    token = repository.retire_generation(Mock(), claim, "new", s, "old-attempt", proof)
+    assert len(token["slots"]) == 2
+    assert sum("State='retired'" in sql for sql, _ in writes) == 2
+    assert not any("State='free'" in sql for sql, _ in writes)
+    assert all(
+        "AssignmentID=? AND AttemptID=? AND PartNo=?" in sql
+        for sql, _ in writes
+        if "SourceOutputSlot SET" in sql
+    )
+    member = token["slots"][0]
+    slot = snapshot["slots"][0]
+    slot.update(State="retired", Version=member["version"], LastDispositionID=member["event"])
+    monkeypatch.setattr(
+        mod,
+        "one",
+        lambda c: dict(
+            SequenceNo=3,
+            EvidenceHash=bytes.fromhex(member["evidence_hash"]),
+            OwnerID=claim.owner_id,
+            Fence=5,
+        ),
+    )
+    with pytest.raises(SourceConflict, match="readback"):
+        repository.clear_retired_slot(
+            Mock(),
+            claim,
+            token,
+            member,
+            dict(file_id="wrong", private=True, empty=True, manifest_hash="hash"),
+        )
+    repository.clear_retired_slot(
+        Mock(),
+        claim,
+        token,
+        member,
+        dict(file_id="a", private=True, empty=True, manifest_hash="hash"),
+    )
+    assert "State='free'" in writes[-1][0]
+    assert (
+        "Epoch=? AND State='retired' AND OwnerID IS NULL AND Fence=? AND Version=? AND LastDispositionID=?"
+        in writes[-1][0]
+    )
+    inserts = [c.args for c in cursor.execute.call_args_list if c.args[0].startswith("INSERT")]
+    assert len(inserts) == 3 and all(q.count("?") == len(a) for q, *a in inserts)
+    assert not any("UPDATE dbo.ExportAttempt" in sql or "DELETE" in sql for sql, _ in writes)
+    assert snapshot["attempts"] == s["attempts"]
+
+
+@pytest.mark.parametrize("failure", ["private", "clear", "commit"])
+def test_retirement_provider_or_commit_uncertainty_never_frees_slot(failure):
+    from kvk.services.source_output_pool_service import retire_superseded_generations
+
+    s = retirement_snapshot_fixture()
+    pools, transport = Mock(), Mock()
+    pools.retirement_snapshot.return_value = s
+    pools.retire_generation.return_value = dict(slots=[dict(file_id="a")])
+    if failure == "commit":
+        pools.clear_retired_slot.side_effect = SourceConflict("unknown commit")
+    else:
+        getattr(transport, "rollover_" + failure).side_effect = SourceConflict(
+            "unknown provider outcome"
+        )
+    with pytest.raises(SourceConflict):
+        retire_superseded_generations(
+            pools=pools,
+            coordinator=Mock(),
+            claim=Mock(),
+            current_attempt_id="new",
+            transport=transport,
+            verifier=Mock(),
+        )
+    assert pools.retire_generation.call_count == 1
+    assert pools.clear_retired_slot.call_count == (failure == "commit")
+
+
+def test_repeated_two_part_nonfinal_generations_do_not_exhaust_sixteen_slots(monkeypatch):
+    from copy import deepcopy
+
+    from kvk.services.source_output_pool_service import (
+        capacity_for_snapshot,
+        retire_superseded_generations,
+    )
+
+    monkeypatch.setattr(
+        "kvk.services.source_output_pool_service.GoogleSheetsTransport.partition_manifest",
+        lambda _: [[], []],
+    )
+    s = retirement_snapshot_fixture()
+    pools, transport = Mock(), Mock()
+    pools.retirement_snapshot.side_effect = lambda *a: deepcopy(s)
+    trace = []
+
+    def retire(*args):
+        assert args[4] == "old-attempt"
+        trace.append("retire")
+        for slot in s["slots"]:
+            slot["State"] = "retired"
+        return dict(slots=[dict(file_id=slot["FileID"]) for slot in s["slots"]])
+
+    pools.retire_generation.side_effect = retire
+    transport.rollover_private.side_effect = lambda file: trace.append("private " + file)
+    transport.rollover_clear.side_effect = lambda file: trace.append("clear " + file) or dict(
+        file_id=file, private=True, empty=True, manifest_hash="hash"
+    )
+
+    def cleared(c, claim, token, member, evidence):
+        trace.append("free " + member["file_id"])
+        next(slot for slot in s["slots"] if slot["FileID"] == member["file_id"]).update(
+            State="free", AttemptID=None
+        )
+
+    pools.clear_retired_slot.side_effect = cleared
+    for number in range(24):
+        s = retirement_snapshot_fixture()
+        s["slots"] += [dict(FileID=f"free-{i}", State="free", AttemptID=None) for i in range(14)]
+        assert capacity_for_snapshot({}, s).required_files <= 17
+        retire_superseded_generations(
+            pools=pools,
+            coordinator=Mock(),
+            claim=Mock(),
+            current_attempt_id="new",
+            transport=transport,
+            verifier=Mock(),
+        )
+        assert all(slot["State"] == "free" for slot in s["slots"])
+    assert trace[:4] == ["retire", "private a", "clear a", "free a"]
+
+
+def test_audited_clear_can_rebind_without_deleting_unrelated_app_properties():
+    from tests.test_kvk_source_delivery import google_delivery
+
+    args, _, api = google_delivery()
+    transport = args["transport"]
+    transport._request_guard = lambda _: None
+    api.files_data["fake-1"]["appProperties"] = {"k98Generation": "old", "unrelated": "keep"}
+    transport.rollover_clear("fake-1")
+    transport.prepare_generation(args["generation"])
+    transport.ensure_private(
+        args["destination"], args["generation"].key, args["generation"].manifest()
+    )
+    assert api.files_data["fake-1"]["appProperties"]["unrelated"] == "keep"
+    assert api.files_data["fake-1"]["appProperties"]["k98Generation"] == args["generation"].key

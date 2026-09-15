@@ -194,7 +194,7 @@ class LegacySnapshotDAL:
                 cursor.execute(
                     "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"
                     + (
-                        " UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready'"
+                        " UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready')"
                         if self.output_operations
                         else ""
                     )

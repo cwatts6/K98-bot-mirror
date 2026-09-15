@@ -195,3 +195,148 @@ def test_repair_cannot_be_inferred_from_uncertainty(service, actor):
     with pytest.raises(SourceConflict, match="confirmed damage"):
         service.preview_rebuild(actor, str(uuid4()), reason="repair")
     assert service._previews == {}
+
+
+# Interaction-level coverage complements the operator-service authority tests.
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action,method,args",
+    [
+        ("export", "export", (16, "index")),
+        ("export_status", "status", (16, "index")),
+        ("export_reconcile", "reconcile", ("job",)),
+        ("rollover_confirm", "confirm", ("review",)),
+    ],
+)
+async def test_export_view_dispatch_defers_then_calls_exact_action(
+    monkeypatch, actor, action, method, args
+):
+    from unittest.mock import AsyncMock
+
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views import kvk_source_export_view as view
+
+    inter, svc, trace = interaction(), Mock(), []
+
+    async def defer(*a, **kw):
+        assert kw == {"ephemeral": True}
+        trace.append("defer")
+        return True
+
+    getattr(svc, method).side_effect = lambda *a: trace.append("service") or {"state": "confirmed"}
+    monkeypatch.setattr(view, "safe_defer", defer)
+    monkeypatch.setattr(view, "send_receipt", AsyncMock())
+    await view.dispatch_export(
+        inter,
+        svc,
+        actor,
+        action,
+        kvk_no=16,
+        index_file_id="index",
+        job_id="job",
+        new_kvk=17,
+        review="review",
+    )
+    assert trace == ["defer", "service"]
+    getattr(svc, method).assert_called_once_with(actor, *args)
+    svc.authorize.assert_called_once_with(actor, action)
+    inter.response.send_modal.assert_not_awaited()
+    view.send_receipt.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["export_rebuild", "rollover_preview"])
+async def test_export_view_modal_routes_preview_without_confirming(monkeypatch, action):
+    from unittest.mock import AsyncMock
+
+    from tests.test_kvk_source_admin import ACCESS, ADMIN
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views import kvk_source_export_view as view
+
+    svc = Mock(access_factory=lambda: ACCESS)
+    preview = Mock(action="rollover_confirm", token="review")
+    svc.preview_rollover.return_value = svc.preview_rebuild.return_value = preview
+    inter = interaction(owner=ADMIN.user_id, guild=ADMIN.guild_id, channel=ADMIN.channel_id)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "send_receipt", AsyncMock())
+    await view.dispatch_export(
+        inter,
+        svc,
+        ADMIN,
+        action,
+        kvk_no=16,
+        index_file_id="index",
+        job_id="job",
+        new_kvk=17,
+        review=None,
+    )
+    view.safe_defer.assert_not_awaited()
+    modal = inter.response.send_modal.call_args.args[0]
+    assert len(modal.children) == 1 and modal.reason.max_length == 1024 and modal.reason.required
+    modal.reason.value = "reason"
+    await modal.callback(inter)
+    assert inter.guild.fetch_member.await_count == 1
+    if action == "rollover_preview":
+        svc.preview_rollover.assert_called_once_with(
+            ADMIN, 16, 17, reason="reason", index_file_id="index"
+        )
+        svc.preview_rebuild.assert_not_called()
+    else:
+        svc.preview_rebuild.assert_called_once_with(ADMIN, "job", reason="reason")
+        svc.preview_rollover.assert_not_called()
+    svc.confirm.assert_not_called()
+    assert isinstance(view.send_receipt.call_args.args[3], view.KvkSourceExportView)
+
+
+@pytest.mark.asyncio
+async def test_export_view_unknown_action_and_failed_defer(monkeypatch, actor):
+    from unittest.mock import AsyncMock
+
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views import kvk_source_export_view as view
+
+    svc, inter = Mock(), interaction()
+    kwargs = dict(kvk_no=16, index_file_id=None, job_id=None, new_kvk=None, review=None)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=False))
+    await view.dispatch_export(inter, svc, actor, "export", **kwargs)
+    svc.export.assert_not_called()
+    view.safe_defer.return_value = True
+    with pytest.raises(ValueError, match="Unknown grouped"):
+        await view.dispatch_export(inter, svc, actor, "bogus", **kwargs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case", ["success", "owner", "guild", "channel", "expiry", "revoked", "fetch_failure", "defer"]
+)
+async def test_export_confirm_callback_real_authority_and_expiry(monkeypatch, service, actor, case):
+    from unittest.mock import AsyncMock
+
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views import kvk_source_export_view as view
+
+    preview = service._preview(actor, "rollover_confirm", {})
+    service.rollover.confirm.return_value = {
+        k: "value"
+        for k in ("OperationID", "State", "Phase", "OldKVK", "NewKVK", "OldEpoch", "TargetEpoch")
+    }
+    inter = interaction(
+        owner=9 if case == "owner" else 1,
+        guild=9 if case == "guild" else 2,
+        channel=9 if case == "channel" else 3,
+    )
+    if case == "expiry":
+        service.now = lambda: 310
+    if case == "revoked":
+        service.access_factory = Mock(side_effect=PermissionError("disabled"))
+    if case == "fetch_failure":
+        inter.guild.fetch_member.side_effect = RuntimeError("unavailable")
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=case != "defer"))
+    monkeypatch.setattr(view, "send_receipt", AsyncMock())
+    failure = AsyncMock()
+    monkeypatch.setattr(view, "report_failure", failure)
+    control = view.KvkSourceExportView(service, preview)
+    await control.confirm_button.callback(inter)
+    assert service.rollover.confirm.call_count == (case == "success")
+    assert bool(control.confirm_button.disabled) == (case == "success")
+    assert failure.await_count == (case not in {"success", "defer"})

@@ -540,3 +540,72 @@ def test_recompute_dal_holds_admission_to_commit_and_rejects_new_source(monkeypa
         source == "legacy_full_data"
     )
     assert store.closed == {1}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("confirmed", [True, False])
+async def test_grouped_export_all_distinguishes_confirmed_noop_from_queue(monkeypatch, confirmed):
+    import types
+    from unittest.mock import AsyncMock, Mock
+
+    import bot_config
+    from commands import stats_cmds
+    import decoraters
+    from kvk.services import kvk_admin_service as service
+
+    monkeypatch.setattr(bot_config, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 40)
+    monkeypatch.setattr(decoraters, "ADMIN_USER_ID", 30)
+    monkeypatch.setattr(decoraters, "NOTIFY_CHANNEL_ID", 40)
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: types.SimpleNamespace(log=AsyncMock()))
+    monkeypatch.setattr(stats_cmds, "GUILD_ID", 10)
+    groups = []
+    bot = types.SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kw: lambda fn: fn, loop=None
+    )
+    stats_cmds.register_stats(bot)
+    command = next(
+        c for g in groups if g.name == "kvk_admin" for c in g.subcommands if c.name == "export_all"
+    )
+    user = types.SimpleNamespace(id=30, roles=[])
+    guild = types.SimpleNamespace(id=10, fetch_member=AsyncMock(return_value=user))
+    channel = types.SimpleNamespace(
+        id=40,
+        parent_id=None,
+        permissions_for=lambda _: types.SimpleNamespace(view_channel=True, send_messages=True),
+    )
+    followup = types.SimpleNamespace(send=AsyncMock())
+    response = types.SimpleNamespace(
+        is_done=lambda: False, defer=AsyncMock(), send_message=AsyncMock()
+    )
+    inter = types.SimpleNamespace(
+        user=user,
+        guild=guild,
+        channel=channel,
+        response=response,
+        followup=followup,
+        data={"options": []},
+    )
+    ctx = types.SimpleNamespace(
+        user=user,
+        guild=guild,
+        channel=channel,
+        interaction=inter,
+        followup=followup,
+        command=command,
+        bot=bot,
+    )
+    monkeypatch.setattr(stats_cmds, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(service, "resolve_kvk_no", lambda _: 16)
+    execute = Mock(
+        return_value=types.SimpleNamespace(
+            ok=confirmed, job_id="retained-job", kvk_no=16, sheet_name="index"
+        )
+    )
+    monkeypatch.setattr(service, "run_export_all", execute)
+    await command._invoke(ctx)
+    execute.assert_called_once()
+    message = followup.send.call_args.args[0]
+    assert ("already confirmed" in message) == confirmed
+    assert ("provider completion is pending" in message) == (not confirmed)
+    assert followup.send.call_args.kwargs["ephemeral"] is True

@@ -671,7 +671,7 @@ class ExportCoordinationDAL:
                         continue
                 if self.output_operations:
                     cursor.execute(
-                        "SELECT TOP (1) OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready' AND EnqueueSequence<?",
+                        "SELECT TOP (1) OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready') AND EnqueueSequence<?",
                         account,
                         job["EnqueueSequence"],
                     )

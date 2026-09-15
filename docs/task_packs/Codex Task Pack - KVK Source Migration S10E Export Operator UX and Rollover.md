@@ -401,3 +401,14 @@ Retain S6-OPS01/PERF01/CAP01 and uncertain publications e19c89ac-7977-5f28-ae4c-
 54a2480a-26fb-5bad-a3f5-9321525a731c, all retained databases/files and evidence. S8A six-script/
 VERIFYONLY, S8B 50-case/actual restore plus distinct offline history, and S8C seven local checks
 remain distinct. No new live Discord, deployment or activation evidence is claimed.
+
+
+## PR review corrections — 2026-09-15
+
+Bot PR #280 review adds callback-level tests, confirmed-no-op messaging and closing-ticket admission barriers for jobs and preparation preflight. SQL PR #88 independently strengthens the authored CAS fixture with correct-owner stale-version/fence negatives and a successful current-version control. No SQL execution is claimed.
+
+Ordinary superseded generations are eligible for audited in-season retirement only when their immutable attempt manifest explicitly records non-final retention (`retain=false`), their exact confirmed multipart receipt matches, and all assigned slots are active and unowned. Missing/older retention metadata, final representations, live references, uncertain/quarantined/retired slots remain protected. A trusted composed verifier must attest the exact snapshot, old-writer termination, current new pointer and absence of live references while the current job retains its full resource claim. There is no age/job-state release.
+
+After new-pointer readback and before job confirmation releases resources, append retirement intent under owner/fence/version CAS, privately clear/read back each exact slot, then append its clear disposition before freeing it at the same epoch. Preserve original attempt/part receipts, assignments and accepted inputs byte-for-byte. Failure retains owned delivery and incomplete retired slots for reconciliation; no blind cleanup resume. Completed clear removes only K98 provider labels, preserving unrelated application properties, and assignments use the cleared blank representation. Capacity continues to reserve final/referenced and incomplete retired representations.
+
+The delivery adapter now accepts an explicitly injected `retirement_verifier`; composition remains disabled until independent evidence producers and SQL/provider behavior are separately validated. Offline tests cover protected candidates, proof omissions, scoped CAS, provider/commit failures, repeated provisional two-part retirement, cleared-file rebinding and view callbacks. This does not authorize or prove installation, activation, provider execution, production promotion or bot-machine changes.
