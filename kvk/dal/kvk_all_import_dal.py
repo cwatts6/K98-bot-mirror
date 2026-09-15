@@ -17,6 +17,11 @@ import pyodbc
 from file_utils import fetch_one_dict
 from kvk.schemas.kvk_all_schema import FULL_DATA_NUMERIC_COLUMN_MAP, SCHEMA_VERSION
 from kvk.services.kvk_all_import_service import KvkAllPreparedImport
+from services.legacy_export_snapshot_service import (
+    admitted_writer,
+    record_writer_completion,
+    validate_writer_season,
+)
 from utils import ensure_aware_utc
 
 logger = logging.getLogger(__name__)
@@ -312,6 +317,7 @@ def _first_scalar(cursor: Any) -> Any:
     return next(iter(row.values()))
 
 
+@admitted_writer("all_kvk")
 def ingest_prepared_import(
     *,
     con: pyodbc.Connection,
@@ -356,6 +362,7 @@ def ingest_prepared_import(
     scan_ts_utc = ensure_aware_utc(scan_ts_utc)
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
     admitted_season = admit_legacy(cur, scan_ts_naive)
+    validate_writer_season(admitted_season)
     stage_rows_started = time.perf_counter()
     stage_rows = rows_for_stage(token, df)
     stage_rows_ms = (time.perf_counter() - stage_rows_started) * 1000.0
@@ -524,6 +531,13 @@ def ingest_prepared_import(
         except Exception:
             pass
         raise
+    record_writer_completion(
+        cursor=cur,
+        procedure="KVK ingest and recompute",
+        kvk_no=int(kvk_no),
+        scan_id=int(scan_id),
+        file_sha256=file_hash_hex,
+    )
     con.commit()
 
     cur = con.cursor()

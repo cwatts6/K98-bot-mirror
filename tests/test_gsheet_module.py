@@ -12,6 +12,22 @@ import pandas as pd
 import gsheet_module as gm
 
 
+def test_scan_entrypoint_enqueues_without_sql_or_provider(monkeypatch):
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime = Mock()
+    runtime.submit.return_value = "retained-job"
+    legacy = Mock(side_effect=AssertionError("uncoordinated path"))
+    monkeypatch.setattr(gm, "_render_run_all_exports", legacy)
+    with use_runtime(runtime):
+        ok, message = gm.run_all_exports(None, None, None, None)
+    assert ok is False and message.startswith("Queued export job retained-job")
+    runtime.submit.assert_called_once_with(consumer="scan_data", kvk_no=None)
+    legacy.assert_not_called()
+
+
 class _FakeCredentials:
     @staticmethod
     def from_service_account_file(*_args, **_kwargs):

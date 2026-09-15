@@ -37,6 +37,7 @@ class KvkExportAllResult:
     kvk_no: int
     sheet_name: str
     ok: bool
+    job_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -129,7 +130,18 @@ def run_export_all(
     event_loop: Any,
     runner: Callable[..., bool],
 ) -> KvkExportAllResult:
-    reject_uncoordinated_export(kvk_no)
+    from services.legacy_export_snapshot_service import _writer_runtime
+
+    runtime = _writer_runtime()
+    if runtime is None:
+        reject_uncoordinated_export(kvk_no)
+    choice = kvk_admin_dal.read_admin_source(kvk_no)
+    if choice["SourceKey"] != "legacy_full_data":
+        # S10E owns the grouped new-source operator export workflow.
+        reject_uncoordinated_export(kvk_no)
+    runtime.validate_destination(kvk_no=choice["KVK_NO"], sheet_name=sheet_name)
+    job_id = runtime.submit(consumer="all_kvk", kvk_no=choice["KVK_NO"])
+    return KvkExportAllResult(choice["KVK_NO"], sheet_name, False, job_id)
 
 
 def reject_uncoordinated_export(kvk_no):

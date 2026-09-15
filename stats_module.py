@@ -255,6 +255,12 @@ async def _offload_callable_py(fn, *args, name: str | None = None, meta: dict | 
     Offload a direct Python callable using run_step -> run_blocking_in_thread -> asyncio.to_thread.
     Returns the callable result (not metadata).
     """
+    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
+
+    if _writer_runtime() is not None:
+        # One invocation, propagated owner context, and a drained late thread.
+        # A helper exception is never grounds to rerun a committed procedure.
+        return await drain_thread(fn, *args)
     try:
         from file_utils import run_blocking_in_thread, run_step  # type: ignore
     except Exception:
@@ -299,6 +305,9 @@ async def run_sql_procedure(
     if isinstance(import_metadata, dict):
         _set_import_metadata_state(import_metadata, "sql_owned")
 
+    from services.legacy_export_snapshot_service import admitted_writer, record_writer_completion
+
+    @admitted_writer("scan_data")
     def _proc_and_get_expected_counter() -> int:
         with _conn_trusted() as conn:
             # UPDATE_ALL2 owns its Phase A/Phase B transactions and rejects any
@@ -399,6 +408,11 @@ async def run_sql_procedure(
 
             if fallback_control_id is not None and isinstance(import_metadata, dict):
                 import_metadata["_fallback_import_control_id"] = fallback_control_id
+            record_writer_completion(
+                procedure="dbo.UPDATE_ALL2",
+                completed_filename=completed_filename,
+                phases=result.get("phase_results") or [],
+            )
             if import_metadata:
                 _delete_import_metadata()
             return expected_counter

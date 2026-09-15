@@ -1,6 +1,7 @@
 # kvk_all_importer.py
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
 import time
@@ -22,6 +23,7 @@ from kvk.services.kvk_all_import_service import (
     KvkAllImportPreparationError,
     prepare_kvk_all_import,
 )
+from services.legacy_export_snapshot_service import admitted_writer
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,7 @@ def ingest_kvk_all_excel(
     database: str,
     username: str,
     password: str,
+    owner_token=None,
 ) -> dict[str, Any]:
     """
     Compatibility wrapper for the KVK_ALL Full Data import pipeline.
@@ -105,6 +108,37 @@ def ingest_kvk_all_excel(
             "schema": prepared.schema_metadata,
         }
 
+    result = _ingest_validated_workbook(
+        prepared=prepared,
+        content=content,
+        source_filename=source_filename,
+        uploader_id=uploader_id,
+        scan_ts_utc=scan_ts_utc,
+        server=server,
+        database=database,
+        username=username,
+        password=password,
+        owner_token=owner_token,
+    )
+    result.setdefault("prepare_ms", prepare_ms)
+    result.setdefault("duration_s", round(time.perf_counter() - started, 2))
+    return result
+
+
+@admitted_writer("all_kvk")
+def _ingest_validated_workbook(
+    *,
+    prepared,
+    content,
+    source_filename,
+    uploader_id,
+    scan_ts_utc,
+    server,
+    database,
+    username,
+    password,
+):
+    """Own the SQL lifetime only after pure workbook validation has succeeded."""
     con = kvk_all_import_dal.connect_sql_server(
         server=server,
         database=database,
@@ -126,14 +160,23 @@ def ingest_kvk_all_excel(
         except Exception:
             pass
 
-    result.setdefault("prepare_ms", prepare_ms)
-    result.setdefault("duration_s", round(time.perf_counter() - started, 2))
     return result
 
 
-async def _auto_export_kvk(kvk_no: int, notify_channel, bot_loop):
+async def _auto_export_kvk(kvk_no: int, notify_channel, bot_loop, *, preparation_id=None):
     try:
         from file_utils import run_blocking_in_thread
+        from services.legacy_export_snapshot_service import _writer_runtime
+
+        runtime = _writer_runtime()
+        if runtime is not None:
+            if preparation_id is None:
+                raise ValueError("Automatic export requires this import's exact capture identity.")
+            job_id = await asyncio.to_thread(
+                runtime.submit, consumer="all_kvk", kvk_no=kvk_no, preparation_id=preparation_id
+            )
+            logger.info("[KVK_EXPORT] queued durable job=%s kvk=%s", job_id, kvk_no)
+            return job_id
 
         ok = await run_blocking_in_thread(
             run_kvk_proc_exports_with_alerts,
@@ -149,7 +192,7 @@ async def _auto_export_kvk(kvk_no: int, notify_channel, bot_loop):
             name="run_kvk_proc_exports_with_alerts",
             meta={"kvk_no": kvk_no},
         )
-        if ok and notify_channel:
+        if ok is True and notify_channel:
             await notify_channel.send(
                 f"\U0001f4e4 Export complete: **KVK {kvk_no} \u2192 {KVK_SHEET_NAME}**"
             )

@@ -8,6 +8,32 @@ import pytest
 # Import the module under test
 import stats_module as sm
 
+
+@pytest.mark.asyncio
+async def test_coordinated_timeout_waits_for_actual_sql_thread():
+    from threading import Event
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    started, release = Event(), Event()
+
+    def producer():
+        started.set()
+        assert release.wait(5)
+
+    async def invoke():
+        with use_runtime(object()):
+            await asyncio.wait_for(sm._offload_callable_py(producer), timeout=0.03)
+
+    task = asyncio.create_task(invoke())
+    assert await asyncio.to_thread(started.wait, 5)
+    await asyncio.sleep(0.06)
+    assert not task.done()
+    release.set()
+    with pytest.raises(TimeoutError):
+        await task
+
+
 COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 
 

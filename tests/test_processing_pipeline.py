@@ -6,6 +6,30 @@ import pytest
 pytest_plugins = ("pytest_asyncio",)
 
 
+@pytest.mark.asyncio
+async def test_pipeline_keeps_queued_export_distinct_from_completion(monkeypatch):
+    import processing_pipeline as pp
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+
+    async def archive(*a, **k):
+        return True, "archive", {"excel": True, "archive": True, "sql": True}
+
+    monkeypatch.setattr(pp, "run_stats_copy_archive", archive)
+    monkeypatch.setattr(
+        pp,
+        "run_all_exports",
+        lambda *a, **k: (False, "Queued export job exact-job; provider completion is pending."),
+    )
+    sent = AsyncMock()
+    monkeypatch.setattr(pp, "send_status_embed", sent)
+    result = await pp.execute_processing_pipeline(
+        1, seed=1, user=AsyncMock(), filename="test.xlsx", channel_id=0, save_path=None
+    )
+    assert result[3] is False
+    assert any(call.args[1].get("Status") == "Queued" for call in sent.call_args_list)
+
+
 def _patch_lightweight_pipeline_boundaries(monkeypatch):
     async def fake_send_status_embed(*args, **kwargs):
         return True

@@ -1,5 +1,27 @@
 # Environment Reference
 
+## Current status — S10B merged and locally pulled; S10C scope next, 2026-09-14
+
+S10B mirror #278 and production #585 are merged; local pulls are complete.
+**No changes have been pulled to the bot machine.** Repository delivery is not deployment or activation.
+Bot main/origin main: `8ae66da6e12b53781c5df0d46a8ee79314cecead`; production/main:
+`40c2e48111ebbe44d58d71269dea63a6dd9388b7`. SQL #85 remains accepted at
+`3776dfa6b0892a8800d236fdf111c4d2f93c3813`; no S10B SQL delta.
+Final retained offline validation: **4,433 passed / 66 skipped**; review fixes are in both repositories.
+See [S10B closeout and exact S10C documentation manifest](kvk_source_migration/s10b_closeout_and_s10c_handoff.md) for exact delivery/content proof and evidence boundaries.
+
+Next: **S10C Legacy and Scan Export Adapters, initial review/scope only**: [task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md).
+Completed S10B pack/starter are archived; retained runbooks, databases, files and evidence stay available.
+Every pending Bot document and both S10B archive move sides must accompany the eventual S10C Bot implementation PR.
+Verify exact filename AND previous_filename or exact merged/absent-at-base proof; counts alone are insufficient.
+No standalone documentation PR or repository mixing. The two pending SQL documents stay in the next authorized SQL PR.
+
+Preserve S6-OPS01/PERF01/CAP01 and both uncertain publications. S8A six scripts, S8B 50-case/actual-restore
+and offline-runner evidence, and S8C seven local checks remain distinct. No new live Discord evidence is claimed.
+This closeout authorizes no S10C implementation, Git publication, SQL/provider/Discord execution, real imports/exports,
+bot-machine pull/restart/deployment, activation, predecessor rerun or automatic new task.
+Earlier dated statuses and approvals below are historical; settled acceptance and grouping stay settled.
+
 Purpose: document the environment variables and runtime configuration points used by the bot.
 
 Primary code sources:

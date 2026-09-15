@@ -663,7 +663,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             )
             return
 
-        if result.ok:
+        if result.job_id:
+            await ctx.followup.send(
+                f"⏳ Export queued for KVK `{result.kvk_no}`. Job `{result.job_id}`; provider completion is pending.",
+                ephemeral=True,
+            )
+        elif result.ok:
             await ctx.followup.send(
                 f"✅ Exported KVK `{result.kvk_no}` to **{result.sheet_name}**.", ephemeral=True
             )

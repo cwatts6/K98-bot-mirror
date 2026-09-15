@@ -1,5 +1,27 @@
 # S7 exact implementation manifests and delivery
 
+## Current status — S10B merged and locally pulled; S10C scope next, 2026-09-14
+
+S10B mirror #278 and production #585 are merged; local pulls are complete.
+**No changes have been pulled to the bot machine.** Repository delivery is not deployment or activation.
+Bot main/origin main: `8ae66da6e12b53781c5df0d46a8ee79314cecead`; production/main:
+`40c2e48111ebbe44d58d71269dea63a6dd9388b7`. SQL #85 remains accepted at
+`3776dfa6b0892a8800d236fdf111c4d2f93c3813`; no S10B SQL delta.
+Final retained offline validation: **4,433 passed / 66 skipped**; review fixes are in both repositories.
+See [S10B closeout and exact S10C documentation manifest](s10b_closeout_and_s10c_handoff.md) for exact delivery/content proof and evidence boundaries.
+
+Next: **S10C Legacy and Scan Export Adapters, initial review/scope only**: [task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10C%20Legacy%20and%20Scan%20Export%20Adapters.md).
+Completed S10B pack/starter are archived; retained runbooks, databases, files and evidence stay available.
+Every pending Bot document and both S10B archive move sides must accompany the eventual S10C Bot implementation PR.
+Verify exact filename AND previous_filename or exact merged/absent-at-base proof; counts alone are insufficient.
+No standalone documentation PR or repository mixing. The two pending SQL documents stay in the next authorized SQL PR.
+
+Preserve S6-OPS01/PERF01/CAP01 and both uncertain publications. S8A six scripts, S8B 50-case/actual-restore
+and offline-runner evidence, and S8C seven local checks remain distinct. No new live Discord evidence is claimed.
+This closeout authorizes no S10C implementation, Git publication, SQL/provider/Discord execution, real imports/exports,
+bot-machine pull/restart/deployment, activation, predecessor rerun or automatic new task.
+Earlier dated statuses and approvals below are historical; settled acceptance and grouping stay settled.
+
 ## S9B implementation authorization — 2026-09-14
 
 The operator approved the initial review and implementation plan with the two exact path
@@ -13,7 +35,7 @@ live operations or activation. The original scope-only starter below is historic
 SQL's two pending documentation paths remain a separate SQL PR in the same delivery cycle.
 
 
-## Current status — S10A accepted and merged; S10B scope next, 2026-09-14
+## Historical S10A closeout status — 2026-09-14
 
 S10A SQL #85 is merged and locally pulled at `3776dfa6b0892a8800d236fdf111c4d2f93c3813`.
 All five disposable fixture modes, 76 unique cases in install and constraints, direct apply/rerun,
@@ -22,7 +44,7 @@ No changes have been pulled to the bot machine; no production SQL deployment or 
 S9B mirror #277, production #584 and SQL #84 remain delivered. Bot comparison anchors are unchanged.
 
 Next: **S10B Shared Export Coordination Worker and Durable Budget, initial review/scope only**.
-Use the [S10B task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md).
+Use the [S10B task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md) and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md).
 The [S10A closeout and exact carry-forward manifest](s10a_implementation_and_s10b_handoff.md) controls delivery.
 Completed S10A and S9B packs/starters are archived; retained execution/operator evidence stays available.
 Every pending Bot document and archive destination belongs in the eventual S10B implementation PR.
@@ -671,3 +693,8 @@ authoring; no SQL file is created by this checkpoint. The S10A SQL PR must inclu
 The Bot documentation set in the current closeout is mandatory for S10B's next Bot implementation
 PR; S10A scope/closeout must preserve and hand it onward. No standalone docs PR, mixed-repository
 PR or renewed grouping approval. Exact filename/previous_filename coverage remains mandatory.
+
+
+## S10B delivered / S10C initial scope checkpoint — 2026-09-14
+
+S10B is merged in mirror #278 and production #585 and locally pulled, including the final memory correction. No bot-machine pull occurred. The [S10B closeout](s10b_closeout_and_s10c_handoff.md) is the current evidence and exact pending documentation authority. The 26-path S7 S10C table above remains the initial implementation boundary; union it with every pending Bot document in the closeout, including both S10B archive source/destination pairs and the S10C pack/starter. Reconcile any necessary source/test additions at scope time. No standalone docs PR or repository mixing; require filename/previous_filename or exact merged/absent-at-base proof. Separate SQL delivery-log and migration-README updates accompany the next authorized SQL PR. This checkpoint does not authorize implementation, execution or publication.

@@ -9,6 +9,34 @@ from kvk.dal import kvk_admin_dal
 from kvk.services import kvk_admin_service
 
 
+def test_legacy_manual_export_is_queued_without_calling_old_runner(monkeypatch):
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime, runner = Mock(), Mock(side_effect=AssertionError("old exporter"))
+    runtime.submit.return_value = "exact-job"
+    monkeypatch.setattr(
+        kvk_admin_dal, "read_admin_source", lambda _: {"KVK_NO": 7, "SourceKey": "legacy_full_data"}
+    )
+    with use_runtime(runtime):
+        result = kvk_admin_service.run_export_all(
+            kvk_no=7,
+            sheet_name="KVK LIST",
+            server="",
+            database="",
+            username="",
+            password="",
+            credentials_file="",
+            alert_channel=None,
+            event_loop=None,
+            runner=runner,
+        )
+    assert result.job_id == "exact-job" and result.ok is False
+    runtime.validate_destination.assert_called_once_with(kvk_no=7, sheet_name="KVK LIST")
+    runner.assert_not_called()
+
+
 def test_normalize_sheet_name_uses_default_for_blank_values() -> None:
     assert kvk_admin_service.normalize_sheet_name("", "Default") == "Default"
     assert kvk_admin_service.normalize_sheet_name("  Custom  ", "Default") == "Custom"

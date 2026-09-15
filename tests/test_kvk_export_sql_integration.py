@@ -16,6 +16,68 @@ from services.export_coordination_dal import ExportCoordinationDAL, JobSpec
 
 
 @pytest.fixture
+def s10c_preparation_dal():
+    """Distinct, unexecuted S10C gate; S10B approval cannot enable these tests."""
+    if os.environ.get("K98_S10C_SQL_AUTHORIZED") != "S10C_EXACT_DISPOSABLE_OPERATIONS_APPROVED":
+        pytest.skip("S10C SQL execution not authorized; authored coverage only")
+    database = os.environ.get("K98_S10C_SQL_DATABASE", "")
+    if not re.fullmatch(r"K98_S10C_Disposable_[0-9]{8}_validation", database):
+        pytest.fail("A distinct S10C disposable target is required")
+    import pyodbc
+
+    from services.legacy_export_snapshot_dal import LegacySnapshotDAL
+
+    def connect():
+        con = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};SERVER=lpc:localhost\\K98DEV;"
+            + f"DATABASE={database};Trusted_Connection=yes;",
+            autocommit=False,
+            timeout=5,
+        )
+        try:
+            cur = con.cursor()
+            cur.execute("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(128)),DB_NAME()")
+            if tuple(cur.fetchone()) != ("9SX2VF4\\K98DEV", database):
+                raise ValueError("S10C exact server/database mismatch")
+            con.commit()
+            return con
+        except BaseException:
+            con.close()
+            raise
+
+    return LegacySnapshotDAL(connect)
+
+
+def test_s10c_sql_preparation_claim_survives_fresh_dal_and_blocks_job(s10c_preparation_dal):
+    dal = s10c_preparation_dal
+    account = "s10c-" + uuid4().hex
+    identifier = dal.request(
+        account=account,
+        consumer="scan_data",
+        kvk_no=None,
+        request={"fixture": str(uuid4())},
+        storage_owner="synthetic:S10C",
+        actor="fixture",
+        reason="separately approved S10C fixture",
+    )
+    claim = dal.claim(
+        identifier,
+        account=account,
+        storage_owner="synthetic:S10C",
+        stage="preflight",
+        resource_keys=("account:" + account,),
+    )
+    assert claim is not None
+    coordinator = ExportCoordinationDAL(dal.connect, preparations=True)
+    coordinator.enqueue(daily(account, "s10c-" + uuid4().hex))
+    assert coordinator.claim_next(account, storage_owner="synthetic:S10B") is None
+    from services.legacy_export_snapshot_dal import LegacySnapshotDAL
+
+    assert LegacySnapshotDAL(dal.connect).authorize(claim)["State"] == "preflight"
+    # Retain synthetic evidence and claims; no lease-based fixture cleanup.
+
+
+@pytest.fixture
 def sql_dal():
     database = os.environ.get("K98_S10B_SQL_DATABASE", "")
     if os.environ.get("K98_S10B_SQL_AUTHORIZED") != "S10B_EXACT_DISPOSABLE_OPERATIONS_APPROVED":

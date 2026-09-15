@@ -8,6 +8,31 @@ import pytest
 # Import the module under test
 import stats_module as sm
 
+
+@pytest.mark.asyncio
+async def test_repeated_cancellation_cannot_abandon_admitted_thread():
+    from threading import Event
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    started, release = Event(), Event()
+
+    def producer():
+        started.set()
+        assert release.wait(5)
+
+    with use_runtime(object()):
+        task = asyncio.create_task(sm._offload_callable_py(producer))
+        assert await asyncio.to_thread(started.wait, 5)
+        for _ in range(2):
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
 COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 
 

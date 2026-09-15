@@ -6,6 +6,20 @@ pytest_plugins = ("pytest_asyncio",)
 
 
 @pytest.mark.asyncio
+async def test_producer_capture_collection_isolated_between_concurrent_runs():
+    from services.legacy_export_snapshot_service import _captures, collect_producer_captures
+
+    @collect_producer_captures
+    async def producer(identity):
+        _captures.get().append(identity)
+        await asyncio.sleep(0)
+        return list(_captures.get())
+
+    assert await asyncio.gather(producer("A"), producer("B")) == [["A"], ["B"]]
+    assert _captures.get() is None
+
+
+@pytest.mark.asyncio
 async def test_run_step_with_sync_and_async(monkeypatch):
     """
     Validate run_step handles both sync and async functions consistently.

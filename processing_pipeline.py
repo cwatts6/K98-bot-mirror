@@ -6,6 +6,8 @@ import os
 import time
 import traceback
 
+from services.legacy_export_snapshot_service import collect_producer_captures
+
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
 
@@ -160,6 +162,7 @@ async def run_step(
     return result
 
 
+@collect_producer_captures
 async def execute_processing_pipeline(
     rank: int, *, seed: int, user, filename: str, channel_id: int, save_path: str | None = None
 ) -> tuple[bool, bool, bool, bool, bool | None, str]:
@@ -589,14 +592,23 @@ async def execute_processing_pipeline(
                 )
             else:
                 try:
-                    ok, out = await run_maintenance_with_isolation(
-                        "proc_import",
-                        args=[],
-                        timeout=PROC_IMPORT_TIMEOUT,
-                        name="proc_import",
-                        meta=step_meta,
-                        prefer_process=(MAINT_WORKER_MODE == "process"),
-                    )
+                    from services.legacy_export_snapshot_service import _writer_runtime
+
+                    if _writer_runtime() is not None:
+                        from proc_config_import import run_proc_config_import_offload
+
+                        ok, out = await run_proc_config_import_offload(
+                            prefer_process=False, meta=step_meta
+                        )
+                    else:
+                        ok, out = await run_maintenance_with_isolation(
+                            "proc_import",
+                            args=[],
+                            timeout=PROC_IMPORT_TIMEOUT,
+                            name="proc_import",
+                            meta=step_meta,
+                            prefer_process=(MAINT_WORKER_MODE == "process"),
+                        )
                     success_proc_import = bool(ok)
                     if not ok:
                         out_text = _safe_trim(out, 4000)
@@ -843,7 +855,14 @@ async def execute_processing_pipeline(
 
     await send_status_embed(
         "📊 Google Sheets Export",
-        {"Status": "Success" if success_export else "Failure", "Log": out_export},
+        {
+            "Status": (
+                "Queued"
+                if str(out_export).startswith("Queued export job ")
+                else ("Success" if success_export else "Failure")
+            ),
+            "Log": out_export,
+        },
         bool(success_export),
         user,
         notify_channel,

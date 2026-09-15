@@ -600,8 +600,13 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     "Please check the bot logs and the notify channel."
                 )
 
-        title = "📊 Sheets Export Complete" if success else "❌ Sheets Export Failed"
-        color = 0x2ECC71 if success else 0xE74C3C
+        queued = raw_text.startswith("Queued export job ")
+        title = (
+            "⏳ Sheets Export Queued"
+            if queued
+            else ("📊 Sheets Export Complete" if success else "❌ Sheets Export Failed")
+        )
+        color = 0xF1C40F if queued else (0x2ECC71 if success else 0xE74C3C)
 
         embed = discord.Embed(title=title, description=desc, color=color)
         embed.add_field(name="Triggered by", value=f"<@{ctx.user.id}>", inline=True)

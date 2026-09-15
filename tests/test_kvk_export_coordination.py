@@ -578,9 +578,9 @@ def test_uncertain_budget_completion_retains_claims_without_mutation(monkeypatch
     dal.accounts.return_value = ["acct"]
     claim = SimpleNamespace(job_id="job")
     dal.claim_next.return_value = claim
-    dal.authorize.return_value = dict(ConsumerKind="scan_data", SpoolKey=None)
+    dal.authorize.return_value = dict(ConsumerKind="new_source", SpoolKey=None)
     adapter = Mock(side_effect=BudgetCompletionUnknown())
-    ExportCoordinator(dal, adapters={"scan_data": adapter}).run_batch(Event())
+    ExportCoordinator(dal, adapters={"new_source": adapter}).run_batch(Event())
     dal.fail.assert_called_once_with(claim, retain_claims=True)
 
 

@@ -105,6 +105,29 @@ def _success_result(**overrides):
     return result
 
 
+@pytest.mark.asyncio
+async def test_automatic_export_passes_exact_producer_capture():
+    captured = []
+
+    def schedule(kvk_no, channel, loop, *, preparation_id):
+        captured.append((kvk_no, preparation_id))
+
+        async def noop():
+            return None
+
+        return noop()
+
+    deps, *_ = _deps(
+        auto_export_enabled=True,
+        offload_result=_success_result(export_preparation_id="capture-A"),
+        auto_export_scheduler=schedule,
+    )
+    assert await route.handle_kvk_all_upload(
+        _message(attachments=[_FakeAttachment("kvk.xlsx", b"payload")]), deps
+    )
+    assert captured == [(13, "capture-A")]
+
+
 def _deps(**overrides):
     sent_embeds = []
     offloads = []

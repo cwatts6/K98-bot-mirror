@@ -172,8 +172,9 @@ def validate_parts(parts, destinations):
 
 
 class ExportCoordinationDAL:
-    def __init__(self, connect):
+    def __init__(self, connect, *, preparations=False):
         self.connect = connect
+        self.preparations = preparations
 
     @contextmanager
     def _account(self, account):
@@ -214,10 +215,42 @@ class ExportCoordinationDAL:
             )
             return rows(cursor)
 
-    def enqueue(self, spec):
+    def enqueue(self, spec, *, preparation_id=None):
         if not isinstance(spec, JobSpec):
             raise ValueError("Validated immutable job specification required.")
         with self._account(spec.account) as cursor:
+            preparation = None
+            if preparation_id is not None:
+                if not self.preparations or spec.consumer == "new_source":
+                    raise SourceConflict("Preparation admission is unavailable.")
+                cursor.execute(
+                    "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+                    preparation_id,
+                )
+                preparation = one(cursor)
+                if (
+                    not preparation
+                    or preparation["State"] not in {"captured", "materialized"}
+                    or (
+                        preparation["AccountKey"],
+                        preparation["ConsumerKind"],
+                        preparation["KVK_NO"],
+                        preparation["SpoolKey"],
+                        preparation["SpoolBytes"],
+                        preparation["StorageOwner"],
+                        bytes(preparation["SpoolHash"]),
+                    )
+                    != (
+                        spec.account,
+                        spec.consumer,
+                        spec.kvk_no,
+                        spec.spool_key,
+                        spec.spool_bytes,
+                        spec.storage_owner,
+                        spec.input_hash,
+                    )
+                ):
+                    raise SourceConflict("Preparation differs from immutable job inputs.")
             if spec.intent_id is not None:
                 _mutex(cursor, "intent:" + spec.intent_id)
             # Replay uniqueness includes exact NULL season/epoch/repair tuples.
@@ -241,6 +274,11 @@ class ExportCoordinationDAL:
             previous = one(cursor)
             if previous:
                 row = _job(cursor, previous["JobID"])
+                if preparation is not None and (
+                    preparation["State"] != "materialized"
+                    or identity(preparation["JobID"]) != identity(row["JobID"])
+                ):
+                    raise SourceConflict("Replay belongs to another preparation receipt.")
                 if (row["IntentID"], row["SpoolKey"], row["SpoolBytes"], row["StorageOwner"]) != (
                     spec.intent_id,
                     spec.spool_key,
@@ -292,11 +330,20 @@ class ExportCoordinationDAL:
                         for r in rows(cursor)
                     ):
                         raise SourceConflict("New-source pool overlaps legacy/daily output.")
-            cursor.execute(
-                "SELECT ISNULL(MAX(EnqueueSequence),0)+1 AS Ticket FROM dbo.ExportJob WHERE AccountKey=?",
-                spec.account,
-            )
+            if self.preparations:
+                cursor.execute(
+                    "SELECT ISNULL(MAX(Ticket),0)+1 AS Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=?) q",
+                    spec.account,
+                    spec.account,
+                )
+            else:
+                cursor.execute(
+                    "SELECT ISNULL(MAX(EnqueueSequence),0)+1 AS Ticket FROM dbo.ExportJob WHERE AccountKey=?",
+                    spec.account,
+                )
             ticket = one(cursor)["Ticket"]
+            if preparation is not None:
+                ticket = preparation["EnqueueSequence"]
             cursor.execute(
                 "SELECT * FROM dbo.ExportJob WITH (UPDLOCK,HOLDLOCK) WHERE AccountKey=? "
                 "AND ConsumerKind='new_source' AND State IN ('waiting','ready') "
@@ -344,6 +391,14 @@ class ExportCoordinationDAL:
             for key in spec.resource_keys:
                 cursor.execute(
                     "INSERT dbo.ExportJobResource (JobID,ResourceKey) VALUES (?,?)", job_id, key
+                )
+            if preparation is not None:
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportPreparation SET State='materialized',JobID=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND Version=? AND State='captured' AND JobID IS NULL",
+                    job_id,
+                    preparation_id,
+                    preparation["Version"],
                 )
             for old in pending:
                 _mutex(cursor, "intent:" + old["IntentID"])
@@ -431,10 +486,22 @@ class ExportCoordinationDAL:
                     )
                     resources.append(one(cursor))
                 if any(
-                    not r or r["ActiveJobID"] is not None or r["BlockedReason"] for r in resources
+                    not r
+                    or r["ActiveJobID"] is not None
+                    or r.get("ActivePreparationID") is not None
+                    or r["BlockedReason"]
+                    for r in resources
                 ):
                     continue
                 job = _job(cursor, candidate["JobID"])
+                if self.preparations:
+                    cursor.execute(
+                        "SELECT TOP (1) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending' AND EnqueueSequence<?",
+                        account,
+                        job["EnqueueSequence"],
+                    )
+                    if one(cursor):
+                        continue
                 retry = (
                     job["State"] == "failed"
                     and json.loads(job["ProvenanceJson"]).get("safe_retry", {}).get("requested")
@@ -487,7 +554,8 @@ class ExportCoordinationDAL:
                     result = _cas(
                         cursor,
                         "UPDATE dbo.ExportResource SET ActiveJobID=?,OwnerID=?,Fence=?,Version=Version+1 "
-                        "OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND BlockedReason IS NULL",
+                        "OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND BlockedReason IS NULL"
+                        + (" AND ActivePreparationID IS NULL" if self.preparations else ""),
                         job["JobID"],
                         owner,
                         fence,
@@ -708,8 +776,12 @@ class ExportCoordinationDAL:
             raise SourceConflict("Attempt part cardinality or immutable manifest differs.")
         return attempt, parts
 
-    def verified(self, claim, attempt_id):
-        with self._owned(claim) as (cursor, _):
+    def verified(self, claim, attempt_id, *, audience="private"):
+        if audience not in {"private", "public_viewer"}:
+            raise ValueError("Verified audience required.")
+        with self._owned(claim) as (cursor, job):
+            if job["ConsumerKind"] == "new_source" and audience != "private":
+                raise SourceConflict("New-source staging must remain private.")
             attempt, parts = self._attempt(cursor, claim, attempt_id)
             if attempt["Phase"] != "private_started":
                 raise SourceConflict("Only private work may become verified.")
@@ -719,7 +791,9 @@ class ExportCoordinationDAL:
                 if p["Role"] != "index":
                     _cas(
                         cursor,
-                        "UPDATE dbo.ExportAttemptPart SET VerificationState='verified',VerifiedUTC=SYSUTCDATETIME(),AclState='private',AclCheckedUTC=SYSUTCDATETIME(),Version=Version+1 "
+                        "UPDATE dbo.ExportAttemptPart SET VerificationState='verified',VerifiedUTC=SYSUTCDATETIME(),AclState='"
+                        + audience
+                        + "',AclCheckedUTC=SYSUTCDATETIME(),Version=Version+1 "
                         "OUTPUT inserted.Version WHERE AttemptID=? AND PartNo=? AND Version=? AND QuarantineState='none'",
                         attempt_id,
                         p["PartNo"],

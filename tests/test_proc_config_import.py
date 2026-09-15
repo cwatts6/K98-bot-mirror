@@ -10,6 +10,31 @@ import gsheet_module as gm
 import proc_config_import as pci
 
 
+@pytest.mark.asyncio
+async def test_coordinated_config_offload_preserves_runtime_without_process(monkeypatch):
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import require_runtime, use_runtime
+
+    runtime = object()
+    calls = []
+
+    def run(dry_run, **kwargs):
+        calls.append(require_runtime())
+        return True, {"success": True}
+
+    process = Mock(side_effect=AssertionError("process loses runtime"))
+    monkeypatch.setattr(pci, "run_proc_config_import", run)
+    monkeypatch.setattr(pci, "run_maintenance_with_isolation", process, raising=False)
+    with use_runtime(runtime):
+        assert await pci.run_proc_config_import_offload(prefer_process=True) == (
+            True,
+            {"success": True},
+        )
+    assert calls == [runtime]
+    process.assert_not_called()
+
+
 def _make_df(cols, rows=0):
     # rows of None to provide header-only DataFrame if rows==0
     if rows == 0:

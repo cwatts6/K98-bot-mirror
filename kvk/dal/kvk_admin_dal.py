@@ -7,6 +7,11 @@ from typing import Any
 
 from file_utils import cursor_row_to_dict, fetch_one_dict, get_conn_with_retries
 from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor
+from services.legacy_export_snapshot_service import (
+    admitted_writer,
+    record_writer_completion,
+    validate_writer_season,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +219,7 @@ def resolve_kvk_no(kvk_no: int | None = None) -> int:
             return resolve_current_kvk_no_from_cursor(cursor, kvk_no)
 
 
+@admitted_writer("all_kvk")
 def recompute_windows(kvk_no: int | None = None) -> int:
     """Keep fixed legacy admission locked through EXEC and its single commit."""
     from kvk.dal.new_source_import_dal import lock_scope, transaction
@@ -223,8 +229,10 @@ def recompute_windows(kvk_no: int | None = None) -> int:
         resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
         lock_scope(cursor, resolved_kvk)
         require_source(cursor, resolved_kvk, "legacy_full_data")
+        validate_writer_season(resolved_kvk)
         logger.info("[KVK ADMIN] recomputing windows kvk_no=%s", resolved_kvk)
         cursor.execute(RECOMPUTE_SQL, (resolved_kvk,))
+        record_writer_completion(cursor=cursor, procedure="KVK recompute", kvk_no=resolved_kvk)
     return resolved_kvk
 
 

@@ -4,6 +4,14 @@ import pytest
 from gsheet_module import _coerce_date_uk, _coerce_float, _coerce_int, _normalize_headers
 
 
+def test_direct_table_reader_cannot_bypass_coordinated_capture(monkeypatch):
+    import gsheet_module as gm
+    from services.legacy_export_snapshot_service import SnapshotUnavailable, use_runtime
+
+    with use_runtime(object()), pytest.raises(SnapshotUnavailable, match="immutable"):
+        gm.transfer_and_sort(None, None, None, "SELECT unsafe", "title", "tab")
+
+
 def test_normalize_headers_basic():
     df = pd.DataFrame(columns=[" KV K_No ", "Name", "Other"])
     rename_map = {"KVK_NO": ["KVK_NO", "KV K_No", "kvk_no"], "KVK_NAME": ["Name", "KVK_Name"]}

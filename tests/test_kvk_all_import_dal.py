@@ -16,6 +16,27 @@ from kvk.schemas.kvk_all_schema import (
 from kvk.services.kvk_all_import_service import KvkAllPreparedImport
 
 
+def test_capture_season_conflict_prevents_staging(monkeypatch):
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    connection = MockConnection()
+    monkeypatch.setattr(dal, "admit_legacy", lambda *a, **k: 13)
+    monkeypatch.setattr(
+        dal, "validate_writer_season", Mock(side_effect=SnapshotUnavailable("wrong capture season"))
+    )
+    with pytest.raises(SnapshotUnavailable):
+        dal.ingest_prepared_import(
+            con=connection,
+            prepared=_prepared_frame(),
+            content=b"abc",
+            source_filename="test.xlsx",
+            uploader_id=1,
+            scan_ts_utc=dt.datetime(2026, 9, 13, tzinfo=dt.UTC),
+        )
+    assert connection.commit_calls == 0
+    assert not connection.cursors[0].executemany_calls
+
+
 def test_source_rejection_happens_before_staging(monkeypatch):
     from kvk.dal.new_source_import_dal import SourceConflict
 

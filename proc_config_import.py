@@ -615,7 +615,10 @@ def run_proc_config_import(
                 _set_last_import_report(report)
                 return False, report
 
-            ok_sheets, sheet_errors = _validate_sheet_schemas(sheet_service)
+            from services.legacy_export_snapshot_service import configuration_requests
+
+            with configuration_requests():
+                ok_sheets, sheet_errors = _validate_sheet_schemas(sheet_service)
             if not ok_sheets:
                 for e in sheet_errors:
                     logger.error("[IMPORT][DRYRUN] Schema check:  %s", e)
@@ -645,22 +648,40 @@ def run_proc_config_import(
 
     conn = None
     cursor = None
+    admission = None
     committed_tables: list[str] = []
     _tx_tables = [t.strip() for t in IMPORT_TRANSACTIONAL_TABLES.split(",") if t.strip()]
 
     try:
-        sheet = _get_sheet_service()
+        from services.legacy_export_snapshot_service import configuration_requests, writer_scope
 
-        logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, KVK_SHEET_ID)
-        df = _read_sheet_to_df(sheet, KVK_SHEET_ID, RANGE_NAME)
-        if df.empty or "KVK_NO" not in df.columns:
-            msg = "ProcConfig tab empty or missing KVK_NO. Aborting import"
-            logger.error(msg)
-            report["errors"].append(msg)
-            _set_last_import_report(report)
-            return False, report
+        with configuration_requests():
+            sheet = _get_sheet_service()
 
-        df = df[df["KVK_NO"].notna()]
+            logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, KVK_SHEET_ID)
+            df = _read_sheet_to_df(sheet, KVK_SHEET_ID, RANGE_NAME)
+            if df.empty or "KVK_NO" not in df.columns:
+                msg = "ProcConfig tab empty or missing KVK_NO. Aborting import"
+                logger.error(msg)
+                report["errors"].append(msg)
+                _set_last_import_report(report)
+                return False, report
+
+            df = df[df["KVK_NO"].notna()]
+            # All provider reads finish before SQL admission/transactions begin.
+            collected_frames = {
+                name: _read_sheet_to_df(sheet, KVK_SHEET_ID, name)
+                for name in (
+                    BAND_RANGE_NAME,
+                    EXEMPT_RANGE_NAME,
+                    DETAILS_RANGE_NAME,
+                    WEIGHTS_RANGE_NAME,
+                    WINDOWS_RANGE_NAME,
+                    CAMP_RANGE_NAME,
+                )
+            }
+        admission = writer_scope("scan_data")
+        admission.__enter__()
         conn = _get_import_connection_with_retry()
         cursor = conn.cursor()
 
@@ -741,7 +762,7 @@ def run_proc_config_import(
                     )
 
                 # Continue with other table writes inside same transaction (unchanged)
-                df_bands = _read_sheet_to_df(sheet, KVK_SHEET_ID, BAND_RANGE_NAME)
+                df_bands = collected_frames[BAND_RANGE_NAME].copy(deep=True)
                 if not df_bands.empty:
                     _coerce_int(
                         df_bands, ["KVKVersion", "KillTarget", "MinKillTarget", "DeadTarget"]
@@ -760,7 +781,7 @@ def run_proc_config_import(
                     raise RuntimeError(f"KVKTargetBands write failed: {res.get('error')}")
 
                 # EXEMPT
-                df_exempt = _read_sheet_to_df(sheet, KVK_SHEET_ID, EXEMPT_RANGE_NAME)
+                df_exempt = collected_frames[EXEMPT_RANGE_NAME].copy(deep=True)
                 if not df_exempt.empty:
                     _coerce_int(df_exempt, ["GovernorID", "KVK_NO", "Exempt"])
                 res = write_df_to_table(
@@ -776,7 +797,7 @@ def run_proc_config_import(
                     raise RuntimeError(f"EXEMPT write failed: {res.get('error')}")
 
                 # KVK_Details (unchanged)
-                df_details = _read_sheet_to_df(sheet, KVK_SHEET_ID, DETAILS_RANGE_NAME)
+                df_details = collected_frames[DETAILS_RANGE_NAME].copy(deep=True)
                 if not df_details.empty:
                     try:
                         _validate_kvk_details_dataframe(df_details)
@@ -829,7 +850,7 @@ def run_proc_config_import(
                     raise RuntimeError(f"KVK_Details write failed: {res.get('error')}")
 
                 # KVK_DKPWeights
-                df_weights = _read_sheet_to_df(sheet, KVK_SHEET_ID, WEIGHTS_RANGE_NAME)
+                df_weights = collected_frames[WEIGHTS_RANGE_NAME].copy(deep=True)
                 from kvk.services.new_source_config_service import source_weight_tokens
 
                 source_weights = None
@@ -856,7 +877,7 @@ def run_proc_config_import(
                     raise RuntimeError(f"KVK_DKPWeights write failed: {res.get('error')}")
 
                 # KVK_Windows
-                df_win = _read_sheet_to_df(sheet, KVK_SHEET_ID, WINDOWS_RANGE_NAME)
+                df_win = collected_frames[WINDOWS_RANGE_NAME].copy(deep=True)
                 df_win = _normalize_headers(
                     df_win,
                     {
@@ -896,7 +917,7 @@ def run_proc_config_import(
                     raise RuntimeError(f"KVK_Windows write failed: {res.get('error')}")
 
                 # KVK_CampMap
-                df_camp = _read_sheet_to_df(sheet, KVK_SHEET_ID, CAMP_RANGE_NAME)
+                df_camp = collected_frames[CAMP_RANGE_NAME].copy(deep=True)
                 df_camp = _normalize_headers(
                     df_camp,
                     {
@@ -1104,6 +1125,14 @@ def run_proc_config_import(
 
         report["duration_sec"] = time.time() - report["start_time"]
         success = len(report.get("errors", [])) == 0
+        if success:
+            from services.legacy_export_snapshot_service import record_writer_completion
+
+            record_writer_completion(
+                procedure="ProcConfig and sp_TARGETS_MASTER",
+                tables=committed_tables.copy(),
+                targets_kvk=report.get("targets_master_kvk"),
+            )
         report["success"] = success
         report["partial_commits"] = committed_tables.copy()
 
@@ -1171,6 +1200,13 @@ def run_proc_config_import(
                 conn.close()
         except Exception:
             pass
+        if admission is not None:
+            if report.get("errors"):
+                admission.__exit__(
+                    RuntimeError, RuntimeError("Configuration outcome unavailable"), None
+                )
+            else:
+                admission.__exit__(None, None, None)
 
 
 # ---------------------------------------------------------------------------
@@ -1228,6 +1264,11 @@ async def run_proc_config_import_offload(
         call_kwargs["source_actor"] = source_actor
     if source_provenance is not None:
         call_kwargs["source_provenance"] = dict(source_provenance)
+    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
+
+    if _writer_runtime() is not None:
+        # Runtime and owner context cannot cross the legacy process boundary.
+        return await drain_thread(run_proc_config_import, dry_run, **call_kwargs)
     try:
         # For testability: if the test/module has explicitly set module-level names, respect them
         # (even if they are None). Only import from file_utils if the name is NOT present in globals().

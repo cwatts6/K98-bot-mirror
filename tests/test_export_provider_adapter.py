@@ -1,0 +1,251 @@
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
+from services.export_provider_adapter import ProviderAdapter, ProviderOutcomeUnknown
+
+
+def delivery_fixture(*, wrong_grid=False, wrong_readback=False):
+    import hashlib
+    from threading import Event
+    from uuid import uuid4
+
+    from services.export_provider_adapter import LegacyProviderJob
+    from services.legacy_export_snapshot_service import (
+        LegacySnapshot,
+        OutputSection,
+        configuration_digest,
+        output_digest,
+    )
+
+    sections = (
+        OutputSection("data", ("GovernorID", "Name"), ((123, "=RAW literal"), (None, None))),
+    )
+    config = dict(
+        destinations=["file-a"],
+        outputs=[dict(section="data", file_id="file-a", tab="Data", grid_id=7, format_requests=[])],
+    )
+    snapshot = LegacySnapshot.capture(
+        consumer="scan_data",
+        preparation_id=str(uuid4()),
+        config=config,
+        generation=dict(
+            completion="committed",
+            commit_identity="exact-completion",
+            output_sha256=output_digest(sections),
+            config_sha256=configuration_digest(config),
+        ),
+        provenance={},
+        sections=sections,
+    )
+    events = []
+
+    class SDK:
+        def __init__(self):
+            self.rows = []
+
+        def spreadsheets(self):
+            return self
+
+        def values(self):
+            return self
+
+        def permissions(self):
+            return self
+
+        def request(self, method, response):
+            def execute(**kwargs):
+                assert kwargs == {"num_retries": 0}
+                events.append(method)
+                return response() if callable(response) else response
+
+            return SimpleNamespace(
+                method=method,
+                uri="https://sheets.googleapis.com/v4/spreadsheets/file-a",
+                execute=execute,
+            )
+
+        def list(self, **kwargs):
+            return self.request("GET", {"permissions": [{"type": "user", "role": "owner"}]})
+
+        def get(self, **kwargs):
+            if "fields" in kwargs:
+                return self.request(
+                    "GET",
+                    {
+                        "sheets": [
+                            {
+                                "properties": {
+                                    "sheetId": 8 if wrong_grid else 7,
+                                    "title": "Data",
+                                    "gridProperties": {"rowCount": 1, "columnCount": 1},
+                                }
+                            }
+                        ]
+                    },
+                )
+            return self.request(
+                "GET", lambda: {"values": [["wrong"]] if wrong_readback else self.rows[:-1]}
+            )
+
+        def batchUpdate(self, **kwargs):
+            assert kwargs["body"]["requests"][0]["updateSheetProperties"]["properties"][
+                "gridProperties"
+            ] == {"rowCount": 3, "columnCount": 2}
+            return self.request("POST", {})
+
+        def clear(self, **kwargs):
+            return self.request("POST", {})
+
+        def update(self, **kwargs):
+            assert kwargs["valueInputOption"] == "RAW"
+            return self.request(
+                "PUT", lambda: setattr(self, "rows", kwargs["body"]["values"]) or {}
+            )
+
+    sdk = SDK()
+    dal, budget = Mock(), Mock()
+    dal.begin_attempt.return_value = "attempt-1"
+    job = dict(ConsumerKind="scan_data", InputHash=hashlib.sha256(snapshot.payload).digest())
+    args = job, SimpleNamespace(fence=9), dal, budget, Event(), snapshot.payload
+    return LegacyProviderJob(lambda job: (sdk, sdk)), args, events
+
+
+def test_complete_delivery_paces_every_request_and_confirms_exact_attempt():
+    worker, args, events = delivery_fixture()
+    worker(*args)
+    dal, budget = args[2:4]
+    assert budget.call_count == budget.completed.call_count == len(events) == 7
+    assert events == ["GET", "GET", "POST", "POST", "PUT", "GET", "GET"]
+    dal.verified.assert_called_once_with(args[1], "attempt-1", audience="private")
+    receipt = dal.confirm.call_args.args[2]
+    assert receipt["attempt_id"] == "attempt-1" and receipt["fence"] == 9
+    assert receipt["files"] == ["file-a"]
+
+
+def test_grid_conflict_is_detected_before_any_attempt_or_mutation():
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    worker, args, events = delivery_fixture(wrong_grid=True)
+    with pytest.raises(SnapshotUnavailable, match="conflicts"):
+        worker(*args)
+    assert events == ["GET", "GET"]
+    args[2].begin_attempt.assert_not_called()
+
+
+def test_failed_full_readback_retains_attempt_and_never_confirms():
+    worker, args, events = delivery_fixture(wrong_readback=True)
+    with pytest.raises(ProviderOutcomeUnknown, match="readback"):
+        worker(*args)
+    args[2].begin_attempt.assert_called_once()
+    args[2].verified.assert_not_called()
+    args[2].confirm.assert_not_called()
+
+
+def adapter():
+    budget, authorize = Mock(), Mock()
+    return (
+        ProviderAdapter(budget=budget, authorize=authorize, destinations=("file-a",)),
+        budget,
+        authorize,
+    )
+
+
+def test_google_execute_reserves_rechecks_and_checkpoints_actual_request():
+    wrapped, budget, authorize = adapter()
+    events = []
+    budget.side_effect = lambda: events.append("reserve")
+    budget.completed.side_effect = lambda: events.append("complete")
+    authorize.side_effect = lambda **kw: events.append("authorize")
+    request = SimpleNamespace(
+        method="GET",
+        uri="https://sheets.googleapis.com/v4/spreadsheets/file-a",
+        execute=Mock(side_effect=lambda **kw: events.append("execute")),
+    )
+    wrapped.execute(request)
+    assert events == ["authorize", "reserve", "authorize", "execute", "complete"]
+    request.execute.assert_called_once_with(num_retries=0)
+
+
+def test_gspread_multi_request_method_paces_every_http_request():
+    wrapped, budget, _ = adapter()
+
+    class Client:
+        def request(self, method, endpoint):
+            return "value"
+
+        def many(self):
+            return [
+                self.request("get", "https://sheets.googleapis.com/v4/spreadsheets/file-a")
+                for _ in range(3)
+            ]
+
+    client = wrapped.bind_gspread(Client())
+    assert client.many() == ["value"] * 3
+    assert budget.call_count == budget.completed.call_count == 3
+    with pytest.raises(ValueError):
+        wrapped.bind_gspread(client)
+
+
+def test_gspread_internal_backoff_is_rejected_before_requests():
+    from gspread.http_client import BackOffHTTPClient
+
+    wrapped, budget, _ = adapter()
+    with pytest.raises(ValueError, match="backoff"):
+        wrapped.bind_gspread(BackOffHTTPClient.__new__(BackOffHTTPClient))
+    budget.assert_not_called()
+
+
+def test_mutation_failure_blocks_same_adapter_even_if_outer_wrapper_retries():
+    wrapped, budget, _ = adapter()
+    execute = Mock(side_effect=TimeoutError("ambiguous"))
+    with pytest.raises(ProviderOutcomeUnknown):
+        wrapped.call(execute, mutation=True, destination="file-a")
+    with pytest.raises(ProviderOutcomeUnknown):
+        wrapped.call(execute, mutation=True, destination="file-a")
+    assert execute.call_count == budget.call_count == budget.completed.call_count == 1
+
+
+@pytest.mark.parametrize("checkpoint", ["reservation", "completed", "rejected"])
+def test_unknown_budget_checkpoint_retains_claim(checkpoint):
+    wrapped, budget, _ = adapter()
+    execute = Mock(return_value="ok")
+    if checkpoint == "reservation":
+        budget.side_effect = RuntimeError("lost commit")
+    else:
+        getattr(budget, checkpoint).side_effect = RuntimeError("lost commit")
+        if checkpoint == "rejected":
+            execute.side_effect = TimeoutError()
+    with pytest.raises(ProviderOutcomeUnknown):
+        wrapped.call(execute, mutation=False, destination="file-a")
+    assert wrapped.uncertain
+
+
+def test_gspread_retry_after_is_normalized_for_common_budget():
+    wrapped, budget, _ = adapter()
+    error = RuntimeError("limited")
+    error.response = SimpleNamespace(status_code=429, headers={"Retry-After": "120"})
+    with pytest.raises(RuntimeError):
+        wrapped.call(Mock(side_effect=error), mutation=False, destination="file-a")
+    response = budget.rejected.call_args.args[0].resp
+    assert response.status == 429 and response["retry-after"] == "120"
+    budget.completed.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "http://sheets.googleapis.com/v4/spreadsheets/file-a",
+        "https://evil.invalid/file-a",
+        "https://sheets.googleapis.com/v4/spreadsheets/file-b",
+        "https://www.googleapis.com/drive/v3/files",
+    ],
+)
+def test_unregistered_or_discovery_request_never_escapes(uri):
+    wrapped, budget, _ = adapter()
+    request = SimpleNamespace(method="POST", uri=uri, execute=Mock())
+    with pytest.raises(ValueError):
+        wrapped.execute(request)
+    budget.assert_not_called()
+    request.execute.assert_not_called()

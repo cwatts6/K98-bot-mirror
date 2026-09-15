@@ -5,6 +5,22 @@ from pathlib import Path
 import pytest
 
 
+def test_admitted_cache_refresh_never_reexecutes_unknown_sql(monkeypatch):
+    from unittest.mock import Mock
+
+    import player_stats_cache as mod
+
+    connection = Mock()
+    connection.cursor.return_value.execute.side_effect = [None, mod.pyodbc.Error("unknown")]
+    monkeypatch.setattr(mod, "current_owner", lambda: object())
+    sleep = Mock(side_effect=AssertionError("retry forbidden"))
+    monkeypatch.setattr(mod.time, "sleep", sleep)
+    with pytest.raises(mod.pyodbc.Error):
+        mod._execute_sp_with_retries.__wrapped__(connection, retries=3)
+    assert connection.cursor.return_value.execute.call_count == 2
+    sleep.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("raw_value", "expected"),
     [

@@ -13,6 +13,11 @@ from typing import Any
 import pyodbc
 
 from constants import PLAYER_STATS_CACHE
+from services.legacy_export_snapshot_service import (
+    admitted_writer,
+    current_owner,
+    record_writer_completion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +311,7 @@ def _atomic_write_json_with_retries(
     from file_utils import atomic_write_json
 
     last_exc: Exception | None = None
+
     for attempt in range(1, retries + 1):
         try:
             atomic_write_json(path, obj)
@@ -430,6 +436,7 @@ def _validate_last_refresh(value: str) -> str:
     return parsed.isoformat()
 
 
+@admitted_writer("scan_data")
 def _execute_sp_with_retries(
     cn: pyodbc.Connection,
     *,
@@ -447,6 +454,9 @@ def _execute_sp_with_retries(
         max_backoff: Maximum delay in seconds
     """
     last_exc: Exception | None = None
+
+    if current_owner() is not None:
+        retries = 1  # A lost commit acknowledgment requires reconciliation.
 
     for attempt in range(1, retries + 1):
         try:
@@ -468,6 +478,7 @@ def _execute_sp_with_retries(
 
             # Explicitly commit the transaction
             cn.commit()
+            record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
 
             sp_duration = time.perf_counter() - sp_start
             logger.info(

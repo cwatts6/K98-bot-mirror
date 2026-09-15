@@ -10,6 +10,22 @@ import file_utils
 from stats.dal.immutable_import_dal import ImmutableImportOutcome
 import stats_module
 
+
+@pytest.mark.asyncio
+async def test_coordinated_sql_offload_never_retries_uncertain_producer():
+    from services.legacy_export_snapshot_service import use_runtime
+
+    calls = []
+
+    def producer():
+        calls.append(1)
+        raise OSError("commit acknowledgment lost")
+
+    with use_runtime(object()), pytest.raises(OSError, match="acknowledgment"):
+        await stats_module._offload_callable_py(producer)
+    assert calls == [1]
+
+
 COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 
 

@@ -105,6 +105,12 @@ class ExportCoordinator:
                             job["StorageOwner"],
                         )
                     )
+                if job["ConsumerKind"] in {"all_kvk", "scan_data"}:
+                    from services.legacy_export_snapshot_service import LegacySnapshot
+
+                    if snapshot is None:
+                        raise SourceConflict("Legacy/daily execution requires a complete snapshot.")
+                    LegacySnapshot.load(snapshot)
                 adapter(
                     job,
                     claim,

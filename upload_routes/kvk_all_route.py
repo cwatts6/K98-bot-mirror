@@ -550,6 +550,11 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         kvk_no,
                         notify_ch,
                         deps.bot.loop,
+                        **(
+                            {"preparation_id": result["export_preparation_id"]}
+                            if result.get("export_preparation_id")
+                            else {}
+                        ),
                     )
                 )
                 if audit_context is not None:
