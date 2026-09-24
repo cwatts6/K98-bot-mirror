@@ -226,6 +226,9 @@ def recompute_windows(kvk_no: int | None = None) -> int:
     from kvk.dal.season_source_dal import require_source
 
     with transaction(get_conn_with_retries) as cursor:
+        from services.legacy_export_snapshot_service import verify_producer_cursor
+
+        verify_producer_cursor(cursor)
         resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
         lock_scope(cursor, resolved_kvk)
         require_source(cursor, resolved_kvk, "legacy_full_data")

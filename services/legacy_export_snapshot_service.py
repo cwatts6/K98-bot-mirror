@@ -206,6 +206,12 @@ _captures = ContextVar("legacy_export_captures", default=None)
 @contextmanager
 def use_runtime(runtime):
     """Explicit composition only. No environment flag constructs live clients."""
+    current = _runtime.get()
+    owner = _owner.get()
+    if (current is not None and current is not runtime) or (
+        owner is not None and owner.runtime is not runtime
+    ):
+        raise SnapshotUnavailable("An inherited export scope cannot switch runtime.")
     token = _runtime.set(runtime)
     try:
         yield runtime
@@ -232,6 +238,18 @@ def record_writer_completion(*, cursor=None, **evidence):
         require_runtime().checkpoint_writer(owner, evidence, cursor=cursor)
 
 
+def verify_producer_cursor(cursor):
+    """Actual connection gate; a separate snapshot guard session is insufficient."""
+    runtime = _writer_runtime()
+    if runtime is None:
+        return
+    owner = current_owner()
+    if owner is None:
+        raise SnapshotUnavailable("Actual SQL producer has no admitted writer owner.")
+    runtime._require_writer(owner)
+    runtime.dal.verify_producer_cursor(owner.claim, cursor)
+
+
 @contextmanager
 def configuration_requests():
     runtime = _writer_runtime()
@@ -253,6 +271,10 @@ def require_runtime():
 
 def _writer_runtime():
     runtime = _runtime.get()
+    if runtime is not None:
+        from services.export_runtime_composition import validate_caller_context
+
+        validate_caller_context(runtime)
     if runtime is None:
         # Existing imports remain unchanged while the new coordinator is disabled.
         # An enabling flag cannot allow partially upgraded writers to bypass it.
@@ -266,19 +288,30 @@ def _writer_runtime():
 @contextmanager
 def writer_scope(kind, *, owner_token=None):
     runtime = _writer_runtime()
-    inherited = owner_token or _owner.get()
+    current = _owner.get()
+    if owner_token is not None and current is not None and owner_token is not current:
+        raise SnapshotUnavailable("Explicit writer owner differs from the inherited owner.")
+    inherited = owner_token if owner_token is not None else current
     if runtime is None:
         if inherited is not None:
             raise SnapshotUnavailable("Owner token has no registered runtime.")
         yield None
         return
-    if inherited is not None and not inherited.closed:
+    if inherited is not None:
+        # A delayed child or explicit stale token must not create a new root
+        # writer after its original scope closed, even on the same runtime.
+        runtime._require_writer(inherited)
         if inherited.kind != kind:
             raise SnapshotUnavailable("Nested writer belongs to another output scope.")
         runtime.authorize_writer(inherited)
         token = _owner.set(inherited)
         try:
             yield inherited
+        except BaseException:
+            # The root may catch a helper's failure. Keep that failure attached
+            # to its shared owner so it cannot publish a partial generation.
+            inherited.failed = True
+            raise
         finally:
             _owner.reset(token)
         return
@@ -312,6 +345,13 @@ def admitted_writer(kind):
                     and result.get("success") is False
                 ):
                     owner.failed = True
+            if (
+                owner is not None
+                and owner.closed
+                and owner.failed
+                and not (isinstance(result, dict) and result.get("success") is False)
+            ):
+                raise SnapshotUnavailable("Writer outcome requires reconciliation.")
             if owner is not None and owner.closed and not owner.failed and isinstance(result, dict):
                 result["export_preparation_id"] = owner.claim.preparation_id
             return result
@@ -331,6 +371,55 @@ def collect_producer_captures(function):
             _captures.reset(token)
 
     return run
+
+
+@contextmanager
+def caller_runtime():
+    """Bind each actual caller, including independently scheduled Discord tasks."""
+    from services.export_runtime_composition import caller_scope
+
+    with caller_scope(_runtime.get()) as runtime:
+        if runtime is None:
+            yield None
+        else:
+            with use_runtime(runtime):
+                yield runtime
+
+
+def bound_runtime(function):
+    """Own the complete call and drain its async work before releasing admission."""
+    import inspect
+
+    if inspect.iscoroutinefunction(function):
+
+        @wraps(function)
+        async def asynchronous(*args, **kwargs):
+            with caller_runtime() as runtime:
+                if runtime is None:
+                    return await function(*args, **kwargs)
+                pending = asyncio.create_task(function(*args, **kwargs))
+                try:
+                    return await asyncio.shield(pending)
+                except asyncio.CancelledError:
+                    while not pending.done():
+                        try:
+                            await asyncio.shield(pending)
+                        except asyncio.CancelledError:
+                            continue
+                        except Exception:
+                            break
+                    if pending.done() and not pending.cancelled():
+                        pending.exception()
+                    raise
+
+        return asynchronous
+
+    @wraps(function)
+    def synchronous(*args, **kwargs):
+        with caller_runtime():
+            return function(*args, **kwargs)
+
+    return synchronous
 
 
 async def drain_thread(function, *args, **kwargs):
@@ -358,6 +447,7 @@ class WriterOwner:
     connection: object
     session_guard: object
     kind: str
+    runtime: object
     closed: bool = False
     failed: bool = False
     completion: dict | None = None
@@ -371,13 +461,28 @@ class LegacyExportRuntime:
     sections and committed evidence. It must not contact providers or recompute.
     """
 
-    def __init__(self, *, dal, coordinator, store, account, configuration, capture=None):
+    def __init__(
+        self,
+        *,
+        dal,
+        coordinator,
+        store,
+        account,
+        configuration,
+        capture=None,
+        authority_stream=None,
+    ):
         self.dal, self.coordinator, self.store = dal, coordinator, store
         self.account = account
         self.configuration = _json(configuration)
         self.capture = capture or dal.capture_outputs
+        self.authority_stream = authority_stream
         if not coordinator.preparations:
             raise ValueError("S10C preparation-aware coordinator required.")
+        if (getattr(dal, "execution_evidence", False) is True) != (
+            getattr(coordinator, "execution_evidence", False) is True
+        ):
+            raise ValueError("Configuration preparation and coordinator evidence gates differ.")
 
     @contextmanager
     def configuration_requests(self):
@@ -385,6 +490,14 @@ class LegacyExportRuntime:
 
         from services.export_provider_adapter import ProviderAdapter, use_provider
         from services.export_request_budget import RequestBudget
+
+        if getattr(self.dal, "execution_evidence", False) is True and self.authority_stream is None:
+            raise SnapshotUnavailable("S11 configuration reads need an exact authority probe.")
+        if (
+            getattr(self.dal, "execution_evidence", False) is not True
+            and self.authority_stream is not None
+        ):
+            raise SnapshotUnavailable("Authority probe requires the matching SQL evidence gate.")
 
         scope = json.loads(self.configuration)["config"]
         identifier = self.dal.request(
@@ -417,14 +530,24 @@ class LegacyExportRuntime:
                 raise SnapshotUnavailable("Configuration collection is read-only.")
             self.dal.authorize(claim)
 
-        adapter = ProviderAdapter(
-            budget=RequestBudget(self.coordinator, self.account),
-            authorize=authorize,
-            destinations=scope["destinations"],
+        from contextlib import nullcontext
+
+        owner = (
+            self.authority_stream(claim, scope["destinations"])
+            if self.authority_stream is not None
+            else nullcontext(None)
         )
         try:
-            with use_provider(adapter):
-                yield
+            with owner as stream:
+                adapter = ProviderAdapter(
+                    budget=RequestBudget(self.coordinator, self.account),
+                    authorize=authorize,
+                    destinations=scope["destinations"],
+                    execution=stream.execute if stream is not None else None,
+                    stream_id=stream.stream_id if stream is not None else None,
+                )
+                with use_provider(adapter):
+                    yield
             self.dal.transition(claim, expected="preflight", state="completed", release=True)
         except BaseException:
             self.dal.uncertain(claim)
@@ -485,14 +608,22 @@ class LegacyExportRuntime:
                 if connection is not None:
                     connection.close()
             raise
-        return WriterOwner(claim, connection, guard, kind)
+        return WriterOwner(claim, connection, guard, kind, self)
+
+    def _require_writer(self, owner):
+        if not isinstance(owner, WriterOwner) or owner.runtime is not self:
+            raise SnapshotUnavailable("Writer owner belongs to another runtime.")
 
     def authorize_writer(self, owner):
+        self._require_writer(owner)
         if owner.closed:
             raise SnapshotUnavailable("Writer admission has ended.")
+        if owner.failed:
+            raise SnapshotUnavailable("Writer outcome requires reconciliation.")
         return self.dal.authorize(owner.claim)
 
     def _close_writer(self, owner):
+        self._require_writer(owner)
         owner.closed = True
         try:
             owner.session_guard.__exit__(None, None, None)
@@ -500,6 +631,7 @@ class LegacyExportRuntime:
             owner.connection.close()
 
     def uncertain_writer(self, owner):
+        self._require_writer(owner)
         if owner.closed:
             return
         try:
@@ -508,6 +640,11 @@ class LegacyExportRuntime:
             self._close_writer(owner)
 
     def checkpoint_writer(self, owner, evidence, *, cursor=None):
+        self._require_writer(owner)
+        if owner.closed:
+            raise SnapshotUnavailable("Writer admission has ended.")
+        if owner.failed:
+            raise SnapshotUnavailable("Writer outcome requires reconciliation.")
         if owner.completion is not None:
             raise SnapshotUnavailable("A producer cannot overwrite its completed generation.")
         scope = json.loads(self.configuration)[owner.kind]
@@ -528,6 +665,7 @@ class LegacyExportRuntime:
         owner.completion = pending
 
     def finish_writer(self, owner):
+        self._require_writer(owner)
         if owner.closed:
             return
         try:

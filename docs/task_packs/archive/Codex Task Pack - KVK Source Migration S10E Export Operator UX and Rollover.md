@@ -1,5 +1,13 @@
 # S10E — Export Operator UX and Rollover
 
+## Archived completed S10E task — 2026-09-15
+
+Implementation, reviews and repository delivery completed in mirror #280, production #587
+and SQL #88. Local pulls are complete; **no bot-machine pull/restart/deployment or activation**.
+See the [S10E closeout](../../reference/kvk_source_migration/s10e_closeout_and_s11_handoff.md) for final validation, merged identities and retained
+runtime gates. Next is [S11 review/scope](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md). The original task/approval text below
+is retained as historical evidence and does not authorize renewed implementation or execution.
+
 ## Approved implementation and evidence boundaries — 2026-09-15
 
 The operator subsequently approved the concrete SQL ownership amendment and its two additional
@@ -231,7 +239,7 @@ Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; product
 These are comparison anchors, not reset instructions. Preserve all pending work and the recovery archive.
 S10C/S10D SQL merge/static evidence is not database installation, execution or activation proof.
 
-Read the [S10D closeout and exact documentation manifests](../reference/kvk_source_migration/s10d_closeout_and_s10e_handoff.md) and
+Read the [S10D closeout and exact documentation manifests](../../reference/kvk_source_migration/s10d_closeout_and_s10e_handoff.md) and
 [starter](Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md). Return scope, affected layers, exact implementation manifest,
 risks, tests, migration/rollback implications and implementation plan for approval. Do not implement,
 publish Git changes, execute SQL/provider/Discord, run imports/exports, pull/restart the bot machine,

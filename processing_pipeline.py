@@ -7,7 +7,7 @@ import time
 import traceback
 from typing import Literal
 
-from services.legacy_export_snapshot_service import collect_producer_captures
+from services.legacy_export_snapshot_service import bound_runtime, collect_producer_captures
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -180,6 +180,7 @@ async def run_step(
     return result
 
 
+@bound_runtime
 @collect_producer_captures
 async def execute_processing_pipeline(
     rank: int, *, seed: int, user, filename: str, channel_id: int, save_path: str | None = None

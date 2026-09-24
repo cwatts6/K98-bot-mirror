@@ -1,4 +1,158 @@
 # Environment Reference
+## S11 client pipe access correction — 2026-09-25
+
+Both the Bot client and supervised provider child use the same message-pipe opener. Its
+explicit access mask, also used by the server's client DACL entry, is 0x120103: read/write data,
+read control, synchronization and FILE_WRITE_ATTRIBUTES for selecting message-read mode.
+It excludes FILE_CREATE_PIPE_INSTANCE (0x4). Mode-setup failure closes the just-opened handle,
+including interruption. These are source and fake-native test results; actual access checks,
+message mode, server identity, cancellation and recovery still require the exact G4 host.
+
+## S11 authority launcher preconditions — 2026-09-25
+
+The three explicit G4 entry files (run_export_authority.py, run_export_provider_child.py and
+enroll_export_output_pool.py under scripts) and the isolated Python/pywin32 installation are
+administrator-verified deployment trust roots. Launch with -I. Child and enrollment load the
+shared authority launcher by exact .py filename before making application packages importable.
+This is not a mechanism for validating a launcher that was already replaced before execution.
+
+Provision a reviewed source-only application tree: no native application modules, adjacent
+sourceless bytecode or populated application __pycache__ directories. Bootstrap checks the
+protected manifest and full source hash inventory, and checks each executable source directory
+as a protected leaf so untrusted create-file/create-directory rights are rejected before imports.
+Bytecode writing is disabled after that check. No cleanup or deployment is performed here.
+Existing administrator/authority ownership, private credential/evidence paths and reparse-point
+refusal remain required. General drive ancestors retain replacement checks; their unrelated
+child-creation rights are not confused with rights inside the executable source tree.
+
+Bot-facing authority pipe accept, whole-frame read and reply write each have a 30-second I/O
+deadline. Broker/provider processing is outside that transport deadline. Timeout or disconnect
+does not release claims or authorize a retry; the caller retains reconciliation uncertainty.
+Actual Windows overlapped cancellation and the next-client recovery cases require G4 evidence.
+
+## S11 protected runtime manifest — 2026-09-24
+
+K98_EXPORT_RUNTIME_MANIFEST is a local absolute path to the independently reviewed, administrator-
+owned Bot-readable runtime manifest. It is consumed only when EXPORT_COORDINATION_ENABLED is true;
+missing or mismatched readiness keeps the actual factories closed. Do not set it or enable flags
+as part of source authoring. The version-1 Bot manifest has exact fields version, authority,
+registration, sql_contract, legacy_sql_contract, application_sql_contract, spool_root, source_hashes,
+export_config_file and export_config_sha256. authority pins host, authority_sid, bot_sid, pipe_id
+and deployment_hash. Source/config/manifest must not be writable by the Bot identity; spool is an
+existing private Bot-owned directory outside Git. No credentials are loaded by this factory.
+
+Normal authority manifests are version 2 and require deployment_boundary plus runtime_registration.
+Enrollment retains its separate version-1 manifest/enrollment_profile. Never substitute one for
+the other. Both are explicit operator tools; no launcher or provisioning runs at Bot import/startup.
+The fresh provider key/client identity and seven protected G4 records are exact hashes in the
+boundary. See the current integration contract and release readiness packet for custody and G4.
+
+
+## S11 legacy SQL permission contract — authored 2026-09-24
+
+The approved local permission addition introduces no automatic runtime enable flag or credential
+default. LegacySnapshotDAL(execution_evidence=True) requires a protected legacy_sql_contract:
+version 1, exact server/database/principal, the source-pinned SQL permission manifest, certificate
+thumbprint/public-key hashes, per-module signature hashes, migration hash and metadata fingerprint.
+The supported source resolution is SQL Server 2022 / ROK_TRACKER / dbo default schema. Expected
+values come from independently approved source and a G4 packet, never from live observation or
+Bot IPC. No private signing key belongs in this contract. The existing coordination contract's
+version remains 2; the legacy gate does not activate the still-closed production factory.
+
+The separately disabled legacy SQL test fixture uses K98_S11_LEGACY_SQL_AUTHORIZED with exact value
+S11_EXACT_LEGACY_PERMISSION_TESTS_APPROVED, K98_S11_LEGACY_SQL_APPROVAL_FILE (absolute local path),
+and K98_S11_LEGACY_SQL_APPROVAL_SHA256. These are G4 test inputs, not instructions to set them now.
+The private packet includes the exact isolated instance, restricted connection, original manifest,
+backup/actual restore evidence and four named operations. Do not reuse production/S6/S8 data or
+the ordinary S11 evidence fixture's database for these legacy-body tests. Local offline runs keep
+this authorization disabled. See release_readiness_and_rollback for the unchanged operator gates.
+
+## S11 SQL permission contract version 2 — 2026-09-24
+
+Both normal authority and fresh-file enrollment manifests now require version 2 inside their
+approved SQL installation contract. The outer manifest and enrollment_profile still use version 1;
+these are distinct version fields. Version 2 binds the exact target, restricted principal,
+migration hashes, independently approved metadata fingerprint and fixed effective export permissions.
+No environment flag grants readiness and no live observation may supply its own approved fingerprint.
+
+The authority profile includes durable budget writes and coordination/origin reads plus restricted
+evidence-procedure execution. The reader profile includes the Bot's existing coordination writes
+as well as evidence reads. Object and every-column SELECT/UPDATE observations must match the fixed
+source-derived map; direct evidence mutation and extra ownership/DDL permissions are rejected.
+This bounded contract does not certify broader import/configuration SQL or complete writer coverage.
+No manifest, credential, SQL grant or deployed configuration was created or changed here. See the
+[source and remaining readiness record](kvk_source_migration/release_evidence_log.md#s11-fixed-coordination-permission-contract--2026-09-24).
+
+## S11 enrollment profile contract — 2026-09-24
+
+Source authoring only; no environment or credential has been provisioned. The separate enrollment
+manifest uses all protected authority identity/source/storage/SQL fields, replacing
+`runtime_registration` with `enrollment_profile`. That exact profile contains version 1,
+owner_email, client_id and the sole scope https://www.googleapis.com/auth/drive.file. The ordinary
+service-account manifest/profile remains distinct. Neither profile permits credential fallback.
+
+An external authority-private authorized_user credential file must contain exactly type, client_id,
+client_secret, refresh_token, token_uri and scopes; token_uri is https://oauth2.googleapis.com/token,
+client_id and scopes must match the protected profile. Cached access tokens, broader scopes,
+service-account substitutes and delegated credentials are rejected. Refresh happens before the
+sole provider send; an absent or broader granted_scopes result blocks send and needs G4 investigation,
+never inferred permission. Actual credential access, consent and provisioning need exact G4 approval.
+
+The separately protected plan binds the raw manifest SHA-256 and canonical profile SHA-256, version,
+purpose output_enrollment, account, storage_owner, owner_email, editor_email, project_id, file_count
+3–17 and plan_id. SQL hashes canonical plan JSON as UTF-16LE. Source/profile hashes alone do not prove
+old-writer exclusion, live containment or historical provider finality. No actual path/token/value
+has been selected by this source contract; do not place private inputs in Git.
+
+
+## S11 protected authority inventory — 2026-09-24
+
+The independent authority launcher now requires runtime_registration in its protected manifest:
+version, account, spool storage_owner, service_account_email, complete legacy_configuration
+(all_kvk/scan_data/config), all one-through-eight pools and sorted protected_file_ids. Each pool
+binds pool_id, registration_sha256, index_file_id, two-through-sixteen slot_file_ids, owner_email
+and explicit audience. All pool files must be unique and disjoint from protected/shared files.
+This is an immutable scope binding, not old-writer exclusion or installation/finality proof.
+No actual environment, credential, manifest or bot-machine configuration was changed.
+
+Normal runtime factories remain closed pending complete trusted issuance/composition/readiness.
+The [proposed initial enrollment extension](kvk_source_migration/integration_contract_and_consumer_matrix.md#s11-initial-file-enrollment-additional-implementation-proposal)
+would add an independently protected human-authorized creation profile; that credential capability
+and origin persistence are not approved or implemented here. Do not provision credentials or enable
+exports from this source checkpoint. Exact G4 operations and G5 acceptance remain separate.
+
+
+## S11 implementation status — 2026-09-24
+
+S11 independent-authority configuration is not deployable yet: the validated authority launcher and complete composition are unimplemented. Do not infer readiness from source files or enable exports. No actual environment or credential configuration was changed. See [checkpoint](kvk_source_migration/release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
+
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](kvk_source_migration/s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
 
 ## S10E local authoring — 2026-09-15
 
@@ -20,10 +174,10 @@ Those strings document an authored gate; setting them is not authorization. S10B
 are independent and remain disabled. No live SQL/provider/Discord test was authorized here.
 
 The current implementation and evidence boundaries are in the
-[S10E pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[S10E pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 Earlier scope/closeout entries below remain historical.
 
-## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+## Historical S10D closeout — 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -33,7 +187,7 @@ provider/Discord execution are not established. S10C remains source/static SQL e
 See [S10D closeout and exact carry-forward manifests](kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
 
 Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
-[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[task pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
 that closeout, this pack/starter and all required archive identities. Verify filename AND
 previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,

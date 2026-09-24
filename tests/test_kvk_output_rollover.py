@@ -145,6 +145,86 @@ def test_rollover_records_phase_before_each_provider_mutation():
     repository.complete.assert_called_once()
 
 
+def test_s11_rollover_rotates_and_closes_stream_before_each_verified_phase():
+    service, repository, _ = rollover()
+    repository.execution_evidence = True
+    repository.files.return_value = ("file-a",)
+    trace = []
+    version = 0
+
+    def phase(claim, name, *_args):
+        nonlocal version
+        if name.endswith("verified"):
+            assert trace[-1] == ("closed", name.removesuffix("_verified") + "_pending")
+        version += 1
+        trace.append(("phase", name, version))
+        return SimpleNamespace(account="account-a", version=version)
+
+    repository.phase.side_effect = phase
+
+    @contextmanager
+    def stream_for(claim, _operation, name, file_id):
+        assert claim.version == version and file_id == "file-a"
+
+        class Stream:
+            stream_id = str(uuid4())
+
+            def execute(self, message):
+                return message
+
+        stream = Stream()
+        trace.append(("open", name, version))
+        try:
+            yield stream
+        finally:
+            trace.append(("closed", name))
+
+    def transport_for(_operation, stream):
+        adapter = SimpleNamespace(stream_id=stream.stream_id, execution=stream.execute)
+        transport = SimpleNamespace(_authority_adapter=adapter)
+        transport.rollover_private = lambda file_id: {"file_id": file_id, "private": True}
+        transport.rollover_clear = lambda file_id: {
+            "file_id": file_id,
+            "private": True,
+            "empty": True,
+        }
+        transport.rollover_setup = lambda file_id, old, new: {
+            "file_id": file_id,
+            "private": True,
+            "setup": True,
+            "old_kvk": old,
+            "new_kvk": new,
+        }
+        return transport
+
+    service.authority_stream_factory = stream_for
+    service.transport_factory = transport_for
+    service.advance("operation")
+    assert [entry[1] for entry in trace if entry[0] == "open"] == [
+        "private_pending",
+        "clear_pending",
+        "setup_pending",
+    ]
+    repository.complete.assert_called_once()
+
+
+def test_s11_rollover_rejects_unscoped_transport_before_provider_call():
+    service, repository, _ = rollover()
+    repository.execution_evidence = True
+    repository.files.return_value = ("file-a",)
+    repository.phase.side_effect = lambda claim, *_args: claim
+    service.authority_stream_factory = lambda *_args: nullcontext(
+        SimpleNamespace(stream_id=str(uuid4()))
+    )
+    transport = Mock()
+    transport._authority_adapter = SimpleNamespace(stream_id=str(uuid4()), execution=Mock())
+    service.transport_factory = Mock(return_value=transport)
+    with pytest.raises(SourceConflict, match="recorded provider transport"):
+        service.advance("operation")
+    transport.rollover_private.assert_not_called()
+    repository.uncertain.assert_called_once_with(repository.claim.return_value)
+
+
 def test_complete_requires_every_file_and_keeps_append_only_history(monkeypatch):
     from kvk.dal import source_output_pool_dal as mod
 
@@ -335,6 +415,236 @@ def test_clear_readback_contamination_cannot_be_accepted(contamination):
     api.execute = contaminated
     with pytest.raises(SourceConflict, match="empty manifest"):
         transport.rollover_clear("fake-1")
+
+
+def setup_readback_fixture():
+    from kvk.services.new_source_export_service import rollover_marker
+    from tests.test_export_runtime_composition import recorded_google_memory
+
+    args, api, messages = recorded_google_memory()
+    api.grids["fake-index"] = {
+        "Sheet1": dict(sheetId=7, title="Sheet1", gridProperties=dict(rowCount=1, columnCount=3))
+    }
+    api.values["fake-index", "Sheet1"] = [[rollover_marker(16, 17)]]
+    return args, api, messages
+
+
+@pytest.mark.parametrize("computed_fields", [False, True])
+def test_complete_setup_readback_is_read_only_and_never_calls_index_empty(computed_fields):
+    from kvk.services.new_source_export_service import rollover_marker
+
+    args, api, messages = setup_readback_fixture()
+    original = api.execute
+
+    def execute(path, method, kwargs, retries):
+        result = original(path, method, kwargs, retries)
+        if computed_fields and kwargs.get("includeGridData"):
+            cell = result["sheets"][0]["data"][0]["rowData"][0]["values"][0]
+            cell.update(
+                effectiveValue={"stringValue": rollover_marker(16, 17)},
+                formattedValue=rollover_marker(16, 17),
+                effectiveFormat={"numberFormat": {"type": "TEXT"}},
+            )
+        return result
+
+    api.execute = execute
+    with args["authority_stream"]:
+        result = args["transport"].rollover_setup_readback(
+            "fake-index", 16, 17, expected_sheet_id=7
+        )
+    assert result["private"] and result["setup"] and result["sheet_id"] == 7
+    assert len(result["manifest_hash"]) == 64
+    assert "empty" not in result and "proof_id" not in result
+    assert [(m.operation, m.target) for m in messages] == [
+        ("sheets.get", "fake-index"),
+        ("sheets.values.get", "fake-index"),
+        ("drive.files.get", "fake-index"),
+    ]
+    assert all(not m.mutation for m in messages)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "extra_tab",
+        "extra_cell",
+        "namedRanges",
+        "developerMetadata",
+        "dataSources",
+        "rows",
+        "columns",
+        "sheet_id",
+        "title",
+        "chart",
+        "description",
+        "properties",
+        "public",
+        "formula",
+        "note",
+        "format",
+        "effective_value",
+        "formatted_value",
+        "grid_extra_cell",
+        "grid_extra_row",
+        "grid_offset",
+        "grid_duplicate",
+        "grid_missing",
+    ],
+)
+def test_setup_marker_cannot_hide_old_grid_metadata_sharing_or_contradictory_cells(damage):
+    from dataclasses import replace
+
+    args, api, messages = setup_readback_fixture()
+    transport = args["transport"]
+    transport.registration = replace(transport.registration, audience="public_viewer")
+    original = api.execute
+
+    def execute(path, method, kwargs, retries):
+        result = original(path, method, kwargs, retries)
+        if path == "/files":
+            if damage == "description":
+                result["description"] = "old pointer"
+            elif damage == "properties":
+                result["appProperties"]["k98Export"] = "old"
+            elif damage == "public":
+                result["permissions"].append(
+                    dict(type="anyone", role="reader", allowFileDiscovery=False)
+                )
+        elif path == "/spreadsheets/values" and damage == "extra_cell":
+            result["values"][0].append("old receipt")
+        elif kwargs.get("includeGridData"):
+            grid = result["sheets"][0]
+            block = grid["data"][0]
+            cells = block["rowData"][0]["values"]
+            if damage == "extra_tab":
+                result["sheets"].append(dict(properties=dict(title="OldTab")))
+            elif damage in {"namedRanges", "developerMetadata", "dataSources"}:
+                result[damage] = [dict(retained=True)]
+            elif damage in {"rows", "columns"}:
+                grid["properties"]["gridProperties"][
+                    "rowCount" if damage == "rows" else "columnCount"
+                ] += 1
+            elif damage == "sheet_id":
+                grid["properties"]["sheetId"] += 1
+            elif damage == "title":
+                grid["properties"]["title"] = "Other"
+            elif damage == "chart":
+                grid["charts"] = [dict(chartId=123)]
+            elif damage == "formula":
+                cells[0]["userEnteredValue"] = dict(formulaValue='="same displayed marker"')
+            elif damage == "note":
+                cells[0]["note"] = "retained data"
+            elif damage == "format":
+                cells[0]["userEnteredFormat"] = dict(textFormat=dict(bold=True))
+            elif damage == "effective_value":
+                cells[0]["effectiveValue"] = dict(stringValue="different")
+            elif damage == "formatted_value":
+                cells[0]["formattedValue"] = "different"
+            elif damage == "grid_extra_cell":
+                cells.append(dict(note="hidden old content"))
+            elif damage == "grid_extra_row":
+                block["rowData"].append(dict(values=[dict(note="old")]))
+            elif damage == "grid_offset":
+                block["startColumn"] = 1
+            elif damage == "grid_duplicate":
+                grid["data"].append(block)
+            elif damage == "grid_missing":
+                grid["data"] = []
+        return result
+
+    api.execute = execute
+    with args["authority_stream"]:
+        assert transport.rollover_setup_readback("fake-index", 16, 17, expected_sheet_id=7) is None
+    assert len(messages) == 3 and all(not m.mutation for m in messages)
+
+
+@pytest.mark.parametrize(
+    "file_id,old,new,sheet_id",
+    [
+        ("fake-1", 16, 17, 7),
+        ("fake-index", 0, 17, 7),
+        ("fake-index", 16, 16, 7),
+        ("fake-index", True, 17, 7),
+        ("fake-index", "16", 17, 7),
+        ("fake-index", 16, 17, -1),
+        ("fake-index", 16, 17, True),
+        ("fake-index", 16, 17, 2**31),
+    ],
+)
+def test_setup_readback_rejects_wrong_index_season_or_sheet_before_requests(
+    file_id, old, new, sheet_id
+):
+    args, api, messages = setup_readback_fixture()
+    with pytest.raises(SourceConflict):
+        args["transport"].rollover_setup_readback(file_id, old, new, expected_sheet_id=sheet_id)
+    assert not messages and not api.calls
+
+
+def test_setup_write_uses_complete_readback_and_never_repairs_contradiction():
+    args, api, messages = setup_readback_fixture()
+    transport = args["transport"]
+    transport._request_guard = lambda _: None
+    api.named_ranges["fake-index"] = [dict(namedRangeId="old-name")]
+    with args["authority_stream"], pytest.raises(SourceConflict, match="Complete private"):
+        transport.rollover_setup("fake-index", 16, 17)
+    assert [m.operation for m in messages if m.mutation] == ["sheets.values.update"]
+    assert api.named_ranges["fake-index"] == [dict(namedRangeId="old-name")]
+
+
+@pytest.mark.parametrize("failed_path", ["/spreadsheets", "/spreadsheets/values", "/files"])
+def test_setup_readback_failure_never_retries_or_mutates(failed_path):
+    from services.export_provider_adapter import ProviderOutcomeUnknown
+
+    args, api, messages = setup_readback_fixture()
+    original = api.execute
+    failures = []
+
+    def execute(path, method, kwargs, retries):
+        if path == failed_path:
+            failures.append(path)
+            raise TimeoutError("Read acknowledgment lost")
+        return original(path, method, kwargs, retries)
+
+    api.execute = execute
+    with args["authority_stream"], pytest.raises(ProviderOutcomeUnknown):
+        args["transport"].rollover_setup_readback("fake-index", 16, 17)
+    assert failures == [failed_path] and all(not m.mutation for m in messages)
+
+
+def test_complete_setup_evaluator_consumes_sealed_readback_without_provider():
+    from copy import deepcopy
+
+    from kvk.services.new_source_export_service import GoogleSheetsTransport
+    from services.export_reconciliation_service import ClosedProbeReplay
+    from tests.test_export_reconciliation_service import sealed_publication_fixture
+
+    args, api, messages = setup_readback_fixture()
+    stream = args["authority_stream"]
+    real_execute = stream.client.execute.side_effect
+    observations = []
+
+    def execute(message):
+        response = real_execute(message)
+        observations.append((deepcopy(message), deepcopy(response)))
+        return response
+
+    stream.client.execute.side_effect = execute
+    with stream:
+        original = args["transport"].rollover_setup_readback("fake-index", 16, 17)
+    scope = dict(snapshot=dict(pool=dict(RegistrationHash="a" * 64)), stream_id=stream.stream_id)
+    dal, store, _, _ = sealed_publication_fixture(scope, observations)
+    calls = len(api.calls)
+    with ClosedProbeReplay(dal=dal, store=store, account="account-a", **scope) as replay:
+        transport = GoogleSheetsTransport.from_authority(
+            registration=args["transport"].registration,
+            reuse_guard=lambda *_: False,
+            protected_file_ids=args["transport"].protected,
+            execution=replay.execute,
+            stream_id=stream.stream_id,
+            authorize=lambda **_: None,
+        )
+        assert transport.rollover_setup_readback("fake-index", 16, 17) == original
+    assert len(api.calls) == calls and len(messages) == 3
 
 
 def retirement_snapshot_fixture(*, retain=False):

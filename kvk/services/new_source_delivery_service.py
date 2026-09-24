@@ -4,6 +4,7 @@ No background worker or daily-send admission is installed here. A Discord caller
 already own normal cadence admission; uncertain outcomes never authorize replacement.
 """
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 import json
 import logging
@@ -254,7 +255,18 @@ def deliver_export(
 
 
 def deliver_coordinated_export(
-    *, job, claim, dal, transport, connect, budget, stop, retirement_verifier=None
+    *,
+    job,
+    claim,
+    dal,
+    transport,
+    connect,
+    budget,
+    stop,
+    retirement_verifier=None,
+    authority_stream=None,
+    retirement_stream_factory=None,
+    retirement_transport_factory=None,
 ):
     """S10B Sheets path: pinned vector, durable attempts, no SQL around requests.
 
@@ -269,6 +281,24 @@ def deliver_coordinated_export(
 
     if not isinstance(transport, GoogleSheetsTransport) or job["ConsumerKind"] != "new_source":
         raise ValueError("Coordinated new-source Sheets transport required.")
+    recorded = getattr(dal, "execution_evidence", False) is True
+    if recorded and (transport._authority_adapter is None or authority_stream is None):
+        raise RemoteOutcomeUnknown("S11 delivery requires an exact recorded authority stream.")
+    if not recorded and authority_stream is not None:
+        raise ValueError("Authority stream requires the matching SQL execution-evidence gate.")
+    if (
+        recorded
+        and getattr(dal, "output_operations", False) is True
+        and not all(
+            callable(item)
+            for item in (
+                retirement_verifier,
+                retirement_stream_factory,
+                retirement_transport_factory,
+            )
+        )
+    ):
+        raise SourceConflict("Complete S11 retirement composition required before delivery.")
     registration = transport.registration
     destinations = tuple(sorted((registration.index_file_id, *registration.slot_file_ids)))
     if digest(destinations) != bytes(job["DestinationSetHash"]):
@@ -292,7 +322,9 @@ def deliver_coordinated_export(
     if getattr(dal, "output_operations", False) is True:
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
 
-        pool_dal = SourceOutputPoolDAL(connect)
+        pool_dal = SourceOutputPoolDAL(
+            connect, execution_evidence=getattr(dal, "execution_evidence", False) is True
+        )
         pool_id = pool_dal.resolve(job["KVK_NO"], registration.index_file_id)
         pool = pool_dal.snapshot(pool_id)
         transport.quarantined = frozenset(
@@ -359,58 +391,65 @@ def deliver_coordinated_export(
             parts,
         )
 
-    transport._request_pacer, transport._request_guard, transport._plan_callback = (
-        budget,
-        guard,
-        plan,
-    )
-    # Only audited private-empty slots may be assigned; never relabel old content.
-    transport.reuse_guard = lambda *_: False
-    manifest = generation.manifest()
-    transport.ensure_private(destination, delivery_key, manifest)
-    if attempt_id is None:
-        raise SourceConflict("Provider preparation did not retain an attempt.")
-    for item in generation.tables:
-        transport.write_range(
-            destination,
-            delivery_key,
-            item.name,
-            "A1",
-            item.raw_values(),
-            value_input_option="RAW",
+    # This function owns delivery closure, so retirement proofs and final release
+    # cannot run while its credential-bearing child remains able to issue requests.
+    with authority_stream if recorded else nullcontext(None):
+        if recorded:
+            from services.export_runtime_composition import require_bound_transport
+
+            require_bound_transport(transport, authority_stream)
+        transport._request_pacer, transport._request_guard, transport._plan_callback = (
+            budget,
+            guard,
+            plan,
         )
-    if transport.verify(destination, delivery_key) != manifest:
-        raise SourceConflict("Exact private manifest readback failed.")
-    # Check every generation ACL rather than inferring private verification from
-    # successful writes. The previous index may legitimately remain public.
-    if any(
-        any(p.get("type") == "anyone" for p in transport._get(part["file_id"])["permissions"])
-        for part in parts[1:]
-    ):
-        raise SourceConflict("Generation is not private.")
-    dal.verified(claim, attempt_id)
-    dal.publication_pending(claim, attempt_id)
-    remote = transport.publish_current(destination, delivery_key, claim.fence)
-    probe = SimpleNamespace(
-        receipt=canonical({"export_key": delivery_key}),
-        fence=claim.fence,
-        selection=generation.selections[0],
-    )
-    state, _ = transport.reconcile(destination, probe)
-    actual_files = [
-        registration.index_file_id,
-        *(f["id"] for f in transport._files(destination, delivery_key)),
-    ]
-    if state != "confirmed" or actual_files != [p["file_id"] for p in parts]:
-        raise RemoteOutcomeUnknown("Publication readback differs from the admitted attempt.")
-    receipt = dict(
-        export_key=delivery_key,
-        fence=claim.fence,
-        attempt_id=attempt_id,
-        files=actual_files,
-        audience=registration.audience,
-        remote_id=remote,
-    )
+        # Only audited private-empty slots may be assigned; never relabel old content.
+        transport.reuse_guard = lambda *_: False
+        manifest = generation.manifest()
+        transport.ensure_private(destination, delivery_key, manifest)
+        if attempt_id is None:
+            raise SourceConflict("Provider preparation did not retain an attempt.")
+        for item in generation.tables:
+            transport.write_range(
+                destination,
+                delivery_key,
+                item.name,
+                "A1",
+                item.raw_values(),
+                value_input_option="RAW",
+            )
+        if transport.verify(destination, delivery_key) != manifest:
+            raise SourceConflict("Exact private manifest readback failed.")
+        # Check every generation ACL rather than inferring private verification from
+        # successful writes. The previous index may legitimately remain public.
+        if any(
+            any(p.get("type") == "anyone" for p in transport._get(part["file_id"])["permissions"])
+            for part in parts[1:]
+        ):
+            raise SourceConflict("Generation is not private.")
+        dal.verified(claim, attempt_id)
+        dal.publication_pending(claim, attempt_id)
+        remote = transport.publish_current(destination, delivery_key, claim.fence)
+        probe = SimpleNamespace(
+            receipt=canonical({"export_key": delivery_key}),
+            fence=claim.fence,
+            selection=generation.selections[0],
+        )
+        state, _ = transport.reconcile(destination, probe, pinned_manifest=manifest)
+        actual_files = [
+            registration.index_file_id,
+            *(f["id"] for f in transport._files(destination, delivery_key)),
+        ]
+        if state != "confirmed" or actual_files != [p["file_id"] for p in parts]:
+            raise RemoteOutcomeUnknown("Publication readback differs from the admitted attempt.")
+        receipt = dict(
+            export_key=delivery_key,
+            fence=claim.fence,
+            attempt_id=attempt_id,
+            files=actual_files,
+            audience=registration.audience,
+            remote_id=remote,
+        )
     if getattr(dal, "output_operations", False) is True:
         from kvk.services.source_output_pool_service import retire_superseded_generations
 
@@ -421,6 +460,8 @@ def deliver_coordinated_export(
             current_attempt_id=attempt_id,
             transport=transport,
             verifier=retirement_verifier,
+            stream_factory=retirement_stream_factory,
+            transport_factory=retirement_transport_factory,
         )
     dal.confirm(claim, attempt_id, receipt)
     return receipt

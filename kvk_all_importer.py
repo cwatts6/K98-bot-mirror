@@ -23,7 +23,7 @@ from kvk.services.kvk_all_import_service import (
     KvkAllImportPreparationError,
     prepare_kvk_all_import,
 )
-from services.legacy_export_snapshot_service import admitted_writer
+from services.legacy_export_snapshot_service import admitted_writer, bound_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ _with_source_metadata = kvk_all_import_service.attach_source_metadata
 _rows_for_stage = kvk_all_import_dal.rows_for_stage
 
 
+@bound_runtime
 def ingest_kvk_all_excel(
     *,
     content: bytes,
@@ -163,6 +164,7 @@ def _ingest_validated_workbook(
     return result
 
 
+@bound_runtime
 async def _auto_export_kvk(kvk_no: int, notify_channel, bot_loop, *, preparation_id=None):
     try:
         from file_utils import run_blocking_in_thread

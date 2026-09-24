@@ -14,7 +14,14 @@ import json
 import re
 from uuid import uuid4
 
-from kvk.dal.new_source_import_dal import SourceConflict, canonical, digest, one, rows, transaction
+from kvk.dal.new_source_import_dal import (
+    SourceConflict,
+    canonical,
+    digest,
+    one,
+    rows,
+    transaction,
+)
 from kvk.models.source_integration import identity
 
 
@@ -61,6 +68,35 @@ def account_identity(service_account, project):
     if not all(isinstance(v, str) and v and v == v.strip() for v in (service_account, project)):
         raise ValueError("Explicit account and project identities are required.")
     return hashlib.sha256(canonical([service_account.lower(), project]).encode()).hexdigest()
+
+
+def checked_attempt_manifest(attempt, parts):
+    """Validate the same pinned attempt from SQL rows or the immutable wire snapshot."""
+
+    def hex_value(value):
+        return value if isinstance(value, str) else bytes(value).hex()
+
+    document = json.loads(attempt["ManifestJson"])
+    if digest(document).hex() != hex_value(attempt["ManifestHash"]):
+        raise SourceConflict("Attempt manifest hash differs.")
+    actual = [
+        dict(
+            file_id=p["FileID"],
+            role=p["Role"],
+            manifest_hash=hex_value(p["ManifestHash"]),
+            grids=p["GridCount"],
+            rows=p["RowCount"],
+            cells=p["CellCount"],
+        )
+        for p in parts
+    ]
+    if (
+        len(parts) != attempt["PartCount"]
+        or actual != document["parts"]
+        or [p["PartNo"] for p in parts] != list(range(1, len(parts) + 1))
+    ):
+        raise SourceConflict("Attempt part cardinality or immutable manifest differs.")
+    return document
 
 
 @dataclass(frozen=True)
@@ -202,12 +238,23 @@ def validate_parts(parts, destinations):
 
 
 class ExportCoordinationDAL:
-    def __init__(self, connect, *, preparations=False, output_operations=False):
+    def __init__(
+        self, connect, *, preparations=False, output_operations=False, execution_evidence=False
+    ):
         self.connect = connect
         self.preparations = preparations
         if output_operations and not preparations:
             raise ValueError("Output operations require the complete preparation contract.")
         self.output_operations = output_operations
+        if execution_evidence and not output_operations:
+            raise ValueError("Execution evidence requires all existing ownership contracts.")
+        self.execution_evidence = execution_evidence
+
+    def _execution_gate(self, cursor, account):
+        if self.execution_evidence:
+            from services.export_execution_dal import ExportExecutionDAL
+
+            ExportExecutionDAL.assert_no_active_stream(cursor, account)
 
     @contextmanager
     def _account(self, account):
@@ -312,7 +359,12 @@ class ExportCoordinationDAL:
                     or identity(preparation["JobID"]) != identity(row["JobID"])
                 ):
                     raise SourceConflict("Replay belongs to another preparation receipt.")
-                if (row["IntentID"], row["SpoolKey"], row["SpoolBytes"], row["StorageOwner"]) != (
+                if (
+                    row["IntentID"],
+                    row["SpoolKey"],
+                    row["SpoolBytes"],
+                    row["StorageOwner"],
+                ) != (
                     spec.intent_id,
                     spec.spool_key,
                     spec.spool_bytes,
@@ -749,6 +801,7 @@ class ExportCoordinationDAL:
                         raise SourceConflict(
                             "Retained predecessor receipt needs authoritative reconciliation."
                         )
+                self._execution_gate(cursor, account)
                 fence = max([job["Fence"], *(r["Fence"] for r in resources)]) + 1
                 owner = str(uuid4())
                 version = _cas(
@@ -780,7 +833,13 @@ class ExportCoordinationDAL:
                     )
                     claimed.append((resource["ResourceKey"], result["Version"]))
                 return Claim(
-                    job["JobID"], account, owner, fence, version, tuple(claimed), job["IntentID"]
+                    job["JobID"],
+                    account,
+                    owner,
+                    fence,
+                    version,
+                    tuple(claimed),
+                    job["IntentID"],
                 )
             return None
 
@@ -860,7 +919,12 @@ class ExportCoordinationDAL:
             raise ValueError("Bounded retry actor and reason required.")
         with self._account(account) as cursor:
             job = _job(cursor, identity(job_id))
-            if not job or (job["AccountKey"], job["Version"], job["PoolEpoch"], job["State"]) != (
+            if not job or (
+                job["AccountKey"],
+                job["Version"],
+                job["PoolEpoch"],
+                job["State"],
+            ) != (
                 account,
                 expected_version,
                 expected_epoch,
@@ -974,31 +1038,12 @@ class ExportCoordinationDAL:
         attempt = one(cursor)
         if not attempt:
             raise SourceConflict("Attempt identity changed.")
-        document = json.loads(attempt["ManifestJson"])
-        if digest(document) != bytes(attempt["ManifestHash"]):
-            raise SourceConflict("Attempt manifest hash differs.")
         cursor.execute(
             "SELECT * FROM dbo.ExportAttemptPart WITH (UPDLOCK,HOLDLOCK) WHERE AttemptID=? ORDER BY PartNo",
             attempt_id,
         )
         parts = rows(cursor)
-        actual = [
-            dict(
-                file_id=p["FileID"],
-                role=p["Role"],
-                manifest_hash=bytes(p["ManifestHash"]).hex(),
-                grids=p["GridCount"],
-                rows=p["RowCount"],
-                cells=p["CellCount"],
-            )
-            for p in parts
-        ]
-        if (
-            len(parts) != attempt["PartCount"]
-            or actual != document["parts"]
-            or [p["PartNo"] for p in parts] != list(range(1, len(parts) + 1))
-        ):
-            raise SourceConflict("Attempt part cardinality or immutable manifest differs.")
+        checked_attempt_manifest(attempt, parts)
         return attempt, parts
 
     def verified(self, claim, attempt_id, *, audience="private"):
@@ -1113,11 +1158,17 @@ class ExportCoordinationDAL:
                     )
             uncertain = bool(attempted) or retain_claims
             self._finish(
-                cursor, claim, job, "uncertain" if uncertain else "failed", release=not uncertain
+                cursor,
+                claim,
+                job,
+                "uncertain" if uncertain else "failed",
+                release=not uncertain,
             )
 
     def _finish(self, cursor, claim, job, state, *, release):
         # Called only after evidence validation in confirm/fail, never on job state alone.
+        if release:
+            self._execution_gate(cursor, claim.account)
         _cas(
             cursor,
             "UPDATE dbo.ExportJob SET State=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE JobID=? AND Version=? AND OwnerID=? AND Fence=? AND State='running'",
@@ -1200,26 +1251,38 @@ class ExportCoordinationDAL:
 
     def reconcile_operator(self, snapshot, proof, *, actor):
         job = snapshot["job"]
-        if (
-            not self.output_operations
-            or proof.get("snapshot_hash") != digest(snapshot).hex()
-            or proof.get("writer_terminated") is not True
-            or not proof.get("evidence_id")
-            or proof.get("state") not in {"confirmed", "absent", "damaged"}
-        ):
-            raise SourceConflict(
-                "Exact termination and remote outcome evidence required; uncertainty remains blocked."
-            )
+
+        def validate_proof(proof):
+            if (
+                not self.output_operations
+                or proof.get("snapshot_hash") != digest(snapshot).hex()
+                or proof.get("writer_terminated") is not True
+                or not proof.get("evidence_id")
+                or proof.get("state") not in {"confirmed", "absent", "damaged"}
+            ):
+                raise SourceConflict(
+                    "Exact termination and remote outcome evidence required; uncertainty remains blocked."
+                )
+
+        if not self.execution_evidence:
+            validate_proof(proof)
         from kvk.dal.source_output_pool_dal import pending_retirements
 
         if any(s["State"] == "retired" for s in snapshot["pool"]["slots"]):
             pending_retirements(snapshot)  # Validate journal before naming the required workflow.
             raise SourceConflict("Complete explicit retirement recovery before releasing this job.")
         with self._account(job["AccountKey"]) as cursor:
-            for resource in snapshot["resources"]:
+            for resource in sorted(snapshot["resources"], key=lambda row: row["ResourceKey"]):
                 _mutex(cursor, resource["ResourceKey"])
             if self._operator_snapshot(cursor, job["JobID"]) != snapshot:
                 raise SourceConflict("Reconciliation snapshot changed.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor, proof, snapshot=snapshot, account=job["AccountKey"], kind="publication"
+                )
+                validate_proof(proof)
             audit = json.loads(job["ProvenanceJson"])
             history = audit.setdefault("reconciliations", [])
             history.append(dict(actor=actor, proof=proof))
@@ -1293,7 +1356,7 @@ class ExportCoordinationDAL:
             settle_reconciled_parts(
                 cursor, retained_claim, attempt["AttemptID"], confirmed=state == "confirmed"
             )
-            for resource in snapshot["resources"]:
+            for resource in sorted(snapshot["resources"], key=lambda row: row["ResourceKey"]):
                 if (
                     resource["ActiveJobID"],
                     resource["OwnerID"],
@@ -1352,15 +1415,22 @@ class ExportCoordinationDAL:
     def admit_repair(self, repair_id, plan):
         snapshot, proof = plan["snapshot"], plan["proof"]
         original = snapshot["job"]
-        if (
-            not self.output_operations
-            or original["State"] != "confirmed"
-            or proof.get("state") != "damaged"
-            or proof.get("snapshot_hash") != digest(snapshot).hex()
-            or proof.get("writer_terminated") is not True
-            or not proof.get("evidence_id")
-        ):
-            raise SourceConflict("Confirmed damage and exact termination required for RepairID.")
+
+        def validate_proof(proof):
+            if (
+                not self.output_operations
+                or original["State"] != "confirmed"
+                or proof.get("state") != "damaged"
+                or proof.get("snapshot_hash") != digest(snapshot).hex()
+                or proof.get("writer_terminated") is not True
+                or not proof.get("evidence_id")
+            ):
+                raise SourceConflict(
+                    "Confirmed damage and exact termination required for RepairID."
+                )
+
+        if not self.execution_evidence:
+            validate_proof(proof)
         repair_id = identity(repair_id)
         with self._account(original["AccountKey"]) as cursor:
             cursor.execute(
@@ -1380,7 +1450,7 @@ class ExportCoordinationDAL:
                     repair_id=repair_id,
                     state="already_admitted",
                 )
-            for resource in snapshot["resources"]:
+            for resource in sorted(snapshot["resources"], key=lambda row: row["ResourceKey"]):
                 _mutex(cursor, resource["ResourceKey"])
                 if any(
                     resource.get(k) is not None
@@ -1395,11 +1465,24 @@ class ExportCoordinationDAL:
                     raise SourceConflict("Repair must wait for every owning writer to drain.")
             if self._operator_snapshot(cursor, original["JobID"]) != snapshot:
                 raise SourceConflict("Damage/registration snapshot changed; preview again.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor,
+                    proof,
+                    snapshot=snapshot,
+                    account=original["AccountKey"],
+                    kind="publication",
+                )
+                validate_proof(proof)
             preflight = plan.get("output_preflight")
             if not preflight:
                 raise SourceConflict("Repair requires complete pinned P/Q/R capacity preflight.")
             provenance = dict(
-                output_preflight=preflight, repair_plan_hash=digest(plan).hex(), repair=plan
+                output_preflight=preflight,
+                repair_plan_hash=digest(plan).hex(),
+                repair=dict(plan, proof=proof),
             )
             destinations = tuple(
                 sorted(

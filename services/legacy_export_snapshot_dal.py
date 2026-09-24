@@ -24,9 +24,41 @@ class PreparationClaim:
 
 
 class LegacySnapshotDAL:
-    def __init__(self, connect, *, output_operations=False):
+    def __init__(
+        self,
+        connect,
+        *,
+        output_operations=False,
+        execution_evidence=False,
+        legacy_sql_contract=None,
+        application_sql_contract=None,
+    ):
         self.connect = connect
         self.output_operations = output_operations
+        if execution_evidence and not output_operations:
+            raise ValueError("Execution evidence requires output-operation-aware preparation.")
+        self.execution_evidence = execution_evidence
+        self.legacy_sql_contract = None
+        self.application_sql_contract = None
+        if execution_evidence:
+            from services.export_execution_protocol import decode, encode
+            from services.export_runtime_composition import validate_legacy_installation_contract
+
+            validate_legacy_installation_contract(legacy_sql_contract)
+            self.legacy_sql_contract = decode(encode(legacy_sql_contract))
+            if application_sql_contract is not None:
+                from services.export_runtime_composition import (
+                    validate_application_installation_contract,
+                )
+
+                validate_application_installation_contract(application_sql_contract)
+                self.application_sql_contract = decode(encode(application_sql_contract))
+
+    def _execution_gate(self, cursor, account, *, probe_only=False):
+        if self.execution_evidence:
+            from services.export_execution_dal import ExportExecutionDAL
+
+            ExportExecutionDAL.assert_no_active_stream(cursor, account, probe_only=probe_only)
 
     def request(self, *, account, consumer, kvk_no, request, storage_owner, actor, reason):
         if consumer not in {"all_kvk", "scan_data", "config"}:
@@ -206,6 +238,7 @@ class LegacySnapshotDAL:
                 )
                 if one(cursor):
                     return None
+            self._execution_gate(cursor, account, probe_only=stage == "writing")
             fence = max(preparation["Fence"], *(r["Fence"] for r in resources)) + 1
             owner = str(uuid4())
             version = _cas(
@@ -246,7 +279,8 @@ class LegacySnapshotDAL:
         for key, version in claim.resources:
             _mutex(cursor, key)
             cursor.execute(
-                "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) WHERE ResourceKey=?", key
+                "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) WHERE ResourceKey=?",
+                key,
             )
             r = one(cursor)
             if (
@@ -347,6 +381,8 @@ class LegacySnapshotDAL:
             )
 
     def _release(self, cursor, claim):
+        if any(not key.startswith("sql_snapshot:") for key, _ in claim.resources):
+            self._execution_gate(cursor, claim.account)
         for key, version in claim.resources:
             _cas(
                 cursor,
@@ -409,17 +445,59 @@ class LegacySnapshotDAL:
         if not connection.autocommit:
             raise ValueError("Session admission requires an autocommit connection.")
         cursor = connection.cursor()
-        cursor.execute(
-            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; IF @r<0 THROW 51421,'Legacy snapshot busy',1;"
-        )
         try:
-            yield claim
-        finally:
-            # Releasing this SQL session lock never releases durable ownership.
+            if self.execution_evidence:
+                from services.export_execution_dal import legacy_installation_snapshot
+                from services.export_runtime_composition import verify_legacy_installation_contract
+
+                verify_legacy_installation_contract(
+                    legacy_installation_snapshot(cursor, self.legacy_sql_contract["source"]),
+                    self.legacy_sql_contract,
+                )
             cursor.execute(
-                "EXEC sys.sp_releaseapplock @Resource=N'k98-legacy-output-snapshot',@LockOwner='Session';"
+                "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; IF @r<0 THROW 51421,'Legacy snapshot busy',1;"
             )
+            try:
+                if self.application_sql_contract is not None:
+                    from services.export_execution_dal import application_installation_snapshot
+                    from services.export_runtime_composition import (
+                        verify_application_installation_contract,
+                    )
+
+                    verify_application_installation_contract(
+                        application_installation_snapshot(cursor), self.application_sql_contract
+                    )
+                yield claim
+            finally:
+                # Releasing this SQL session lock never releases durable ownership.
+                cursor.execute(
+                    "EXEC sys.sp_releaseapplock @Resource=N'k98-legacy-output-snapshot',@LockOwner='Session';"
+                )
+        finally:
             cursor.close()
+
+    def verify_producer_cursor(self, claim, cursor):
+        """Check the actual producer session without committing or rolling it back."""
+        self.authorize(claim)
+        if not self.execution_evidence:
+            return
+        from services.export_execution_dal import (
+            application_installation_snapshot,
+            legacy_installation_snapshot,
+        )
+        from services.export_runtime_composition import (
+            verify_application_installation_contract,
+            verify_legacy_installation_contract,
+        )
+
+        verify_legacy_installation_contract(
+            legacy_installation_snapshot(cursor, self.legacy_sql_contract["source"]),
+            self.legacy_sql_contract,
+        )
+        if self.application_sql_contract is not None:
+            verify_application_installation_contract(
+                application_installation_snapshot(cursor), self.application_sql_contract
+            )
 
     @staticmethod
     def capture_result_sets(cursor, names):

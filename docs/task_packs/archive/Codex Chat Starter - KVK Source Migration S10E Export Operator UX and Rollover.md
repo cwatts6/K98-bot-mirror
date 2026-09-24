@@ -1,5 +1,13 @@
 # S10E chat starter — Export Operator UX and Rollover
 
+## Archived completed S10E task — 2026-09-15
+
+Implementation, reviews and repository delivery completed in mirror #280, production #587
+and SQL #88. Local pulls are complete; **no bot-machine pull/restart/deployment or activation**.
+See the [S10E closeout](../../reference/kvk_source_migration/s10e_closeout_and_s11_handoff.md) for final validation, merged identities and retained
+runtime gates. Next is [S11 review/scope](../Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md). The original task/approval text below
+is retained as historical evidence and does not authorize renewed implementation or execution.
+
 ## Current implementation — 2026-09-15
 
 The operator approved the SQL ownership amendment and the two additional Bot paths, then
@@ -29,7 +37,7 @@ decisions remain settled. No implementation, SQL execution, publication or deplo
 The original initial-review request below remains historical context, not a request to repeat scope.
 
 Please begin **S10E Export Operator UX and Rollover, initial review/scope only**, using
-[the task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [S10D closeout and exact manifests](../reference/kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
+[the task pack](Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [S10D closeout and exact manifests](../../reference/kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
 Read current AGENTS/core references, approved S7 contracts/manifests, authoritative S10A/C/D SQL,
 architecture/EndScanID amendment and retained S6/S8 evidence. S10D SQL #87 is merged and locally
 pulled: SQL main/origin main `80353a6280e523f30c27e724f71e7b47dadadd16`; Bot main/origin main

@@ -35,6 +35,7 @@ from gsheet_module import (
     _normalize_headers,
     _safe_execute,
 )
+from services.legacy_export_snapshot_service import bound_runtime
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -219,6 +220,11 @@ def _get_sheet_service():
     Fallback: if gm.get_sheet_values is unavailable or fails, fall back to the
     previous behaviour that builds a service via service_account + _build_sheets_with_timeout.
     """
+    from services.export_provider_adapter import current_provider, recorded_clients
+
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        return recorded_clients()[0].spreadsheets()
     # Try to build an adapter backed by gm.get_sheet_values
     try:
         import gsheet_module as gm  # local import to avoid cycle at top-level
@@ -284,6 +290,18 @@ def _read_sheet_to_df(sheet, spreadsheet_id: str, range_name: str) -> pd.DataFra
     Preferred path: use gm.get_sheet_values to get rows list (centralized helper).
     Fallback: use sheet.values().get(...).execute() with _safe_execute for compatibility.
     """
+    from services.export_provider_adapter import current_provider
+
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        import gsheet_module as gm
+
+        rows = gm.get_sheet_values(spreadsheet_id, range_name, timeout=GSHEETS_TIMEOUT)
+        if not rows or not rows[0]:
+            return pd.DataFrame()
+        frame = pd.DataFrame(rows[1:], columns=rows[0])
+        frame.replace(to_replace=r"^\s*$", value=None, regex=True, inplace=True)
+        return frame
     # small jitter to reduce thundering herd
     time.sleep(random.uniform(0.10, 0.60))
 
@@ -396,6 +414,10 @@ def _validate_import_config() -> tuple[bool, list[str]]:
     Validate runtime configuration required to run the import.
     Returns (is_valid, missing_list).
     """
+    from services.legacy_export_snapshot_service import _writer_runtime
+
+    runtime = _writer_runtime()
+    recorded = getattr(getattr(runtime, "dal", None), "execution_evidence", False) is True
     missing = []
 
     # Enhanced logging for diagnostics (use logger.info so it appears in normal logs)
@@ -417,7 +439,9 @@ def _validate_import_config() -> tuple[bool, list[str]]:
     if not KVK_SHEET_ID:
         missing.append("KVK_SHEET_ID")
 
-    if not CREDENTIALS_FILE:
+    if recorded:
+        logger.info("[IMPORT][VALIDATION] Provider requests use the registered authority")
+    elif not CREDENTIALS_FILE:
         missing.append("CREDENTIALS_FILE (environment variable not set)")
     elif not os.path.isfile(CREDENTIALS_FILE):
         # Log detailed path info for debugging subprocess working directory issues
@@ -579,6 +603,7 @@ def _validate_sheet_schemas(sheet) -> tuple[bool, list[str]]:
 # ---------------------------------------------------------------------------
 # Main import entrypoint (modified to use write_df_to_staging_and_upsert)
 # ---------------------------------------------------------------------------
+@bound_runtime
 def run_proc_config_import(
     dry_run: bool = False, *, source_actor: str | None = None, source_provenance: dict | None = None
 ) -> tuple[bool, dict]:
@@ -607,17 +632,10 @@ def run_proc_config_import(
     if dry_run:
         logger.info("[IMPORT] Dry-run requested - validating Google Sheets schemas (no DB changes)")
         try:
-            try:
-                sheet_service = _get_sheet_service()
-            except Exception as exc:
-                logger.error("[IMPORT][DRYRUN] Failed to create sheet service: %s", exc)
-                report["errors"].append(f"Failed to create sheet service: {exc}")
-                _set_last_import_report(report)
-                return False, report
-
             from services.legacy_export_snapshot_service import configuration_requests
 
             with configuration_requests():
+                sheet_service = _get_sheet_service()
                 ok_sheets, sheet_errors = _validate_sheet_schemas(sheet_service)
             if not ok_sheets:
                 for e in sheet_errors:
@@ -684,6 +702,9 @@ def run_proc_config_import(
         admission.__enter__()
         conn = _get_import_connection_with_retry()
         cursor = conn.cursor()
+        from services.legacy_export_snapshot_service import verify_producer_cursor
+
+        verify_producer_cursor(cursor)
 
         try:
             preflight_or_raise(conn, dbname=DATABASE, warn_threshold=85.0)
@@ -1242,6 +1263,7 @@ def run_proc_config_import_payload(payload):
     return success, summary
 
 
+@bound_runtime
 async def run_proc_config_import_offload(
     dry_run: bool = False,
     *,

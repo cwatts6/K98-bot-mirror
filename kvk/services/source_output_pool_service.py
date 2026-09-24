@@ -4,6 +4,7 @@ Providers and termination verifiers are explicitly composed dependencies. SQL st
 lease age and an operator assertion are never proof that an old writer has stopped.
 """
 
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 import json
 
@@ -95,11 +96,36 @@ def checked_plan(snapshot, new_choice, *, actor, reason):
 
 
 class SourceOutputPoolService:
-    def __init__(self, repository, *, transport_factory, termination_verifier, budget_factory):
+    def __init__(
+        self,
+        repository,
+        *,
+        transport_factory,
+        termination_verifier,
+        budget_factory,
+        authority_stream_factory=None,
+    ):
         self.repository = repository
         self.transport_factory = transport_factory
         self.termination_verifier = termination_verifier
         self.budget_factory = budget_factory
+        self.authority_stream_factory = authority_stream_factory
+
+    def _recorded_phase(self, claim, operation, phase, file_id, action):
+        """One immutable claim-version scope, closed before the next phase CAS."""
+        if not callable(self.authority_stream_factory):
+            raise SourceConflict("S11 rollover requires a phase-scoped authority stream.")
+        with self.authority_stream_factory(claim, operation, phase, file_id) as stream:
+            transport = self.transport_factory(operation, stream)
+            adapter = getattr(transport, "_authority_adapter", None)
+            if (
+                adapter is None
+                or adapter.stream_id != stream.stream_id
+                or getattr(adapter.execution, "__self__", None) is not stream
+            ):
+                raise SourceConflict("S11 rollover requires recorded provider transport.")
+            transport._request_guard = lambda request: self.repository.authorize(claim)
+            return action(transport)
 
     def run_pending(self, account):
         for operation_id in self.repository.pending(account):
@@ -140,20 +166,54 @@ class SourceOutputPoolService:
         if claim is None:
             return self.repository.operation(operation_id)
         try:
-            transport = self.transport_factory(operation)
-            transport._request_pacer = self.budget_factory(claim.account)
-            transport._request_guard = lambda request: self.repository.authorize(claim)
+            recorded = getattr(self.repository, "execution_evidence", False) is True
+            if not recorded:
+                transport = self.transport_factory(operation)
+                transport._request_pacer = self.budget_factory(claim.account)
+                transport._request_guard = lambda request: self.repository.authorize(claim)
             for file_id in self.repository.files(operation_id):
                 claim = self.repository.phase(claim, "private_pending", file_id)
-                private = transport.rollover_private(file_id)
+                private = (
+                    self._recorded_phase(
+                        claim,
+                        operation,
+                        "private_pending",
+                        file_id,
+                        lambda transport: transport.rollover_private(file_id),
+                    )
+                    if recorded
+                    else transport.rollover_private(file_id)
+                )
                 claim = self.repository.phase(claim, "private_verified", file_id, private)
                 claim = self.repository.phase(claim, "clear_pending", file_id)
-                empty = transport.rollover_clear(file_id)
+                empty = (
+                    self._recorded_phase(
+                        claim,
+                        operation,
+                        "clear_pending",
+                        file_id,
+                        lambda transport: transport.rollover_clear(file_id),
+                    )
+                    if recorded
+                    else transport.rollover_clear(file_id)
+                )
                 claim = self.repository.phase(claim, "clear_verified", file_id, empty)
             index_file_id = json.loads(operation["PlanJson"])["snapshot"]["pool"]["IndexFileID"]
             claim = self.repository.phase(claim, "setup_pending", index_file_id)
-            setup = transport.rollover_setup(
-                index_file_id, operation["OldKVK"], operation["NewKVK"]
+            setup = (
+                self._recorded_phase(
+                    claim,
+                    operation,
+                    "setup_pending",
+                    index_file_id,
+                    lambda transport: transport.rollover_setup(
+                        index_file_id, operation["OldKVK"], operation["NewKVK"]
+                    ),
+                )
+                if recorded
+                else transport.rollover_setup(
+                    index_file_id, operation["OldKVK"], operation["NewKVK"]
+                )
             )
             claim = self.repository.phase(claim, "setup_verified", index_file_id, setup)
             return self.repository.complete(claim)
@@ -201,8 +261,77 @@ class SourceOutputPlanner:
         )
 
 
+@contextmanager
+def _retirement_transport(
+    *, claim, snapshot, retirement, member, stream_factory, transport_factory, recovery=False
+):
+    """One independently closed child per clear, before audited slot reuse."""
+    from services.export_runtime_composition import AuthorityStream, require_bound_transport
+
+    stream = stream_factory(claim, retirement, member)
+    if not isinstance(stream, AuthorityStream):
+        raise SourceConflict("Retirement requires an owned authority stream.")
+    scope = stream.scope
+    pool = snapshot.get("pool", {})
+    pool = pool.get("pool", pool)
+    if (
+        tuple(
+            scope.get(k)
+            for k in (
+                "OwnerKind",
+                "ObjectID",
+                "AccountKey",
+                "OwnerID",
+                "Fence",
+                "ClaimVersion",
+                "RegistrationHash",
+                "Epoch",
+                "Purpose",
+            )
+        )
+        != (
+            "job",
+            claim.job_id,
+            claim.account,
+            claim.owner_id,
+            claim.fence,
+            claim.version,
+            pool["RegistrationHash"],
+            pool["Epoch"],
+            "mutation",
+        )
+        or (scope.get("NestedToken") is not None) != recovery
+        or scope.get("ScopeJson")
+        != {
+            "resources": [
+                {"key": key, "version": version} for key, version in sorted(claim.resources)
+            ]
+        }
+    ):
+        raise SourceConflict("Retirement stream differs from its exact job/nested owner.")
+    with stream:
+        transport = transport_factory(snapshot, stream)
+        require_bound_transport(transport, stream)
+        context = snapshot["pool"] if "pool" in snapshot["pool"] else snapshot
+        if transport.registration.index_file_id != pool["IndexFileID"] or set(
+            transport.registration.slot_file_ids
+        ) != {s["FileID"] for s in context["slots"]}:
+            raise SourceConflict("Retirement transport differs from exact registration.")
+        yield transport
+    # AuthorityStream closes even on error. A lost close acknowledgment raises;
+    # the caller must never commit a reusable slot or advance the nested owner.
+
+
 def retire_superseded_generations(
-    *, pools, coordinator, claim, current_attempt_id, transport, verifier
+    *,
+    pools,
+    coordinator,
+    claim,
+    current_attempt_id,
+    transport,
+    verifier,
+    stream_factory=None,
+    transport_factory=None,
 ):
     """Runs after exact new-pointer readback, before the owning job is released.
 
@@ -213,6 +342,9 @@ def retire_superseded_generations(
 
     from kvk.dal.source_output_pool_dal import reusable_attempts
 
+    recorded = getattr(pools, "execution_evidence", False) is True
+    if recorded and not (callable(stream_factory) and callable(transport_factory)):
+        raise SourceConflict("S11 retirement requires independent stream and transport factories.")
     while True:
         snapshot = pools.retirement_snapshot(coordinator, claim, current_attempt_id)
         if snapshot["pool"].get("PoolState") == "closing":
@@ -230,50 +362,83 @@ def retire_superseded_generations(
         if retirement is None:
             return  # Admission closed while the verifier was reading.
         for member in retirement["slots"]:
-            transport.rollover_private(member["file_id"])
-            empty = transport.rollover_clear(member["file_id"])
+            owner = (
+                _retirement_transport(
+                    claim=claim,
+                    snapshot=snapshot,
+                    retirement=retirement,
+                    member=member,
+                    stream_factory=stream_factory,
+                    transport_factory=transport_factory,
+                )
+                if recorded
+                else nullcontext(transport)
+            )
+            with owner as active_transport:
+                active_transport.rollover_private(member["file_id"])
+                empty = active_transport.rollover_clear(member["file_id"])
             pools.clear_retired_slot(coordinator, claim, retirement, member, empty)
 
 
 class RetirementRecovery:
     """Explicit reconciliation-only adapter; never runs from cadence or status."""
 
-    def __init__(self, *, pools, coordinator, transport_factory, budget_factory):
+    def __init__(
+        self, *, pools, coordinator, transport_factory, budget_factory, stream_factory=None
+    ):
         self.pools, self.coordinator = pools, coordinator
         self.transport_factory, self.budget_factory = transport_factory, budget_factory
+        self.stream_factory = stream_factory
 
     def resume(self, snapshot, proof, *, actor):
         from kvk.dal.source_output_pool_dal import pending_retirements
 
+        recorded = getattr(self.pools, "execution_evidence", False) is True
+        if recorded and not callable(self.stream_factory):
+            raise SourceConflict("S11 retirement recovery requires independent clear streams.")
         pending = pending_retirements(snapshot)
         claim = self.pools.claim_retirement_recovery(self.coordinator, snapshot, proof, actor=actor)
         attempt_id = snapshot["attempts"][0]["AttemptID"]
         try:
-            transport = self.transport_factory(snapshot)
-            from kvk.services.new_source_export_service import GoogleSheetsTransport
-
             pool = snapshot["pool"]["pool"]
-            if (
-                not isinstance(transport, GoogleSheetsTransport)
-                or transport.registration.index_file_id != pool["IndexFileID"]
-                or set(transport.registration.slot_file_ids)
-                != {s["FileID"] for s in snapshot["pool"]["slots"]}
-            ):
-                raise SourceConflict("Recovery transport differs from exact registration.")
-            transport._request_pacer = self.budget_factory(claim.account)
-
-            def guard(request):
-                with self.pools._recovery_owned(self.coordinator, claim, attempt_id):
-                    pass
-
-            transport._request_guard = guard
+            legacy_transport = None if recorded else self.transport_factory(snapshot)
             # A fresh independent probe reconciled ALL former requests before admission.
             # Each remaining slot is still reserved by its original durable retire event.
             for retirement in pending:
                 for member in retirement["slots"]:
-                    empty = transport.retirement_readback(member["file_id"])
-                    if empty is None:
-                        empty = transport.rollover_clear(member["file_id"])
+                    owner = (
+                        _retirement_transport(
+                            claim=claim,
+                            snapshot=snapshot,
+                            retirement=retirement,
+                            member=member,
+                            stream_factory=self.stream_factory,
+                            transport_factory=self.transport_factory,
+                            recovery=True,
+                        )
+                        if recorded
+                        else nullcontext(legacy_transport)
+                    )
+                    with owner as transport:
+                        if (
+                            not isinstance(transport, GoogleSheetsTransport)
+                            or transport.registration.index_file_id != pool["IndexFileID"]
+                            or set(transport.registration.slot_file_ids)
+                            != {s["FileID"] for s in snapshot["pool"]["slots"]}
+                        ):
+                            raise SourceConflict(
+                                "Recovery transport differs from exact registration."
+                            )
+                        transport._request_pacer = self.budget_factory(claim.account)
+
+                        def guard(request):
+                            with self.pools._recovery_owned(self.coordinator, claim, attempt_id):
+                                pass
+
+                        transport._request_guard = guard
+                        empty = transport.retirement_readback(member["file_id"])
+                        if empty is None:
+                            empty = transport.rollover_clear(member["file_id"])
                     self.pools.clear_retired_slot(
                         self.coordinator, claim, retirement, member, empty, recovery=True
                     )

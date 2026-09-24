@@ -404,7 +404,8 @@ def assert_registration(cursor, *, account, kvk_no, epoch, destinations):
         if digest(json.loads(pool["RegistrationJson"])) != bytes(pool["RegistrationHash"]):
             raise SourceConflict("Immutable registration hash differs.")
         cursor.execute(
-            "SELECT FileID FROM KVK.SourceOutputSlot WHERE PoolID=? ORDER BY FileID", pool["PoolID"]
+            "SELECT FileID FROM KVK.SourceOutputSlot WHERE PoolID=? ORDER BY FileID",
+            pool["PoolID"],
         )
         files = tuple(sorted((pool["IndexFileID"], *(r["FileID"] for r in rows(cursor)))))
         if files == destinations:
@@ -415,8 +416,15 @@ def assert_registration(cursor, *, account, kvk_no, epoch, destinations):
 
 
 class SourceOutputPoolDAL:
-    def __init__(self, connect):
+    def __init__(self, connect, *, execution_evidence=False):
         self.connect = connect
+        self.execution_evidence = execution_evidence
+
+    def _execution_gate(self, cursor, account):
+        if self.execution_evidence:
+            from services.export_execution_dal import ExportExecutionDAL
+
+            ExportExecutionDAL.assert_no_active_stream(cursor, account)
 
     @staticmethod
     def _snapshot(cursor, pool_id):
@@ -528,17 +536,26 @@ class SourceOutputPoolDAL:
         self, coordinator, claim, current_attempt_id, snapshot, old_attempt_id, proof
     ):
         """Journal intent before provider I/O. Interrupted retirement stays reserved."""
-        if (
-            not isinstance(proof, dict)
-            or proof.get("snapshot_hash") != digest(snapshot).hex()
-            or proof.get("current_attempt_id") != current_attempt_id
-            or proof.get("old_attempt_id") != old_attempt_id
-            or proof.get("writer_terminated") is not True
-            or proof.get("current_pointer_verified") is not True
-            or proof.get("no_live_references") is not True
-            or not proof.get("evidence_id")
-        ):
-            raise SourceConflict("Exact termination and reference evidence required.")
+        if self.execution_evidence != (getattr(coordinator, "execution_evidence", False) is True):
+            raise SourceConflict(
+                "Retirement requires the same execution-evidence contract on both DALs."
+            )
+
+        def validate_proof(proof):
+            if (
+                not isinstance(proof, dict)
+                or proof.get("snapshot_hash") != digest(snapshot).hex()
+                or proof.get("current_attempt_id") != current_attempt_id
+                or proof.get("old_attempt_id") != old_attempt_id
+                or proof.get("writer_terminated") is not True
+                or proof.get("current_pointer_verified") is not True
+                or proof.get("no_live_references") is not True
+                or not proof.get("evidence_id")
+            ):
+                raise SourceConflict("Exact termination and reference evidence required.")
+
+        if not self.execution_evidence:
+            validate_proof(proof)
         with self._retirement_owned(coordinator, claim, current_attempt_id) as (
             cursor,
             job,
@@ -552,6 +569,13 @@ class SourceOutputPoolDAL:
                 actual, current_attempt_id
             ):
                 raise SourceConflict("Retirement snapshot or protected assignment changed.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor, proof, snapshot=snapshot, account=claim.account, kind="retirement"
+                )
+                validate_proof(proof)
             pool = actual["pool"]
             operation_id = str(uuid4())
             retired = []
@@ -645,6 +669,10 @@ class SourceOutputPoolDAL:
     def clear_retired_slot(
         self, coordinator, claim, retirement, member, evidence, *, recovery=False
     ):
+        if self.execution_evidence != (getattr(coordinator, "execution_evidence", False) is True):
+            raise SourceConflict(
+                "Retirement clear requires the same evidence contract on both DALs."
+            )
         if (
             evidence.get("file_id") != member["file_id"]
             or evidence.get("private") is not True
@@ -658,6 +686,10 @@ class SourceOutputPoolDAL:
             job,
             snapshot,
         ):
+            # A private readback does not by itself stop its writer. Closure must
+            # commit before this slot becomes reusable under the account lock.
+            if self.execution_evidence:
+                self._execution_gate(cursor, claim.account)
             pool = snapshot["pool"]
             slot = next((s for s in snapshot["slots"] if s["FileID"] == member["file_id"]), None)
             if (pool["PoolID"], pool["Epoch"]) != (
@@ -737,7 +769,14 @@ class SourceOutputPoolDAL:
                     operation["State"],
                     operation["Phase"],
                     operation["OwnerID"],
-                ) != (pool["PoolID"], claim.account, pool["Epoch"], "closing", "draining", None):
+                ) != (
+                    pool["PoolID"],
+                    claim.account,
+                    pool["Epoch"],
+                    "closing",
+                    "draining",
+                    None,
+                ):
                     raise SourceConflict("Closing reservation changed during recovery.")
             elif pool["OwnerID"] is not None:
                 raise SourceConflict("Recovery pool has another owner.")
@@ -747,7 +786,13 @@ class SourceOutputPoolDAL:
         """Explicit nested owner after independent termination; never replays export."""
         from services.export_coordination_dal import Claim, validate_confirmed_probe
 
-        validate_confirmed_probe(snapshot, proof)
+        if self.execution_evidence != (getattr(coordinator, "execution_evidence", False) is True):
+            raise SourceConflict(
+                "Recovery requires the same execution-evidence contract on both DALs."
+            )
+
+        if not self.execution_evidence:
+            validate_confirmed_probe(snapshot, proof)
         pending = pending_retirements(snapshot)
         job = snapshot["job"]
         if (
@@ -756,11 +801,19 @@ class SourceOutputPoolDAL:
             or job["State"] not in {"uncertain", "running"}
         ):
             raise SourceConflict("Exact interrupted retirement required.")
-        if (
-            proof.get("retirement_outcomes_reconciled") is not True
-            or proof.get("no_delayed_retirement_effects") is not True
-        ):
-            raise SourceConflict("Reconcile all prior retirement requests before resuming clear.")
+
+        def validate_recovery(proof):
+            validate_confirmed_probe(snapshot, proof)
+            if (
+                proof.get("retirement_outcomes_reconciled") is not True
+                or proof.get("no_delayed_retirement_effects") is not True
+            ):
+                raise SourceConflict(
+                    "Reconcile all prior retirement requests before resuming clear."
+                )
+
+        if not self.execution_evidence:
+            validate_recovery(proof)
         pool = snapshot["pool"]["pool"]
         expected = {
             "account:" + job["AccountKey"],
@@ -770,11 +823,22 @@ class SourceOutputPoolDAL:
         if {r["ResourceKey"] for r in snapshot["resources"]} != expected:
             raise SourceConflict("Recovery requires complete registered resource membership.")
         with coordinator._account(job["AccountKey"]) as cursor:
-            for resource in snapshot["resources"]:
+            for resource in sorted(snapshot["resources"], key=lambda row: row["ResourceKey"]):
                 _mutex(cursor, resource["ResourceKey"])
             _mutex(cursor, "pool:" + pool["PoolID"])
             if coordinator._operator_snapshot(cursor, job["JobID"]) != snapshot:
                 raise SourceConflict("Retirement recovery snapshot changed.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor,
+                    proof,
+                    snapshot=snapshot,
+                    account=job["AccountKey"],
+                    kind="retirement_recovery",
+                )
+                validate_recovery(proof)
             audit = json.loads(job["ProvenanceJson"])
             recovery = dict(
                 token=str(uuid4()),
@@ -836,7 +900,13 @@ class SourceOutputPoolDAL:
 
     def finish_retirement_recovery(self, coordinator, claim, attempt_id):
         # Revoke the nested provider owner BEFORE taking a fresh read-only probe.
+        if self.execution_evidence != (getattr(coordinator, "execution_evidence", False) is True):
+            raise SourceConflict(
+                "Recovery completion requires the same evidence contract on both DALs."
+            )
         with self._recovery_owned(coordinator, claim, attempt_id) as (cursor, job, _):
+            if self.execution_evidence:
+                self._execution_gate(cursor, claim.account)
             if pending_retirements(coordinator._operator_snapshot(cursor, claim.job_id)):
                 raise SourceConflict("Retirement recovery has unfinished clears.")
             _cas(
@@ -932,7 +1002,8 @@ class SourceOutputPoolDAL:
                 _mutex(cursor, resource["ResourceKey"])
             _mutex(cursor, "pool:" + str(pool_id))
             cursor.execute(
-                "SELECT * FROM KVK.SourceOutputPool WITH (UPDLOCK,HOLDLOCK) WHERE PoolID=?", pool_id
+                "SELECT * FROM KVK.SourceOutputPool WITH (UPDLOCK,HOLDLOCK) WHERE PoolID=?",
+                pool_id,
             )
             yield cursor, one(cursor)
 
@@ -968,34 +1039,42 @@ class SourceOutputPoolDAL:
             snapshot["pool"]["pool"]["IndexFileID"],
             *(s["FileID"] for s in snapshot["pool"]["slots"]),
         }
-        if (
-            proof.get("snapshot_hash") != digest(snapshot).hex()
-            or proof.get("writer_terminated") is not True
-            or proof.get("state") != "completed"
-            or not proof.get("evidence_id")
-            or set(proof.get("files", {})) != expected
-            or not proof.get("setup")
-        ):
-            raise SourceConflict(
-                "Exact terminal rollover readback and old-writer termination required."
-            )
-        for file_id, evidence in proof["files"].items():
+
+        def validate_proof(proof):
             if (
-                evidence.get("file_id") != file_id
-                or evidence.get("private") is not True
-                or evidence.get("empty") is not True
-                or not evidence.get("manifest_hash")
+                proof.get("snapshot_hash") != digest(snapshot).hex()
+                or proof.get("writer_terminated") is not True
+                or proof.get("state") != "completed"
+                or not proof.get("evidence_id")
+                or set(proof.get("files", {})) != expected
+                or not proof.get("setup")
             ):
-                raise SourceConflict("Every registered file needs complete private-clear evidence.")
-        setup = proof["setup"]
-        if (
-            setup.get("file_id"),
-            setup.get("private"),
-            setup.get("setup"),
-            setup.get("old_kvk"),
-            setup.get("new_kvk"),
-        ) != (snapshot["pool"]["pool"]["IndexFileID"], True, True, op["OldKVK"], op["NewKVK"]):
-            raise SourceConflict("Exact setup marker evidence required.")
+                raise SourceConflict(
+                    "Exact terminal rollover readback and old-writer termination required."
+                )
+            for file_id, evidence in proof["files"].items():
+                if (
+                    evidence.get("file_id") != file_id
+                    or evidence.get("private") is not True
+                    or evidence.get("empty") is not True
+                    or not evidence.get("manifest_hash")
+                ):
+                    raise SourceConflict(
+                        "Every registered file needs complete private-clear evidence."
+                    )
+            setup = proof["setup"]
+            if (
+                setup.get("file_id"),
+                setup.get("private"),
+                setup.get("setup"),
+                setup.get("old_kvk"),
+                setup.get("new_kvk"),
+            ) != (snapshot["pool"]["pool"]["IndexFileID"], True, True, op["OldKVK"], op["NewKVK"]):
+                raise SourceConflict("Exact setup marker evidence required.")
+            return setup
+
+        if not self.execution_evidence:
+            setup = validate_proof(proof)
         with self._locked(op["PoolID"]) as (cursor, pool):
             current = self._operation(cursor, op["OperationID"])
             cursor.execute(
@@ -1011,6 +1090,17 @@ class SourceOutputPoolDAL:
                 )
             ) != snapshot or current["State"] not in {"running", "uncertain"}:
                 raise SourceConflict("Rollover reconciliation snapshot changed.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor,
+                    proof,
+                    snapshot=snapshot,
+                    account=op["AccountKey"],
+                    kind="rollover_complete",
+                )
+                setup = validate_proof(proof)
             for resource in _wire(resources):
                 if (
                     resource["ActiveOutputOperationID"],
@@ -1191,6 +1281,16 @@ class SourceOutputPoolDAL:
                 r["DeliveryState"] in {"claimed", "uncertain"} for r in drain["legacy_receipts"]
             ):
                 raise SourceConflict("Historical publication still requires reconciliation.")
+            if self.execution_evidence:
+                from services.export_execution_dal import ExportExecutionDAL
+
+                proof = ExportExecutionDAL.settlement_proof(
+                    cursor,
+                    proof,
+                    snapshot=drain,
+                    account=current["AccountKey"],
+                    kind="rollover_drain",
+                )
             if (
                 proof.get("snapshot_hash") != digest(drain).hex()
                 or proof.get("all_writers_terminated") is not True
@@ -1250,6 +1350,7 @@ class SourceOutputPoolDAL:
                 for r in resources
             ):
                 return None
+            self._execution_gate(cursor, op["AccountKey"])
             fence = max(pool["Fence"], op["Fence"], *(r["Fence"] for r in resources)) + 1
             owner = str(uuid4())
             version = _cas(
@@ -1283,7 +1384,13 @@ class SourceOutputPoolDAL:
                 op["OldEpoch"],
             )["Version"]
             return OutputClaim(
-                operation_id, op["AccountKey"], owner, fence, version, tuple(claimed), pool_version
+                operation_id,
+                op["AccountKey"],
+                owner,
+                fence,
+                version,
+                tuple(claimed),
+                pool_version,
             )
 
     @contextmanager
@@ -1370,7 +1477,10 @@ class SourceOutputPoolDAL:
             if phase.startswith("setup_"):
                 plan = json.loads(op["PlanJson"])
                 pool = plan["snapshot"]["pool"]
-                expected = {pool["IndexFileID"], *(s["FileID"] for s in plan["snapshot"]["slots"])}
+                expected = {
+                    pool["IndexFileID"],
+                    *(s["FileID"] for s in plan["snapshot"]["slots"]),
+                }
                 if file_id != pool["IndexFileID"] or set(progress["files"]) != expected:
                     raise SourceConflict("Setup follows complete verified clear of every file.")
             if phase.endswith("verified"):
@@ -1423,6 +1533,7 @@ class SourceOutputPoolDAL:
             pool,
             op,
         ):
+            self._execution_gate(cursor, claim.account)
             progress = json.loads(op["ProgressJson"])
             plan = json.loads(op["PlanJson"])
             files = {pool["IndexFileID"], *(s["FileID"] for s in plan["snapshot"]["slots"])}

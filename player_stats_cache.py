@@ -15,6 +15,7 @@ import pyodbc
 from constants import PLAYER_STATS_CACHE
 from services.legacy_export_snapshot_service import (
     admitted_writer,
+    bound_runtime,
     current_owner,
     record_writer_completion,
 )
@@ -469,6 +470,9 @@ def _execute_sp_with_retries(
 
             sp_start = time.perf_counter()
             cur = cn.cursor()
+            from services.legacy_export_snapshot_service import verify_producer_cursor
+
+            verify_producer_cursor(cur)
 
             # Set query timeout
             cur.execute(f"SET LOCK_TIMEOUT {_SP_EXECUTION_TIMEOUT * 1000};")  # milliseconds
@@ -1163,14 +1167,19 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
         raise
 
 
+@bound_runtime
 async def build_player_stats_cache() -> dict[str, Any] | None:
     from file_utils import run_blocking_in_thread
+    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
 
-    output = await run_blocking_in_thread(
-        _build_and_persist_cache_sync,
-        name="build_player_stats_cache",
-        meta={"cache_path": PLAYER_STATS_CACHE},
-    )
+    if _writer_runtime() is not None:
+        output = await drain_thread(_build_and_persist_cache_sync)
+    else:
+        output = await run_blocking_in_thread(
+            _build_and_persist_cache_sync,
+            name="build_player_stats_cache",
+            meta={"cache_path": PLAYER_STATS_CACHE},
+        )
 
     if output is None:
         return None

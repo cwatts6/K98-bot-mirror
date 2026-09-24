@@ -46,6 +46,7 @@ from kvk.services.kvk_export_service import (
     section_ref_to_name,
 )
 from services.export_provider_adapter import current_provider
+from services.legacy_export_snapshot_service import bound_runtime
 from sheet_importer import detect_transient_error
 
 logger = logging.getLogger(__name__)
@@ -1230,6 +1231,7 @@ def validate_export_config(config):
 # -------------------------
 # run_all_exports: orchestrator with retry and optional alerting via Discord
 # -------------------------
+@bound_runtime
 def run_all_exports(
     server,
     database,
@@ -1446,6 +1448,14 @@ def _render_run_all_exports(
 # Public runner: run_single_export
 # -------------------------
 def get_gsheet_client(credentials_file: str):
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+        raise SnapshotUnavailable(
+            "Recorded exports require exact captured file IDs; no discovery client."
+        )
+    _reject_uncoordinated_credentials()
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -1458,6 +1468,12 @@ def get_gsheet_client(credentials_file: str):
 
 
 def get_sort_service(credentials_file: str, timeout: int | None = None):
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        from services.export_provider_adapter import recorded_clients
+
+        return recorded_clients()[0]
+    _reject_uncoordinated_credentials()
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive.metadata.readonly",
@@ -1466,6 +1482,7 @@ def get_sort_service(credentials_file: str, timeout: int | None = None):
     return _build_sheets_with_timeout(creds, timeout=timeout)
 
 
+@bound_runtime
 def run_single_export(
     server, database, username, password, config_path, credentials_file=CREDENTIALS_FILE
 ):
@@ -1545,6 +1562,25 @@ def get_sheet_values(
     This function reuses the module's internal _build_sheets_with_timeout and
     error-recording helpers so callers get consistent retry/telemetry behavior.
     """
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        from services.export_provider_adapter import recorded_clients
+
+        sheets, _drive = recorded_clients()
+        result = provider.execute(
+            sheets.spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=spreadsheet_id,
+                range=range_a1,
+                valueRenderOption=valueRenderOption,
+                dateTimeRenderOption=dateTimeRenderOption,
+            )
+        )
+        # An authority failure must propagate. It cannot become an empty config
+        # or trigger the legacy helper's alternate credential/client/retry path.
+        return result.get("values", []) or []
+    _reject_uncoordinated_credentials()
     # Lazy-import heavy dependency to avoid import-time failures in test env
     try:
         from google.oauth2.service_account import Credentials  # type: ignore
@@ -1630,6 +1666,12 @@ def get_sheet_values(
 # Utility: Drive metadata helper
 # -------------------------
 def get_drive_service(credentials_file: str, timeout: int | None = None):
+    provider = current_provider()
+    if provider is not None and provider.execution is not None:
+        from services.export_provider_adapter import recorded_clients
+
+        return recorded_clients()[1]
+    _reject_uncoordinated_credentials()
     creds = Credentials.from_service_account_file(
         credentials_file, scopes=["https://www.googleapis.com/auth/drive.metadata.readonly"]
     )
@@ -1667,9 +1709,34 @@ def get_spreadsheet_modified_time(drive_service, spreadsheet_id: str) -> str | N
 # -------------------------
 # Basic connectivity check
 # -------------------------
+def _reject_uncoordinated_credentials():
+    import bot_config
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    if bot_config.EXPORT_COORDINATION_ENABLED:
+        raise SnapshotUnavailable("S11 provider access requires a recorded authority scope.")
+
+
+@bound_runtime
 def check_basic_gsheets_access(
     credentials_file: str, sheet_id: str, max_retries: int = 2, retry_backoff_sec: float = 1.0
 ):
+    from services.legacy_export_snapshot_service import _writer_runtime, configuration_requests
+
+    if _writer_runtime() is not None:
+        try:
+            with configuration_requests():
+                from services.export_provider_adapter import recorded_clients
+
+                sheets, _ = recorded_clients()
+                current_provider().execute(
+                    sheets.spreadsheets().get(spreadsheetId=sheet_id, fields="spreadsheetId")
+                )
+            return True, "GSheets access confirmed through the S11 authority"
+        except Exception:
+            # The owned preparation retains uncertainty. Health polling must not
+            # fall back to the copied legacy key or retry an unresolved action.
+            return False, "S11 provider access is unresolved; inspect retained evidence"
     client = get_gsheet_client(credentials_file)
     attempt = 0
     while True:
@@ -1946,6 +2013,7 @@ _KVK_DATE_COLS = {
 }
 
 
+@bound_runtime
 def run_kvk_proc_exports(
     server,
     database,
@@ -3524,6 +3592,7 @@ def create_additional_kvk_spreadsheets(
     return results
 
 
+@bound_runtime
 def run_kvk_proc_exports_with_alerts(
     server,
     database,

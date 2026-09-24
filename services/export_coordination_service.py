@@ -230,10 +230,9 @@ def wake_exports():
 
 
 def configured_coordinator():
-    # S10B has no legacy/scan adapters or deployment-attestation owner. An enabling
-    # environment flag cannot stand in for those later gates. No SQL/credentials
-    # are opened and no directories created by this fail-closed factory.
-    raise SourceConflict("Export admission requires S10C adapters and deployment gates.")
+    from services.export_runtime_composition import configured_runtime
+
+    return configured_runtime()
 
 
 def register_exports(task_monitor, *, factory=None):
@@ -244,10 +243,13 @@ def register_exports(task_monitor, *, factory=None):
     global _worker, _loop
     if task_monitor.is_running("export_coordination"):
         return _worker
-    # Production remains closed; dependency injection is for offline composition.
     if factory is None:
-        logger.warning("Export admission disabled pending S10C adapters and deployment gates.")
-        return None
+        try:
+            configured_coordinator()
+        except SourceConflict:
+            logger.warning("Export admission disabled: protected S11 runtime is unavailable.")
+            return None
+        factory = configured_coordinator
     _loop = asyncio.get_running_loop()
     _worker = ExportWorker(factory)
     task_monitor.create("export_coordination", _worker.run)
@@ -255,6 +257,9 @@ def register_exports(task_monitor, *, factory=None):
 
 
 def stop_export_admission():
+    from services.export_runtime_composition import stop_runtime_admission
+
+    stop_runtime_admission()
     if _worker is not None:
         _worker.stop.set()
         wake_exports()

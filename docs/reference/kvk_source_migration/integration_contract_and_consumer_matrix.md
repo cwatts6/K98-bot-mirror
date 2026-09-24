@@ -1,6 +1,834 @@
 # S7 integration contract and consumer matrix
+## S11 authority and caller composition authored — 2026-09-24
 
-## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+The operator approved the one-host/fresh-identity contract and continued local implementation.
+Earlier unanswered-proposal and closed-factory statements below are historical. The actual
+factories are now authored behind complete readiness; nothing has been activated or installed.
+
+The Bot process owns command authorization, producer scopes and durable SQL coordination.
+The separate Windows authority owns the fresh service-account key, supervised provider children,
+private DPAPI evidence and fixed proof producers. Only identifiers and an expected snapshot hash
+cross the proof IPC boundary. The authority obtains the current SQL snapshot itself, runs the
+fixed producer and sealed replay, checks every session belongs to its host, rechecks the exact
+snapshot and protected deployment records, stores/readbacks private evidence and submits one
+exact proof CAS. The Bot cannot provide evidence JSON, termination flags or substitute a probe.
+Unknown commit/response outcomes retain ownership and require reconciliation.
+
+Publication proof supports confirmed, positively damaged and proven absent. Damage requires
+byte-different cell content after the expected ACL, structure, manifest and pointer all match;
+ACL/pointer/structure errors and provider exceptions remain unresolved. Absence requires a closed
+complete history with no dispatched mutation for the exact job, no generation marker, and an
+empty pointer or the exact previous confirmed pointer. SQL independently enforces the no-dispatch
+condition. A missing marker or a Boolean alone never proves absence or no delayed effects.
+Ordinary retirement, interrupted journal recovery, rollover drain and rollover completion retain
+their distinct fixed producers, private replay and owner/fence/version checks.
+
+One immutable ExportRuntime binds worker, operator, rollover, delivery and legacy capture services.
+Actual daily pipeline, standalone procedure/cache refresh, configuration import, kvk_all import/
+automatic export and manual export roots bind this bundle. Nested ownership persists across thread
+offloads. Cancellation drains owned work; shutdown closes new admission and waits for existing
+roots/entered children. Readiness runs outside the publication lock; shutdown during readiness
+cannot publish a late bundle. The existing upload offload is already thread-only; commands pass
+to bound functions. No additional upload route or command implementation was necessary.
+
+Readiness checks fixed coordination SQL, the legacy signed-module permission closure and the
+whole application metadata/permissions against independently reviewed pins. It also pins source,
+export configuration, host/SIDs, deployment hash, registration and an existing private spool.
+The actual producer cursor is checked before its first write, including kvk_all ingest and window
+recompute; a separate guard connection is insufficient. Metadata reads do not commit, rollback or
+close the producer's connection. Existing producer transaction ownership remains unchanged.
+
+The G4 protected deployment boundary requires seven typed source records: host_acl, bot_identity,
+identity_issuance, key_inventory, file_access, writer_drain and sql_installation. They bind the same
+deployment/review UUIDs and exact protected bytes. The Bot account must be nonprivileged; every
+Bot IPC request checks its actual token, including deny-only administrator groups and disabled
+privileges. Windows can re-enable a privilege already in a token; see [Microsoft's token guidance](https://learn.microsoft.com/en-us/windows/win32/secbp/changing-privileges-in-a-token).
+Authority child authentication remains a separate SID/PID check. Trusted Windows/SQL/provider
+administrators remain trusted: reviewed records are not independent discovery of key custody or
+proof that an administrator made no later change. G4 must review original source observations,
+all issuance/impersonation capabilities, old processes/sessions, ACLs and credential holders.
+No live Windows/provider observation has been made by this authoring work.
+
+The old shared service account remains outside S11 execution. The fresh key stays only in the
+Bot machine's authority-private custody; development remains source/offline. Player link access
+may remain viewer-only. The owner administrator remains a trusted maintenance actor and must
+freeze edits during accepted execution; viewer settings do not establish writer exclusion.
+
+
+## S11 single-authority contract approved — 2026-09-24
+
+The operator answered "Approved please continue" to the one-Bot-machine execution
+authority and fresh S11 service-account proposal below. Its earlier unanswered wording
+is retained as historical evidence; this approval is satisfied. Local implementation of
+the protected deployment evidence contract, trusted proof issuer, runtime composition,
+actual shared callers and readiness checks may proceed under the existing exact manifest.
+
+Provisioning the identity/key, editing sharing, live SQL/provider/Discord work, deployment,
+activation, G4 operations and G5 acceptance remain separately operator-owned. A reviewed
+structured deployment packet is a prerequisite, never an invented success flag. Closed
+source implementation and offline validation must remain distinct from those live proofs.
+
+## S11 remaining host and credential decision — 2026-09-24
+
+The approved NULL guard correction and its separate SQL Changes review are complete. The
+remaining local issuer/runtime authoring needs a concrete credential-custody boundary; the
+operator has been asked to confirm the following recommendation. No reply has yet been
+received. This does not revoke earlier local implementation authority or authorize G4 actions.
+
+
+The current service-account key is present on both machines. The user reports one Bot instance
+and no other imports or manual writers, but that inventory is not enforced credential exclusion.
+The authored Windows authority supervises only its own children. Its private DPAPI evidence is
+also local to that authority identity; SQL hashes cannot make another host's missing private
+journal readable. A successful fixed probe proves the observed response, not closure of an
+unregistered holder of the same key. The existing runtime/proof factories therefore remain closed.
+
+Current sources: core/export_execution_host.py (PrivateEvidenceStore and protected ACL checks),
+services/export_execution_authority.py (owned stream/child closure),
+services/export_reconciliation_service.py (complete recorded catalogue and private replay),
+scripts/run_export_authority.py (local authenticated pipe), and
+services/export_runtime_composition.py (registration is explicitly not deployment proof).
+
+### Recommended initial release contract
+
+1. Use one execution authority, on the Bot machine, for all admitted legacy/configuration and
+   new-source provider calls. The development machine remains a source/offline-test host.
+   Keep the shared SQL coordinator and account budget. No cross-host replay, automatic failover,
+   network RPC or transfer of an old authority's private evidence is added.
+2. Provision a fresh S11 service-account identity for that authority at G4. Its credential is
+   issued into protected custody on the Bot machine; the ordinary Bot and development machine
+   cannot read it. This is a proposed identity/custody change, not a claim that it is provisioned.
+   The current identity and retained files are untouched during authoring.
+3. Admin-created legacy/configuration sheets are explicitly shared with the new identity when
+   G4 authorizes the exact cutover. New S11 pools use the existing fresh-file enrollment path.
+   The old identity must have no write capability over S11 files. Public viewer sharing remains
+   the chosen audience. Do not infer editor exclusion from viewer visibility.
+4. G4 must establish the closed writer boundary with an actual, reviewed evidence packet:
+   exact host and Windows SIDs; authority/child/source hashes; protected credential and evidence
+   paths and ACL observations; provider identity/key inventory and issuance/custody evidence;
+   exact file owner/editor/audience observations; old process/SQL-producer drain evidence; exact
+   SQL target, installed metadata and effective privileges. Name the trusted OS/SQL/provider
+   administrators and permitted maintenance changes. Missing evidence or an unexplained writer
+   keeps admission closed. A free-text assertion or a Boolean configuration flag is insufficient.
+5. Proof issuance can then combine that established deployment boundary with authenticated
+   origins, complete closed request catalogues, exact current snapshots, fixed fresh probes and
+   private replay. It must refuse foreign-host evidence, unknown outcomes, missing origins,
+   interrupted journals or stale snapshots. No token-expiry timer or repeated empty read becomes
+   a no-delayed-effects proof. Existing S6 files/publications remain protected and ineligible
+   for automatic adoption or reuse.
+
+The fresh identity provides a clear boundary from the copied legacy key. Keeping the existing
+identity is possible only after separately designing and proving an equally concrete exclusion
+of all former keys/tokens/writers. The current inventory alone does not supply that proof.
+
+This recommendation is an inference from the current code and custody facts. Google documents
+that possession of a service-account private key permits authentication as that identity and
+recommends preventing copies during deployment ([key management](https://docs.cloud.google.com/iam/docs/best-practices-for-managing-service-account-keys)).
+Drive grants edit capability through writer permissions, separately from reader visibility
+([Drive roles](https://developers.google.com/workspace/drive/api/guides/ref-roles)). These sources
+support the identity/access boundary; they do not certify a deployed writer inventory or the
+outcome of an escaped request.
+
+
+The current confirmation is the initial one-host/fresh-identity design and local authoring
+only. No service account, key, permission, SQL object or host process is changed now. The
+existing [implementation manifest](integration_implementation_manifests.md#s11-preparation-and-proposed-implementation-manifests--2026-09-24)
+states: "If it needs a supervisor change, additional durable SQL state, a new configuration
+surface or credential protocol, return an exact amended manifest before coding." The
+fresh-identity/custody contract is that new decision. No samples or private keys are requested.
+The exact affected source/test owners and remaining stage gates are recorded in the current
+[manifest](integration_implementation_manifests.md#s11-remaining-authority-composition-scope--2026-09-24)
+and [release matrix](release_readiness_and_rollback.md#s11-corrected-sql-review-and-remaining-authority-decision--2026-09-24).
+
+
+## S11 SQL NULL guard correction proposal — 2026-09-24
+
+The completed SQL Changes review found no reportable security vulnerability under the
+inspected authority and protected-code boundaries. It did identify source defects that
+must be corrected before release. These are implementation defects, not missing provider
+proof, and security suppression does not accept them as correct.
+
+1. dbo.usp_ExportProviderRequestEventAppend accepts an explicit NULL ExpectedVersion. Its
+   inequality against the current non-NULL version then evaluates UNKNOWN, allowing an
+   otherwise-valid event without an exact observed-version precondition. Add an explicit
+   NULL rejection to the SQL API and synchronize both embedded migration copies. Keep
+   authority/session, owner/fence, resource, state and append-only checks intact. The real
+   authority supplies its own SQL-derived stream.version; IPC cannot supply this parameter.
+2. The five API definition comparisons in 20260924_001 use OBJECT_DEFINITION inequality
+   without rejecting an unavailable definition. An existing complete installation can
+   therefore pass that check with an opaque body and otherwise matching module metadata.
+   Reject NULL definitions before granting authority execution. Do not adopt, decrypt,
+   overwrite or repair an unknown installed body automatically. Fresh-install literals
+   currently match the exact snapshots. Producing malicious existing code requires a
+   protected schema/deployment capability; runtime readiness independently rejects opaque
+   definitions. That limits security reportability but does not repair the installer.
+3. The narrow S11 SQL fixture also compares HAS_PERMS_BY_NAME and administrator-membership
+   observations without consistently rejecting NULL. Make an unknown permission/token
+   observation fail closed before any synthetic session operation. This is fixture
+   correctness, not evidence that a real restricted token or installed schema was tested.
+
+This proposal is limited to the existing S11 evidence API/installer/fixture and regression
+authoring. No new SQL object, role, grant, certificate, credential, provider protocol or
+business procedure is proposed. No command/view/DAL refactor, query optimisation or cache
+change is needed. The existing evidence DAL remains the caller. Retained state, receipts,
+claims and all source/endpoint/UpdateID, P/Q/R, 9,000,000-cell and 8/16 contracts stay intact.
+
+See the [exact correction manifest](integration_implementation_manifests.md#s11-sql-null-guard-correction-manifest--2026-09-24)
+and [approval, validation and rollback plan](release_readiness_and_rollback.md#s11-sql-review-correction-approval--2026-09-24).
+The correction proposal has not been implemented or executed.
+
+
+
+## S11 approved SQL NULL guard corrections — 2026-09-24
+
+The operator approved the eleven-path correction plan and continued local gap closure.
+The event API now explicitly rejects NULL expected/current versions before mutation. The
+uninstalled 001 draft synchronizes the API body and comparison literal and rejects NULL
+definitions for all five evidence APIs. Its static checker compares both embedded bodies
+against each source snapshot. The narrow fixture rejects unknown permission/admin tokens.
+No existing business procedure, role, grant or migration identity changed.
+
+The gated event regression now includes NULL, zero, negative and stale prepare versions,
+NULL/zero/stale terminal versions, exact unchanged stream/request/event observations on
+rejection, and the existing positive prepare/not_sent/freeze/close sequence. These engine
+cases are authored but remain disabled and unexecuted. Static/offline validation cannot
+establish actual SQL NULL, permission, installation or provider behavior.
+
+The prior proposal below remains historical evidence; its approval requirement is satisfied.
+Trusted issuance, complete shared-caller composition, application readiness and final reviews
+remain authorized local work. Live operations and G4/G5 acceptance remain separately gated.
+
+## S11 legacy SQL permission implementation — 2026-09-24
+
+The operator approved the proposal below with "approved please continue". Its earlier
+approval-request wording is retained as historical evidence. The additional local SQL
+source, Bot readiness and offline-test authoring is now implemented. No existing business
+procedure, merged migration, configuration query or private credential was rewritten.
+
+The source manifest pins 37 procedures and dbo.fn_NormalizeGovernorNameKey. UPDATE_ALL2,
+sp_TARGETS_MASTER and SP_Stats_for_Upload get separate root signatures; 23 countersignatures
+retain the appropriate capability along the reviewed child paths. The function, pure fixed
+DML/read children, three KVK roots and two existing EXECUTE AS OWNER helpers receive no
+unnecessary signature. This corrects the first lexical inventory's omission of INSERT EXEC
+calls without treating its comment/string candidates as actual modules.
+
+Import/target certificate users have the DDL and SELECT/INSERT capabilities required by
+existing output-table replacement and numeric-season objects. Schema UPDATE/DELETE is not
+granted. Stats has schema SELECT and ALTER on STATS_FOR_UPLOAD for its existing statistics
+refresh. Only import has CHECKPOINT, the separate master certificate-user xp_cmdshell and
+xp_fileexist EXECUTE grants, and certificate-login bulk/performance grants. The Bot receives
+none of those certificate capabilities. ExportLegacyEntryReader contains only the seven
+public entry EXECUTE grants; application membership is a later explicit G4 operation.
+
+The additive SQL delivery requires independently provisioned public-only certificates,
+exact source/body hashes and exported signature blobs. It does not generate a signing key,
+enable xp_cmdshell, create its proxy credential or change Windows ACLs. Signature validity,
+exact grant rows, certificate principal identities and exclusive signature placement must
+match. Unknown existing names, signatures, partial states or drift refuse; exact reapplication
+verifies the existing delivery. The inverse requires the original packet and unchanged
+delivery with no remaining application membership; it retains certificates and all evidence.
+
+The Bot source pin is a canonical hash of that exact SQL manifest, not an installation-derived
+allowlist. A protected version-1 legacy_sql_contract carries the source manifest, exact server,
+ROK_TRACKER database, application principal, public-key/thumbprint pins, signature hashes,
+migration hash and metadata fingerprint. Its 13 bounded read-only batches use the producer's
+own connection. Source definitions, certificate identities/grants, forbidden direct or inherited
+DDL/impersonation/grant-option permissions and owned schemas/objects/principals must match.
+SQL Server 2022 and dbo default-schema resolution are explicit supported prerequisites.
+
+LegacySnapshotDAL with execution_evidence=True requires that contract at construction and
+checks the same SQL session before entering the producer. Validation failure closes its cursor,
+retains durable ownership and neither commits, rolls back nor executes the producer. Nested
+ownership and the existing session app-lock remain intact. The older version-2 fixed coordination
+contract remains a separate prerequisite. No production factory or caller is opened by this gate.
+
+This is a module/permission prerequisite. Complete installed table/view/trigger dependencies,
+dynamic output shapes, actual root/nested transactions, bulk/proxy behavior, independently proven
+writer coverage and provider/host evidence remain separate. The new disabled SQL fixture covers
+restricted-login denial and the original configuration helper's real denied-TRUNCATE/DELETE
+fallback with explicit caller rollback under both XACT_ABORT settings. Its behavior is unproven
+until the exact G4 fixture is approved and executed; failure does not justify broad Bot DDL.
+
+## S11 legacy SQL privilege-isolation proposal — 2026-09-24
+
+This is a newly identified scope decision, not permission to execute or install SQL. The approved
+evidence-ledger implementation and fixed coordination checks continue to stand. Their restricted
+Bot/authority profiles cannot be treated as a complete permission plan for existing legacy writers.
+The source gap is an explicit contract for elevated legacy operations while keeping the Bot unable
+to author trusted evidence. Installed grants, signatures, proxy identity and behavior are unobserved;
+this is not a claim that production is currently broken or exploitable.
+
+### Source evidence and affected existing behavior
+
+The fourteen SELECTs in config/sheet_config.json resolve in the authoritative repository to thirteen
+distinct table/view definitions. Some names are unqualified; two queries explicitly name ROK_TRACKER.
+Future capture readiness must bind actual database/default-schema resolution, exact definitions and
+column/result shapes rather than assuming that matching query text selects the intended object.
+The all-KVK capture calls KVK.sp_KVK_Get_Exports and consumes its ten existing ordered result sets.
+
+Seven existing procedure roots were followed through a static candidate inventory: dbo.UPDATE_ALL2,
+dbo.SP_Stats_for_Upload, dbo.sp_TARGETS_MASTER, dbo.sp_Upsert_ProcConfig_From_Staging,
+KVK.sp_KVK_AllPlayers_Ingest, KVK.sp_KVK_Recompute_Windows and KVK.sp_KVK_Get_Exports.
+The retained artifact records exact paths, content hashes and call-site lines for 37 procedure
+candidates. It is a lexical inventory, including conditional/dynamic-call review points, not a
+complete runtime call graph or an instruction to sign all 37 modules.
+
+| Existing source | Concrete additional permission boundary |
+|---|---|
+| dbo.UPDATE_ALL2 | EXECUTE AS CALLER; index/statistics maintenance, table truncation and calls that rebuild output tables; preserve its public-entry transaction refusal and original import ownership |
+| dbo.sp_Rebuild_ExcelForDashboard | EXECUTE AS CALLER; dynamic DROP and SELECT INTO dbo.EXCEL_FOR_DASHBOARD, using existing integer season-derived tables |
+| dbo.sp_Prep_TargetTable, dbo.sp_Prep_ExcelExportTable and related output helpers | Existing dynamic per-season object creation and later refresh/index/view work need an exact reviewed dependency/permission closure |
+| dbo.CLAIM_KS4_IMPORT_FILE, dbo.ARCHIVE_IMPORT_STAGING_FILE, dbo.HASH_KS4_IMPORT_ARCHIVE_FILE | Existing master.dbo.xp_cmdshell/file-existence calls; actual execution/proxy identity and file ACLs are separate server/host evidence |
+| dbo.IMPORT_STAGING_PROC_CORE | Existing dynamic BULK INSERT of the claimed file; preserve file hash, single-owner and archive contracts |
+| proc_config_import.py via sheet_importer.py | Existing TRUNCATE-to-DELETE fallback and direct fixed-table writes; do not grant broad DDL merely to make the first branch succeed or assume fallback transaction behavior is proven |
+
+SQL Server requires database CREATE TABLE and schema ALTER for SELECT INTO. Microsoft also describes
+ownership-chain risks from schema ALTER with object-creation capabilities; table-level evidence
+denials alone are not a complete application privilege design. See
+[SELECT INTO permissions](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-into-clause-transact-sql?view=sql-server-ver17)
+and [schema permission implications](https://learn.microsoft.com/en-us/sql/t-sql/statements/grant-schema-permissions-transact-sql?view=sql-server-ver17).
+No certificate/module-signing contract was found in repository SQL, PowerShell or Markdown. That
+source search does not establish whether an unrecorded installation has signatures or other grants.
+
+### Recommended additional local scope
+
+Author a separate, additive SQL module-permission delivery contract. Grant elevated capabilities to
+certificate-mapped identities used only by exact reviewed modules; ordinary Bot connections retain
+the required data operations and exact entry-point EXECUTE permissions without general schema/module
+control. Do not solve this by granting db_owner, retaining a second unrestricted Bot credential or
+placing the Bot in ExportExecutionAuthority. The authority/enrollment identities remain separate.
+
+1. Resolve the complete privilege-requiring closure from the seven existing roots, including dynamic
+   SQL, called modules, server operations and the existing configuration helper. Record exact module
+   definition hashes, parameters, required capabilities and existing caller/transaction ownership.
+   Unknown dynamic targets or parameter-to-command ambiguity block that root. Pure read/DML modules
+   receive no unnecessary elevated signature. No automatic database-wide module enumeration/signing.
+2. Author explicit root signatures and necessary child countersignatures, narrowly scoped certificate
+   principals/grants and read-only verification. Signing must bind independently approved module
+   bytes. A procedure edit invalidates its signature and readiness; never silently sign whatever is
+   currently installed. No business procedure body, output contract or old migration is rewritten.
+3. Specify the separate master/server side only for the existing file/bulk operations that require
+   it. No sysadmin/CONTROL SERVER grant, automatic xp_cmdshell enablement, proxy credential creation,
+   file ACL change or signing-key generation follows from local authoring. Those identities and exact
+   operations need their own G4 packet. Unsupported execution contexts remain closed.
+4. Extend Bot readiness to validate this source-derived module/permission contract, actual target
+   resolution and relevant schema/module capabilities. The current version-2 fixed export observation
+   stays a bounded prerequisite; it must not be promoted into a whole-application certificate. Reuse
+   existing DAL and composition boundaries and guard checks before any producer starts.
+5. Retain the configuration helper's current behavior during this scope. Validate its denied-TRUNCATE
+   fallback and transaction outcome in the separately disabled SQL fixture. If preserving semantics
+   requires a new helper/procedure body change, report that concrete exception before expanding edits.
+
+Module signatures do not automatically survive a nested procedure call: explicit countersignatures
+can preserve the matching signature along a reviewed chain. Changing a module removes its signature.
+These constraints shape the proposed allowlist and readiness tests; signing is not itself proof that
+the existing inputs/privileges are safe. See Microsoft's
+[ADD SIGNATURE contract](https://learn.microsoft.com/en-us/sql/t-sql/statements/add-signature-transact-sql?view=sql-server-ver17).
+
+### Validation, delivery and rollback
+
+Offline validation will cover exact root/child allowlists, definition or signer drift, missing/extra
+signatures/grants, changed default schema/database resolution, direct evidence mutation/DDL rejection,
+and refusal before producer admission. Static SQL parsing and both repository Changes reviews, Deep
+off, remain distinct from the disabled exact-target SQL permission/transaction fixtures. Actual
+root/nested calls, proxy/bulk behavior and private-key handling require operator-approved disposable
+resources and actual restore evidence under G4; no predecessor scenario is rerun automatically.
+
+Before installation, rollback remains continued non-installation. Later reversal requires admission
+closure, owned work drain/reconciliation and exact pre-change permission/signature evidence. Remove
+only this delivery's signatures/grants under an approved reverse plan, retaining journals/claims,
+origin evidence, historical receipts and both uncertain publications. Do not delete signing material
+needed to restore existing signatures or weaken evidence denials to restore a legacy writer.
+
+The [exact additional file proposal](integration_implementation_manifests.md#s11-legacy-sql-permission-scope-amendment--2026-09-24)
+and [approval boundary](release_readiness_and_rollback.md#s11-additional-sql-permission-scope-decision--2026-09-24)
+are ready for review. The request is for local source/static/offline authoring of this additional
+SQL privilege-isolation layer. Git publication, SQL/provider/Discord operations, credential/signing
+key provisioning, bot-machine actions, activation, G4 execution and G5 acceptance remain unapproved.
+
+## S11 file enrollment approval — 2026-09-24
+
+The operator approved the additional implementation proposal below with “approved please
+proceed”. This authorizes its exact local source, SQL authoring and offline validation scope.
+The proposal's earlier approval-request wording remains historical evidence. Live G4/G5
+operations, credentials, provider/SQL execution, publication and deployment remain unapproved.
+
+The origin entity uses append-only `created` and `eligible` records. Creation retains its exact
+preparation, ordinal, request, response and closed child stream; eligibility appends the sealed
+verification stream and private evidence without rewriting creation. Interrupted enrollment
+retains ownership. Catalogue membership includes every stream of each origin's preparation,
+including the account-only stream preceding the first returned file ID. A completed preparation
+alone cannot authenticate origin eligibility; the authority-written eligible records are required.
+
+## S11 initial file enrollment: additional implementation proposal
+
+Status: reviewable proposal only. No additional code, SQL object, credential flow or live
+operation described below is authorized or implemented by this document. Existing approved
+local implementation authority and every G4/G5 restriction remain intact.
+
+### Finding and decision
+
+The current independent authority can establish exact S11 child closure and terminal outcomes
+for its recorded requests. CatalogueVerifier checks every relevant registered stream and the
+five fixed probes replay sealed response bytes. None establishes a file's history before that
+recording boundary, or excludes an unregistered credential-bearing writer. RuntimeRegistration
+now binds admitted account/files/configuration; that protected allowlist is not historical proof.
+
+The current SQL stream requires a pre-existing job/preparation/output-operation owner and
+immutable resources. ProviderRequest and the child currently refuse create/discovery. There is
+no durable binding from an independently observed creation request to a newly returned file ID.
+SourceOutputDisposition supports only retire/quarantine/clear/assign; it is not a file-origin ledger.
+Fabricating a baseline, treating a current blank file as a virgin file, importing a caller Boolean,
+or treating zero S11 rows as complete history would violate the approved proof contract.
+
+Recommend adding a narrowly scoped enrollment path for **new dedicated output files** whose
+creation and complete subsequent managed request history can be recorded from the start.
+Existing files without independently verifiable origin/history stay ineligible for automatic
+finality/reuse; all retained S6 data and both uncertain publications remain untouched. This does
+not add capacity to an existing blocked pool or let another account bypass an unresolved claim.
+Existing registrations remain unchanged until separately authorized exact G4 operations.
+
+Google documents that service accounts cannot own files and have no storage quota; shared-drive
+files instead have organizational ownership and no individual owner role. The existing transport
+requires an exact human owner. Therefore this proposal uses a separate **human-authorized,
+authority-held creation credential**, bounded to the application's newly created files, while
+retaining the existing service-account Editor identity for normal execution. No shared-drive
+contract change or domain-wide delegation is inferred. The concrete OAuth client, user identity,
+consent, token provisioning and any actual creation require a separate exact G4 approval.
+
+Primary sources checked 2026-09-24:
+- [Google Drive ownership and service-account limits](https://developers.google.com/workspace/drive/api/guides/about-shareddrives)
+- [Sheets create API and returned spreadsheet](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/create)
+- [Service-account impersonation prerequisites](https://developers.google.com/identity/protocols/oauth2/service-account)
+
+This is a proposed implementation direction, not proof that a future deployment has excluded all
+external writers. The exact G4 inventory must still cover every host, identity, credential copy,
+SQL producer, manual/scheduled caller and destination alias. The named owner and privileged OS/SQL
+administrators remain inside the existing trusted computing base; owner automation is not exempt
+from the writer inventory. A missing or unverifiable exclusion stops admission.
+
+### Proposed fixed flow
+
+1. An explicit authority-side enrollment command accepts a protected, exact approved plan: one
+   account/project, human owner, service-account Editor, requested index/slot count, private initial
+   audience, source/build hashes and SQL/storage identities. No title-based discovery or Bot IPC
+   enrollment. All 8/16 and protected-file/alias bounds remain. No command runs on import/startup.
+2. Use the approved preparation ownership model with a new, strictly typed `output_enrollment`
+   request purpose and account-only preflight under exact owner/fence/version CAS. This is a
+   separately created preparation, never an existing configuration-read claim. Only the protected
+   authority-side command may create it; normal Bot configuration requests cannot request this
+   capability. Existing unresolved account/request ownership blocks it. Each creation ordinal is
+   unique. Do not invent a completed job, replace a preparation or adopt an old claim.
+3. Supervise one owner-authorized child, record a fixed create request before dispatch, validate its
+   exact synchronous response and newly returned ID, then close/seal the stream. An ambiguous
+   creation remains blocked: no repeat, name search, duplicate creation, adoption or cleanup.
+4. Associate each returned ID with its original successful request and closed stream in an
+   authority-only origin record. Add that exact destination to provisioning ownership only through
+   the account/sorted-resource/owner lock order and current-version CAS. Never mutate old stream
+   scope or substitute returned IDs. New streams use the enlarged exact resource membership.
+5. Record the bounded Editor grant and complete private workbook/ACL readback under the exact
+   owner. Close the owner-capable child and all bootstrap streams before eligibility. No public
+   grant or real data export occurs in enrollment. Unknown grants/readbacks retain the operation.
+6. Seal a canonical origin/evidence digest. Register a pool only from the completed origin set via
+   separately authorized G4 SQL operations; do not automatically alter active registrations. The
+   trusted issuer requires the original protected origin proof plus every subsequent relevant
+   stream, including bootstrap streams whose original account-only scope preceded file creation.
+7. The fixed publication/retirement/recovery/rollover probes can then issue SQL ProofIDs only after
+   complete origin/history, snapshot, deployment and current observation checks. Unsupported
+   history and unknown outcomes remain reconciliation, potentially indefinitely. Status never
+   starts a probe. No caller-authored evidence flags can cross the trust boundary.
+
+### Exact proposed authoring manifest amendment
+
+All paths below are proposed, not newly authored by this packet. Existing pending documents remain
+grouped with the next genuine Bot implementation PR; SQL implementation and its two closeouts are
+separate. No standalone documentation PR or Git publication is requested here.
+
+New Bot paths:
+- `services/export_enrollment_service.py`: fixed provisioning/origin and complete-history verifier.
+- `scripts/enroll_export_output_pool.py`: explicit authority-side entry; closed by default.
+- `tests/test_export_enrollment_service.py`: offline state/identity/ambiguity/coverage cases.
+
+Additional behavior in already pending Bot paths:
+- `services/export_execution_protocol.py`: bounded typed create request/response, no generic endpoint.
+- `services/export_execution_authority.py`: exact enrollment preparation and returned-file association.
+- `services/export_execution_dal.py`: typed provisioning/origin procedures and complete membership.
+- `services/export_reconciliation_service.py`: origin-gated issuance, retaining fixed sealed probes.
+- `services/export_runtime_composition.py`: separate protected bootstrap profile and completed-origin
+  readiness; retain normal Bot/service-account identity and every shared-writer gate.
+- `scripts/run_export_authority.py`, `scripts/run_export_provider_child.py`: isolated creation
+  credential profile, exact identity/operation allowlist and no fallback to broader credentials.
+- `tests/test_export_execution_protocol.py`, `tests/test_export_execution_authority.py`,
+  `tests/test_export_execution_sql_integration.py`, `tests/test_export_runtime_composition.py`,
+  `tests/test_export_authority_launcher.py`, `tests/test_export_reconciliation_service.py`.
+- Existing integration contract/manifests, release evidence/readiness, ENV_REFERENCE and startup/
+  shutdown/diagnostics runbooks receive additive contracts and exact non-executed G4 steps.
+
+New SQL paths (separate repository):
+- `sql_schema/dbo.ExportManagedFileOrigin.Table.sql`
+- `sql_schema/dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql`
+
+Existing pending SQL paths requiring amendment:
+- `migrations/20260924_001_export_execution_evidence.sql` (unmerged/uninstalled only; never rewrite
+  a merged migration; re-resolve date/ordinal if this is no longer the current unmerged migration).
+- `sql_schema/dbo.ExportExecutionStream.Table.sql`
+- `sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql`
+- `sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql`
+- `sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql`
+- `validation/kvk_source/s11_export_execution_evidence.sql`
+- `deploy/Test-ExportExecutionEvidenceContracts.ps1`
+- `docs/SQL_DELIVERY_LOG.md`, `migrations/README.md`.
+
+Physical SQL design precedes dependent Bot authoring: immutable preparation/plan identity; exact
+account/owner/fence/version and monotonic phase; unique file ID and creation ordinal/request;
+foreign keys to the existing preparation and authenticated session/stream/request; original credential-profile/registration
+and response/closure digest references; bounded canonical evidence; no DELETE/update-origin API;
+authority-only EXECUTE and evidence writes; reader-only ordinary Bot evidence access. Creation
+streams join proof membership through authoritative origins even if their initial scope had no
+file ID. SQL must independently repeat that membership at issue and consuming settlement.
+
+### Validation, risks and rollback
+
+| Layer | Local authoring/validation proposal | Separate live evidence required |
+|---|---|---|
+| Bot/static | Fixed method/body/response parsing, origin lineage, claim/resource/epoch binding, guarded imports, caller matrix, complete pytest and log hygiene | None claimed by offline passes |
+| SQL/static | New schemas/procedures/migration sync, keys/role predicates, complete catalogue selection | Installation, effective permissions, rollback/locking/CAS races and actual restore |
+| Transaction | Disabled tests for duplicate/unknown create, atomic origin registration, cross-account/file substitution, proof-vs-provisioning races, replay refusal | Exact approved disposable target and operator packet |
+| Provider/OS | Fake successful, partial, wrong-ID, lost-response, grant-loss, closure-loss and restart cases | Owner consent/credential isolation, actual private creation/readback, exact child closure, all-writer exclusion |
+| Deployment | Separate profiles; no startup/bootstrap side effects; unsupported pre-S11 history blocked | Approved identities/builds/paths, complete writer inventory and G4 operations; G5 operator acceptance |
+
+Main risks are broader credential authority, accidental creation replay, incomplete bootstrap
+membership and treating enrollment as old-history repair. Keep the creation capability outside
+Bot IPC, limited to fixed reviewed operations on newly created files, with all bytes/evidence
+retained. Every negative outcome preserves claims and does not create reusable capacity. Tests
+must verify no direct credential fallback and that pre-S11/forged/cross-file origins never issue a
+ProofID. Bot and SQL require separate exact Changes reviews with Deep off after settled authoring.
+
+Rollback now is non-installation. After a separately authorized deployment, close admission,
+drain/freeze and observe owned children, retain every origin/request/claim and uncertain remote
+file, and forward-fix SQL. Never delete unknown creations, reset versions, reuse old files or
+restore an old direct writer as an automatic rollback. No retained predecessor is a test fixture.
+
+### Approval requested
+
+Approve or reject the additional local implementation scope above: trusted fresh-file enrollment,
+the separate owner-authorized creation profile, one additional SQL evidence entity/procedure,
+and origin-gated proof issuance. This approval would authorize source/static/offline work only.
+It would not authorize OAuth consent, credential access/provisioning, SQL/provider/Discord
+execution, creation of any real file, Git publication, bot-machine changes, deployment or activation.
+
+The current release plan requires an explicit scope amendment for additional behavior/paths.
+The choice is material because the original five-entity request ledger alone cannot authenticate
+pre-recording file history, and the existing service-account-only credential contract cannot own
+new human-owned workbooks. Do not quietly broaden either trust boundary during composition.
+
+
+## S11 proof-consumption continuation — 2026-09-24
+
+Six S11 settlement paths now resolve trusted SQL ProofID in their existing locked snapshot
+transactions. Private-journal verification is implemented as a prerequisite to proof issuance;
+the complete issuer, launcher and caller composition remain unfinished and disabled. See the
+[current continuation evidence](release_evidence_log.md#s11-continuation-trusted-proof-consumption--2026-09-24)
+for exact files and source-only validation. Earlier checkpoint statements remain historical.
+
+
+## S11 implementation status — 2026-09-24
+
+The operator approved this mechanism for implementation. Current source authoring implements only the evidence/transport foundations and optional admission gates. Trusted proof production/consumption and complete caller composition remain real implementation gaps. No source/static check establishes installation, containment or provider behavior. See [checkpoint](release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
+
+
+## S11 proof-mechanism decision proposal — 2026-09-24
+
+The operator agreed to the architecture direction and authorized this bounded mechanism-design
+pass after the preparation summary. **Only documentation/design is authorized.** The recommendation
+below makes the earlier unresolved proof interface concrete; it adds a genuine proposed Bot/SQL/
+deployment scope that still needs G3 approval. Earlier statements that no new SQL need was
+established describe the initial scope checkpoint, not the result of this deeper investigation.
+
+### Decision and limits
+
+Recommend an independent Windows export authority with supervised provider-execution children,
+and a normalized SQL request/evidence ledger in the existing coordinator database. All participating
+export/config/provisioning SDK traffic must cross this boundary. Keep existing domain planners,
+queue fairness, claims, storage/provenance and delivery/retirement state machines. Do not place
+the authority in Discord handlers or treat an in-process Boolean callback as trusted evidence.
+
+This is a conservative recovery mechanism, not a guarantee that every interrupted operation can
+be recovered. A possibly dispatched mutation without durable terminal success remains unknown.
+No timer, repeated readback, fresh process or marker alone upgrades it to no-delayed-effects proof.
+This can block a pool/account indefinitely. A different destination or provider-assisted resolution
+would need its own reviewed operation; neither frees the original claims nor silently adds capacity.
+
+Evidence for the need: ExportRequestBudget contains aggregate timing/version state, ExportAttempt
+contains phase/manifest/receipt state, and ExportPreparation contains generation/spool state.
+None records every outbound request or a trusted process incarnation. Both SDK paths can issue
+requests after an ownership check; that check alone cannot revoke a request already in flight.
+`run_bot.py` waits for its child but is not an independent durable export-request authority.
+`process_utils.py` provides best-effort PID checks and conservative fallbacks, not proof of closure.
+
+### Trust and process model
+
+- Run a dedicated authority under a separate explicitly registered Windows identity per participating
+  host. Use the existing pywin32 dependency. This is a new supervised runtime entry point, not a
+  rewrite of the bot watchdog. Its exact service/task launcher, account, ACL and executable hash
+  belong in G4; no service installation or credential move is authorized now.
+- Local Bot callers use a versioned, authenticated named-pipe protocol with explicit DACL, bounded
+  messages, peer identity checks and denied remote access. It accepts only registered typed actions,
+  resource identities and validated claims, not arbitrary Python, SQL, URLs, credentials or shell
+  commands. Hosts use their own local authority and the same SQL coordinator; no network RPC server
+  or automatic cross-host authority failover is proposed.
+- The authority owns credential access, request dispatch and evidence writes. Bot callers cannot
+  create terminal evidence rows or read provider credentials. Provider children run approved fixed
+  code, are created suspended, attached to a non-breakaway Windows Job Object before execution,
+  and identified by retained process handles plus launch/session UUIDs, host and executable hash.
+  Close-on-authority-loss termination is required; no credential-bearing orphan may survive.
+- A provider-execution child is scoped to one owner/stream. A closing stream accepts no new work.
+  The authority observes child termination using OS handles, verifies the supervised process set,
+  and commits closure. It never maps an inaccessible/reused PID, missing lock file, watchdog log or
+  RPC disconnect to `writer_terminated`. The Bot process itself need not exit, but the exact old
+  provider writer must terminate and its capability must be permanently revoked.
+- The trusted computing base includes authority/child code, OS and SQL administrators, protected
+  configuration and the provider. This does not defend against their compromise. Deployment must
+  exclude old credential copies and all unregistered account/file writers; direct SDK fallback
+  remains forbidden in admitted mode. Merely changing an environment flag does not prove exclusion.
+- Preparation SQL writers still use existing session admission and nested owner tokens. Before
+  provider/rollover release, verify their exact resources drained/reconciled as well; a provider-child
+  exit cannot prove a separate SQL producer stopped. No reinterpretation of UPDATE_ALL2 ownership.
+
+Windows supports process grouping/termination through [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+and persistent [process handles](https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers).
+These primitives motivate the proposed implementation; they do not prove any deployed process has
+been contained. The named pipe requires an explicit security descriptor rather than permissive
+defaults; see [Microsoft's access-rights guidance](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights).
+
+### Durable request protocol
+
+Use append-only request identities/events and a CAS-controlled session/stream lifecycle. Never
+hold a SQL transaction while waiting, doing IPC, joining a child or calling Google. One request
+dispatch is outstanding per owned account initially; existing fair job tickets remain authoritative.
+
+1. Resolve exact job/preparation/output-operation or nested recovery owner, current CAS versions,
+   registration, file set, purpose and account. Persist immutable RequestID/sequence, request kind,
+   method, resolved resource scope, canonical payload hash and encrypted/private payload reference.
+   File discovery/create binds its preparation scope; returned file IDs are durably registered before
+   any content mutation. Unknown create outcome blocks admission, never rediscovers by title.
+2. Reserve/refresh the existing server-UTC budget. Recheck ownership after waiting. Under the
+   authority's stream admission lock, persist `dispatch_intent` before allowing the child to send.
+   A close request uses the same boundary so it cannot omit an escaping request. SQL commit loss
+   before send prohibits sending until exact RequestID readback resolves it. No automatic mutation
+   retry at SDK, HTTP, child, IPC or queue layers.
+3. Child reports a completed response to its parent; parent records a bounded response digest,
+   method-specific validated outcome and timestamps. `succeeded` requires a supported synchronous
+   success response; arbitrary HTTP 2xx, partial bodies or asynchronous acceptance are not enough.
+   Method allowlists must include exact success-body validators and tests before implementation
+   handoff. Unsupported methods remain closed. Raw tokens/content never enter ordinary logs.
+4. Durably checkpoint budget completion separately. If response evidence exists but budget/job
+   acknowledgment is lost, reconcile the SQL checkpoint without repeating the provider mutation.
+   A success result held only in child/parent memory is not durable evidence after their loss.
+5. Freeze the stream, drain completed work, terminate/observe the exact provider child and commit
+   stream closure with its final request sequence and event digest. Proof generation rejects missing,
+   contradictory, duplicated or mutable request/event membership. A `dispatch_intent` with no
+   conclusive terminal event is unknown even if the child died before it probably sent anything.
+6. On authority restart, open a new SessionID. Never relabel an old session or replay its uncertain
+   requests. If containment/closure cannot be re-established from trusted OS and durable records,
+   old session closure remains unknown; no lease-based takeover. Cleanly sealed old sessions can
+   be read without replay, subject to fresh snapshot and provider verification.
+
+`not_sent` is permitted only while the trusted authority can prove dispatch was never authorized
+and atomically closes that request/stream against future dispatch. For the first version, every
+possibly dispatched mutation error (including timeout, 429/503 and ambiguous transport failures)
+is unknown unless a separately reviewed method-specific terminal classifier proves otherwise.
+Existing exception classes such as RemoteRequestRejected are not terminal evidence by themselves.
+GET retries remain bounded/paced, with a distinct record per attempt, never disguised mutations.
+
+Google documents atomic Sheets updates and a 180-second processing timeout in its
+[usage limits](https://developers.google.com/workspace/sheets/api/limits). The design does not infer
+a cancellation/finality certificate from that timeout: the cited page does not supply a request
+outcome query for our lost-response case. Drive also disallows concurrent permission modifications
+on the same file across clients; all such operations need serialization and external-writer
+exclusion. See [permissions.create](https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create).
+
+### Decision table for settlement and reuse
+
+| Durable evidence after exact writer closure | Permitted outcome |
+|---|---|
+| Every relevant mutation has validated terminal success; fresh exact content/ACL/pointer matches | Candidate confirmed proof; commit only against current snapshot/CAS |
+| No mutation was dispatched; all requests are proven not_sent; fresh readback agrees | Candidate absence proof, preserving original receipts/history; any retry still uses existing explicit safe-retry authority |
+| Mutation succeeded but response-event persistence failed; output currently looks correct | Unknown; readback cannot close an unrecorded escaped request |
+| dispatch_intent exists but no terminal response, timeout, process loss or ambiguous error | Unknown; retain claims and occupied capacity; no automatic retry, clear, epoch advance or reuse |
+| Confirmed publication later differs, and all former requests/owners are conclusively closed | Damage proof may support explicit RepairID after current registration/capacity checks |
+| Retirement clear succeeded and terminal record exists, but slot CAS acknowledgment was lost | Journal recovery may read-before-clear and finish exact nested CAS; do not replay confirmed clear |
+| Retirement clear response itself is unknown, including a prior nested recovery writer | No no-delayed-retirement-effects proof; recovery remains blocked even if file currently appears empty |
+| Rollover interrupted after only some files were processed | No generic completion proof; preserve partial journal and claims. This proposal does not invent a partial-rollover retry workflow |
+
+### Read-only probes, proof storage and consuming CAS
+
+Probe authority is a separate read-only stream referencing the retained owner, exact resource set
+and immutable snapshot. It does not claim a new export or free blocked resources. The SQL stream
+gate serializes account access with jobs, preparations, output operations and other probes; all
+admission paths must observe it. Existing ownership remains intact. Under uncertainty only a
+registered observational probe can run, after local writers are stopped; GETs cannot certify that
+an unresolved remote mutation will never complete. Pace them through the same RequestBudget.
+Forbid mutations, discovery, creation and permission changes in this stream.
+
+Persist an immutable proof record containing ProofID/type, authenticated authority SessionID,
+snapshot hash, source claim identities/versions, complete closed-stream/request high-watermarks,
+registration/epoch, outcome and hashes/references for fresh observations. SQL stores normalized
+membership and bounded metadata; private evidence files hold larger sanitized response material
+with hashes, ACLs, durable flush and backup. A hash detects byte mismatch; it does not authenticate
+an untrusted producer. SQL credentials/roles and authority identity supply that trust. Evidence
+cannot share a disposable temp root or an ordinary caller-writable spool path. Missing/corrupt
+evidence fails closed; no garbage collection or retention horizon is introduced here.
+
+Settlement takes ProofID, loads the authoritative record in its existing short transaction, checks
+the full current snapshot and source versions, and records the exact proof association in the
+append-only audit. It must not trust a caller-built dictionary with true flags. Replay of the same
+proof/outcome is idempotent; changed snapshot or outcome requires a new proof. Old proof is never
+relabelled after a version change. Status reads do not issue provider probes or settle anything.
+
+Ordinary retirement verifies the old attempt's writer and outstanding requests are closed while
+the current owning job still holds its claim. Its own clear operations use a separately identified
+child/stream. Interrupted retirement covers every previous nested writer, uses the existing hashed
+journal and exact versioned recovery owner, then revokes/terminates that recovery stream and performs
+a fresh publication probe. Successful clear does not rewrite historical receipts. Complete P/Q/R,
+9,000,000-cell parts, 8/16 bounds, protected finals and both retained S6 uncertainties stay intact.
+
+### Implementation consequence
+
+New supervisor/IPC, per-request journaling, authenticated proof loading and independent evidence
+permissions are necessary for this recommendation. They are not present in the earlier two-module
+composition proposal. The [manifest amendment](integration_implementation_manifests.md#s11-proof-mechanism-manifest-amendment--2026-09-24)
+lists the additional exact Bot/SQL paths and validation. No SQL/runtime file is created now.
+The operational tradeoff requiring operator acceptance is indefinite blocking after genuinely
+unprovable mutations; implementing a gateway does not make those outcomes knowable.
+
+## S11 composition and trusted-proof design — 2026-09-24
+
+**Approved work: documentation preparation/design only. Proposed runtime design below is not
+implemented or authorized.** Current S7 source, endpoint, UpdateID, counterpart, B0/overall and
+independent-consumer contracts remain binding; no new product decision is introduced.
+
+### Actual ownership map and composition gaps
+
+| Producer/caller | Existing path and ownership | Required composition boundary |
+|---|---|---|
+| Ready lifecycle | `bot_instance.py:_run_ready_runtime_services` calls `register_exports(task_monitor)`; `services/export_coordination_service.py` refuses a missing factory | Supply a verified composition only after gates; retain one supervised worker and disabled default |
+| Grouped operator actions | `commands/stats_cmds.py` and `kvk/services/kvk_admin_service.py` call `configured_operator_service`, which raises | Return the same registered runtime's operator service; preserve fresh access checks and no new command |
+| New-source publication/recovery | Complete selection and durable full-vector intent; recovery wakes export discovery | Compose immutable generation loader, `ExportCoordinator`, `SourceOutputPlanner` and `deliver_coordinated_export`; never deliver raw component selections |
+| Legacy upload/recompute | `upload_routes/kvk_all_route.py` → `kvk_all_importer.py` → `kvk/dal/kvk_all_import_dal.py`; admin recompute uses `kvk/dal/kvk_admin_dal.py` | Bind `LegacyExportRuntime` at actual orchestration entry, across nested helpers and auto-export capture; accepted generation/provenance remains pinned |
+| Daily scan processing | `processing_pipeline.py`, `stats_module.py` (`UPDATE_ALL2`), `player_stats_cache.py`, both `proc_config_import.py` branches | Bind one runtime per task; preserve nested owner, SQL session admission, complete captures and existing daily order/SCANORDER |
+| Manual exports | `commands/admin_cmds.py` → `gsheet_module.py:run_all_exports`; legacy admin export and compatibility wrappers | Reuse verified ready capture; queue JobID is not a provider-completion receipt |
+| Compatibility/provisioning | `run_single_export`, `transfer_and_sort`, `run_kvk_export_test`, `run_kvk_proc_exports`, `run_kvk_proc_exports_with_alerts`, `create_additional_kvk_spreadsheets` | Each deployed caller must be bound or explicitly excluded; account admission precedes discovery/create and IDs precede mutation |
+| Rollover/retirement | `source_output_pool_service.py`, `source_output_pool_dal.py`, `source_export_operator_service.py` already implement durable transitions and explicit journal recovery | Supply termination verifier, reconciler, retirement verifier and `RetirementRecovery`; never substitute test dictionaries |
+| External writers | SQL Agent, standalone/manual SQL, other hosts/services and all users of the account/project | Operator inventory required; compatible shared coordination or verified exclusion, with a named owner for each process |
+
+Source searches found no production caller constructing `LegacyExportRuntime`/using `use_runtime`,
+and no production implementation supplying the trusted rollover/retirement proof callbacks.
+`configured_coordinator` and `configured_operator_service` are deliberately closed. Existing SQL
+and provider adapter authoring is not installation evidence. No claim about absent external
+processes follows from source search.
+
+### Proposed runtime composition contract
+
+Use a service-owned composition root; commands/views keep validation, fresh permissions and
+rendering, DALs keep SQL and short transactions. Proposed file placement is in the
+[exact manifest](integration_implementation_manifests.md#s11-preparation-and-proposed-implementation-manifests--2026-09-24).
+
+1. Closed/default construction must not open SQL, credentials, SDK clients or create storage.
+   Read a versioned, immutable approved deployment manifest only through an explicit gate.
+   A flag or user-supplied command payload is not that manifest's authority.
+2. The admitted manifest binds the one coordinator database, Bot/SQL protocol revisions, account/
+   project identity, all writer identities, exact destination/index/slot IDs and registration hash,
+   season/choice/epoch, audience/owner, and existing private spool root/storage owner. Reject missing,
+   conflicting, overlapping, stale or unsupported identities; do not infer IDs from titles.
+3. Validate S10A/C/D/E installation and enable both preparation and output-operation ownership in
+   every relevant DAL instance. No old two-owner writer may coexist with operation admission.
+4. Compose existing generation loader/partitioner, planner, coordinator, `LegacyProviderJob`, owned
+   new-source delivery, `RequestBudget`, pool service, operator service and retirement recovery.
+   Dedicated SDK clients remain per owner. Budget all reads, retries, grants, clear/readback and
+   formatting using server UTC; no SQL transaction spans provider I/O or waits.
+5. Bind `use_runtime` at each actual asynchronous/synchronous orchestration boundary, including
+   manual commands, automatic capture/export, config refresh and scheduled writers. Startup task
+   context alone does not establish later Discord task context. Test offload propagation explicitly;
+   do not replace existing nested owner tokens or detach cancellation from an owned thread.
+6. Preserve immutable running A; only eligible pending work coalesces. Keep original fairness age,
+   daily ordering/history, registration-aware waiting intents and one-period compaction. Keep full
+   output/config/header/provenance capture, spool digest/length/owner and unavailable capture state.
+7. Shutdown closes admission first, then drains owned SDK/budget/readback/confirmation. Timeout,
+   forced exit, missing spool or lost checkpoint retain claims for explicit reconciliation.
+
+Reuse existing snapshot, provider, budget, partition, full-readback, access and interaction helpers.
+No parser/calculator rewrite, command SQL, new top-level command, unrelated cleanup or dependency
+is proposed. These are required release dependencies, not deferred optimisation items.
+
+### Trusted proof production and conservative outcomes
+
+The SQL/DAL checks validate proof shape and exact CAS; they cannot certify the producer. Proposed
+proof service must combine an independently controlled execution-authority record with fresh,
+read-only provider observations. Evidence must be private, durable, attributable and bound to the
+exact snapshot hash, account/files, job/attempt or operation, owner/fence/version, epoch and
+registration. A free-text operator assertion, editable Boolean, SQL lease, timestamp or PID alone
+is insufficient. PID reuse must not identify a process incarnation.
+
+| Consumer | Existing proof contract | Producer obligation |
+|---|---|---|
+| Rollover drain | `all_writers_terminated`, `remote_outcomes_reconciled`, `snapshot_hash`, `evidence_id` | Enumerate all old writers and nested owners; independently prevent further requests and reconcile already escaped requests before `ready` |
+| Export reconciliation | `writer_terminated`, `state`, exact snapshot/evidence; confirmed receipt pins export key, attempt, fence, ordered files, audience and remote ID | Read exact attempt output, ACL and pointer; preserve an existing receipt byte-for-byte; mismatches remain uncertain |
+| Terminal absence | Above plus `no_delayed_effect` | Positive closure of all escaped request outcomes; missing pointer or repeated empty reads alone cannot prove absence |
+| Ordinary retirement | Termination, current pointer and no-live-reference proof bound to exact old/new attempt | Verify superseded, explicitly non-final, unreferenced generation and complete slot membership; final/unknown/uncertain/quarantined assignments stay protected |
+| Interrupted retirement | Confirmed publication plus `retirement_outcomes_reconciled` and `no_delayed_retirement_effects` | Reconstruct hashed journal/assignment evidence, cover former nested recovery owners, then admit exact versioned recovery token; read-before-clear; revoke recovery owner and freshly probe publication |
+| Rollover completion | Terminated writer, completed state, exact files with private/empty evidence and old/new-season setup marker | Verify every registered file and marker against current operation snapshot before CAS; no speculative continuation of partial rollover |
+
+Provider requests already accepted remotely can outlive a dead process. No finite sleep is proposed
+as a no-delayed-effects proof. Until a concrete execution authority and request-outcome mechanism
+are reviewed, the adapter must return unavailable/uncertain and perform no settlement, retry or
+reuse. This unresolved mechanism is an explicit implementation-design gate, not a claim that an
+injectable interface solves it. The initial implementation proposal may safely reject unsupported
+proofs; it may not claim release readiness without the approved real evidence producer.
+
+Reconciliation reads themselves require a reviewed account-budget/read-only authorization path
+compatible with retained blocked claims. They must not steal a normal job claim, issue an unpaced
+SDK call or acquire a conflicting SQL transaction across I/O. Exact producer deployment/credential
+identity, evidence storage and request-outcome authority remain unfilled in the G4 packet.
+
+### Unchanged release invariants
+
+Retain fixed season source; supplied overall/B0 and authoritative aggregate/DKP; exact 11-10,
+12-10, final 13-10 and authorized 14-10 with explicit counterpart attestation and matched UpdateID.
+Preserve exact owner/fence/version CAS, monotonic epochs, append-only dispositions and byte-exact
+receipts. Capacity is `1 + P + P + max(P,Q) + P + R` using actual 9,000,000-cell parts, with 8/16
+bounds; retained evidence is never free capacity. Rollover closes admission, drains/reconciles,
+proves termination and privately clears/reads back before audited reuse. Uncertain remains
+reconciliation, never blind retry or mutable generation relabeling.
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
+
+## Historical S10D closeout — 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -10,7 +838,7 @@ provider/Discord execution are not established. S10C remains source/static SQL e
 See [S10D closeout and exact carry-forward manifests](s10d_closeout_and_s10e_handoff.md).
 
 Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
-[task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
 that closeout, this pack/starter and all required archive identities. Verify filename AND
 previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,

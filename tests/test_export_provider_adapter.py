@@ -6,6 +6,74 @@ import pytest
 from services.export_provider_adapter import ProviderAdapter, ProviderOutcomeUnknown
 
 
+def authority_adapter(execution):
+    from uuid import uuid4
+
+    budget, authorize = Mock(), Mock()
+    adapter = ProviderAdapter(
+        budget=budget,
+        authorize=authorize,
+        destinations=["file-a"],
+        execution=execution,
+        stream_id=str(uuid4()),
+    )
+    return adapter, budget, authorize
+
+
+def test_authority_bridge_never_executes_local_sdk_or_double_reserves():
+    execute = Mock(return_value={"spreadsheetId": "file-a", "sheets": []})
+    adapter, budget, authorize = authority_adapter(execute)
+    request = SimpleNamespace(
+        method="GET",
+        uri="https://sheets.googleapis.com/v4/spreadsheets/file-a?fields=sheets.properties",
+        body=None,
+        execute=Mock(side_effect=AssertionError("Local SDK escaped")),
+    )
+    assert adapter.execute(request)["spreadsheetId"] == "file-a"
+    execute.assert_called_once()
+    assert execute.call_args.args[0]["operation"] == "sheets.get"
+    authorize.assert_called_once_with(mutation=False)
+    budget.assert_not_called()
+    request.execute.assert_not_called()
+    with pytest.raises(ValueError, match="Unrecorded"):
+        adapter.call(Mock(), mutation=False, destination="file-a")
+
+
+def test_authority_bridge_lost_response_is_not_replayed_with_new_identity():
+    execute = Mock(side_effect=TimeoutError("IPC reply lost"))
+    adapter, budget, authorize = authority_adapter(execute)
+    request = SimpleNamespace(
+        method="POST",
+        uri="https://sheets.googleapis.com/v4/spreadsheets/file-a/values/A1:clear",
+        body="{}",
+        execute=Mock(),
+    )
+    for _ in range(2):
+        with pytest.raises(ProviderOutcomeUnknown):
+            adapter.execute(request)
+    execute.assert_called_once()
+    request.execute.assert_not_called()
+
+
+def test_authority_gspread_bridge_returns_response_without_local_http():
+    execute = Mock(return_value={"spreadsheetId": "file-a", "sheets": []})
+    adapter, budget, authorize = authority_adapter(execute)
+    original = Mock(side_effect=AssertionError("Local HTTP escaped"))
+    http = SimpleNamespace(request=original)
+    adapter.bind_gspread(http)
+    response = http.request(
+        "get",
+        "https://sheets.googleapis.com/v4/spreadsheets/file-a",
+        params={"includeGridData": "false"},
+    )
+    assert response.json()["spreadsheetId"] == "file-a"
+    assert execute.call_args.args[0]["arguments"] == {"includeGridData": False}
+    original.assert_not_called()
+    with pytest.raises(ValueError, match="Unsupported"):
+        http.request("get", "https://sheets.googleapis.com/v4/spreadsheets/file-a", headers={})
+    assert execute.call_count == 1
+
+
 def delivery_fixture(*, wrong_grid=False, wrong_readback=False, decimal_cells=False):
     import hashlib
     from threading import Event
@@ -153,6 +221,38 @@ def test_complete_delivery_paces_every_request_and_confirms_exact_attempt():
     receipt = dal.confirm.call_args.args[2]
     assert receipt["attempt_id"] == "attempt-1" and receipt["fence"] == 9
     assert receipt["files"] == ["file-a"]
+
+
+def test_s11_legacy_delivery_refuses_unscoped_sdk_before_provider_call():
+    worker, args, events = delivery_fixture()
+    args[2].execution_evidence = True
+    with pytest.raises(ProviderOutcomeUnknown, match="Independent authority stream"):
+        worker(*args)
+    assert events == []
+    args[2].begin_attempt.assert_not_called()
+    args[2].confirm.assert_not_called()
+
+
+def test_s11_legacy_binds_real_authority_stream_and_retains_provider_failure(monkeypatch):
+    from services.export_runtime_composition import AuthorityStream
+
+    worker, args, events = delivery_fixture()
+    args[2].execution_evidence = True
+    client = Mock()
+    stream = AuthorityStream(client, {})
+    worker.authority_stream = lambda *_args: stream
+
+    def adapter(**kwargs):
+        assert kwargs["execution"].__self__ is stream
+        assert kwargs["stream_id"] == stream.stream_id
+        return SimpleNamespace(execute=Mock(side_effect=ProviderOutcomeUnknown("lost response")))
+
+    monkeypatch.setattr("services.export_provider_adapter.ProviderAdapter", adapter)
+    with pytest.raises(ProviderOutcomeUnknown):
+        worker(*args)
+    client.close_stream.assert_called_once_with(stream.stream_id)
+    args[2].confirm.assert_not_called()
+    assert events == []
 
 
 def test_decimal_planning_snapshot_and_raw_delivery_preserve_exact_values():

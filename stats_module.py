@@ -27,6 +27,8 @@ import time
 
 import pyodbc
 
+from services.legacy_export_snapshot_service import bound_runtime
+
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
 
@@ -286,6 +288,7 @@ async def _offload_callable_py(fn, *args, name: str | None = None, meta: dict | 
 
 
 # === Execute SQL Stored Procedure and Wait (NON-BLOCKING) ===
+@bound_runtime
 async def run_sql_procedure(
     rank=None,
     seed=None,
@@ -316,6 +319,9 @@ async def run_sql_procedure(
             # ambient transaction before the public procedure is invoked.
             conn.autocommit = True
             cur = conn.cursor()
+            from services.legacy_export_snapshot_service import verify_producer_cursor
+
+            verify_producer_cursor(cur)
             try:
                 cur.timeout = max(1, int(timeout_seconds) - 5)
             except Exception:
@@ -510,6 +516,7 @@ async def run_sql_procedure(
 
 
 # === Combined Runner (make steps non-blocking) ===
+@bound_runtime
 async def run_stats_copy_archive(
     rank=None, seed=None, source_filename=None, send_step_embed=None
 ) -> tuple[bool, str, dict]:

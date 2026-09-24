@@ -1,6 +1,173 @@
 # Local SQL development environment
+## S11 complete application readiness authoring — 2026-09-24
 
-## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+services/export_execution_dal.py now authors 14 read-only metadata batches covering application
+objects/columns/indexes/checks/FKs/triggers, UDTs, dependencies, synonyms, database triggers and
+effective schema/object/column permissions. ScriptDom parsed all 14 with zero errors; none ran
+against SQL Server. Both startup and each actual producer cursor compare independently reviewed
+expected hashes. Existing producer transaction ownership is preserved.
+
+application_sql_contract version 1 requires server, database, principal, sources, dynamic_objects,
+metadata_hash, permissions_hash and review_id. Canonical sources pins all 538 current sql_schema
+files (382 tables, 96 procedures, 49 views, nine functions and two UDTs), sorted by path, as
+name/type/path/sha256 records. Its canonical digest is
+0fcc6360f17cc6017801b074117b6b7d6fb8ebb0bd808d686971511b350a27d2.
+The exact generated source inventory is retained in the local composition artifact directory;
+recompute against the SQL authority and compare the runtime constant when preparing G4.
+Dynamic object entries must name a bounded dbo/KVK object, U/V type and reviewed producer modules.
+They require exact metadata shape review, not a wildcard or inferred permission. The complete
+metadata response is bounded to 16 MiB. Historical constraint/trigger dispositions remain pinned
+rather than requiring unrelated repairs; opaque modules or changed shapes still refuse readiness.
+
+The source-file hash is an authoring anchor, not an installation certificate. G4 must independently
+compare source, real installed definitions/dependencies/dynamic output shapes and effective
+permissions before writing approved expected hashes. Missing historical source objects or larger
+metadata on the actual target are real G4 compatibility questions, not permission to auto-create
+objects, loosen the contract or accept observations as their own expected values. No SQL repository
+bytes changed for this Bot metadata/readiness continuation. The corrected SQL Changes result and
+pending SQL closeouts remain separate from the final Bot runtime review.
+
+
+## S11 legacy permission fixture boundary — authored 2026-09-24
+
+The approved source-only permission delivery adds migration 20260924_002 after the S11 evidence
+migration. It leaves all business modules unchanged. The SQL manifest pins exact source bodies,
+three root signing groups and their required child countersignatures. Public-only certificates,
+exported exact signature blobs and protected deployment inputs are separate G4 prerequisites;
+no local test here generates keys, enables xp_cmdshell, creates its proxy or installs grants.
+
+Current legacy source explicitly names ROK_TRACKER and relies on dbo resolution. Its new disabled
+fixture therefore needs a separate, explicitly named K98_S11_Disposable_ SQL instance with database
+ROK_TRACKER. It cannot reuse the ordinary S11 evidence fixture simply by renaming that database.
+The operator must approve actual backup/restore evidence, the restricted real login and exact
+readiness/denial/configuration-fallback operations. The fallback case requires precisely one
+synthetic ProcConfig_Staging row: KVK_NO 2147483000, all nine remaining columns NULL. It writes a
+different synthetic KVK_NO inside the caller's transaction and rolls it back under both XACT_ABORT
+settings. No upsert, root import, export, provider or predecessor scenario is invoked.
+
+These tests are authored, not executed. A failed or doomed fallback is a real compatibility issue
+to reconcile before admission; it is not permission to grant the Bot schema ALTER or retry an
+uncertain import. The separate actual root/nested/bulk/proxy and output-shape cases remain G4 work.
+Source parsing and mocked metadata tests do not replace those observations.
+
+## S11 implementation status — 2026-09-24
+
+S11 additive evidence SQL source is authored separately under implementation approval. The offline checker passed 87 assertions and ScriptDom parsed 11 files; no SQL connection, installation or transaction fixture ran. The guarded new disposable-target fixture remains opt-in and is not a predecessor rerun. See [checkpoint](kvk_source_migration/release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
+
+
+## S11 evidence-ledger design amendment — 2026-09-24
+
+The mechanism design now establishes a proposed additive SQL requirement: execution sessions,
+streams, immutable provider requests, append-only request events and reconciliation proofs, with
+four narrowly permissioned transition/issuance procedures. Existing aggregate request-budget and
+attempt/preparation records do not provide that independent request evidence. This supersedes the
+earlier no-established-SQL-requirement checkpoint; there is still no authored SQL delta.
+
+Use the [exact SQL paths and table contracts](kvk_source_migration/integration_implementation_manifests.md#s11-proof-mechanism-manifest-amendment--2026-09-24).
+Resolve physical types, bounds, keys, lock order, indexes and effective permissions against the
+source-of-truth schema before dependent implementation. The reserved migration filename must be
+re-resolved for the actual authoring date/available ordinal; never rename merged migrations.
+Do not reconstruct historical request certainty or release existing claims during installation.
+
+Static authoring can establish object and caller alignment. Only separately authorized disposable
+SQL execution can establish transaction rollback, concurrent CAS, proof consumption/replay,
+permission isolation and installation behavior. Provider finality and Windows process termination
+need their own evidence. No database identity is assigned, no connection is opened and no previous
+fixture is rerun in this design pass. S8A VERIFYONLY, S8B actual restore and offline history, S8C
+local checks, and S10C/D/E static evidence remain distinct. Pending SQL closeout documents remain
+untouched for the next actual authorized SQL implementation PR, separately from Bot delivery.
+
+
+## S11 exact-target packet — 2026-09-24
+
+S11 preparation/design is approved; **no SQL connection, service start, database creation,
+fixture execution, migration, backup or restore is authorized**. The historical instance is
+`9SX2VF4\K98DEV` (alias `localhost\K98DEV`), SQL Server 2022 Developer `16.0.1200.5`, compatibility
+160 and development collation `Latin1_General_CI_AS`. These are dated observations, not current
+verification. The authoritative repository remains `C:/K98-bot-SQL-Server` at
+`2352a898881d4b74d6eec153bb3cb381d6162041`; it has two pending Markdown files and no new SQL delta.
+
+### Exact installation dependencies and evidence
+
+| Slice | Exact SQL-repository migration | Current evidence boundary |
+|---|---|---|
+| S10A | `migrations/20260914_001_shared_export_coordination.sql` | Accepted earlier disposable execution/actual restore; no new target installation inferred |
+| S10C | `migrations/20260914_002_legacy_export_preparation.sql` | Authored/static; preparation/resource ownership must exist before composed writers |
+| S10D | `migrations/20260915_001_kvk_output_pool_rollover.sql` | Authored/static; typed file/pool/slot/disposition identities and attempt references |
+| S10E | `migrations/20260915_002_kvk_output_operation_ownership.sql` | Authored/static; operation/resource ownership, third mutually exclusive ExportResource owner |
+
+S8 source/update/selection/intent prerequisites precede these. Compare actual catalog and migration
+history before selecting installation work. Never rerun a predecessor to manufacture S11 evidence
+or apply an older exact-shape guard blindly after a successor changed that shape. Standalone
+`sql_schema` files are reference contracts, not an alternate installation procedure. Preserve
+short schema transactions, lock bounds, trusted scoped FKs and receipt bytes; no data backfill,
+registration seeding, grants or activation is implicit in schema installation.
+
+### Proposed operation packet fields — all unresolved values block execution
+
+| Field | Required exact value before G4-SQL |
+|---|---|
+| Server and authentication | Operator-approved instance and current SERVERPROPERTY identity; no default production connection |
+| Primary disposable database | A new explicit name and confirmed absence; never an existing S6/S8 evidence database |
+| Restore database | Another new explicit name, data/log file paths and confirmed absence; no WITH REPLACE over retained data |
+| Engine/collation/compatibility | Current values, required contract and mismatch stop condition |
+| Fixture/prerequisite plan | Exact source hashes, ordered objects and synthetic seed IDs; no real import or inferred historical classification |
+| Installation plan | Exact missing migration hashes/commands and permitted lock budget, pre/post catalog assertions |
+| Backup | Explicit new path, COPY_ONLY/CHECKSUM options as applicable, hash and readable backup metadata |
+| Actual restore | Separate target, exact MOVE paths/commands, DBCC/catalog/row-content checks and expected results; VERIFYONLY alone insufficient |
+| Transaction cases | Exact selected cases/operation IDs, connection/process count, interruption points, timeouts and expected retained states |
+| Preservation | Before/after retained-row/receipt/claim evidence, database/file exclusion list and evidence output path |
+
+Existing opt-in S10E tests require a name matching `K98_S10E_Disposable_YYYYMMDD_validation`,
+the exact server/database, backup/restore evidence and distinct ready/CAS/contention/confirmation
+IDs. No name or ID is allocated here; if a different S11 naming scheme is chosen, the test-gate
+change needs explicit manifest approval. Authorization strings are safeguards, not approval.
+
+Use `tests/test_kvk_export_sql_integration.py` in Bot and the separately selected SQL fixtures
+`validation/kvk_source/s10c_legacy_export_preparation.sql`, `s10_output_pool_rollover.sql` and
+`s10e_output_operation_ownership.sql` only after exact target/case authorization. Test independent
+stale owner, fence and version with a positive control; job/preparation/operation contention;
+closing replay/lost acknowledgments; and newly affected nested recovery. Mock results cannot
+close transaction gates. Do not automatically execute an entire predecessor fixture pack.
+
+All retained S1-S10 databases, backups, synthetic rows, originals and provider receipts are excluded
+from new destructive/setup operations. S8A six scripts/VERIFYONLY, S8B 50 cases/actual restore and
+later offline runner history stay separate. S10C/D/E installation is unproven. New backup/restore
+evidence must name its source revision and actual target; no transitive installation claim.
+
+Abort on target mismatch, partial/incompatible schema, untrusted constraints, unexpected populated
+rows, unapproved locks or preservation differences. Leave evidence intact and propose forward
+repair. No blanket reset, cleanup, retention deletion or implicit SQL PR. See the
+[release approval packet](kvk_source_migration/release_readiness_and_rollback.md#s11-preparation-and-release-approval-packet--2026-09-24).
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](kvk_source_migration/s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
+
+## Historical S10D closeout — 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -10,7 +177,7 @@ provider/Discord execution are not established. S10C remains source/static SQL e
 See [S10D closeout and exact carry-forward manifests](kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
 
 Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
-[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[task pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
 that closeout, this pack/starter and all required archive identities. Verify filename AND
 previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,

@@ -10,6 +10,20 @@ import gsheet_module as gm
 import proc_config_import as pci
 
 
+def test_recorded_config_validation_does_not_require_bot_provider_credentials(monkeypatch):
+    from types import SimpleNamespace
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime = SimpleNamespace(dal=SimpleNamespace(execution_evidence=True))
+    monkeypatch.setattr(pci, "CREDENTIALS_FILE", None)
+    for name in ("KVK_SHEET_ID", "SERVER", "DATABASE", "IMPORT_USERNAME", "IMPORT_PASSWORD"):
+        monkeypatch.setattr(pci, name, "offline-fixture")
+    with use_runtime(runtime):
+        ok, missing = pci._validate_import_config()
+    assert ok and not missing
+
+
 @pytest.mark.asyncio
 async def test_coordinated_config_offload_preserves_runtime_without_process(monkeypatch):
     from unittest.mock import Mock

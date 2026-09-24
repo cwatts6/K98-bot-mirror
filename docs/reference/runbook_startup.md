@@ -1,6 +1,101 @@
 # Startup Runbook
+## S11 readiness before caller admission — 2026-09-24
 
-## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+The existing runtime-services ready hook now prepares the protected export bundle before export
+registration. It checks exact source/config, host/SIDs, all three SQL contracts, authority ready
+handshake and spool custody. It opens no provider credentials and launches no authority. Failure
+leaves actual export/capture roots closed; startup logs the failure type without private details.
+A concurrent shutdown prevents late publication. G4 must separately provision/start the reviewed
+authority and approve deployment; source authoring does not enable this hook's gated behavior.
+See ENV_REFERENCE.md and the S11 release readiness packet for the exact manifest contract.
+
+
+## S11 legacy permission prerequisite — authored 2026-09-24
+
+The additional local permission work is approved; production startup remains closed. The Bot
+machine has not pulled this work. No installation, key/proxy provisioning, restart or activation
+is implied by the new SQL source or successful offline checks.
+
+An eventual composed legacy producer with execution evidence must receive the protected version-1
+legacy_sql_contract and pass its source/signature/permission checks on its own SQL session before
+the producer is entered. Construction without that contract refuses. The gate checks exact target
+and dbo default schema, source bodies and owners, public-only certificate mappings and signature
+hashes, exact grants, absent inherited escalation/ownership and the migration receipt. It does
+not commit, roll back, call a business procedure or open provider access. A refusal retains owned
+work for reconciliation. The existing version-2 fixed coordination check is still separate.
+
+G4 must first establish exact installed dependencies/output shapes, actual restricted-login and
+nested transaction behavior, master/proxy/file ACLs, writer exclusion and protected receipt inputs.
+Only after complete source composition, separate exact Bot/SQL Changes reviews (Deep off), delivery
+approval and the operator's exact G4 actions can startup/activation be considered. G5 acceptance
+remains separate. A permission check or migration-history row is never a release switch.
+
+## S11 fixed SQL permission startup prerequisite — 2026-09-24
+
+The authored authority and enrollment entries now require the nested SQL installation contract
+and observation at version 2. A missing required budget/origin capability, unexpected evidence
+column write, incomplete inventory or metadata mismatch blocks startup before session transition,
+evidence-store creation or provider-child construction. The fixed map is a source prerequisite;
+actual installed grants, all broader application SQL dependencies and complete runtime/issuer
+composition remain unproven. Version 1 is not a fallback. See the
+[version distinction](ENV_REFERENCE.md#s11-sql-permission-contract-version-2--2026-09-24)
+and [offline evidence](kvk_source_migration/release_evidence_log.md#s11-fixed-coordination-permission-contract--2026-09-24).
+
+This local authoring does not install or invoke either entry, provision credentials, register a
+pool or activate the Bot. Preserve the exact separately approved G4 operations and G5 acceptance
+boundary described below, including old-writer exclusion, private readback and retained uncertainty.
+
+## S11 fresh-file enrollment gate — 2026-09-24
+
+Enrollment is an explicit authority-side G4 operation, never Bot startup. Before any invocation,
+approve the exact SQL installation/permissions, identities/builds, protected manifest/plan/credential
+paths, owner consent/project/client, new file count and full writer/credential exclusion inventory.
+Use the separate narrow creation profile described in [ENV_REFERENCE](ENV_REFERENCE.md#s11-enrollment-profile-contract--2026-09-24).
+The authored entry is scripts/enroll_export_output_pool.py, requiring --manifest, --plan, --actor,
+--reason and --authorize-operation S11_CREATE_PRIVATE_OUTPUT_POOL. This syntax is documentation,
+not permission to execute it now. No token, target or real invocation is provided here.
+
+The entry verifies protected source/plan/SQL contract before starting a session or child. It creates
+private blank files and records eligibility; it does not register or activate a pool. Exact later
+G4 registration uses the complete sealed origin set and must preserve pool/alias/protected-file
+bounds. Missing history or an unresolved existing account blocks enrollment, without using a new
+account/pool to bypass uncertainty. Trusted issuer/caller readiness must also be complete before
+normal admission. Initial SQL-authoring/offline passes establish none of these runtime premises.
+
+
+## S11 implementation status — 2026-09-24
+
+Do not start the S11 provider child directly or activate the incomplete authority foundations. Launcher, immutable manifest readiness, SQL installation/permissions and all-writer composition still require completion and operator-owned G4 evidence. No automatic service installation is provided. See [checkpoint](kvk_source_migration/release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
+
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](kvk_source_migration/s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
+
+## Historical S10D closeout — 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -10,7 +105,7 @@ provider/Discord execution are not established. S10C remains source/static SQL e
 See [S10D closeout and exact carry-forward manifests](kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
 
 Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
-[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[task pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
 that closeout, this pack/starter and all required archive identities. Verify filename AND
 previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,

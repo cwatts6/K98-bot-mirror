@@ -12,6 +12,7 @@ from kvk.services.new_source_admin_service import CONFIRM_SECONDS
 from kvk.services.new_source_export_service import compact_sheets_generation
 from kvk.services.source_output_pool_service import capacity_for_snapshot
 from services.export_coordination_dal import JobSpec, bounded_json
+from services.legacy_export_snapshot_service import bound_runtime
 
 EXPORT_ACTIONS = frozenset(
     {
@@ -79,6 +80,7 @@ class SourceExportOperatorService:
             self._previews[token] = row
         return row
 
+    @bound_runtime
     def status(self, actor, kvk_no, index_file_id=None):
         self.authorize(actor, "export_status")
         context = self.pools.export_context(self.pools.resolve(kvk_no, index_file_id))
@@ -110,6 +112,7 @@ class SourceExportOperatorService:
             ),
         )
 
+    @bound_runtime
     def export(self, actor, kvk_no, index_file_id=None):
         self.authorize(actor, "export")
         context = self.pools.export_context(self.pools.resolve(kvk_no, index_file_id))
@@ -169,6 +172,7 @@ class SourceExportOperatorService:
         )
         return dict(job_id=str(job["JobID"]).lower(), state=job["State"], no_op=False)
 
+    @bound_runtime
     def preview_rollover(self, actor, kvk_no, new_kvk, *, reason, index_file_id=None):
         self.authorize(actor, "rollover_preview")
         plan = self.rollover.preview(
@@ -176,6 +180,7 @@ class SourceExportOperatorService:
         )
         return self._preview(actor, "rollover_confirm", plan)
 
+    @bound_runtime
     def confirm(self, actor, token):
         token = str(UUID(str(token)))
         # Confirmed operations outlive the disposable preview and process. A duplicate
@@ -238,6 +243,7 @@ class SourceExportOperatorService:
                 return self.coordinator.admit_repair(row.token, plan)
             raise SourceConflict("Unsupported confirmation.")
 
+    @bound_runtime
     def reconcile(self, actor, job_id):
         self.authorize(actor, "export_reconcile")
         job_id = str(UUID(str(job_id)))
@@ -276,6 +282,7 @@ class SourceExportOperatorService:
         # Provider reads and positive termination verification have returned before SQL.
         return self.coordinator.reconcile_operator(snapshot, proof, actor=str(actor.user_id))
 
+    @bound_runtime
     def preview_rebuild(self, actor, job_id, *, reason):
         self.authorize(actor, "export_rebuild")
         if not reason or not reason.strip() or len(reason.encode("utf-16-le")) > 2048:
@@ -346,6 +353,6 @@ class SourceExportOperatorService:
 
 
 def configured_operator_service():
-    # S11 activation is separate. Neither a Discord action nor an environment flag
-    # constructs provider clients or attests SQL installation/old-writer termination.
-    raise SourceConflict("S10E operator admission awaits explicit deployment and writer gates.")
+    from services.export_runtime_composition import configured_runtime
+
+    return configured_runtime().operator

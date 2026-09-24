@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 def rollover_marker(old_kvk, new_kvk):
+    if any(type(v) is not int or v <= 0 for v in (old_kvk, new_kvk)) or old_kvk == new_kvk:
+        raise SourceConflict("Two distinct positive season identities required for rollover.")
     return f"Season {old_kvk} ended. Season {new_kvk} setup; awaiting verified export."
 
 
@@ -629,6 +631,9 @@ class GoogleSheetsTransport:
         retry_sleep=time.sleep,
         request_guard=None,
         plan_callback=None,
+        authority_execution=None,
+        authority_stream_id=None,
+        authority_guard=None,
     ):
         if not isinstance(registration, SheetsRegistration) or not callable(reuse_guard):
             raise ValueError("Explicit registration and durable reuse guard are required.")
@@ -645,6 +650,26 @@ class GoogleSheetsTransport:
         self._retry_sleep = retry_sleep
         self._request_guard = request_guard
         self._plan_callback = plan_callback
+        if any(
+            value is not None
+            for value in (authority_execution, authority_stream_id, authority_guard)
+        ):
+            if not all(
+                value is not None
+                for value in (authority_execution, authority_stream_id, authority_guard)
+            ):
+                raise ValueError("Exact authority stream, execution and owner guard required.")
+            from services.export_provider_adapter import ProviderAdapter
+
+            self._authority_adapter = ProviderAdapter(
+                budget=None,
+                authorize=authority_guard,
+                destinations=(registration.index_file_id, *registration.slot_file_ids),
+                execution=authority_execution,
+                stream_id=authority_stream_id,
+            )
+        else:
+            self._authority_adapter = None
         self.last_error = None
         self.quarantined = frozenset()
         self._verified = set()
@@ -696,7 +721,32 @@ class GoogleSheetsTransport:
             request_pacer=GoogleRequestPacer(registration.service_account_email),
         )
 
+    @classmethod
+    def from_authority(
+        cls, *, registration, reuse_guard, protected_file_ids, execution, stream_id, authorize
+    ):
+        """Construct request descriptions without a Bot-owned provider credential."""
+        from services.export_provider_adapter import recorded_clients
+
+        sheets, drive = recorded_clients()
+        return cls(
+            drive=drive,
+            sheets=sheets,
+            registration=registration,
+            reuse_guard=reuse_guard,
+            protected_file_ids=protected_file_ids,
+            authority_execution=execution,
+            authority_stream_id=stream_id,
+            authority_guard=authorize,
+        )
+
     def _execute(self, request):
+        if self._authority_adapter is not None:
+            if self._request_guard is not None:
+                self._request_guard(request)
+            # This path does not own credentials, local pacing or SDK HTTP. The
+            # authority records/paces every request and never blindly retries.
+            return self._authority_adapter.execute(request)
         # Only idempotent GET requests retry. Mutations always execute exactly once.
         for attempt in range(3):
             self._request_pacer()
@@ -1105,14 +1155,72 @@ class GoogleSheetsTransport:
                 body=dict(values=[[marker]]),
             )
         )
+        result = self.rollover_setup_readback(file_id, old_kvk, new_kvk)
+        if result is None:
+            raise SourceConflict("Complete private season-ended/setup readback failed.")
+        return result
+
+    def rollover_setup_readback(self, file_id, old_kvk, new_kvk, *, expected_sheet_id=None):
+        """Read the complete final index; its marker is not an empty-file observation.
+
+        This establishes current shape/content/ACL only. Original private-clear
+        evidence and all-writer finality are independent completion prerequisites.
+        A mismatch remains unresolved and never causes a repair or another write.
+        """
+        if file_id != self.registration.index_file_id or (
+            expected_sheet_id is not None
+            and (type(expected_sheet_id) is not int or not 0 <= expected_sheet_id < 2**31)
+        ):
+            raise SourceConflict("Exact registered setup index and sheet identity required.")
+        marker = rollover_marker(old_kvk, new_kvk)
+        book = self._execute(
+            self.sheets.spreadsheets().get(spreadsheetId=file_id, includeGridData=True)
+        )
         values = self._execute(
             self.sheets.spreadsheets()
             .values()
             .get(spreadsheetId=file_id, range="Sheet1", valueRenderOption="FORMULA")
         ).get("values", [])
         file = self._get(file_id)
-        if values != [[marker]] or any(p.get("type") == "anyone" for p in file["permissions"]):
-            raise SourceConflict("Season-ended/setup private readback failed.")
+        grids = book.get("sheets", [])
+        if (
+            values != [[marker]]
+            or any(book.get(k) for k in ("namedRanges", "developerMetadata", "dataSources"))
+            or len(grids) != 1
+            or any(k not in {"properties", "data"} for k in grids[0])
+            or grids[0]["properties"].get("title") != "Sheet1"
+            or grids[0]["properties"].get("gridProperties", {}).get("rowCount") != 1
+            or grids[0]["properties"].get("gridProperties", {}).get("columnCount") != 3
+            or type(grids[0]["properties"].get("sheetId")) is not int
+            or not 0 <= grids[0]["properties"]["sheetId"] < 2**31
+            or (
+                expected_sheet_id is not None
+                and grids[0]["properties"]["sheetId"] != expected_sheet_id
+            )
+            or any(p.get("type") == "anyone" for p in file["permissions"])
+            or any(k.startswith("k98") for k in file.get("appProperties", {}))
+            or file.get("description")
+        ):
+            return None
+        data = grids[0].get("data", [])
+        if (
+            len(data) != 1
+            or data[0].get("startRow", 0) != 0
+            or data[0].get("startColumn", 0) != 0
+            or len(data[0].get("rowData", [])) != 1
+        ):
+            return None
+        cells = data[0]["rowData"][0].get("values", [])
+        if (
+            not 1 <= len(cells) <= 3
+            or cells[0].get("userEnteredValue") != {"stringValue": marker}
+            or cells[0].get("effectiveValue", {"stringValue": marker}) != {"stringValue": marker}
+            or cells[0].get("formattedValue", marker) != marker
+            or set(cells[0])
+            - {"userEnteredValue", "effectiveValue", "formattedValue", "effectiveFormat"}
+            or any(cells[1:])
+        ):
+            return None
         return dict(
             file_id=file_id,
             private=True,
@@ -1120,6 +1228,8 @@ class GoogleSheetsTransport:
             old_kvk=old_kvk,
             new_kvk=new_kvk,
             marker=marker,
+            manifest_hash=digest(book).hex(),
+            sheet_id=grids[0]["properties"]["sheetId"],
         )
 
     def ensure_private(self, destination, key, manifest):
@@ -1524,26 +1634,30 @@ class GoogleSheetsTransport:
             self._public_file(self._get(index["id"]))
         return url
 
-    def reconcile(self, destination, claim):
-        original = json.loads(claim.receipt)
-        key = original["export_key"]
+    def _publication_readback(self, destination, key, fence, *, pinned_manifest=None):
+        """Shared read-only content/ACL/pointer check; uncertainty has no receipt."""
         try:
             file, index = self._file(destination, key), self._index(destination, key)
             if self.registration.audience == "public_viewer" and any(
                 not any(p.get("type") == "anyone" for p in f["permissions"])
                 for f in [index, *self._files(destination, key)]
             ):
-                return "unknown", None
+                return None
             values = self._pointer(index)
             if (
                 not values
                 or len(values) != 1
                 or len(values[0]) != 3
-                or values[0][:2] != [key, str(claim.fence)]
+                or values[0][:2] != [key, str(fence)]
             ):
-                return "unknown", None
-            if self.verify(destination, key) != json.loads(file["description"]):
-                return "unknown", None
+                return None
+            remote_manifest = json.loads(file["description"])
+            if self._authority_adapter is not None and pinned_manifest is None:
+                return None
+            if pinned_manifest is not None and remote_manifest != pinned_manifest:
+                return None
+            if self.verify(destination, key) != remote_manifest:
+                return None
             props = self._execute(
                 self.sheets.spreadsheets().get(spreadsheetId=file["id"], fields="sheets.properties")
             )
@@ -1554,8 +1668,101 @@ class GoogleSheetsTransport:
             )
             expected = f"https://docs.google.com/spreadsheets/d/{file['id']}/edit#gid={sid}"
             if values[0][2] != expected:
-                return "unknown", None
+                return None
         except SourceConflict:
+            return None
+        return expected
+
+    def read_coordinated_publication(self, destination, key, fence, *, manifest, files):
+        """Observe an exact pinned attempt; never mutate, settle or infer absence."""
+        if self._authority_adapter is None or not isinstance(manifest, dict) or not manifest:
+            raise SourceConflict("Recorded readback and pinned content manifest required.")
+        if type(fence) is not int or fence <= 0:
+            raise SourceConflict("Exact positive publication fence required.")
+        remote = self._publication_readback(destination, key, fence, pinned_manifest=manifest)
+        if remote is None:
+            raise SourceConflict("Publication readback is unresolved.")
+        actual = [
+            self.registration.index_file_id,
+            *(f["id"] for f in self._files(destination, key)),
+        ]
+        if actual != files:
+            raise SourceConflict("Observed publication differs from exact attempted file order.")
+        return remote
+
+    def assess_confirmed_contents(self, destination, key, fence, *, manifest, files):
+        """Positive content comparison for an otherwise exact retained publication.
+
+        Changed/missing ownership, ACLs, binding, structure, pointer or receipt
+        remain unresolved. Only complete successful reads of the pinned physical
+        representation can establish a content mismatch; no exception is damage.
+        """
+        if self._authority_adapter is None:
+            raise SourceConflict("Recorded confirmed-content assessment required.")
+        members, index = self._files(destination, key), self._index(destination, key)
+        if (
+            [self.registration.index_file_id, *(f["id"] for f in members)] != files
+            or any(json.loads(f["description"]) != manifest for f in members)
+            or (
+                self.registration.audience == "public_viewer"
+                and any(
+                    not any(p.get("type") == "anyone" for p in f["permissions"])
+                    for f in [index, *members]
+                )
+            )
+        ):
+            raise SourceConflict("Exact retained files, manifest and audience required.")
+        props = self._execute(
+            self.sheets.spreadsheets().get(
+                spreadsheetId=members[0]["id"], fields="sheets.properties"
+            )
+        )
+        directories = [
+            p["properties"]["sheetId"]
+            for p in props["sheets"]
+            if p["properties"]["title"] == self._tab(key, "DIRECTORY")
+        ]
+        if len(directories) != 1:
+            raise SourceConflict("Exact retained directory required.")
+        remote = (
+            f"https://docs.google.com/spreadsheets/d/{members[0]['id']}/edit#gid={directories[0]}"
+        )
+        if self._pointer(index) != [[key, str(fence), remote]]:
+            raise SourceConflict("Changed publication pointer remains unresolved.")
+        observed = self.verify(destination, key)
+        return remote, observed
+
+    def read_retirement_generation(self, destination, key, *, manifest, files):
+        """Read an explicitly unretained old assignment; never authorize its reuse."""
+        if self._authority_adapter is None or not isinstance(manifest, dict) or not manifest:
+            raise SourceConflict("Recorded retirement readback and pinned manifest required.")
+        members = self._files(destination, key)
+        if (
+            [self.registration.index_file_id, *(f["id"] for f in members)] != files
+            or any(f["appProperties"].get("k98Retain") != "False" for f in members)
+            or any(json.loads(f["description"]) != manifest for f in members)
+            or self.verify(destination, key) != manifest
+        ):
+            raise SourceConflict("Old generation retention, assignment or content is unresolved.")
+        props = self._execute(
+            self.sheets.spreadsheets().get(
+                spreadsheetId=members[0]["id"], fields="sheets.properties"
+            )
+        )
+        sid = next(
+            p["properties"]["sheetId"]
+            for p in props["sheets"]
+            if p["properties"]["title"] == self._tab(key, "DIRECTORY")
+        )
+        return f"https://docs.google.com/spreadsheets/d/{members[0]['id']}/edit#gid={sid}"
+
+    def reconcile(self, destination, claim, *, pinned_manifest=None):
+        original = json.loads(claim.receipt)
+        key = original["export_key"]
+        expected = self._publication_readback(
+            destination, key, claim.fence, pinned_manifest=pinned_manifest
+        )
+        if expected is None:
             return "unknown", None
         from kvk.services.new_source_delivery_service import _receipt
 

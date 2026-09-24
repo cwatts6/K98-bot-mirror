@@ -333,6 +333,9 @@ def ingest_prepared_import(
     schema_metadata = prepared.schema_metadata
 
     cur = con.cursor()
+    from services.legacy_export_snapshot_service import verify_producer_cursor
+
+    verify_producer_cursor(cur)
     enable_fast_executemany(cur)
 
     try:

@@ -15,6 +15,62 @@ from services.legacy_export_snapshot_service import (
 )
 
 
+def test_evidence_preparation_requires_protected_legacy_sql_contract_before_connecting():
+    from unittest.mock import Mock
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    connect = Mock()
+    with pytest.raises(SourceConflict, match="protected legacy SQL"):
+        LegacySnapshotDAL(connect, output_operations=True, execution_evidence=True)
+    connect.assert_not_called()
+
+
+@pytest.mark.parametrize("drift", [False, True])
+def test_evidence_session_checks_same_connection_before_producer_and_preserves_transaction(
+    monkeypatch, drift
+):
+    from unittest.mock import Mock
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    import services.export_execution_dal as evidence
+    from tests.test_export_runtime_composition import legacy_permission_fixture
+
+    observed, approved = legacy_permission_fixture(monkeypatch)
+    dal = LegacySnapshotDAL(
+        Mock(), output_operations=True, execution_evidence=True, legacy_sql_contract=approved
+    )
+    # The caller cannot change the retained contract by mutating its input object.
+    approved["principal"] = "changed-after-composition"
+    assert dal.legacy_sql_contract["principal"] == "fixture-bot"
+    dal.authorize = Mock()
+    cursor = Mock()
+    connection = Mock(autocommit=True)
+    connection.cursor.return_value = cursor
+    collected = Mock(return_value=observed)
+    monkeypatch.setattr(evidence, "legacy_installation_snapshot", collected)
+    entered = []
+    if drift:
+        observed["target"][0]["AuthorityRole"] = 1
+        with pytest.raises(SourceConflict):
+            with dal.session("claim", connection):
+                entered.append(True)
+        assert entered == []
+        cursor.execute.assert_not_called()
+    else:
+        with dal.session("claim", connection):
+            entered.append(True)
+        assert entered == [True]
+        assert "sp_getapplock" in cursor.execute.call_args_list[0].args[0]
+        assert "sp_releaseapplock" in cursor.execute.call_args_list[-1].args[0]
+    collected.assert_called_once_with(cursor, dal.legacy_sql_contract["source"])
+    cursor.close.assert_called_once()
+    connection.commit.assert_not_called()
+    connection.rollback.assert_not_called()
+    connection.close.assert_not_called()
+    assert connection.autocommit is True
+
+
 def producer_runtime(tmp_path, *, capture=None):
     from contextlib import nullcontext
     from dataclasses import replace
@@ -23,6 +79,7 @@ def producer_runtime(tmp_path, *, capture=None):
     from services.legacy_export_snapshot_dal import PreparationClaim
     from services.legacy_export_snapshot_service import LegacyExportRuntime
 
+    tmp_path.mkdir(exist_ok=True)
     dal = Mock()
     claim = PreparationClaim(
         str(uuid4()), "acct", "owner", 1, 1, (("sql_snapshot:legacy_outputs", 1),)
@@ -230,6 +287,226 @@ def test_explicit_owner_is_inherited_by_nested_helpers(tmp_path):
     dal.request.assert_called_once()
     runtime.capture.assert_not_called()
     dal.uncertain.assert_not_called()
+
+
+@pytest.mark.parametrize("replacement", ["another", "none"])
+def test_nested_runtime_cannot_replace_or_disable_an_inherited_scope(tmp_path, replacement):
+    from services.legacy_export_snapshot_service import require_runtime, use_runtime
+
+    runtime, dal = producer_runtime(tmp_path / "first")
+    other, other_dal = producer_runtime(tmp_path / "second")
+    with use_runtime(runtime):
+        with use_runtime(runtime):
+            assert require_runtime() is runtime
+        with pytest.raises(SnapshotUnavailable, match="cannot switch runtime"):
+            with use_runtime(other if replacement == "another" else None):
+                pytest.fail("An inherited scope must remain pinned")
+        assert require_runtime() is runtime
+    dal.request.assert_not_called()
+    other_dal.request.assert_not_called()
+    with pytest.raises(SnapshotUnavailable, match="unavailable"):
+        require_runtime()
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_closed_writer_token_cannot_create_a_new_root_writer(tmp_path, explicit):
+    from contextvars import copy_context
+
+    from services.legacy_export_snapshot_service import (
+        admitted_writer,
+        record_writer_completion,
+        use_runtime,
+        writer_scope,
+    )
+
+    runtime, dal = producer_runtime(tmp_path)
+    ran = []
+
+    @admitted_writer("all_kvk")
+    def delayed():
+        ran.append(True)
+
+    with use_runtime(runtime):
+        with writer_scope("all_kvk") as owner:
+            inherited = copy_context()
+            record_writer_completion(procedure="recompute")
+        assert owner.closed
+        before = list(dal.mock_calls)
+        with pytest.raises(SnapshotUnavailable, match="ended"):
+            if explicit:
+                delayed(owner_token=owner)
+            else:
+                inherited.run(delayed)
+        assert dal.mock_calls == before
+    assert not ran
+    dal.request.assert_called_once()
+    dal.captured.assert_called_once()
+
+
+def test_owner_from_another_runtime_is_refused_before_nested_sql_or_new_admission(tmp_path):
+    from services.legacy_export_snapshot_service import admitted_writer, use_runtime
+
+    runtime, dal = producer_runtime(tmp_path / "first")
+    other, other_dal = producer_runtime(tmp_path / "second")
+    owner = runtime.begin_writer("all_kvk")
+    before = list(dal.mock_calls)
+
+    @admitted_writer("all_kvk")
+    def wrong_scope():
+        pytest.fail("A foreign owner must never enter a producer")
+
+    try:
+        with use_runtime(other), pytest.raises(SnapshotUnavailable, match="another runtime"):
+            wrong_scope(owner_token=owner)
+        assert dal.mock_calls == before
+        assert not other_dal.mock_calls
+        assert not owner.closed
+    finally:
+        runtime._close_writer(owner)
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["authorize_writer", "checkpoint_writer", "finish_writer", "uncertain_writer", "_close_writer"],
+)
+def test_foreign_runtime_cannot_checkpoint_release_or_close_an_owner(tmp_path, action):
+    runtime, dal = producer_runtime(tmp_path / "first")
+    other, other_dal = producer_runtime(tmp_path / "second")
+    owner = runtime.begin_writer("all_kvk")
+    before = list(dal.mock_calls)
+    try:
+        with pytest.raises(SnapshotUnavailable, match="another runtime"):
+            getattr(other, action)(
+                owner, *([{"procedure": "recompute"}] if action == "checkpoint_writer" else [])
+            )
+        assert dal.mock_calls == before
+        assert not other_dal.mock_calls
+        assert not owner.closed
+    finally:
+        runtime._close_writer(owner)
+
+
+def test_explicit_owner_cannot_replace_a_different_inherited_owner(tmp_path):
+    from services.legacy_export_snapshot_service import (
+        current_owner,
+        record_writer_completion,
+        use_runtime,
+        writer_scope,
+    )
+
+    runtime, dal = producer_runtime(tmp_path)
+    with use_runtime(runtime), writer_scope("all_kvk") as owner:
+        before = list(dal.mock_calls)
+        with pytest.raises(SnapshotUnavailable, match="differs from the inherited owner"):
+            with writer_scope("all_kvk", owner_token=object()):
+                pytest.fail("The explicit token must not override inherited ownership")
+        assert current_owner() is owner
+        assert dal.mock_calls == before
+        record_writer_completion(procedure="recompute")
+    dal.captured.assert_called_once()
+
+
+def test_closed_owner_cannot_checkpoint_after_its_scope_ends(tmp_path):
+    runtime, dal = producer_runtime(tmp_path)
+    owner = runtime.begin_writer("all_kvk")
+    runtime._close_writer(owner)
+    before = list(dal.mock_calls)
+    with pytest.raises(SnapshotUnavailable, match="ended"):
+        runtime.checkpoint_writer(owner, {"procedure": "recompute"})
+    assert dal.mock_calls == before
+
+
+@pytest.mark.parametrize("failure", [RuntimeError, KeyboardInterrupt])
+def test_caught_nested_failure_retains_owner_and_cannot_capture_partial_generation(
+    tmp_path, failure
+):
+    from services.legacy_export_snapshot_service import (
+        admitted_writer,
+        current_owner,
+        record_writer_completion,
+        use_runtime,
+    )
+
+    runtime, dal = producer_runtime(tmp_path)
+
+    @admitted_writer("all_kvk")
+    def nested():
+        raise failure("nested producer did not complete")
+
+    @admitted_writer("all_kvk")
+    def outer():
+        owner = current_owner()
+        with pytest.raises(failure):
+            nested()
+        assert owner.failed and not owner.closed
+        dal.uncertain.assert_not_called()  # The root still owns its SQL work.
+        before = list(dal.mock_calls)
+        with pytest.raises(SnapshotUnavailable, match="requires reconciliation"):
+            record_writer_completion(procedure="recompute")
+        with pytest.raises(SnapshotUnavailable, match="requires reconciliation"):
+            nested()
+        assert dal.mock_calls == before
+        return {"success": True}
+
+    with use_runtime(runtime), pytest.raises(SnapshotUnavailable, match="requires reconciliation"):
+        outer()
+    dal.request.assert_called_once()
+    dal.uncertain.assert_called_once()
+    dal.captured.assert_not_called()
+    runtime.capture.assert_not_called()
+    dal.connect.return_value.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_tasks_keep_exact_runtime_and_nested_owner_in_offloaded_threads(tmp_path):
+    import asyncio
+
+    from services.legacy_export_snapshot_service import (
+        admitted_writer,
+        current_owner,
+        drain_thread,
+        record_writer_completion,
+        require_runtime,
+        use_runtime,
+    )
+
+    first, first_dal = producer_runtime(tmp_path / "first")
+    second, second_dal = producer_runtime(tmp_path / "second")
+    ready = asyncio.Event()
+
+    @admitted_writer("all_kvk")
+    def nested(expected, owner):
+        assert require_runtime() is expected
+        assert current_owner() is owner
+        record_writer_completion(procedure="recompute")
+
+    @admitted_writer("all_kvk")
+    def producer(expected):
+        assert require_runtime() is expected
+        owner = current_owner()
+        nested(expected, owner, owner_token=owner)
+        return {"success": True}
+
+    async def task(runtime):
+        with use_runtime(runtime):
+            await ready.wait()
+            result = await drain_thread(producer, runtime)
+            assert require_runtime() is runtime
+            assert current_owner() is None
+            return result
+
+    pending = [asyncio.create_task(task(runtime)) for runtime in (first, second)]
+    ready.set()
+    results = await asyncio.gather(*pending)
+    assert [r["export_preparation_id"] for r in results] == [
+        dal.request.return_value for dal in (first_dal, second_dal)
+    ]
+    for dal in (first_dal, second_dal):
+        dal.request.assert_called_once()
+        dal.captured.assert_called_once()
+        dal.uncertain.assert_not_called()
+    with pytest.raises(SnapshotUnavailable, match="unavailable"):
+        require_runtime()
 
 
 def test_structured_producer_failure_never_invents_committed_generation(tmp_path):
@@ -624,3 +901,48 @@ def test_earlier_rollover_blocks_later_preflight(monkeypatch, operation_state):
     sql = cursor.execute.call_args.args[0]
     assert "State IN ('closing','ready')" in sql
     assert not any(c.args[0].startswith("UPDATE") for c in cursor.execute.call_args_list)
+
+
+@pytest.mark.parametrize("drift", [None, "legacy", "application"])
+def test_actual_producer_cursor_is_checked_without_transaction_side_effects(monkeypatch, drift):
+    from unittest.mock import Mock
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    import services.export_execution_dal as evidence
+    from tests.test_export_runtime_composition import (
+        application_installation_fixture,
+        legacy_permission_fixture,
+    )
+
+    legacy_observed, legacy = legacy_permission_fixture(monkeypatch)
+    app_observed, application = application_installation_fixture(monkeypatch)
+    connect, cursor = Mock(), Mock()
+    dal = LegacySnapshotDAL(
+        connect,
+        output_operations=True,
+        execution_evidence=True,
+        legacy_sql_contract=legacy,
+        application_sql_contract=application,
+    )
+    dal.authorize = Mock()
+    legacy_read = Mock(return_value=legacy_observed)
+    app_read = Mock(return_value=app_observed)
+    monkeypatch.setattr(evidence, "legacy_installation_snapshot", legacy_read)
+    monkeypatch.setattr(evidence, "application_installation_snapshot", app_read)
+    if drift == "legacy":
+        legacy_observed["target"][0]["AuthorityRole"] = 1
+    elif drift == "application":
+        app_observed["target"]["Principal"] = "another"
+    if drift:
+        with pytest.raises(SourceConflict):
+            dal.verify_producer_cursor("claim", cursor)
+    else:
+        dal.verify_producer_cursor("claim", cursor)
+    dal.authorize.assert_called_once_with("claim")
+    legacy_read.assert_called_once_with(cursor, legacy["source"])
+    if drift != "legacy":
+        app_read.assert_called_once_with(cursor)
+    cursor.commit.assert_not_called()
+    cursor.rollback.assert_not_called()
+    cursor.close.assert_not_called()
+    connect.assert_not_called()

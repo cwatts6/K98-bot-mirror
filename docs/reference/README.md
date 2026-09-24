@@ -1,6 +1,75 @@
 # K98 Bot Reference Docs
+## S11 current local checkpoint — 2026-09-25
 
-## Current status — S10D SQL merged; S10E scope next, 2026-09-15
+Approved S11 runtime composition is locally implemented. The [latest evidence](kvk_source_migration/release_evidence_log.md)
+records exact validation/review targets; the [next approval plan](kvk_source_migration/release_readiness_and_rollback.md#s11-local-closure-and-exact-next-approval--2026-09-25)
+separates draft-PR delivery from operator-owned G4 operations and G5 acceptance. Admission stays
+closed. Older pending-design and incomplete-composition notes below are historical.
+
+## S11 current local composition — 2026-09-24
+
+The one-host/fresh-identity design is approved and local runtime/caller/issuer composition is
+authored behind readiness gates. Earlier pending-answer and missing-factory notes are historical.
+Final local validation/review is recorded in release_evidence_log; no installation, publication
+or Bot-machine action follows. See [the current remaining gates](kvk_source_migration/release_readiness_and_rollback.md#s11-composed-runtime-and-remaining-operational-gates--2026-09-24).
+
+
+## S11 implementation status — 2026-09-24
+
+S11 has moved from approved mechanism design into incomplete local implementation. See [the checkpoint](kvk_source_migration/release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24). Earlier design-only statements are historical; no operational gate is passed.
+
+
+## S11 trusted-proof design checkpoint — 2026-09-24
+
+Current recommendation: a separately supervised provider authority, durable SQL request events
+and authoritative proofs, with inconclusive mutations retained for reconciliation. The
+[decision/approval packet](kvk_source_migration/release_readiness_and_rollback.md#s11-proof-design-approval-and-rollback--2026-09-24)
+and [exact proposed manifest amendment](kvk_source_migration/integration_implementation_manifests.md#s11-proof-mechanism-manifest-amendment--2026-09-24)
+supersede the earlier unresolved mechanism/no-established-SQL-requirement checkpoint below.
+This remains documentation/design only. Historical temporary recovery archives are currently
+unavailable; see the new evidence checkpoint before relying on previous verification records.
+
+
+## S11 preparation/design approved — 2026-09-24
+
+Current S11 authority is documentation preparation and design only, following operator approval
+of the initial scope. Use the [release/approval packet](kvk_source_migration/release_readiness_and_rollback.md#s11-preparation-and-release-approval-packet--2026-09-24),
+[composition/proof contracts](kvk_source_migration/integration_contract_and_consumer_matrix.md#s11-composition-and-trusted-proof-design--2026-09-24),
+[exact manifests and tests](kvk_source_migration/integration_implementation_manifests.md#s11-preparation-and-proposed-implementation-manifests--2026-09-24),
+[evidence](kvk_source_migration/release_evidence_log.md#s11-preparation-evidence--2026-09-24),
+and [SQL target packet](local_sql_development.md#s11-exact-target-packet--2026-09-24).
+The [S10E closeout manifest](kvk_source_migration/s10e_closeout_and_s11_handoff.md#exact-mandatory-next-pr-documentation-manifest)
+still controls the entire mandatory delivery union. Older initial-scope and next-slice wording
+below is dated history; it does not authorize runtime changes, predecessor reruns or execution.
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](kvk_source_migration/s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
+
+## Historical S10D closeout — 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -10,7 +79,7 @@ provider/Discord execution are not established. S10C remains source/static SQL e
 See [S10D closeout and exact carry-forward manifests](kvk_source_migration/s10d_closeout_and_s10e_handoff.md).
 
 Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
-[task pack](../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+[task pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
 that closeout, this pack/starter and all required archive identities. Verify filename AND
 previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,

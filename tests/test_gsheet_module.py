@@ -8,8 +8,79 @@ import types
 
 from gspread.exceptions import SpreadsheetNotFound
 import pandas as pd
+import pytest
 
 import gsheet_module as gm
+
+
+def test_recorded_configuration_reads_never_load_credentials_or_local_http(monkeypatch):
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    import pytest
+
+    import proc_config_import as pci
+    from services.export_execution_protocol import ProviderRequest
+    from services.export_provider_adapter import ProviderAdapter, use_provider
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    forbidden = Mock(side_effect=AssertionError("local credential or HTTP fallback"))
+    monkeypatch.setattr(gm.Credentials, "from_service_account_file", forbidden)
+    monkeypatch.setattr(gm, "_build_sheets_with_timeout", forbidden)
+    monkeypatch.setattr(pci, "_safe_execute", forbidden)
+    execute = Mock(
+        return_value=dict(range="ProcConfig!A1:J", values=[["key", "value"], ["x", "  "]])
+    )
+    provider = ProviderAdapter(
+        budget=forbidden,
+        authorize=Mock(),
+        destinations=["config-aaa"],
+        execution=execute,
+        stream_id=str(uuid4()),
+    )
+    with use_provider(provider):
+        frame = pci._read_sheet_to_df(pci._get_sheet_service(), "config-aaa", "ProcConfig!A1:J")
+        assert list(frame.columns) == ["key", "value"] and pd.isna(frame.iloc[0, 1])
+        with pytest.raises(SnapshotUnavailable):
+            gm.get_gsheet_client("missing-credentials.json")
+        request = gm.get_sort_service("missing").spreadsheets().get(spreadsheetId="config-aaa")
+        with pytest.raises(RuntimeError, match="escaped"):
+            request.execute(num_retries=0)
+        assert gm.get_drive_service("missing").files().get(fileId="config-aaa").method == "GET"
+    typed = ProviderRequest.parse(execute.call_args.args[0])
+    assert typed.operation == "sheets.values.get" and typed.target == "config-aaa"
+    assert not typed.mutation and execute.call_count == 1
+    forbidden.assert_not_called()
+
+
+def test_recorded_configuration_unknown_response_has_no_alternate_read(monkeypatch):
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    import pytest
+
+    import proc_config_import as pci
+    from services.export_provider_adapter import (
+        ProviderAdapter,
+        ProviderOutcomeUnknown,
+        use_provider,
+    )
+
+    forbidden = Mock(side_effect=AssertionError("credential or alternate SDK retry"))
+    monkeypatch.setattr(gm.Credentials, "from_service_account_file", forbidden)
+    monkeypatch.setattr(pci, "_safe_execute", forbidden)
+    execute = Mock(side_effect=TimeoutError("unknown"))
+    provider = ProviderAdapter(
+        budget=forbidden,
+        authorize=Mock(),
+        destinations=["config-aaa"],
+        execution=execute,
+        stream_id=str(uuid4()),
+    )
+    with use_provider(provider), pytest.raises(ProviderOutcomeUnknown):
+        pci._read_sheet_to_df(pci._get_sheet_service(), "config-aaa", "ProcConfig!A1:J")
+    assert execute.call_count == 1 and provider.uncertain
+    forbidden.assert_not_called()
 
 
 def test_scan_entrypoint_enqueues_without_sql_or_provider(monkeypatch):
@@ -317,3 +388,45 @@ def test_create_additional_kvk_spreadsheets_accepts_named_export_sections(monkey
     assert result["KVK_PASS4_ALL_PLAYER_OUTPUT"]["created"] is True
     assert "PASS4_PLAYER" in written_tabs
     assert "KVK_Scan_Log" in written_tabs
+
+
+@pytest.mark.parametrize("name", ["get_gsheet_client", "get_sort_service", "get_drive_service"])
+def test_s11_provider_getters_cannot_fall_back_to_copied_legacy_key(monkeypatch, name):
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(gm, "current_provider", lambda: None)
+    with pytest.raises(SnapshotUnavailable):
+        getattr(gm, name)("not-a-real-credential.json")
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_s11_health_uses_one_owned_authority_request_without_credential_fallback(
+    monkeypatch, failed
+):
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    import services.export_provider_adapter as provider
+    import services.legacy_export_snapshot_service as legacy
+
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: object())
+    monkeypatch.setattr(legacy, "configuration_requests", lambda: nullcontext())
+    sheets = Mock()
+    adapter = Mock()
+    if failed:
+        adapter.execute.side_effect = RuntimeError("unknown response")
+    monkeypatch.setattr(provider, "recorded_clients", lambda: (sheets, object()))
+    monkeypatch.setattr(gm, "current_provider", lambda: adapter)
+    fallback = Mock(side_effect=AssertionError("legacy key used"))
+    monkeypatch.setattr(gm, "get_gsheet_client", fallback)
+    # Test the health operation inside its already-owned boundary; separate
+    # runtime tests cover the decorator's admission and cancellation behavior.
+    ok, message = gm.check_basic_gsheets_access.__wrapped__("unused", "registered-config")
+    assert ok is not failed
+    assert ("unresolved" if failed else "authority") in message
+    sheets.spreadsheets().get.assert_called_once_with(
+        spreadsheetId="registered-config", fields="spreadsheetId"
+    )
+    adapter.execute.assert_called_once()
+    fallback.assert_not_called()

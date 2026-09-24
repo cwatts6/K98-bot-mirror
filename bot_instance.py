@@ -1470,6 +1470,9 @@ async def _graceful_teardown():
     from services.export_coordination_service import stop_export_admission
 
     stop_export_admission()
+    from services.export_runtime_composition import drain_runtime
+
+    await drain_runtime()
 
     # Diagnostic sends must finish their reservation finalizers before client teardown.
     try:
@@ -1788,7 +1791,15 @@ async def _run_ready_queue_lifecycle() -> None:
 async def _run_ready_runtime_services() -> None:
     from kvk.services.new_source_recovery_service import register_recovery
     from services.export_coordination_service import register_exports
+    from services.export_runtime_composition import install_configured_runtime
+    from services.legacy_export_snapshot_service import drain_thread
 
+    try:
+        await drain_thread(install_configured_runtime)
+    except Exception as exc:
+        logger.warning(
+            "[BOOT] S11 export admission remains closed error_type=%s", type(exc).__name__
+        )
     register_recovery(task_monitor)
     register_exports(task_monitor)
 

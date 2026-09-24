@@ -12,6 +12,7 @@ from typing import Any
 from core.discord_embed_limits import MAX_FIELD_VALUE_CHARACTERS
 from core.operator_diagnostic_payloads import pack_complete_units, redact_diagnostic_text
 from kvk.dal import kvk_admin_dal
+from services.legacy_export_snapshot_service import bound_runtime
 
 logger = logging.getLogger(__name__)
 DISCORD_EMBED_FIELD_VALUE_LIMIT = MAX_FIELD_VALUE_CHARACTERS
@@ -117,6 +118,7 @@ def run_export_test(
     reject_uncoordinated_export(kvk_no)
 
 
+@bound_runtime
 def run_export_all(
     *,
     kvk_no: int | None,
@@ -204,6 +206,7 @@ def load_embed_test_context(
     )
 
 
+@bound_runtime
 def recompute_kvk_windows(kvk_no: int | None = None) -> KvkRecomputeResult:
     started = time.perf_counter()
     choice = kvk_admin_dal.read_admin_source(kvk_no)
