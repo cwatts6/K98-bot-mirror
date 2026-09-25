@@ -578,3 +578,30 @@ def test_freeze_and_dispatch_are_serialized(runtime):
         closing.result(timeout=5)
     order = [v.get("State", v.get("Action")) for _, v in dal.calls]
     assert order.index("succeeded") < order.index("freeze") < order.index("close")
+
+
+def test_child_handshake_failure_retains_claim_and_returns_authority_control(runtime, monkeypatch):
+    from core.export_execution_host import HostBoundaryError
+
+    authority, dal, store, child, budget, request = runtime
+    scope = {
+        k: v
+        for k, v in dal.calls[0][1].items()
+        if k not in {"SessionID", "StreamID", "Action", "ExpectedVersion", "ChildIdentity"}
+    }
+    stream_id = str(uuid4())
+    original = Child.resume
+
+    def stalled(_):
+        raise HostBoundaryError("IPC deadline expired")
+
+    monkeypatch.setattr(Child, "resume", stalled)
+    with pytest.raises(ExecutionUncertain, match="startup"):
+        authority.open_stream(stream_id=stream_id, scope=scope)
+    retained = authority._streams[stream_id]
+    assert retained.frozen and retained.uncertain and retained.child.terminated
+    assert [v["Action"] for kind, v in dal.calls if kind == "stream"] == ["open", "open"]
+    assert not any(kind == "event" for kind, _ in dal.calls)
+    monkeypatch.setattr(Child, "resume", original)
+    next_id = str(uuid4())
+    assert authority.open_stream(stream_id=next_id, scope=scope) == next_id

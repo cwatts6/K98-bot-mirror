@@ -1580,7 +1580,13 @@ def get_sheet_values(
         # An authority failure must propagate. It cannot become an empty config
         # or trigger the legacy helper's alternate credential/client/retry path.
         return result.get("values", []) or []
-    _reject_uncoordinated_credentials()
+    from services.legacy_export_snapshot_service import has_runtime_context
+
+    # Calendar and display metadata reads are independent of export admission.
+    # An inherited export/configuration scope must still never fall back from
+    # authority evidence to the legacy credential or retry path.
+    if provider is not None or has_runtime_context():
+        _reject_uncoordinated_credentials()
     # Lazy-import heavy dependency to avoid import-time failures in test env
     try:
         from google.oauth2.service_account import Credentials  # type: ignore

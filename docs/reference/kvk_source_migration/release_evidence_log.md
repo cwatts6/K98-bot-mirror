@@ -3189,3 +3189,37 @@ publications open; do not infer runtime truth from static SQL, merged commits or
 Release rollback stops admission and drains/reconciles owned work. Preserve sealed inputs, receipt
 bytes, history, old/nested-owner evidence and uncertain claims; forward-fix installed SQL. Only an
 explicit target/operation approval permits any provider/Discord/SQL or bot-machine action.
+
+### S11 PR review corrections — 2026-09-25
+
+Bot mirror PR #281 and SQL PR #89 remain separate source deliveries. The review delta
+preserves independent read-only calendar/display Sheets access while inherited export
+contexts and recorded authority failures cannot fall back to legacy credentials. Provider
+child accept and hello each have a 30-second deadline and observe the retained process
+handle. Timeout/exit cancels and drains pending IPC; authority startup failure retains the
+SQL claim, terminates the owned child and returns control for reconciliation. Provider
+HTTP/authentication timeouts are unchanged after the authenticated handshake.
+
+SQL first installation rejects either pre-existing evidence-role name before installation
+DDL; exact-schema reapplication preserves subsequently authorized G4 memberships. Session
+closure rejects incomplete enrollment preparations, including the interval between closed
+provider phases. Enrollment admission locks the session until its transaction completes.
+The authoritative procedure snapshots and both migration body copies agree.
+
+Correction validation: 632 focused offline tests passed, 10 live-only cases skipped;
+operational logs remained byte/metadata unchanged. Black/Ruff, architecture, deferred-item,
+security-routing, test-selection, command-registration and smoke-import checks passed.
+SQL static checks passed 188 assertions and ScriptDom parsed the three changed SQL files
+without errors. The selector recommends full pytest for the entire branch; the earlier
+5,812-pass full run is retained historical evidence, with the correction's 632-case run
+covering the changed boundaries, composition, snapshots and event-data caller. It is not
+represented as a new full-suite run. Separate Changes reviews use the published Bot
+`c3e9fc37391c690f0c9303b6e6f3056947cc36a4` and SQL
+`c106867fe8278b9d1d341a77a0b6f5b71ce94de6` as correction baselines, Deep off.
+
+The authored SQL tests now reject session closure before an enrollment's first stream and
+between closed phases. SQL installation/reapplication, effective role membership, concurrent
+transaction behavior and native child-failure timing are still unexecuted G4 gates. No
+provider/Discord operations, deployment, activation, merge, predecessor rerun or G5
+acceptance is implied by resolving these source-review threads. All retained S6/S8 evidence,
+uncertain publications, pending-document/archive identities and rollback obligations stand.

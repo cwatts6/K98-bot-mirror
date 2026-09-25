@@ -289,6 +289,80 @@ def test_shutdown_during_pending_io_drains_cancellation_then_propagates():
     assert events[-3:] == ["cancel", "drain", "close-event"]
 
 
+@pytest.mark.parametrize("operation", ["connect", "read"])
+@pytest.mark.parametrize("wait", [0, 258])
+def test_child_handshake_exit_or_stall_cancels_pending_io(monkeypatch, operation, wait):
+    pipe, events = bounded_pipe()
+    process = object()
+    pipe.process = process
+    waits = []
+
+    def observe(handles, all_handles, timeout):
+        assert handles[0] is process and all_handles is False
+        waits.append(timeout)
+        return wait
+
+    pipe.events.WaitForMultipleObjects = observe
+    monkeypatch.setitem(sys.modules, "win32pipe", SimpleNamespace(ConnectNamedPipe=lambda *_: 997))
+    with pytest.raises(host.HostBoundaryError, match=r"exited|deadline"):
+        pipe.connect() if operation == "connect" else pipe.receive()
+    assert waits == [30]
+    assert events[-3:] == ["cancel", "drain", "close-event"]
+
+
+def test_child_response_after_handshake_still_observes_exact_process():
+    pipe, events = bounded_pipe()
+    process = object()
+    pipe.process, pipe.timeout_ms = process, None
+    pipe.events.WaitForMultipleObjects = Mock(return_value=1)
+    assert pipe.receive() == {}
+    handles, all_handles, timeout = pipe.events.WaitForMultipleObjects.call_args.args
+    assert handles[0] is process and all_handles is False and timeout == 0xFFFFFFFF
+    assert "cancel" not in events
+
+
+@pytest.mark.parametrize("failure", [None, "connect", "hello", "identity"])
+def test_child_resume_uses_bounded_handshake_and_keeps_handles_on_failure(monkeypatch, failure):
+    pipe = SimpleNamespace(
+        handle=SimpleNamespace(Close=Mock()),
+        connect=Mock(),
+        receive=Mock(return_value={"child_id": "child", "version": 1}),
+        timeout_ms=30000,
+    )
+    if failure in {"connect", "hello"}:
+        getattr(pipe, "connect" if failure == "connect" else "receive").side_effect = (
+            host.HostBoundaryError("deadline")
+        )
+    elif failure == "identity":
+        pipe.receive.return_value = {"child_id": "different", "version": 1}
+    authenticate = Mock()
+    monkeypatch.setattr(host, "authenticated_peer", authenticate)
+    child = host.WindowsProviderChild(
+        identity="child",
+        process=SimpleNamespace(Close=Mock()),
+        thread=SimpleNamespace(Close=Mock()),
+        job=SimpleNamespace(Close=Mock()),
+        pid=17,
+        pipe=pipe,
+        sid="sid",
+        api={"process": SimpleNamespace(ResumeThread=Mock())},
+    )
+    if failure:
+        with pytest.raises(host.HostBoundaryError):
+            child.resume()
+        assert pipe.timeout_ms == 30000
+    else:
+        child.resume()
+        assert pipe.timeout_ms is None
+        authenticate.assert_called_once_with(pipe.handle, "sid", expected_pid=17)
+    assert child.resumed and not child.terminated
+    child.process.Close.assert_not_called()
+    child.job.Close.assert_not_called()
+    pipe.handle.Close.assert_not_called()
+    with pytest.raises(host.HostBoundaryError, match="again"):
+        child.resume()
+
+
 def test_skipped_directory_alias_is_checked_before_walk_can_omit_it(tmp_path, monkeypatch):
     # A directory symlink appears in dirnames but is never yielded by os.walk
     # with followlinks=False. Do not create a native link in this offline test.

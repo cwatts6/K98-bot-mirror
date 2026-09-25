@@ -470,15 +470,17 @@ class PrivateEvidenceStore:
 
 
 class MessagePipe:
-    def __init__(self, handle, *, api=None, timeout_ms=None, event_api=None, overlapped=None):
+    def __init__(
+        self, handle, *, api=None, timeout_ms=None, event_api=None, overlapped=None, process=None
+    ):
         if api is None:
             import win32file
 
             api = win32file
         self.handle, self.api = handle, api
-        if timeout_ms is not None:
-            if type(timeout_ms) is not int or not 0 < timeout_ms <= 30000:
-                raise HostBoundaryError("Bounded pipe deadline required.")
+        if timeout_ms is not None and (type(timeout_ms) is not int or not 0 < timeout_ms <= 30000):
+            raise HostBoundaryError("Bounded pipe deadline required.")
+        if timeout_ms is not None or process is not None:
             if event_api is None:
                 import win32event
 
@@ -488,6 +490,7 @@ class MessagePipe:
 
                 overlapped = pywintypes.OVERLAPPED
         self.timeout_ms, self.events, self.overlapped = timeout_ms, event_api, overlapped
+        self.process = process
 
     def _bounded_io(self, start):
         """One overlapped operation; cancellation completes before buffer release.
@@ -505,8 +508,22 @@ class MessagePipe:
                 return 0
             if status not in (0, 997):
                 raise HostBoundaryError("Incomplete IPC operation; do not replay.")
-            if pending and self.events.WaitForSingleObject(operation.hEvent, self.timeout_ms) != 0:
-                raise HostBoundaryError("IPC deadline expired; outcome is unresolved.")
+            if pending:
+                if self.process is None:
+                    wait = self.events.WaitForSingleObject(operation.hEvent, self.timeout_ms)
+                else:
+                    # Retain and observe the exact child handle, never a recycled PID.
+                    # Process first makes simultaneous exit/completion fail closed.
+                    wait = self.events.WaitForMultipleObjects(
+                        (self.process, operation.hEvent),
+                        False,
+                        self.timeout_ms if self.timeout_ms is not None else 0xFFFFFFFF,
+                    )
+                    if wait == 0:
+                        raise HostBoundaryError("Provider child exited; outcome is unresolved.")
+                    wait = 0 if wait == 1 else wait
+                if wait != 0:
+                    raise HostBoundaryError("IPC deadline expired; outcome is unresolved.")
             count = self.api.GetOverlappedResult(self.handle, operation, False)
             pending = False
             return count
@@ -528,7 +545,7 @@ class MessagePipe:
                 operation.hEvent.Close()
 
     def connect(self):
-        """Bounded accept for an overlapped Bot-facing server handle."""
+        """Bounded accept for an overlapped server handle."""
         import win32pipe
 
         def start(operation):
@@ -539,7 +556,7 @@ class MessagePipe:
 
     def send(self, message):
         raw = encode(message)
-        if self.timeout_ms is None:
+        if self.overlapped is None:
             status, count = self.api.WriteFile(self.handle, raw)
         else:
             count = self._bounded_io(
@@ -550,7 +567,7 @@ class MessagePipe:
             raise HostBoundaryError("Incomplete IPC write; do not replay.")
 
     def receive(self):
-        if self.timeout_ms is not None:
+        if self.overlapped is not None:
             # A single buffer bounds the complete frame, including slow partial
             # writes; a per-chunk deadline would allow an indefinite trickle.
             buffer = self.api.AllocateReadBuffer(MAX_MESSAGE_BYTES + 1)
@@ -774,15 +791,14 @@ class WindowsProviderChild:
         self.thread.Close()
         self.thread = None
         self.resumed = True
-        try:
-            self.api["pipe"].ConnectNamedPipe(self.pipe.handle, None)
-        except self.api["error"] as exc:
-            if exc.winerror != 535:  # Client may connect before ConnectNamedPipe.
-                raise
+        self.pipe.connect()
         hello = self.pipe.receive()
         authenticated_peer(self.pipe.handle, self.sid, expected_pid=self.pid)
         if hello != {"child_id": self.identity, "version": 1}:
             raise HostBoundaryError("Child handshake differs.")
+        # Only startup has the IPC deadline. Provider HTTP/authentication retains
+        # its existing timeouts; subsequent overlapped I/O still observes exit.
+        self.pipe.timeout_ms = None
 
     def execute(self, message):
         if not self.resumed or self.terminated:
@@ -839,7 +855,9 @@ class WindowsExecutionHost:
         import win32process
 
         name = "\\\\.\\pipe\\K98Export-" + identity
-        pipe = create_private_pipe(name, authority_sid=self.sid, client_sid=self.sid)
+        pipe = create_private_pipe(
+            name, authority_sid=self.sid, client_sid=self.sid, overlapped=True
+        )
         job = win32job.CreateJobObject(None, None)
         limits = win32job.QueryInformationJobObject(job, 9)
         limits["BasicLimitInformation"]["LimitFlags"] = 0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
@@ -877,7 +895,7 @@ class WindowsExecutionHost:
                 thread=thread,
                 job=job,
                 pid=pid,
-                pipe=MessagePipe(pipe),
+                pipe=MessagePipe(pipe, timeout_ms=30000, process=process),
                 sid=self.sid,
                 api={
                     "job": win32job,

@@ -223,6 +223,11 @@ def current_owner():
     return _owner.get()
 
 
+def has_runtime_context():
+    """Identify an inherited export scope without admitting a new writer."""
+    return _runtime.get() is not None
+
+
 def validate_writer_season(kvk_no):
     owner = current_owner()
     if owner is not None:

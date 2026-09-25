@@ -563,6 +563,10 @@ def test_s11_enrollment_refuses_replay_stale_owner_and_unproven_binding(
         Reason="Exact authorized synthetic SQL checks",
     )
     claim = dal.transition("enrollment", **common, **begin)
+    # Admission owns resources even before its first provider stream exists.
+    with pytest.raises(EvidenceCommitUnknown):
+        dal.transition("session", SessionID=session_id, Action="close", ExpectedVersion=1)
+    assert dal.read_session(session_id)["State"] == "open"
     with pytest.raises(EvidenceCommitUnknown):
         dal.transition("enrollment", **common, **begin)
     for damage in ({"ExpectedVersion": claim["Version"] + 1}, {"OwnerID": str(uuid4())}, {}):
@@ -630,4 +634,9 @@ def test_s11_enrollment_refuses_replay_stale_owner_and_unproven_binding(
             **scope,
         )
     assert dal.read_origins(plan.value()["account"], ["s11-unproven-file"]) == []
+    # A closed phase does not mean its enclosing enrollment is complete.
+    with pytest.raises(EvidenceCommitUnknown):
+        dal.transition("session", SessionID=session_id, Action="close", ExpectedVersion=1)
+    session = dal.read_session(session_id)
+    assert session["State"] == "open" and session["Version"] == 1
     # No provider success, origin eligibility, release, cleanup or pool activation.

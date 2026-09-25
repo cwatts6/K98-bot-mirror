@@ -124,8 +124,11 @@ class _FakeClient:
         return _FakeSpreadsheet()
 
 
-def test_get_sheet_values_success(monkeypatch):
+@pytest.mark.parametrize("coordinated", [False, True])
+def test_get_sheet_values_success(monkeypatch, coordinated):
     """Should return the rows list when the Sheets client returns values."""
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", coordinated)
 
     class FakeReq:
         def __init__(self, payload):
@@ -155,6 +158,54 @@ def test_get_sheet_values_success(monkeypatch):
     rows = gm.get_sheet_values("FAKE_ID", "Sheet1!A1:B2", timeout=5)
     assert isinstance(rows, list)
     assert rows == [["a", "b"], ["c", "d"]]
+
+
+@pytest.mark.parametrize("scope", ["runtime", "provider"])
+def test_sheet_read_in_export_scope_cannot_fall_back_to_legacy_key(monkeypatch, scope):
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import SnapshotUnavailable, use_runtime
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(
+        gm,
+        "current_provider",
+        lambda: types.SimpleNamespace(execution=None) if scope == "provider" else None,
+    )
+    credentials = Mock(side_effect=AssertionError("legacy credential used"))
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file", credentials
+    )
+    with use_runtime(object()) if scope == "runtime" else nullcontext():
+        with pytest.raises(SnapshotUnavailable):
+            gm.get_sheet_values("export_config", "Config!A1:Z")
+    credentials.assert_not_called()
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_authority_sheet_read_never_falls_back_to_legacy_credentials(monkeypatch, failed):
+    from unittest.mock import Mock
+
+    import services.export_provider_adapter as adapter
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    provider = Mock(execution=object())
+    provider.execute.return_value = {"values": [["recorded"]]}
+    if failed:
+        provider.execute.side_effect = RuntimeError("unresolved read")
+    monkeypatch.setattr(gm, "current_provider", lambda: provider)
+    monkeypatch.setattr(adapter, "recorded_clients", lambda: (Mock(), Mock()))
+    credentials = Mock(side_effect=AssertionError("legacy credential used"))
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file", credentials
+    )
+    if failed:
+        with pytest.raises(RuntimeError, match="unresolved"):
+            gm.get_sheet_values("export_config", "Config!A1:Z")
+    else:
+        assert gm.get_sheet_values("export_config", "Config!A1:Z") == [["recorded"]]
+    credentials.assert_not_called()
 
 
 def test_get_sheet_values_empty_range(monkeypatch):
