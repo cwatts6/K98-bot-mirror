@@ -1,5 +1,36 @@
 # KVK Source Migration S6 release evidence log
 
+## PR #282 final transaction wiring and review handoff — 2026-09-25
+
+The additional caller-wiring gap identified in the preceding correction review is now fixed:
+`scripts/run_export_authority.py` opens fresh transactional connections for budget/pool work.
+`ExportExecutionDAL` still selects autocommit on its own fresh connection before metadata or
+procedure calls. Normal and enrollment launchers share the corrected factory. SQL targets,
+identity, encryption/certificate validation, timeout, schema and grants are unchanged.
+The independent follow-up confirmed the concrete call chains and found no introduced concern.
+
+Three inert actual-factory/DAL cases first reproduced the old mismatch, then passed after the
+fix. Final affected regression: **878 passed, 13 explicit skips**, SQL/network blocked and
+operational logs byte/size/mtime-identical. All six repository gates passed again after this
+source correction; Black/Ruff and whitespace checks passed. Skips and previous full/predecessor
+results retain their original meaning; no runtime evidence is inferred from these local checks.
+
+Incremental Changes scan `87c25b87-a554-4ecd-bf3a-b7a2a921901d`, Deep off, completed with the one
+runtime file fully reviewed and zero findings. Base/head `7ccb7df2e839452f899fe272f0e7b32714335622`;
+snapshot `07d4c9e22b4f5b637201535eadc5a2677134f5474c901c1bd075af4d96d7a1f2`.
+The earlier correction scan and local commit remain unchanged. Managed artifacts retain both
+canonical reports, architecture/transaction analysis and frozen-byte/offline validation proof.
+The manifest does not expose a measured scan token total; none is inferred. This subsequent
+Markdown receipt has a precise documentation-only skip; no reviewed Python bytes changed.
+
+The two accepted Bot comments are ready for replies/resolution against the published correction
+head. Read current GitHub checks and thread states before merge. SQL #90 needs no source edit
+or comment resolution and remains unchanged. The complete 43-path Bot union includes every
+original pending document, with exact original archive/merged proof retained. Production must
+receive the reviewed runtime/test modifications and publication policy through a separate patch
+promotion; only still-identical paths can be omitted. Neither source review nor publication
+authorizes merge, deployment or G4 operations. Next stage remains **G4 plan development only**.
+
 ## PR #282 review correction validation — 2026-09-25
 
 Two review comments were accepted: incomplete authority drain must return failure and retained

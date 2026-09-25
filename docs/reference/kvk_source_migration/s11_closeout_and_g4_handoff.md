@@ -11,6 +11,14 @@ remain absolute until SQL server UTC applies the bound. Invalid/missing headers 
 fallback. There is no provider retry or terminal outcome inferred from this feedback. A lost
 cooldown acknowledgement retains uncertainty, dispatch evidence and claims.
 
+The concrete authority/enrollment connection factory also now opens fresh transactional
+connections for shared budget and pool work. Evidence DAL methods explicitly enable autocommit
+on their own fresh connections before calling procedures that own their transactions. This
+closes the pre-existing caller-wiring mismatch found during review; fixed targets, integrated
+identity, encryption/certificate validation, timeout and SQL permissions remain unchanged.
+Actual-factory regressions exercise reservation, cooldown and evidence-procedure modes with
+inert ODBC connections and the real DAL/transaction helpers.
+
 The runtime delta is exactly `scripts/run_export_authority.py`,
 `scripts/run_export_provider_child.py`, `core/export_execution_host.py`,
 `services/export_execution_authority.py` and `services/export_execution_protocol.py`, with
@@ -20,7 +28,7 @@ regressions in `tests/test_export_authority_launcher.py`,
 runtime delta; the existing `ExportCoordinationDAL.extend_cooldown` and authoritative
 `dbo.ExportRequestBudget` definition already provide the required SQL contract.
 
-Fresh offline validation: **875 passed, 13 skipped** across authority, protocol, host, runtime,
+Final offline validation: **878 passed, 13 skipped** across authority, protocol, host, runtime,
 enrollment, adapter/budget and publication suites. Skips remain explicitly gated live checks
 and unavailable local Windows/rsync capabilities. Network and SQL connections were blocked;
 operational logs remained byte/mtime-identical. These are source checks, not G4 runtime proof.

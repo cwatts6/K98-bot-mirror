@@ -307,7 +307,9 @@ def connection_factory(manifest):
     )
 
     def connect():
-        return pyodbc.connect(target, autocommit=True, timeout=5)
+        # Budget/pool DALs own transactions; evidence procedures explicitly
+        # enable autocommit on their own fresh connection before their first SQL.
+        return pyodbc.connect(target, autocommit=False, timeout=5)
 
     return connect
 

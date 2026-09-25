@@ -84,6 +84,88 @@ def test_authority_shutdown_reports_retained_session_and_preserves_service_error
     connector.assert_not_called()
 
 
+@pytest.mark.parametrize("operation", ["reserve", "cooldown", "evidence"])
+def test_authority_connection_factory_supports_budget_and_procedure_transactions(
+    monkeypatch, operation
+):
+    from datetime import datetime
+
+    import pyodbc
+
+    from scripts.run_export_authority import connection_factory
+    from services.export_coordination_dal import ExportCoordinationDAL
+    from services.export_execution_dal import ExportExecutionDAL
+
+    now = datetime(2026, 9, 25)
+    responses = iter(
+        {
+            "reserve": [{"NowUTC": now}, None],
+            "cooldown": [{"NowUTC": now}, {"CooldownUntilUTC": None, "Version": 7}, {"Version": 8}],
+            "evidence": [{"Version": 1}],
+        }[operation]
+    )
+    connections = []
+
+    def open_fixture(target, *, autocommit, timeout):
+        assert target == (
+            "DRIVER={ODBC Driver 18 for SQL Server};SERVER=fixture-server;"
+            "DATABASE=fixture-database;Trusted_Connection=yes;Encrypt=yes;TrustServerCertificate=no;"
+        )
+        assert timeout == 5
+        connection, cursor = Mock(), Mock()
+        connection.autocommit = autocommit
+        connection.cursor.return_value = cursor
+        cursor.description = [("Version",)]
+        cursor.fetchall.return_value = []
+        cursor.nextset.return_value = False
+
+        def execute(query, *arguments):
+            assert query.count("?") == len(arguments)
+            # Exercise the actual DAL/transaction helpers, not a patched transaction.
+            assert connection.autocommit is (operation == "evidence")
+
+        def fetchone():
+            row = next(responses)
+            if row is None:
+                return None
+            cursor.description = [(key,) for key in row]
+            return tuple(row.values())
+
+        cursor.execute.side_effect = execute
+        cursor.fetchone.side_effect = fetchone
+        connections.append(connection)
+        return connection
+
+    driver = Mock(side_effect=open_fixture)
+    monkeypatch.setattr(pyodbc, "connect", driver)
+    connect = connection_factory(
+        {"sql_server": "fixture-server", "sql_database": "fixture-database"}
+    )
+    if operation == "reserve":
+        assert ExportCoordinationDAL(connect).reserve_request("fixture") == {
+            "ReservedUTC": now,
+            "WaitSeconds": 0,
+        }
+    elif operation == "cooldown":
+        ExportCoordinationDAL(connect).extend_cooldown("fixture", 12)
+    else:
+        assert ExportExecutionDAL(connect).transition(
+            "session",
+            SessionID=str(uuid4()),
+            Action="close",
+            ExpectedVersion=7,
+        ) == {"Version": 1}
+    driver.assert_called_once()
+    assert driver.call_args.kwargs["autocommit"] is False
+    connection = connections[0]
+    if operation == "evidence":
+        connection.commit.assert_not_called()  # the stored procedure owns its transaction
+    else:
+        connection.commit.assert_called_once_with()
+    connection.rollback.assert_not_called()
+    connection.close.assert_called_once_with()
+
+
 def registration():
     return RuntimeRegistration(registration_fixture())
 
