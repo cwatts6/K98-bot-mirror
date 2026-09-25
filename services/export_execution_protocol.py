@@ -5,6 +5,8 @@ Validation happens again in the authority; a Bot-side check is not authorization
 """
 
 from dataclasses import dataclass
+from datetime import datetime
+from email.utils import format_datetime
 import hashlib
 import json
 import re
@@ -70,6 +72,65 @@ def enrollment_create_arguments(plan_id, ordinal):
 
 class ProtocolError(ValueError):
     """The message is not a supported bounded authority request."""
+
+
+class ProviderThrottled(ProtocolError):
+    """Bounded provider feedback, never evidence of a terminal request outcome."""
+
+    def __init__(self, status, retry_after):
+        if type(status) is not int or status not in (429, 503):
+            raise ProtocolError("Exact throttling status required.")
+        if (
+            not isinstance(retry_after, str)
+            or len(retry_after) > 64
+            or self._normalize(retry_after) != retry_after
+        ):
+            raise ProtocolError("Canonical bounded Retry-After required.")
+        super().__init__("Provider throttling requires reconciliation.")
+        self.status, self.retry_after = status, retry_after
+
+    @staticmethod
+    def _normalize(header):
+        from services.export_request_budget import retry_delay
+
+        # Never forward arbitrary provider headers/prose over the child pipe.
+        if not isinstance(header, str) or len(header) > 128:
+            header = None
+        delay = retry_delay(header)
+        if isinstance(delay, datetime):
+            # Preserve the absolute date: only SQL's UTC clock computes a wait.
+            return format_datetime(delay, usegmt=True)
+        return str(float(delay))
+
+    @classmethod
+    def from_header(cls, status, header):
+        return cls(status, cls._normalize(header))
+
+    def message(self, request_id):
+        return {
+            "request_id": uuid_text(request_id),
+            "error": "provider_throttled",
+            "status": self.status,
+            "retry_after": self.retry_after,
+        }
+
+    @classmethod
+    def parse(cls, message, *, request_id):
+        if (
+            set(message) != {"request_id", "error", "status", "retry_after"}
+            or message["request_id"] != uuid_text(request_id)
+            or message["error"] != "provider_throttled"
+        ):
+            raise ProtocolError("Exact provider feedback identity required.")
+        return cls(message["status"], message["retry_after"])
+
+    @property
+    def resp(self):
+        """The existing RequestBudget.rejected HTTP-response contract."""
+        return self
+
+    def get(self, name, default=None):
+        return self.retry_after if name == "retry-after" else default
 
 
 def uuid_text(value):

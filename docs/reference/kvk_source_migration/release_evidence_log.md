@@ -1,5 +1,38 @@
 # KVK Source Migration S6 release evidence log
 
+## PR #282 review correction validation — 2026-09-25
+
+Two review comments were accepted: incomplete authority drain must return failure and retained
+429/503 outcomes must persist bounded shared cooldown feedback without replay or claim release.
+The [closeout](s11_closeout_and_g4_handoff.md#pr-282-review-corrections--2026-09-25) records the
+exact runtime/test paths and updated production promotion requirements. SQL #90 has no actionable
+comments and remains its separate two-document PR at `41301d7544248f30b9db2e0e98ec3fa15fe0243e`.
+
+The first correction patch passed **875 tests, 13 explicit skips** under the offline SQL/network
+guard. Architecture, deferred-items, security-routing, test-selection, command registration,
+import smoke, Black/Ruff, whitespace and relative-link checks passed. Operational log bytes,
+sizes and mtimes were unchanged. Full pytest was not repeated: the affected authority/host/
+protocol/runtime/enrollment/budget suites cover this bounded change; prior full results remain
+historical. Live SQL/native/provider cases stay disabled, not silently accepted or rerun.
+
+Changes review `cb2c1a02-8452-467b-8182-95e79eb1c26a`, Deep off, completed with five of five runtime
+files reviewed and zero security findings. Base/head `11f1b8599ddf8c25e4610f9c30e61c04416315cc`;
+frozen snapshot `442ad4022c4ac5ce25b17bb7a32d5b2160604f3db40bf8ac49e047503fb86e06`.
+Canonical report and independent architecture model are retained under that scan ID. This
+subsequent receipt is Markdown-only; reviewed source bytes remain frozen for the local commit.
+
+The architecture pass also identified a pre-existing, fail-closed connection-factory mismatch:
+authority connections use autocommit but shared budget transactions reject that mode. Three
+inert real-factory/DAL regressions reproduced it. Publication remains withheld until that
+related caller-wiring defect is fixed and reviewed separately; zero security findings does not
+close this functional gap. No SQL schema change or live SQL execution is needed for that fix.
+
+All original 38 PR paths remain represented; five existing-file correction paths bring the
+reviewed union to 43. Each unchanged original blob and both S10E archive destinations/source
+absences were reverified, with their earlier exact rename/base proof retained. The immutable
+merged-delivery manifest is unchanged. Nothing has been merged, promoted or deployed here;
+the next operational stage remains G4 plan development only.
+
 ## Published PR handoff — 2026-09-25
 
 [Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and

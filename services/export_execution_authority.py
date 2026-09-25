@@ -9,7 +9,12 @@ import logging
 import threading
 from uuid import UUID, uuid4
 
-from services.export_execution_protocol import ProviderRequest, encode, validate_response
+from services.export_execution_protocol import (
+    ProviderRequest,
+    ProviderThrottled,
+    encode,
+    validate_response,
+)
 from services.export_request_budget import BudgetCompletionUnknown
 
 logger = logging.getLogger(__name__)
@@ -187,7 +192,14 @@ class ExportExecutionAuthority:
                 # still leave dispatch_intent in SQL and therefore retains claims.
                 self._event(stream, request, "dispatch_intent", {"request_id": request.request_id})
                 dispatched = True
-                response = stream.child.execute(request.message())
+                try:
+                    response = stream.child.execute(request.message())
+                except ProviderThrottled as exc:
+                    # Persist shared feedback, but never infer non-delivery or
+                    # replay. A lost cooldown acknowledgment is uncertain too.
+                    stream.uncertain = True
+                    budget.rejected(exc)
+                    raise
                 validate_response(request, response)
                 self._event(
                     stream,

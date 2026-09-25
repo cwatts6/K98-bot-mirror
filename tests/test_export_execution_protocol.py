@@ -6,10 +6,59 @@ import pytest
 from services.export_execution_protocol import (
     ProtocolError,
     ProviderRequest,
+    ProviderThrottled,
     decode,
     encode,
     validate_response,
 )
+
+
+@pytest.mark.parametrize(
+    "header,expected",
+    [
+        (None, "1.0"),
+        ("provider prose", "1.0"),
+        ("x" * 129, "1.0"),
+        ("inf", "1.0"),
+        ("NaN", "1.0"),
+        ("-10", "1.0"),
+        ("9000", "3600.0"),
+        ("12.5", "12.5"),
+        ("Wed, 21 Oct 2015 07:28:00 GMT", "Wed, 21 Oct 2015 07:28:00 GMT"),
+    ],
+)
+def test_throttle_feedback_is_bounded_and_preserves_absolute_dates(header, expected):
+    request_id = str(uuid4())
+    failure = ProviderThrottled.from_header(429, header)
+    wire = decode(encode(failure.message(request_id)))
+    parsed = ProviderThrottled.parse(wire, request_id=request_id)
+    assert parsed.status == 429
+    assert parsed.retry_after == expected
+    assert len(encode(wire)) < 160
+    assert str(parsed) == "Provider throttling requires reconciliation."
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"status": 400},
+        {"status": True},
+        {"status": 429.0},
+        {"request_id": str(uuid4())},
+        {"error": "unproven_outcome"},
+        {"retry_after": "arbitrary provider text"},
+        {"retry_after": "9000.0"},
+        {"retry_after": 12},
+        {"retry_after": "NaN"},
+        {"retry_after": "x" * 1000},
+        {"result": {}},
+    ],
+)
+def test_child_throttle_envelope_rejects_wrong_identity_or_unbounded_fields(change):
+    request_id = str(uuid4())
+    wire = ProviderThrottled.from_header(503, "12").message(request_id)
+    with pytest.raises(ProtocolError):
+        ProviderThrottled.parse(wire | change, request_id=request_id)
 
 
 def message(operation="sheets.values.update", arguments=None):

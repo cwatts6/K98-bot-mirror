@@ -17,11 +17,20 @@ parallel review. No merge or production publisher run is implied. Before merging
 require the new Linux Mirror Publication Policy check: real rsync is unavailable on this host.
 
 Any authorized delivery must include the complete pending Bot union, including the new task
-pack/starter, closeout and identity manifest. Production patch promotion must omit the five
-already-present identical source/test additions and retain the filter/test/workflow/docs delta.
+pack/starter, closeout and identity manifest. PR #282 now also corrects incomplete-drain exit
+status and shared 429/503 cooldown feedback; see the [correction scope](s11_closeout_and_g4_handoff.md#pr-282-review-corrections--2026-09-25).
+Production patch promotion must carry those runtime/test modifications and the filter/workflow/
+docs delta. Compare current blobs and omit only still-identical additions; four of the five
+initially restored source/test files now differ from production due to these corrections.
 Verify exact filenames/blobs and production publisher synchronization; never mix histories.
 The operator's latest instruction explicitly authorizes the two SQL closeout documents in their
 own SQL PR now, superseding the earlier deferral for these entries. No SQL runtime delta is added.
+
+G4 planning must pin the reviewed correction revision and refreshed protected source inventory.
+Include incomplete-drain failure/session retention and 429/503 cooldown plus lost-checkpoint
+cases in the exact later approved runtime evidence packet. If these fail, close admission,
+retain claims/evidence and reconcile; never use a retry or claim release as rollback. Restoring
+earlier source bytes does not settle a dispatched request or prove provider termination.
 
 Use the new G4 pack to develop exact targets, commands, prerequisites, evidence, rollback and
 approval checkpoints. No operation is executable while target/identity/source/approval fields

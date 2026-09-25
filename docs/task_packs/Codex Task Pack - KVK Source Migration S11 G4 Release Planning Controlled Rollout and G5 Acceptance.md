@@ -27,9 +27,14 @@ operation, a changed target, or the next phase.
 ## Delivered design and evidence limits
 
 Bot mirror #281, SQL #89 and production Bot #588 are merged. The production publisher omitted
-five authority source/test paths because of `**/*auth*`; the approved follow-up restores their
-exact reviewed production bytes and adds exact-path exceptions. Verify that repair's final
-publication and production synchronization before selecting a release revision.
+five authority source/test paths because of `**/*auth*`; the initial follow-up restored their
+exact reviewed production bytes and added exact-path exceptions. PR #282 review corrections
+then added incomplete-drain failure status and bounded, durable shared 429/503 cooldown
+feedback without replay or release. Verify the final correction revision and production
+synchronization before selecting release/source-hash pins. Compare current files individually;
+the original five-file identity proof must not cause new corrections to be omitted in promotion.
+Plan explicit shutdown/retained-session and cooldown/lost-checkpoint evidence cases for later
+approved G4 execution. No SQL runtime change is required by these two corrections.
 
 The implemented design has one protected authority host and a fresh authority-only provider
 identity. Bot callers submit bounded requests through the authenticated local channel; the

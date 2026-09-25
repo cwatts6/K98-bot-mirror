@@ -427,7 +427,7 @@ def test_child_transport_never_retries_or_follows_redirects(status):
     class Session:
         def request(self, *args, **kwargs):
             calls.append((args, kwargs))
-            return SimpleNamespace(status_code=status, close=lambda: None)
+            return SimpleNamespace(status_code=status, headers={}, close=lambda: None)
 
     request = ProviderRequest.parse(
         dict(
@@ -449,6 +449,78 @@ def test_child_transport_never_retries_or_follows_redirects(status):
     assert len(calls) == 1
     assert calls[0][1]["allow_redirects"] is False
     assert calls[0][0][0] == "POST"
+
+
+@pytest.mark.parametrize("throttled", [False, True])
+def test_child_loop_sends_only_bounded_error_and_exits(monkeypatch, tmp_path, throttled):
+    import hashlib
+    import json
+    from pathlib import Path
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    import requests
+
+    import core.export_execution_host as host
+    import scripts.run_export_provider_child as launcher
+    from services.export_execution_protocol import ProviderThrottled
+    from tests.test_export_execution_protocol import message
+
+    credentials = tmp_path / "fixture-credentials.json"
+    credentials.write_bytes(b"{}")
+    manifest = tmp_path / "fixture-manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "authority_sid": "fixture",
+                "credentials_file": str(credentials),
+                "deployment_boundary": {
+                    "identity": {"credential_sha256": hashlib.sha256(b"{}").hexdigest()}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launcher, "bootstrap", Mock())
+    monkeypatch.setattr(launcher, "provider_credentials", Mock())
+    monkeypatch.setattr(host, "assert_protected_path", lambda value, **_: Path(value))
+    monkeypatch.setattr(host, "current_sid", lambda: "fixture")
+    handle, pipe, http, authentication = Mock(), Mock(), Mock(), Mock()
+    monkeypatch.setattr(host, "open_message_pipe", Mock(return_value=handle))
+    monkeypatch.setattr(host, "MessagePipe", Mock(return_value=pipe))
+    monkeypatch.setattr(requests, "Session", Mock(side_effect=[http, authentication]))
+    request = message()
+    pipe.receive.return_value = request
+    error = ProviderThrottled.from_header(503, "12") if throttled else ValueError("private prose")
+    execute = Mock(side_effect=error)
+    monkeypatch.setattr(launcher, "execute_http", execute)
+    child_id = str(uuid4())
+    assert (
+        launcher.main(
+            [
+                "--manifest",
+                str(manifest),
+                "--child-id",
+                child_id,
+                "--pipe",
+                "\\\\.\\pipe\\K98Export-" + child_id,
+            ]
+        )
+        == 1
+    )
+    expected = (
+        error.message(request["request_id"])
+        if throttled
+        else {"request_id": request["request_id"], "error": "unproven_outcome"}
+    )
+    assert pipe.send.call_args_list[-1].args == (expected,)
+    assert pipe.send.call_count == 2  # handshake, then one error
+    execute.assert_called_once()
+    http.request.assert_not_called()
+    handle.Close.assert_called_once()
+    http.close.assert_called_once()
+    authentication.close.assert_called_once()
 
 
 def test_child_batch_read_uses_one_fixed_get_with_ordered_ranges():

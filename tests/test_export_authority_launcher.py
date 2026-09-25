@@ -18,6 +18,72 @@ from services.export_runtime_composition import RuntimeRegistration
 from tests.test_export_runtime_composition import registration_fixture
 
 
+@pytest.mark.parametrize("drained", [False, True])
+@pytest.mark.parametrize("serve_error", [None, KeyboardInterrupt, RuntimeError])
+def test_authority_shutdown_reports_retained_session_and_preserves_service_errors(
+    monkeypatch, tmp_path, drained, serve_error
+):
+    import json
+
+    import core.export_execution_host as host
+    import kvk.dal.source_output_pool_dal as pools
+    import scripts.run_export_authority as launcher
+    import services.export_coordination_dal as coordination
+    import services.export_execution_authority as execution
+    import services.export_execution_dal as persistence
+    import services.export_reconciliation_service as reconciliation
+    import services.export_runtime_composition as runtime
+
+    path = tmp_path / "fixture-manifest.json"
+    manifest = {
+        "sql_contract": {},
+        "python": str(path),
+        "child_script": "fixture-child",
+        "authority_sid": "fixture-sid",
+        "evidence_root": "fixture-store",
+        "storage_owner": "fixture-owner",
+        "runtime_registration": {},
+    }
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(launcher, "bootstrap", Mock())
+    monkeypatch.setattr(launcher, "manifest_contract", lambda value, **_: value)
+    monkeypatch.setattr(host, "assert_protected_path", lambda value, **_: Path(value))
+    monkeypatch.setattr(host, "current_sid", lambda: "fixture-sid")
+    for name in ("DeploymentBoundary", "WindowsExecutionHost", "PrivateEvidenceStore"):
+        monkeypatch.setattr(host, name, Mock())
+    connector = Mock(side_effect=AssertionError("real SQL escaped offline test"))
+    monkeypatch.setattr(launcher, "connection_factory", lambda _: connector)
+    monkeypatch.setattr(runtime, "verify_installation_contract", Mock())
+    monkeypatch.setattr(runtime, "RuntimeRegistration", Mock())
+    monkeypatch.setattr(runtime, "LocalAuthorityClient", Mock())
+    monkeypatch.setattr(reconciliation, "TrustedProofIssuer", Mock())
+    monkeypatch.setattr(pools, "SourceOutputPoolDAL", Mock())
+    monkeypatch.setattr(coordination, "ExportCoordinationDAL", Mock())
+    dal = Mock()
+    dal.transition.return_value = {"Version": 7}
+    monkeypatch.setattr(persistence, "ExportExecutionDAL", Mock(return_value=dal))
+    authority = Mock()
+    authority.drain.return_value = drained
+    monkeypatch.setattr(execution, "ExportExecutionAuthority", Mock(return_value=authority))
+    monkeypatch.setattr(launcher, "AuthorityBroker", Mock())
+    monkeypatch.setattr(launcher, "serve", Mock(side_effect=serve_error))
+
+    if serve_error is RuntimeError:
+        with pytest.raises(RuntimeError):
+            launcher.main(["--manifest", str(path)])
+    else:
+        assert launcher.main(["--manifest", str(path)]) == (0 if drained else 1)
+    authority.drain.assert_called_once_with()
+    transitions = dal.transition.call_args_list
+    assert [call.kwargs["Action"] for call in transitions] == (
+        ["open", "close"] if drained else ["open"]
+    )
+    if drained:
+        assert transitions[-1].kwargs["ExpectedVersion"] == 7
+        assert transitions[-1].kwargs["SessionID"] == transitions[0].kwargs["SessionID"]
+    connector.assert_not_called()
+
+
 def registration():
     return RuntimeRegistration(registration_fixture())
 

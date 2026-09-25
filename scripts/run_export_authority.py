@@ -611,11 +611,13 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     finally:
-        if authority.drain():
+        drained = authority.drain()
+        if drained:
             dal.transition(
                 "session", SessionID=session_id, Action="close", ExpectedVersion=session["Version"]
             )
-    return 0
+    # Retained claims require reconciliation; do not report a clean service stop.
+    return 0 if drained else 1
 
 
 if __name__ == "__main__":

@@ -21,6 +21,11 @@ repair/handoff delivery status. These anchors are not reset instructions. Preser
 file and recovered evidence. The operator reports nothing updated on the bot machine; that is
 not an independently verified runtime inventory.
 
+PR #282 also contains review corrections for incomplete-drain failure status and shared provider
+429/503 cooldown feedback, preserving uncertainty and no retry. Check their final review,
+production patch and protected source hashes individually; the initial five-file restoration
+proof is historical. Include their later approved runtime evidence cases in the G4 plan.
+
 Read current AGENTS/core references, S7 contracts/manifests, architecture/EndScanID amendment,
 authoritative S10A/C/D/E/S11 SQL, retained S6/S8 evidence, environment/startup/shutdown/diagnostics
 and release/rollback references. Prior source implementation/review is complete; do not restart

@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import UTC, datetime
 import hashlib
 import json
 from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -128,6 +129,86 @@ def runtime():
         arguments={"range": "Sheet1!A1", "valueInputOption": "RAW", "body": {"values": [[1]]}},
     )
     return authority, dal, store, children[0], budget, request
+
+
+@pytest.mark.parametrize("checkpoint_fails", [False, True])
+@pytest.mark.parametrize(
+    "status,header,expected",
+    [
+        (429, "12", 12.0),
+        (503, None, 1.0),
+        (429, "provider prose", 1.0),
+        (503, "9000", 3600.0),
+        (429, "Wed, 21 Oct 2015 07:28:00 GMT", datetime(2015, 10, 21, 7, 28, tzinfo=UTC)),
+    ],
+)
+def test_throttled_child_checkpoints_shared_cooldown_without_replay_or_release(
+    runtime, status, header, expected, checkpoint_fails
+):
+    from core.export_execution_host import WindowsProviderChild
+    from scripts.run_export_provider_child import execute_http
+    from services.export_execution_protocol import (
+        ProviderRequest,
+        ProviderThrottled,
+        decode,
+        encode,
+    )
+    from services.export_request_budget import BudgetCompletionUnknown, RequestBudget
+
+    authority, dal, store, _, _, request = runtime
+    budget_dal = Mock()
+    reservation = {"WaitSeconds": 0, "ReservedUTC": datetime(2026, 1, 1)}
+    budget_dal.reserve_request.return_value = reservation
+    budget_dal.refresh_reservation.return_value = reservation
+    if checkpoint_fails:
+        budget_dal.extend_cooldown.side_effect = RuntimeError("lost cooldown acknowledgement")
+    authority.budget_factory = lambda account: RequestBudget(budget_dal, account)
+    response = Mock(status_code=status, headers={"Retry-After": header})
+    session = Mock()
+    session.request.return_value = response
+
+    # Exercise HTTP feedback, the wire envelope, parent validation and the real
+    # budget together; only SQL, OS and network are inert substitutes.
+    def child_response():
+        with pytest.raises(ProviderThrottled) as caught:
+            execute_http(
+                ProviderRequest.parse(request),
+                session=session,
+                credentials=SimpleNamespace(valid=True, token="fixture"),
+                refresh_request=None,
+            )
+        return decode(encode(caught.value.message(request["request_id"])))
+
+    pipe = Mock()
+    pipe.receive.side_effect = child_response
+    child = WindowsProviderChild(
+        identity="fixture",
+        process=None,
+        thread=None,
+        job=None,
+        pid=17,
+        pipe=pipe,
+        sid="fixture",
+        api={},
+    )
+    child.resumed = True
+    authority._streams[request["stream_id"]].child = child
+    with pytest.raises(ExecutionUncertain) as caught:
+        authority.execute(request)
+    expected_cause = BudgetCompletionUnknown if checkpoint_fails else ProviderThrottled
+    assert isinstance(caught.value.__cause__, expected_cause)
+    budget_dal.extend_cooldown.assert_called_once_with("test", expected)
+    budget_dal.complete_request.assert_not_called()
+    assert authority._streams[request["stream_id"]].uncertain
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request | {"request_id": str(uuid4())})
+    session.request.assert_called_once()
+    response.close.assert_called_once()
+    response.json.assert_not_called()
+    assert [v["State"] for k, v in dal.calls if k == "event"] == ["prepared", "dispatch_intent"]
+    assert not any(v.get("Action") in {"close", "release"} for _, v in dal.calls)
 
 
 def test_success_commits_events_before_return_and_duplicate_does_not_send(runtime):

@@ -11,7 +11,7 @@ import socket
 import subprocess
 import time
 
-from services.export_execution_protocol import MAX_MESSAGE_BYTES, decode, encode
+from services.export_execution_protocol import MAX_MESSAGE_BYTES, ProviderThrottled, decode, encode
 from services.export_snapshot_store import ExportSnapshotStore, SnapshotReceipt
 
 
@@ -834,6 +834,8 @@ class WindowsProviderChild:
             raise HostBoundaryError("Provider child is not live.")
         self.pipe.send(message)
         response = self.pipe.receive()
+        if response.get("error") == "provider_throttled":
+            raise ProviderThrottled.parse(response, request_id=message["request_id"])
         if (
             set(response) != {"request_id", "result"}
             or response["request_id"] != message["request_id"]

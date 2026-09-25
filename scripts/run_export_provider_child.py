@@ -19,7 +19,11 @@ def bootstrap(manifest_path):
 
 
 def execute_http(request, *, session, credentials, refresh_request, enrollment=False):
-    from services.export_execution_protocol import ProtocolError, validate_response
+    from services.export_execution_protocol import (
+        ProtocolError,
+        ProviderThrottled,
+        validate_response,
+    )
 
     arguments = request.arguments
     body = arguments.pop("body", None)
@@ -81,6 +85,10 @@ def execute_http(request, *, session, credentials, refresh_request, enrollment=F
     )
     try:
         expected = 204 if request.operation == "drive.permissions.delete" else 200
+        if response.status_code in (429, 503):
+            raise ProviderThrottled.from_header(
+                response.status_code, response.headers.get("Retry-After")
+            )
         if response.status_code != expected:
             raise ProtocolError("Provider returned an unproven terminal outcome.")
         result = None if expected == 204 else response.json()
@@ -147,7 +155,12 @@ def main(argv=None):
         current_sid,
         open_message_pipe,
     )
-    from services.export_execution_protocol import ProviderRequest, decode, uuid_text
+    from services.export_execution_protocol import (
+        ProviderRequest,
+        ProviderThrottled,
+        decode,
+        uuid_text,
+    )
 
     manifest_path = assert_protected_path(args.manifest, private=True)
     assert_protected_path(Path(__file__).resolve())
@@ -196,6 +209,10 @@ def main(argv=None):
                     refresh_request=Request(session=authentication),
                     enrollment=enrollment,
                 )
+            except ProviderThrottled as exc:
+                # Feedback only: exit without retrying or claiming non-delivery.
+                pipe.send(exc.message(request.request_id))
+                return 1
             except Exception:
                 # No provider prose, token, content or automatic retry crosses
                 # the boundary. Exit; the authority retains dispatch_intent.

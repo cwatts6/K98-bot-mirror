@@ -1,5 +1,40 @@
 # S11 source delivery closeout and G4/G5 handoff
 
+## PR #282 review corrections — 2026-09-25
+
+The operator authorized action, replies and resolution for the current PR comments. Two Bot
+findings require runtime corrections beyond the original byte-exact restoration: incomplete
+authority drain now returns status 1 while retaining the SQL session; provider 429/503 feedback
+now crosses the authenticated child pipe as an exact request-bound, bounded envelope and
+extends the existing shared cooldown. Numeric waits are capped at 3,600 seconds; HTTP dates
+remain absolute until SQL server UTC applies the bound. Invalid/missing headers use the existing
+fallback. There is no provider retry or terminal outcome inferred from this feedback. A lost
+cooldown acknowledgement retains uncertainty, dispatch evidence and claims.
+
+The runtime delta is exactly `scripts/run_export_authority.py`,
+`scripts/run_export_provider_child.py`, `core/export_execution_host.py`,
+`services/export_execution_authority.py` and `services/export_execution_protocol.py`, with
+regressions in `tests/test_export_authority_launcher.py`,
+`tests/test_export_execution_authority.py`, `tests/test_export_execution_host.py` and
+`tests/test_export_execution_protocol.py`. SQL #90 has no actionable review comments and no
+runtime delta; the existing `ExportCoordinationDAL.extend_cooldown` and authoritative
+`dbo.ExportRequestBudget` definition already provide the required SQL contract.
+
+Fresh offline validation: **875 passed, 13 skipped** across authority, protocol, host, runtime,
+enrollment, adapter/budget and publication suites. Skips remain explicitly gated live checks
+and unavailable local Windows/rsync capabilities. Network and SQL connections were blocked;
+operational logs remained byte/mtime-identical. These are source checks, not G4 runtime proof.
+The original restoration and earlier published-head receipts below remain historical evidence.
+The merged-delivery manifest is unchanged and does not assert equality for these new corrections.
+Current correction security/check/publication evidence is recorded in the release evidence log.
+
+Before production promotion, compare every current PR path against the exact production base.
+Carry the runtime corrections and their tests as modifications to existing production files;
+omit only paths whose current blobs still match. Do not omit all five original restorations:
+four now contain review corrections. The unchanged authority-boundary test remains identical.
+Use a separate production patch/PR and refresh protected source hashes in the later G4 plan.
+Review/merge/promotion does not authorize deployment, live SQL/provider work or G5 acceptance.
+
 ## Published PR handoff — 2026-09-25
 
 [Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
@@ -95,7 +130,7 @@ these reviewed files from the mirror snapshot while leaving them in production:
 | `tests/test_export_authority_launcher.py` | `ed43c4155b3334d37d491576f8e83aee6c22e15b` |
 | `tests/test_export_execution_authority.py` | `5230e8bc2ab7031ae1a4708eae396bef3cec2837` |
 
-The approved repair restores exactly these production bytes and adds five root-anchored include
+The initial approved repair restored exactly these production bytes and added five root-anchored include
 rules before the broad auth exclusion. Other credential/runtime exclusions remain in place;
 the production publisher's existing secret scan remains unchanged. No folder-wide or general
 Python exception is introduced. The
@@ -108,9 +143,10 @@ negative fixtures. `.github/workflows/mirror-publish-policy.yml` requires rsync 
 test with read-only repository permissions. No real credentials, runtime data or production
 publication directory are used by the test.
 
-Production already has these five blobs. Future patch-based promotion must recognize their
-exact identity and omit duplicate additions, while carrying `.publishignore`, the policy test/
-workflow and the documentation delta. Do not push mirror history into production. Bot-machine
+Production already has these original five blobs. The review correction above changes four of
+those paths and other existing files. Future patch-based promotion must compare current blobs,
+carry those modifications plus `.publishignore`, policy test/workflow and documentation, and omit
+only still-identical additions. Do not push mirror history into production. Bot-machine
 deployment remains only from reviewed `K98-bot/main`, under later exact approval.
 
 ## Filename, content and archive proof
