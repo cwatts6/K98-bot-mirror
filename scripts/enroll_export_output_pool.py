@@ -90,27 +90,30 @@ def main(argv=None):
         ExecutableHash=hashlib.sha256(Path(manifest["python"]).read_bytes()).digest(),
         ManifestHash=hashlib.sha256(raw).digest(),
     )
-    budget_dal = ExportCoordinationDAL(
-        connect, preparations=True, output_operations=True, execution_evidence=True
-    )
-    authority = ExportExecutionAuthority(
-        dal=dal,
-        store=store,
-        host=host,
-        session_id=session_id,
-        budget_factory=lambda account: RequestBudget(budget_dal, account),
-        enrollment_plan=plan,
-    )
+    authority = None
     try:
+        budget_dal = ExportCoordinationDAL(
+            connect, preparations=True, output_operations=True, execution_evidence=True
+        )
+        authority = ExportExecutionAuthority(
+            dal=dal,
+            store=store,
+            host=host,
+            session_id=session_id,
+            budget_factory=lambda account: RequestBudget(budget_dal, account),
+            enrollment_plan=plan,
+        )
         OutputEnrollment(plan=plan, authority=authority, dal=dal, store=store).run(
             actor=args.actor, reason=args.reason
         )
     finally:
-        if authority.drain():
+        # Construction opens no streams; once constructed, require a proven drain.
+        drained = authority is None or authority.drain()
+        if drained:
             dal.transition(
                 "session", SessionID=session_id, Action="close", ExpectedVersion=session["Version"]
             )
-    return 0
+    return 0 if drained else 1
 
 
 if __name__ == "__main__":

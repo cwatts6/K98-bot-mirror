@@ -578,42 +578,45 @@ def main(argv=None):
         ExecutableHash=hashlib.sha256(Path(manifest["python"]).read_bytes()).digest(),
         ManifestHash=hashlib.sha256(raw).digest(),
     )
-    budget_dal = ExportCoordinationDAL(
-        connect, preparations=True, output_operations=True, execution_evidence=True
-    )
-    authority = ExportExecutionAuthority(
-        dal=dal,
-        store=store,
-        host=host,
-        session_id=session_id,
-        budget_factory=lambda account: RequestBudget(budget_dal, account),
-    )
-    from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
-    from services.export_reconciliation_service import TrustedProofIssuer
-    from services.export_runtime_composition import LocalAuthorityClient, RuntimeRegistration
-
-    registration = RuntimeRegistration(manifest["runtime_registration"])
-    broker = AuthorityBroker(authority, registration, boundary=boundary)
-    broker.issuer = TrustedProofIssuer(
-        authority=authority,
-        boundary=boundary,
-        registration=registration,
-        coordinator=budget_dal,
-        pools=SourceOutputPoolDAL(connect, execution_evidence=True),
-        client=LocalAuthorityClient(broker),
-    )
+    authority = None
     try:
-        serve(
-            manifest=manifest,
-            authority=authority,
-            make_pipe=create_private_pipe,
-            authenticate=authenticated_peer,
-            broker=broker,
+        budget_dal = ExportCoordinationDAL(
+            connect, preparations=True, output_operations=True, execution_evidence=True
         )
-    except KeyboardInterrupt:
-        pass
+        authority = ExportExecutionAuthority(
+            dal=dal,
+            store=store,
+            host=host,
+            session_id=session_id,
+            budget_factory=lambda account: RequestBudget(budget_dal, account),
+        )
+        from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+        from services.export_reconciliation_service import TrustedProofIssuer
+        from services.export_runtime_composition import LocalAuthorityClient, RuntimeRegistration
+
+        registration = RuntimeRegistration(manifest["runtime_registration"])
+        broker = AuthorityBroker(authority, registration, boundary=boundary)
+        broker.issuer = TrustedProofIssuer(
+            authority=authority,
+            boundary=boundary,
+            registration=registration,
+            coordinator=budget_dal,
+            pools=SourceOutputPoolDAL(connect, execution_evidence=True),
+            client=LocalAuthorityClient(broker),
+        )
+        try:
+            serve(
+                manifest=manifest,
+                authority=authority,
+                make_pipe=create_private_pipe,
+                authenticate=authenticated_peer,
+                broker=broker,
+            )
+        except KeyboardInterrupt:
+            pass
     finally:
-        drained = authority.drain()
+        # Construction opens no streams; once constructed, require a proven drain.
+        drained = authority is None or authority.drain()
         if drained:
             dal.transition(
                 "session", SessionID=session_id, Action="close", ExpectedVersion=session["Version"]

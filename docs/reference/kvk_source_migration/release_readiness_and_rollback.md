@@ -18,7 +18,8 @@ require the new Linux Mirror Publication Policy check: real rsync is unavailable
 
 Any authorized delivery must include the complete pending Bot union, including the new task
 pack/starter, closeout and identity manifest. PR #282 now also corrects incomplete-drain exit
-status and shared 429/503 cooldown feedback; see the [correction scope](s11_closeout_and_g4_handoff.md#pr-282-review-corrections--2026-09-25).
+status, shared 429/503 cooldown feedback and both launchers' post-open initialization cleanup;
+see the [correction scope](s11_closeout_and_g4_handoff.md#pr-282-review-corrections--2026-09-25).
 Production patch promotion must carry those runtime/test modifications and the filter/workflow/
 docs delta. Compare current blobs and omit only still-identical additions; four of the five
 initially restored source/test files now differ from production due to these corrections.
@@ -27,8 +28,9 @@ The operator's latest instruction explicitly authorizes the two SQL closeout doc
 own SQL PR now, superseding the earlier deferral for these entries. No SQL runtime delta is added.
 
 G4 planning must pin the reviewed correction revision and refreshed protected source inventory.
-Include incomplete-drain failure/session retention and 429/503 cooldown plus lost-checkpoint
-cases in the exact later approved runtime evidence packet. If these fail, close admission,
+Include post-open initialization failure/confirmed-empty-session close, incomplete-drain
+failure/session retention, unknown open/close acknowledgement and 429/503 cooldown plus
+lost-checkpoint cases in the exact later approved runtime evidence packet. If these fail, close admission,
 retain claims/evidence and reconcile; never use a retry or claim release as rollback. Restoring
 earlier source bytes does not settle a dispatched request or prove provider termination.
 

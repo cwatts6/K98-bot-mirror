@@ -18,17 +18,16 @@ from services.export_runtime_composition import RuntimeRegistration
 from tests.test_export_runtime_composition import registration_fixture
 
 
-@pytest.mark.parametrize("drained", [False, True])
-@pytest.mark.parametrize("serve_error", [None, KeyboardInterrupt, RuntimeError])
-def test_authority_shutdown_reports_retained_session_and_preserves_service_errors(
-    monkeypatch, tmp_path, drained, serve_error
-):
+@pytest.fixture
+def authority_launch(monkeypatch, tmp_path):
     import json
 
     import core.export_execution_host as host
     import kvk.dal.source_output_pool_dal as pools
+    import scripts.enroll_export_output_pool as enrollment
     import scripts.run_export_authority as launcher
     import services.export_coordination_dal as coordination
+    import services.export_enrollment_service as enrollment_service
     import services.export_execution_authority as execution
     import services.export_execution_dal as persistence
     import services.export_reconciliation_service as reconciliation
@@ -54,25 +53,72 @@ def test_authority_shutdown_reports_retained_session_and_preserves_service_error
     connector = Mock(side_effect=AssertionError("real SQL escaped offline test"))
     monkeypatch.setattr(launcher, "connection_factory", lambda _: connector)
     monkeypatch.setattr(runtime, "verify_installation_contract", Mock())
-    monkeypatch.setattr(runtime, "RuntimeRegistration", Mock())
-    monkeypatch.setattr(runtime, "LocalAuthorityClient", Mock())
-    monkeypatch.setattr(reconciliation, "TrustedProofIssuer", Mock())
-    monkeypatch.setattr(pools, "SourceOutputPoolDAL", Mock())
-    monkeypatch.setattr(coordination, "ExportCoordinationDAL", Mock())
+    factories = {}
+    for name, module in {
+        "RuntimeRegistration": runtime,
+        "LocalAuthorityClient": runtime,
+        "TrustedProofIssuer": reconciliation,
+        "SourceOutputPoolDAL": pools,
+        "ExportCoordinationDAL": coordination,
+        "AuthorityBroker": launcher,
+        "OutputEnrollment": enrollment_service,
+    }.items():
+        factories[name] = Mock()
+        monkeypatch.setattr(module, name, factories[name])
     dal = Mock()
     dal.transition.return_value = {"Version": 7}
     monkeypatch.setattr(persistence, "ExportExecutionDAL", Mock(return_value=dal))
     authority = Mock()
+    authority.drain.return_value = True
+    factories["ExportExecutionAuthority"] = Mock(return_value=authority)
+    monkeypatch.setattr(
+        execution, "ExportExecutionAuthority", factories["ExportExecutionAuthority"]
+    )
+    serve = Mock()
+    monkeypatch.setattr(launcher, "serve", serve)
+    monkeypatch.setattr(enrollment, "bootstrap", Mock())
+    monkeypatch.setattr(enrollment, "approved_plan", Mock())
+    arguments = ["--manifest", str(path)]
+    return SimpleNamespace(
+        dal=dal,
+        authority=authority,
+        connector=connector,
+        factories=factories,
+        serve=serve,
+        launchers={
+            "authority": lambda: launcher.main(arguments),
+            "enrollment": lambda: enrollment.main(
+                arguments
+                + [
+                    "--plan",
+                    str(path),
+                    "--actor",
+                    "fixture",
+                    "--reason",
+                    "fixture",
+                    "--authorize-operation",
+                    "S11_CREATE_PRIVATE_OUTPUT_POOL",
+                ]
+            ),
+        },
+    )
+
+
+@pytest.mark.parametrize("drained", [False, True])
+@pytest.mark.parametrize("serve_error", [None, KeyboardInterrupt, RuntimeError])
+def test_authority_shutdown_reports_retained_session_and_preserves_service_errors(
+    authority_launch, drained, serve_error
+):
+    setup = authority_launch
+    authority, dal = setup.authority, setup.dal
     authority.drain.return_value = drained
-    monkeypatch.setattr(execution, "ExportExecutionAuthority", Mock(return_value=authority))
-    monkeypatch.setattr(launcher, "AuthorityBroker", Mock())
-    monkeypatch.setattr(launcher, "serve", Mock(side_effect=serve_error))
+    setup.serve.side_effect = serve_error
 
     if serve_error is RuntimeError:
         with pytest.raises(RuntimeError):
-            launcher.main(["--manifest", str(path)])
+            setup.launchers["authority"]()
     else:
-        assert launcher.main(["--manifest", str(path)]) == (0 if drained else 1)
+        assert setup.launchers["authority"]() == (0 if drained else 1)
     authority.drain.assert_called_once_with()
     transitions = dal.transition.call_args_list
     assert [call.kwargs["Action"] for call in transitions] == (
@@ -81,7 +127,122 @@ def test_authority_shutdown_reports_retained_session_and_preserves_service_error
     if drained:
         assert transitions[-1].kwargs["ExpectedVersion"] == 7
         assert transitions[-1].kwargs["SessionID"] == transitions[0].kwargs["SessionID"]
-    connector.assert_not_called()
+    setup.connector.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "launcher,stage",
+    [
+        (launcher, stage)
+        for launcher in ("authority", "enrollment")
+        for stage in ("ExportCoordinationDAL", "ExportExecutionAuthority")
+    ]
+    + [
+        ("authority", stage)
+        for stage in (
+            "RuntimeRegistration",
+            "AuthorityBroker",
+            "SourceOutputPoolDAL",
+            "LocalAuthorityClient",
+            "TrustedProofIssuer",
+            "proof_import",
+        )
+    ]
+    + [("enrollment", "OutputEnrollment")],
+)
+def test_post_open_initialization_failure_closes_empty_session(
+    authority_launch, monkeypatch, launcher, stage
+):
+    import builtins
+
+    setup = authority_launch
+    failure = RuntimeError("inert initialization failure")
+    if stage == "proof_import":
+        original = builtins.__import__
+
+        def import_fixture(name, *args, **kwargs):
+            if name == "services.export_reconciliation_service":
+                raise failure
+            return original(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", import_fixture)
+    else:
+        setup.factories[stage].side_effect = failure
+    with pytest.raises(RuntimeError) as caught:
+        setup.launchers[launcher]()
+    assert caught.value is failure
+    calls = setup.dal.transition.call_args_list
+    assert [call.kwargs["Action"] for call in calls] == ["open", "close"]
+    assert calls[-1].kwargs["SessionID"] == calls[0].kwargs["SessionID"]
+    assert calls[-1].kwargs["ExpectedVersion"] == 7
+    if stage in {"ExportCoordinationDAL", "ExportExecutionAuthority"}:
+        setup.authority.drain.assert_not_called()
+    else:
+        setup.authority.drain.assert_called_once_with()
+    setup.serve.assert_not_called()
+    setup.factories["OutputEnrollment"].return_value.run.assert_not_called()
+    setup.connector.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "launcher,stage", [("authority", "TrustedProofIssuer"), ("enrollment", "OutputEnrollment")]
+)
+@pytest.mark.parametrize("drain_error", [False, True])
+def test_startup_failure_retains_session_when_drain_is_unproven(
+    authority_launch, launcher, stage, drain_error
+):
+    setup = authority_launch
+    setup.factories[stage].side_effect = RuntimeError("initialization failed")
+    setup.authority.drain.return_value = False
+    if drain_error:
+        setup.authority.drain.side_effect = RuntimeError("closure unknown")
+    with pytest.raises(RuntimeError):
+        setup.launchers[launcher]()
+    setup.authority.drain.assert_called_once_with()
+    assert [call.kwargs["Action"] for call in setup.dal.transition.call_args_list] == ["open"]
+
+
+@pytest.mark.parametrize("launcher", ["authority", "enrollment"])
+def test_uncertain_session_open_never_attempts_cleanup_or_retry(authority_launch, launcher):
+    from services.export_execution_dal import EvidenceCommitUnknown
+
+    setup = authority_launch
+    setup.dal.transition.side_effect = EvidenceCommitUnknown("open acknowledgement lost")
+    with pytest.raises(EvidenceCommitUnknown):
+        setup.launchers[launcher]()
+    setup.dal.transition.assert_called_once()
+    assert setup.dal.transition.call_args.kwargs["Action"] == "open"
+    setup.factories["ExportCoordinationDAL"].assert_not_called()
+    setup.authority.drain.assert_not_called()
+
+
+@pytest.mark.parametrize("launcher", ["authority", "enrollment"])
+def test_startup_cleanup_close_failure_is_not_retried(authority_launch, launcher):
+    from services.export_execution_dal import EvidenceCommitUnknown
+
+    setup = authority_launch
+    setup.factories["ExportCoordinationDAL"].side_effect = RuntimeError("setup failed")
+    setup.dal.transition.side_effect = [
+        {"Version": 7},
+        EvidenceCommitUnknown("close acknowledgement lost"),
+    ]
+    with pytest.raises(EvidenceCommitUnknown):
+        setup.launchers[launcher]()
+    assert [call.kwargs["Action"] for call in setup.dal.transition.call_args_list] == [
+        "open",
+        "close",
+    ]
+
+
+@pytest.mark.parametrize("drained", [False, True])
+def test_enrollment_exit_reports_incomplete_drain(authority_launch, drained):
+    setup = authority_launch
+    setup.authority.drain.return_value = drained
+    assert setup.launchers["enrollment"]() == (0 if drained else 1)
+    setup.authority.drain.assert_called_once_with()
+    assert [call.kwargs["Action"] for call in setup.dal.transition.call_args_list] == (
+        ["open", "close"] if drained else ["open"]
+    )
 
 
 @pytest.mark.parametrize("operation", ["reserve", "cooldown", "evidence"])

@@ -3,7 +3,7 @@
 ## PR #282 review corrections — 2026-09-25
 
 The operator authorized action, replies and resolution for the current PR comments. Two Bot
-findings require runtime corrections beyond the original byte-exact restoration: incomplete
+findings initially required runtime corrections beyond the original byte-exact restoration: incomplete
 authority drain now returns status 1 while retaining the SQL session; provider 429/503 feedback
 now crosses the authenticated child pipe as an exact request-bound, bounded envelope and
 extends the existing shared cooldown. Numeric waits are capped at 3,600 seconds; HTTP dates
@@ -19,7 +19,16 @@ identity, encryption/certificate validation, timeout and SQL permissions remain 
 Actual-factory regressions exercise reservation, cooldown and evidence-procedure modes with
 inert ODBC connections and the real DAL/transaction helpers.
 
-The runtime delta is exactly `scripts/run_export_authority.py`,
+A subsequent comment identified post-open initialization outside the cleanup scope. Both the
+authority and enrollment launchers now protect all initialization after the acknowledged session
+open, including late imports and construction. A construction failure before any authority exists
+closes the empty session using the acknowledged version; once an authority exists, a successful
+drain is required. Failed or raising drains retain the session. An uncertain open is never closed
+or retried, and an uncertain close is not retried. Enrollment also returns failure for incomplete
+drain. The authoritative SQL close still enforces version CAS and rejects unfinished streams or
+enrollment preparations; no SQL contract or live operation changes.
+
+The runtime delta is exactly `scripts/run_export_authority.py`, `scripts/enroll_export_output_pool.py`,
 `scripts/run_export_provider_child.py`, `core/export_execution_host.py`,
 `services/export_execution_authority.py` and `services/export_execution_protocol.py`, with
 regressions in `tests/test_export_authority_launcher.py`,
@@ -28,13 +37,16 @@ regressions in `tests/test_export_authority_launcher.py`,
 runtime delta; the existing `ExportCoordinationDAL.extend_cooldown` and authoritative
 `dbo.ExportRequestBudget` definition already provide the required SQL contract.
 
-Final offline validation: **878 passed, 13 skipped** across authority, protocol, host, runtime,
+Final offline validation: **899 passed, 13 skipped** across authority, protocol, host, runtime,
 enrollment, adapter/budget and publication suites. Skips remain explicitly gated live checks
 and unavailable local Windows/rsync capabilities. Network and SQL connections were blocked;
 operational logs remained byte/mtime-identical. These are source checks, not G4 runtime proof.
 The original restoration and earlier published-head receipts below remain historical evidence.
 The merged-delivery manifest is unchanged and does not assert equality for these new corrections.
 Current correction security/check/publication evidence is recorded in the release evidence log.
+The 21 added startup cases first produced 15 failures and six passing controls at the previous
+head; all pass after the correction. They cover both launchers, late-import failure, failed/raising
+drain, uncertain open/close acknowledgements and incomplete-enrollment-drain exit status.
 
 Before production promotion, compare every current PR path against the exact production base.
 Carry the runtime corrections and their tests as modifications to existing production files;

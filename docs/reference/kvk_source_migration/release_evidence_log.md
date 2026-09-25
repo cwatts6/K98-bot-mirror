@@ -1,5 +1,42 @@
 # KVK Source Migration S6 release evidence log
 
+## PR #282 startup cleanup review correction — 2026-09-25
+
+The additional review comment identified post-open initialization outside the authority cleanup
+scope. `scripts/run_export_authority.py` and the related enrollment launcher now cover all
+initialization after a confirmed session-open acknowledgement. Before authority construction,
+no streams exist; after construction, close requires successful drain. Both use the exact session
+ID and acknowledged version. Unknown opens, failed/raising drains and unknown closes are retained
+without retry. Enrollment returns status 1 for incomplete drain. The existing SQL procedure
+independently rejects unfinished streams/preparations and stale or foreign session ownership.
+
+The 21 new offline cases first reproduced **15 failures and six passing controls** at
+`77a2e85df861599512db7f2f7f2aa3a3f09d8f31`; all pass after the correction. Launcher suite:
+**64 passed**. Final affected suites: **899 passed, 13 explicit skips**. Architecture, deferred
+items, security routing, test selection, command registration and import smoke passed, as did
+Black/Ruff, whitespace and relative-link checks. SQL/network access was blocked and operational
+logs remained byte/size/mtime-identical. Full pytest was not repeated for this bounded lifecycle
+change; the affected export/runtime/enrollment/budget suites cover its callers. Live fixtures,
+native checks and unavailable local rsync remain explicit skips, not runtime acceptance.
+
+Changes scan `9e09cc4d-b245-4812-ade4-8a80c632873c`, Deep off, completed with both changed runtime
+files reviewed and zero findings. Base/head: `77a2e85df861599512db7f2f7f2aa3a3f09d8f31`;
+snapshot: `ef70301f7cc2b98e0a02a32621c70bffd7862d2038a5876e2e7b9d21e9b20813`.
+The independent architecture pass verified both startup paths, inert constructors, actual
+resource consumers, drain and authoritative SQL session-close guards. Managed scan artifacts
+retain its canonical model, frozen file identities, offline evidence and sealed report. This
+subsequent Markdown-only receipt has a documented non-runtime skip; reviewed bytes are unchanged.
+
+The exact Bot union is now 44 paths, including every original pending document. Both S10E
+archive destination/source identities and their earlier merged/absent-at-base proofs remain
+unchanged. The SQL checkout and PR #90 remain unchanged at
+`41301d7544248f30b9db2e0e98ec3fa15fe0243e`, with no actionable comments or SQL runtime delta.
+Read back the published correction head, comment resolution and final-head checks before merge.
+Production promotion must include both launcher modifications and refreshed protected source
+hashes. Nothing here merges, deploys, installs SQL, calls providers or closes retained S6/S8
+gates. Next stage remains **G4 plan development only**, then separately approved operations and
+operator-owned G5 acceptance. Earlier receipts below retain their historical scope and counts.
+
 ## PR #282 final transaction wiring and review handoff — 2026-09-25
 
 The additional caller-wiring gap identified in the preceding correction review is now fixed:
