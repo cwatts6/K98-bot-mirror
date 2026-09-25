@@ -1,5 +1,29 @@
 # KVK Source Migration S6 release evidence log
 
+## Production #589 promotion and policy review follow-up — 2026-09-25
+
+The production-based promotion at `44d57e43324d77907de6843ff6261087a60cdc41` included 43 exact
+reviewed mirror blobs from `61e59d2d1af8002fa0d95f6c4c6b1ca2dc9c95a7`. Four original restorations
+became modifications; one already-identical boundary test was omitted. Every remote filename,
+previous_filename, status and blob was checked, with the S10E archive contents and old-name
+absence retained. The generic promotion collision guard was not weakened. Guarded offline
+pytest passed 5,909 tests with 84 skips and unchanged operational logs. All four production CI
+checks passed. Exact Changes scan `66faee30-5695-48bb-963a-0dd1a7ed1a49`, Deep off, had zero findings.
+
+The next two review corrections affect only the G4 promotion wording, the inert publication
+test and its read-only CI gate, plus these delivery receipts. The test now validates the real
+production publisher's rsync arguments and exercises that invocation in a disposable fixture.
+The scrubbed mirror retains an explicit production-workflow skip; production CI fails if its
+publisher disappears. Missing/replaced filters, changed flags/destinations, duplicate or removed
+commands and appended shell text have negative coverage. The real publisher is read, never run.
+
+This narrow follow-up uses focused policy tests, static/lint/type checks and the repository
+validation gates. Earlier full-suite/runtime evidence remains historical; no runtime source,
+SQL contract, credential filter or publisher command changes. The final correction commits,
+security decision and results are recorded in the PR replies. No SQL/provider/Discord execution,
+merge, bot-machine action, activation or predecessor rerun occurred. G4 planning and later exact
+operations/G5 decisions retain their separate approvals and all S6/S8 preservation obligations.
+
 ## PR #282 startup cleanup review correction — 2026-09-25
 
 The additional review comment identified post-open initialization outside the authority cleanup

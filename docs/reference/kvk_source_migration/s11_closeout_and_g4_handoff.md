@@ -1,5 +1,25 @@
 # S11 source delivery closeout and G4/G5 handoff
 
+## Production PR #589 review corrections — 2026-09-25
+
+[Production #589](https://github.com/cwatts6/k98-bot/pull/589) carries the reviewed mirror repair
+and G4 handoff on production history. Its initial head `44d57e43324d77907de6843ff6261087a60cdc41`
+passed all four CI checks and the guarded local full suite (5,909 passed, 84 skipped). Those
+results remain evidence for that head, not an assertion that later edits were already tested.
+
+Two further review comments are corrected in both Bot PRs. The current G4 pack now explicitly
+retains the four corrected authority source/test paths as production modifications and omits
+only the still-identical `tests/test_export_authority_boundaries.py`. The publication-policy
+gate now triggers on changes to the real production publisher, reads its YAML and validates its
+actual rsync invocation before using those arguments with inert temporary fixtures. Changed
+flags, filter, destinations or command shape fail the check. Production CI requires the publisher
+file; the scrubbed mirror explicitly skips that production-only coverage. The CI parser uses the
+existing pinned PyYAML version. No publisher workflow, runtime, SQL or deployment action changes.
+
+The original delivery manifest and archive proofs remain intact. Review replies record the new
+commit identities and validation outcomes; final-head CI remains the merge gate. Next remains
+G4 plan development only, with exact operational approval and G5 acceptance separate.
+
 ## PR #282 review corrections — 2026-09-25
 
 The operator authorized action, replies and resolution for the current PR comments. Two Bot

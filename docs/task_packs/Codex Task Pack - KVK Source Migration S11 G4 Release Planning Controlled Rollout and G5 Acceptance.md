@@ -217,9 +217,13 @@ not part of those local checks.
 
 The approved mirror filter repair is the genuine Bot change carrying this handoff; verify every
 pending Bot file by filename plus previous_filename or exact content/base/absence proof before
-any separately authorized publication. The five restored files already exist identically in
-production: promotion must omit duplicate additions using that proof and carry the filter/docs
-delta. No repository history mixing or separate Bot documentation PR. On 2026-09-25 the operator
+any separately authorized publication. Compare the current reviewed blobs against the exact
+production base: only `tests/test_export_authority_boundaries.py` remains identical and may be
+omitted. Carry `scripts/run_export_authority.py`, `services/export_execution_authority.py`,
+`tests/test_export_authority_launcher.py` and `tests/test_export_execution_authority.py` as
+modifications, including their later review corrections, alongside every other reviewed runtime,
+test, filter and documentation change. The original five-file restoration proof does not establish
+current identity. No repository history mixing or separate Bot documentation PR. On 2026-09-25 the operator
 explicitly authorized a separate SQL documentation closeout PR for `docs/SQL_DELIVERY_LOG.md`
 and `migrations/README.md`, to be reviewed alongside this Bot repair/handoff. That authorization
 supersedes the earlier deferral for those two entries; no SQL implementation is invented.
