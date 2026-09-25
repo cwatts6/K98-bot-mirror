@@ -3223,3 +3223,36 @@ transaction behavior and native child-failure timing are still unexecuted G4 gat
 provider/Discord operations, deployment, activation, merge, predecessor rerun or G5
 acceptance is implied by resolving these source-review threads. All retained S6/S8 evidence,
 uncertain publications, pending-document/archive identities and rollback obligations stand.
+
+### S11 additional PR review corrections — 2026-09-25
+
+PR #281 now waits up to one overall 30-second deadline to acquire the authority pipe.
+Busy instances, the race after availability, and the gap between server instances are
+handled before authentication or action transmission. Access errors still fail immediately;
+connected sends/replies are never retried. The shared provider-child connection helper keeps
+the existing exact pipe rights, message mode, server authentication and cleanup obligations.
+Timeout or uncertain delivery still retains claims for reconciliation.
+
+SQL PR #89 rejects closing a frozen stream while any registered request lacks a terminal
+`succeeded`, `not_sent` or `unknown` event. Legal terminal appends remain possible while
+frozen. `unknown` remains insufficient for reconciliation proof. The authoritative snapshot
+and both migration copies match. All 14 permission-manifest source paths use forward slashes;
+LF checkout is pinned and all three exact manifest-hash references are synchronized.
+
+Validation: 681 focused offline tests passed, 12 live-only cases skipped, with operational
+logs unchanged. Tests cover busy/raced acquisition, instance turnover, one overall deadline,
+fail-fast errors and no connected-action replay. Black/Ruff and all six repository gates
+passed. SQL checks passed 193 evidence and 454 permission assertions; ScriptDom parsed all
+five changed SQL files. The whole-branch test selector still recommends full pytest; its
+earlier full-suite evidence remains historical. This correction uses focused affected-path
+coverage and does not rerun predecessors. Separate Changes reviews, Deep off, target the
+Bot delta from `771be9b45f3e6eb67b224a941e31b55cf5579a7d` and the SQL delta from
+`70d1916c39359c4bf5cf990552c3b1e57850b2c4`.
+
+The authored, gated SQL case now checks rejection without row/event changes for prepared
+and dispatch-intent requests, then legal terminal append and closure for each terminal
+state. It has not run against SQL. Native two-caller contention, exact installation/reapply,
+concurrent SQL transactions, provider/deployment proof and G4/G5 acceptance remain operator
+gates. Rollback closes admission, drains/reconciles and retains evidence and uncertain claims;
+installed SQL is forward-fixed. No provider/Discord/SQL execution, merge, bot-machine change
+or activation occurred. Prior document grouping and every retained S6/S8 obligation stand.

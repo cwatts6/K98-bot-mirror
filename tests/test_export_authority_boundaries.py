@@ -469,3 +469,114 @@ def test_bot_client_uses_the_shared_message_mode_boundary(monkeypatch):
     )
     assert client._connect_pipe() == "fixture-handle"
     connect.assert_called_once_with(r"\\.\pipe\K98Export-00000000-0000-0000-0000-000000000001")
+
+
+def pipe_acquisition(monkeypatch, opens, waits=()):
+    clock = SimpleNamespace(now=0.0)
+
+    def advance(seconds):
+        clock.now += seconds
+
+    monkeypatch.setattr(host, "time", SimpleNamespace(monotonic=lambda: clock.now, sleep=advance))
+    opened = Mock(side_effect=opens)
+    waited = Mock(side_effect=waits)
+    mode = Mock()
+    monkeypatch.setitem(sys.modules, "win32file", SimpleNamespace(CreateFile=opened))
+    monkeypatch.setitem(
+        sys.modules,
+        "win32pipe",
+        SimpleNamespace(WaitNamedPipe=waited, SetNamedPipeHandleState=mode),
+    )
+    return clock, opened, waited, mode
+
+
+@pytest.mark.parametrize("gap", [False, True])
+def test_pipe_acquisition_retries_busy_race_and_instance_turnover(monkeypatch, gap):
+    handle = SimpleNamespace(Close=Mock())
+    errors = [WinError(231), WinError(231), handle]
+    waits = [None, None]
+    if gap:
+        errors.insert(1, WinError(2))
+        waits[0] = WinError(2)
+    clock, opened, waited, mode = pipe_acquisition(monkeypatch, errors, waits)
+    assert host.open_message_pipe("fixture-pipe", timeout_ms=100) is handle
+    assert opened.call_count == len(errors) and waited.call_count == 2
+    assert all(0 < call.args[1] <= 100 for call in waited.call_args_list)
+    mode.assert_called_once_with(handle, 2, None, None)
+    handle.Close.assert_not_called()
+    assert clock.now < 0.1
+
+
+@pytest.mark.parametrize("code", [2, 231])
+def test_pipe_acquisition_uses_one_overall_deadline(monkeypatch, code):
+    clock, opened, waited, mode = pipe_acquisition(monkeypatch, WinError(code))
+
+    def timeout(_name, milliseconds):
+        clock.now += milliseconds / 1000
+        raise WinError(121)
+
+    waited.side_effect = timeout
+    with pytest.raises(host.HostBoundaryError, match="deadline expired"):
+        host.open_message_pipe("fixture-pipe", timeout_ms=50)
+    assert 0.05 <= clock.now < 0.051
+    assert opened.call_count > 0
+    assert waited.call_count == (1 if code == 231 else 0)
+    mode.assert_not_called()
+
+
+@pytest.mark.parametrize("during_wait", [False, True])
+def test_pipe_acquisition_does_not_retry_unrelated_errors(monkeypatch, during_wait):
+    error = WinError(5)
+    _, opened, waited, mode = pipe_acquisition(
+        monkeypatch, WinError(231) if during_wait else error, error
+    )
+    with pytest.raises(WinError) as caught:
+        host.open_message_pipe("fixture-pipe")
+    assert caught.value is error
+    opened.assert_called_once()
+    assert waited.call_count == int(during_wait)
+    mode.assert_not_called()
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 30001, True, 0.5])
+def test_pipe_acquisition_requires_bounded_deadline(monkeypatch, timeout):
+    _, opened, waited, mode = pipe_acquisition(monkeypatch, [])
+    with pytest.raises(host.HostBoundaryError, match="Bounded"):
+        host.open_message_pipe("fixture-pipe", timeout_ms=timeout)
+    opened.assert_not_called()
+    waited.assert_not_called()
+    mode.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", [None, "send", "receive"])
+def test_authority_action_is_never_replayed_after_pipe_acquisition(monkeypatch, failure):
+    from services.export_execution_authority import ExecutionUncertain
+    from services.export_runtime_composition import AuthorityClient
+
+    handle, server = SimpleNamespace(Close=Mock()), SimpleNamespace(Close=Mock())
+    _, opened, waited, mode = pipe_acquisition(
+        monkeypatch, [WinError(231), WinError(231), handle], [None, None]
+    )
+    pipe = SimpleNamespace(send=Mock(), receive=Mock(return_value={"version": 1, "result": {}}))
+    if failure:
+        getattr(pipe, failure).side_effect = OSError("connection lost")
+    monkeypatch.setattr(host, "MessagePipe", Mock(return_value=pipe))
+    verify = Mock(return_value=server)
+    client = AuthorityClient(
+        pipe_id="00000000-0000-0000-0000-000000000001",
+        authority_sid="S-1-5-21-1",
+        bot_sid="S-1-5-21-2",
+        verify_server=verify,
+    )
+    message = {"version": 1, "action": "fixture"}
+    if failure:
+        with pytest.raises(ExecutionUncertain, match="reconciliation"):
+            client._invoke(message)
+    else:
+        assert client._invoke(message) == {}
+    assert opened.call_count == 3 and waited.call_count == 2
+    verify.assert_called_once_with(handle)
+    pipe.send.assert_called_once_with(message)
+    assert pipe.receive.call_count == (0 if failure == "send" else 1)
+    server.Close.assert_called_once()
+    handle.Close.assert_called_once()

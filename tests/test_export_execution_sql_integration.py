@@ -257,8 +257,9 @@ def closing_probe_scope(sql_packet):
     return admitted[0]
 
 
+@pytest.mark.parametrize("terminal_state", ["not_sent", "succeeded", "unknown"])
 def test_s11_closing_probe_exact_admission_and_mutation_rejection(
-    sql_connections, sql_packet, closing_probe_scope
+    sql_connections, sql_packet, closing_probe_scope, terminal_state
 ):
     """AUTHORED ONLY: transaction proof; synthetic evidence never claims provider success."""
     dal = ExportExecutionDAL(lambda: sql_connections(sql_packet["authority_user"]))
@@ -394,16 +395,51 @@ def test_s11_closing_probe_exact_admission_and_mutation_rejection(
             )
         assert dal.read_request(request_id) == retained_request
         assert dal.read_stream(stream_id) == prepared
-    terminal = dal.transition(
-        "event", **base, EventID=str(uuid4()), ExpectedVersion=prepared["Version"], State="not_sent"
-    )
+    if terminal_state != "not_sent":
+        prepared = dal.transition(
+            "event",
+            **base,
+            EventID=str(uuid4()),
+            ExpectedVersion=prepared["Version"],
+            State="dispatch_intent",
+        )
     frozen = dal.transition(
         "stream",
         SessionID=session_id,
         StreamID=stream_id,
         AccountKey=scope["AccountKey"],
         Action="freeze",
-        ExpectedVersion=terminal["Version"],
+        ExpectedVersion=prepared["Version"],
+    )
+    close = dict(
+        SessionID=session_id,
+        StreamID=stream_id,
+        AccountKey=scope["AccountKey"],
+        Action="close",
+        ChildIdentity=child_id,
+        ClosureHash=b"c" * 32,
+        ClosureReference=str(uuid4()),
+    )
+    count, event_digest = dal.stream_digest(stream_id)
+    retained_request = dal.read_request(request_id)
+    with pytest.raises(EvidenceCommitUnknown):
+        dal.transition(
+            "stream",
+            **close,
+            ExpectedVersion=frozen["Version"],
+            EventDigest=event_digest,
+            LastSequence=count,
+        )
+    assert dal.read_stream(stream_id) == frozen
+    assert dal.read_request(request_id) == retained_request
+    # A frozen stream still accepts its legal terminal evidence; closing must
+    # not strand prepared/dispatch_intent. Unknown remains unproven for proofs.
+    terminal = dal.transition(
+        "event",
+        **base,
+        EventID=str(uuid4()),
+        ExpectedVersion=frozen["Version"],
+        State=terminal_state,
     )
     count, event_digest = dal.stream_digest(stream_id)
     # These are disposable synthetic SQL values, not genuine Windows closure evidence.
@@ -413,13 +449,15 @@ def test_s11_closing_probe_exact_admission_and_mutation_rejection(
         StreamID=stream_id,
         AccountKey=scope["AccountKey"],
         Action="close",
-        ExpectedVersion=frozen["Version"],
+        ExpectedVersion=terminal["Version"],
         ChildIdentity=child_id,
         ClosureHash=b"c" * 32,
         ClosureReference=str(uuid4()),
         EventDigest=event_digest,
         LastSequence=count,
     )
+    assert dal.read_stream(stream_id)["State"] == "closed"
+    assert dal.read_request(request_id)[1][-1]["State"] == terminal_state
     dal.transition("session", SessionID=session_id, Action="close", ExpectedVersion=1)
 
 

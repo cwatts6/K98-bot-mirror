@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import socket
 import subprocess
+import time
 
 from services.export_execution_protocol import MAX_MESSAGE_BYTES, decode, encode
 from services.export_snapshot_store import ExportSnapshotStore, SnapshotReceipt
@@ -588,12 +589,40 @@ class MessagePipe:
                 return decode(b"".join(chunks))
 
 
-def open_message_pipe(name):
-    """Open one client endpoint with only the rights needed by this protocol."""
+def open_message_pipe(name, *, timeout_ms=30000):
+    """Wait for one endpoint before sending; never retry a connected action."""
     import win32file
     import win32pipe
 
-    handle = win32file.CreateFile(name, PIPE_CLIENT_ACCESS, 0, None, 3, 0, None)
+    if type(timeout_ms) is not int or not 0 < timeout_ms <= 30000:
+        raise HostBoundaryError("Bounded pipe connection deadline required.")
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise HostBoundaryError("Pipe connection deadline expired.")
+        try:
+            handle = win32file.CreateFile(name, PIPE_CLIENT_ACCESS, 0, None, 3, 0, None)
+            break
+        except Exception as exc:
+            code = getattr(exc, "winerror", None)
+            if code not in (2, 231):  # FILE_NOT_FOUND during instance turnover; PIPE_BUSY.
+                raise
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise HostBoundaryError("Pipe connection deadline expired.")
+        if code == 2:
+            # WaitNamedPipe returns immediately if the last instance disappeared.
+            time.sleep(min(0.01, remaining))
+            continue
+        try:
+            win32pipe.WaitNamedPipe(name, max(1, int(remaining * 1000)))
+        except Exception as exc:
+            if getattr(exc, "winerror", None) not in (2, 121):  # FILE_NOT_FOUND / SEM_TIMEOUT.
+                raise
+            time.sleep(min(0.01, max(0, deadline - time.monotonic())))
+        # Availability is not a reservation: another caller may win CreateFile.
+        # Retry only acquisition, within the same overall deadline.
     try:
         win32pipe.SetNamedPipeHandleState(handle, 2, None, None)
         return handle
