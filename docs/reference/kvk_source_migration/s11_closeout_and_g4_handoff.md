@@ -1,5 +1,25 @@
 # S11 source delivery closeout and G4/G5 handoff
 
+## Published PR handoff — 2026-09-25
+
+[Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
+[SQL closeout #90](https://github.com/cwatts6/K98-bot-SQL-Server/pull/90) are open for review.
+Bot includes all 38 pending files, including every untracked document; SQL contains only its
+two closeout documents. Initial published heads: Bot `b6543935e929d14d8a061694ca0cea6fcffc70e3`,
+SQL `41301d7544248f30b9db2e0e98ec3fa15fe0243e`. The later Bot receipt commit changes Markdown only;
+recheck current PR heads/checks before merge. Exact remote filenames and blobs are read back.
+
+The [Linux publication-policy job](https://github.com/cwatts6/K98-bot-mirror/actions/runs/36125063464/job/108039157281)
+passed both tests with rsync 3.2.7, including the real filter regression, on the initial Bot head.
+This closes the local rsync availability gap; the earlier skipped local result remains history.
+Bot Command Governance also passed on that head. At this receipt, SQL validation and automated
+reviews are still running. A passing initial head does not replace final-head checks.
+
+No PR has been merged, production policy promoted, bot machine changed or G4 operation executed
+by this follow-up. Next stage remains **G4 plan development only**; controlled rollout and G5
+acceptance require their distinct operator approvals. Production's publishing policy still
+needs the reviewed repair through a separate production promotion after Bot review.
+
 ## Current status — 2026-09-25
 
 S11 implementation and review corrections are merged into Bot mirror #281, SQL #89 and
@@ -141,7 +161,8 @@ repository gates passed and operational logs were preserved. Separate configurat
 `61ed6784-ae3d-4d5e-aba1-ecc24685151c` completed with zero findings and complete scoped source
 coverage. The [current receipt](release_evidence_log.md#mirror-repair-and-g4g5-handoff-validation--2026-09-25)
 records the frozen target, post-scan AST-equivalent formatting, usage and retained report. The
-Linux rsync CI check remains required before merge; it has not run. No SQL source is changed by the repair; new SQL
+Linux rsync check was unavailable at local preparation; its subsequent passing CI result is
+recorded in the published handoff receipt above. Require final-head CI before merge. No SQL source is changed by the repair; new SQL
 closeout text is documentation-only and does not warrant another SQL runtime scan or execution.
 
 ## Remaining work and ownership

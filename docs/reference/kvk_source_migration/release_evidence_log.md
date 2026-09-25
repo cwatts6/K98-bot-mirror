@@ -1,5 +1,25 @@
 # KVK Source Migration S6 release evidence log
 
+## Published PR handoff — 2026-09-25
+
+[Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
+[SQL closeout #90](https://github.com/cwatts6/K98-bot-SQL-Server/pull/90) are open for review.
+Bot includes all 38 pending files, including every untracked document; SQL contains only its
+two closeout documents. Initial published heads: Bot `b6543935e929d14d8a061694ca0cea6fcffc70e3`,
+SQL `41301d7544248f30b9db2e0e98ec3fa15fe0243e`. The later Bot receipt commit changes Markdown only;
+recheck current PR heads/checks before merge. Exact remote filenames and blobs are read back.
+
+The [Linux publication-policy job](https://github.com/cwatts6/K98-bot-mirror/actions/runs/36125063464/job/108039157281)
+passed both tests with rsync 3.2.7, including the real filter regression, on the initial Bot head.
+This closes the local rsync availability gap; the earlier skipped local result remains history.
+Bot Command Governance also passed on that head. At this receipt, SQL validation and automated
+reviews are still running. A passing initial head does not replace final-head checks.
+
+No PR has been merged, production policy promoted, bot machine changed or G4 operation executed
+by this follow-up. Next stage remains **G4 plan development only**; controlled rollout and G5
+acceptance require their distinct operator approvals. Production's publishing policy still
+needs the reviewed repair through a separate production promotion after Bot review.
+
 ## Separate Bot and SQL PR handoff authorized — 2026-09-25
 
 The operator authorized publishing the mirror repair with all pending/untracked Bot documents,

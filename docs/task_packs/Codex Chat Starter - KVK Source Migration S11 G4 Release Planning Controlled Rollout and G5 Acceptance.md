@@ -1,5 +1,10 @@
 # Chat starter — S11 G4 planning, controlled rollout and G5 acceptance
 
+Follow-up delivery: [Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
+[SQL closeout #90](https://github.com/cwatts6/K98-bot-SQL-Server/pull/90) are open for review.
+Recheck their final outcomes and any later production promotion in the S11 closeout before
+choosing release pins. These PRs do not authorize G4 execution or G5 acceptance.
+
 Paste the following into a new task when ready. Creating this file does not create that task.
 
 ---

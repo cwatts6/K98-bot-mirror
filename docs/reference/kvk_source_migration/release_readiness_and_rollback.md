@@ -2,6 +2,12 @@
 
 ## Current next step: deliver repair, then plan G4 — 2026-09-25
 
+Delivery update: [Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
+[SQL closeout #90](https://github.com/cwatts6/K98-bot-SQL-Server/pull/90) are open. Linux CI
+passed the real rsync regression on the initial Bot head; see the
+[published receipt](release_evidence_log.md#published-pr-handoff--2026-09-25). Review final-head
+checks before merge; production promotion and all G4/G5 operations remain separate.
+
 S11 mirror #281, SQL #89 and production #588 are already merged. The prior publication proposals
 below are historical. The approved local mirror publication repair and current handoff documents
 are ready for review together on `codex/s11-mirror-g4-handoff`; see the
