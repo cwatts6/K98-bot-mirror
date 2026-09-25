@@ -1,0 +1,454 @@
+# KVK Source Migration — post-S6 closeout and S7 handoff
+
+## S11 local implementation and next approval — 2026-09-25
+
+The approved single-host/fresh-authority-identity composition is now locally implemented and
+validated. See the latest [evidence](release_evidence_log.md) and [exact next approval](release_readiness_and_rollback.md#s11-local-closure-and-exact-next-approval--2026-09-25).
+The full run passed 5,812 cases before the final narrow client correction; its affected suites
+then passed 704 cases. Final security/source receipts distinguish those trees. Historical
+pending-design notes below do not request that approval again. Git publication and actual G4/G5
+remain separate; S6 open gates, both uncertain publications and all retained data are untouched.
+All mandatory Bot documents and exact S10E archive sides remain in the next genuine authorized
+Bot implementation PR; SQL's two closeouts stay in its separate implementation PR.
+
+
+## S11 implementation status — 2026-09-24
+
+Approved S11 mechanism implementation has begun, with no S6 gate closure or retained-data change. S6 uncertain publications are not reconstructed into the new request ledger. Missing historical closure cannot be repaired by a fresh readback alone. See [checkpoint](release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
+
+
+## S11 trusted-proof design handoff — 2026-09-24
+
+After the preparation summary, the operator agreed to the bounded mechanism-design pass.
+The [new design](integration_contract_and_consumer_matrix.md#s11-proof-mechanism-decision-proposal--2026-09-24)
+recommends independent Windows provider supervision and additive SQL request/proof evidence.
+The [approval sequence](release_readiness_and_rollback.md#s11-proof-design-approval-and-rollback--2026-09-24)
+and [manifest amendment](integration_implementation_manifests.md#s11-proof-mechanism-manifest-amendment--2026-09-24)
+are proposals for subsequent implementation, not authorization to implement or operate now.
+
+Only the same eight agreed Bot documents are changed by this pass. All other pending Bot paths
+and both SQL closeout documents are preserved. Older temporary recovery archives are unavailable;
+the fresh repository snapshot does not assert recovery of their historical metadata. Publication
+must close that per-file evidence gap. All predecessor acceptance boundaries, retained uncertain
+publications, document grouping and operator-owned G4/G5 remain as previously recorded.
+
+
+## S11 approved preparation checkpoint — 2026-09-24
+
+The operator's "approved please proceed" accepts the initial S11 scope's proposed next step:
+preparation/design only. This checkpoint changes eight existing Bot Markdown files. It does not
+implement or activate composition, execute tests against SQL/providers/Discord, publish Git,
+pull/restart the bot machine, or reopen predecessor acceptance.
+
+Both local branches remain main with empty indexes. Bot HEAD/origin main is
+`721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main is
+`3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL HEAD/origin main is
+`2352a898881d4b74d6eec153bb3cb381d6162041`. No bot-machine pull is reported.
+
+The [S11 release packet](release_readiness_and_rollback.md#s11-preparation-and-release-approval-packet--2026-09-24)
+and [implementation proposal](integration_implementation_manifests.md#s11-preparation-and-proposed-implementation-manifests--2026-09-24)
+separate genuine composition/proof-producer gaps from unproven installation and runtime behavior.
+The startup registration call exists; its default factory remains closed. No new schema need is
+established. External writer inventory and trusted process/provider evidence remain prerequisites.
+
+The full [57-identity Bot carry-forward manifest](s10e_closeout_and_s11_handoff.md#exact-mandatory-next-pr-documentation-manifest)
+remains pending, including this preparation. All names/actions/base blobs and entry content hashes
+were checked against retained evidence; original archives remain untouched. SQL's two documents
+remain unchanged for its next actual implementation PR. No grouping reapproval or standalone docs
+PR is required or permitted. Delivery must reconcile filename AND previous_filename, exact head/
+merge bytes and source-present/destination-absent base proof for both S10E moves.
+
+Keep S6-OPS01/PERF01/CAP01 open. Preserve both uncertain publications
+`e19c89ac-7977-5f28-ae4c-031807cd1728` and `54a2480a-26fb-5bad-a3f5-9321525a731c`,
+all retained databases/files, accepted measurements and recovered documentation. S8A's six scripts/
+VERIFYONLY, S8B's 50 SQL cases/actual restore and later offline history, and S8C's seven local
+operator checks remain distinct. The [evidence record](release_evidence_log.md#s11-preparation-evidence--2026-09-24)
+records new preparation checks separately from historical implementation results.
+
+## Current status — S10E merged; S11 review/scope next, 2026-09-15
+
+S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
+[production #587](https://github.com/cwatts6/k98-bot/pull/587) and
+[SQL #88](https://github.com/cwatts6/K98-bot-SQL-Server/pull/88) are merged and locally pulled.
+Bot main/origin main `721ad7e0cd6b160ddddad328c2338a98bdfb6e0a`; production/main `3dbe63e7a47175df85ed17814ea06f9dd3d130b7`; SQL main/origin main `2352a898881d4b74d6eec153bb3cb381d6162041`.
+**No changes have been pulled to the bot machine.** Repository delivery is complete;
+SQL installation, real provider/Discord execution, runtime acceptance and activation remain unproven.
+
+Next: **S11 Controlled Release and Acceptance, initial review/scope only**:
+[task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md) and [starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20Controlled%20Release%20and%20Acceptance.md).
+Read the [S10E closeout and exact next-PR manifest](s10e_closeout_and_s11_handoff.md).
+S11 starts from S7's eight-document release proposal plus mandatory carry-forward docs;
+reconcile real composition/installation/operational gaps before proposing any runtime scope.
+Its eventual authorized Bot PR MUST include every listed pending document, both S10E archive
+move identities, this closeout and S11 pack/starter. Verify filename AND previous_filename,
+exact content and absent-at-base proof; counts are insufficient. No standalone docs PR,
+mixed repositories or manufactured implementation. Pending SQL closeout edits belong only
+in the next genuine authorized SQL implementation PR; otherwise carry them forward.
+
+Preserve all recovered documentation evidence, S6-OPS01/PERF01/CAP01, both uncertain publications
+and retained data. S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C
+seven local checks remain distinct. S10C/D/E static authoring is not installation/provider proof.
+No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/deployment,
+activation, new task creation or Git publication is authorized by this documentation closeout.
+Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
+
+## Historical S10D closeout — 2026-09-15
+
+SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
+Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
+`aa1821adbde9ccda47797caa83b5d5a9958bfce9`. **No changes have been pulled to the bot machine.**
+S10D authoring, offline checks and Changes security review are complete; SQL installation and
+provider/Discord execution are not established. S10C remains source/static SQL evidence too.
+See [S10D closeout and exact carry-forward manifests](s10d_closeout_and_s10e_handoff.md).
+
+Next: **S10E Export Operator UX and Rollover, initial review/scope only**:
+[task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md) and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
+The eventual authorized S10E Bot implementation PR MUST include every pending Bot document in
+that closeout, this pack/starter and all required archive identities. Verify filename AND
+previous_filename, or exact merged/content and absent-at-base proof. No standalone docs PR,
+repository mixing, manufactured implementation or renewed predecessor/grouping approval.
+Both SQL documents were delivered in #87; their new closeout edits stay in SQL for the next
+actual authorized SQL implementation PR. S10E scope must assess any genuine SQL delta separately.
+
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and every retained database/file.
+S8A six scripts, S8B 50 cases/actual restore versus offline history, and S8C seven local checks
+remain distinct; none is new live Discord or deployment evidence. Shutdown stops admission and
+drains owned delivery; uncertainty retains claims. No lease-age/job-state release.
+This documentation closeout authorizes no implementation, Git publication, SQL/provider/Discord
+execution, real import/export, bot-machine action, deployment, activation, predecessor rerun or
+new task. Earlier dated checkpoints are historical; the current closeout controls the next step.
+
+## Historical S10A closeout status — 2026-09-14
+
+S10A SQL #85 is merged and locally pulled at `3776dfa6b0892a8800d236fdf111c4d2f93c3813`.
+All five disposable fixture modes, 76 unique cases in install and constraints, direct apply/rerun,
+backup/actual restore and final preservation checks passed; final CI passed. Results accepted.
+No changes have been pulled to the bot machine; no production SQL deployment or activation.
+S9B mirror #277, production #584 and SQL #84 remain delivered. Bot comparison anchors are unchanged.
+
+Next: **S10B Shared Export Coordination Worker and Durable Budget, initial review/scope only**.
+Use the [S10B task pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md) and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S10B%20Shared%20Export%20Coordination%20Worker%20and%20Durable%20Budget.md).
+The [S10A closeout and exact carry-forward manifest](s10a_implementation_and_s10b_handoff.md) controls delivery.
+Completed S10A and S9B packs/starters are archived; retained execution/operator evidence stays available.
+Every pending Bot document and archive destination belongs in the eventual S10B implementation PR.
+Check exact filename AND previous_filename, with explicit absent-at-base proof for never-committed
+S10A source paths. No standalone documentation PR or repository mixing; grouping is settled.
+Both mandatory SQL delivery documents were included and merged in SQL #85.
+
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+S8B accepted smoke/50-case and actual-restore evidence remains distinct from offline runner history,
+S8A six-script evidence and S8C seven local checks; S8C is not live Discord acceptance.
+No S10B implementation, Git publication, runtime execution, deployment, activation or automatic new task
+is authorized by this closeout. SourceRouting.Enabled alone never enables source activation.
+Earlier dated checkpoints below are historical.
+
+
+## Historical S8B closeout status — 2026-09-13
+
+S8B is complete, operator accepted, successfully smoke tested and delivered through merged
+production #581 and SQL #81. Local pulls are complete; **no changes have been pulled to the
+bot machine**. Mirror #274 is closed without a merge record; its delivered content is verified
+in synchronized mirror main. See the [canonical closeout and exact carry-forward manifest](s8b_closeout_and_s8c_handoff.md)
+for merge/content proof, final offline tests and the distinct historical disposable/runner evidence.
+No fresh post-merge SQL or bot-machine smoke, deployment or activation is claimed.
+
+**Next: S8C Intake and Admin Pairing UX in a new chat, initial review/scope only.**
+Use the [S8C pack](../../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md) and [starter](../../task_packs/archive/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S8C%20Intake%20and%20Admin%20Pairing%20UX.md).
+The eventual separately authorized S8C Bot PR must include all closeout documentation and both
+sides of both S8B archive moves, checking actual filename and previous_filename; SQL delivery-log
+carry-forward is separate. S7 decisions and predecessor acceptance remain settled. S9 public
+routing and S10 export coordination remain later work; SourceRouting.Enabled alone is insufficient.
+Preserve S6-OPS01/PERF01/CAP01, both uncertain publications and all retained databases/files.
+Earlier dated scope/approval/next-slice statements are historical and do not reopen accepted work.
+
+## 1. Summary and authority
+
+2026-09-12. Chris Watts confirmed the existing PRs merged and deployed locally,
+with nothing pushed to production, then authorized all documentation updates,
+archives and additions for the next slice. This authorizes local documentation
+changes only. No new task, runtime implementation, Git publication or live action
+is performed by this handoff.
+
+GitHub independently confirms that the production-repository PR merged. Therefore
+“nothing pushed to production” is recorded as no reported production runtime or
+bot-machine deployment, not a denial of that repository merge. Local deployment is
+operator-attested; its executable, process/config and smoke outcomes were not
+independently checked. Feature activation and programme G5 remain incomplete.
+
+| Evidence | Exact observed value |
+|---|---|
+| Mirror PR | #272 merged 2026-09-12 19:20:50 UTC; merge `016df1e61c8017556a7e8ba8374d31375aebfb74`; final head `fa1f47339509804e84325ff1332ecc9801b25f2c` |
+| Production-repository PR | #579 merged 2026-09-12 19:21:34 UTC; merge `a8c9c515066ca6ef079120b76dd160e3389badab`; final head `b9c84751d3cc1deaba0a5772ab45d89263fcb398` |
+| Local Bot | main and origin/main `a2f148fa9bd4fb367fd46d0500a768c14fee915b`; clean at handoff entry; mirror synchronization commit identifies production merge above |
+| Local production/main | `a8c9c515066ca6ef079120b76dd160e3389badab` |
+| Bot remotes | origin `https://github.com/cwatts6/K98-bot-mirror.git`; production `https://github.com/cwatts6/K98-bot.git` |
+| Local SQL | main and origin/main `44afa315dd6cbfe9fec101f2a39a62e534f5b583`; clean |
+| SQL remote | origin `https://github.com/cwatts6/K98-bot-SQL-Server.git` |
+
+No pull/reset/fetch/merge was used to establish these values. S6's exact measured
+evidence and failure states remain in the archived pack and release documents.
+The source-routing review correction remains a blocker, not a resolved runtime bug.
+
+## 2. Exact next-slice carry-forward file manifest
+
+The following is the complete authorized handoff delta relative to Bot
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`. Include every path in the next separately
+authorized slice PR, or prove it already merged. GitHub may collapse each archive
+move into one entry; count both previous_filename and filename. Do not omit these
+changes as pre-existing work. SQL has no file changes.
+
+| Action | Exact repository path |
+|---|---|
+| Modify | `README-DEV.md` |
+| Modify | `docs/reference/README.md` |
+| Modify | `docs/reference/kvk_source_migration/decision_and_evidence_register.md` |
+| Modify | `docs/reference/kvk_source_migration/phase_2_acceptance_scenarios.md` |
+| Modify | `docs/reference/kvk_source_migration/phase_2_contract_and_architecture.md` |
+| Modify | `docs/reference/kvk_source_migration/phase_2_evidence_and_validation_log.md` |
+| Modify | `docs/reference/kvk_source_migration/phase_2_implementation_plan.md` |
+| Modify | `docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md` |
+| Create | `docs/reference/kvk_source_migration/post_s6_handoff_log.md` |
+| Create | `docs/reference/kvk_source_migration/post_s6_integration_requirements.md` |
+| Modify | `docs/reference/kvk_source_migration/release_evidence_log.md` |
+| Modify | `docs/reference/kvk_source_migration/release_readiness_and_rollback.md` |
+| Modify | `docs/reference/local_sql_development.md` |
+| Delete (archive source) | `docs/task_packs/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md` |
+| Create | `docs/task_packs/Codex Chat Starter - KVK Source Migration S7 Integration Contract and Implementation Planning.md` |
+| Delete (archive source) | `docs/task_packs/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md` |
+| Create | `docs/task_packs/Codex Task Pack - KVK Source Migration S7 Integration Contract and Implementation Planning.md` |
+| Modify | `docs/task_packs/KVK Source Migration - Programme Pack.md` |
+| Modify | `docs/task_packs/README.md` |
+| Create (archive destination) | `docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S6 Release Readiness and Controlled Activation.md` |
+| Modify | `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S4B Versioned Exports and Delivery.md` |
+| Create (archive destination) | `docs/task_packs/archive/Codex Task Pack - KVK Source Migration S6 Release Readiness and Controlled Activation.md` |
+| Modify | `docs/task_packs/archive/README.md` |
+
+S7 additionally permits creation of exactly
+`docs/reference/kvk_source_migration/integration_contract_and_consumer_matrix.md`
+and `docs/reference/kvk_source_migration/integration_implementation_manifests.md`.
+Those are S7 outputs, not created or claimed complete by this handoff. They extend
+the eventual PR manifest only when that separately approved slice creates them.
+
+## 3. New files
+
+The integration requirements capture S7-D01–D09 and their consequences. This handoff
+records verified merges, authority, validation and the exact carry-forward list.
+The S7 task pack and starter define the next bounded documentation-only work and
+its implementation-planning outputs. S7 itself has not been run by creating them.
+
+## 4. Modified files and archives
+
+Current status is added to the core entry points, plan/evidence/decision records,
+programme and release docs. The architecture receives the operator amendment;
+acceptance scenarios gain S7-T01–T16. The roadmap maps original programme phases
+to the accepted S1–S6 delivery and proposed S7–S11 integration/release sequence.
+
+The completed S6 pack and starter move to archive with explicit historical status.
+Their relative links and incoming links/manifests are repaired. The older S4B pack
+changes only its references to the new S6 archive locations. Accepted predecessor
+outcomes, IDs, hashes, limitations and failures are preserved; no reruns claimed.
+
+## 5. SQL changes
+
+None. SourceRouting and SourceDelivery definitions were read from the authoritative
+SQL repo to establish that source-choice/pair/queue design must be validated, not
+assumed from existing fields. No database connection, SQL execution, schema edit,
+data import or disposable rehearsal was performed. The SQL tree remains clean.
+
+## 6. Helpers reused
+
+No runtime helpers created or changed. Existing import scheduling, publication,
+delivery/recovery, diagnostic routing and legacy spreadsheet reuse are referenced
+as integration seams in the requirements, not claimed sufficient implementations.
+Local temporary scripts perform documentation backup/link/manifest validation only.
+
+## 7. Refactor findings
+
+No opportunistic source refactor is included. Fixed source choice, paired public
+publication, complete consumer routing, common export coordination, manual recovery
+and rollover are required delivery work assigned to S7–S11. They are not deferred
+optimization items. General reliability WS1 remains outside this scope unless S7
+proves a necessary dependency and obtains a bounded implementation decision.
+
+## 8. Validation and actual outcomes
+
+Validation results are recorded below after the final document checks. Runtime
+pytest, import smoke, command registration and predecessor rehearsals are skipped
+because this delta is Markdown-only and changes no executable behavior. The S7
+scenarios and S8–S11 steps are required future evidence, not executed tests.
+
+## 9. Security decision
+
+Bot: documented skip for this exact Markdown-only handoff delta against
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`; no runtime, permission, config,
+dependency, SQL/data-access, network or persistence behavior changes. SQL: separate
+no-change skip at `44afa315dd6cbfe9fec101f2a39a62e534f5b583`. No new security scan
+claimed. Future runtime/SQL slices require Changes reviews at separate exact
+targets with Deep off after routing; no standard/deep audit is authorized.
+
+Credentials, source workbooks, private player rows and temporary rehearsal files
+are not added to Git. Preserve local evidence outside Git. A local documentation
+privacy check is not a claim of a staged Gitleaks pass when nothing is staged.
+
+## 10. Deployment and rollback
+
+No Git commit/push/PR, production promotion, database/provider/Discord operation,
+restart, real import/export or source activation. The current work is left as a
+pending documentation delta for the next slice. Both original S6 rename sides must
+be included in its eventual separately approved promotion as well as its mirror PR.
+No disposable DB or remote workbook was modified or deleted.
+
+## 11. Follow-ups and approval
+
+Next: explicit approval of the prepared S7 documentation/read-only pack, then
+review its contract and exact manifests before implementation. Settled product
+decisions need no repetition. S8–S11 identifiers describe planned work, not standing
+permission. Preserve S6-OPS01/PERF01/CAP01 with measured acceptance and remaining
+operational components; do not close them merely because S6 documents merged.
+The public routing implementation, production parity/backup/audit evidence, exact
+G4 operations and G5 acceptance remain outstanding. No further general product
+question is needed to start S7; investigate technical details there.
+
+## Final local validation — 2026-09-12
+
+- Exact handoff manifest: 23 Git paths, 21 existing Markdown documents and both
+  deleted S6 source paths; index remains empty. No Python/SQL/config changes.
+- All 259 local Markdown links and 11 fragments resolve; no incoming link to either
+  removed S6 source path remains. S7 pack/starter navigation and allowed Create paths
+  are explicit; all nine decision IDs and sixteen new scenario IDs are present.
+- Prior recorded SHA/commit identities are retained. Both S6 archived bodies match
+  entry content apart from repaired link/manifest locations and the added archive
+  status. Both S5B archive documents remain byte-identical to entry.
+- Architecture validation passed (0 Python files). Deferred-item validation passed
+  (21 Markdown files); an initial vague-phrase rejection was corrected in the new
+  pack, then the validator passed. Security-routing passed with 0 errors/warnings.
+- Exact-path test selection passed; generic smoke-import and command-registration
+  recommendations are skipped for this documentation-only handoff. Runtime pytest,
+  log-noise/full-suite and provider/SQL rehearsals are not repeated. git diff --check
+  passed. No blanket pre-commit or staged-secrets pass is claimed; nothing is staged.
+- An independent Gitleaks directory check of the exact 21-document snapshot returned
+  exit 1 with 27 generic-api-key matches. Every match was inspected: a pre-existing
+  synthetic 64-hex export generation digest in key/export_key fields, not a credential.
+  The derivation is explicit in new_source_export_service.py:177–182. Zero confirmed
+  credential findings; raw scanner outcome is retained rather than labelled a clean
+  scan. No scanner policy/allowlist change or evidence-hash deletion was made.
+- Both repository branches/HEADs/remotes and local tracking refs remain as recorded
+  at entry; SQL is clean. No commit, push, PR, merge, fetch or live operation occurred.
+
+Local backup/validation directory:
+`C:/Users/cwatt/AppData/Local/Temp/k98-post-s6-docs-36_hgs76`.
+It contains original document snapshots, entry/manifest JSON, validation.json,
+selected-tests.txt, redacted privacy-report.json and privacy-classification.json.
+This is local evidence, not a committed artifact or durable external archive.
+
+
+<a id="s7-documentation-delivery-and-validation"></a>
+## S7 documentation delivery and validation
+
+S7 documentation/read-only approval was supplied by Chris Watts in the current task.
+The [contract and consumer matrix](integration_contract_and_consumer_matrix.md) and
+[exact implementation/test manifests and canonical delivery](integration_implementation_manifests.md)
+are delivered for review. The earlier S7-not-run/pending-approval statements describe
+the handoff entry, not this completed planning pass. No implementation is authorized.
+
+Both repositories remain on main at the supplied anchors: Bot
+`a2f148fa9bd4fb367fd46d0500a768c14fee915b`, SQL
+`44afa315dd6cbfe9fec101f2a39a62e534f5b583`; local production/main
+`a8c9c515066ca6ef079120b76dd160e3389badab`. Remotes and tracking refs are local
+observations, not a fresh fetch. Mirror #272 and production #579 merged evidence
+remains accepted; local deployment remains operator-attested, not production runtime
+deployment or fresh post-merge smoke.
+
+The eventual separately authorized slice PR must carry all 23 paths in section 2
+plus the two S7 Creates, including both deleted S6 sources and both archive destinations.
+No specific path is claimed already merged. Remote Files changed cannot be verified
+until a new PR is separately authorized; local 25-path union verification is recorded
+below. Do not omit pre-existing handoff work from the next slice.
+
+S7 uses the required architecture/SQL/command/test/security-routing skills and reviews
+the completed documentation with k98-pr-review. Bot security skip applies to the exact
+25-path Markdown delta against its entry SHA; SQL is a separate no-change skip. No scan
+was launched. Future Changes reviews require exact separate Bot/SQL targets, Deep off.
+No standard/deep scan or automatic new task.
+
+Local evidence/backup: `C:/Users/cwatt/AppData/Local/Temp/k98-s7-docs-9ib_g9cd`.
+It holds entry byte snapshots, exact path/hash inventory, implementation-manifest JSON
+and local validation results. It is not a committed artifact or external durable archive.
+
+Final S7 documentation validation:
+
+- Architecture boundary validator passed (zero changed Python files).
+- Deferred-item validator passed (23 existing Markdown files in the change set).
+- Codex Security routing validator passed with zero errors and warnings. Security review
+  is a documented documentation-only skip; no discovery scan was launched.
+- Exact-path test selection passed. Its generic smoke-import and registration suggestions
+  are skipped for this documentation-only scope; no runtime test pass is claimed.
+- Local inventory verified all 25 carry-forward Git paths, including both S6 archive move
+  sides and both S7 creates; 23 paths are existing documents and two are deletions. No
+  path is claimed already merged. Final PR Files changed verification remains mandatory
+  in the next separately authorized slice because this starter creates no PR.
+- All 283 local Markdown links and 16 fragments resolved. Incoming Markdown references
+  to the deleted S6 source paths were checked and none remain. Exact test references
+  resolve to existing files or explicitly proposed Create entries.
+- Six retained archive/evidence/index files are byte-identical to the entry snapshots.
+  The manifest contains 171 file/action entries across eleven proposed boundaries;
+  the consumer inventory contains 65 direct and 12 indirect entries and all 16 S7 tests.
+- `git diff --check` passed; Git emitted only CRLF-to-LF notices for the existing scenario
+  and implementation-plan files. Bot branch/HEAD/remotes and production tracking anchor
+  are unchanged, the index is empty, and SQL branch/HEAD/remotes remain unchanged and clean.
+
+No blocking documentation finding remains. This is ready for operator review of the
+contract, exact manifests and three evidenced design tradeoffs, not implementation or
+release approval. No runtime/SQL/config implementation, fresh smoke, provider operation,
+production deployment, Git publication or predecessor/successor execution occurred.
+
+
+## S7 approval and S8A preparation — 2026-09-12
+
+Chris Watts stated "contract and manifest approved" and then agreed to proceed with
+preparation of S8A's task pack/starter. This records S7 design acceptance, including the
+recommended technical direction; it does not grant S8A implementation, SQL execution or
+Git publication. No previously settled product decision is reopened.
+
+Created:
+
+- `docs/task_packs/Codex Task Pack - KVK Source Migration S8A SQL Foundation.md`
+- `docs/task_packs/Codex Chat Starter - KVK Source Migration S8A SQL Foundation.md`
+
+Updated status/navigation in README-DEV, reference/task-pack indexes, the programme,
+Phase 2 implementation plan, both S7 outputs and both retained S7 pack/starter files,
+plus this handoff. The approved contract's technical content and eight-file S8A SQL
+manifest are unchanged. No S7 archive move is introduced.
+
+The complete Bot carry-forward is now 27 paths: the exact 23 in section 2, the two S7
+outputs and the two S8A outputs above. Both S6 source deletions and both archive destinations
+remain included. The next separately authorized Bot PR must verify actual Files changed
+including previous_filename, or prove an omitted path already merged. SQL uses its separate
+eight-file manifest and separate PR; a SQL PR cannot absorb the Bot documentation. No path
+has been claimed merged by this preparation and no PR exists for this delta.
+
+Preparation rechecked Bot main/origin main a2f148fa9bd4fb367fd46d0500a768c14fee915b,
+production/main a8c9c515066ca6ef079120b76dd160e3389badab and SQL main/origin main
+44afa315dd6cbfe9fec101f2a39a62e534f5b583. Remotes match section 1. SQL remains clean;
+Bot index remains empty. All prior work and accepted S6 evidence are preserved.
+
+Security decision: documented skip for the exact 27-path Bot Markdown-only uncommitted
+patch against the verified Bot HEAD; SQL no-change skip at the verified SQL HEAD. No
+executable data-access/config/persistence surface changed. Future S8A requires its own
+exact SQL Changes review, Deep off, after routing; no discovery scan ran now.
+
+Preparation validation passed: architecture (zero changed Python files), deferred items
+(25 existing Markdown files), security routing (zero errors/warnings), exact-path selector
+and git diff --check. The 27-path union includes two deletions; all 313 local Markdown
+links and 16 fragments resolve. Six retained archive/evidence/index files remain
+byte-identical to the S7 entry snapshots. The S8A SQL file table matches the approved
+eight-file boundary. SQL is clean and the Bot index is empty; refs/remotes are unchanged.
+Git reports normal CRLF-to-LF notices only. Runtime pytest, smoke/registration, staged
+checks and SQL execution are skipped because preparation changes only Markdown and
+staging/operations are not authorized. No proposed S8A test pass is claimed.
+
+Completed documentation review found no blocking preparation issue. The pack is ready
+for separate file-implementation authorization; static preparation does not prove SQL
+compilation, concurrency, migration execution or release readiness. Validation inventory
+is retained locally alongside the S7 scratch evidence as
+`s8a-preparation-validation.json`; it is not a committed or external durable archive.

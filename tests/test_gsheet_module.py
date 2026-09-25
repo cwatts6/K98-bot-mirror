@@ -1,0 +1,483 @@
+"""
+Unit tests for gsheet_module.get_sheet_values and retry helpers.
+
+These tests monkeypatch internal builders so no network or credentials are required.
+"""
+
+import types
+
+from gspread.exceptions import SpreadsheetNotFound
+import pandas as pd
+import pytest
+
+import gsheet_module as gm
+
+
+def test_recorded_configuration_reads_never_load_credentials_or_local_http(monkeypatch):
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    import pytest
+
+    import proc_config_import as pci
+    from services.export_execution_protocol import ProviderRequest
+    from services.export_provider_adapter import ProviderAdapter, use_provider
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    forbidden = Mock(side_effect=AssertionError("local credential or HTTP fallback"))
+    monkeypatch.setattr(gm.Credentials, "from_service_account_file", forbidden)
+    monkeypatch.setattr(gm, "_build_sheets_with_timeout", forbidden)
+    monkeypatch.setattr(pci, "_safe_execute", forbidden)
+    execute = Mock(
+        return_value=dict(range="ProcConfig!A1:J", values=[["key", "value"], ["x", "  "]])
+    )
+    provider = ProviderAdapter(
+        budget=forbidden,
+        authorize=Mock(),
+        destinations=["config-aaa"],
+        execution=execute,
+        stream_id=str(uuid4()),
+    )
+    with use_provider(provider):
+        frame = pci._read_sheet_to_df(pci._get_sheet_service(), "config-aaa", "ProcConfig!A1:J")
+        assert list(frame.columns) == ["key", "value"] and pd.isna(frame.iloc[0, 1])
+        with pytest.raises(SnapshotUnavailable):
+            gm.get_gsheet_client("missing-credentials.json")
+        request = gm.get_sort_service("missing").spreadsheets().get(spreadsheetId="config-aaa")
+        with pytest.raises(RuntimeError, match="escaped"):
+            request.execute(num_retries=0)
+        assert gm.get_drive_service("missing").files().get(fileId="config-aaa").method == "GET"
+    typed = ProviderRequest.parse(execute.call_args.args[0])
+    assert typed.operation == "sheets.values.get" and typed.target == "config-aaa"
+    assert not typed.mutation and execute.call_count == 1
+    forbidden.assert_not_called()
+
+
+def test_recorded_configuration_unknown_response_has_no_alternate_read(monkeypatch):
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    import pytest
+
+    import proc_config_import as pci
+    from services.export_provider_adapter import (
+        ProviderAdapter,
+        ProviderOutcomeUnknown,
+        use_provider,
+    )
+
+    forbidden = Mock(side_effect=AssertionError("credential or alternate SDK retry"))
+    monkeypatch.setattr(gm.Credentials, "from_service_account_file", forbidden)
+    monkeypatch.setattr(pci, "_safe_execute", forbidden)
+    execute = Mock(side_effect=TimeoutError("unknown"))
+    provider = ProviderAdapter(
+        budget=forbidden,
+        authorize=Mock(),
+        destinations=["config-aaa"],
+        execution=execute,
+        stream_id=str(uuid4()),
+    )
+    with use_provider(provider), pytest.raises(ProviderOutcomeUnknown):
+        pci._read_sheet_to_df(pci._get_sheet_service(), "config-aaa", "ProcConfig!A1:J")
+    assert execute.call_count == 1 and provider.uncertain
+    forbidden.assert_not_called()
+
+
+def test_scan_entrypoint_enqueues_without_sql_or_provider(monkeypatch):
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime = Mock()
+    runtime.submit.return_value = "retained-job"
+    legacy = Mock(side_effect=AssertionError("uncoordinated path"))
+    monkeypatch.setattr(gm, "_render_run_all_exports", legacy)
+    with use_runtime(runtime):
+        ok, message = gm.run_all_exports(None, None, None, None)
+    assert ok is False and message.startswith("Queued export job retained-job")
+    runtime.submit.assert_called_once_with(consumer="scan_data", kvk_no=None)
+    legacy.assert_not_called()
+
+
+class _FakeCredentials:
+    @staticmethod
+    def from_service_account_file(*_args, **_kwargs):
+        return object()
+
+
+class _FakeSpreadsheet:
+    id = "fake-sheet-id"
+    url = "https://example.invalid/fake-sheet"
+
+    def worksheets(self):
+        return []
+
+
+class _FakeClient:
+    def open(self, _name):
+        return _FakeSpreadsheet()
+
+    def create(self, _name):
+        return _FakeSpreadsheet()
+
+    def open_by_key(self, _key):
+        return _FakeSpreadsheet()
+
+
+@pytest.mark.parametrize("coordinated", [False, True])
+def test_get_sheet_values_success(monkeypatch, coordinated):
+    """Should return the rows list when the Sheets client returns values."""
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", coordinated)
+
+    class FakeReq:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def execute(self, num_retries=0):
+            return self._payload
+
+    class FakeValues:
+        def get(self, **kwargs):
+            return FakeReq({"values": [["a", "b"], ["c", "d"]]})
+
+    class FakeSheetsService:
+        def spreadsheets(self):
+            return types.SimpleNamespace(values=lambda: FakeValues())
+
+    # monkeypatch the builder used by get_sheet_values
+    monkeypatch.setattr(
+        gm, "_build_sheets_with_timeout", lambda creds, timeout=None: FakeSheetsService()
+    )
+    monkeypatch.setattr(gm, "CREDENTIALS_FILE", "fake-creds.json")
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file",
+        _FakeCredentials.from_service_account_file,
+    )
+
+    rows = gm.get_sheet_values("FAKE_ID", "Sheet1!A1:B2", timeout=5)
+    assert isinstance(rows, list)
+    assert rows == [["a", "b"], ["c", "d"]]
+
+
+@pytest.mark.parametrize("scope", ["runtime", "provider"])
+def test_sheet_read_in_export_scope_cannot_fall_back_to_legacy_key(monkeypatch, scope):
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    from services.legacy_export_snapshot_service import SnapshotUnavailable, use_runtime
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(
+        gm,
+        "current_provider",
+        lambda: types.SimpleNamespace(execution=None) if scope == "provider" else None,
+    )
+    credentials = Mock(side_effect=AssertionError("legacy credential used"))
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file", credentials
+    )
+    with use_runtime(object()) if scope == "runtime" else nullcontext():
+        with pytest.raises(SnapshotUnavailable):
+            gm.get_sheet_values("export_config", "Config!A1:Z")
+    credentials.assert_not_called()
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_authority_sheet_read_never_falls_back_to_legacy_credentials(monkeypatch, failed):
+    from unittest.mock import Mock
+
+    import services.export_provider_adapter as adapter
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    provider = Mock(execution=object())
+    provider.execute.return_value = {"values": [["recorded"]]}
+    if failed:
+        provider.execute.side_effect = RuntimeError("unresolved read")
+    monkeypatch.setattr(gm, "current_provider", lambda: provider)
+    monkeypatch.setattr(adapter, "recorded_clients", lambda: (Mock(), Mock()))
+    credentials = Mock(side_effect=AssertionError("legacy credential used"))
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file", credentials
+    )
+    if failed:
+        with pytest.raises(RuntimeError, match="unresolved"):
+            gm.get_sheet_values("export_config", "Config!A1:Z")
+    else:
+        assert gm.get_sheet_values("export_config", "Config!A1:Z") == [["recorded"]]
+    credentials.assert_not_called()
+
+
+def test_get_sheet_values_empty_range(monkeypatch):
+    """Should return an empty list when the sheet range contains no values."""
+
+    class FakeReq:
+        def execute(self, num_retries=0):
+            return {"values": []}
+
+    class FakeValues:
+        def get(self, **kwargs):
+            return FakeReq()
+
+    class FakeSheetsService:
+        def spreadsheets(self):
+            return types.SimpleNamespace(values=lambda: FakeValues())
+
+    monkeypatch.setattr(
+        gm, "_build_sheets_with_timeout", lambda creds, timeout=None: FakeSheetsService()
+    )
+    monkeypatch.setattr(gm, "CREDENTIALS_FILE", "fake-creds.json")
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file",
+        _FakeCredentials.from_service_account_file,
+    )
+
+    rows = gm.get_sheet_values("FAKE_ID", "Sheet1!A1:A", timeout=2)
+    assert isinstance(rows, list)
+    assert rows == []
+
+
+def test_get_sheet_values_client_error_records_and_returns_none(monkeypatch):
+    """
+    If the sheets builder raises (e.g., missing credentials) or execute raises,
+    get_sheet_values should return None and call _record_sheets_error.
+    """
+    called = {}
+
+    def fake_record(kind, exc):
+        called["called"] = (kind, exc)
+
+    # Simulate builder raising
+    def raise_builder(creds, timeout=None):
+        raise RuntimeError("no client")
+
+    monkeypatch.setattr(gm, "_build_sheets_with_timeout", raise_builder)
+    monkeypatch.setattr(gm, "_record_sheets_error", fake_record)
+
+    res = gm.get_sheet_values("ID", "RANGE")
+    assert res is None
+    assert "called" in called
+    assert called["called"][0] in (
+        "fetch_values",
+        "credentials_unavailable",
+        "credentials_load_failed",
+        "credentials_missing",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tests for _is_retryable_gspread_details — SpreadsheetNotFound + 2xx logic
+# ---------------------------------------------------------------------------
+
+
+def test_is_retryable_spreadsheet_not_found_no_status_code():
+    """SpreadsheetNotFound with no HTTP status code (None) is a genuine missing-sheet
+    signal (e.g. first-time open→create flow) and must NOT be retried."""
+    details = {
+        "repr": "SpreadsheetNotFound: <Response [200]>",
+        "status_code": None,
+        "status": None,
+    }
+    assert gm._is_retryable_gspread_details(details) is False
+
+
+def test_is_retryable_spreadsheet_not_found_200():
+    """SpreadsheetNotFound with HTTP 200 is a Drive pagination miss → retryable."""
+    details = {
+        "repr": "SpreadsheetNotFound: some message",
+        "status_code": 200,
+        "status": None,
+    }
+    assert gm._is_retryable_gspread_details(details) is True
+
+
+def test_is_retryable_spreadsheet_not_found_404_not_retryable():
+    """SpreadsheetNotFound with HTTP 404 means the sheet genuinely doesn't exist → not retryable."""
+    details = {
+        "repr": "SpreadsheetNotFound",
+        "status_code": 404,
+        "status": None,
+    }
+    assert gm._is_retryable_gspread_details(details) is False
+
+
+def test_is_retryable_regular_200_not_retryable():
+    """A non-SpreadsheetNotFound error with HTTP 200 is not retryable."""
+    details = {
+        "repr": "SomeOtherError: something went wrong",
+        "status_code": 200,
+        "status": None,
+    }
+    assert gm._is_retryable_gspread_details(details) is False
+
+
+def test_is_retryable_server_error_500():
+    """HTTP 500 errors are always retryable."""
+    details = {"repr": "SomeError", "status_code": 500, "status": None}
+    assert gm._is_retryable_gspread_details(details) is True
+
+
+# ---------------------------------------------------------------------------
+# Tests for _retry_gspread_call — SpreadsheetNotFound retried correctly
+# ---------------------------------------------------------------------------
+
+
+def test_retry_gspread_call_retries_spreadsheet_not_found_2xx(monkeypatch):
+    """
+    _retry_gspread_call must retry SpreadsheetNotFound when the response status
+    is 2xx (Drive listing pagination miss), rather than giving up immediately.
+    """
+    call_count = {"n": 0}
+    slept = {"total": 0.0}
+
+    def fake_sleep(s):
+        slept["total"] += s
+
+    monkeypatch.setattr(gm.time, "sleep", fake_sleep)
+
+    # Build a fake SpreadsheetNotFound with a 200 response
+    exc = SpreadsheetNotFound()
+    fake_resp = types.SimpleNamespace(status_code=200)
+    exc.response = fake_resp
+
+    def flaky_fn():
+        call_count["n"] += 1
+        if call_count["n"] < 3:
+            raise exc
+        return "ok"
+
+    result = gm._retry_gspread_call(flaky_fn, retries=5)
+    assert result == "ok"
+    assert call_count["n"] == 3
+
+
+def test_retry_gspread_call_does_not_retry_spreadsheet_not_found_no_response(monkeypatch):
+    """
+    _retry_gspread_call must NOT retry SpreadsheetNotFound when there is no response
+    attached (status_code=None) — that signals a genuine missing sheet (e.g. the normal
+    open→create flow), not a Drive pagination miss.
+    """
+    import pytest
+
+    call_count = {"n": 0}
+
+    monkeypatch.setattr(gm.time, "sleep", lambda s: None)
+
+    exc = SpreadsheetNotFound()
+    # No response attribute set → status_code is None
+
+    def flaky_fn():
+        call_count["n"] += 1
+        raise exc
+
+    with pytest.raises(SpreadsheetNotFound):
+        gm._retry_gspread_call(flaky_fn, retries=5)
+
+    # Should give up after the very first attempt (not retried)
+    assert call_count["n"] == 1
+
+
+def test_create_additional_kvk_spreadsheets_accepts_named_export_sections(monkeypatch):
+    written_tabs = []
+
+    monkeypatch.setattr(gm, "_retry_gspread_call", lambda fn, **_kwargs: fn())
+    monkeypatch.setattr(
+        gm,
+        "_get_or_create_ws",
+        lambda _ss, title, cols=26: types.SimpleNamespace(title=title, id=1),
+    )
+    monkeypatch.setattr(
+        gm,
+        "export_dataframe_to_sheet",
+        lambda ws, _df, service=None, format_columns=None: written_tabs.append(ws.title),
+    )
+    monkeypatch.setattr(gm, "_sort_kvk_export_sheet", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(gm, "_reorder_sheet_tabs", lambda *_args, **_kwargs: None)
+
+    sections = {
+        "KVK_Scan_Log": pd.DataFrame({"KVK_NO": [1], "ScanID": [1]}),
+        "KVK_Windows": pd.DataFrame({"KVK_NO": [1], "WindowName": ["Pass 4"]}),
+        "KVK_DKP_Weights": pd.DataFrame({"KVK_NO": [1], "WeightT4X": [1]}),
+        "KVK_Player_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "governor_id": [123],
+                "name": ["Player"],
+                "kingdom": [98],
+                "campid": [1],
+                "kp_gain": [10],
+                "acclaim_gain": [3],
+                "dkp": [1.0],
+            }
+        ),
+        "KVK_Kingdom_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "kingdom": [98],
+                "campid": [1],
+                "camp_name": ["A"],
+                "kp_gain": [10],
+                "dkp": [1.0],
+            }
+        ),
+        "KVK_Camp_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "campid": [1],
+                "camp_name": ["A"],
+                "kp_gain": [10],
+                "dkp": [1.0],
+            }
+        ),
+    }
+
+    result = gm.create_additional_kvk_spreadsheets(sections, _FakeClient(), object(), 1)
+
+    assert result["KVK_PASS4_ALL_PLAYER_OUTPUT"]["created"] is True
+    assert "PASS4_PLAYER" in written_tabs
+    assert "KVK_Scan_Log" in written_tabs
+
+
+@pytest.mark.parametrize("name", ["get_gsheet_client", "get_sort_service", "get_drive_service"])
+def test_s11_provider_getters_cannot_fall_back_to_copied_legacy_key(monkeypatch, name):
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(gm, "current_provider", lambda: None)
+    with pytest.raises(SnapshotUnavailable):
+        getattr(gm, name)("not-a-real-credential.json")
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_s11_health_uses_one_owned_authority_request_without_credential_fallback(
+    monkeypatch, failed
+):
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    import services.export_provider_adapter as provider
+    import services.legacy_export_snapshot_service as legacy
+
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: object())
+    monkeypatch.setattr(legacy, "configuration_requests", lambda: nullcontext())
+    sheets = Mock()
+    adapter = Mock()
+    if failed:
+        adapter.execute.side_effect = RuntimeError("unknown response")
+    monkeypatch.setattr(provider, "recorded_clients", lambda: (sheets, object()))
+    monkeypatch.setattr(gm, "current_provider", lambda: adapter)
+    fallback = Mock(side_effect=AssertionError("legacy key used"))
+    monkeypatch.setattr(gm, "get_gsheet_client", fallback)
+    # Test the health operation inside its already-owned boundary; separate
+    # runtime tests cover the decorator's admission and cancellation behavior.
+    ok, message = gm.check_basic_gsheets_access.__wrapped__("unused", "registered-config")
+    assert ok is not failed
+    assert ("unresolved" if failed else "authority") in message
+    sheets.spreadsheets().get.assert_called_once_with(
+        spreadsheetId="registered-config", fields="spreadsheetId"
+    )
+    adapter.execute.assert_called_once()
+    fallback.assert_not_called()
