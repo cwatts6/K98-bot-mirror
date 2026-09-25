@@ -1,5 +1,81 @@
 # KVK Source Migration S6 release evidence log
 
+## Separate Bot and SQL PR handoff authorized — 2026-09-25
+
+The operator authorized publishing the mirror repair with all pending/untracked Bot documents,
+and a separate SQL closeout documentation PR for parallel review. This explicitly supersedes
+the prior SQL-document deferral for `docs/SQL_DELIVERY_LOG.md` and `migrations/README.md`.
+No runtime/configuration byte changed after the completed repair review; this continuation
+updates only Markdown publication status and approval scope. The existing Changes review is
+reused for exact reviewed source; additional Markdown status edits have a documented skip.
+SQL remains Markdown-only, so SQL execution and a new SQL Changes scan are skipped.
+
+Merged S11 implementation remains mirror #281, production #588 and SQL #89. The new PRs are
+follow-up repair/closeout delivery, not production deployment or acceptance. Next: **G4 plan
+development only**, then only specifically approved controlled operations, then operator G5.
+The validation receipt below is historical local evidence; its earlier pending-publication and
+SQL grouping statements describe the decision before this explicit authorization.
+
+## Mirror repair and G4/G5 handoff validation — 2026-09-25
+
+The approved local follow-up on `codex/s11-mirror-g4-handoff` restores five exact production
+source/test blobs and narrows publication exceptions to their exact root-relative paths.
+The current [closeout](s11_closeout_and_g4_handoff.md) and new task pack/starter replace the
+old initial-S11 entrypoint. No commit, PR, production policy update or publisher run is claimed.
+
+Guarded focused validation: **196 passed / 1 skipped**, with external network/SQL blocked,
+live fixture flags disabled and operational log bytes/sizes/mtimes unchanged. The skipped case
+requires real rsync, unavailable locally; the new Linux workflow requires it and remains unrun.
+Architecture, deferred items, security routing, test selection, command registration and import
+smoke all passed. Restored source/tests pass Black and Ruff unchanged. The test selector suggests
+full pytest because tests were restored/added; a fresh full run is skipped because those runtime
+bytes exactly equal reviewed production, with focused restoration/import tests covering this
+repair. Earlier full-suite evidence remains historical. No native/SQL/provider execution occurred.
+
+All 96 added local links resolve; every existing amended Bot document body is preserved. Exact
+merged identities, both S10E previous_filename/source/destination proofs and the single trailing-
+blank-line exception are in `s11_merged_delivery_manifest.json`. SQL's two additive closeouts stay
+pending separately for the next real authorized SQL implementation PR, with a documentation-only
+security skip. No retained data or recovered evidence changed.
+
+Bot Changes scan **61ed6784-ae3d-4d5e-aba1-ecc24685151c**, Deep off, completed and was read back:
+**complete scoped source coverage, zero candidates/findings**. Base/head:
+`511c129602e144a198dc29e9c396196d90d30df9`; frozen snapshot
+`codex-security-snapshot/v1:sha256:bc9a2b4b0f62ebc324c438aec61c5d92d72aefda954eeda557e169e662068b89`.
+The inventory's three source-like paths were supplemented by all 38 changed/new files, including
+filter, tests, documents and identity manifest. Independent review read all eight source/config/
+test files and directly supporting publication/authority paths. Preflight ready; no config edits.
+
+Retained report:
+`C:/Users/cwatt/.codex/state/plugins/codex-security/scans/discord_file_downloader/511c129602e144a198dc29e9c396196d90d30df9_20260925T101657Z_h7pg52cq/report.md`.
+Tool-reported aggregate rollout usage: **3,342,048 tokens**, including **3,115,136 cached input**,
+across three threads. This is aggregate rollout attribution, not isolated scan analysis cost.
+
+This receipt/readiness update follows sealing and is documentation-only. The new policy test also
+received only whitespace/expression wrapping after sealing, with AST equality proved; its SHA-256
+changed from `fe2d2cecda90aa50367a5e26d3f682eb309a9c09f368254ab679e2e2f452ced3` to
+`59328d73e7818c024c4313a4a159dc364f9b6785c7168cae519fc9ab461ed5cf`.
+That nonfunctional delta has a precise security skip; the sealed snapshot is not relabelled as
+including later bytes. `.publishignore`, workflow and all restored runtime/test bytes are unchanged.
+Final delivery hashes and format evidence remain under `.codex_artifacts/s11-authority-composition/`.
+Final Black in-process and Ruff checks passed; the formatted policy test again passed its portable
+check with only rsync skipped. A stalled Black CLI process was stopped by verified process identity;
+no Bot process was touched. Final security routing and whitespace checks passed in both repos.
+Live G4 proof and G5 acceptance remain open.
+
+## Current delivery and next phase — 2026-09-25
+
+S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the
+[source closeout and exact manifest](s11_closeout_and_g4_handoff.md) for delivered behavior, review
+corrections, source pins and the mirror publication repair follow-up. Production deployment,
+SQL installation, provider behavior and G5 acceptance are not established by these merges.
+
+Next: **G4 plan development only**, using the [new task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md) and
+[chat starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md). Controlled rollout executes only specifically approved
+operations; G5 remains operator-owned. Earlier dated checkpoints below retain their original
+scope/status as historical evidence, including headings used by existing links. They do not
+reopen implementation or authorize live operations. Preserve S6/S8 gates, uncertainties and data.
+
 ## S11 final local review receipt — 2026-09-25
 
 Sealed-readback qualification: canonical coverage.completeness is **partial** because an

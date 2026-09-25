@@ -1,4 +1,41 @@
 # KVK Source Migration S6 release readiness and rollback
+
+## Current next step: deliver repair, then plan G4 — 2026-09-25
+
+S11 mirror #281, SQL #89 and production #588 are already merged. The prior publication proposals
+below are historical. The approved local mirror publication repair and current handoff documents
+are ready for review together on `codex/s11-mirror-g4-handoff`; see the
+[validation receipt](release_evidence_log.md#mirror-repair-and-g4g5-handoff-validation--2026-09-25).
+The operator has now authorized separate Bot-mirror repair/handoff and SQL closeout PRs for
+parallel review. No merge or production publisher run is implied. Before merging the repair,
+require the new Linux Mirror Publication Policy check: real rsync is unavailable on this host.
+
+Any authorized delivery must include the complete pending Bot union, including the new task
+pack/starter, closeout and identity manifest. Production patch promotion must omit the five
+already-present identical source/test additions and retain the filter/test/workflow/docs delta.
+Verify exact filenames/blobs and production publisher synchronization; never mix histories.
+The operator's latest instruction explicitly authorizes the two SQL closeout documents in their
+own SQL PR now, superseding the earlier deferral for these entries. No SQL runtime delta is added.
+
+Use the new G4 pack to develop exact targets, commands, prerequisites, evidence, rollback and
+approval checkpoints. No operation is executable while target/identity/source/approval fields
+are unresolved. Controlled rollout executes only named approved packet operations. Operator G5
+acceptance and activation are separate decisions after evidence review. No source or security
+review result closes SQL/native/provider/deployment gates or retained S6/S8 uncertainties.
+
+## Current delivery and next phase — 2026-09-25
+
+S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the
+[source closeout and exact manifest](s11_closeout_and_g4_handoff.md) for delivered behavior, review
+corrections, source pins and the mirror publication repair follow-up. Production deployment,
+SQL installation, provider behavior and G5 acceptance are not established by these merges.
+
+Next: **G4 plan development only**, using the [new task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md) and
+[chat starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md). Controlled rollout executes only specifically approved
+operations; G5 remains operator-owned. Earlier dated checkpoints below retain their original
+scope/status as historical evidence, including headings used by existing links. They do not
+reopen implementation or authorize live operations. Preserve S6/S8 gates, uncertainties and data.
+
 ## S11 local work complete; publication decision — 2026-09-25
 
 Report qualification: the sealed Bot coverage flag retains an obsolete pending-review row.

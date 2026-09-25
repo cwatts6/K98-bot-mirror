@@ -1,5 +1,18 @@
 # KVK Source Migration — post-S6 closeout and S7 handoff
 
+## Current delivery and next phase — 2026-09-25
+
+S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the
+[source closeout and exact manifest](s11_closeout_and_g4_handoff.md) for delivered behavior, review
+corrections, source pins and the mirror publication repair follow-up. Production deployment,
+SQL installation, provider behavior and G5 acceptance are not established by these merges.
+
+Next: **G4 plan development only**, using the [new task pack](../../task_packs/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md) and
+[chat starter](../../task_packs/Codex%20Chat%20Starter%20-%20KVK%20Source%20Migration%20S11%20G4%20Release%20Planning%20Controlled%20Rollout%20and%20G5%20Acceptance.md). Controlled rollout executes only specifically approved
+operations; G5 remains operator-owned. Earlier dated checkpoints below retain their original
+scope/status as historical evidence, including headings used by existing links. They do not
+reopen implementation or authorize live operations. Preserve S6/S8 gates, uncertainties and data.
+
 ## S11 local implementation and next approval — 2026-09-25
 
 The approved single-host/fresh-authority-identity composition is now locally implemented and

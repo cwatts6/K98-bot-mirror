@@ -1,0 +1,30 @@
+name: Mirror Publication Policy
+
+on:
+  pull_request:
+    paths:
+      - ".publishignore"
+      - ".github/workflows/mirror-publish-policy.yml"
+      - "tests/test_mirror_publish_policy.py"
+      - "scripts/run_export_authority.py"
+      - "services/export_execution_authority.py"
+      - "tests/test_export_authority_boundaries.py"
+      - "tests/test_export_authority_launcher.py"
+      - "tests/test_export_execution_authority.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publication-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Require rsync
+        run: rsync --version
+      - name: Test publication filters using inert files
+        run: python -m unittest discover -s tests -p test_mirror_publish_policy.py -v
