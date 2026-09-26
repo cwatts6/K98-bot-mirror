@@ -1,0 +1,1147 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+import json
+
+import pytest
+
+from voting import survey_dal
+from voting.service import VoteValidationError
+from voting.survey_models import (
+    SurveyCreateRequest,
+    SurveyQuestionCreateRequest,
+    SurveyRatingLabel,
+    SurveyResponsePayload,
+)
+
+
+@pytest.mark.asyncio
+async def test_get_survey_snapshot_skips_rating_queries_when_rating_table_missing(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    executed_queries: list[str] = []
+
+    async def fake_run_one_async(sql, params=None):
+        if "OBJECT_ID" in sql:
+            return {"ObjectId": None}
+        return {
+            "SurveyID": 42,
+            "GuildID": 1,
+            "ChannelID": 2,
+            "MessageID": 3,
+            "CreatedByDiscordUserID": 4,
+            "Title": "Planning",
+            "Description": None,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "LaunchMentionEveryone": 0,
+            "ReminderMentionEveryone": 0,
+            "CloseMentionEveryone": 0,
+            "OpensAtUtc": None,
+            "ClosesAtUtc": now,
+            "ClosedAtUtc": None,
+            "ClosedByDiscordUserID": None,
+            "ClosedReason": None,
+            "TotalResponses": 0,
+            "CreatedAtUtc": now,
+            "UpdatedAtUtc": now,
+            "ResultVisibility": "PublicLive",
+        }
+
+    async def fake_run_query_async(sql, params=None):
+        executed_queries.append(sql)
+        assert "SurveyRatingAnswers" not in sql
+        if "FROM dbo.SurveyQuestions q" in sql:
+            return [
+                {
+                    "SurveyQuestionID": 10,
+                    "SurveyID": 42,
+                    "QuestionKey": "q1",
+                    "Prompt": "Pick one",
+                    "QuestionType": "SingleChoice",
+                    "SortOrder": 1,
+                    "IsRequired": 1,
+                    "MinSelections": 1,
+                    "MaxSelections": 1,
+                    "AllowDetails": 0,
+                    "AnsweredResponseCount": 0,
+                    "AverageRating": None,
+                    "MinimumRating": None,
+                    "MaximumRating": None,
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    snapshot = await survey_dal.get_survey_snapshot(42)
+
+    assert snapshot is not None
+    assert snapshot.questions[0].rating_counts == ()
+    assert executed_queries
+
+
+def test_snapshot_rows_include_rating_scale_metadata_and_labels():
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    snapshot = survey_dal._snapshot_from_rows(
+        {
+            "SurveyID": 42,
+            "GuildID": 1,
+            "ChannelID": 2,
+            "MessageID": 3,
+            "CreatedByDiscordUserID": 4,
+            "Title": "Planning",
+            "Description": None,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "LaunchMentionEveryone": 0,
+            "ReminderMentionEveryone": 0,
+            "CloseMentionEveryone": 0,
+            "OpensAtUtc": None,
+            "ClosesAtUtc": now,
+            "ClosedAtUtc": None,
+            "ClosedByDiscordUserID": None,
+            "ClosedReason": None,
+            "TotalResponses": 2,
+            "CreatedAtUtc": now,
+            "UpdatedAtUtc": now,
+            "ResultVisibility": "PublicLive",
+        },
+        [
+            {
+                "SurveyQuestionID": 10,
+                "SurveyID": 42,
+                "QuestionKey": "q1",
+                "Prompt": "Rate readiness",
+                "QuestionType": "Rating",
+                "SortOrder": 1,
+                "IsRequired": 1,
+                "MinSelections": 0,
+                "MaxSelections": 0,
+                "AllowDetails": 0,
+                "AnsweredResponseCount": 2,
+                "AverageRating": 6.5,
+                "MinimumRating": 3,
+                "MaximumRating": 10,
+                "RatingMinValue": 1,
+                "RatingMaxValue": 10,
+                "RatingLowLabel": "Poor",
+                "RatingHighLabel": "Excellent",
+            }
+        ],
+        [],
+        [
+            {"SurveyQuestionID": 10, "RatingValue": 3, "ResponseCount": 1},
+            {"SurveyQuestionID": 10, "RatingValue": 10, "ResponseCount": 1},
+        ],
+        [],
+        [
+            {"SurveyQuestionID": 10, "RatingValue": 1, "Label": "Poor"},
+            {"SurveyQuestionID": 10, "RatingValue": 10, "Label": "Excellent"},
+        ],
+    )
+
+    question = snapshot.questions[0]
+    assert question.rating_min_value == 1
+    assert question.rating_max_value == 10
+    assert question.rating_low_label == "Poor"
+    assert question.rating_high_label == "Excellent"
+    assert question.rating_labels == (
+        SurveyRatingLabel(1, "Poor"),
+        SurveyRatingLabel(10, "Excellent"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_submit_survey_response_missing_rating_table_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": None}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 4, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RATING_MIGRATION_ID):
+        await survey_dal.submit_survey_response(
+            survey_id=42,
+            discord_user_id=123,
+            answers_by_question_id={},
+            rating_answers_by_question_id={10: 5},
+            now_utc=now,
+        )
+
+
+@pytest.mark.asyncio
+async def test_submit_survey_response_missing_ranking_table_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": None}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 4, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RANKING_MIGRATION_ID):
+        await survey_dal.submit_survey_response(
+            survey_id=42,
+            discord_user_id=123,
+            answers_by_question_id={},
+            ranking_answers_by_question_id={10: (101, 102)},
+            now_utc=now,
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_survey_missing_ranking_table_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+    def fake_fetch_one_dict(cur):
+        assert "OBJECT_ID" in cur.last_sql
+        return {"ObjectId": None}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    req = SurveyCreateRequest(
+        guild_id=1,
+        channel_id=2,
+        created_by_discord_user_id=3,
+        title="Planning",
+        description=None,
+        questions=(
+            SurveyQuestionCreateRequest(
+                prompt="Rank priorities",
+                question_type="Ranking",
+                options=("A", "B"),
+                min_selections=2,
+                max_selections=2,
+            ),
+            SurveyQuestionCreateRequest(
+                prompt="Pick one",
+                question_type="SingleChoice",
+                options=("Yes", "No"),
+            ),
+        ),
+        closes_at_utc=now,
+        reminder_offsets_minutes=(),
+    )
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RANKING_MIGRATION_ID):
+        await survey_dal.create_survey(req)
+
+
+@pytest.mark.asyncio
+async def test_create_survey_missing_rating_scale_metadata_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        executed: list[str]
+        last_sql = ""
+
+        def __init__(self):
+            self.executed = []
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            self.executed.append(sql)
+
+    cursor = FakeCursor()
+
+    def fake_fetch_one_dict(cur):
+        assert "RatingMinValue" in cur.last_sql
+        return {"RatingMinValueColumn": None, "LabelsObjectId": None}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(cursor)
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    req = SurveyCreateRequest(
+        guild_id=1,
+        channel_id=2,
+        created_by_discord_user_id=3,
+        title="Planning",
+        description=None,
+        questions=(
+            SurveyQuestionCreateRequest(
+                prompt="Rate readiness",
+                question_type="Rating",
+                options=(),
+                min_selections=0,
+                max_selections=0,
+                rating_min_value=1,
+                rating_max_value=10,
+            ),
+            SurveyQuestionCreateRequest(
+                prompt="Pick one",
+                question_type="SingleChoice",
+                options=("Yes", "No"),
+            ),
+        ),
+        closes_at_utc=now,
+        reminder_offsets_minutes=(),
+    )
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RATING_SCALE_MIGRATION_ID):
+        await survey_dal.create_survey(req)
+    assert not any("INSERT INTO dbo.SurveyPosts" in sql for sql in cursor.executed)
+
+
+@pytest.mark.asyncio
+async def test_save_survey_response_draft_detects_stale_revision(monkeypatch):
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            if "SELECT TOP (1) ResponseID" in self.last_sql:
+                return None
+            if "SELECT Revision" in self.last_sql:
+                return (2,)
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 6, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        payload=SurveyResponsePayload({10: (101,)}, {}, {}),
+        expected_revision=1,
+        now_utc=now,
+    )
+
+    assert result.status == "stale"
+    assert result.revision == 2
+    assert "newer draft" in result.message
+
+
+@pytest.mark.asyncio
+async def test_save_survey_response_draft_clears_expired_draft_before_insert(monkeypatch):
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+    executed_sql: list[str] = []
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            executed_sql.append(sql)
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 6, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        payload=SurveyResponsePayload({10: (101,)}, {}, {}),
+        expected_revision=0,
+        now_utc=now,
+    )
+
+    assert result.status == "saved"
+    cleanup_index = next(
+        index for index, sql in enumerate(executed_sql) if "ExpiresAtUtc <= SYSUTCDATETIME" in sql
+    )
+    insert_index = next(
+        index
+        for index, sql in enumerate(executed_sql)
+        if "INSERT INTO dbo.SurveyResponseDrafts" in sql
+    )
+    assert cleanup_index < insert_index
+
+
+@pytest.mark.asyncio
+async def test_save_survey_response_draft_updates_only_active_row(monkeypatch):
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+    executed_sql: list[str] = []
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            executed_sql.append(sql)
+
+        def fetchone(self):
+            if "SELECT TOP (1) ResponseID" in self.last_sql:
+                return None
+            if "SELECT Revision" in self.last_sql:
+                return (2,)
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 6, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        payload=SurveyResponsePayload({10: (101,)}, {}, {}),
+        expected_revision=2,
+        now_utc=now,
+    )
+
+    update_sql = next(sql for sql in executed_sql if "UPDATE dbo.SurveyResponseDrafts" in sql)
+    assert result.status == "saved"
+    assert result.revision == 3
+    assert "AND Status = 'Active'" in update_sql
+
+
+@pytest.mark.asyncio
+async def test_discard_survey_response_draft_allows_missing_initial_draft(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return None
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.discard_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        expected_revision=0,
+    )
+
+    assert result.status == "discarded"
+
+
+def test_survey_draft_payload_json_round_trip_preserves_answer_types():
+    payload = SurveyResponsePayload(
+        selected_option_ids={10: (101,)},
+        text_answers={11: "free text"},
+        detail_text_by_option={(10, 101): "detail"},
+        rating_answers={12: 5},
+        ranking_answers={13: (201, 0, 203)},
+    )
+
+    round_tripped = survey_dal._payload_from_json_value(
+        json.dumps(survey_dal._payload_to_json_dict(payload))
+    )
+
+    assert round_tripped == payload
+
+
+def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
+    now = datetime(2026, 7, 3, 12, 0, tzinfo=UTC)
+    rows = [
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps(
+                {
+                    "choices": {"10": [101, 102]},
+                    "text": {"11": "old text"},
+                    "details": {"10": {"101": "old detail"}},
+                }
+            ),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Choice?",
+            "QuestionType": "SingleChoice",
+            "IsRequired": 0,
+            "SurveyOptionID": 101,
+            "OptionKey": "opt1",
+            "Label": "A",
+            "AnswerText": None,
+            "DetailText": "new detail",
+        },
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps(
+                {
+                    "choices": {"10": [101, 102]},
+                    "text": {"11": "old text"},
+                    "details": {"10": {"101": "old detail"}},
+                }
+            ),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Choice?",
+            "QuestionType": "MultiSelect",
+            "IsRequired": 0,
+            "SurveyOptionID": 102,
+            "OptionKey": "opt2",
+            "Label": "B",
+            "AnswerText": None,
+            "DetailText": None,
+        },
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps(
+                {
+                    "choices": {"10": [101]},
+                    "text": {"11": "old text"},
+                    "details": {"10": {"101": "old detail"}},
+                }
+            ),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 11,
+            "QuestionKey": "q2",
+            "Prompt": "Explain?",
+            "QuestionType": "Text",
+            "IsRequired": 1,
+            "SurveyOptionID": None,
+            "OptionKey": None,
+            "Label": None,
+            "AnswerText": "new text",
+            "DetailText": None,
+        },
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert audit_rows[0].selected_option_ids == (101, 102)
+    assert audit_rows[0].is_required is False
+    assert audit_rows[0].selected_option_detail_notes == ("101:new detail", "102:")
+    assert audit_rows[0].original_selected_option_detail_notes == ("101:old detail", "102:")
+    assert audit_rows[1].text_answer == "new text"
+    assert audit_rows[1].is_required is True
+    assert audit_rows[1].original_text_answer == "old text"
+
+
+@pytest.mark.asyncio
+async def test_reporting_question_rows_require_reporting_views(monkeypatch):
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": None, "OptionViewObjectId": None}
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_REPORTING_MIGRATION_ID):
+        await survey_dal.list_reporting_question_rows(42)
+
+
+@pytest.mark.asyncio
+async def test_reporting_rows_read_sql_reporting_views(monkeypatch):
+    captured: list[str] = []
+
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": 1, "OptionViewObjectId": 2}
+
+    async def fake_run_query_async(sql, params=None):
+        captured.append(sql)
+        assert params == (42, 42)
+        if "v_SurveyReportingQuestionSummary" in sql:
+            return [
+                {
+                    "SurveyID": 42,
+                    "Title": "Planning",
+                    "Status": "Closed",
+                    "ResultVisibility": "HiddenUntilClose",
+                    "SurveyQuestionID": 10,
+                    "QuestionKey": "q1",
+                    "Prompt": "Rate?",
+                    "QuestionType": "Rating",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 0,
+                    "MinSelections": 0,
+                    "MaxSelections": 0,
+                    "AllowDetails": 0,
+                    "TotalResponses": 3,
+                    "OptionCount": 0,
+                    "AnsweredResponses": 2,
+                    "SkippedResponses": 1,
+                    "ChoiceSelectionCount": 0,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": 4.5,
+                    "MinimumRating": 4,
+                    "MaximumRating": 5,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 1,
+                    "Rating5Count": 1,
+                }
+            ]
+        return [
+            {
+                "SurveyID": 42,
+                "Title": "Planning",
+                "Status": "Closed",
+                "ResultVisibility": "HiddenUntilClose",
+                "SurveyQuestionID": 11,
+                "QuestionKey": "q2",
+                "Prompt": "Rank?",
+                "QuestionType": "Ranking",
+                "QuestionSortOrder": 2,
+                "IsRequired": 1,
+                "SurveyOptionID": 101,
+                "OptionKey": "opt1",
+                "OptionLabel": "A",
+                "OptionSortOrder": 1,
+                "TotalResponses": 3,
+                "SelectionCount": 0,
+                "IsTopSelection": 0,
+                "RankedCount": 2,
+                "AverageRank": 1.5,
+                "Rank1Count": 1,
+                "Rank2Count": 1,
+                "Rank3Count": 0,
+                "Rank4Count": 0,
+                "Rank5Count": 0,
+                "Rank6Count": 0,
+            }
+        ]
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    question_rows = await survey_dal.list_reporting_question_rows(42)
+    option_rows = await survey_dal.list_reporting_option_rows(42)
+
+    assert question_rows[0].question_type == "Rating"
+    assert question_rows[0].is_required is False
+    assert question_rows[0].average_rating == 4.5
+    assert option_rows[0].question_type == "Ranking"
+    assert option_rows[0].average_rank == 1.5
+    assert option_rows[0].rank1_count == 1
+    assert any("dbo.v_SurveyReportingQuestionSummary" in sql for sql in captured)
+    assert any("dbo.v_SurveyReportingOptionSummary" in sql for sql in captured)
+
+
+@pytest.mark.asyncio
+async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
+    captured: list[tuple[str, tuple[int, ...]]] = []
+
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": 1, "OptionViewObjectId": 2}
+
+    async def fake_run_query_async(sql, params=None):
+        captured.append((sql, params))
+        assert params == (43, 42, 43, 42)
+        assert "IN (?, ?)" in sql
+        assert "CASE SurveyID WHEN ? THEN 0 WHEN ? THEN 1 ELSE 2 END ASC" in sql
+        if "v_SurveyReportingQuestionSummary" in sql:
+            return [
+                {
+                    "SurveyID": 43,
+                    "Title": "Planning 2",
+                    "Status": "Closed",
+                    "ResultVisibility": "PublicLive",
+                    "SurveyQuestionID": 12,
+                    "QuestionKey": "q1",
+                    "Prompt": "Pick?",
+                    "QuestionType": "SingleChoice",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 1,
+                    "MinSelections": 1,
+                    "MaxSelections": 1,
+                    "AllowDetails": 1,
+                    "TotalResponses": 4,
+                    "OptionCount": 2,
+                    "AnsweredResponses": 4,
+                    "SkippedResponses": 0,
+                    "ChoiceSelectionCount": 4,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": None,
+                    "MinimumRating": None,
+                    "MaximumRating": None,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 0,
+                    "Rating5Count": 0,
+                },
+                {
+                    "SurveyID": 42,
+                    "Title": "Planning",
+                    "Status": "Closed",
+                    "ResultVisibility": "HiddenUntilClose",
+                    "SurveyQuestionID": 10,
+                    "QuestionKey": "q1",
+                    "Prompt": "Rate?",
+                    "QuestionType": "Rating",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 0,
+                    "MinSelections": 0,
+                    "MaxSelections": 0,
+                    "AllowDetails": 0,
+                    "TotalResponses": 3,
+                    "OptionCount": 0,
+                    "AnsweredResponses": 2,
+                    "SkippedResponses": 1,
+                    "ChoiceSelectionCount": 0,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": 4.5,
+                    "MinimumRating": 4,
+                    "MaximumRating": 5,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 1,
+                    "Rating5Count": 1,
+                },
+            ]
+        return [
+            {
+                "SurveyID": 43,
+                "Title": "Planning 2",
+                "Status": "Closed",
+                "ResultVisibility": "PublicLive",
+                "SurveyQuestionID": 12,
+                "QuestionKey": "q1",
+                "Prompt": "Pick?",
+                "QuestionType": "SingleChoice",
+                "QuestionSortOrder": 1,
+                "IsRequired": 1,
+                "SurveyOptionID": 201,
+                "OptionKey": "opt1",
+                "OptionLabel": "A",
+                "OptionSortOrder": 1,
+                "TotalResponses": 4,
+                "SelectionCount": 3,
+                "IsTopSelection": 1,
+                "RankedCount": 0,
+                "AverageRank": None,
+                "Rank1Count": 0,
+                "Rank2Count": 0,
+                "Rank3Count": 0,
+                "Rank4Count": 0,
+                "Rank5Count": 0,
+                "Rank6Count": 0,
+            }
+        ]
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    question_rows = await survey_dal.list_reporting_question_rows_for_surveys((43, 43, 42))
+    option_rows = await survey_dal.list_reporting_option_rows_for_surveys((43, 43, 42))
+
+    assert [row.survey_id for row in question_rows] == [43, 42]
+    assert option_rows[0].survey_id == 43
+    assert len(captured) == 2
+
+
+@pytest.mark.asyncio
+async def test_update_survey_post_blocks_response_sensitive_fields_after_responses(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 1}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(FakeCursor()))
+
+    result = await survey_dal.update_survey_post(
+        survey_id=42,
+        actor_discord_user_id=123,
+        allow_response_change=False,
+    )
+
+    assert result == "has_responses"
+
+
+@pytest.mark.asyncio
+async def test_update_survey_post_rebuilds_pending_reminders_for_close_change(monkeypatch):
+    close_at = datetime.now(UTC) + timedelta(hours=3)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def __init__(self) -> None:
+            self.executed: list[tuple[str, tuple[object, ...]]] = []
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            self.executed.append((sql, tuple(params)))
+
+        def fetchone(self):
+            return None
+
+        def fetchall(self):
+            return [(60,), (30,)]
+
+    cursor = FakeCursor()
+
+    def fake_fetch_one_dict(cur):
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 0}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(cursor))
+
+    result = await survey_dal.update_survey_post(
+        survey_id=42,
+        actor_discord_user_id=123,
+        closes_at_utc=close_at,
+    )
+
+    assert result == "updated"
+    assert any("SELECT OffsetMinutesBeforeClose" in sql for sql, _params in cursor.executed)
+    assert any("DELETE FROM dbo.SurveyReminders" in sql for sql, _params in cursor.executed)
+    reminder_inserts = [
+        params for sql, params in cursor.executed if "INSERT INTO dbo.SurveyReminders" in sql
+    ]
+    assert [params[1] for params in reminder_inserts] == [60, 30]
+    assert [params[2] for params in reminder_inserts] == [
+        survey_dal._naive_utc(close_at - timedelta(minutes=60)),
+        survey_dal._naive_utc(close_at - timedelta(minutes=30)),
+    ]
+    audit_params = next(
+        params for sql, params in cursor.executed if "INSERT INTO dbo.SurveyAudit" in sql
+    )
+    assert json.loads(str(audit_params[2]))["reminders"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_survey_option_emoji_blocks_after_responses(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "COL_LENGTH" in cur.last_sql:
+            return {"EmojiKindColumn": 1}
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 1}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_option_emoji_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(FakeCursor()))
+
+    with pytest.raises(ValueError, match="after responses exist"):
+        await survey_dal.update_survey_option_emoji(
+            survey_id=42,
+            option_id=101,
+            emoji=None,
+            actor_discord_user_id=123,
+        )
+
+
+def test_answer_audit_rows_include_rating_values_and_original_metadata():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = [
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps({"ratings": {"10": 2}}),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Rate readiness",
+            "QuestionType": "Rating",
+            "IsRequired": 1,
+            "SurveyOptionID": None,
+            "OptionKey": None,
+            "Label": None,
+            "AnswerText": None,
+            "DetailText": None,
+            "RatingValue": 5,
+        }
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert audit_rows[0].question_type == "Rating"
+    assert audit_rows[0].rating_value == 5
+    assert audit_rows[0].original_rating_value == 2
+    assert audit_rows[0].selected_option_ids == ()
+
+
+def test_answer_audit_rows_expand_ranking_values_and_original_metadata():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    base = {
+        "SurveyID": 42,
+        "Title": "Planning",
+        "ClosedAtUtc": now,
+        "ResponseID": 9,
+        "DiscordUserID": 123,
+        "OriginalAnswersJson": json.dumps({"rankings": {"10": [102, 101]}}),
+        "ResponseCreatedAtUtc": now,
+        "ResponseUpdatedAtUtc": now,
+        "SurveyQuestionID": 10,
+        "QuestionKey": "q1",
+        "Prompt": "Rank priorities",
+        "QuestionType": "Ranking",
+        "IsRequired": 1,
+        "SurveyOptionID": None,
+        "OptionKey": None,
+        "Label": None,
+        "AnswerText": None,
+        "DetailText": None,
+        "RatingValue": None,
+    }
+    rows = [
+        {
+            **base,
+            "RankingOptionID": 101,
+            "RankingOptionKey": "opt1",
+            "RankingOptionLabel": "A",
+            "RankingRankValue": 1,
+        },
+        {
+            **base,
+            "RankingOptionID": 102,
+            "RankingOptionKey": "opt2",
+            "RankingOptionLabel": "B",
+            "RankingRankValue": 2,
+        },
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert len(audit_rows) == 2
+    assert audit_rows[0].question_type == "Ranking"
+    assert audit_rows[0].ranking_option_id == 101
+    assert audit_rows[0].ranking_rank_value == 1
+    assert audit_rows[0].original_ranking_rank_value == 2
+    assert audit_rows[1].ranking_option_id == 102
+    assert audit_rows[1].ranking_rank_value == 2
+    assert audit_rows[1].original_ranking_rank_value == 1
+
+
+def test_answer_audit_rows_preserve_original_ranking_when_current_is_cleared():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = [
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps({"rankings": {"10": [102, 101]}}),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Rank priorities",
+            "QuestionType": "Ranking",
+            "IsRequired": 0,
+            "SurveyOptionID": None,
+            "OptionKey": None,
+            "Label": None,
+            "AnswerText": None,
+            "DetailText": None,
+            "RatingValue": None,
+            "RankingOptionID": None,
+            "RankingOptionKey": None,
+            "RankingOptionLabel": None,
+            "RankingRankValue": None,
+        }
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert len(audit_rows) == 2
+    assert audit_rows[0].question_type == "Ranking"
+    assert audit_rows[0].ranking_option_id == 102
+    assert audit_rows[0].ranking_rank_value is None
+    assert audit_rows[0].original_ranking_rank_value == 1
+    assert audit_rows[1].ranking_option_id == 101
+    assert audit_rows[1].ranking_rank_value is None
+    assert audit_rows[1].original_ranking_rank_value == 2
