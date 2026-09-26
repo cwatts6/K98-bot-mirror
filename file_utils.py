@@ -2235,7 +2235,14 @@ async def run_maintenance_with_isolation(
                     meta=meta,
                     timeout=timeout,
                 )
-                ok = bool(res)
+                ok = (
+                    isinstance(res, (tuple, list))
+                    and len(res) == 2
+                    and type(res[0]) is bool
+                    and isinstance(res[1], dict)
+                    and res[0] is True
+                    and res[1].get("success") is not False
+                )
                 emit_telemetry_event(
                     {
                         "event": "maintenance_run.complete",
@@ -2245,7 +2252,12 @@ async def run_maintenance_with_isolation(
                         "meta": meta,
                     }
                 )
-                return ok, "proc_import thread completed" if ok else "proc_import returned failure"
+                return ok, (
+                    "proc_import thread completed"
+                    if ok
+                    else "proc_import failed or returned an invalid outcome; "
+                    "inspect durable state before retrying"
+                )
             except Exception as exc:
                 emit_telemetry_event(
                     {
