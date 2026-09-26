@@ -2,6 +2,7 @@ import os
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 import proc_config_import as pci
 
@@ -12,10 +13,20 @@ class FakeCursor:
         self.executed = []
         self.executed_autocommit = []
         self.closed = False
+        self.pending = 0
+        self.drain_error = False
 
     def execute(self, sql, *args, **kwargs):
         self.executed.append(sql)
         self.executed_autocommit.append(self.connection.autocommit)
+        if "sp_TARGETS_MASTER" in sql:
+            self.pending = 3
+
+    def nextset(self):
+        if self.drain_error:
+            raise RuntimeError("late procedure failure")
+        self.pending = max(0, self.pending - 1)
+        return bool(self.pending)
 
     def fetchall(self):
         return []
@@ -34,6 +45,18 @@ class FakeConn:
 
     def cursor(self):
         return self._cursor
+
+    @property
+    def autocommit(self):
+        return self._autocommit
+
+    @autocommit.setter
+    def autocommit(self, value):
+        if hasattr(self, "_cursor") and self._cursor.pending:
+            raise RuntimeError("Connection is busy with results for another command")
+        if hasattr(self, "_cursor") and getattr(self, "cleanup_error", False) and not value:
+            raise RuntimeError("connection cleanup failed")
+        self._autocommit = value
 
     def commit(self):
         self.committed = True
@@ -55,7 +78,8 @@ def _patch_import_credentials(monkeypatch, tmp_path):
     monkeypatch.setattr(pci, "CREDENTIALS_FILE", str(creds))
 
 
-def test_transactional_success(monkeypatch, tmp_path):
+@pytest.mark.parametrize("failure", [None, "drain", "cleanup"])
+def test_transactional_success(monkeypatch, tmp_path, failure):
     # Prepare environment and monkeypatches
     monkeypatch.setattr(pci, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
@@ -72,6 +96,8 @@ def test_transactional_success(monkeypatch, tmp_path):
 
     # Provide fake connection
     fake_conn = FakeConn()
+    fake_conn._cursor.drain_error = failure == "drain"
+    fake_conn.cleanup_error = failure == "cleanup"
     monkeypatch.setattr(pci, "_get_import_connection_with_retry", lambda: fake_conn)
 
     # Mock preflight and log_backup_context
@@ -91,6 +117,18 @@ def test_transactional_success(monkeypatch, tmp_path):
 
     # Run import
     success, report = pci.run_proc_config_import(dry_run=False)
+    if failure:
+        assert success is False
+        assert report["success"] is False
+        assert report["targets_master_outcome"] == (
+            "uncertain" if failure == "drain" else "completed"
+        )
+        assert report["targets_master_executed"] is (failure == "cleanup")
+        assert any("inspect durable state" in error for error in report["errors"])
+        assert fake_conn.committed and fake_conn.closed and fake_conn._cursor.closed
+        assert len([sql for sql in fake_conn._cursor.executed if "sp_TARGETS_MASTER" in sql]) == 1
+        assert report["config_import_committed"] is True
+        return
     assert success is True
     assert report["tables"]["dbo.ProcConfig_Staging"]["status"] == "ok"
     assert report["tables"]["dbo.ProcConfig_Staging_upsert"]["status"] == "ok"

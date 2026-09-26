@@ -984,6 +984,7 @@ def run_proc_config_import(
                 # Commit transaction
                 try:
                     conn.commit()
+                    report["config_import_committed"] = True
                 except Exception:
                     logger.exception("Commit failed after transactional writes")
                     raise
@@ -1023,6 +1024,7 @@ def run_proc_config_import(
                 # Ensure final commit for upsert (write_df_to_staging_and_upsert leaves commit control to caller)
                 try:
                     conn.commit()
+                    report["config_import_committed"] = True
                 except Exception:
                     logger.exception("Commit failed after non-transactional upsert")
                     raise
@@ -1115,6 +1117,9 @@ def run_proc_config_import(
 
         # Post-transaction stored proc
         previous_autocommit = conn.autocommit
+        report["partial_commits"] = committed_tables.copy()
+        report["targets_master_executed"] = False
+        report["targets_master_outcome"] = "uncertain"
         try:
             # sp_TARGETS_MASTER owns its internal publication transactions and
             # deliberately rejects ambient caller transactions. With pyodbc,
@@ -1137,12 +1142,22 @@ def run_proc_config_import(
                 report["targets_master_mode"] = "full"
                 report["targets_master_kvk"] = None
 
+            # Advance through every result before changing connection attributes.
+            # nextset discards unread rows without materializing them and surfaces
+            # late SQL errors. execute() returning is not completion evidence.
+            while cursor.nextset():
+                pass
             report["targets_master_executed"] = True
-        except Exception:
-            logger.exception("sp_TARGETS_MASTER execution failed")
-            report["errors"].append("sp_TARGETS_MASTER execution failed")
-        finally:
+            report["targets_master_outcome"] = "completed"
             conn.autocommit = previous_autocommit
+        except Exception:
+            logger.exception("sp_TARGETS_MASTER completion or connection cleanup failed")
+            report["errors"].append(
+                "sp_TARGETS_MASTER completion or connection cleanup failed; "
+                "inspect durable state before retrying"
+            )
+            # On a drain failure do not restore autocommit on a busy connection.
+            # The outer finally closes it; no second execution or blind retry.
 
         report["duration_sec"] = time.time() - report["start_time"]
         success = len(report.get("errors", [])) == 0

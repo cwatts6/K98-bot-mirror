@@ -284,6 +284,23 @@ def do_proc_import():
                 return 3
         else:
             res = fn()
+        valid_result = (
+            isinstance(res, (tuple, list))
+            and len(res) == 2
+            and type(res[0]) is bool
+            and isinstance(res[1], dict)
+        )
+        if not valid_result or res[0] is not True or res[1].get("success") is False:
+            logger.error("proc_config_import failed or returned an invalid outcome; no retry")
+            emit_telemetry_event({"event": "proc_import_worker", "status": "failed"})
+            _print_result_json(
+                "proc_import",
+                "failed",
+                returncode=3,
+                details="Import outcome failed or unavailable; inspect durable state before retrying",
+                result=res if valid_result else None,
+            )
+            return 3
         logger.info("proc_config_import completed successfully")
         emit_telemetry_event({"event": "proc_import_worker", "status": "success"})
         _print_result_json("proc_import", "success", returncode=0, result=res)
@@ -384,7 +401,7 @@ def _sanitize_for_logging(obj: Any, *, max_collection_items: int = 8) -> str:
                 try:
                     _, path = obj.split(":", 1)
                     bn = os.path.basename(path)
-                    return f"{obj.split(':',1)[0]}:{bn}"
+                    return f"{obj.split(':', 1)[0]}:{bn}"
                 except Exception:
                     return obj.split(":", 1)[0] + ":<path>"
             if len(obj) > 200:
