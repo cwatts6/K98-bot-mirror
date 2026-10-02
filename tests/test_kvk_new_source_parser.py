@@ -67,7 +67,7 @@ def test_calculation_chain_references_do_not_change_observation():
                 "xl/calcChain.xml",
                 '<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
                 '<c r="Z20" i="1"/><c r="A2"/><c r="A2" i="2"/>'
-                '</calcChain>',
+                "</calcChain>",
             )
         content = output.getvalue()
     assert player(content).digest == player(original).digest

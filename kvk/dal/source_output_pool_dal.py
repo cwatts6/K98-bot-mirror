@@ -1526,12 +1526,10 @@ class SourceOutputPoolDAL:
             # Resource owner tokens remain byte-for-byte intact. No independent release.
 
     def complete(self, claim, *, _owned_values=None):
-        with (
-            self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
-                cursor,
-                pool,
-                op,
-            )
+        with self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
+            cursor,
+            pool,
+            op,
         ):
             self._execution_gate(cursor, claim.account)
             progress = json.loads(op["ProgressJson"])

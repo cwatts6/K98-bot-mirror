@@ -1,6 +1,6 @@
 # S11 accepted local review and approved production inventory — 2026-10-02
 
-**Current stage: local implementation review accepted and CLOSED; bounded production inventory and staged rollout preparation APPROVED.** Production installation, publication, deployment/restart, enrollment/export writes and G5/activation have not been approved by this decision. Actual inventory results are not yet available.
+**Current stage: local implementation review accepted and CLOSED; bounded production inventory and staged rollout preparation APPROVED.** Production installation, deployment/restart, enrollment/export writes and G5/activation have not been approved by this decision. Actual inventory results are not yet available.
 
 Chris's decision in the originating chat:
 
@@ -33,15 +33,13 @@ Report installation/source differences before drafting missing-only install comm
 
 No production no-write period is needed merely for this read-only inventory. An actual future effectful run needs the minimal version 5 operator confirmation of no outstanding conflicting work/holding the other machine's triggers until completion or reconciliation. Do not turn it back into the rejected remote-shutdown requirement.
 
-## Repository synchronization and PR recommendation
+## Published PRs and next-stage boundary
 
-Both repositories retain substantial uncommitted/untracked accepted work. Entry preservation captured184 Bot and 18 SQL pending paths. Bot HEAD `2046ecdbd983450ab5098ec2a0caebfda91e41ab`; SQL HEAD `4cd1554dc3d063e323f22350c88df1444cd0ed4b`. These are local comparison anchors; no fetch/live remote freshness or publication was performed for this documentation handoff.
+Chris subsequently authorized ready-for-review Bot and SQL PRs, review/fixes and this exact-state handover, with both PRs left unmerged. [Bot #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) now preserve the complete implementation/document unions. Follow the [PR review checkpoint](s11_g4_pr_review_checkpoint_20261002.md) for checks, findings and source-pin qualifications. This supersedes the earlier draft recommendation and publication approval question; do not recreate PRs or repeat that question.
 
-**Recommend separate draft PRs now**, once the complete manifests and ordinary pre-PR checks are ready: one accepted Bot implementation/document union to `K98-bot-mirror`, and one SQL implementation/migration/document union to `K98-bot-SQL-Server`. They preserve a reviewable repository checkpoint and can be updated with inventory findings. Inventory does not depend on publication. A draft PR alone does not synchronize main, deploy production or make the running hotfix match local files.
+Bases were refreshed before publication: Bot `2046ecdbd983450ab5098ec2a0caebfda91e41ab`; SQL `4cd1554dc3d063e323f22350c88df1444cd0ed4b`. Initial publication preserved 187 Bot and 18 SQL paths individually. Later review fixes and documentation are additive, retained in the PR histories. Compare exact paths/content and final remote heads using the separate publication evidence; do not reset/clean/stash/main pull.
 
-The user asked whether to publish; this is a recommendation, **not PR/push authorization**. Prepare exact manifests/titles/bodies first and ask only for the concrete publication decision when ready. No docs-only PR: retain all earlier mandatory pending/recovered carry-forward paths and archive identities; compare path/content individually. Do not indiscriminately stage private artifacts, logs, credentials or evidence with machine-specific secrets. Bot and SQL histories stay separate. Final pre-publication remote refresh must preserve pending work; no reset/clean/stash/main pull.
-
-Merge/promotion/deployment remain later decisions. Promotion uses a patch based on the private production history, never a direct push of mirror history. Production is the last observed isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`, not production/main. Do not use a PR as justification to pull main onto it. Current full-suite/security qualifications remain explicit; refresh only checks required by actual later changes/publication gates.
+Merge/promotion/deployment remain later decisions. Promotion uses a patch based on private production history, never a direct push of mirror history. Production is the last observed isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`, not production/main. No production runtime observation or change occurred during PR publication. The SQL runner now rejects default batch mode and superseded IDs before SQL; explicit target selection does not replace installation-order or target-approval checks.
 
 ## Documentation and stage ownership
 

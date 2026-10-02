@@ -1,6 +1,6 @@
 # S11 G4 production inventory — copyable chat starter
 
-Continue S11 with **bounded production inventory and staged rollout preparation**. Chris has explicitly **accepted and closed the local implementation review** and **approved this next stage**. Carry that approval forward; do not ask again. Publication/PR/push/merge, production installation, deployment/restart, enrollment/export writes and G5/activation remain separate decisions.
+Continue S11 with **bounded production inventory and staged rollout preparation**. Chris has explicitly **accepted and closed the local implementation review** and **approved this next stage**. Carry that approval forward; do not ask again. Merge/promotion, production installation, deployment/restart, enrollment/export writes and G5/activation remain separate decisions.
 
 Read first:
 
@@ -22,6 +22,6 @@ Preserve DB22 `S11_G4_Recovery_20260928_97337` ONLINE/RESTRICTED_USER/read-only/
 
 Deliver current production source/config/installed-state comparison, minimum source-backed staged SQL/deployment/enrollment/coordinated-validation/rollback proposal, exact commands/budgets/hashes where factual bindings exist, and explicit unresolved inputs otherwise. Never derive expected metadata from unreviewed runtime or install all 540 source objects. Future process identities and restricted SQL permissions cannot be fabricated from administrator access or tests.
 
-Prepare separate complete draft Bot-mirror/SQL publication manifests: recommended now to checkpoint accepted source, but **publication is not authorized by this starter**. Inventory proceeds independently. No standalone docs PR, mirror-history push to production, reset/clean/stash, main pull onto the hotfix or automatic new task. Finish authorized inventory/preparation before presenting the next concrete publication/mutation decisions.
+Existing ready-for-review [Bot PR #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL PR #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) must remain unmerged. Read the [PR checkpoint](../reference/kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md) and separate publication evidence for exact final heads/review state. Do not recreate PRs, reset/clean/stash, push mirror history into production, pull main onto the hotfix or start another task automatically. Complete the approved inventory/preparation, then present concrete rollout/merge decisions.
 
 [Full handoff](../reference/kvk_source_migration/s11_g4_production_inventory_handoff_20261002.md) · [Task pack](S11%20G4%20Production%20Inventory%20and%20Staged%20Rollout%20-%20Task%20Pack%20-%2020261002.md)

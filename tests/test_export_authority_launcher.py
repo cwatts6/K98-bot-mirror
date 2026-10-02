@@ -27,9 +27,9 @@ def authority_launch(monkeypatch, tmp_path):
     import scripts.enroll_export_output_pool as enrollment
     import scripts.run_export_authority as launcher
     import services.export_coordination_dal as coordination
-    import services.export_manual_enrollment as enrollment_service
     import services.export_execution_authority as execution
     import services.export_execution_dal as persistence
+    import services.export_manual_enrollment as enrollment_service
     import services.export_reconciliation_service as reconciliation
     import services.export_runtime_composition as runtime
 
@@ -185,7 +185,8 @@ def test_post_open_initialization_failure_closes_empty_session(
 
 
 @pytest.mark.parametrize(
-    "launcher,stage", [("authority", "TrustedProofIssuer"), ("enrollment", "ManualOutputEnrollment")]
+    "launcher,stage",
+    [("authority", "TrustedProofIssuer"), ("enrollment", "ManualOutputEnrollment")],
 )
 @pytest.mark.parametrize("drain_error", [False, True])
 def test_startup_failure_retains_session_when_drain_is_unproven(

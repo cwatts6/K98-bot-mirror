@@ -4,7 +4,7 @@
 
 Chris accepted and closed the local implementation review and approved **bounded production inventory and staged rollout preparation** on 2026-10-02. Read the [current handoff](../reference/kvk_source_migration/s11_g4_production_inventory_handoff_20261002.md) first. Carry that approval forward without another general approval cycle.
 
-Complete the authorized read-only inventory and prepare the next concrete publication/install/deployment decisions. No Git publication, installation, enrollment/export writes, Bot restart/deployment, feature activation or G5 acceptance follows from this approval. This task pack is a local handover document; it does not create another app task automatically.
+Complete the authorized read-only inventory and prepare the next concrete merge/install/deployment decisions. No installation, enrollment/export writes, Bot restart/deployment, feature activation or G5 acceptance follows from this approval. This task pack is a local handover document; it does not create another app task automatically.
 
 ## Required reading
 
@@ -57,11 +57,11 @@ Prepare distinct later operations for SQL installation/permissions, source publi
 
 Keep admission closed. Before installation rollback means no change. Afterwards settle exact owned work and preserve uncertainty before considering a compatible fallback. Do not restore over retained databases, clear outputs or reenable an old writer whose compatibility is unproved. A reviewed forward correction may be required.
 
-## D. Prepare the publication checkpoint
+## D. Preserve the existing publication checkpoint
 
-Recommend separate draft Bot-mirror and SQL PRs now to preserve accepted implementation, with later inventory findings added as needed. Prepare complete repository-specific manifests, titles, bodies and verification plan. Inventory does not depend on publication. No publication is authorized merely by this recommendation; ask for the concrete push/PR decision only after its package is reviewable.
+[Bot PR #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL PR #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) were explicitly authorized as ready for review and must remain unmerged. Follow the [PR review checkpoint](../reference/kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md) and final publication evidence. Reconcile their exact heads, reviews and path/content manifests; do not create duplicates or reinterpret publication as rollout approval. Inventory proceeds independently. The new SQL fail-closed selection guard requires exact migration selection and rejects superseded IDs; it does not establish production prerequisites.
 
-No docs-only PR. Carry all pending implementation, mandatory recovered documents and archive identities; verify actual paths/content rather than counts. Exclude credentials/private artifacts deliberately. Do not stage indiscriminately, mix histories or push mirror history into production. Later production promotion uses the documented patch-based flow; deployment only from approved private production main, never a blind main pull onto the hotfix.
+Carry all implementation/recovered documents and archive identities forward. Exclude credentials/private artifacts deliberately. Do not mix histories or push mirror history into production. Later promotion uses the documented patch-based flow and a separate merge/deployment decision.
 
 ## Evidence, protections and exit criteria
 
@@ -71,4 +71,4 @@ Preserve DB22 `S11_G4_Recovery_20260928_97337` ONLINE/RESTRICTED_USER/read-only/
 
 Preserve uncertain publications `e19c89ac-7977-5f28-ae4c-031807cd1728` and `54a2480a-26fb-5bad-a3f5-9321525a731c`. September 12 measured S6 results were already accepted; remaining capacity/retention/uncertainty handling and S8/G5 operational gates stay open. Memory investigation/withdrawn helper remain deferred; empty KVK report and view-rehydration warning remain separate.
 
-Final local tests: 644 passed, one skipped. Bot Changes scan `25f11c9d-3ca6-40f2-9280-e3f4b61e7d09`: 21/21, no findings, Deep off. Preserve historical broad-suite and SQL complete/partial review qualifications. Later runtime changes need scoped test/security routing; documentation-only changes justify a skip. No routine Codebase/Deep audit or predecessor rerun.
+Accepted focused tests: 644 passed, one skipped; subsequent full offline suite: 6,124 passed, 65 skipped, 8 subtests passed (see PR checkpoint for later formatting/review qualification). Bot Changes scan `25f11c9d-3ca6-40f2-9280-e3f4b61e7d09`: 21/21, no findings, Deep off. Preserve historical broad-suite and SQL complete/partial review qualifications. Later runtime changes need scoped test/security routing; documentation-only changes justify a skip. No routine Codebase/Deep audit or predecessor rerun.

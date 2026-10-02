@@ -395,9 +395,9 @@ def deliver_coordinated_export(
                 "repair_id": job.get("RepairID"),
                 "retain": transport._retained.get(generation.key, True),
                 "tables": manifest,
-                "staging_audience": "public_viewer"
-                if transport.preserve_public_staging
-                else "private",
+                "staging_audience": (
+                    "public_viewer" if transport.preserve_public_staging else "private"
+                ),
             },
             parts,
         )
