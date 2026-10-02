@@ -19,7 +19,13 @@ SQL publication fixes: cross-repository links now point to the Bot PR; migration
 
 The 540-object source list now has canonical digest `73c23c1391471e829c6a835be0f7371239e11d9880071c079fbfdb3c157c1555` and raw SHA256 `343e1fa220b639bd620ccb8bb789d9c3e8f183bd49bdb6020d788d606f95d3bd`; all 540 referenced SQL files were checked individually. The pin change follows the reference-snapshot header correction; table shape and installation migration are unchanged. A further 370 Bot installation/source-contract tests passed with unchanged operational logs. Existing runtime approval/config files and old seals were not rewritten; future target packets must bind the new source digest.
 
-Final hosted review/check results are being reconciled before the handoff is sealed. Do not interpret a COMMENTED review or empty reviewDecision as human approval. Final publication heads and API readbacks are retained outside Git in the publication evidence to avoid self-referential hashes.
+## Completed PR review state
+
+Reviewed source heads: Bot `84282961d1348f57055159a5207f898f40f2c82c`; SQL `9d9f3defe2388efb6f26667cf7e6c455f74d57cf`. Bot publication-policy CI and both SQL hosted CI runs passed. Bot's initial hosted Codex review completed without inline findings and Copilot reported no findings; subsequent formatting and source-pin changes have the local checks and separate Changes review above. SQL's final hosted Codex review completed at 2026-10-02T13:46:55Z with no major issues. All four SQL review discussions are addressed and resolved. No remaining blocking source-review finding is known.
+
+Both PRs are OPEN, non-draft/ready for review, unmerged, with automatic merge disabled. There is no human GitHub approval claim: COMMENTED reviews and empty reviewDecision are not approval. The Bot follow-up after the source head above records only this completed review state. Final publication heads, checks, review-thread readbacks and individual filename/status/blob verification are retained in the separate publication evidence, avoiding a self-referential document hash. Final scopes are 188 Bot paths and 22 SQL paths; every originally pending path remains included. Both local working trees and remote branch heads must match in the final readback.
+
+The complete PR ranges passed secret scanning. Both earlier sealed packages (295 and 248 members) were rechecked individually unchanged. Full G4/G5 and operational S6/S8 acceptance remain open; none of these PR or CI results authorizes production execution. No SQL installation, provider action, runtime observation, deployment or restart occurred during publication/review.
 
 ## Next chat
 
