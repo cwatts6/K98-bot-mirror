@@ -13,8 +13,25 @@ from services.export_execution_protocol import encode
 from tests.test_export_single_account import shared_deployment
 
 
-def fixture(tmp_path):
+def fixture(tmp_path, monkeypatch=None):
     m, records, reads = shared_deployment(tmp_path)
+    if monkeypatch is not None:
+        # Bind a synthetic Windows custody path even on the Linux CI runner.
+        # Only its file read maps to the temporary fixture; runtime validation is intact.
+        import core.export_execution_host as host
+
+        physical_key = Path(m["credentials_file"])
+        logical_key = r"C:\fixture\development-key.json"
+        m["credentials_file"] = logical_key
+        m["deployment_boundary"]["paths"]["credentials_file"] = logical_key
+        for record in records.values():
+            for observation in record["observations"]:
+                for field in ("custody_path", "path"):
+                    if observation.get(field) == str(physical_key):
+                        observation[field] = logical_key
+        monkeypatch.setattr(
+            host, "Path", lambda path: physical_key if path == logical_key else Path(path)
+        )
     b = m["deployment_boundary"]
     b["version"] = 4
     b["identity"].pop("previous_service_account_email")
@@ -90,8 +107,10 @@ def seal(m, records):
         ref["sha256"] = hashlib.sha256(raw).hexdigest()
 
 
-def test_both_custody_identities_required_without_fabricated_exited_processes(tmp_path):
-    m, records, reads = fixture(tmp_path)
+def test_both_custody_identities_required_without_fabricated_exited_processes(
+    tmp_path, monkeypatch
+):
+    m, records, reads = fixture(tmp_path, monkeypatch)
     seal(m, records)
     boundary = DeploymentBoundary(m, **reads)
     assert boundary.recheck() == boundary.fingerprint
@@ -123,8 +142,8 @@ def test_both_custody_identities_required_without_fabricated_exited_processes(tm
         "unclosed_sql",
     ],
 )
-def test_two_host_contract_fails_closed(tmp_path, damage):
-    m, r, reads = fixture(tmp_path)
+def test_two_host_contract_fails_closed(tmp_path, monkeypatch, damage):
+    m, r, reads = fixture(tmp_path, monkeypatch)
     b = m["deployment_boundary"]
     c = b["key_custody"]
     w = r["writer_drain"]["observations"][1]

@@ -217,35 +217,38 @@ def _public_manual_permissions(value, acl):
                 raise SourceConflict("Explicit link-only Viewer access required.")
         elif "allowFileDiscovery" in permission:
             raise SourceConflict("Unexpected discovery flag on user permission.")
-        details = permission.get("permissionDetails")
-        if not isinstance(details, list) or not 1 <= len(details) <= 4:
-            raise SourceConflict("Direct permission details required.")
-        seen, direct = set(), 0
-        for detail in details:
-            if (
-                not isinstance(detail, dict)
-                or set(detail) != {"permissionType", "role", "inherited"}
-                or detail["permissionType"] != "file"
-                or not isinstance(detail["role"], str)
-                or type(detail["inherited"]) is not bool
-            ):
-                raise SourceConflict("Malformed or unscoped permission details.")
-            entry = (detail["role"], detail["inherited"])
-            if entry in seen:
-                raise SourceConflict("Duplicate permission details.")
-            seen.add(entry)
-            if not detail["inherited"]:
-                if detail["role"] != identity[2]:
-                    raise SourceConflict("Direct role differs from permission.")
-                direct += 1
-            elif identity != ("user", value["owner_email"], "owner") or detail["role"] not in {
-                "reader",
-                "commenter",
-                "writer",
-            }:
-                raise SourceConflict("Only subordinate same-owner inheritance is allowed.")
-        if direct != 1:
-            raise SourceConflict("Exactly one matching direct grant required.")
+        # Drive omits these output-only details for My Drive files. The exact
+        # top-level ACL remains mandatory; supplied details must still be safe.
+        if "permissionDetails" in permission:
+            details = permission.get("permissionDetails")
+            if not isinstance(details, list) or not 1 <= len(details) <= 4:
+                raise SourceConflict("Direct permission details required.")
+            seen, direct = set(), 0
+            for detail in details:
+                if (
+                    not isinstance(detail, dict)
+                    or set(detail) != {"permissionType", "role", "inherited"}
+                    or detail["permissionType"] != "file"
+                    or not isinstance(detail["role"], str)
+                    or type(detail["inherited"]) is not bool
+                ):
+                    raise SourceConflict("Malformed or unscoped permission details.")
+                entry = (detail["role"], detail["inherited"])
+                if entry in seen:
+                    raise SourceConflict("Duplicate permission details.")
+                seen.add(entry)
+                if not detail["inherited"]:
+                    if detail["role"] != identity[2]:
+                        raise SourceConflict("Direct role differs from permission.")
+                    direct += 1
+                elif identity != ("user", value["owner_email"], "owner") or detail["role"] not in {
+                    "reader",
+                    "commenter",
+                    "writer",
+                }:
+                    raise SourceConflict("Only subordinate same-owner inheritance is allowed.")
+            if direct != 1:
+                raise SourceConflict("Exactly one matching direct grant required.")
         ids.add(permission_id)
         observed.add(identity)
     if observed != expected:

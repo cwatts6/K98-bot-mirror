@@ -528,6 +528,7 @@ def _prepare_configured_runtime():
             verify_legacy_installation_contract(
                 legacy_installation_snapshot(cursor, config["legacy_sql_contract"]["source"]),
                 config["legacy_sql_contract"],
+                profile=config["sql_contract"]["profile"],
             )
             verify_application_installation_contract(
                 application_installation_snapshot(cursor), config["application_sql_contract"]
@@ -1219,7 +1220,7 @@ def validate_legacy_installation_contract(approved):
         raise SourceConflict("Exact independently approved certificates/signature hashes required.")
 
 
-def verify_legacy_installation_contract(observed, approved):
+def verify_legacy_installation_contract(observed, approved, *, profile="reader"):
     """Check source bodies, exact signing privileges and this producer's SQL token."""
     from services.export_execution_dal import (
         LEGACY_PERMISSION_MIGRATION,
@@ -1228,6 +1229,8 @@ def verify_legacy_installation_contract(observed, approved):
     )
 
     validate_legacy_installation_contract(approved)
+    if not isinstance(profile, str) or profile not in {"reader", "application"}:
+        raise SourceConflict("Exact reader or shared application SQL profile required.")
     source = approved["source"]
     queries = legacy_permission_queries(source)
     if (
@@ -1251,8 +1254,8 @@ def verify_legacy_installation_contract(observed, approved):
         DatabaseOwner=0,
         ViewDefinition=1,
         EntryRole=1,
-        ReaderRole=1,
-        AuthorityRole=0,
+        ReaderRole=int(profile == "reader"),
+        AuthorityRole=int(profile == "application"),
     )
     if observed["target"] != [expected_target] or any(
         type(observed["target"][0][k]) is not int

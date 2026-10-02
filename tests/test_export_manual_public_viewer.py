@@ -54,7 +54,7 @@ def test_public_policy_accepts_direct_grants_and_same_owner_inheritance():
         "discoverable",
         "discovery_missing",
         "editor_inherited",
-        "editor_details_missing",
+        "editor_details_null",
         "owner_direct_missing",
         "owner_wrong",
         "owner_inherited_owner",
@@ -106,8 +106,8 @@ def test_public_policy_rejects_unsafe_or_incomplete_readback(damage):
         del public["allowFileDiscovery"]
     elif damage == "editor_inherited":
         detail["inherited"] = True
-    elif damage == "editor_details_missing":
-        del editor["permissionDetails"]
+    elif damage == "editor_details_null":
+        editor["permissionDetails"] = None
     elif damage == "owner_direct_missing":
         owner["permissionDetails"].pop(0)
     elif damage == "owner_wrong":
@@ -277,3 +277,16 @@ def test_public_uncertainty_does_not_retry_or_release(monkeypatch, failure):
     with pytest.raises(SourceConflict):
         runtime.runner.run(actor="admin", reason="retry")
     assert len(runtime.sent) == sent
+
+
+@pytest.mark.parametrize("omitted", [(0,), (1,), (2,), (0, 1, 2)])
+def test_my_drive_acl_accepts_omitted_details_but_keeps_exact_principals(omitted):
+    plan = ManualEnrollmentPlan(public_value())
+    file = plan.value()["files"][0]
+    response = public_responses(plan, file)
+    for index in omitted:
+        response[1]["permissions"][index].pop("permissionDetails")
+    manual_readback(plan, file, response)
+    response[1]["permissions"][1]["emailAddress"] = "other@example.com"
+    with pytest.raises(SourceConflict):
+        manual_readback(plan, file, response)

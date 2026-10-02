@@ -2473,3 +2473,34 @@ def test_closed_runtime_constructs_actual_factories_without_connecting(monkeypat
     assert bundle.coordinator.adapters["all_kvk"] is bundle.coordinator.adapters["scan_data"]
     assert bundle.coordinator.adapters["new_source"].__self__ is bundle
     connect.assert_not_called()
+
+
+@pytest.mark.parametrize("profile", ["reader", "application"])
+def test_legacy_roles_match_explicit_runtime_profile_and_reject_the_other(monkeypatch, profile):
+    from services.export_runtime_composition import verify_legacy_installation_contract
+
+    observed, approved = legacy_permission_fixture(monkeypatch)
+    observed["target"][0].update(
+        ReaderRole=int(profile == "reader"), AuthorityRole=int(profile == "application")
+    )
+    approved["metadata_hash"] = digest(observed).hex()
+    assert (
+        verify_legacy_installation_contract(observed, approved, profile=profile)
+        == digest(observed).hex()
+    )
+    other = "reader" if profile == "application" else "application"
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved, profile=other)
+    observed["target"][0].update(ReaderRole=1, AuthorityRole=1)
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved, profile=profile)
+
+
+@pytest.mark.parametrize("profile", ["authority", "unknown", None])
+def test_legacy_contract_rejects_unsupported_runtime_profiles(monkeypatch, profile):
+    from services.export_runtime_composition import verify_legacy_installation_contract
+
+    observed, approved = legacy_permission_fixture(monkeypatch)
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved, profile=profile)
