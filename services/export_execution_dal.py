@@ -393,7 +393,7 @@ def _proof_acknowledgment(values, result, columns):
 
 # S11 source-manifest pin is generated from the separately reviewed SQL delivery.
 # It is not learned from the installed database or accepted from a Bot IPC caller.
-LEGACY_PERMISSION_SOURCE_HASH = "d7a5c11769acc6427a5fa1bf2fb00b9b6d4e3bbdc840f34455aaabd8040ed3de"
+LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc6141eddc9b7fc0dbaf68"
 # Canonical JSON digest of deploy/export_application_schema_source.json: 540
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
 # LF-normalized manual-registration snapshots. Installed metadata is a separate hash domain.

@@ -1,5 +1,7 @@
 # S11 published PR review checkpoint — 2026-10-02
 
+> Current compatibility publication stage: Chris accepted and approved publishing the focused source-derived compatibility delta into existing PRs #284/#91, including review and feedback resolution. See the [compatibility result](s11_g4_production_compatibility_preparation_20261002.md). Final heads, source/blob comparisons, current checks and review readbacks are retained in the separate additive publication evidence at `C:\discord_file_downloader\.codex_artifacts\s11-compatibility-publication-20261002`. Earlier exact heads below remain historical. Both PRs stay unmerged; installation, deployment, enrollment and G5 remain separate.
+
 Chris authorized separate ready-for-review PRs, review/fixes and exact-state documentation, with both PRs left **unmerged**. This supersedes older draft-PR recommendations and publication-not-authorized statements. Local implementation acceptance remains closed; bounded production inventory/staged rollout preparation remains approved. No production installation, deployment/restart, enrollment/export writes or G5 activation follows.
 
 | Repository | PR | Branch | Initial implementation head | State |

@@ -1286,7 +1286,13 @@ def verify_legacy_installation_contract(observed, approved):
             or row["AnsiNulls"] != 1
             or type(row["QuotedIdentifier"]) is not int
             or row["QuotedIdentifier"] != 1
-            or legacy_definition_hash(row["ModuleDefinition"]) != expected["definition_sha256"]
+            # Exact finite source-derived script forms, pinned by the complete
+            # source manifest. No installed hash is learned or normalized here.
+            or legacy_definition_hash(row["ModuleDefinition"])
+            not in (
+                expected["definition_sha256"],
+                *expected.get("compatible_definition_sha256", []),
+            )
         ):
             raise SourceConflict("Legacy source definition, execution context or owner differs.")
     expected_signatures = []

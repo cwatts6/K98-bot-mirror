@@ -1,5 +1,7 @@
 # S11 accepted local review and approved production inventory — 2026-10-02
 
+Later production reads and the approved local compatibility preparation are recorded in [the production comparison and staged rollout addendum](s11_g4_production_compatibility_preparation_20261002.md). The original pending-observation text below describes this handoff's creation time; all original seals remain unchanged. Installation, merge/promotion, deployment/restart, enrollment/export writes and activation remain separate decisions.
+
 **Current stage: local implementation review accepted and CLOSED; bounded production inventory and staged rollout preparation APPROVED.** Production installation, deployment/restart, enrollment/export writes and G5/activation have not been approved by this decision. Actual inventory results are not yet available.
 
 Chris's decision in the originating chat:
