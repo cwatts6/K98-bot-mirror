@@ -78,9 +78,11 @@ def equivalent_tokens(name, text):
     header_tokens = tokens(header)
     if name in TYPE_FORMS:
         header_tokens = [
-            t.strip("[]").lower()
-            if t.lower() in {"int", "[int]", "nvarchar", "[nvarchar]", "sysname", "[sysname]"}
-            else t
+            (
+                t.strip("[]").lower()
+                if t.lower() in {"int", "[int]", "nvarchar", "[nvarchar]", "sysname", "[sysname]"}
+                else t
+            )
             for t in header_tokens
         ]
     body_tokens = tokens(body)
