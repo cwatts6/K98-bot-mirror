@@ -31,7 +31,7 @@ The five files in pool-bindings are verified blank candidates, not enrolled orig
 
 Inspect both Git histories and every pending path before work. Preserve drift; compare source members individually. Do not reset, clean, stash or pull main. Bot base `2046ecdbd983450ab5098ec2a0caebfda91e41ab`; SQL base `4cd1554dc3d063e323f22350c88df1444cd0ed4b`. Local refs do not prove remote freshness.
 
-Accepted package final-manifest SHA256 `c739b758ab37d90ff36df6110c0d85291ab4a1722e528e3a7975f5342c768c67`. Later approval/docs evidence is separate at `C:\Users\cwatt\Documents\Codex\s11-production-inventory-handoff-20261002`. Preserve old seals and their saved files. SQL 540-object canonical source-list digest is `f082cd0cbf28261cddf966a954a4564d34a81a552d796707eb90dc75a6baf3cf`; raw list SHA256 `06735c6f245e3c77f7506d18581f6c2d595c19a4484c6485a619abd544411aa0`. Keep normalized source and installed-definition hash domains distinct.
+Accepted package final-manifest SHA256 `c739b758ab37d90ff36df6110c0d85291ab4a1722e528e3a7975f5342c768c67`. Later approval/docs evidence is separate at `C:\Users\cwatt\Documents\Codex\s11-production-inventory-handoff-20261002`. Preserve old seals and their saved files. SQL 540-object canonical source-list digest is `73c23c1391471e829c6a835be0f7371239e11d9880071c079fbfdb3c157c1555`; raw list SHA256 `343e1fa220b639bd620ccb8bb789d9c3e8f183bd49bdb6020d788d606f95d3bd`. Keep normalized source and installed-definition hash domains distinct.
 
 ## B. Prepare and run the approved read packet
 

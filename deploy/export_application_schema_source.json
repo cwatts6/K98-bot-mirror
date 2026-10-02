@@ -1071,7 +1071,7 @@
     "name": "dbo.ExportManualFileOrigin",
     "type": "U",
     "path": "sql_schema/dbo.ExportManualFileOrigin.Table.sql",
-    "sha256": "935be11f65111dbfad331bcc23aaa08f23ab8384b2625acb88440271c75f193d"
+    "sha256": "082f5ce2b083117ea8c1c16d87a0c45697a9ba24e17738037173510ecd660bc7"
   },
   {
     "name": "dbo.ExportPreparation",

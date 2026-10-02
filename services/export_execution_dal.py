@@ -397,7 +397,7 @@ LEGACY_PERMISSION_SOURCE_HASH = "d7a5c11769acc6427a5fa1bf2fb00b9b6d4e3bbdc840f34
 # Canonical JSON digest of deploy/export_application_schema_source.json: 540
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
 # LF-normalized manual-registration snapshots. Installed metadata is a separate hash domain.
-APPLICATION_SCHEMA_SOURCE_HASH = "f082cd0cbf28261cddf966a954a4564d34a81a552d796707eb90dc75a6baf3cf"
+APPLICATION_SCHEMA_SOURCE_HASH = "73c23c1391471e829c6a835be0f7371239e11d9880071c079fbfdb3c157c1555"
 LEGACY_PERMISSION_MIGRATION = "20260924_002_export_legacy_module_permissions"
 LEGACY_DATABASE_CAPABILITIES = (
     "CONTROL",
