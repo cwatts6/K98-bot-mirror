@@ -97,12 +97,27 @@ _PARAMETERS = {
         "EligibilityReference",
     ),
 }
+_PARAMETERS["manual_enrollment"] = tuple(
+    p
+    for p in _PARAMETERS["enrollment"]
+    if p
+    not in {
+        "Ordinal",
+        "FileID",
+        "CreationStreamID",
+        "CreationRequestID",
+        "ResponseEventID",
+        "OriginHash",
+        "OriginReference",
+    }
+)
 _PROCEDURES = {
     "session": "dbo.usp_ExportExecutionSessionTransition",
     "stream": "dbo.usp_ExportExecutionStreamTransition",
     "event": "dbo.usp_ExportProviderRequestEventAppend",
     "proof": "dbo.usp_ExportReconciliationProofIssue",
     "enrollment": "dbo.usp_ExportOutputEnrollmentTransition",
+    "manual_enrollment": "dbo.usp_ExportManualOutputEnrollmentTransition",
 }
 
 # Source-of-truth: the S10A/C/D/E migrations and the additive S11 migration in
@@ -113,6 +128,7 @@ INSTALLATION_MIGRATIONS = (
     "20260915_001_kvk_output_pool_rollover",
     "20260915_002_kvk_output_operation_ownership",
     "20260924_001_export_execution_evidence",
+    "20260929_001_manual_export_registration",
 )
 EVIDENCE_TABLES = tuple(
     "dbo." + name
@@ -123,6 +139,7 @@ EVIDENCE_TABLES = tuple(
         "ExportProviderRequestEvent",
         "ExportReconciliationProof",
         "ExportManagedFileOrigin",
+        "ExportManualFileOrigin",
     )
 )
 INSTALLATION_OBJECTS = {
@@ -143,6 +160,7 @@ INSTALLATION_OBJECTS = {
             "ExportProviderRequestEvent",
             "ExportReconciliationProof",
             "ExportManagedFileOrigin",
+            "ExportManualFileOrigin",
         )
     },
     **{
@@ -207,14 +225,25 @@ def installation_permissions(profile):
     Other source/import/configuration dependencies require separate readiness;
     this bounded object set is not a whole-application permission certificate.
     """
-    if profile not in {"authority", "reader"}:
+    if profile not in {"authority", "reader", "application"}:
         raise ValueError("Unknown installation permission profile.")
     writes = AUTHORITY_COORDINATION_WRITES if profile == "authority" else BOT_COORDINATION_WRITES
+    if profile == "application":
+        writes = {
+            name: tuple(
+                set(BOT_COORDINATION_WRITES.get(name, ()))
+                | set(AUTHORITY_COORDINATION_WRITES.get(name, ()))
+            )
+            for name in BOT_COORDINATION_WRITES.keys() | AUTHORITY_COORDINATION_WRITES.keys()
+        }
     return {
         (name, None, permission): int(
             permission == "SELECT"
             or permission in writes.get(name, ())
-            or (permission == "EXECUTE" and (profile == "authority" or name in LOCK_PROCEDURES))
+            or (
+                permission == "EXECUTE"
+                and (profile in {"authority", "application"} or name in LOCK_PROCEDURES)
+            )
         )
         for name, permissions in INSTALLATION_PERMISSIONS.items()
         for permission in permissions
@@ -365,10 +394,10 @@ def _proof_acknowledgment(values, result, columns):
 # S11 source-manifest pin is generated from the separately reviewed SQL delivery.
 # It is not learned from the installed database or accepted from a Bot IPC caller.
 LEGACY_PERMISSION_SOURCE_HASH = "d7a5c11769acc6427a5fa1bf2fb00b9b6d4e3bbdc840f34455aaabd8040ed3de"
-# Canonical path/name/type/raw-file hashes for all 538 current authoritative
-# sql_schema scripts, including the separate uninstalled S11 delivery. This is
-# source identity, not an observed installation or permission allowlist.
-APPLICATION_SCHEMA_SOURCE_HASH = "0fcc6360f17cc6017801b074117b6b7d6fb8ebb0bd808d686971511b350a27d2"
+# Canonical JSON digest of deploy/export_application_schema_source.json: 540
+# Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
+# LF-normalized manual-registration snapshots. Installed metadata is a separate hash domain.
+APPLICATION_SCHEMA_SOURCE_HASH = "f082cd0cbf28261cddf966a954a4564d34a81a552d796707eb90dc75a6baf3cf"
 LEGACY_PERMISSION_MIGRATION = "20260924_002_export_legacy_module_permissions"
 LEGACY_DATABASE_CAPABILITIES = (
     "CONTROL",
@@ -904,9 +933,9 @@ class ExportExecutionDAL:
             "WITH (ResourceKey varchar(256) '$.key') r JOIN OPENJSON(c.TargetsJson) "
             "WITH (FileID varchar(128) '$') f ON r.ResourceKey COLLATE Latin1_General_100_BIN2="
             "('destination:'+f.FileID) COLLATE Latin1_General_100_BIN2) "
-            "OR EXISTS(SELECT 1 FROM dbo.ExportManagedFileOrigin o JOIN OPENJSON(c.TargetsJson) "
+            "OR EXISTS(SELECT 1 FROM (SELECT FileID,Stage,PreparationID FROM dbo.ExportManagedFileOrigin UNION ALL SELECT FileID,Stage,PreparationID FROM dbo.ExportManualFileOrigin) o JOIN OPENJSON(c.TargetsJson) "
             "WITH (FileID varchar(128) '$') f ON f.FileID COLLATE Latin1_General_100_BIN2=o.FileID "
-            "WHERE o.PreparationID=s.PreparationID AND o.Stage='created'))"
+            "WHERE o.PreparationID=s.PreparationID AND o.Stage IN ('created','registered')))"
             + (
                 " AND LOWER(CONVERT(varchar(36),s.StreamID)) COLLATE Latin1_General_100_BIN2>?"
                 if paged
@@ -919,7 +948,7 @@ class ExportExecutionDAL:
     def _origin_query():
         return (
             "SELECT o.*,p.AccountKey,p.RequestJson,p.RequestHash,p.GenerationJson,p.State AS PreparationState "
-            "FROM dbo.ExportManagedFileOrigin o JOIN dbo.ExportPreparation p ON p.PreparationID=o.PreparationID "
+            "FROM (SELECT * FROM dbo.ExportManagedFileOrigin UNION ALL SELECT FileID,Stage,ParentStage,PreparationID,Ordinal,SessionID,NULL,NULL,NULL,PlanHash,ProfileHash,NULL,NULL,NULL,NULL,VerificationStreamID,VerificationClosureHash,EligibilityHash,EligibilityReference,CreatedUTC FROM dbo.ExportManualFileOrigin) o JOIN dbo.ExportPreparation p ON p.PreparationID=o.PreparationID "
             "JOIN OPENJSON(?) WITH(FileID varchar(128) '$') t ON t.FileID COLLATE Latin1_General_100_BIN2=o.FileID "
             "WHERE p.AccountKey=? ORDER BY o.FileID,o.Stage"
         )

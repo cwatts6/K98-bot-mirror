@@ -1,5 +1,27 @@
 # Shutdown Runbook
 
+## Current S11 checkpoint — 2026-09-29
+
+Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
+
+The approved single-account/manual-Sheets source implementation and focused local review are complete, pending and unpublished. Chris manually creates Sheets as `chrislos35@gmail.com`; existing `sheets-service@statsupdate.iam.gserviceaccount.com` writes to the registered fixed pool. No human OAuth, automated creation or replacement identity is planned. Equivalent reports and safe referenced/uncertain-output protection remain required.
+
+The 119-set development restore, recovery and clean CHECKDB are evidenced; the selected 15-table baseline covers 2,410,159 rows with its retained provenance qualifications. Keep `S11_G4_Recovery_20260928_97337` read-only/restricted/Broker-disabled. All seven current typed G4 proofs remain incomplete.
+
+Next is local preparation of the exact bounded SQL/provider/two-export validation packet, not execution. Production stays on isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`; no main pull, restart, installation, provider call, activation, publication or automatic chat creation. The old window ended 2026-09-29T09:23:23Z; local preparation needs no window. Rollout and G5 remain separate operator decisions.
+
+Registration uncertainty does not authorize replay or claim release. Existing admission closure, owned-child drain and no-delayed-effects proof remain required. Hotfix queue-drain logs are not a completed S11 all-writer drain.
+
+
+## Local S11 single-account profile — 2026-09-25
+
+One Windows account does not change shutdown ownership: close admission, drain owned work,
+retain uncertain claims/sessions and reconcile dispatched outcomes before reuse. Peer process
+exit, stale PID/creation time or lost reply is uncertainty, never a retry or release signal.
+Incomplete drain retains the session and returns status 1. Restart requires approved fresh
+process bindings and old-work reconciliation. Existing evidence must not be relabelled across
+the separate-account and shared-account profiles. No live shutdown or restart is authorized.
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the

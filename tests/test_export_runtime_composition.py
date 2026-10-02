@@ -917,11 +917,63 @@ def recorded_google_memory():
     return args, api, messages
 
 
+@pytest.mark.parametrize("policy", [None, "private", "public_viewer"])
+def test_recovery_writer_keeps_exact_attempt_audience_under_public_registration(
+    monkeypatch, policy
+):
+    from dataclasses import replace
+
+    from services.export_runtime_composition import ExportRuntime
+    from tests.test_export_retirement_recovery_evidence import recovery_fixture
+
+    args, api, _, _ = recovery_fixture(monkeypatch, empty=True)
+    snapshot = args["snapshot"]
+    attempt = snapshot["attempts"][0]
+    document = json.loads(attempt["ManifestJson"])
+    if policy is not None:
+        document["generation"]["staging_audience"] = policy
+    attempt["ManifestJson"] = json.dumps(document)
+    attempt["ManifestHash"] = digest(document).hex()
+    registration = replace(args["registration"], audience="public_viewer")
+    runtime = object.__new__(ExportRuntime)
+    runtime.registration = Mock()
+    runtime.registration.sheets.return_value = registration
+    runtime.registration.value.return_value = {"protected_file_ids": []}
+    stream = SimpleNamespace(
+        scope={"OwnerKind": "job", "ObjectID": attempt["JobID"], "NestedToken": str(uuid4())},
+        stream_id=str(uuid4()),
+        execute=args["execute"],
+    )
+    transport = runtime.transport(snapshot, stream)
+    assert transport.preserve_public_staging is (policy == "public_viewer")
+    if policy == "public_viewer":
+        api.files_data["fake-2"]["permissions"].append(
+            dict(id="viewer", type="anyone", role="reader", allowFileDiscovery=False)
+        )
+    evidence = transport.retirement_readback("fake-2")
+    assert evidence["private"] is (policy != "public_viewer")
+    if policy == "public_viewer":
+        assert evidence["audience"] == "public_viewer"
+
+
 @pytest.mark.parametrize("failure", [None, "close", "transport"])
-def test_actual_new_source_worker_readback_crosses_typed_batch_read_boundary(monkeypatch, failure):
+@pytest.mark.parametrize("public", [False, True])
+def test_actual_new_source_worker_readback_crosses_typed_batch_read_boundary(
+    monkeypatch, failure, public
+):
+    from dataclasses import replace
     from threading import Event
 
     args, api, messages = recorded_google_memory()
+    if public:
+        args["transport"].registration = replace(
+            args["transport"].registration, audience="public_viewer"
+        )
+        args["transport"].preserve_public_staging = True
+        for file in api.files_data.values():
+            file["permissions"].append(
+                dict(id="existing-viewer", type="anyone", role="reader", allowFileDiscovery=False)
+            )
     generation = args["generation"]
     monkeypatch.setattr(
         "kvk.services.new_source_export_service.load_intent_generation", lambda **_: generation
@@ -972,6 +1024,12 @@ def test_actual_new_source_worker_readback_crosses_typed_batch_read_boundary(mon
     assert api.values["fake-index", "Sheet1"][0][0] == generation.key
     assert args["authority_stream"]._closed
     args["authority_stream"].client.close_stream.assert_called_once()
+    expected = "public_viewer" if public else "private"
+    assert dal.begin_attempt.call_args.args[1]["staging_audience"] == expected
+    dal.verified.assert_called_once_with(claim, "attempt-a", audience=expected)
+    if public:
+        assert not any(r.operation.startswith("drive.permissions.") for r in messages)
+        assert not any(r.operation == "drive.files.create" for r in messages)
 
 
 def retirement_stream_fixture(claim, pool, *, recovery=False, fail=None):
@@ -1276,6 +1334,7 @@ def test_authority_reconciliation_needs_pinned_sql_manifest():
 def test_s11_new_source_refuses_unrecorded_transport_before_claim_or_provider():
     transport = object.__new__(GoogleSheetsTransport)
     transport._authority_adapter = None
+    transport.preserve_public_staging = False
     dal = Mock(execution_evidence=True)
     with pytest.raises(RemoteOutcomeUnknown, match="recorded authority stream"):
         deliver_coordinated_export(

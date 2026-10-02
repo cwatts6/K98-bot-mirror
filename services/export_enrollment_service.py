@@ -376,7 +376,11 @@ class EnrollmentEvidence:
         )
         scope["OwnerID"] = str(scope["OwnerID"]).lower()
         phase = plan.authorize_scope(scope)
-        expected_count = 1 if phase["phase"] == "create" else 5 * plan.value()["file_count"]
+        expected_count = (
+            1
+            if phase["phase"] == "create"
+            else (4 if plan.value()["version"] in (2, 3) else 5) * plan.value()["file_count"]
+        )
         if stream["LastSequence"] != expected_count:
             raise SourceConflict("Enrollment transcript exceeds the fixed complete request set.")
         records = []
@@ -588,6 +592,18 @@ class ManagedOriginVerifier:
         ):
             raise SourceConflict("Complete canonical enrolled pool required.")
         rows = self.dal.read_origins(account, targets)
+        if any(row["Stage"] == "registered" for row in rows):
+            from services.export_manual_enrollment import verify_manual_origin
+
+            return verify_manual_origin(
+                dal=self.dal,
+                store=self.store,
+                rows=rows,
+                account=account,
+                targets=targets,
+                owner_email=owner_email,
+                editor_email=editor_email,
+            )
         if len(rows) != 2 * len(targets):
             raise SourceConflict("Unproven old files cannot receive fabricated origins.")
         grouped = {}

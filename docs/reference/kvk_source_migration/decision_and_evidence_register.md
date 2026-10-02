@@ -1,5 +1,20 @@
 # KVK Source Migration — Decision and Evidence Register
 
+## Local review accepted; production inventory approved — 2026-10-02
+
+Chris has **accepted and CLOSED the local implementation review** and **APPROVED bounded production inventory and staged rollout preparation**. Follow the [current approval/handoff](s11_g4_production_inventory_handoff_20261002.md), [handover task](../../task_packs/S11%20G4%20Production%20Inventory%20and%20Staged%20Rollout%20-%20Task%20Pack%20-%2020261002.md) and [new chat starter](../../task_packs/S11%20G4%20Production%20Inventory%20-%20Chat%20Starter%20-%2020261002.md). Carry this approval forward without repeating the question. Prepare exact bounded read commands, preserve their hashes/copies, then execute the permitted production reads. Installation, publication/PR, deployment/restart, enrollment/export writes and G5/activation remain separate decisions. Version 5 operator control and the verified five-file pool remain accepted; do not reopen settled choices. Earlier approval/status statements below are dated history, not current stage authority. No production observation was performed for this documentation update.
+
+## Current S11 checkpoint — 2026-09-29
+
+Read the [current validation handoff](s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
+
+The approved single-account/manual-Sheets source implementation and focused local review are complete, pending and unpublished. Chris manually creates Sheets as `chrislos35@gmail.com`; existing `sheets-service@statsupdate.iam.gserviceaccount.com` writes to the registered fixed pool. No human OAuth, automated creation or replacement identity is planned. Equivalent reports and safe referenced/uncertain-output protection remain required.
+
+The 119-set development restore, recovery and clean CHECKDB are evidenced; the selected 15-table baseline covers 2,410,159 rows with its retained provenance qualifications. Keep `S11_G4_Recovery_20260928_97337` read-only/restricted/Broker-disabled. All seven current typed G4 proofs remain incomplete.
+
+Next is local preparation of the exact bounded SQL/provider/two-export validation packet, not execution. Production stays on isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`; no main pull, restart, installation, provider call, activation, publication or automatic chat creation. The old window ended 2026-09-29T09:23:23Z; local preparation needs no window. Rollout and G5 remain separate operator decisions.
+
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the

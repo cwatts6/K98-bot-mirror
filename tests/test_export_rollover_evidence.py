@@ -31,7 +31,9 @@ from tests.test_export_reconciliation_service import sealed_publication_fixture
 from tests.test_export_runtime_composition import operation_snapshot, recorded_google_memory
 
 
-def rollover_fixture(*, uncertain=False, acknowledged=True, public=False, slot_count=2):
+def rollover_fixture(
+    *, uncertain=False, acknowledged=True, public=False, slot_count=2, preserve=False
+):
     args, api, messages = recorded_google_memory()
     registration = args["transport"].registration
     registration = replace(
@@ -177,6 +179,7 @@ def rollover_fixture(*, uncertain=False, acknowledged=True, public=False, slot_c
             execution=execute,
             stream_id=stream_id,
             authorize=lambda **_: None,
+            preserve_public_staging=preserve,
         )
         transport._request_guard = lambda _: None
         result = action(transport)
@@ -274,6 +277,22 @@ def test_original_closed_phases_and_current_completion_keep_old_clear_separate_f
     assert "empty" not in json.loads(result.setup_json)
     assert not hasattr(result, "writer_terminated") and not hasattr(result, "proof_id")
     assert len(observations) == 7 and f.snapshot == original
+
+
+@pytest.mark.parametrize("uncertain", [False, True])
+@pytest.mark.parametrize("acknowledged", [False, True])
+def test_public_rollover_preserves_viewer_and_replays_truthful_public_evidence(
+    uncertain, acknowledged
+):
+    f = rollover_fixture(uncertain=uncertain, acknowledged=acknowledged, public=True, preserve=True)
+    assert len(verifier(f).verify(f.snapshot)) == 64
+    args, observations = probe_arguments(f)
+    result = observe_rollover_completion(**args)
+    for evidence in json.loads(result.original_clears_json).values():
+        assert evidence["private"] is False
+        assert evidence["audience"] == "public_viewer"
+    assert json.loads(result.setup_json)["private"] is False
+    assert not any(path == "/permissions" and method != "get" for path, method, _ in f.api.calls)
 
 
 def test_maximum_sixteen_slot_pool_preserves_every_original_and_current_file():

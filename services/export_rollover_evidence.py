@@ -19,6 +19,7 @@ from kvk.services.new_source_export_service import (
     SheetsRegistration,
     rollover_marker,
 )
+from services.export_audience import check_audience
 from services.export_coordination_dal import bounded_json
 from services.export_execution_dal import ExportExecutionDAL
 from services.export_execution_protocol import ProviderRequest, encode, proof_membership, uuid_text
@@ -105,10 +106,14 @@ def completion_context(snapshot):
     ):
         raise SourceConflict("Complete owned rollover setup journal required.")
     for file_id, evidence in progress["files"].items():
+        audience = check_audience(evidence, pool)
         if (
-            set(evidence) != {"file_id", "private", "empty", "manifest_hash", "sheet_id"}
+            set(evidence)
+            != (
+                {"file_id", "private", "empty", "manifest_hash", "sheet_id"}
+                | ({"audience"} if audience == "public_viewer" else set())
+            )
             or evidence["file_id"] != file_id
-            or evidence["private"] is not True
             or evidence["empty"] is not True
             or not isinstance(evidence["manifest_hash"], str)
             or not re.fullmatch(r"[0-9a-f]{64}", evidence["manifest_hash"])
@@ -156,6 +161,10 @@ def _transport(snapshot, registration, protected_file_ids, execute, stream_id):
         execution=read_only,
         stream_id=stream_id,
         authorize=lambda **_: None,
+        preserve_public_staging=any(
+            e.get("audience") == "public_viewer"
+            for e in json.loads(snapshot["operation"]["ProgressJson"]).get("files", {}).values()
+        ),
     )
 
 
@@ -285,7 +294,10 @@ class RolloverJournalVerifier:
                 snapshot, self.registration, self.protected_file_ids, replay.execute, identifier
             )
             fresh = transport._get(file_id)
-            if any(p.get("type") == "anyone" for p in fresh["permissions"]):
+            if transport.preserve_public_staging:
+                if mutations:
+                    raise SourceConflict("Public Viewer phase must not change permissions.")
+            elif any(p.get("type") == "anyone" for p in fresh["permissions"]):
                 raise SourceConflict("Original private phase did not establish private sharing.")
             replay.finished()
         else:
@@ -301,6 +313,10 @@ class RolloverJournalVerifier:
                     operations.count("sheets.batchUpdate") != 1
                     or operations.count("drive.files.update") != 1
                     or operations.count("drive.permissions.delete") > 1
+                    or (
+                        transport.preserve_public_staging
+                        and "drive.permissions.delete" in operations
+                    )
                 ):
                     raise SourceConflict("Exact original clear mutations required.")
                 batch = next(m for m in mutations if m.operation == "sheets.batchUpdate")

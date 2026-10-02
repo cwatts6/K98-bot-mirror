@@ -166,6 +166,14 @@ def main(argv=None):
     assert_protected_path(Path(__file__).resolve())
     manifest = decode(manifest_path.read_bytes())
     expected_version = 1 if "enrollment_profile" in manifest else 2
+    from core.export_process_identity import TRUST_MODEL
+
+    if manifest.get("trust_model") == TRUST_MODEL:
+        expected_version += 1
+        if manifest.get("bot_sid") != manifest.get("authority_sid"):
+            raise ValueError("Shared application identity differs.")
+    elif "trust_model" in manifest:
+        raise ValueError("Unknown execution trust model.")
     if (
         manifest.get("version") != expected_version
         or manifest.get("authority_sid") != current_sid()

@@ -96,6 +96,9 @@ def deliver_export(
         from kvk.services.new_source_export_service import GoogleSheetsTransport, SheetsRegistration
 
         google = isinstance(transport, GoogleSheetsTransport)
+        public_staging = google and transport.preserve_public_staging
+        if public_staging and recover_private:
+            raise ValueError("Public staging cannot use private recovery.")
         if recover_private and (
             not google or not isinstance(prior_registration, SheetsRegistration)
         ):
@@ -186,11 +189,14 @@ def deliver_export(
                     raise SourceConflict("Registration contains quarantined workbook slots.")
                 claim = repository.checkpoint(
                     claim,
-                    phase="private_started",
+                    phase="public_started" if public_staging else "private_started",
                     export_complete=False,
                     attempt_slots=list(transport.registration.slot_file_ids),
                     audience=audience,
                 )
+            # Existing public sheets expose partial writes even before the index
+            # changes. Any failure must retain uncertainty and prohibit replay.
+            exposed = public_staging
             manifest = generation.manifest()
             transport.ensure_private(destination, generation.key, manifest)
             for item in generation.tables:
@@ -282,6 +288,8 @@ def deliver_coordinated_export(
     if not isinstance(transport, GoogleSheetsTransport) or job["ConsumerKind"] != "new_source":
         raise ValueError("Coordinated new-source Sheets transport required.")
     recorded = getattr(dal, "execution_evidence", False) is True
+    if transport.preserve_public_staging and not recorded:
+        raise SourceConflict("Coordinated public staging requires recorded execution evidence.")
     if recorded and (transport._authority_adapter is None or authority_stream is None):
         raise RemoteOutcomeUnknown("S11 delivery requires an exact recorded authority stream.")
     if not recorded and authority_stream is not None:
@@ -387,6 +395,9 @@ def deliver_coordinated_export(
                 "repair_id": job.get("RepairID"),
                 "retain": transport._retained.get(generation.key, True),
                 "tables": manifest,
+                "staging_audience": "public_viewer"
+                if transport.preserve_public_staging
+                else "private",
             },
             parts,
         )
@@ -422,12 +433,16 @@ def deliver_coordinated_export(
             raise SourceConflict("Exact private manifest readback failed.")
         # Check every generation ACL rather than inferring private verification from
         # successful writes. The previous index may legitimately remain public.
-        if any(
-            any(p.get("type") == "anyone" for p in transport._get(part["file_id"])["permissions"])
-            for part in parts[1:]
+        generation_acls = [transport._get(part["file_id"]) for part in parts[1:]]
+        if not transport.preserve_public_staging and any(
+            any(p.get("type") == "anyone" for p in file["permissions"]) for file in generation_acls
         ):
             raise SourceConflict("Generation is not private.")
-        dal.verified(claim, attempt_id)
+        dal.verified(
+            claim,
+            attempt_id,
+            audience="public_viewer" if transport.preserve_public_staging else "private",
+        )
         dal.publication_pending(claim, attempt_id)
         remote = transport.publish_current(destination, delivery_key, claim.fence)
         probe = SimpleNamespace(

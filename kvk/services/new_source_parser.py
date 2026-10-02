@@ -83,15 +83,28 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
     text_count = 0
     previous_row = 0
     previous_column = 0
+    root_name = None
+    spreadsheet_namespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+    def calculation_reference(name):
+        # Excel's calculation chain uses <c> for references, not worksheet cells.
+        # Match the XML structure, never the archive member's filename.
+        return (
+            depth == 2
+            and root_name == spreadsheet_namespace + "calcChain"
+            and name == spreadsheet_namespace + "c"
+        )
 
     def forbidden(*args):
         _reject("xml_declaration", "DTD and entity declarations are not accepted.")
 
     def start(name, attrs):
         nonlocal cell, numeric, in_value, text_length, depth, text_depth, text_count
-        nonlocal previous_row, previous_column, value_seen
+        nonlocal previous_row, previous_column, value_seen, root_name
         local = name.rsplit("}", 1)[-1]
         depth += 1
+        if depth == 1:
+            root_name = name
         if depth > 64 or any(len(v) > limits.max_cell_characters for v in attrs.values()):
             _reject("xml_limit", "XML nesting or attribute size exceeds parser limits.")
         if local == "Relationship" and attrs.get("TargetMode", "").lower() == "external":
@@ -108,7 +121,7 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
             if not re.fullmatch(r"[1-9][0-9]{0,6}", row_token) or int(row_token) <= previous_row:
                 _reject("row_coordinate", "Worksheet rows must be ordered and uniquely numbered.")
             previous_row, previous_column = int(row_token), 0
-        if local == "c":
+        if local == "c" and not calculation_reference(name):
             total_cells[0] += 1
             if total_cells[0] > limits.max_populated_cells:
                 _reject("cell_limit", "Populated cell budget exceeded.")
@@ -160,7 +173,7 @@ def _xml_preflight(data: bytes, limits: ParseLimits, total_cells: list[int]) -> 
         local = name.rsplit("}", 1)[-1]
         if local == "v":
             in_value = False
-        if local == "c":
+        if local == "c" and not calculation_reference(name):
             if numeric and value_parts:
                 numbers[cell] = "".join(value_parts)
             cell = None

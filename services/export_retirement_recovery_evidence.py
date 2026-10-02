@@ -199,6 +199,10 @@ def observe_retirement_recovery(*, snapshot, registration, protected_file_ids, e
         execution=read_only,
         stream_id=stream_id,
         authorize=lambda **_: None,
+        preserve_public_staging=json.loads(snapshot["attempts"][0]["ManifestJson"])[
+            "generation"
+        ].get("staging_audience", "private")
+        == "public_viewer",
     )
     observed = []
     for token in pending:

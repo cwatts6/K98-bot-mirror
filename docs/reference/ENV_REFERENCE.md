@@ -1,5 +1,28 @@
 # Environment Reference
 
+## Current S11 checkpoint — 2026-09-29
+
+Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
+
+The approved single-account/manual-Sheets source implementation and focused local review are complete, pending and unpublished. Chris manually creates Sheets as `chrislos35@gmail.com`; existing `sheets-service@statsupdate.iam.gserviceaccount.com` writes to the registered fixed pool. No human OAuth, automated creation or replacement identity is planned. Equivalent reports and safe referenced/uncertain-output protection remain required.
+
+The 119-set development restore, recovery and clean CHECKDB are evidenced; the selected 15-table baseline covers 2,410,159 rows with its retained provenance qualifications. Keep `S11_G4_Recovery_20260928_97337` read-only/restricted/Broker-disabled. All seven current typed G4 proofs remain incomplete.
+
+Next is local preparation of the exact bounded SQL/provider/two-export validation packet, not execution. Production stays on isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`; no main pull, restart, installation, provider call, activation, publication or automatic chat creation. The old window ended 2026-09-29T09:23:23Z; local preparation needs no window. Rollout and G5 remain separate operator decisions.
+
+Current manual enrollment uses the normal shared supervisor/service-account manifest v3 with runtime registration and deployment boundary. Bot manifest v2, boundary/observation records v3, manual plan v2 and SQL application readiness v3 are distinct contracts. There is no OAuth enrollment profile or predecessor-account field in the existing-identity boundary. No environment/config/credential file was changed by this documentation update.
+
+
+## Local S11 single-account profile — 2026-09-25
+
+The approved local amendment adds `single_account_application_v1` in protected manifests,
+not an environment flag that bypasses readiness. Bot manifest v2 and supervisor v3 bind the
+same Windows SID, exact distinct process incarnations and the same restricted application
+SQL contract (v3). Enrollment outer manifest v2 still uses a separate Google-owner OAuth
+profile; normal exports use the fresh service-account credential. No second Windows account
+is required by this profile. No environment file has been changed or runtime configured.
+See [the exact packet](kvk_source_migration/s11_g4_release_packet.md#local-implementation-amendment--2026-09-25).
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the

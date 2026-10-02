@@ -27,7 +27,7 @@ def authority_launch(monkeypatch, tmp_path):
     import scripts.enroll_export_output_pool as enrollment
     import scripts.run_export_authority as launcher
     import services.export_coordination_dal as coordination
-    import services.export_enrollment_service as enrollment_service
+    import services.export_manual_enrollment as enrollment_service
     import services.export_execution_authority as execution
     import services.export_execution_dal as persistence
     import services.export_reconciliation_service as reconciliation
@@ -61,7 +61,7 @@ def authority_launch(monkeypatch, tmp_path):
         "SourceOutputPoolDAL": pools,
         "ExportCoordinationDAL": coordination,
         "AuthorityBroker": launcher,
-        "OutputEnrollment": enrollment_service,
+        "ManualOutputEnrollment": enrollment_service,
     }.items():
         factories[name] = Mock()
         monkeypatch.setattr(module, name, factories[name])
@@ -97,7 +97,7 @@ def authority_launch(monkeypatch, tmp_path):
                     "--reason",
                     "fixture",
                     "--authorize-operation",
-                    "S11_CREATE_PRIVATE_OUTPUT_POOL",
+                    "S11_REGISTER_MANUAL_OUTPUT_POOL",
                 ]
             ),
         },
@@ -148,7 +148,7 @@ def test_authority_shutdown_reports_retained_session_and_preserves_service_error
             "proof_import",
         )
     ]
-    + [("enrollment", "OutputEnrollment")],
+    + [("enrollment", "ManualOutputEnrollment")],
 )
 def test_post_open_initialization_failure_closes_empty_session(
     authority_launch, monkeypatch, launcher, stage
@@ -180,12 +180,12 @@ def test_post_open_initialization_failure_closes_empty_session(
     else:
         setup.authority.drain.assert_called_once_with()
     setup.serve.assert_not_called()
-    setup.factories["OutputEnrollment"].return_value.run.assert_not_called()
+    setup.factories["ManualOutputEnrollment"].return_value.run.assert_not_called()
     setup.connector.assert_not_called()
 
 
 @pytest.mark.parametrize(
-    "launcher,stage", [("authority", "TrustedProofIssuer"), ("enrollment", "OutputEnrollment")]
+    "launcher,stage", [("authority", "TrustedProofIssuer"), ("enrollment", "ManualOutputEnrollment")]
 )
 @pytest.mark.parametrize("drain_error", [False, True])
 def test_startup_failure_retains_session_when_drain_is_unproven(
@@ -640,7 +640,7 @@ def test_explicit_authority_startup_checks_installation_before_session_store_or_
             "--reason",
             "fixture",
             "--authorize-operation",
-            "S11_CREATE_PRIVATE_OUTPUT_POOL",
+            "S11_REGISTER_MANUAL_OUTPUT_POOL",
         ]
     with pytest.raises(SourceConflict):
         run(arguments)

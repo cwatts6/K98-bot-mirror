@@ -1394,6 +1394,81 @@ def test_terminal_google_rejection_is_diagnostic_and_resumes_bound_blank_slot():
     assert deliver_export(**args).delivery_state == "confirmed"
 
 
+def public_staging_delivery():
+    from kvk.services.new_source_export_service import GoogleSheetsTransport
+
+    args, repo, api = google_delivery()
+    old = args["transport"]
+    args["transport"] = GoogleSheetsTransport(
+        drive=api.client(),
+        sheets=api.client(),
+        registration=replace(old.registration, audience="public_viewer"),
+        reuse_guard=old.reuse_guard,
+        protected_file_ids=old.protected,
+        preserve_public_staging=True,
+    )
+    for file in api.files_data.values():
+        file["permissions"].append(
+            dict(id="existing-viewer", type="anyone", role="reader", allowFileDiscovery=False)
+        )
+    return args, repo, api
+
+
+def test_standalone_public_staging_keeps_access_and_reuses_confirmed_receipt():
+    args, repo, api = public_staging_delivery()
+    first = deliver_export(**args)
+    assert first.delivery_state == "confirmed"
+    assert not any(c[0] == "/permissions" and c[1] != "get" for c in api.calls)
+    calls = len(api.calls)
+    assert deliver_export(**args).receipt == first.receipt
+    assert len(api.calls) == calls
+    assert all(
+        any(p.get("id") == "existing-viewer" for p in f["permissions"])
+        for f in api.files_data.values()
+    )
+
+
+def test_standalone_public_partial_write_is_uncertain_and_cannot_retry_or_recover():
+    args, repo, api = public_staging_delivery()
+    original = api.execute
+
+    def execute(path, method, payload, retries):
+        if path == "/spreadsheets/values" and method == "update":
+            retained = repo.read_receipt(args["selection"], args["destination"])
+            assert json.loads(retained.receipt)["phase"] == "public_started"
+            original(path, method, payload, retries)
+            raise TimeoutError("Lost public write acknowledgement")
+        return original(path, method, payload, retries)
+
+    api.execute = execute
+    result = deliver_export(**args)
+    assert result.delivery_state == "uncertain"
+    calls = len(api.calls)
+    with pytest.raises(SourceConflict, match="reconciliation"):
+        deliver_export(**args)
+    with pytest.raises(ValueError, match="Public staging"):
+        deliver_export(**args, recover_private=True)
+    assert len(api.calls) == calls
+
+
+def test_standalone_public_staging_requires_existing_viewer_without_granting():
+    args, _, api = public_staging_delivery()
+    api.files_data["fake-index"]["permissions"] = [
+        p for p in api.files_data["fake-index"]["permissions"] if p["type"] != "anyone"
+    ]
+    assert deliver_export(**args).delivery_state == "uncertain"
+    assert not any(c[1] in ("create", "delete", "update", "batchUpdate") for c in api.calls)
+
+
+def test_standalone_public_staging_rejects_retirement_before_permission_mutation():
+    args, _, api = public_staging_delivery()
+    with pytest.raises(SourceConflict, match="cannot perform private retirement"):
+        args["transport"].rollover_private("fake-1")
+    with pytest.raises(SourceConflict, match="cannot revoke Viewer"):
+        args["transport"]._private_file(api.files_data["fake-1"])
+    assert not api.calls
+
+
 def test_public_viewer_is_revoked_for_staging_and_granted_only_after_verification():
     args, repo, api = google_delivery()
     t = args["transport"]

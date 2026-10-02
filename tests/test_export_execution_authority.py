@@ -131,6 +131,33 @@ def runtime():
     return authority, dal, store, children[0], budget, request
 
 
+def test_expired_custody_after_pacing_never_dispatches_or_replays(runtime):
+    authority, dal, store, child, budget, request = runtime
+    authority.dispatch_guard = Mock(side_effect=ValueError("custody expired during pacing"))
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    authority.dispatch_guard.assert_called_once()
+    assert child.calls == []
+    assert not any(values.get("State") == "dispatch_intent" for _, values in dal.calls)
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert authority.drain() is True
+    assert child.terminated
+
+
+def test_expired_custody_during_intent_commit_retains_unknown_intent_without_send(runtime):
+    authority, dal, store, child, budget, request = runtime
+    authority.dispatch_guard = Mock(side_effect=[None, ValueError("expired during SQL commit")])
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert authority.dispatch_guard.call_count == 2
+    assert child.calls == []
+    assert any(values.get("State") == "dispatch_intent" for _, values in dal.calls)
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert authority.drain() is True
+
+
 @pytest.mark.parametrize("checkpoint_fails", [False, True])
 @pytest.mark.parametrize(
     "status,header,expected",

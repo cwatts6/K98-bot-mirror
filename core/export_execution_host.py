@@ -65,12 +65,15 @@ class DeploymentBoundary:
         }
     )
 
-    def __init__(self, manifest, *, inspect_path=None, observe_host=None, observe_sid=None):
+    def __init__(
+        self, manifest, *, inspect_path=None, observe_host=None, observe_sid=None, now=None
+    ):
         # Defaults are resolved at use, after module definition and only on the
         # explicit authority startup path. Tests inject reads, never host APIs.
         self._inspect = inspect_path or assert_protected_path
         self._host = observe_host or machine_identity
         self._sid = observe_sid or current_sid
+        self._now = now
         self._manifest = decode(encode(manifest))
         self._raw = encode(self._manifest["deployment_boundary"])
         self.recheck()
@@ -96,20 +99,37 @@ class DeploymentBoundary:
             "paths",
             "review",
         }
+        from core.export_process_identity import TRUST_MODEL, validate_process_bindings
+
+        shared = m.get("trust_model") == TRUST_MODEL
+        if shared:
+            fields |= {"trust_model", "process_bindings"}
+        if value.get("version") == 4:
+            fields.add("key_custody")
+        if value.get("version") == 5:
+            fields.add("operator_control")
         if (
             not isinstance(value, dict)
             or set(value) != fields
             or type(value["version"]) is not int
-            or value["version"] != 1
+            or value["version"] not in ({2, 3, 4, 5} if shared else {1})
         ):
             raise HostBoundaryError("Exact reviewed deployment boundary required.")
         uuid_text(value["deployment_id"])
+        if shared:
+            if (
+                value["trust_model"] != TRUST_MODEL
+                or value["process_bindings"] != m.get("process_bindings")
+                or value["authority_sid"] != value["bot_sid"]
+            ):
+                raise HostBoundaryError("Reviewed shared application binding differs.")
+            validate_process_bindings(value["process_bindings"], value["authority_sid"])
         if (
             value["host"] != self._host()
             or value["authority_sid"] != self._sid()
             or value["authority_sid"] != m["authority_sid"]
             or value["bot_sid"] != m["bot_sid"]
-            or value["authority_sid"] == value["bot_sid"]
+            or (not shared and value["authority_sid"] == value["bot_sid"])
         ):
             raise HostBoundaryError("Deployment belongs to another host or identity.")
         for field, source in (
@@ -131,24 +151,45 @@ class DeploymentBoundary:
         if (
             not isinstance(identity, dict)
             or set(identity)
-            != {
-                "service_account_email",
-                "previous_service_account_email",
-                "project_id",
-                "client_id",
-                "private_key_id",
-                "credential_sha256",
-            }
+            != (
+                {
+                    "service_account_email",
+                    "project_id",
+                    "client_id",
+                    "private_key_id",
+                    "credential_sha256",
+                }
+                | ({"previous_service_account_email"} if value["version"] < 3 else set())
+            )
             or identity["service_account_email"] != m["service_account_email"]
             or identity["project_id"] != m["project_id"]
-            or identity["previous_service_account_email"] == identity["service_account_email"]
-            or not re.fullmatch(
-                r"[A-Za-z0-9_.@-]{3,254}", identity["previous_service_account_email"]
+            or (
+                value["version"] < 3
+                and (
+                    identity["previous_service_account_email"] == identity["service_account_email"]
+                    or not re.fullmatch(
+                        r"[A-Za-z0-9_.@-]{3,254}", identity["previous_service_account_email"]
+                    )
+                )
             )
             or not re.fullmatch(r"[0-9]{1,32}", identity["client_id"])
             or not re.fullmatch(r"[0-9a-f]{40}", identity["private_key_id"])
         ):
-            raise HostBoundaryError("Fresh exact service-account/key identity required.")
+            raise HostBoundaryError("Exact versioned service-account/key identity required.")
+        if value["version"] == 5:
+            from core.export_key_custody import validate_operator_control
+
+            try:
+                validate_operator_control(value)
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HostBoundaryError("Exact operator-controlled deployment required.") from exc
+        if value["version"] == 4:
+            from core.export_key_custody import validate_custody
+
+            try:
+                validate_custody(value, m, now=self._now() if self._now else None)
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HostBoundaryError("Reviewed two-host custody/window differs.") from exc
         raw = Path(paths["credentials_file"]).read_bytes()
         if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != identity["credential_sha256"]:
             raise HostBoundaryError("Protected credential bytes differ.")
@@ -201,9 +242,14 @@ class DeploymentBoundary:
             record = decode(raw)
             if (
                 not isinstance(record, dict)
-                or set(record) != {"version", "kind", "deployment_id", "review_id", "observations"}
+                or set(record)
+                != (
+                    {"version", "kind", "deployment_id", "review_id", "observations"}
+                    | ({"trust_model"} if shared else set())
+                )
                 or type(record["version"]) is not int
-                or record["version"] != 1
+                or record["version"] != value["version"]
+                or (shared and record.get("trust_model") != TRUST_MODEL)
                 or record["kind"] != kind
                 or record["deployment_id"] != value["deployment_id"]
                 or record["review_id"] != review["review_id"]
@@ -213,6 +259,13 @@ class DeploymentBoundary:
             ):
                 raise HostBoundaryError("Reviewed source observations are missing or foreign.")
             self._validate_observations(kind, record["observations"], value)
+        if value["version"] == 4:
+            try:
+                validate_custody(value, m, now=self._now() if self._now else None)
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HostBoundaryError(
+                    "Custody window expired during boundary verification."
+                ) from exc
         return self.fingerprint
 
     def _validate_observations(self, kind, rows, boundary):
@@ -240,6 +293,33 @@ class DeploymentBoundary:
                 raise HostBoundaryError("Complete typed G4 observations required.")
 
         m, identity = self._manifest, boundary["identity"]
+        if boundary["version"] == 5 and kind in {"key_inventory", "writer_drain"}:
+            from core.export_key_custody import validate_operator_observation
+
+            try:
+                if len(rows) != 1:
+                    raise ValueError("One operator observation required.")
+                validate_operator_observation(
+                    kind, rows[0], boundary, now=self._now() if self._now else None
+                )
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HostBoundaryError("Complete operator-control observation required.") from exc
+            return
+        if boundary["version"] == 4 and kind in {"key_inventory", "writer_drain"}:
+            from core.export_key_custody import validate_exclusion, validate_inventory
+
+            try:
+                if kind == "writer_drain":
+                    validate_exclusion(rows, boundary, now=self._now() if self._now else None)
+                elif len(rows) == 1:
+                    validate_inventory(rows[0], boundary, now=self._now() if self._now else None)
+                else:
+                    raise ValueError("One key inventory required.")
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HostBoundaryError(
+                    "Complete two-host custody/exclusion observations required."
+                ) from exc
+            return
         if kind == "host_acl":
             found = set()
             for row in rows:
@@ -299,34 +379,60 @@ class DeploymentBoundary:
                 instant(row["observed_utc"])
                 if row["host"] != boundary["host"]:
                     raise HostBoundaryError("Bot account observation belongs to another host.")
-                validate_bot_token_profile(
-                    {k: v for k, v in row.items() if k not in {"host", "observed_utc"}},
-                    m["bot_sid"],
-                    authority_sid=m["authority_sid"],
-                )
+                profile = {k: v for k, v in row.items() if k not in {"host", "observed_utc"}}
+                if "process_bindings" in boundary:
+                    if profile != boundary["process_bindings"]["bot"]["token_profile"]:
+                        raise HostBoundaryError("Reviewed application token differs.")
+                else:
+                    validate_bot_token_profile(
+                        profile, m["bot_sid"], authority_sid=m["authority_sid"]
+                    )
             elif kind == "identity_issuance":
-                exact(
-                    row,
-                    "service_account_email project_id client_id private_key_id created_utc issued_utc custody_path issuing_administrator",
-                )
-                if (
-                    any(
-                        row[k] != identity[k]
-                        for k in (
-                            "service_account_email",
-                            "project_id",
-                            "client_id",
-                            "private_key_id",
+                if boundary["version"] >= 3:
+                    exact(
+                        row,
+                        "service_account_email project_id client_id private_key_id provenance observed_utc custody_path reviewing_administrator",
+                    )
+                    instant(row["observed_utc"])
+                    if (
+                        row["provenance"] != "existing"
+                        or any(
+                            row[k] != identity[k]
+                            for k in (
+                                "service_account_email",
+                                "project_id",
+                                "client_id",
+                                "private_key_id",
+                            )
                         )
+                        or row["custody_path"] != m["credentials_file"]
+                        or row["reviewing_administrator"]
+                        != boundary["review"]["administrators"]["provider"]
+                    ):
+                        raise HostBoundaryError("Existing identity provenance/custody differs.")
+                else:
+                    exact(
+                        row,
+                        "service_account_email project_id client_id private_key_id created_utc issued_utc custody_path issuing_administrator",
                     )
-                    or instant(row["created_utc"]) > instant(row["issued_utc"])
-                    or row["custody_path"] != m["credentials_file"]
-                    or row["issuing_administrator"]
-                    != boundary["review"]["administrators"]["provider"]
-                ):
-                    raise HostBoundaryError(
-                        "Fresh issuance and private custody observation differs."
-                    )
+                    if (
+                        any(
+                            row[k] != identity[k]
+                            for k in (
+                                "service_account_email",
+                                "project_id",
+                                "client_id",
+                                "private_key_id",
+                            )
+                        )
+                        or instant(row["created_utc"]) > instant(row["issued_utc"])
+                        or row["custody_path"] != m["credentials_file"]
+                        or row["issuing_administrator"]
+                        != boundary["review"]["administrators"]["provider"]
+                    ):
+                        raise HostBoundaryError(
+                            "Fresh issuance and private custody observation differs."
+                        )
             elif kind == "key_inventory":
                 exact(
                     row,
@@ -417,7 +523,10 @@ def assert_protected_path(path, *, private=False, allow_current_identity=True):
 
 
 class PrivateEvidenceStore:
-    """DPAPI protects payloads under the independent authority's Windows identity.
+    """DPAPI protects payloads under the configured execution Windows identity.
+
+    A shared-account deployment trusts the Bot too; encryption does not isolate
+    evidence from other processes running under that same identity.
 
     Root ACL and service identity are checked during explicitly approved startup.
     The existing immutable fsync/readback store supplies byte-integrity semantics.
@@ -646,9 +755,10 @@ def create_private_pipe(name, *, authority_sid, client_sid, overlapped=False):
         for c in name.removeprefix("\\\\.\\pipe\\")
     ):
         raise HostBoundaryError("Local registered pipe name required.")
-    descriptor = win32security.ConvertStringSecurityDescriptorToSecurityDescriptor(
-        f"D:P(A;;GA;;;{authority_sid})(A;;0x{PIPE_CLIENT_ACCESS:x};;;{client_sid})", 1
-    )
+    acl = f"D:P(A;;GA;;;{authority_sid})"
+    if authority_sid != client_sid:
+        acl += f"(A;;0x{PIPE_CLIENT_ACCESS:x};;;{client_sid})"
+    descriptor = win32security.ConvertStringSecurityDescriptorToSecurityDescriptor(acl, 1)
     attributes = pywintypes.SECURITY_ATTRIBUTES()
     attributes.SECURITY_DESCRIPTOR = descriptor
     attributes.bInheritHandle = False
@@ -716,7 +826,9 @@ def validate_bot_token_profile(profile, expected_sid, *, authority_sid=None):
         raise HostBoundaryError("Bot must use a nonprivileged account without authority access.")
 
 
-def inspect_bot_token(token, expected_sid, *, authority_sid=None, security=None):
+def inspect_bot_token(
+    token, expected_sid, *, authority_sid=None, security=None, observe_only=False
+):
     if security is None:
         import win32security as security
     sid, _ = security.GetTokenInformation(token, security.TokenUser)
@@ -738,7 +850,13 @@ def inspect_bot_token(token, expected_sid, *, authority_sid=None, security=None)
         elevated=bool(security.GetTokenInformation(token, security.TokenElevation)),
         ui_access=bool(security.GetTokenInformation(token, security.TokenUIAccess)),
     )
-    validate_bot_token_profile(profile, expected_sid, authority_sid=authority_sid)
+    if observe_only:
+        from core.export_process_identity import validate_token_profile
+
+        validate_token_profile(profile, expected_sid)
+    else:
+        validate_bot_token_profile(profile, expected_sid, authority_sid=authority_sid)
+    return profile
 
 
 def authenticated_peer(handle, expected_sid, *, expected_pid=None, bot_authority_sid=None):

@@ -1,4 +1,4 @@
-"""Explicit G4-only fresh-file enrollment. No startup, import or Bot IPC action."""
+"""Explicit G4-only manual-file registration. No startup, import or Bot IPC action."""
 
 import argparse
 import hashlib
@@ -15,37 +15,54 @@ def bootstrap(manifest_path):
 
 
 def approved_plan(manifest, manifest_bytes, plan_bytes):
-    from services.export_enrollment_service import EnrollmentPlan
     from services.export_execution_protocol import decode, encode
-    from services.export_runtime_composition import enrollment_profile
+    from services.export_manual_enrollment import ManualEnrollmentPlan, manual_profile
 
-    profile = enrollment_profile(manifest["enrollment_profile"])
-    plan = EnrollmentPlan(decode(plan_bytes))
+    profile = manual_profile(manifest)
+    plan = ManualEnrollmentPlan(decode(plan_bytes))
     value = plan.value()
     if (
         value["manifest_sha256"] != hashlib.sha256(manifest_bytes).hexdigest()
         or value["credential_profile_sha256"] != hashlib.sha256(encode(profile)).hexdigest()
-        or value["owner_email"] != profile["owner_email"]
         or value["editor_email"] != manifest["service_account_email"]
         or value["project_id"] != manifest["project_id"]
         or value["storage_owner"] != manifest["storage_owner"]
     ):
         raise ValueError("Protected enrollment plan differs from the exact deployed profile.")
+    from services.export_runtime_composition import RuntimeRegistration
+
+    registered = RuntimeRegistration(manifest["runtime_registration"]).value()
+    targets = [f["file_id"] for f in value["files"]]
+    pools = [p for p in registered["pools"] if targets == [p["index_file_id"], *p["slot_file_ids"]]]
+    excluded = set(registered["protected_file_ids"])
+    for pool in registered["pools"]:
+        if pool not in pools:
+            excluded.update([pool["index_file_id"], *pool["slot_file_ids"]])
+    if (
+        len(pools) != 1
+        or value["owner_email"] != pools[0]["owner_email"]
+        or value["account"] != registered["account"]
+        or value["protected_file_ids"] != sorted(excluded)
+    ):
+        raise ValueError("Manual plan differs from registered pool/owner/protected exclusions.")
     return plan
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Explicit S11 G4 fresh private-file enrollment")
+    parser = argparse.ArgumentParser(
+        description="Explicit S11 G4 registration of manually created files with an exact access policy"
+    )
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--plan", required=True)
     parser.add_argument("--actor", required=True)
     parser.add_argument("--reason", required=True)
     parser.add_argument(
-        "--authorize-operation", choices=["S11_CREATE_PRIVATE_OUTPUT_POOL"], required=True
+        "--authorize-operation", choices=["S11_REGISTER_MANUAL_OUTPUT_POOL"], required=True
     )
     args = parser.parse_args(argv)
     bootstrap(args.manifest)
     from core.export_execution_host import (
+        DeploymentBoundary,
         PrivateEvidenceStore,
         WindowsExecutionHost,
         assert_protected_path,
@@ -53,10 +70,10 @@ def main(argv=None):
     )
     from scripts.run_export_authority import connection_factory, manifest_contract
     from services.export_coordination_dal import ExportCoordinationDAL
-    from services.export_enrollment_service import OutputEnrollment
     from services.export_execution_authority import ExportExecutionAuthority
     from services.export_execution_dal import ExportExecutionDAL
     from services.export_execution_protocol import decode
+    from services.export_manual_enrollment import ManualOutputEnrollment
     from services.export_request_budget import RequestBudget
     from services.export_runtime_composition import verify_installation_contract
 
@@ -66,9 +83,11 @@ def main(argv=None):
         script=__file__,
         current_sid=current_sid(),
         inspect_path=assert_protected_path,
-        enrollment=True,
+        enrollment=False,
     )
     plan = approved_plan(manifest, raw, assert_protected_path(args.plan, private=True).read_bytes())
+    boundary = DeploymentBoundary(manifest)
+    boundary.recheck()
     connect = connection_factory(manifest)
     dal = ExportExecutionDAL(connect)
     verify_installation_contract(dal.installation_snapshot(), manifest["sql_contract"])
@@ -102,8 +121,9 @@ def main(argv=None):
             session_id=session_id,
             budget_factory=lambda account: RequestBudget(budget_dal, account),
             enrollment_plan=plan,
+            dispatch_guard=boundary.recheck,
         )
-        OutputEnrollment(plan=plan, authority=authority, dal=dal, store=store).run(
+        ManualOutputEnrollment(plan=plan, authority=authority, dal=dal, store=store).run(
             actor=args.actor, reason=args.reason
         )
     finally:

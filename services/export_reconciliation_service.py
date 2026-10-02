@@ -450,6 +450,8 @@ def observe_publication(
         execution=read_only,
         stream_id=stream_id,
         authorize=lambda **_: None,
+        preserve_public_staging=document["generation"].get("staging_audience", "private")
+        == "public_viewer",
     )
     # Other quarantined generations remain untouched. The attempted generation
     # itself must still be read when reconciling an uncertain assignment.

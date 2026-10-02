@@ -1,5 +1,51 @@
 # S7 exact implementation manifests and delivery
 
+## Current S11 checkpoint — 2026-09-29
+
+Read the [current validation handoff](s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
+
+The approved single-account/manual-Sheets source implementation and focused local review are complete, pending and unpublished. Chris manually creates Sheets as `chrislos35@gmail.com`; existing `sheets-service@statsupdate.iam.gserviceaccount.com` writes to the registered fixed pool. No human OAuth, automated creation or replacement identity is planned. Equivalent reports and safe referenced/uncertain-output protection remain required.
+
+The 119-set development restore, recovery and clean CHECKDB are evidenced; the selected 15-table baseline covers 2,410,159 rows with its retained provenance qualifications. Keep `S11_G4_Recovery_20260928_97337` read-only/restricted/Broker-disabled. All seven current typed G4 proofs remain incomplete.
+
+Next is local preparation of the exact bounded SQL/provider/two-export validation packet, not execution. Production stays on isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`; no main pull, restart, installation, provider call, activation, publication or automatic chat creation. The old window ended 2026-09-29T09:23:23Z; local preparation needs no window. Rollout and G5 remain separate operator decisions.
+
+The candidate adds `services/export_manual_enrollment.py` and SQL `dbo.ExportManualFileOrigin` / `dbo.usp_ExportManualOutputEnrollmentTransition`, with additive migration `20260929_001_manual_export_registration.sql`. The source inventory is now 540 objects; canonical digest `fda765142962492ffa7fb5ed919ac1a4026c51114365f2d1cdc7ad2c03462944`. Final runtime/source member hashes remain in `final-source-seal-v3.json` in the implementation artifact directory; new documentation has a separate handoff seal.
+
+
+## Local single-account implementation — 2026-09-25
+
+Approved scope is locally authored in core/export_execution_host.py,
+core/export_process_identity.py, services/export_runtime_composition.py,
+services/export_execution_dal.py, scripts/run_export_authority.py and
+scripts/run_export_provider_child.py. The retained source manifest is
+deploy/export_application_schema_source.json; focused new regressions are in
+tests/test_export_single_account.py. No SQL source change, new export trigger, report calculation
+change, publication or live operation. All pending documents still belong to the genuine Bot
+amendment; the [packet](s11_g4_release_packet.md#local-implementation-amendment--2026-09-25)
+records exact versions, permission roles and unresolved G4 startup bindings.
+
+## G4 account-design clarification — 2026-09-25
+
+One Windows account is the operator's preferred deployment model. The
+[bounded assessment](s11_g4_release_packet.md#single-account-assessment--operator-direction-2026-09-25)
+identifies host/token/pipe/custody/readiness and SQL permission-contract dependencies before an
+exact source-change proposal. This is planning only: current source still rejects equal Bot and
+authority SIDs; no runtime implementation or SQL delta is authorized. Existing delivery manifests
+remain historical proof, and all pending/recovered evidence must be preserved.
+
+## S11 G4 planning packet — 2026-09-25
+
+Mirror #282, production #589 and SQL closeout #90 are now verified merged; final-head
+checks passed. Current tips and individual corrected source/archive proofs are recorded in
+the [G4 planning packet](s11_g4_release_packet.md). It includes the later drain/cooldown,
+connection-mode and startup-cleanup evidence cases. The operator confirms one production
+Bot and no test Bot; local SQL is localhost\K98DEV. Repository-derived paths/identities
+remain distinct from live observations. The packet is **DRAFT / NOT EXECUTABLE**: missing
+target bindings remain UNRESOLVED, no operation is approved, and G5/activation remain
+separate operator decisions. No live operations or publication occurred during planning.
+Earlier dated open-PR/implementation checkpoints below remain historical.
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the

@@ -40,9 +40,20 @@ class OwnedStream:
 
 
 class ExportExecutionAuthority:
-    def __init__(self, *, dal, store, host, budget_factory, session_id, enrollment_plan=None):
+    def __init__(
+        self,
+        *,
+        dal,
+        store,
+        host,
+        budget_factory,
+        session_id,
+        enrollment_plan=None,
+        dispatch_guard=None,
+    ):
         self.dal, self.store, self.host = dal, store, host
         self.budget_factory, self.session_id = budget_factory, session_id
+        self.dispatch_guard = dispatch_guard
         if enrollment_plan is not None:
             from services.export_enrollment_service import EnrollmentPlan
 
@@ -187,10 +198,14 @@ class ExportExecutionAuthority:
                     PayloadReference=str(UUID(payload.key)),
                 )
                 budget()
+                if self.dispatch_guard is not None:
+                    self.dispatch_guard()
                 # Procedure checks current owner/fence/version AFTER the wait.
                 # Any commit exception prevents send. A lost acknowledgment may
                 # still leave dispatch_intent in SQL and therefore retains claims.
                 self._event(stream, request, "dispatch_intent", {"request_id": request.request_id})
+                if self.dispatch_guard is not None:
+                    self.dispatch_guard()
                 dispatched = True
                 try:
                     response = stream.child.execute(request.message())

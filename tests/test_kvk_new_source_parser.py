@@ -57,6 +57,41 @@ def test_preserves_typed_rows_optional_profiles_and_all_observed_identities():
     assert not hasattr(result, "scan_id")  # No allocation or B0 roster mutation in S1.
 
 
+def test_calculation_chain_references_do_not_change_observation():
+    original = player_bytes()
+    with BytesIO(original) as source, BytesIO() as output:
+        with ZipFile(source) as old, ZipFile(output, "w") as new:
+            for entry in old.infolist():
+                new.writestr(entry, old.read(entry.filename))
+            new.writestr(
+                "xl/calcChain.xml",
+                '<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                '<c r="Z20" i="1"/><c r="A2"/><c r="A2" i="2"/>'
+                '</calcChain>',
+            )
+        content = output.getvalue()
+    assert player(content).digest == player(original).digest
+
+
+@pytest.mark.parametrize(
+    "xml",
+    [
+        '<worksheet><c r="A2"/></worksheet>',
+        '<calcChain><c r="A2"/></calcChain>',
+        '<calcChain xmlns="urn:unknown"><c r="A2"/></calcChain>',
+        '<worksheet><calcChain><c r="A2"/></calcChain></worksheet>',
+        '<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<row r="1"><c r="A2"/></row></calcChain>',
+    ],
+)
+def test_calculation_chain_exception_does_not_hide_malformed_cells(xml):
+    from kvk.services.new_source_parser import _xml_preflight
+
+    with pytest.raises(SourceValidationError) as error:
+        _xml_preflight(xml.encode(), ParseLimits(), [0])
+    assert error.value.code == "cell_order"
+
+
 @pytest.mark.parametrize(
     "identity",
     [

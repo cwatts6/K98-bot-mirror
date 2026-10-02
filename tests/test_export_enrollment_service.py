@@ -764,50 +764,11 @@ def test_origin_receipt_numeric_type_is_byte_exact_even_with_a_matching_hash(rep
         )
 
 
-@pytest.mark.parametrize(
-    "change",
-    [
-        None,
-        "owner_email",
-        "editor_email",
-        "project_id",
-        "storage_owner",
-        "manifest_sha256",
-        "credential_profile_sha256",
-    ],
-)
-def test_entry_plan_is_bound_to_exact_manifest_and_profile(change):
+def test_manual_entry_rejects_legacy_oauth_plan():
     from scripts.enroll_export_output_pool import approved_plan
 
-    value = plan_value()
-    profile = dict(
-        version=1,
-        owner_email=value["owner_email"],
-        client_id="123-app.apps.googleusercontent.com",
-        scopes=["https://www.googleapis.com/auth/drive.file"],
-    )
-    manifest = dict(
-        enrollment_profile=profile,
-        service_account_email=value["editor_email"],
-        project_id=value["project_id"],
-        storage_owner=value["storage_owner"],
-    )
-    raw = encode(manifest)
-    value["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-    value["credential_profile_sha256"] = hashlib.sha256(encode(profile)).hexdigest()
-    if change:
-        value[change] = {
-            "owner_email": "other@example.com",
-            "editor_email": "other@test-project.iam.gserviceaccount.com",
-            "project_id": "other-project",
-            "storage_owner": "another-owner",
-            "manifest_sha256": "f" * 64,
-            "credential_profile_sha256": "f" * 64,
-        }[change]
-        with pytest.raises((SourceConflict, ValueError)):
-            approved_plan(manifest, raw, encode(value))
-    else:
-        assert approved_plan(manifest, raw, encode(value)).value() == value
+    with pytest.raises(SourceConflict, match="not OAuth"):
+        approved_plan({"enrollment_profile": {}}, b"{}", encode(plan_value()))
 
 
 @pytest.mark.parametrize("damage", [None, "wrong_id", "wrong_manifest", "wrong_protocol"])

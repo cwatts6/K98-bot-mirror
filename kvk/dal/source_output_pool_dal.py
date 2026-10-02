@@ -10,6 +10,7 @@ import json
 from uuid import UUID, uuid4
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
+from services.export_audience import check_audience
 from services.export_coordination_dal import ExportCoordinationDAL, _cas, _mutex, bounded_json
 
 
@@ -675,7 +676,6 @@ class SourceOutputPoolDAL:
             )
         if (
             evidence.get("file_id") != member["file_id"]
-            or evidence.get("private") is not True
             or evidence.get("empty") is not True
             or not evidence.get("manifest_hash")
         ):
@@ -691,6 +691,7 @@ class SourceOutputPoolDAL:
             if self.execution_evidence:
                 self._execution_gate(cursor, claim.account)
             pool = snapshot["pool"]
+            check_audience(evidence, pool)
             slot = next((s for s in snapshot["slots"] if s["FileID"] == member["file_id"]), None)
             if (pool["PoolID"], pool["Epoch"]) != (
                 retirement["pool_id"],
@@ -1053,9 +1054,9 @@ class SourceOutputPoolDAL:
                     "Exact terminal rollover readback and old-writer termination required."
                 )
             for file_id, evidence in proof["files"].items():
+                check_audience(evidence, snapshot["pool"]["pool"])
                 if (
                     evidence.get("file_id") != file_id
-                    or evidence.get("private") is not True
                     or evidence.get("empty") is not True
                     or not evidence.get("manifest_hash")
                 ):
@@ -1063,13 +1064,13 @@ class SourceOutputPoolDAL:
                         "Every registered file needs complete private-clear evidence."
                     )
             setup = proof["setup"]
+            check_audience(setup, snapshot["pool"]["pool"])
             if (
                 setup.get("file_id"),
-                setup.get("private"),
                 setup.get("setup"),
                 setup.get("old_kvk"),
                 setup.get("new_kvk"),
-            ) != (snapshot["pool"]["pool"]["IndexFileID"], True, True, op["OldKVK"], op["NewKVK"]):
+            ) != (snapshot["pool"]["pool"]["IndexFileID"], True, op["OldKVK"], op["NewKVK"]):
                 raise SourceConflict("Exact setup marker evidence required.")
             return setup
 
@@ -1445,7 +1446,7 @@ class SourceOutputPoolDAL:
             return op
 
     def phase(self, claim, phase, file_id, evidence=None):
-        with self._owned(claim) as (cursor, _, op):
+        with self._owned(claim) as (cursor, owned_pool, op):
             cursor.execute(
                 "SELECT FileID FROM KVK.SourceOutputOperationResource WHERE OperationID=? AND FileID=?",
                 claim.operation_id,
@@ -1484,11 +1485,8 @@ class SourceOutputPoolDAL:
                 if file_id != pool["IndexFileID"] or set(progress["files"]) != expected:
                     raise SourceConflict("Setup follows complete verified clear of every file.")
             if phase.endswith("verified"):
-                if (
-                    not isinstance(evidence, dict)
-                    or evidence.get("file_id") != file_id
-                    or evidence.get("private") is not True
-                ):
+                check_audience(evidence, owned_pool)
+                if not isinstance(evidence, dict) or evidence.get("file_id") != file_id:
                     raise SourceConflict("Exact private file readback required.")
                 if phase == "clear_verified":
                     if evidence.get("empty") is not True:
@@ -1528,10 +1526,12 @@ class SourceOutputPoolDAL:
             # Resource owner tokens remain byte-for-byte intact. No independent release.
 
     def complete(self, claim, *, _owned_values=None):
-        with self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
-            cursor,
-            pool,
-            op,
+        with (
+            self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
+                cursor,
+                pool,
+                op,
+            )
         ):
             self._execution_gate(cursor, claim.account)
             progress = json.loads(op["ProgressJson"])
@@ -1544,22 +1544,22 @@ class SourceOutputPoolDAL:
             ):
                 raise SourceConflict("Every exact registered file requires verified private clear.")
             for file_id, evidence in progress["files"].items():
+                check_audience(evidence, pool)
                 if not isinstance(evidence, dict) or (
                     evidence.get("file_id"),
-                    evidence.get("private"),
                     evidence.get("empty"),
-                ) != (file_id, True, True):
+                ) != (file_id, True):
                     raise SourceConflict(
                         "Every exact registered file requires verified private clear."
                     )
             setup = progress["setup"]
+            check_audience(setup, pool)
             if not isinstance(setup, dict) or (
                 setup.get("file_id"),
-                setup.get("private"),
                 setup.get("setup"),
                 setup.get("old_kvk"),
                 setup.get("new_kvk"),
-            ) != (pool["IndexFileID"], True, True, op["OldKVK"], op["NewKVK"]):
+            ) != (pool["IndexFileID"], True, op["OldKVK"], op["NewKVK"]):
                 raise SourceConflict("Exact new-season setup readback required before release.")
             cursor.execute(
                 "SELECT ISNULL(MAX(SequenceNo),0) AS SequenceNo FROM KVK.SourceOutputDisposition WHERE PoolID=?",

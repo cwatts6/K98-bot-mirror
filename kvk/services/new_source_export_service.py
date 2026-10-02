@@ -634,6 +634,7 @@ class GoogleSheetsTransport:
         authority_execution=None,
         authority_stream_id=None,
         authority_guard=None,
+        preserve_public_staging=False,
     ):
         if not isinstance(registration, SheetsRegistration) or not callable(reuse_guard):
             raise ValueError("Explicit registration and durable reuse guard are required.")
@@ -641,6 +642,11 @@ class GoogleSheetsTransport:
             raise ValueError("Bounded row batches required.")
         self.drive, self.sheets = drive, sheets
         self.registration, self.reuse_guard = registration, reuse_guard
+        if type(preserve_public_staging) is not bool or (
+            preserve_public_staging and registration.audience != "public_viewer"
+        ):
+            raise ValueError("Public staging requires an explicit Viewer transport.")
+        self.preserve_public_staging = preserve_public_staging
         self.protected = frozenset(protected_file_ids)
         if self.protected.intersection((registration.index_file_id, *registration.slot_file_ids)):
             raise ValueError("Protected configuration workbook cannot be an export destination.")
@@ -723,7 +729,15 @@ class GoogleSheetsTransport:
 
     @classmethod
     def from_authority(
-        cls, *, registration, reuse_guard, protected_file_ids, execution, stream_id, authorize
+        cls,
+        *,
+        registration,
+        reuse_guard,
+        protected_file_ids,
+        execution,
+        stream_id,
+        authorize,
+        preserve_public_staging=False,
     ):
         """Construct request descriptions without a Bot-owned provider credential."""
         from services.export_provider_adapter import recorded_clients
@@ -738,6 +752,7 @@ class GoogleSheetsTransport:
             authority_execution=execution,
             authority_stream_id=stream_id,
             authority_guard=authorize,
+            preserve_public_staging=preserve_public_staging,
         )
 
     def _execute(self, request):
@@ -844,14 +859,29 @@ class GoogleSheetsTransport:
             or file.get("capabilities", {}).get("canEdit") is not True
             or len(file.get("permissions", [])) != 2 + int(public_ok)
             or actual != expected
+            or (self.preserve_public_staging and not public_ok)
         ):
             raise DestinationSetupRequired(
                 instruction + " Verify the registered owner and remove other sharing."
             )
         return file
 
+    def _staging_file(self, file):
+        """Public staging preserves the manually established Viewer grant.
+
+        The caller must durably mark this attempt exposed before any mutation. It
+        cannot use private recovery; retirement requires its own durable claim.
+        """
+        if not self.preserve_public_staging:
+            return self._private_file(file)
+        if file["id"] in self.quarantined:
+            raise SourceConflict("Quarantined workbook must never be written again.")
+        return self._get(file["id"])
+
     def _private_file(self, file):
         """Revoke only the admitted public-reader permission, then re-read before writes."""
+        if self.preserve_public_staging:
+            raise SourceConflict("Standalone public staging cannot revoke Viewer access.")
         if file["id"] in self.quarantined:
             raise SourceConflict("Quarantined workbook must never be written again.")
         for permission in file.get("permissions", []):
@@ -1017,13 +1047,17 @@ class GoogleSheetsTransport:
             raise SourceConflict("Initial registration cannot overwrite existing workbook data.")
 
     def rollover_private(self, file_id):
-        """Only the separately owned rollover adapter may invoke this mutation."""
+        """Historical name: establish the owned operation's exact staging audience."""
+        if self.preserve_public_staging and self._authority_adapter is None:
+            raise SourceConflict("Standalone public staging cannot perform private retirement.")
         if file_id not in (self.registration.index_file_id, *self.registration.slot_file_ids):
             raise SourceConflict("Rollover file differs from exact registration.")
         if self._request_guard is None:
             raise SourceConflict("Durable rollover ownership is required.")
-        self._private_file(self._get(file_id))
-        return dict(file_id=file_id, private=True)
+        self._staging_file(self._get(file_id))
+        from services.export_audience import audience_evidence
+
+        return dict(file_id=file_id, **audience_evidence(public=self.preserve_public_staging))
 
     def rollover_clear(self, file_id):
         """Replace all grids, remove names/metadata, then read back a private empty file.
@@ -1128,14 +1162,19 @@ class GoogleSheetsTransport:
                 for data in grids[0].get("data", [])
                 for row in data.get("rowData", [])
             )
-            or any(p.get("type") == "anyone" for p in fresh["permissions"])
+            or (
+                not self.preserve_public_staging
+                and any(p.get("type") == "anyone" for p in fresh["permissions"])
+            )
             or any(k.startswith("k98") for k in fresh.get("appProperties", {}))
             or fresh.get("description")
         ):
             return None
+        from services.export_audience import audience_evidence
+
         return dict(
             file_id=file_id,
-            private=True,
+            **audience_evidence(public=self.preserve_public_staging),
             empty=True,
             manifest_hash=digest(empty).hex(),
             sheet_id=grids[0]["properties"]["sheetId"],
@@ -1197,7 +1236,10 @@ class GoogleSheetsTransport:
                 expected_sheet_id is not None
                 and grids[0]["properties"]["sheetId"] != expected_sheet_id
             )
-            or any(p.get("type") == "anyone" for p in file["permissions"])
+            or (
+                not self.preserve_public_staging
+                and any(p.get("type") == "anyone" for p in file["permissions"])
+            )
             or any(k.startswith("k98") for k in file.get("appProperties", {}))
             or file.get("description")
         ):
@@ -1221,9 +1263,11 @@ class GoogleSheetsTransport:
             or any(cells[1:])
         ):
             return None
+        from services.export_audience import audience_evidence
+
         return dict(
             file_id=file_id,
-            private=True,
+            **audience_evidence(public=self.preserve_public_staging),
             setup=True,
             old_kvk=old_kvk,
             new_kvk=new_kvk,
@@ -1316,7 +1360,7 @@ class GoogleSheetsTransport:
                     index, [planned[str(i)] for i in range(len(layout))], layout, manifest
                 )
             for part, file in zip(missing, available[: len(missing)], strict=True):
-                file = self._private_file(file)
+                file = self._staging_file(file)
                 self._bind(destination, key, file, "generation", manifest, int(part))
                 bound_parts[part] = self._get(file["id"])
         elif self._plan_callback is not None:
@@ -1325,7 +1369,7 @@ class GoogleSheetsTransport:
             )
         chosen = [bound_parts[str(i)] for i in range(len(layout))]
         for part, (file, pieces) in enumerate(zip(chosen, layout, strict=True)):
-            self._private_file(self._get(file["id"]))
+            self._staging_file(self._get(file["id"]))
             props = self._execute(
                 self.sheets.spreadsheets().get(spreadsheetId=file["id"], fields="sheets.properties")
             )
@@ -1410,7 +1454,7 @@ class GoogleSheetsTransport:
                 .values()
                 .update(
                     spreadsheetId=chosen[0]["id"],
-                    range=f"'{self._tab(key, 'DIRECTORY')}'!A{offset+1}",
+                    range=f"'{self._tab(key, 'DIRECTORY')}'!A{offset + 1}",
                     valueInputOption="RAW",
                     body={"values": directory[offset : offset + self.batch_rows]},
                 )
@@ -1460,10 +1504,11 @@ class GoogleSheetsTransport:
         ):
             raise SourceConflict("Write does not match immutable generation.")
         for file, pieces in zip(files, self.partition_manifest(manifest), strict=True):
-            if file["id"] in self.quarantined or any(
-                p.get("type") == "anyone" for p in file["permissions"]
+            if file["id"] in self.quarantined or (
+                not self.preserve_public_staging
+                and any(p.get("type") == "anyone" for p in file["permissions"])
             ):
-                raise SourceConflict("Private, non-quarantined ranges required for bulk writes.")
+                raise SourceConflict("Admitted, non-quarantined ranges required for bulk writes.")
             for piece in pieces:
                 if piece["table"] != name:
                     continue

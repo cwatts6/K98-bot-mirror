@@ -1,8 +1,10 @@
-"""Independent, operator-provisioned S11 export supervisor.
+"""Operator-provisioned S11 export supervisor.
 
 No service is installed and importing this file starts nothing. G4 supplies a
 protected manifest, Windows service identity and SQL permissions. The bot's
 normal process does not launch this entry point.
+The explicit shared-account profile trusts the Bot and supervisor together;
+process separation preserves lifecycle accounting, not credential isolation.
 """
 
 import argparse
@@ -172,6 +174,7 @@ def code_files(root, *, inspect_directory=None):
 
 def manifest_contract(manifest, *, script, current_sid, inspect_path, enrollment=False):
     """Validate provisioned identities and protected source before any SQL open."""
+    from core.export_process_identity import TRUST_MODEL, validate_process_bindings
     from services.export_execution_protocol import uuid_text
 
     expected = {
@@ -197,15 +200,30 @@ def manifest_contract(manifest, *, script, current_sid, inspect_path, enrollment
         expected = expected - {"runtime_registration", "deployment_boundary"} | {
             "enrollment_profile"
         }
+    shared = isinstance(manifest, dict) and manifest.get("trust_model") == TRUST_MODEL
+    if shared:
+        expected.add("trust_model")
+        if not enrollment:
+            expected.add("process_bindings")
     if (
         not isinstance(manifest, dict)
         or set(manifest) != expected
         or type(manifest["version"]) is not int
-        or manifest["version"] != (1 if enrollment else 2)
+        or manifest["version"] != ((2 if enrollment else 3) if shared else (1 if enrollment else 2))
     ):
         raise AuthorityStartupError("Exact S11 authority manifest required.")
-    if manifest["authority_sid"] != current_sid or manifest["bot_sid"] == current_sid:
+    if manifest["authority_sid"] != current_sid or (
+        manifest["bot_sid"] != current_sid if shared else manifest["bot_sid"] == current_sid
+    ):
         raise AuthorityStartupError("Separate provisioned authority and Bot identities required.")
+    if shared and not enrollment:
+        validate_process_bindings(manifest["process_bindings"], current_sid)
+        from pathlib import PureWindowsPath
+
+        if PureWindowsPath(manifest["python"]) != PureWindowsPath(
+            manifest["process_bindings"]["authority"]["executable"]
+        ):
+            raise AuthorityStartupError("Supervisor executable differs from approved process.")
     if not all(
         re.fullmatch(r"S-\d+(?:-\d+)+", manifest[key]) for key in ("authority_sid", "bot_sid")
     ):
@@ -234,7 +252,7 @@ def manifest_contract(manifest, *, script, current_sid, inspect_path, enrollment
             "Protected complete SQL installation contract required."
         ) from exc
     if (
-        manifest["sql_contract"]["profile"] != "authority"
+        manifest["sql_contract"]["profile"] != ("application" if shared else "authority")
         or manifest["sql_contract"]["database"] != manifest["sql_database"]
     ):
         raise AuthorityStartupError("Authority SQL profile/database differs from its contract.")
@@ -351,10 +369,17 @@ class AuthorityBroker:
                 or self.issuer is None
             ):
                 raise ValueError("Complete provisioned authority required.")
-            return dict(
+            result = dict(
                 deployment_hash=self.boundary.recheck(),
                 registration_hash=self.registration.fingerprint,
             )
+            from core.export_process_identity import TRUST_MODEL
+
+            if getattr(self.boundary, "_manifest", {}).get("trust_model") == TRUST_MODEL:
+                result["sql_contract_hash"] = self.boundary._manifest["deployment_boundary"][
+                    "sql_contract_hash"
+                ]
+            return result
         if action == "prove":
             if (
                 set(message)
@@ -496,20 +521,41 @@ class AuthorityBroker:
 
 def serve(*, manifest, authority, make_pipe, authenticate, broker):
     from core.export_execution_host import MessagePipe
+    from core.export_process_identity import (
+        TRUST_MODEL,
+        authenticate_process_peer,
+        open_pinned_process,
+        process_snapshot,
+        verify_process_snapshot,
+    )
 
     name = "\\\\.\\pipe\\K98Export-" + manifest["pipe_id"]
     while True:
+        shared = manifest.get("trust_model") == TRUST_MODEL
+        if shared:
+            own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
+            own.Close()
         handle = make_pipe(
             name,
             authority_sid=manifest["authority_sid"],
             client_sid=manifest["bot_sid"],
             overlapped=True,
         )
+        peer = None
         try:
             pipe = MessagePipe(handle, timeout_ms=30000)
             pipe.connect()
+            if shared:
+                peer = authenticate_process_peer(
+                    handle, manifest["process_bindings"]["bot"], server=False
+                )
+            else:
+                authenticate(
+                    handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"]
+                )
             message = pipe.receive()
-            authenticate(handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"])
+            if shared:
+                verify_process_snapshot(process_snapshot(peer), manifest["process_bindings"]["bot"])
             try:
                 result = broker.dispatch(message)
             except Exception:
@@ -524,6 +570,8 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
             # only this connection. Retain all claims and never replay dispatch.
             pass
         finally:
+            if peer is not None:
+                peer.Close()
             handle.Close()
 
 
@@ -554,6 +602,11 @@ def main(argv=None):
         decode(raw), script=__file__, current_sid=current_sid(), inspect_path=assert_protected_path
     )
     boundary = DeploymentBoundary(manifest)
+    from core.export_process_identity import TRUST_MODEL, open_pinned_process
+
+    if manifest.get("trust_model") == TRUST_MODEL:
+        own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
+        own.Close()
     connect = connection_factory(manifest)
     dal = ExportExecutionDAL(connect)
     # This explicit startup performs read-only metadata inspection before an
@@ -589,6 +642,7 @@ def main(argv=None):
             host=host,
             session_id=session_id,
             budget_factory=lambda account: RequestBudget(budget_dal, account),
+            dispatch_guard=boundary.recheck,
         )
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
         from services.export_reconciliation_service import TrustedProofIssuer

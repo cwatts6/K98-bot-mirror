@@ -77,6 +77,11 @@ def checked_attempt_manifest(attempt, parts):
         return value if isinstance(value, str) else bytes(value).hex()
 
     document = json.loads(attempt["ManifestJson"])
+    if document.get("generation", {}).get("staging_audience", "private") not in {
+        "private",
+        "public_viewer",
+    }:
+        raise SourceConflict("Unknown durable staging audience.")
     if digest(document).hex() != hex_value(attempt["ManifestHash"]):
         raise SourceConflict("Attempt manifest hash differs.")
     actual = [
@@ -969,6 +974,10 @@ class ExportCoordinationDAL:
             ]
             validate_parts(parts, destinations)
             document = {"generation": manifest, "parts": parts}
+            if manifest.get("staging_audience", "private") not in {"private", "public_viewer"} or (
+                manifest.get("staging_audience") == "public_viewer" and not self.execution_evidence
+            ):
+                raise SourceConflict("Recorded execution is required for public staging.")
             encoded = bounded_json(document)
             cursor.execute("SELECT AttemptID FROM dbo.ExportAttempt WHERE JobID=?", claim.job_id)
             if one(cursor):
@@ -1050,9 +1059,17 @@ class ExportCoordinationDAL:
         if audience not in {"private", "public_viewer"}:
             raise ValueError("Verified audience required.")
         with self._owned(claim) as (cursor, job):
-            if job["ConsumerKind"] == "new_source" and audience != "private":
-                raise SourceConflict("New-source staging must remain private.")
             attempt, parts = self._attempt(cursor, claim, attempt_id)
+            if job["ConsumerKind"] == "new_source":
+                pinned = json.loads(attempt["ManifestJson"])["generation"].get(
+                    "staging_audience", "private"
+                )
+                if audience != pinned or (
+                    audience == "public_viewer" and not self.execution_evidence
+                ):
+                    raise SourceConflict(
+                        "Verified audience differs from the durable staging policy."
+                    )
             if attempt["Phase"] != "private_started":
                 raise SourceConflict("Only private work may become verified.")
             for p in parts:
@@ -1098,6 +1115,10 @@ class ExportCoordinationDAL:
                 or receipt.get("attempt_id") != attempt_id
                 or receipt.get("files") != [p["FileID"] for p in parts]
                 or receipt.get("audience") not in {"private", "public_viewer"}
+                or (
+                    document["generation"].get("staging_audience") == "public_viewer"
+                    and receipt.get("audience") != "public_viewer"
+                )
                 or not receipt.get("remote_id")
             ):
                 raise SourceConflict("Confirmation differs from the pinned attempt.")

@@ -28,8 +28,10 @@ from tests.test_export_reconciliation_service import (
 from tests.test_export_retirement_evidence import retirement_observation_fixture
 
 
-def recovery_fixture(monkeypatch, *, nested=False, empty=False, count=1):
-    args, api, observations, snapshot, _claim = retirement_observation_fixture(monkeypatch)
+def recovery_fixture(monkeypatch, *, nested=False, empty=False, count=1, public=False):
+    args, api, observations, snapshot, _claim = retirement_observation_fixture(
+        monkeypatch, public=public
+    )
     args.pop("current_attempt_id")
     args.pop("old_attempt_id")
     args["snapshot"] = snapshot
@@ -210,7 +212,27 @@ def recovery_fixture(monkeypatch, *, nested=False, empty=False, count=1):
                 )
             )
         )
+    if public:
+        attempt = snapshot["attempts"][0]
+        document = json.loads(attempt["ManifestJson"])
+        document["generation"]["staging_audience"] = "public_viewer"
+        attempt.update(ManifestJson=bounded_json(document), ManifestHash=digest(document).hex())
     return args, api, observations, proofs
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_public_completed_clear_is_recognized_without_retrying_or_revoking_viewer(
+    monkeypatch, nested
+):
+    args, api, observations, _ = recovery_fixture(
+        monkeypatch, nested=nested, empty=True, public=True
+    )
+    calls = len(api.calls)
+    result = observe_retirement_recovery(**args)
+    evidence = json.loads(result.slots[0].empty_json)
+    assert evidence["empty"] is True and evidence["private"] is False
+    assert evidence["audience"] == "public_viewer"
+    assert all(method in {"get", "batchGet"} for _, method, _ in api.calls[calls:])
 
 
 @pytest.mark.parametrize("nested", [False, True])

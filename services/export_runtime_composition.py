@@ -305,6 +305,20 @@ class ExportRuntime(RuntimeLifetime):
     def transport(self, context, stream):
         from kvk.services.new_source_export_service import GoogleSheetsTransport
 
+        attempt_policy = None
+        if stream.scope["OwnerKind"] == "job":
+            attempts = [
+                a for a in context.get("attempts", []) if a["JobID"] == stream.scope["ObjectID"]
+            ]
+            if attempts or stream.scope.get("NestedToken") is not None:
+                if len(attempts) != 1:
+                    raise SourceConflict("Recovery transport requires its exact durable attempt.")
+                from services.export_coordination_dal import checked_attempt_manifest
+
+                attempt = attempts[0]
+                parts = [p for p in context["parts"] if p["AttemptID"] == attempt["AttemptID"]]
+                document = checked_attempt_manifest(attempt, parts)
+                attempt_policy = document["generation"].get("staging_audience", "private")
         if stream.scope["OwnerKind"] == "operation":
             context = self.pools.operation_snapshot(stream.scope["ObjectID"])["pool"]
         elif "pool" in context.get("pool", {}):
@@ -317,6 +331,7 @@ class ExportRuntime(RuntimeLifetime):
             execution=stream.execute,
             stream_id=stream.stream_id,
             authorize=lambda **_: None,
+            preserve_public_staging=(attempt_policy or registration.audience) == "public_viewer",
         )
 
     def deliver(self, job, claim, dal, budget, stop, snapshot):
@@ -408,6 +423,7 @@ def _prepare_configured_runtime():
     from pathlib import Path
 
     from core.export_execution_host import assert_protected_path, current_sid, machine_identity
+    from core.export_process_identity import TRUST_MODEL, validate_process_bindings
     from kvk.dal.new_source_admin_dal import configured_connection
     from scripts.run_export_authority import code_files
     from services.export_execution_dal import (
@@ -438,21 +454,36 @@ def _prepare_configured_runtime():
         "export_config_file",
         "export_config_sha256",
     }
-    if set(config) != fields or type(config["version"]) is not int or config["version"] != 1:
+    shared = config.get("trust_model") == TRUST_MODEL
+    if shared:
+        fields.add("trust_model")
+    if (
+        set(config) != fields
+        or type(config["version"]) is not int
+        or config["version"] != (2 if shared else 1)
+    ):
         raise SourceConflict("Complete protected Bot runtime manifest required.")
     registration = RuntimeRegistration(config["registration"])
     authority = config["authority"]
     if (
         not isinstance(authority, dict)
-        or set(authority) != {"host", "authority_sid", "bot_sid", "pipe_id", "deployment_hash"}
+        or set(authority)
+        != (
+            {"host", "authority_sid", "bot_sid", "pipe_id", "deployment_hash"}
+            | ({"process_bindings"} if shared else set())
+        )
         or authority["host"] != machine_identity()
         or authority["bot_sid"] != current_sid()
     ):
         raise SourceConflict("Bot runtime belongs to another host or identity.")
+    if shared:
+        validate_process_bindings(authority["process_bindings"], authority["bot_sid"])
+        if authority["authority_sid"] != authority["bot_sid"]:
+            raise SourceConflict("Shared application requires the same Windows identity.")
     validate_installation_contract(config["sql_contract"])
     validate_legacy_installation_contract(config["legacy_sql_contract"])
     validate_application_installation_contract(config["application_sql_contract"])
-    if config["sql_contract"]["profile"] != "reader" or any(
+    if config["sql_contract"]["profile"] != ("application" if shared else "reader") or any(
         any(
             config[name][key] != config["sql_contract"][key]
             for key in ("server", "database", "principal")
@@ -506,11 +537,19 @@ def _prepare_configured_runtime():
     finally:
         connection.close()
     client = AuthorityClient(
-        **{k: authority[k] for k in ("pipe_id", "authority_sid", "bot_sid", "deployment_hash")}
+        **{k: authority[k] for k in ("pipe_id", "authority_sid", "bot_sid", "deployment_hash")},
+        **(
+            {"trust_model": TRUST_MODEL, "process_bindings": authority["process_bindings"]}
+            if shared
+            else {}
+        ),
     )
-    if client._invoke(dict(version=1, action="ready")) != dict(
+    expected_ready = dict(
         deployment_hash=authority["deployment_hash"], registration_hash=registration.fingerprint
-    ):
+    )
+    if shared:
+        expected_ready.update(sql_contract_hash=digest(config["sql_contract"]).hex())
+    if client._invoke(dict(version=1, action="ready")) != expected_ready:
         raise SourceConflict("Protected authority registration/deployment differs.")
     spool = assert_protected_path(config["spool_root"], private=True)
     store = ExportSnapshotStore(spool, registration.value()["storage_owner"])
@@ -826,8 +865,8 @@ def validate_installation_contract(approved):
         not isinstance(approved, dict)
         or set(approved) != fields
         or type(approved["version"]) is not int
-        or approved["version"] != 2
-        or approved["profile"] not in {"authority", "reader"}
+        or (approved["version"], approved["profile"])
+        not in {(2, "authority"), (2, "reader"), (3, "application")}
         or any(
             not isinstance(approved[k], str)
             or not 1 <= len(approved[k]) <= 128
@@ -876,7 +915,8 @@ def verify_installation_contract(observed, approved):
         Sysadmin=0,
         DatabaseOwner=0,
         ViewDefinition=1,
-        AuthorityRole=int(approved["profile"] == "authority"),
+        AuthorityRole=int(approved["profile"] in {"authority", "application"}),
+        # Reader has explicit DENY EXECUTE; never combine it with authority.
         ReaderRole=int(approved["profile"] == "reader"),
         ControlDatabase=0,
         AlterRole=0,
@@ -1136,8 +1176,8 @@ def validate_legacy_installation_contract(approved):
         "migration_hash",
         "metadata_hash",
     }
-    hexadecimal = lambda value, length=64: isinstance(value, str) and re.fullmatch(
-        rf"[0-9a-f]{{{length}}}", value
+    hexadecimal = lambda value, length=64: (
+        isinstance(value, str) and re.fullmatch(rf"[0-9a-f]{{{length}}}", value)
     )
     if (
         not isinstance(approved, dict)
@@ -1274,9 +1314,7 @@ def verify_legacy_installation_contract(observed, approved):
         raise SourceConflict("Missing, extra, changed or invalid legacy module signature.")
     expected_certs = []
     for name, pin in approved["certificate_pins"].items():
-        for database in (
-            ["ROK_TRACKER", "master"] if name == "S11LegacyImport" else ["ROK_TRACKER"]
-        ):
+        for database in ["ROK_TRACKER", "master"] if name == "S11LegacyImport" else ["ROK_TRACKER"]:
             expected_certs.append(
                 dict(
                     DatabaseName=database,
@@ -1839,13 +1877,27 @@ class AuthorityClient:
         pipe_factory=None,
         verify_server=None,
         deployment_hash=None,
+        trust_model=None,
+        process_bindings=None,
     ):
+        from core.export_process_identity import TRUST_MODEL, validate_process_bindings
+
         uuid_text(pipe_id)
-        if authority_sid == bot_sid or not all(
+        shared = trust_model == TRUST_MODEL
+        if trust_model not in (None, TRUST_MODEL):
+            raise ValueError("Unknown application trust model.")
+        if (authority_sid != bot_sid if shared else authority_sid == bot_sid) or not all(
             isinstance(value, str) and value.startswith("S-1-")
             for value in (authority_sid, bot_sid)
         ):
             raise ValueError("Distinct registered Windows identities required.")
+        if shared:
+            validate_process_bindings(process_bindings, bot_sid)
+            if deployment_hash is None:
+                raise ValueError("Shared application requires a pinned deployment.")
+        elif process_bindings is not None:
+            raise ValueError("Process bindings require the explicit application profile.")
+        self.process_bindings = json.loads(json.dumps(process_bindings)) if shared else None
         self.pipe_id, self.authority_sid, self.bot_sid = pipe_id, authority_sid, bot_sid
         if deployment_hash is not None and (
             not isinstance(deployment_hash, str)
@@ -1866,6 +1918,16 @@ class AuthorityClient:
 
         if current_sid() != self.bot_sid:
             raise ExecutionUncertain("Bot process identity differs from provisioned caller.")
+        if self.process_bindings is not None:
+            import os
+
+            from core.export_process_identity import authenticate_process_peer, open_pinned_process
+
+            own = open_pinned_process(os.getpid(), self.process_bindings["bot"])
+            own.Close()
+            return authenticate_process_peer(
+                handle, self.process_bindings["authority"], server=True
+            )
         return authenticated_server(handle, self.authority_sid)
 
     def _invoke(self, message):
@@ -1881,6 +1943,12 @@ class AuthorityClient:
             pipe = MessagePipe(handle)
             pipe.send(message)
             reply = pipe.receive()
+            if self.process_bindings is not None:
+                from core.export_process_identity import process_snapshot, verify_process_snapshot
+
+                verify_process_snapshot(
+                    process_snapshot(server), self.process_bindings["authority"]
+                )
             if set(reply) != {"version", "result"} or reply["version"] != 1:
                 raise ExecutionUncertain("Authority action has no exact acknowledgment.")
             return reply["result"]

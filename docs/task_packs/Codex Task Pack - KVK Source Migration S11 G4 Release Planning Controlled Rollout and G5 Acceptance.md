@@ -1,5 +1,63 @@
 # S11 — G4 release planning, controlled rollout and G5 acceptance
 
+## Local review accepted; production inventory approved — 2026-10-02
+
+Chris has **accepted and CLOSED the local implementation review** and **APPROVED bounded production inventory and staged rollout preparation**. Follow the [current approval/handoff](../reference/kvk_source_migration/s11_g4_production_inventory_handoff_20261002.md), [handover task](S11%20G4%20Production%20Inventory%20and%20Staged%20Rollout%20-%20Task%20Pack%20-%2020261002.md) and [new chat starter](S11%20G4%20Production%20Inventory%20-%20Chat%20Starter%20-%2020261002.md). Carry this approval forward without repeating the question. Prepare exact bounded read commands, preserve their hashes/copies, then execute the permitted production reads. Installation, publication/PR, deployment/restart, enrollment/export writes and G5/activation remain separate decisions. Version 5 operator control and the verified five-file pool remain accepted; do not reopen settled choices. Earlier approval/status statements below are dated history, not current stage authority. No production observation was performed for this documentation update.
+
+## Operator-controlled readiness decision — current 2026-10-02 overlay
+
+Read the [current operator-control result and decision packet](../reference/kvk_source_migration/s11_g4_operator_control_readiness_20261002.md) first. The operator-approved simpler version 5 model is implemented: Chris controls commands/imports; no remote shutdown/process-session inventory or fixed duration cap is required. The five candidate files (Slots 02–06) passed actual read-only owner/Editor/Viewer/blank-grid checks; proposed roles and protected exclusions are pinned. 644 focused tests passed, one skipped; Changes review completed 21/21 with no findings. This resolves the local source/minimum-file blockers. Actual enrollment, target installation/configuration/process proofs, S6/S8 operational gates, production rollout and G5 remain separate. Historical bodies and seals below are preserved.
+
+## Coordinated Viewer / two-host amendment — current 2026-10-02 overlay
+
+Read the [completed local amendment](../reference/kvk_source_migration/s11_g4_coordinated_viewer_custody_amendment_20261002.md) before older R1/R2 source-blocker statements. Coordinated public Viewer preparation/verification/retirement/rollover/recovery and version 4 two-host custody are now implemented and locally tested. Historical private recovery keeps its original policy. The Changes review and final-source pin qualification are retained. Actual seven-proof G4 evidence, fresh pool capacity/targets, production installation/rollout and G5 remain open; no activation follows. Earlier source seals and evidence remain historical.
+
+
+## Full readiness review — current 2026-10-02 overlay
+
+**Review complete; DO NOT PROMOTE or activate.** Read the [full readiness review](../reference/kvk_source_migration/s11_g4_full_readiness_review_20261002.md) before dated readiness statements below. Local calculation and standalone Sheets reuse succeeded, but coordinated public Viewer semantics, two-host custody/writer proof, pool capacity and seven current typed proofs remain unresolved. The initial broad offline run found 16 stale-fixture failures; all were corrected and both affected modules passed (391 tests). Runtime source is unchanged by this review. Separate Bot/SQL security evidence and its SQL coverage qualification are retained. Production and G5 remain unapproved.
+
+
+## Current development SQL checkpoint — 2026-10-01
+
+Read the [disposable SQL repair and retest checkpoint](../reference/kvk_source_migration/s11_g4_disposable_sql_retest_20261001.md) before the dated installation and next-step statements below. The explicitly approved isolated development installation and SQL synthetic rehearsal have now run, encountered guarded failures, been corrected and completed across retained reconciled attempts. The development TrustServerCertificate exception remains connection-local. Production, real exports, the seven complete typed G4 proofs and G5 remain outside this result. All original bodies and seals below remain historical evidence.
+
+
+## Public Viewer correction — current 2026-09-29 overlay
+
+Read the [public Viewer implementation update](../reference/kvk_source_migration/s11_g4_public_viewer_implementation_20260929.md) before older policy/source statements below. The operator explicitly retains anyone-with-link Viewer access. Local manual plan v3 and coordinated SQL correction are implemented, offline-tested and separately reviewed; no installation, registration, export, deployment or activation follows. Private-only initial wording and older source pins below are historical. Existing receipt interpretations, seals and reference/uncertainty protections remain preserved.
+
+
+## Current S11 checkpoint — 2026-09-29
+
+Read the [current validation handoff](../reference/kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
+
+The approved single-account/manual-Sheets source implementation and focused local review are complete, pending and unpublished. Chris manually creates Sheets as `chrislos35@gmail.com`; existing `sheets-service@statsupdate.iam.gserviceaccount.com` writes to the registered fixed pool. No human OAuth, automated creation or replacement identity is planned. Equivalent reports and safe referenced/uncertain-output protection remain required.
+
+The 119-set development restore, recovery and clean CHECKDB are evidenced; the selected 15-table baseline covers 2,410,159 rows with its retained provenance qualifications. Keep `S11_G4_Recovery_20260928_97337` read-only/restricted/Broker-disabled. All seven current typed G4 proofs remain incomplete.
+
+Next is local preparation of the exact bounded SQL/provider/two-export validation packet, not execution. Production stays on isolated hotfix `bd980c0f497faf2048eaf1fb6b79600662911763`; no main pull, restart, installation, provider call, activation, publication or automatic chat creation. The old window ended 2026-09-29T09:23:23Z; local preparation needs no window. Rollout and G5 remain separate operator decisions.
+
+### Next-chat exit checklist
+
+- Reconcile retained evidence and final candidate hashes; preserve pending work and all retained recovery targets.
+- Specify a new disjoint disposable SQL target, minimal prerequisites, restricted capabilities and positive/negative transaction cases.
+- Bind dedicated spreadsheet/grid IDs and exact existing-identity metadata requests using nonsecret facts; do not re-ask settled owner/account preferences.
+- Separate read-only verification, effectful registration/two-export demonstration, production deployment and G5 decisions.
+- For each operation provide exact command/hash, target, effects, prerequisites, budgets, evidence, stops and recovery boundary; obtain approval only after the packet is reviewable.
+- Retain memory-investigation deferral, withdrawn-collector prohibition, separate empty-report/view issues, S6/S8 gates and uncertain publications.
+
+
+## S11 G4 packet prepared — 2026-09-25
+
+See the [local planning packet](../reference/kvk_source_migration/s11_g4_release_packet.md).
+Mirror #282, production #589 and SQL #90 are verified merged with final-head checks passed.
+The packet pins the corrected delivery and preserves both S10E archive identities. One
+production Bot is reported; no test Bot exists. Production SQL is operator-confirmed as
+MINI_AMD / ROK_TRACKER; local disposable SQL is localhost\K98DEV. Actual inventory requires
+separately approved observations. This is **DRAFT / NOT EXECUTABLE** with no approved
+operation IDs, no publication and no G5/activation decision. Earlier open-PR status is history.
+
 Follow-up delivery: [Bot-mirror #282](https://github.com/cwatts6/K98-bot-mirror/pull/282) and
 [SQL closeout #90](https://github.com/cwatts6/K98-bot-SQL-Server/pull/90) are open for review.
 Recheck their final outcomes and any later production promotion in the S11 closeout before
