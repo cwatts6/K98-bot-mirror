@@ -431,8 +431,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         )
         assert client_factory.call_args.kwargs["trust_model"] == TRUST_MODEL
         assert (
-            runtime.verify_legacy_installation_contract.call_args.kwargs["profile"]
-            == "application"
+            runtime.verify_legacy_installation_contract.call_args.kwargs["profile"] == "application"
         )
         connection.close.assert_called_once()
 
