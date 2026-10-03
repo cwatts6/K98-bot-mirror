@@ -79,11 +79,15 @@ def _patch_import_credentials(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("failure", [None, "drain", "cleanup"])
-def test_transactional_success(monkeypatch, tmp_path, failure):
+@pytest.mark.parametrize("coordinated", [False, True])
+def test_transactional_success(monkeypatch, tmp_path, failure, coordinated):
     # Prepare environment and monkeypatches
     monkeypatch.setattr(pci, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
     monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", True)
+    import services.legacy_export_snapshot_service as legacy
+
+    monkeypatch.setattr(legacy, "has_runtime_context", lambda: coordinated)
     _patch_import_credentials(monkeypatch, tmp_path)
 
     # Mock sheet service / read
@@ -106,8 +110,16 @@ def test_transactional_success(monkeypatch, tmp_path, failure):
 
     # Mock centralized helper to return success
     def fake_write_df_to_staging_and_upsert(
-        cursor, conn, df, staging_table, upsert_proc, batch_size, transactional
+        cursor,
+        conn,
+        df,
+        staging_table,
+        upsert_proc,
+        batch_size,
+        transactional,
+        staging_mode="truncate",
     ):
+        assert staging_mode == ("replace" if coordinated else "truncate")
         return {
             "staging": {"table": staging_table, "rows": len(df), "status": "ok", "error": None},
             "upsert": {"proc": upsert_proc, "status": "ok", "error": None},
@@ -162,7 +174,16 @@ def test_transactional_upsert_failure_triggers_rollback(monkeypatch, tmp_path):
     monkeypatch.setattr(pci, "preflight_or_raise", lambda *a, **k: None)
     monkeypatch.setattr(pci, "log_backup_context", lambda *a, **k: None)
 
-    def failing_write(cursor, conn, df, staging_table, upsert_proc, batch_size, transactional):
+    def failing_write(
+        cursor,
+        conn,
+        df,
+        staging_table,
+        upsert_proc,
+        batch_size,
+        transactional,
+        staging_mode="truncate",
+    ):
         return {
             "staging": {"table": staging_table, "rows": len(df), "status": "ok", "error": None},
             "upsert": {"proc": upsert_proc, "status": "error", "error": "proc failed"},
@@ -199,7 +220,16 @@ def test_non_transactional_calls_helper_and_commits(monkeypatch, tmp_path):
 
     called = {"args": None}
 
-    def fake_write_non_tx(cursor, conn, df, staging_table, upsert_proc, batch_size, transactional):
+    def fake_write_non_tx(
+        cursor,
+        conn,
+        df,
+        staging_table,
+        upsert_proc,
+        batch_size,
+        transactional,
+        staging_mode="truncate",
+    ):
         called["args"] = {"staging_table": staging_table, "transactional": transactional}
         return {
             "staging": {"table": staging_table, "rows": len(df), "status": "ok", "error": None},

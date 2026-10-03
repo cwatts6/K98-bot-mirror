@@ -164,7 +164,19 @@ def configured_service():
     if not c.KVK_SOURCE_ARTIFACT_ROOT:
         raise PermissionError("Configure a private artifact root before using source intake.")
     store = ArtifactStore(Path(c.KVK_SOURCE_ARTIFACT_ROOT))
-    return SourceAdminService(access, SourceAdminDAL(configured_connection, store), store)
+    from services.export_runtime_composition import configured_runtime
+    from services.export_sql_health_dal import preflight
+
+    return SourceAdminService(
+        access,
+        SourceAdminDAL(configured_connection, store),
+        store,
+        write_preflight=(
+            preflight
+            if c.EXPORT_COORDINATION_ENABLED and configured_runtime().sql_profile == "application"
+            else None
+        ),
+    )
 
 
 def _wire(value):
@@ -172,8 +184,13 @@ def _wire(value):
 
 
 class SourceAdminService:
-    def __init__(self, access, repository, artifacts, now=utc_now):
+    def __init__(self, access, repository, artifacts, now=utc_now, *, write_preflight=None):
         self.access, self.repository, self.artifacts, self.now = access, repository, artifacts, now
+        self.write_preflight = write_preflight
+
+    def _admit_write(self):
+        if self.write_preflight is not None:
+            self.write_preflight()
 
     def receipt(self, actor, receipt_id, action="status"):
         self.access.authorize(actor, action)
@@ -198,6 +215,7 @@ class SourceAdminService:
 
     def stage_upload(self, actor, *, filename, content, message_id, attachment_id, season=None):
         self.access.authorize(actor, upload=True)
+        self._admit_write()
         if not filename.lower().endswith(".xlsx"):
             raise ValueError("Source intake supports XLSX workbooks only.")
         candidate = parse_filename_metadata(filename)
@@ -291,6 +309,7 @@ class SourceAdminService:
     ):
         admin = self.access.authorize(actor, action)
         row = self.receipt(actor, receipt_id, action)
+        self._admit_write()
         if action not in ("accept", "finalize", "correct"):
             raise ValueError("Choose accept, finalize or correct for workbook metadata.")
         if not reason.strip() or len(reason) > 512:
@@ -370,6 +389,7 @@ class SourceAdminService:
     ):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
+        self._admit_write()
         b0_revision = row["ObservationRevisionID"] or (
             row["payload"].get("proposal", {}).get("b0_revision")
         )
@@ -462,6 +482,7 @@ class SourceAdminService:
     def prepare_roster_correction(self, actor, receipt_id, version, *, reason, publication_plan):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
+        self._admit_write()
         revision = row["ObservationRevisionID"] or row["payload"].get("proposal", {}).get(
             "b0_revision"
         )
@@ -522,6 +543,7 @@ class SourceAdminService:
         if not proposal:
             raise ValueError("Prepare metadata before accepting the workbook.")
         admin = self.access.authorize(actor, proposal["action"])
+        self._admit_write()
 
         def operation(locked, importer, cursor):
             saved = locked["payload"]["proposal"]

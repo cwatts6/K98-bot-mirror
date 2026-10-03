@@ -200,7 +200,15 @@ class ExportRuntime(RuntimeLifetime):
     """
 
     def __init__(
-        self, *, connect, registration, store, client, legacy_sql_contract, application_sql_contract
+        self,
+        *,
+        connect,
+        registration,
+        store,
+        client,
+        legacy_sql_contract,
+        application_sql_contract,
+        sql_profile="reader",
     ):
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
         from kvk.services.new_source_admin_service import access_from_config
@@ -226,6 +234,7 @@ class ExportRuntime(RuntimeLifetime):
         if client.deployment_hash is None:
             raise SourceConflict("Runtime requires the approved authority deployment identity.")
         self.connect, self.registration, self.client = connect, registration, client
+        self.sql_profile = sql_profile
         config = registration.value()
         if store.storage_owner != config["storage_owner"]:
             raise SourceConflict("Spool custody differs from runtime registration.")
@@ -239,6 +248,7 @@ class ExportRuntime(RuntimeLifetime):
             execution_evidence=True,
             legacy_sql_contract=legacy_sql_contract,
             application_sql_contract=application_sql_contract,
+            sql_profile=sql_profile,
         )
         self.jobs = NewSourceJobStreams(coordinator=self.dal, client=client)
         self.operations = OutputOperationStreams(pools=self.pools, client=client)
@@ -429,6 +439,7 @@ def _prepare_configured_runtime():
     from services.export_execution_dal import (
         ExportExecutionDAL,
         application_installation_snapshot,
+        installation_migrations,
         legacy_installation_snapshot,
     )
     from services.export_execution_protocol import decode
@@ -483,6 +494,8 @@ def _prepare_configured_runtime():
     validate_installation_contract(config["sql_contract"])
     validate_legacy_installation_contract(config["legacy_sql_contract"])
     validate_application_installation_contract(config["application_sql_contract"])
+    if (config["sql_contract"]["version"] == 4) != (config["legacy_sql_contract"]["version"] == 2):
+        raise SourceConflict("Direct legacy and fixed SQL permission models must agree.")
     if config["sql_contract"]["profile"] != ("application" if shared else "reader") or any(
         any(
             config[name][key] != config["sql_contract"][key]
@@ -517,10 +530,22 @@ def _prepare_configured_runtime():
     # Connection factories are existing application owners. Each readiness
     # observation checks its actual target; no SQL identity is inferred from
     # environment names or from the authority's separate database session.
-    verify_installation_contract(
-        ExportExecutionDAL(configured_connection).installation_snapshot(), config["sql_contract"]
+    from functools import partial
+
+    connection_factory = partial(
+        configured_connection, sql_profile=config["sql_contract"]["profile"]
     )
-    connection = configured_connection()
+    verify_installation_contract(
+        ExportExecutionDAL(connection_factory).installation_snapshot(
+            **(
+                {"migrations": installation_migrations(config["sql_contract"])}
+                if config["sql_contract"]["version"] == 4
+                else {}
+            )
+        ),
+        config["sql_contract"],
+    )
+    connection = connection_factory()
     try:
         connection.autocommit = True
         cursor = connection.cursor()
@@ -555,12 +580,13 @@ def _prepare_configured_runtime():
     spool = assert_protected_path(config["spool_root"], private=True)
     store = ExportSnapshotStore(spool, registration.value()["storage_owner"])
     bundle = ExportRuntime(
-        connect=configured_connection,
+        connect=connection_factory,
         registration=registration,
         store=store,
         client=client,
         legacy_sql_contract=config["legacy_sql_contract"],
         application_sql_contract=config["application_sql_contract"],
+        sql_profile=config["sql_contract"]["profile"],
     )
     return bundle
 
@@ -849,7 +875,7 @@ class RuntimeRegistration:
 
 def validate_installation_contract(approved):
     """Validate the protected contract before any SQL connection can be opened."""
-    from services.export_execution_dal import INSTALLATION_MIGRATIONS
+    from services.export_execution_dal import installation_migrations
 
     fields = {
         "version",
@@ -867,7 +893,7 @@ def validate_installation_contract(approved):
         or set(approved) != fields
         or type(approved["version"]) is not int
         or (approved["version"], approved["profile"])
-        not in {(2, "authority"), (2, "reader"), (3, "application")}
+        not in {(2, "authority"), (2, "reader"), (3, "application"), (4, "application")}
         or any(
             not isinstance(approved[k], str)
             or not 1 <= len(approved[k]) <= 128
@@ -875,7 +901,7 @@ def validate_installation_contract(approved):
             for k in ("server", "database", "collation", "principal")
         )
         or not isinstance(approved["migration_hashes"], dict)
-        or set(approved["migration_hashes"]) != set(INSTALLATION_MIGRATIONS)
+        or set(approved["migration_hashes"]) != set(installation_migrations(approved))
         or not all(hexadecimal(v) for v in approved["migration_hashes"].values())
         or not hexadecimal(approved["metadata_hash"])
     ):
@@ -894,8 +920,8 @@ def verify_installation_contract(observed, approved):
     """
     from services.export_execution_dal import (
         INSTALLATION_METADATA,
-        INSTALLATION_MIGRATIONS,
         INSTALLATION_OBJECTS,
+        installation_migrations,
         installation_permissions,
     )
 
@@ -929,8 +955,8 @@ def verify_installation_contract(observed, approved):
     migrations = observed["migrations"]
     if (
         not isinstance(migrations, list)
-        or len(migrations) != len(INSTALLATION_MIGRATIONS)
-        or {m["MigrationId"] for m in migrations} != set(INSTALLATION_MIGRATIONS)
+        or len(migrations) != len(installation_migrations(approved))
+        or {m["MigrationId"] for m in migrations} != set(installation_migrations(approved))
         or any(
             m["Status"] != "Applied"
             or not isinstance(m["ChecksumSha256"], str)
@@ -996,7 +1022,9 @@ def verify_installation_contract(observed, approved):
         raise SourceConflict(
             "Installed SQL definitions differ from the approved metadata fingerprint."
         )
-    expected_permissions = installation_permissions(approved["profile"])
+    expected_permissions = installation_permissions(
+        approved["profile"], direct=approved["version"] == 4
+    )
     for column in columns:
         for permission in ("SELECT", "UPDATE"):
             expected_permissions[(column["ObjectName"], column["ColumnName"], permission)] = (
@@ -1166,6 +1194,11 @@ def validate_legacy_installation_contract(approved):
     """
     from services.export_execution_dal import validate_legacy_permission_source
 
+    if isinstance(approved, dict) and approved.get("version") == 2:
+        from services.export_sql_direct_permissions import validate_contract
+
+        return validate_contract(approved)
+
     fields = {
         "version",
         "server",
@@ -1229,6 +1262,10 @@ def verify_legacy_installation_contract(observed, approved, *, profile="reader")
     )
 
     validate_legacy_installation_contract(approved)
+    if approved["version"] == 2:
+        from services.export_sql_direct_permissions import verify
+
+        return verify(observed, approved, profile=profile)
     if not isinstance(profile, str) or profile not in {"reader", "application"}:
         raise SourceConflict("Exact reader or shared application SQL profile required.")
     source = approved["source"]

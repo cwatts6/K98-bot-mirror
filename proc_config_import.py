@@ -196,7 +196,9 @@ def _retry_predicate(exc: BaseException) -> bool:
     reraise=True,
 )
 def _get_import_connection_with_retry():
-    return _conn_import()
+    from core.export_sql_connection import producer_connection
+
+    return producer_connection(_conn_import)
 
 
 def _enable_fast_executemany(cursor) -> bool:
@@ -706,8 +708,14 @@ def run_proc_config_import(
 
         verify_producer_cursor(cursor)
 
+        from services.legacy_export_snapshot_service import has_runtime_context
+
+        coordinated = has_runtime_context()
+        replacement_mode = "replace" if coordinated else "truncate"
+
         try:
-            preflight_or_raise(conn, dbname=DATABASE, warn_threshold=85.0)
+            if not coordinated:
+                preflight_or_raise(conn, dbname=DATABASE, warn_threshold=85.0)
         except LogHeadroomError as e:
             msg = f"SQL log headroom insufficient: {e}"
             logger.error(msg)
@@ -724,7 +732,8 @@ def run_proc_config_import(
             return False, report
 
         try:
-            log_backup_context(cursor, DATABASE)
+            if not coordinated:
+                log_backup_context(cursor, DATABASE)
         except Exception:
             logger.debug("Failed to log backup context", exc_info=True)
 
@@ -739,7 +748,7 @@ def run_proc_config_import(
                 except Exception:
                     pass
 
-                if IMPORT_CAPTURE_LOGSPACE:
+                if IMPORT_CAPTURE_LOGSPACE and not coordinated:
                     try:
                         log_before = _get_db_logspace(cursor, DATABASE)
                         if log_before:
@@ -759,6 +768,7 @@ def run_proc_config_import(
                         "dbo.sp_Upsert_ProcConfig_From_Staging",
                         batch_size=BATCH_SIZE,
                         transactional=True,
+                        staging_mode=replacement_mode,
                     )
                 except Exception:
                     logger.exception(
@@ -794,7 +804,7 @@ def run_proc_config_import(
                     conn,
                     df_bands,
                     "dbo.KVKTargetBands",
-                    mode="truncate",
+                    mode=replacement_mode,
                     transactional=True,
                 )
                 report["tables"]["dbo.KVKTargetBands"] = res
@@ -810,7 +820,7 @@ def run_proc_config_import(
                     conn,
                     df_exempt,
                     "dbo.EXEMPT_FROM_STATS",
-                    mode="truncate",
+                    mode=replacement_mode,
                     transactional=True,
                 )
                 report["tables"]["dbo.EXEMPT_FROM_STATS"] = res
@@ -864,7 +874,12 @@ def run_proc_config_import(
                     ]
                     df_details = df_details[ordered_cols].dropna(subset=["KVK_NO"])
                 res = write_df_to_table(
-                    cursor, conn, df_details, "dbo.KVK_Details", mode="truncate", transactional=True
+                    cursor,
+                    conn,
+                    df_details,
+                    "dbo.KVK_Details",
+                    mode=replacement_mode,
+                    transactional=True,
                 )
                 report["tables"]["dbo.KVK_Details"] = res
                 if res.get("status") != "ok":
@@ -992,7 +1007,7 @@ def run_proc_config_import(
                 tx_end = time.time()
                 report["transaction_duration_sec"] = (tx_end - tx_start) if tx_start else None
 
-                if IMPORT_CAPTURE_LOGSPACE:
+                if IMPORT_CAPTURE_LOGSPACE and not coordinated:
                     try:
                         log_after = _get_db_logspace(cursor, DATABASE)
                         if log_after:
@@ -1010,6 +1025,7 @@ def run_proc_config_import(
                         "dbo.sp_Upsert_ProcConfig_From_Staging",
                         batch_size=BATCH_SIZE,
                         transactional=False,
+                        staging_mode=replacement_mode,
                     )
                 except Exception:
                     logger.exception(

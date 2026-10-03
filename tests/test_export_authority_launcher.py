@@ -301,7 +301,11 @@ def test_authority_connection_factory_supports_budget_and_procedure_transactions
     driver = Mock(side_effect=open_fixture)
     monkeypatch.setattr(pyodbc, "connect", driver)
     connect = connection_factory(
-        {"sql_server": "fixture-server", "sql_database": "fixture-database"}
+        {
+            "sql_server": "fixture-server",
+            "sql_database": "fixture-database",
+            "sql_contract": {"profile": "authority"},
+        }
     )
     if operation == "reserve":
         assert ExportCoordinationDAL(connect).reserve_request("fixture") == {
@@ -576,11 +580,12 @@ def test_manifest_requires_exact_distinct_ids_and_full_source_inventory(enrollme
 
 
 @pytest.mark.parametrize("enrollment", [False, True])
+@pytest.mark.parametrize("contract_version", [2, 4])
 @pytest.mark.parametrize(
     "mismatch", ["migration", "target", "definition", "budget", "origin_read", "column_write"]
 )
 def test_explicit_authority_startup_checks_installation_before_session_store_or_child(
-    monkeypatch, tmp_path, mismatch, enrollment
+    monkeypatch, tmp_path, mismatch, enrollment, contract_version
 ):
     import json
 
@@ -591,6 +596,9 @@ def test_explicit_authority_startup_checks_installation_before_session_store_or_
     from tests.test_export_runtime_composition import installation_fixture
 
     observation, approved = installation_fixture()
+    approved["version"] = contract_version
+    if contract_version == 4:
+        approved["profile"] = "application"
     if mismatch == "migration":
         observation["migrations"].pop()
     elif mismatch == "target":
@@ -645,6 +653,13 @@ def test_explicit_authority_startup_checks_installation_before_session_store_or_
         ]
     with pytest.raises(SourceConflict):
         run(arguments)
+    dal.installation_snapshot.assert_called_once_with(
+        migrations=(
+            persistence.CURRENT_INSTALLATION_MIGRATIONS
+            if contract_version == 4
+            else persistence.INSTALLATION_MIGRATIONS
+        )
+    )
     connector.assert_not_called()
     dal.transition.assert_not_called()
     process_factory.assert_not_called()

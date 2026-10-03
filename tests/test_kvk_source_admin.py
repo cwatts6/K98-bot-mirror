@@ -1069,3 +1069,35 @@ def test_s8c_season_override_is_explicit_before_receipt_acceptance(rig):
     )
     assert row["KVK_NO"] == 17 and row["Status"] == "received"
     assert not repo.accepted
+
+
+def test_write_headroom_failure_retains_receipt_and_allows_cancellation(rig):
+    service, repo = rig
+    row = upload(service)
+    before = len(repo.calls)
+
+    def insufficient():
+        raise SourceConflict("Insufficient reviewed headroom")
+
+    service.write_preflight = insufficient
+    with pytest.raises(SourceConflict, match="headroom"):
+        upload(service)
+    assert len(repo.calls) == before
+    with pytest.raises(SourceConflict, match="headroom"):
+        prepare(service, row)
+    # Cancellation is a recovery operation, not new workload admission.
+    repo.cancel = Mock(return_value=row)
+    assert service.cancel(ADMIN, row["AttemptID"], row["payload"]["version"]) is row
+    repo.cancel.assert_called_once_with(
+        row["AttemptID"], str(ADMIN.user_id), str(ADMIN.guild_id), 1
+    )
+
+
+def test_read_only_roster_preview_does_not_require_headroom(rig):
+    service, repo = rig
+    row = upload(service)
+    repo.receipts[row["AttemptID"]]["ObservationRevisionID"] = "synthetic-retained-b0"
+    service.write_preflight = Mock(side_effect=SourceConflict("Insufficient headroom"))
+    preview = service.roster_preview(ADMIN, row["AttemptID"])
+    assert "roster_preview" in preview
+    service.write_preflight.assert_not_called()

@@ -268,9 +268,11 @@ def write_df_to_staging_and_upsert(
     upsert_proc: str,
     batch_size: int = 5000,
     transactional: bool = True,
+    staging_mode: str = "truncate",
 ) -> dict:
     """
-    Convenience wrapper: write df to staging_table (truncate + insert) and call upsert_proc.
+    Write df to staging_table and call upsert_proc. staging_mode selects the
+    pre-delete behaviour: "truncate" uses TRUNCATE; "replace" uses DELETE.
 
     Returns dict containing both write result and upsert result status.
     """
@@ -281,7 +283,7 @@ def write_df_to_staging_and_upsert(
         conn,
         df,
         staging_table,
-        mode="truncate",
+        mode=staging_mode,
         batch_size=batch_size,
         commit_per_batch=False,
         transactional=transactional,

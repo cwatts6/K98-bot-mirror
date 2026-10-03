@@ -55,6 +55,10 @@ The application processes Discord interactions and attachments, reads and writes
 - Production deployment occurs only through the authorised production repository, branch, validation, and rollback process.
 - Security controls fail closed when identity, permission, configuration, or authoritative state cannot be established.
 
+## Explicit S11 SQL deployment profiles
+
+The operator-approved `direct_application_v1` profile uses a dedicated SQL login with reviewed direct legacy schema/database/bulk/file permissions. This profile trusts application credentials for those capabilities; certificate-based isolation from that account is not its security boundary. Discord authorization, validated inputs, protected deployment/configuration, explicit operator control, SQL coordination/ownership and fail-closed source/identity checks remain required. `db_owner`, `sysadmin`, unreviewed privileges and automatic signing-to-direct fallback remain outside this profile. Historical signed profiles retain their original checks. Review injection or authorization defects reachable with the direct rights; the intended grant itself does not constitute an unintended privilege escalation.
+
 ## Reportable Security Findings
 
 A finding is normally reportable when a realistic path exists to one or more of the following:

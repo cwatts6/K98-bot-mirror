@@ -71,7 +71,7 @@ def main(argv=None):
     from scripts.run_export_authority import connection_factory, manifest_contract
     from services.export_coordination_dal import ExportCoordinationDAL
     from services.export_execution_authority import ExportExecutionAuthority
-    from services.export_execution_dal import ExportExecutionDAL
+    from services.export_execution_dal import ExportExecutionDAL, installation_migrations
     from services.export_execution_protocol import decode
     from services.export_manual_enrollment import ManualOutputEnrollment
     from services.export_request_budget import RequestBudget
@@ -90,7 +90,10 @@ def main(argv=None):
     boundary.recheck()
     connect = connection_factory(manifest)
     dal = ExportExecutionDAL(connect)
-    verify_installation_contract(dal.installation_snapshot(), manifest["sql_contract"])
+    verify_installation_contract(
+        dal.installation_snapshot(migrations=installation_migrations(manifest["sql_contract"])),
+        manifest["sql_contract"],
+    )
     session_id = str(uuid4())
     host = WindowsExecutionHost(
         python=manifest["python"],

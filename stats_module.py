@@ -312,7 +312,9 @@ async def run_sql_procedure(
 
     @admitted_writer("scan_data")
     def _proc_and_get_expected_counter() -> int:
-        with _conn_trusted() as conn:
+        from core.export_sql_connection import producer_connection
+
+        with producer_connection(_conn_trusted) as conn:
             # UPDATE_ALL2 owns its Phase A/Phase B transactions and rejects any
             # caller-owned transaction at entry. Keep this connection in
             # autocommit mode so the counter/control queries do not create an

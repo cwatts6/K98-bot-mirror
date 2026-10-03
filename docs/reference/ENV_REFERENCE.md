@@ -1,5 +1,16 @@
 # Environment Reference
 
+## S11 dedicated SQL environment configuration — 2026-10-03
+
+The coordinated application profile uses the existing local/production `.env`; no SQL credential JSON file is required. Retain `SQL_USERNAME`/`SQL_PASSWORD` and `IMPORT_SQL_USERNAME`/`IMPORT_SQL_PASSWORD` for legacy workloads. Add `S11_SQL_USERNAME` and `S11_SQL_PASSWORD` for the dedicated `S11_ExportApplication` login (local test names may have a suffix). Reuse `SQL_SERVER` and `SQL_DATABASE=ROK_TRACKER`; the protected runtime manifest must bind these same target/principal values. Missing or invalid dedicated values stop coordinated startup/work; there is no fallback to legacy or Windows credentials.
+
+Set `S11_SQL_MIN_FREE_LOG_BYTES` to the reviewed positive workload reserve and `S11_SQL_MAX_LOG_USED_PERCENT` to the reviewed limit strictly between 0 and 100. These have no invented default. A small synthetic test reserve does not establish production sizing. The application reads one target/principal log measurement; unknown or unsupported recovery/reuse conditions and insufficient headroom stop new work. Reads, cancellation and reconciliation remain available. Audit and SQL Agent/backup hooks retain their existing operational identities; the application login receives no backup or Agent role. Post-import statistics maintenance explicitly retains the legacy operational connection.
+
+Protect `.env` against untrusted reads and writes using the existing single Windows operator account and administrator/SYSTEM access. Keep it ignored by Git and out of evidence snapshots, logs and command lines. ODBC 18 connections require encryption and certificate verification (`Encrypt=yes;TrustServerCertificate=no`), with connect 5s, statement 15s and lock 1s budgets. Passwords are quoted as ODBC values, never SQL identifiers. No secret read or connection occurs when the connection module is imported; explicit calls load the application's `.env` without overriding existing process environment.
+
+This configuration delta does not authorize production installation/deployment, enrollment or activation. Earlier dated entries below remain historical; use the 2026-10-02 production handoff and subsequent operator decisions for current rollout status.
+
+
 ## Current S11 checkpoint — 2026-09-29
 
 Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
@@ -462,3 +473,7 @@ S10B provides dependency-injected DAL/worker composition and a pinned new-source
 ExportSnapshotStore validates the root, opaque keys, byte limits, length and SHA256 before use. Provision the root with private operating-system permissions; storage ownership is an affinity identity, not an ACL substitute. Spool receipt registration follows exclusive write, fsync and readback. No retained spool is deleted by the worker.
 
 Durable pacing also checkpoints a full policy interval after each actual provider completion. A lost checkpoint retains claims for reconciliation; reservation timing alone cannot permit a delayed request burst.
+
+### S11 direct SQL permission model — 2026-10-03
+
+Chris selected `direct_application_v1`, retaining the dedicated `S11_ExportApplication` and protected `.env` `S11_SQL_USERNAME`/`S11_SQL_PASSWORD`. No signing certificates or credential files are required in this explicit model. The reviewed legacy role carries database/schema privileges, and the SID-bound login/master user receives the required bulk/file permissions directly. Ordinary application credentials are trusted for these broader rights; former certificate isolation is not claimed. See [the direct SQL amendment](kvk_source_migration/s11_g4_direct_sql_permission_amendment_20261003.md). Production account grants, real connection validation, Bot promotion/deployment, enrollment and activation remain separately staged.

@@ -413,17 +413,26 @@ async def ensure_sql_headroom_or_notify(notify_ch) -> bool:
     Returns True if it's OK to proceed, False if the import should be skipped because of log headroom.
     This runs the blocking pyodbc check through the once-only offload adapter.
     """
+    import bot_config
+
     server = SQL_SERVER
     database = SQL_DATABASE
     username = SQL_USERNAME
     password = SQL_PASSWORD
     # If any credential is missing, skip the check (legacy behavior) and allow the import.
-    if not (server and database and username and password):
+    if not bot_config.EXPORT_COORDINATION_ENABLED and not (
+        server and database and username and password
+    ):
         logger.debug("SQL env credentials incomplete; skipping log headroom check.")
         return True
 
     try:
         # Keep blocking SQL preflight work off the event loop.
+        if bot_config.EXPORT_COORDINATION_ENABLED:
+            from services.export_sql_health_dal import preflight
+
+            await _offload_callable(preflight, name="s11_sql_headroom", prefer_process=True)
+            return True
         await _offload_callable(
             preflight_from_env_sync,
             server,
@@ -454,7 +463,7 @@ async def ensure_sql_headroom_or_notify(notify_ch) -> bool:
     except Exception as e:
         # Non-deterministic failure checking SQL headroom; log and allow the import to avoid blocking
         logger.exception("Unexpected failure running SQL log headroom check: %s", e)
-        return True
+        return not bot_config.EXPORT_COORDINATION_ENABLED
 
 
 async def trigger_log_backup_background():
