@@ -66,6 +66,7 @@ def render(plan, *, server, database, principal, login_sid):
             or plan.get("legacy_source_sha256") != DIRECT_SOURCE_HASH
             or plan.get("server_permissions")
             != ["ADMINISTER BULK OPERATIONS", "VIEW SERVER PERFORMANCE STATE"]
+            or plan.get("master_database_permissions") != ["CONNECT"]
             or plan.get("master_object_permissions")
             != [
                 dict(object="dbo.xp_cmdshell", permission="EXECUTE"),
@@ -78,6 +79,7 @@ def render(plan, *, server, database, principal, login_sid):
         master_statements = [
             f"IF USER_ID(N'{principal}') IS NOT NULL OR EXISTS(SELECT 1 FROM sys.database_principals WHERE sid={login_sid}) THROW 52080,'Existing master user is not adopted.',1;",
             f"CREATE USER [{principal}] FOR LOGIN [{principal}] WITH DEFAULT_SCHEMA=[dbo];",
+            f"GRANT CONNECT TO [{principal}];",
             f"GRANT EXECUTE ON OBJECT::[dbo].[xp_cmdshell] TO [{principal}];",
             f"GRANT EXECUTE ON OBJECT::[dbo].[xp_fileexist] TO [{principal}];",
             f"GRANT ADMINISTER BULK OPERATIONS TO [{principal}];",

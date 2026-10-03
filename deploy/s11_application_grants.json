@@ -1077,6 +1077,9 @@
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
   "legacy_source_sha256": "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6",
+  "master_database_permissions": [
+    "CONNECT"
+  ],
   "master_object_permissions": [
     {
       "object": "dbo.xp_cmdshell",

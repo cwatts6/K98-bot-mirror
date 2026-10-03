@@ -8,7 +8,7 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 
 DIRECT_SOURCE_HASH = "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "ffc2cc6ec8598676684affa4565240e3be65a012eceaa831acb4a024fdf7c6fc"
+APPLICATION_GRANT_PLAN_HASH = "8e9fab0613e7740ebb7d19d0945a4ea416ad0482ba81c37a2b3fb6ccb5f621dc"
 
 
 def application_grant_rows():
@@ -24,6 +24,9 @@ def application_grant_rows():
     entries += [
         ("ROK_TRACKER", "OBJECT", g["object"], g["permission"], g.get("column"))
         for g in plan["grants"]
+    ]
+    entries += [
+        ("master", "DATABASE", "master", p, None) for p in plan["master_database_permissions"]
     ]
     entries += [
         ("master", "OBJECT", g["object"], g["permission"], None)

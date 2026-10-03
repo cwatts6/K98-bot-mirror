@@ -296,6 +296,44 @@ def test_application_expected_grants_reject_unreviewed_source(monkeypatch):
         direct.application_grant_rows()
 
 
+def test_master_connect_matches_created_user_and_full_contract(contract):
+    observed, approved = contract
+    assert [
+        row
+        for row in observed["application_grants"]
+        if row["DatabaseName"] == "master" and row["SecurableClass"] == "DATABASE"
+    ] == [
+        dict(
+            DatabaseName="master",
+            SecurableClass="DATABASE",
+            TargetName="master",
+            PermissionName="CONNECT",
+            GrantState="G",
+            ColumnName=None,
+        )
+    ]
+    verify_legacy_installation_contract(observed, approved, profile="application")
+
+
+@pytest.mark.parametrize("change", ["missing", "deny", "grant_option", "wrong_target"])
+def test_master_connect_must_match_exact_reviewed_permission(contract, change):
+    observed, approved = contract
+    row = next(
+        row
+        for row in observed["application_grants"]
+        if row["DatabaseName"] == "master" and row["PermissionName"] == "CONNECT"
+    )
+    if change == "missing":
+        observed["application_grants"].remove(row)
+    elif change == "wrong_target":
+        row["TargetName"] = "msdb"
+    else:
+        row["GrantState"] = "D" if change == "deny" else "W"
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="exact reviewed grant plan"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
 def test_fixed_direct_profile_retains_evidence_denies_and_old_profiles():
     old = installation_permissions("application")
     new = installation_permissions("application", direct=True)
@@ -322,11 +360,27 @@ def test_direct_renderer_binds_master_user_and_specific_server_grants():
     assert "Existing master user is not adopted" in sql
     assert "GRANT ADMINISTER BULK OPERATIONS TO [S11_ExportApplication]" in sql
     assert "GRANT EXECUTE ON OBJECT::[dbo].[xp_cmdshell]" in sql
+    assert "USE [master];\n" in sql
+    assert "GRANT CONNECT TO [S11_ExportApplication];" in sql
     assert "ADD SIGNATURE" not in sql and "CREATE CERTIFICATE" not in sql
     assert "ALTER LOGIN [S11_ExportApplication] ENABLE" not in sql
     assert "IF @@TRANCOUNT>0 ROLLBACK TRANSACTION" in sql
     plan["server_permissions"].append("CONTROL SERVER")
     with pytest.raises(ValueError):
+        render(
+            plan,
+            server="mini_AMD",
+            database="ROK_TRACKER",
+            principal="S11_ExportApplication",
+            login_sid="0x" + "12" * 16,
+        )
+
+
+@pytest.mark.parametrize("permissions", [[], ["CONTROL"], ["CONNECT", "CONTROL"]])
+def test_renderer_rejects_master_database_permission_widening(permissions):
+    plan = json.loads(Path("deploy/s11_application_grants.json").read_bytes())
+    plan["master_database_permissions"] = permissions
+    with pytest.raises(ValueError, match="Exact reviewed direct legacy grant plan"):
         render(
             plan,
             server="mini_AMD",
