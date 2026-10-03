@@ -1,6 +1,17 @@
 # Environment Reference
 
-## Current S11 checkpoint — 2026-09-29
+## S11 dedicated SQL environment configuration — 2026-10-03
+
+The coordinated application profile uses the existing local/production `.env`; no SQL credential JSON file is required. Retain `SQL_USERNAME`/`SQL_PASSWORD` and `IMPORT_SQL_USERNAME`/`IMPORT_SQL_PASSWORD` for legacy workloads. Add `S11_SQL_USERNAME` and `S11_SQL_PASSWORD` for the dedicated `S11_ExportApplication` login (local test names may have a suffix). Reuse `SQL_SERVER` and `SQL_DATABASE=ROK_TRACKER`; the protected runtime manifest must bind these same target/principal values. Missing or invalid dedicated values stop coordinated startup/work; there is no fallback to legacy or Windows credentials.
+
+Set `S11_SQL_MIN_FREE_LOG_BYTES` to the reviewed positive workload reserve and `S11_SQL_MAX_LOG_USED_PERCENT` to the reviewed limit strictly between 0 and 100. These have no invented default. A small synthetic test reserve does not establish production sizing. The application reads one target/principal log measurement; unknown or unsupported recovery/reuse conditions and insufficient headroom stop new work. Reads, cancellation and reconciliation remain available. Audit and SQL Agent/backup hooks retain their existing operational identities; the application login receives no backup or Agent role. Post-import statistics maintenance explicitly retains the legacy operational connection.
+
+Protect `.env` against untrusted reads and writes using the existing single Windows operator account and administrator/SYSTEM access. Keep it ignored by Git and out of evidence snapshots, logs and command lines. ODBC 18 connections require encryption and certificate verification (`Encrypt=yes;TrustServerCertificate=no`), with connect 5s, statement 15s and lock 1s budgets. Passwords are quoted as ODBC values, never SQL identifiers. No secret read or connection occurs when the connection module is imported; explicit calls load the application's `.env` without overriding existing process environment.
+
+This configuration delta does not authorize production installation/deployment, enrollment or activation. Earlier dated entries below remain historical; use the 2026-10-02 production handoff and subsequent operator decisions for current rollout status.
+
+
+## Current S11 checkpoint â€” 2026-09-29
 
 Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.
 
@@ -13,7 +24,7 @@ Next is local preparation of the exact bounded SQL/provider/two-export validatio
 Current manual enrollment uses the normal shared supervisor/service-account manifest v3 with runtime registration and deployment boundary. Bot manifest v2, boundary/observation records v3, manual plan v2 and SQL application readiness v3 are distinct contracts. There is no OAuth enrollment profile or predecessor-account field in the existing-identity boundary. No environment/config/credential file was changed by this documentation update.
 
 
-## Local S11 single-account profile — 2026-09-25
+## Local S11 single-account profile â€” 2026-09-25
 
 The approved local amendment adds `single_account_application_v1` in protected manifests,
 not an environment flag that bypasses readiness. Bot manifest v2 and supervisor v3 bind the
@@ -23,7 +34,7 @@ profile; normal exports use the fresh service-account credential. No second Wind
 is required by this profile. No environment file has been changed or runtime configured.
 See [the exact packet](kvk_source_migration/s11_g4_release_packet.md#local-implementation-amendment--2026-09-25).
 
-## Current delivery and next phase — 2026-09-25
+## Current delivery and next phase â€” 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the
 [source closeout and exact manifest](kvk_source_migration/s11_closeout_and_g4_handoff.md) for delivered behavior, review
@@ -36,7 +47,7 @@ operations; G5 remains operator-owned. Earlier dated checkpoints below retain th
 scope/status as historical evidence, including headings used by existing links. They do not
 reopen implementation or authorize live operations. Preserve S6/S8 gates, uncertainties and data.
 
-## S11 client pipe access correction — 2026-09-25
+## S11 client pipe access correction â€” 2026-09-25
 
 Both the Bot client and supervised provider child use the same message-pipe opener. Its
 explicit access mask, also used by the server's client DACL entry, is 0x120103: read/write data,
@@ -45,7 +56,7 @@ It excludes FILE_CREATE_PIPE_INSTANCE (0x4). Mode-setup failure closes the just-
 including interruption. These are source and fake-native test results; actual access checks,
 message mode, server identity, cancellation and recovery still require the exact G4 host.
 
-## S11 authority launcher preconditions — 2026-09-25
+## S11 authority launcher preconditions â€” 2026-09-25
 
 The three explicit G4 entry files (run_export_authority.py, run_export_provider_child.py and
 enroll_export_output_pool.py under scripts) and the isolated Python/pywin32 installation are
@@ -67,7 +78,7 @@ deadline. Broker/provider processing is outside that transport deadline. Timeout
 does not release claims or authorize a retry; the caller retains reconciliation uncertainty.
 Actual Windows overlapped cancellation and the next-client recovery cases require G4 evidence.
 
-## S11 protected runtime manifest — 2026-09-24
+## S11 protected runtime manifest â€” 2026-09-24
 
 K98_EXPORT_RUNTIME_MANIFEST is a local absolute path to the independently reviewed, administrator-
 owned Bot-readable runtime manifest. It is consumed only when EXPORT_COORDINATION_ENABLED is true;
@@ -85,7 +96,7 @@ The fresh provider key/client identity and seven protected G4 records are exact 
 boundary. See the current integration contract and release readiness packet for custody and G4.
 
 
-## S11 legacy SQL permission contract — authored 2026-09-24
+## S11 legacy SQL permission contract â€” authored 2026-09-24
 
 The approved local permission addition introduces no automatic runtime enable flag or credential
 default. LegacySnapshotDAL(execution_evidence=True) requires a protected legacy_sql_contract:
@@ -104,7 +115,7 @@ backup/actual restore evidence and four named operations. Do not reuse productio
 the ordinary S11 evidence fixture's database for these legacy-body tests. Local offline runs keep
 this authorization disabled. See release_readiness_and_rollback for the unchanged operator gates.
 
-## S11 SQL permission contract version 2 — 2026-09-24
+## S11 SQL permission contract version 2 â€” 2026-09-24
 
 Both normal authority and fresh-file enrollment manifests now require version 2 inside their
 approved SQL installation contract. The outer manifest and enrollment_profile still use version 1;
@@ -120,7 +131,7 @@ This bounded contract does not certify broader import/configuration SQL or compl
 No manifest, credential, SQL grant or deployed configuration was created or changed here. See the
 [source and remaining readiness record](kvk_source_migration/release_evidence_log.md#s11-fixed-coordination-permission-contract--2026-09-24).
 
-## S11 enrollment profile contract — 2026-09-24
+## S11 enrollment profile contract â€” 2026-09-24
 
 Source authoring only; no environment or credential has been provisioned. The separate enrollment
 manifest uses all protected authority identity/source/storage/SQL fields, replacing
@@ -137,12 +148,12 @@ never inferred permission. Actual credential access, consent and provisioning ne
 
 The separately protected plan binds the raw manifest SHA-256 and canonical profile SHA-256, version,
 purpose output_enrollment, account, storage_owner, owner_email, editor_email, project_id, file_count
-3–17 and plan_id. SQL hashes canonical plan JSON as UTF-16LE. Source/profile hashes alone do not prove
+3â€“17 and plan_id. SQL hashes canonical plan JSON as UTF-16LE. Source/profile hashes alone do not prove
 old-writer exclusion, live containment or historical provider finality. No actual path/token/value
 has been selected by this source contract; do not place private inputs in Git.
 
 
-## S11 protected authority inventory — 2026-09-24
+## S11 protected authority inventory â€” 2026-09-24
 
 The independent authority launcher now requires runtime_registration in its protected manifest:
 version, account, spool storage_owner, service_account_email, complete legacy_configuration
@@ -159,12 +170,12 @@ and origin persistence are not approved or implemented here. Do not provision cr
 exports from this source checkpoint. Exact G4 operations and G5 acceptance remain separate.
 
 
-## S11 implementation status — 2026-09-24
+## S11 implementation status â€” 2026-09-24
 
 S11 independent-authority configuration is not deployable yet: the validated authority launcher and complete composition are unimplemented. Do not infer readiness from source files or enable exports. No actual environment or credential configuration was changed. See [checkpoint](kvk_source_migration/release_evidence_log.md#s11-approved-implementation-checkpoint--2026-09-24).
 
 
-## Current status — S10E merged; S11 review/scope next, 2026-09-15
+## Current status â€” S10E merged; S11 review/scope next, 2026-09-15
 
 S10E Bot [mirror #280](https://github.com/cwatts6/K98-bot-mirror/pull/280),
 [production #587](https://github.com/cwatts6/k98-bot/pull/587) and
@@ -191,7 +202,7 @@ No predecessor rerun, SQL/provider/Discord operation, bot-machine pull/restart/d
 activation, new task creation or Git publication is authorized by this documentation closeout.
 Earlier dated pending/next-slice instructions are historical and do not reopen accepted work.
 
-## S10E local authoring — 2026-09-15
+## S10E local authoring â€” 2026-09-15
 
 S10E adds no production environment setting, ProcConfig activation row or automatic provider
 client. `configured_operator_service()` remains closed. Future explicitly authorized composition
@@ -214,7 +225,7 @@ The current implementation and evidence boundaries are in the
 [S10E pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S10E%20Export%20Operator%20UX%20and%20Rollover.md).
 Earlier scope/closeout entries below remain historical.
 
-## Historical S10D closeout — 2026-09-15
+## Historical S10D closeout â€” 2026-09-15
 
 SQL #87 is merged and locally pulled at `80353a6280e523f30c27e724f71e7b47dadadd16`.
 Bot main/origin main remains `bf3eccf964601e2975dd86eefe96f7b0153be3bb`; production/main remains
@@ -462,3 +473,7 @@ S10B provides dependency-injected DAL/worker composition and a pinned new-source
 ExportSnapshotStore validates the root, opaque keys, byte limits, length and SHA256 before use. Provision the root with private operating-system permissions; storage ownership is an affinity identity, not an ACL substitute. Spool receipt registration follows exclusive write, fsync and readback. No retained spool is deleted by the worker.
 
 Durable pacing also checkpoints a full policy interval after each actual provider completion. A lost checkpoint retains claims for reconciliation; reservation timing alone cannot permit a delayed request burst.
+
+### S11 direct SQL permission model — 2026-10-03
+
+Chris selected `direct_application_v1`, retaining the dedicated `S11_ExportApplication` and protected `.env` `S11_SQL_USERNAME`/`S11_SQL_PASSWORD`. No signing certificates or credential files are required in this explicit model. The reviewed legacy role carries database/schema privileges, and the SID-bound login/master user receives the required bulk/file permissions directly. Ordinary application credentials are trusted for these broader rights; former certificate isolation is not claimed. See [the direct SQL amendment](kvk_source_migration/s11_g4_direct_sql_permission_amendment_20261003.md). Production account grants, real connection validation, Bot promotion/deployment, enrollment and activation remain separately staged.

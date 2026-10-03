@@ -370,7 +370,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         ),
         registration=registration_fixture(),
         sql_contract=sql,
-        legacy_sql_contract=dict(target, source={}),
+        legacy_sql_contract=dict(target, version=1, source={}),
         application_sql_contract=target.copy(),
         spool_root=str(tmp_path / "spool"),
         source_hashes={},

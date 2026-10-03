@@ -233,6 +233,8 @@ def get_conn_with_retries(
     backoff_base: float | None = None,
     backoff_max: float | None = None,
     meta: dict | None = None,
+    *,
+    operational: bool = False,
 ):
     """
     Attempt to create a DB connection using constants._conn() with retry/backoff and
@@ -259,7 +261,9 @@ def get_conn_with_retries(
         attempts += 1
         try:
             # _conn is the canonical factory in constants
-            return _conn()
+            from core.export_sql_connection import producer_connection
+
+            return _conn() if operational else producer_connection(_conn)
         except Exception as e:
             # Detect if this is a pyodbc.OperationalError if pyodbc is available.
             is_operational = False
@@ -628,7 +632,7 @@ def run_post_import_stats_update(
     server: str, database: str, username: str, password: str, timeout_seconds: int = 300
 ) -> None:
     try:
-        conn = get_conn_with_retries(meta={"operation": "post_import_stats"})
+        conn = get_conn_with_retries(meta={"operation": "post_import_stats"}, operational=True)
     except Exception as e:
         emit_telemetry_event(
             {

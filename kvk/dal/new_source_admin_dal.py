@@ -708,8 +708,15 @@ class SourceAdminDAL:
 
 def configured_connection():
     """Lazy dedicated connection; called only by explicitly enabled private controls."""
+    import bot_config
     from file_utils import get_conn_with_retries
 
-    connection = get_conn_with_retries()
+    if bot_config.EXPORT_COORDINATION_ENABLED:
+        from constants import SQL_DATABASE, SQL_SERVER
+        from core.export_sql_connection import connect
+
+        connection = connect(server=SQL_SERVER, database=SQL_DATABASE)
+    else:
+        connection = get_conn_with_retries()
     connection.autocommit = False
     return connection

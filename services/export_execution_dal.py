@@ -130,6 +130,28 @@ INSTALLATION_MIGRATIONS = (
     "20260924_001_export_execution_evidence",
     "20260929_001_manual_export_registration",
 )
+
+CURRENT_INSTALLATION_MIGRATIONS = (
+    "20260914_001_shared_export_coordination",
+    "20261001_001_legacy_export_preparation_installation",
+    "20261001_002_kvk_output_pool_installation",
+    "20261001_003_kvk_output_operation_installation",
+    "20261001_004_export_execution_evidence_installation",
+    "20261001_005_manual_export_registration_installation",
+    "20261001_006_manual_public_viewer_installation",
+    "20261001_007_manual_file_id_characters",
+    "20261001_008_manual_file_id_constraint",
+    "20261001_009_manual_resource_membership_order",
+    "20261001_010_reconciliation_file_id_characters",
+)
+
+
+def installation_migrations(approved):
+    return (
+        CURRENT_INSTALLATION_MIGRATIONS if approved.get("version") == 4 else INSTALLATION_MIGRATIONS
+    )
+
+
 EVIDENCE_TABLES = tuple(
     "dbo." + name
     for name in (
@@ -218,7 +240,7 @@ INSTALLATION_PERMISSIONS = {
 }
 
 
-def installation_permissions(profile):
+def installation_permissions(profile, *, direct=False):
     """Fixed object capabilities for this export contract, never caller grants.
 
     `reader` means evidence-reader plus the Bot's existing coordination writes.
@@ -239,6 +261,12 @@ def installation_permissions(profile):
     return {
         (name, None, permission): int(
             permission == "SELECT"
+            or (
+                direct
+                and permission == "ALTER"
+                and name.startswith("dbo.")
+                and name not in EVIDENCE_TABLES
+            )
             or permission in writes.get(name, ())
             or (
                 permission == "EXECUTE"
@@ -443,8 +471,15 @@ def legacy_definition_hash(definition):
 
 
 def validate_legacy_permission_source(source):
+    from services.export_sql_direct_permissions import DIRECT_SOURCE_HASH
+
+    expected = (
+        DIRECT_SOURCE_HASH
+        if isinstance(source, dict) and source.get("permission_model") == "direct_application_v1"
+        else LEGACY_PERMISSION_SOURCE_HASH
+    )
     try:
-        if not isinstance(source, dict) or digest(source).hex() != LEGACY_PERMISSION_SOURCE_HASH:
+        if not isinstance(source, dict) or digest(source).hex() != expected:
             raise SourceConflict("Exact reviewed legacy SQL source manifest required.")
     except (TypeError, ValueError, OverflowError) as exc:
         raise SourceConflict("Exact reviewed legacy SQL source manifest required.") from exc
@@ -469,7 +504,7 @@ def legacy_permission_queries(source):
         for c in json.loads(certificates)
         for p in ("ALTER", "CONTROL", "TAKE OWNERSHIP")
     ]
-    return {
+    result = {
         "target": (
             """SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,
             DB_NAME() AS DatabaseName,USER_NAME() AS Principal,SCHEMA_NAME() AS DefaultSchema,
@@ -606,12 +641,18 @@ def legacy_permission_queries(source):
         ),
     }
 
+    if source.get("permission_model") == "direct_application_v1":
+        from services.export_sql_direct_permissions import queries
+
+        return queries(result, source)
+    return result
+
 
 def legacy_installation_snapshot(cursor, source):
     """Observe this producer's own connection; no commit, grant, root call or retry."""
     from services.export_execution_protocol import encode
 
-    result = {"version": 1}
+    result = {"version": 2 if source.get("permission_model") == "direct_application_v1" else 1}
     for name, (query, parameters) in legacy_permission_queries(source).items():
         cursor.execute(query, *parameters)
         result[name] = rows(cursor)
@@ -717,7 +758,7 @@ class ExportExecutionDAL:
     def __init__(self, connect):
         self.connect = connect
 
-    def installation_snapshot(self):
+    def installation_snapshot(self, *, migrations=INSTALLATION_MIGRATIONS):
         """Read the actual target's contract metadata, never execute installation SQL.
 
         Only an explicitly composed readiness path may call this method. It does
@@ -752,7 +793,7 @@ class ExportExecutionDAL:
                     "SELECT MigrationId,ChecksumSha256,Status FROM dbo.SchemaMigrationHistory "
                     "WHERE MigrationId IN (SELECT value FROM OPENJSON(?)) "
                     "ORDER BY MigrationId COLLATE Latin1_General_100_BIN2",
-                    json.dumps(INSTALLATION_MIGRATIONS),
+                    json.dumps(migrations),
                 )
                 migrations = rows(cursor)
                 metadata = {}

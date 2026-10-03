@@ -313,7 +313,18 @@ def manifest_contract(manifest, *, script, current_sid, inspect_path, enrollment
 
 
 def connection_factory(manifest):
-    """Windows integrated SQL identity; no caller-controlled connection options."""
+    """Bind the application profile to dedicated .env credentials."""
+    if manifest["sql_contract"]["profile"] == "application":
+        from core.export_sql_connection import connect as dedicated_connect, settings
+
+        expected = dict(
+            server=manifest["sql_server"],
+            database=manifest["sql_database"],
+            principal=manifest["sql_contract"]["principal"],
+        )
+        settings(**expected)
+        return lambda: dedicated_connect(**expected)
+
     import pyodbc
 
     target = (

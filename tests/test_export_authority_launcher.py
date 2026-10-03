@@ -301,7 +301,11 @@ def test_authority_connection_factory_supports_budget_and_procedure_transactions
     driver = Mock(side_effect=open_fixture)
     monkeypatch.setattr(pyodbc, "connect", driver)
     connect = connection_factory(
-        {"sql_server": "fixture-server", "sql_database": "fixture-database"}
+        {
+            "sql_server": "fixture-server",
+            "sql_database": "fixture-database",
+            "sql_contract": {"profile": "authority"},
+        }
     )
     if operation == "reserve":
         assert ExportCoordinationDAL(connect).reserve_request("fixture") == {

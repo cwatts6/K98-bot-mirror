@@ -139,9 +139,13 @@ INSERT_INGEST_DIAGNOSTIC_SQL = """
 def connect_sql_server(
     *, server: str, database: str, username: str, password: str
 ) -> pyodbc.Connection:
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};"
-        f"SERVER={server};DATABASE={database};UID={username};PWD={password}"
+    from core.export_sql_connection import producer_connection
+
+    return producer_connection(
+        lambda: pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            f"SERVER={server};DATABASE={database};UID={username};PWD={password}"
+        )
     )
 
 

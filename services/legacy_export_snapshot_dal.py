@@ -32,6 +32,7 @@ class LegacySnapshotDAL:
         execution_evidence=False,
         legacy_sql_contract=None,
         application_sql_contract=None,
+        sql_profile="reader",
     ):
         self.connect = connect
         self.output_operations = output_operations
@@ -40,6 +41,9 @@ class LegacySnapshotDAL:
         self.execution_evidence = execution_evidence
         self.legacy_sql_contract = None
         self.application_sql_contract = None
+        if sql_profile not in {"reader", "application"}:
+            raise ValueError("Exact legacy producer SQL profile required.")
+        self.sql_profile = sql_profile
         if execution_evidence:
             from services.export_execution_protocol import decode, encode
             from services.export_runtime_composition import validate_legacy_installation_contract
@@ -481,6 +485,11 @@ class LegacySnapshotDAL:
         self.authorize(claim)
         if not self.execution_evidence:
             return
+        if self.sql_profile == "application":
+            from core.export_sql_connection import settings
+            from services.export_sql_health_dal import verify_headroom
+
+            verify_headroom(cursor, settings())
         from services.export_execution_dal import (
             application_installation_snapshot,
             legacy_installation_snapshot,
@@ -493,6 +502,7 @@ class LegacySnapshotDAL:
         verify_legacy_installation_contract(
             legacy_installation_snapshot(cursor, self.legacy_sql_contract["source"]),
             self.legacy_sql_contract,
+            profile=self.sql_profile,
         )
         if self.application_sql_contract is not None:
             verify_application_installation_contract(
