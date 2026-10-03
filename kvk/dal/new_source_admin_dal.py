@@ -706,17 +706,23 @@ class SourceAdminDAL:
         }
 
 
-def configured_connection():
-    """Lazy dedicated connection; called only by explicitly enabled private controls."""
+def configured_connection(*, sql_profile=None):
+    """Use the explicitly reviewed startup profile or admitted runtime factory."""
     import bot_config
     from file_utils import get_conn_with_retries
 
-    if bot_config.EXPORT_COORDINATION_ENABLED:
+    if sql_profile is None and bot_config.EXPORT_COORDINATION_ENABLED:
+        from services.export_runtime_composition import configured_runtime
+
+        return configured_runtime().connect()
+    if sql_profile == "application":
         from constants import SQL_DATABASE, SQL_SERVER
         from core.export_sql_connection import connect
 
         connection = connect(server=SQL_SERVER, database=SQL_DATABASE)
     else:
-        connection = get_conn_with_retries()
+        if sql_profile not in (None, "reader"):
+            raise SourceConflict("Unsupported Bot SQL connection profile.")
+        connection = get_conn_with_retries(operational=True)
     connection.autocommit = False
     return connection

@@ -225,3 +225,41 @@ def test_login_template_creates_disabled_login_and_never_adopts_existing_account
     assert "CHECK_POLICY=ON" in sql
     assert "REPLACE_IN_PRIVATE_SSMS" in sql
     assert "ALTER LOGIN sa" not in sql and "GRANT" not in sql
+
+
+@pytest.mark.parametrize("profile", ["reader", "application"])
+def test_bot_startup_connection_respects_reviewed_profile(monkeypatch, profile):
+    from unittest.mock import Mock
+
+    import bot_config
+    import file_utils
+    from kvk.dal.new_source_admin_dal import configured_connection
+
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
+    dedicated = Mock(return_value=Mock())
+    legacy = Mock(return_value=Mock())
+    monkeypatch.setattr(connection, "connect", dedicated)
+    monkeypatch.setattr(file_utils, "get_conn_with_retries", legacy)
+    actual = configured_connection(sql_profile=profile)
+    if profile == "reader":
+        assert actual is legacy.return_value
+        legacy.assert_called_once_with(operational=True)
+        dedicated.assert_not_called()
+    else:
+        assert actual is dedicated.return_value
+        dedicated.assert_called_once()
+        legacy.assert_not_called()
+
+
+def test_private_controls_reuse_admitted_profile_factory(monkeypatch):
+    from unittest.mock import Mock
+
+    import bot_config
+    from kvk.dal.new_source_admin_dal import configured_connection
+    from services import export_runtime_composition as runtime
+
+    factory = Mock(return_value=object())
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(runtime, "configured_runtime", lambda: SimpleNamespace(connect=factory))
+    assert configured_connection() is factory.return_value
+    factory.assert_called_once_with()

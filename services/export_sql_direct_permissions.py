@@ -1,12 +1,45 @@
 """Explicit operator-approved legacy direct permissions; never a signing fallback."""
 
 import json
+from pathlib import Path
 import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 
 DIRECT_SOURCE_HASH = "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
+APPLICATION_GRANT_PLAN_HASH = "ffc2cc6ec8598676684affa4565240e3be65a012eceaa831acb4a024fdf7c6fc"
+
+
+def application_grant_rows():
+    """Expected direct user rights derive only from the reviewed source plan."""
+    plan = json.loads(
+        (Path(__file__).resolve().parents[1] / "deploy/s11_application_grants.json").read_bytes()
+    )
+    if digest(plan).hex() != APPLICATION_GRANT_PLAN_HASH:
+        raise SourceConflict("Reviewed application grant source differs.")
+    entries = [
+        ("ROK_TRACKER", "DATABASE", "ROK_TRACKER", p, None) for p in plan["database_permissions"]
+    ]
+    entries += [
+        ("ROK_TRACKER", "OBJECT", g["object"], g["permission"], g.get("column"))
+        for g in plan["grants"]
+    ]
+    entries += [
+        ("master", "OBJECT", g["object"], g["permission"], None)
+        for g in plan["master_object_permissions"]
+    ]
+    return [
+        dict(
+            DatabaseName=db,
+            SecurableClass=kind,
+            TargetName=target,
+            PermissionName=right,
+            GrantState="G",
+            ColumnName=column,
+        )
+        for db, kind, target, right, column in entries
+    ]
 
 
 def validate_contract(approved):
@@ -96,6 +129,25 @@ def queries(base, source):
         UNION ALL SELECT '$server',r.name FROM sys.server_role_members m
         JOIN sys.server_principals u ON u.principal_id=m.member_principal_id
         JOIN sys.server_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()""",
+        (),
+    )
+    result["application_grants"] = (
+        """SELECT DB_NAME() COLLATE Latin1_General_100_BIN2 AS DatabaseName,
+        CASE p.class WHEN 1 THEN 'OBJECT' ELSE p.class_desc END COLLATE Latin1_General_100_BIN2 AS SecurableClass,
+        CASE p.class WHEN 0 THEN DB_NAME() WHEN 3 THEN SCHEMA_NAME(p.major_id)
+        WHEN 1 THEN OBJECT_SCHEMA_NAME(p.major_id)+'.'+OBJECT_NAME(p.major_id) ELSE 'UNSUPPORTED' END COLLATE Latin1_General_100_BIN2 AS TargetName,
+        p.permission_name COLLATE Latin1_General_100_BIN2 AS PermissionName,p.state COLLATE Latin1_General_100_BIN2 AS GrantState,
+        CASE WHEN p.class=1 AND p.minor_id>0 THEN COL_NAME(p.major_id,p.minor_id) END COLLATE Latin1_General_100_BIN2 AS ColumnName
+        FROM sys.database_permissions p JOIN sys.database_principals u ON u.principal_id=p.grantee_principal_id
+        WHERE u.principal_id=USER_ID()
+        UNION ALL SELECT 'master',CASE p.class WHEN 1 THEN 'OBJECT' ELSE p.class_desc END,
+        CASE p.class WHEN 0 THEN 'master' WHEN 3 THEN (SELECT name FROM master.sys.schemas WHERE schema_id=p.major_id)
+        WHEN 1 THEN CASE WHEN p.major_id IN(OBJECT_ID('master.dbo.xp_cmdshell'),OBJECT_ID('master.dbo.xp_fileexist')) THEN 'dbo'
+        ELSE (SELECT s.name FROM master.sys.objects o JOIN master.sys.schemas s ON s.schema_id=o.schema_id WHERE o.object_id=p.major_id) END+'.'+OBJECT_NAME(p.major_id,DB_ID('master')) ELSE 'UNSUPPORTED' END,
+        p.permission_name,p.state,
+        CASE WHEN p.class=1 AND p.minor_id>0 THEN (SELECT name FROM master.sys.columns WHERE object_id=p.major_id AND column_id=p.minor_id) END
+        FROM master.sys.database_permissions p JOIN master.sys.database_principals u ON u.principal_id=p.grantee_principal_id
+        WHERE u.sid=SUSER_SID()""",
         (),
     )
     result["token_grants"] = (
@@ -239,6 +291,7 @@ def verify(observed, approved, *, profile):
     ]
     if (
         not _exact(observed["grants"], expected_grants)
+        or not _exact(observed["application_grants"], application_grant_rows())
         or not _exact(observed["capabilities"], expected_caps)
         or not _exact(observed["module_permissions"], expected_module_rights)
         or not _exact(observed["token_grants"], expected_token)

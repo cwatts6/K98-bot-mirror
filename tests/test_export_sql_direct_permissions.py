@@ -124,6 +124,7 @@ def contract(monkeypatch):
         )
         for g in grants
     ]
+    observed["application_grants"] = direct.application_grant_rows()
     observed["capabilities"] = [
         dict(
             SecurableClass="DATABASE",
@@ -257,6 +258,42 @@ def test_direct_source_mutation_is_not_accepted(contract):
     )
     with pytest.raises(SourceConflict):
         validate_legacy_permission_source(source)
+
+
+@pytest.mark.parametrize(
+    "database,permission", [("ROK_TRACKER", "BACKUP DATABASE"), ("master", "CONTROL")]
+)
+def test_unexpected_direct_database_grants_fail_even_when_metadata_is_resealed(
+    contract, database, permission
+):
+    observed, approved = contract
+    observed["application_grants"].append(
+        dict(
+            DatabaseName=database,
+            SecurableClass="DATABASE",
+            TargetName=database,
+            PermissionName=permission,
+            GrantState="G",
+            ColumnName=None,
+        )
+    )
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="exact reviewed grant plan"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
+def test_application_snapshot_does_not_filter_database_or_object_grant_classes(contract):
+    _, approved = contract
+    query, _ = legacy_permission_queries(approved["source"])["application_grants"]
+    assert "WHERE u.principal_id=USER_ID()" in query
+    assert "WHERE u.sid=SUSER_SID()" in query
+    assert "AND p.class=1" not in query
+
+
+def test_application_expected_grants_reject_unreviewed_source(monkeypatch):
+    monkeypatch.setattr(direct, "APPLICATION_GRANT_PLAN_HASH", "a" * 64)
+    with pytest.raises(SourceConflict, match="grant source differs"):
+        direct.application_grant_rows()
 
 
 def test_fixed_direct_profile_retains_evidence_denies_and_old_profiles():

@@ -164,13 +164,18 @@ def configured_service():
     if not c.KVK_SOURCE_ARTIFACT_ROOT:
         raise PermissionError("Configure a private artifact root before using source intake.")
     store = ArtifactStore(Path(c.KVK_SOURCE_ARTIFACT_ROOT))
+    from services.export_runtime_composition import configured_runtime
     from services.export_sql_health_dal import preflight
 
     return SourceAdminService(
         access,
         SourceAdminDAL(configured_connection, store),
         store,
-        write_preflight=preflight if c.EXPORT_COORDINATION_ENABLED else None,
+        write_preflight=(
+            preflight
+            if c.EXPORT_COORDINATION_ENABLED and configured_runtime().sql_profile == "application"
+            else None
+        ),
     )
 
 

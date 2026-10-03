@@ -234,6 +234,7 @@ class ExportRuntime(RuntimeLifetime):
         if client.deployment_hash is None:
             raise SourceConflict("Runtime requires the approved authority deployment identity.")
         self.connect, self.registration, self.client = connect, registration, client
+        self.sql_profile = sql_profile
         config = registration.value()
         if store.storage_owner != config["storage_owner"]:
             raise SourceConflict("Spool custody differs from runtime registration.")
@@ -529,8 +530,13 @@ def _prepare_configured_runtime():
     # Connection factories are existing application owners. Each readiness
     # observation checks its actual target; no SQL identity is inferred from
     # environment names or from the authority's separate database session.
+    from functools import partial
+
+    connection_factory = partial(
+        configured_connection, sql_profile=config["sql_contract"]["profile"]
+    )
     verify_installation_contract(
-        ExportExecutionDAL(configured_connection).installation_snapshot(
+        ExportExecutionDAL(connection_factory).installation_snapshot(
             **(
                 {"migrations": installation_migrations(config["sql_contract"])}
                 if config["sql_contract"]["version"] == 4
@@ -539,7 +545,7 @@ def _prepare_configured_runtime():
         ),
         config["sql_contract"],
     )
-    connection = configured_connection()
+    connection = connection_factory()
     try:
         connection.autocommit = True
         cursor = connection.cursor()
@@ -574,7 +580,7 @@ def _prepare_configured_runtime():
     spool = assert_protected_path(config["spool_root"], private=True)
     store = ExportSnapshotStore(spool, registration.value()["storage_owner"])
     bundle = ExportRuntime(
-        connect=configured_connection,
+        connect=connection_factory,
         registration=registration,
         store=store,
         client=client,
