@@ -315,6 +315,56 @@ def test_master_connect_matches_created_user_and_full_contract(contract):
     verify_legacy_installation_contract(observed, approved, profile="application")
 
 
+@pytest.mark.parametrize("drift", [False, True])
+def test_direct_application_producer_session_preserves_actual_profile(contract, monkeypatch, drift):
+    from unittest.mock import Mock
+
+    from services import export_execution_dal as evidence
+    from services.legacy_export_snapshot_dal import LegacySnapshotDAL
+
+    observed, approved = contract
+    dal = LegacySnapshotDAL(
+        Mock(),
+        output_operations=True,
+        execution_evidence=True,
+        legacy_sql_contract=approved,
+        sql_profile="application",
+    )
+    dal.authorize = Mock()
+    cursor = Mock()
+    connection = Mock(autocommit=True)
+    connection.cursor.return_value = cursor
+    snapshot = Mock(return_value=observed)
+    monkeypatch.setattr(evidence, "legacy_installation_snapshot", snapshot)
+    if drift:
+        observed["application_grants"].append(
+            dict(
+                DatabaseName="master",
+                SecurableClass="DATABASE",
+                TargetName="master",
+                PermissionName="CONTROL",
+                GrantState="G",
+                ColumnName=None,
+            )
+        )
+        # A new observation fingerprint cannot authorize an unexpected permission.
+        dal.legacy_sql_contract["metadata_hash"] = digest(observed).hex()
+        with pytest.raises(SourceConflict, match="exact reviewed grant plan"):
+            with dal.session("claim", connection):
+                pytest.fail("Producer must not enter with unexpected permissions")
+        cursor.execute.assert_not_called()
+    else:
+        with dal.session("claim", connection) as admitted:
+            assert admitted == "claim"
+        assert "sp_getapplock" in cursor.execute.call_args_list[0].args[0]
+        assert "sp_releaseapplock" in cursor.execute.call_args_list[-1].args[0]
+    snapshot.assert_called_once_with(cursor, dal.legacy_sql_contract["source"])
+    cursor.close.assert_called_once()
+    connection.commit.assert_not_called()
+    connection.rollback.assert_not_called()
+    connection.close.assert_not_called()
+
+
 @pytest.mark.parametrize("change", ["missing", "deny", "grant_option", "wrong_target"])
 def test_master_connect_must_match_exact_reviewed_permission(contract, change):
     observed, approved = contract

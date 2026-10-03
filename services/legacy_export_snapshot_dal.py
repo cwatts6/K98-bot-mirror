@@ -457,6 +457,7 @@ class LegacySnapshotDAL:
                 verify_legacy_installation_contract(
                     legacy_installation_snapshot(cursor, self.legacy_sql_contract["source"]),
                     self.legacy_sql_contract,
+                    profile=self.sql_profile,
                 )
             cursor.execute(
                 "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; IF @r<0 THROW 51421,'Legacy snapshot busy',1;"
