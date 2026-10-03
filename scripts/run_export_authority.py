@@ -602,7 +602,7 @@ def main(argv=None):
     )
     from services.export_coordination_dal import ExportCoordinationDAL
     from services.export_execution_authority import ExportExecutionAuthority
-    from services.export_execution_dal import ExportExecutionDAL
+    from services.export_execution_dal import ExportExecutionDAL, installation_migrations
     from services.export_execution_protocol import decode
     from services.export_request_budget import RequestBudget
     from services.export_runtime_composition import verify_installation_contract
@@ -623,7 +623,10 @@ def main(argv=None):
     # This explicit startup performs read-only metadata inspection before an
     # authority session, evidence store, provider child or request can be created.
     # Expected hashes are protected deployment inputs; never learn them here.
-    verify_installation_contract(dal.installation_snapshot(), manifest["sql_contract"])
+    verify_installation_contract(
+        dal.installation_snapshot(migrations=installation_migrations(manifest["sql_contract"])),
+        manifest["sql_contract"],
+    )
     session_id = str(uuid4())
     host = WindowsExecutionHost(
         python=manifest["python"],
