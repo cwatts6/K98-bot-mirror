@@ -88,3 +88,15 @@ def test_server_capabilities_use_documented_null_server_class(monkeypatch):
     query = dal.legacy_permission_queries(approved["source"])["capabilities"][0]
     assert "SecurableClass='SERVER' THEN HAS_PERMS_BY_NAME(NULL,NULL,PermissionName)" in query
     assert "ELSE HAS_PERMS_BY_NAME(TargetName,SecurableClass,PermissionName)" in query
+
+
+@pytest.mark.parametrize("value", [None, 1])
+def test_signed_unknown_or_present_impersonation_fails_closed(monkeypatch, value):
+    from services.export_runtime_composition import verify_legacy_installation_contract
+    from tests.test_export_runtime_composition import legacy_permission_fixture
+
+    observed, approved = legacy_permission_fixture(monkeypatch)
+    observed["target"][0]["ImpersonateUser"] = value
+    approved["metadata_hash"] = dal.digest(observed).hex()
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved)
