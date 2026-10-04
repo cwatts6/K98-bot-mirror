@@ -122,14 +122,15 @@ def queries(base, source):
         (),
     )
     result["memberships"] = (
-        """SELECT u.name AS PrincipalName,r.name AS RoleName
+        """SELECT u.name COLLATE Latin1_General_100_BIN2 AS PrincipalName,
+        r.name COLLATE Latin1_General_100_BIN2 AS RoleName
         FROM sys.database_role_members m JOIN sys.database_principals u ON u.principal_id=m.member_principal_id
         JOIN sys.database_principals r ON r.principal_id=m.role_principal_id
         WHERE u.name=USER_NAME() OR u.name='ExportLegacyEntryReader'
-        UNION ALL SELECT '$master',r.name FROM master.sys.database_role_members m
+        UNION ALL SELECT '$master' COLLATE Latin1_General_100_BIN2,r.name COLLATE Latin1_General_100_BIN2 FROM master.sys.database_role_members m
         JOIN master.sys.database_principals u ON u.principal_id=m.member_principal_id
         JOIN master.sys.database_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()
-        UNION ALL SELECT '$server',r.name FROM sys.server_role_members m
+        UNION ALL SELECT '$server' COLLATE Latin1_General_100_BIN2,r.name COLLATE Latin1_General_100_BIN2 FROM sys.server_role_members m
         JOIN sys.server_principals u ON u.principal_id=m.member_principal_id
         JOIN sys.server_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()""",
         (),

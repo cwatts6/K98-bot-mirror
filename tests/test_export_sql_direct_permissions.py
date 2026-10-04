@@ -453,3 +453,16 @@ def test_real_direct_manifest_is_pinned_and_only_changes_permission_delivery():
     assert new["modules"] == old["modules"] and new["roots"] == old["roots"]
     assert new["signatures"] == []
     assert {g["principal"] for g in new["grants"]} == {"ExportLegacyEntryReader", "$application"}
+
+
+def test_membership_union_has_explicit_collation_for_each_name(contract):
+    """Catalog names from master/server retain exact case across DB collations."""
+    source = contract[1]["source"]
+    query, parameters = legacy_permission_queries(source)["memberships"]
+    assert parameters == ()
+    assert "u.name COLLATE Latin1_General_100_BIN2 AS PrincipalName" in query
+    assert "r.name COLLATE Latin1_General_100_BIN2 AS RoleName" in query
+    assert "'$master' COLLATE Latin1_General_100_BIN2,r.name COLLATE Latin1_General_100_BIN2" in query
+    assert "'$server' COLLATE Latin1_General_100_BIN2,r.name COLLATE Latin1_General_100_BIN2" in query
+    assert "u.sid=SUSER_SID()" in query
+    assert "WHERE u.name=USER_NAME() OR u.name='ExportLegacyEntryReader'" in query
