@@ -14,7 +14,6 @@ def configuration():
         database="ROK_TRACKER",
         username="S11_ExportApplication",
         password="synthetic;secret}value",
-        headroom=dict(warn_used_percent=85.0, max_used_percent=97.5),
     )
 
 
@@ -263,11 +262,12 @@ def test_private_controls_reuse_admitted_profile_factory(monkeypatch):
 def test_connection_uses_established_policy_without_reserve_settings(protected_settings):
     protected_settings.delenv("S11_SQL_MIN_FREE_LOG_BYTES", raising=False)
     protected_settings.delenv("S11_SQL_MAX_LOG_USED_PERCENT", raising=False)
-    assert connection.settings()["headroom"] == dict(warn_used_percent=85.0, max_used_percent=97.5)
+    assert connection.settings() == configuration()
+    assert "headroom" not in connection.settings()
     # Retired settings must not silently retain the earlier, stricter policy.
     protected_settings.setenv("S11_SQL_MIN_FREE_LOG_BYTES", "999999999999")
     protected_settings.setenv("S11_SQL_MAX_LOG_USED_PERCENT", "1")
-    assert connection.settings()["headroom"] == dict(warn_used_percent=85.0, max_used_percent=97.5)
+    assert connection.settings() == configuration()
 
 
 @pytest.mark.parametrize("used,warns", [(849, False), (850, True), (974, True)])

@@ -9,8 +9,6 @@ import os
 from pathlib import Path
 import re
 
-from core.sql_log_policy import DEFAULT_ABORT_THRESHOLD, DEFAULT_WARN_THRESHOLD
-
 
 class ExportSqlConfigurationError(ValueError):
     """Deliberately excludes secret contents and driver connection strings."""
@@ -41,10 +39,6 @@ def settings(*, server=None, database=None, principal=None):
             database=os.environ["SQL_DATABASE"],
             username=os.environ["S11_SQL_USERNAME"],
             password=os.environ["S11_SQL_PASSWORD"],
-            headroom=dict(
-                warn_used_percent=DEFAULT_WARN_THRESHOLD,
-                max_used_percent=DEFAULT_ABORT_THRESHOLD,
-            ),
         )
         if value["database"] != "ROK_TRACKER":
             raise ValueError()
