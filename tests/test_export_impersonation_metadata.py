@@ -2,7 +2,9 @@
 
 import json
 from unittest.mock import Mock
+
 import pytest
+
 from kvk.dal.new_source_import_dal import SourceConflict
 from services import export_execution_dal as dal
 from services.export_runtime_composition import verify_installation_contract
