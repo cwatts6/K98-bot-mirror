@@ -283,7 +283,9 @@ def verify(observed, approved, *, profile):
     ]
     expected_token = [
         dict(
-            SecurableClass=g["securable_class"],
+            SecurableClass=(
+                "OBJECT_OR_COLUMN" if g["securable_class"] == "OBJECT" else g["securable_class"]
+            ),
             TargetName=g["target"],
             PermissionName=g["permission"],
             GrantState="G",

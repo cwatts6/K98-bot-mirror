@@ -42,6 +42,7 @@ def contract(monkeypatch):
         for kind, target, permission in (
             ("OBJECT", "dbo.UPDATE_ALL2", "EXECUTE"),
             ("OBJECT", "KVK.ingest", "EXECUTE"),
+            ("OBJECT", "dbo.child", "ALTER"),
             ("SCHEMA", "dbo", "ALTER"),
             ("DATABASE", "ROK_TRACKER", "CREATE TABLE"),
         )
@@ -176,6 +177,12 @@ def contract(monkeypatch):
         for p in ("EXECUTE", "ALTER", "CONTROL", "TAKE OWNERSHIP")
     ]
     observed["token_grants"] = [
+        dict(
+            SecurableClass="OBJECT_OR_COLUMN",
+            TargetName="dbo.child",
+            PermissionName="ALTER",
+            GrantState="G",
+        ),
         dict(SecurableClass="SCHEMA", TargetName="dbo", PermissionName="ALTER", GrantState="G"),
         dict(
             SecurableClass="DATABASE",
@@ -470,3 +477,21 @@ def test_membership_union_has_explicit_collation_for_each_name(contract):
     )
     assert "u.sid=SUSER_SID()" in query
     assert "WHERE u.name=USER_NAME() OR u.name='ExportLegacyEntryReader'" in query
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("SecurableClass", "OBJECT"),
+        ("TargetName", "dbo.other"),
+        ("PermissionName", "CONTROL"),
+        ("GrantState", "W"),
+    ],
+)
+def test_token_object_grant_requires_exact_catalog_class_and_privilege(contract, field, value):
+    observed, approved = contract
+    row = next(r for r in observed["token_grants"] if r["SecurableClass"] == "OBJECT_OR_COLUMN")
+    row[field] = value
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved, profile="application")
