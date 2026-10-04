@@ -424,8 +424,9 @@ def _proof_acknowledgment(values, result, columns):
 LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc6141eddc9b7fc0dbaf68"
 # Canonical JSON digest of deploy/export_application_schema_source.json: 540
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
-# LF-normalized manual-registration snapshots. Installed metadata is a separate hash domain.
-APPLICATION_SCHEMA_SOURCE_HASH = "73c23c1391471e829c6a835be0f7371239e11d9880071c079fbfdb3c157c1555"
+# LF-normalized manual-registration snapshots; logical names follow SQL declarations,
+# including names whose exported filenames are sanitized. Installed metadata is separate.
+APPLICATION_SCHEMA_SOURCE_HASH = "73562d08660ee44465e6d407c065329f56af7a14369f8c8b80aac6ac87c79b02"
 LEGACY_PERMISSION_MIGRATION = "20260924_002_export_legacy_module_permissions"
 LEGACY_DATABASE_CAPABILITIES = (
     "CONTROL",

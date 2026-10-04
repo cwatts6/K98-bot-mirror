@@ -1278,7 +1278,7 @@
     "sha256": "3dc2d97acebf0c36e90c923d2f765943b293051bd24e5f1f29430b300dc843cd"
   },
   {
-    "name": "dbo.ID_",
+    "name": "dbo.ID#",
     "type": "U",
     "path": "sql_schema/dbo.ID_.Table.sql",
     "sha256": "c67e49f94bc625e8e648a0e8ed52e2f97af822f32b71c9560de0f4c82689aa23"
@@ -1716,7 +1716,7 @@
     "sha256": "4a08ae2f05d55601c8bec04247c7f763668d616b785abe118b9c19d7f3abc97c"
   },
   {
-    "name": "dbo.LATEST_T4_T5_KILLS",
+    "name": "dbo.LATEST_T4&T5_KILLS",
     "type": "U",
     "path": "sql_schema/dbo.LATEST_T4_T5_KILLS.Table.sql",
     "sha256": "14dd4aa481a55bbb99c4b09d2bcf145c555e966fd24773e52516d41c09a8dca2"

@@ -217,6 +217,42 @@ def test_source_inventory_digest_tracks_pinned_git_bytes_and_rejects_old_pin():
         validate_application_installation_contract(approved | {"sources": original})
 
 
+def test_source_inventory_preserves_sql_names_with_sanitized_export_filenames():
+    from services.export_runtime_composition import validate_application_installation_contract
+
+    manifest = json.loads(
+        (Path(__file__).parents[1] / "deploy/export_application_schema_source.json").read_bytes()
+    )
+    by_path = {item["path"]: item for item in manifest}
+    # Authoritative CREATE TABLE declarations differ from these filesystem-safe names.
+    declared_names = {
+        "sql_schema/dbo.ID_.Table.sql": "dbo.ID#",
+        "sql_schema/dbo.LATEST_T4_T5_KILLS.Table.sql": "dbo.LATEST_T4&T5_KILLS",
+    }
+    for path, name in declared_names.items():
+        assert by_path[path]["name"] == name
+        assert by_path[path]["type"] == "U"
+
+    approved = dict(
+        version=1,
+        server="fixture",
+        database="ROK_TRACKER",
+        principal="fixture",
+        sources=manifest,
+        dynamic_objects=[],
+        metadata_hash="a" * 64,
+        permissions_hash="b" * 64,
+        review_id=str(uuid4()),
+    )
+    validate_application_installation_contract(approved)
+    stale = deepcopy(manifest)
+    for item in stale:
+        if item["path"] in declared_names:
+            item["name"] = Path(item["path"]).name.removesuffix(".Table.sql")
+    with pytest.raises(SourceConflict):
+        validate_application_installation_contract(approved | {"sources": stale})
+
+
 @pytest.mark.parametrize("enrollment", [False, True])
 def test_shared_launcher_requires_new_version_and_application_sql_profile(monkeypatch, enrollment):
     import scripts.run_export_authority as launcher
