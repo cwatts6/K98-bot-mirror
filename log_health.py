@@ -13,6 +13,8 @@ import json
 import logging
 import time as _time
 
+from core.sql_log_policy import DEFAULT_ABORT_THRESHOLD, DEFAULT_WARN_THRESHOLD
+
 try:
     # Central logging already initialized; import path constant (optional use)
     from logging_setup import TELEMETRY_LOG_PATH
@@ -58,7 +60,6 @@ class LogHeadroomError(RuntimeError):
 
 
 DEFAULT_DB = "ROK_TRACKER"
-DEFAULT_WARN_THRESHOLD = 85.0
 
 
 def _query_single_value(cur, sql: str, params: tuple = ()):
@@ -399,7 +400,7 @@ def preflight_from_env_sync(
     *,
     driver: str = "ODBC Driver 17 for SQL Server",
     warn_threshold: float = DEFAULT_WARN_THRESHOLD,
-    abort_threshold: float = 97.5,
+    abort_threshold: float = DEFAULT_ABORT_THRESHOLD,
     wait_on_log_backup: bool = True,
     max_wait_seconds: int = 360,
     poll_interval_seconds: float = 60.0,

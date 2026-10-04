@@ -1,6 +1,11 @@
 """Required read-only headroom gate for dedicated coordinated SQL work."""
 
+import logging
+
+from core.sql_log_policy import DEFAULT_ABORT_THRESHOLD, DEFAULT_WARN_THRESHOLD
 from kvk.dal.new_source_import_dal import SourceConflict
+
+logger = logging.getLogger(__name__)
 
 HEADROOM_SQL = """SELECT DB_NAME() AS DatabaseName, USER_NAME() AS Principal,
     l.total_log_size_in_bytes AS TotalBytes, l.used_log_space_in_bytes AS UsedBytes,
@@ -29,11 +34,17 @@ def verify_headroom(cursor, configuration):
         raise SourceConflict(
             "SQL target, log measurement or reuse state requires operator reconciliation."
         )
-    policy = configuration["headroom"]
     free = total - used
     percent = used * 100.0 / total
-    if free < policy["min_free_bytes"] or percent >= policy["max_used_percent"]:
-        raise SourceConflict("SQL log headroom is below the reviewed workload reserve.")
+    if percent >= DEFAULT_ABORT_THRESHOLD:
+        raise SourceConflict("SQL log usage is at or above the established import abort threshold.")
+    if percent >= DEFAULT_WARN_THRESHOLD:
+        logger.warning(
+            "SQL log usage elevated: %.1f%% (>= %.1f%%); below %.1f%% abort threshold.",
+            percent,
+            DEFAULT_WARN_THRESHOLD,
+            DEFAULT_ABORT_THRESHOLD,
+        )
     return {
         "total_bytes": total,
         "used_bytes": used,

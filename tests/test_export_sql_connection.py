@@ -14,7 +14,7 @@ def configuration():
         database="ROK_TRACKER",
         username="S11_ExportApplication",
         password="synthetic;secret}value",
-        headroom=dict(min_free_bytes=100, max_used_percent=85),
+        headroom=dict(warn_used_percent=85.0, max_used_percent=97.5),
     )
 
 
@@ -26,8 +26,6 @@ def protected_settings(monkeypatch):
         "SQL_DATABASE": "ROK_TRACKER",
         "S11_SQL_USERNAME": "S11_ExportApplication",
         "S11_SQL_PASSWORD": "synthetic;secret}value",
-        "S11_SQL_MIN_FREE_LOG_BYTES": "100",
-        "S11_SQL_MAX_LOG_USED_PERCENT": "85",
     }.items():
         monkeypatch.setenv(key, value)
     return monkeypatch
@@ -40,10 +38,6 @@ def protected_settings(monkeypatch):
         ("SQL_DATABASE", "master"),
         ("S11_SQL_USERNAME", "SHEETS_USER"),
         ("S11_SQL_PASSWORD", ""),
-        ("S11_SQL_MIN_FREE_LOG_BYTES", "0"),
-        ("S11_SQL_MIN_FREE_LOG_BYTES", "1.5"),
-        ("S11_SQL_MAX_LOG_USED_PERCENT", "nan"),
-        ("S11_SQL_MAX_LOG_USED_PERCENT", "100"),
     ],
 )
 def test_invalid_configuration_fails_without_secret(protected_settings, key, value):
@@ -69,8 +63,6 @@ def test_target_and_principal_match_required(protected_settings):
     [
         "S11_SQL_USERNAME",
         "S11_SQL_PASSWORD",
-        "S11_SQL_MIN_FREE_LOG_BYTES",
-        "S11_SQL_MAX_LOG_USED_PERCENT",
     ],
 )
 def test_missing_dedicated_environment_never_falls_back(protected_settings, key):
@@ -137,9 +129,12 @@ def test_coordinated_connection_does_not_use_legacy_credentials(monkeypatch, act
     [
         None,
         ("ROK_TRACKER", "SHEETS_USER", 1000, 10, "FULL", "NOTHING"),
-        ("ROK_TRACKER", "S11_ExportApplication", 1000, 950, "FULL", "NOTHING"),
+        ("ROK_TRACKER", "S11_ExportApplication", 1000, 975, "FULL", "NOTHING"),
         ("ROK_TRACKER", "S11_ExportApplication", 1000, 10, "FULL", "AVAILABILITY_REPLICA"),
         ("ROK_TRACKER", "S11_ExportApplication", None, 10, "FULL", "NOTHING"),
+        ("ROK_TRACKER", "S11_ExportApplication", 0, 0, "FULL", "NOTHING"),
+        ("ROK_TRACKER", "S11_ExportApplication", 1000, -1, "FULL", "NOTHING"),
+        ("ROK_TRACKER", "S11_ExportApplication", 1000, 1001, "FULL", "NOTHING"),
     ],
 )
 def test_headroom_rejects_unknown_pressure_or_wrong_identity(row):
@@ -263,3 +258,51 @@ def test_private_controls_reuse_admitted_profile_factory(monkeypatch):
     monkeypatch.setattr(runtime, "configured_runtime", lambda: SimpleNamespace(connect=factory))
     assert configured_connection() is factory.return_value
     factory.assert_called_once_with()
+
+
+def test_connection_uses_established_policy_without_reserve_settings(protected_settings):
+    protected_settings.delenv("S11_SQL_MIN_FREE_LOG_BYTES", raising=False)
+    protected_settings.delenv("S11_SQL_MAX_LOG_USED_PERCENT", raising=False)
+    assert connection.settings()["headroom"] == dict(warn_used_percent=85.0, max_used_percent=97.5)
+    # Retired settings must not silently retain the earlier, stricter policy.
+    protected_settings.setenv("S11_SQL_MIN_FREE_LOG_BYTES", "999999999999")
+    protected_settings.setenv("S11_SQL_MAX_LOG_USED_PERCENT", "1")
+    assert connection.settings()["headroom"] == dict(warn_used_percent=85.0, max_used_percent=97.5)
+
+
+@pytest.mark.parametrize("used,warns", [(849, False), (850, True), (974, True)])
+def test_existing_warning_boundary_allows_work_below_abort(used, warns, caplog):
+    values = iter([("ROK_TRACKER", "S11_ExportApplication", 1000, used, "FULL", "NOTHING"), None])
+    cursor = SimpleNamespace(execute=lambda q: None, fetchone=lambda: next(values))
+    result = verify_headroom(cursor, configuration())
+    assert result["used_percent"] == used / 10
+    assert ("SQL log usage elevated" in caplog.text) is warns
+    assert configuration()["password"] not in caplog.text
+
+
+@pytest.mark.parametrize("used", [975, 976, 1000])
+def test_existing_abort_boundary_stops_heavy_work(used):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    values = iter([("ROK_TRACKER", "S11_ExportApplication", 1000, used, "FULL", "NOTHING"), None])
+    cursor = SimpleNamespace(execute=lambda q: None, fetchone=lambda: next(values))
+    with pytest.raises(SourceConflict, match="abort threshold"):
+        verify_headroom(cursor, configuration())
+
+
+def test_percentage_policy_does_not_require_unmeasured_absolute_reserve():
+    values = iter([("ROK_TRACKER", "S11_ExportApplication", 10, 1, "FULL", "NOTHING"), None])
+    cursor = SimpleNamespace(execute=lambda q: None, fetchone=lambda: next(values))
+    assert verify_headroom(cursor, configuration())["free_bytes"] == 9
+
+
+def test_legacy_upload_preflight_retains_shared_percentage_defaults():
+    import inspect
+
+    from core.sql_log_policy import DEFAULT_ABORT_THRESHOLD, DEFAULT_WARN_THRESHOLD
+    import log_health
+
+    params = inspect.signature(log_health.preflight_from_env_sync).parameters
+    assert params["warn_threshold"].default == DEFAULT_WARN_THRESHOLD == 85.0
+    assert params["abort_threshold"].default == DEFAULT_ABORT_THRESHOLD == 97.5
+    assert params["wait_on_log_backup"].default is True

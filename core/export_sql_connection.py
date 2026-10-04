@@ -5,10 +5,11 @@ connection or secret read occurs at import time and no fallback is allowed when
 dedicated S11 credentials are required.
 """
 
-import math
 import os
 from pathlib import Path
 import re
+
+from core.sql_log_policy import DEFAULT_ABORT_THRESHOLD, DEFAULT_WARN_THRESHOLD
 
 
 class ExportSqlConfigurationError(ValueError):
@@ -30,7 +31,7 @@ def settings(*, server=None, database=None, principal=None):
     """Load dedicated SQL credentials from the existing application .env.
 
     Existing process environment takes precedence. Missing dedicated values never
-    select legacy SQL or Windows credentials. Workload reserves are explicit.
+    select legacy SQL or Windows credentials. Headroom uses the established import percentage policy.
     """
     try:
         _load_environment()
@@ -41,8 +42,8 @@ def settings(*, server=None, database=None, principal=None):
             username=os.environ["S11_SQL_USERNAME"],
             password=os.environ["S11_SQL_PASSWORD"],
             headroom=dict(
-                min_free_bytes=int(os.environ["S11_SQL_MIN_FREE_LOG_BYTES"]),
-                max_used_percent=float(os.environ["S11_SQL_MAX_LOG_USED_PERCENT"]),
+                warn_used_percent=DEFAULT_WARN_THRESHOLD,
+                max_used_percent=DEFAULT_ABORT_THRESHOLD,
             ),
         )
         if value["database"] != "ROK_TRACKER":
@@ -54,17 +55,12 @@ def settings(*, server=None, database=None, principal=None):
             raise ValueError()
         if not 1 <= len(value["password"]) <= 1024 or "\x00" in value["password"]:
             raise ValueError()
-        policy = value["headroom"]
-        if policy["min_free_bytes"] <= 0 or not math.isfinite(policy["max_used_percent"]):
-            raise ValueError()
-        if not 0 < policy["max_used_percent"] < 100:
-            raise ValueError()
         for expected, key in ((server, "server"), (database, "database"), (principal, "username")):
             if expected is not None and value[key] != expected:
                 raise ValueError()
     except Exception:
         raise ExportSqlConfigurationError(
-            "Dedicated S11 SQL environment target, credentials or headroom policy is invalid."
+            "Dedicated S11 SQL environment target or credentials are invalid."
         ) from None
     return value
 
