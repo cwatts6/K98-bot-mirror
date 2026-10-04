@@ -2252,7 +2252,14 @@ def test_installation_reader_is_explicit_parameterized_and_closes_every_connecti
     assert connection.autocommit is True
     for call in cursor.execute.call_args_list:
         query, *parameters = call.args
-        assert query.startswith(("SELECT", "WITH required AS", "WITH permission_scope AS"))
+        assert query.startswith(
+            (
+                "SELECT",
+                "SET NOCOUNT ON;",
+                "WITH required AS",
+                "WITH permission_scope AS",
+            )
+        )
         if parameters:
             assert len(parameters) == 1 and isinstance(json.loads(parameters[0]), list)
     if failure is None:

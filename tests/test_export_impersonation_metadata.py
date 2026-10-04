@@ -30,7 +30,7 @@ def test_fixed_read_uses_effective_user_permission_and_bounded_scope(monkeypatch
     dal.ExportExecutionDAL(lambda: connection).installation_snapshot()
     sql = cursor.execute.call_args_list[0].args[0]
     assert "'DATABASE','IMPERSONATE ANY USER'" not in sql
-    assert "HAS_PERMS_BY_NAME(p.name,'USER','IMPERSONATE')" in sql
+    assert "HAS_PERMS_BY_NAME(p.name,''USER'',''IMPERSONATE'')" in sql
     assert "TOP (1001)" in sql and "COUNT_BIG(*)>1000 THEN NULL" in sql
     assert "COUNT(Allowed)<>COUNT_BIG(*) THEN NULL" in sql
     assert "p.principal_id<>USER_ID()" in sql
@@ -52,7 +52,8 @@ def test_legacy_query_has_no_invalid_database_capability(monkeypatch):
     queries = dal.legacy_permission_queries(approved["source"])
     capabilities = json.loads(queries["capabilities"][1][0])
     assert not any(c["permission"] == "IMPERSONATE ANY USER" for c in capabilities)
-    assert dal.USER_IMPERSONATION_SQL in queries["target"][0]
+    assert "sys.databases" in queries["target"][0]
+    assert "QUOTENAME(@database)" in queries["target"][0]
     assert "AS ImpersonateUser" in queries["target"][0]
 
 
@@ -64,3 +65,25 @@ def test_direct_unknown_or_present_impersonation_fails_closed(monkeypatch, value
     observed["target"][0]["ImpersonateUser"] = value
     with pytest.raises(SourceConflict):
         verify(observed, approved, profile="application")
+
+
+def test_cross_database_scope_uses_actual_caller_and_fails_closed():
+    sql = dal.user_impersonation_query(
+        "SELECT " + dal.USER_IMPERSONATION_SQL + " AS ImpersonateUser"
+    )
+    assert "HAS_DBACCESS(name)" in sql
+    assert "FROM sys.databases" in sql
+    assert "HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE')" in sql
+    assert "COUNT_BIG(*) FROM @databases)>1000" in sql
+    assert "CanAccess IS NULL" in sql
+    assert "IF @allowed IS NULL" in sql
+    assert "QUOTENAME(@database)" in sql
+    assert "EXECUTE AS" not in sql and "GRANT " not in sql
+    assert "SELECT @user_impersonation AS ImpersonateUser" in sql
+
+
+def test_server_capabilities_use_documented_null_server_class(monkeypatch):
+    _, approved = direct_fixture(monkeypatch)
+    query = dal.legacy_permission_queries(approved["source"])["capabilities"][0]
+    assert "SecurableClass='SERVER' THEN HAS_PERMS_BY_NAME(NULL,NULL,PermissionName)" in query
+    assert "ELSE HAS_PERMS_BY_NAME(TargetName,SecurableClass,PermissionName)" in query

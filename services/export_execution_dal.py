@@ -445,6 +445,43 @@ USER_IMPERSONATION_SQL = """(SELECT CASE
         AND p.name NOT IN ('sys','INFORMATION_SCHEMA')
       ORDER BY p.principal_id) AS impersonation_scope)"""
 
+
+def user_impersonation_query(target_query):
+    """Check every accessible database under the caller; mutate no persistent state.
+
+    Catalog visibility and both catalog/principal bounds are required. Database
+    identifiers come only from that catalog and are quoted by SQL Server; the
+    inner query is a constant. No impersonation or permission change is executed.
+    The table variable only bounds the metadata worklist for this statement.
+    """
+    inner = ("SELECT @allowed=" + USER_IMPERSONATION_SQL).replace("'", "''")
+    return f"""SET NOCOUNT ON;
+    DECLARE @user_impersonation int=0,@allowed int,@database sysname,@sql nvarchar(max);
+    IF ISNULL(HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE'),0)<>1
+        THROW 52051,'Complete database permission scope is not visible',1;
+    DECLARE @inner nvarchar(max)=N'{inner}';
+    DECLARE @databases TABLE(DatabaseName sysname,CanAccess int);
+    INSERT @databases SELECT TOP (1001) name,HAS_DBACCESS(name)
+        FROM sys.databases ORDER BY database_id;
+    IF (SELECT COUNT_BIG(*) FROM @databases)>1000
+        OR EXISTS(SELECT 1 FROM @databases WHERE CanAccess IS NULL)
+        THROW 52051,'Database permission scope is unknown or exceeds its bound',1;
+    WHILE EXISTS(SELECT 1 FROM @databases WHERE CanAccess=1)
+    BEGIN
+        SELECT TOP (1) @database=DatabaseName FROM @databases
+            WHERE CanAccess=1 ORDER BY DatabaseName;
+        SET @allowed=NULL;
+        SET @sql=N'EXEC '+QUOTENAME(@database)+N'.sys.sp_executesql '
+            +N'@inner,N''@allowed int OUTPUT'',@allowed OUTPUT';
+        EXEC sys.sp_executesql @sql,N'@inner nvarchar(max),@allowed int OUTPUT',@inner,@allowed OUTPUT;
+        IF @allowed IS NULL
+            THROW 52051,'Database user permission scope is unknown or exceeds its bound',1;
+        IF @allowed=1 SET @user_impersonation=1;
+        DELETE FROM @databases WHERE DatabaseName=@database;
+    END;
+    """ + target_query.replace(USER_IMPERSONATION_SQL, "@user_impersonation")
+
+
 LEGACY_DATABASE_CAPABILITIES = (
     "CONTROL",
     "ALTER ANY ROLE",
@@ -619,7 +656,8 @@ def legacy_permission_queries(source):
         ),
         "capabilities": (
             """SELECT SecurableClass,TargetName,PermissionName,
-            HAS_PERMS_BY_NAME(TargetName,SecurableClass,PermissionName) AS Allowed
+            CASE WHEN SecurableClass='SERVER' THEN HAS_PERMS_BY_NAME(NULL,NULL,PermissionName)
+            ELSE HAS_PERMS_BY_NAME(TargetName,SecurableClass,PermissionName) END AS Allowed
             FROM OPENJSON(?) WITH (SecurableClass nvarchar(32) '$.kind',TargetName nvarchar(257) '$.target',PermissionName nvarchar(128) '$.permission')
             ORDER BY SecurableClass,TargetName,PermissionName""",
             (json.dumps(capabilities),),
@@ -658,6 +696,9 @@ def legacy_permission_queries(source):
             (LEGACY_PERMISSION_MIGRATION,),
         ),
     }
+
+    target, parameters = result["target"]
+    result["target"] = (user_impersonation_query(target), parameters)
 
     if source.get("permission_model") == "direct_application_v1":
         from services.export_sql_direct_permissions import queries
@@ -792,18 +833,20 @@ class ExportExecutionDAL:
             cursor = connection.cursor()
             try:
                 cursor.execute(
-                    "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,"
-                    "DB_NAME() AS DatabaseName,CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) AS DatabaseCollation,"
-                    "USER_NAME() AS Principal,IS_SRVROLEMEMBER('sysadmin') AS Sysadmin,"
-                    "IS_MEMBER('db_owner') AS DatabaseOwner,"
-                    "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION') AS ViewDefinition,"
-                    "IS_ROLEMEMBER('ExportExecutionAuthority') AS AuthorityRole,"
-                    "IS_ROLEMEMBER('ExportExecutionReader') AS ReaderRole,"
-                    "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL') AS ControlDatabase,"
-                    "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY ROLE') AS AlterRole,"
-                    "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY USER') AS AlterUser,"
-                    + USER_IMPERSONATION_SQL
-                    + " AS ImpersonateUser"
+                    user_impersonation_query(
+                        "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,"
+                        "DB_NAME() AS DatabaseName,CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) AS DatabaseCollation,"
+                        "USER_NAME() AS Principal,IS_SRVROLEMEMBER('sysadmin') AS Sysadmin,"
+                        "IS_MEMBER('db_owner') AS DatabaseOwner,"
+                        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION') AS ViewDefinition,"
+                        "IS_ROLEMEMBER('ExportExecutionAuthority') AS AuthorityRole,"
+                        "IS_ROLEMEMBER('ExportExecutionReader') AS ReaderRole,"
+                        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL') AS ControlDatabase,"
+                        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY ROLE') AS AlterRole,"
+                        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY USER') AS AlterUser,"
+                        + USER_IMPERSONATION_SQL
+                        + " AS ImpersonateUser"
+                    )
                 )
                 target = one(cursor)
                 if target is None or target["ViewDefinition"] != 1:
