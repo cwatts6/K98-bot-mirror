@@ -1,0 +1,3242 @@
+[
+  {
+    "name": "KVK.KVK_AllPlayers_Raw",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_AllPlayers_Raw.Table.sql",
+    "sha256": "b3f426f52f774d7602fcb7e83b628f192505260c8b8384f552008cfb0f15cd00"
+  },
+  {
+    "name": "KVK.KVK_AllPlayers_Stage",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_AllPlayers_Stage.Table.sql",
+    "sha256": "67199b4a24064b41bdb4f6967f59886f5d328e83eab67cda176a24d011b6abae"
+  },
+  {
+    "name": "KVK.KVK_CampMap",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_CampMap.Table.sql",
+    "sha256": "403dd139ab574677458a26838dc75bdcbe4217533e29868e90f81e6d68aedde1"
+  },
+  {
+    "name": "KVK.KVK_Camp_Windowed",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Camp_Windowed.Table.sql",
+    "sha256": "3ced89165a65727a51d01c35efac2eccf1cdd768f4b800a729d24665008710be"
+  },
+  {
+    "name": "KVK.KVK_DKPWeights",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_DKPWeights.Table.sql",
+    "sha256": "146879526deaf7e1d931833d2602de0e72fe4adb16188107354d7882e495c678"
+  },
+  {
+    "name": "KVK.KVK_Ingest_Diagnostics",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Ingest_Diagnostics.Table.sql",
+    "sha256": "8f8e7150d0d08904a63726d7a0ffcb1439874faa2281f9de07bcf8cc105d2b60"
+  },
+  {
+    "name": "KVK.KVK_Ingest_Negatives",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Ingest_Negatives.Table.sql",
+    "sha256": "3e352b15337e08b21f3b23e1254f511996c371704bd2b4571db7068965b7995b"
+  },
+  {
+    "name": "KVK.KVK_Kingdom_Windowed",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Kingdom_Windowed.Table.sql",
+    "sha256": "5c6a40d1b00e096015ea02a3986115bd3a4a94d07f7428e21613eb6c0d388713"
+  },
+  {
+    "name": "KVK.KVK_Player_Baseline",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Player_Baseline.Table.sql",
+    "sha256": "d9b244007ddcb9a1acebf874a3c674dbb5e6888e249b4a1b9e564d8fd5f9b0ec"
+  },
+  {
+    "name": "KVK.KVK_Player_Windowed",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Player_Windowed.Table.sql",
+    "sha256": "887cd845cfe461957194f4e3f4097f8c91415ba98831f467755891970ef5cca3"
+  },
+  {
+    "name": "KVK.KVK_Scan",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Scan.Table.sql",
+    "sha256": "802ab9a6faa61e9fb3697ae60ae1973b74daf2f76459d48082cbf647379265ec"
+  },
+  {
+    "name": "KVK.KVK_Windows",
+    "type": "U",
+    "path": "sql_schema/KVK.KVK_Windows.Table.sql",
+    "sha256": "f208faea58361d5fb9c3a3aad8a106e6bec4dfcf56c3100e78bc3482106a3afa"
+  },
+  {
+    "name": "KVK.SeasonSource",
+    "type": "U",
+    "path": "sql_schema/KVK.SeasonSource.Table.sql",
+    "sha256": "93e6ab971947fe163ccb6cb22ee329ef55a2da483ff3209408d09e4b04dee1eb"
+  },
+  {
+    "name": "KVK.SourceAction",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceAction.Table.sql",
+    "sha256": "be8e5ff10d30711ce42a22222294ad9c5bb8787d0595fc404af28e9f5949b933"
+  },
+  {
+    "name": "KVK.SourceAdminReview",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceAdminReview.Table.sql",
+    "sha256": "72257ae1680d28094f341ce26f73676f9a85f9d6f45b4e3e0b2621a043b89dc3"
+  },
+  {
+    "name": "KVK.SourceAggregateReport",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceAggregateReport.Table.sql",
+    "sha256": "43ceae79854a2d1ccb5ddc749fa73ae3a36e5b701fc05bfa9c549811129cc19a"
+  },
+  {
+    "name": "KVK.SourceAggregateRevision",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceAggregateRevision.Table.sql",
+    "sha256": "5b679d5d5cd0d931b13a83a84c2b6b06f840acc333d826d0c0e059e81a51bb20"
+  },
+  {
+    "name": "KVK.SourceArtifact",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceArtifact.Table.sql",
+    "sha256": "a0e947d06fc06d1b5b567ba901d9b7ef15e9c66f75a907150d897eb5c2e5539d"
+  },
+  {
+    "name": "KVK.SourceCampConfig",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceCampConfig.Table.sql",
+    "sha256": "5555ea386ab198bbe8d38d9280cc3abf62e65e9d65276783202247a7326fe9b4"
+  },
+  {
+    "name": "KVK.SourceCampReportRow",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceCampReportRow.Table.sql",
+    "sha256": "241136c785f2c9fd829817db7c1c4f333c50c4bed42b7a32dfb91663eadba38c"
+  },
+  {
+    "name": "KVK.SourceCompleteSelection",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceCompleteSelection.Table.sql",
+    "sha256": "c20eaa2d467085e1e94f729e8793e666e681429d842e01ec1d2f1a6499e4a095"
+  },
+  {
+    "name": "KVK.SourceConfigRequest",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceConfigRequest.Table.sql",
+    "sha256": "28ca79068b75ce68b626c2e7bf2af6367e530ca6f9046c17142da72facb50aff"
+  },
+  {
+    "name": "KVK.SourceConfigVersion",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceConfigVersion.Table.sql",
+    "sha256": "9a48b08b9af44144cd4b3e65721273c9ea9c66ad3d1278bae40a5b6eb91304cd"
+  },
+  {
+    "name": "KVK.SourceDelivery",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceDelivery.Table.sql",
+    "sha256": "ee947b217a22d760e0c3e7333253fd2e150f14ecb82791b0fcbdd7dc59d3bc1a"
+  },
+  {
+    "name": "KVK.SourceExportIntent",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceExportIntent.Table.sql",
+    "sha256": "50cc712a23728ad36cad0ac57e1c93d735d14827992ab98636bb82389429d585"
+  },
+  {
+    "name": "KVK.SourceExportIntentPublication",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceExportIntentPublication.Table.sql",
+    "sha256": "50dff7cc884f92a6b245752194cead35e649cc663bbc4f3a3ff9536bcd06c24b"
+  },
+  {
+    "name": "KVK.SourceImportAttempt",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceImportAttempt.Table.sql",
+    "sha256": "65207f6028feb566578c2b30f23019baf4c617e03139dd879e5b2b6adeebb2b7"
+  },
+  {
+    "name": "KVK.SourceKingdomReportRow",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceKingdomReportRow.Table.sql",
+    "sha256": "0458bd8ec21998a13eab2f894c37200d063c30834c414d9276de273275d9bf6b"
+  },
+  {
+    "name": "KVK.SourceLogicalScan",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceLogicalScan.Table.sql",
+    "sha256": "bd9975aa4c1de2fcdd4523f1b12ac4789a3bf4bbff19cbf198aa9f1390678eeb"
+  },
+  {
+    "name": "KVK.SourceObservation",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceObservation.Table.sql",
+    "sha256": "6090d060db352fdc213d9641c2d8294fc67354d6cdb5cb8b2bc8c82e322cb7da"
+  },
+  {
+    "name": "KVK.SourceObservationRevision",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceObservationRevision.Table.sql",
+    "sha256": "e1fd1737a1bfc988443af9f22c9fa88544e0d9100f7cf93cb1277e6b5562d597"
+  },
+  {
+    "name": "KVK.SourceOutputDisposition",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputDisposition.Table.sql",
+    "sha256": "bdce4416134dcc5d5898383850acffdc6e54249622f0e4299a6e683627f87a24"
+  },
+  {
+    "name": "KVK.SourceOutputFile",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputFile.Table.sql",
+    "sha256": "0235ec9133d5bd20de9038dfa6681782efaeb3b50834da079500c57d5a469885"
+  },
+  {
+    "name": "KVK.SourceOutputOperation",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputOperation.Table.sql",
+    "sha256": "dafe523ac334fde3af865a40bd5539e99734b2a35d9f2d7fe848ebce47d28054"
+  },
+  {
+    "name": "KVK.SourceOutputOperationResource",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputOperationResource.Table.sql",
+    "sha256": "97f9923837fa6aff9f8b8de0386a2cb791b3cdb6d16b7b823b8a3243fe10ac99"
+  },
+  {
+    "name": "KVK.SourceOutputPool",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputPool.Table.sql",
+    "sha256": "c55cb639628e4b6325a7aa7d0a421f3b12481f2b2a11fda88034395a9ec53be5"
+  },
+  {
+    "name": "KVK.SourceOutputSlot",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceOutputSlot.Table.sql",
+    "sha256": "f712ac21d46cdc500210bcab7de555dc62f6899e22f04813af408addd23b3c7d"
+  },
+  {
+    "name": "KVK.SourcePeriod",
+    "type": "U",
+    "path": "sql_schema/KVK.SourcePeriod.Table.sql",
+    "sha256": "226ce5c5203ab80f1ae1ea3b274f67cf7b8d6c23b8edb34db217814537c6ad8a"
+  },
+  {
+    "name": "KVK.SourcePlayerResult",
+    "type": "U",
+    "path": "sql_schema/KVK.SourcePlayerResult.Table.sql",
+    "sha256": "b2a87dae7530749c1bff6c2ae7a1aee70973afaf68b2dc546ed8d27613f6f58b"
+  },
+  {
+    "name": "KVK.SourcePlayerSnapshot",
+    "type": "U",
+    "path": "sql_schema/KVK.SourcePlayerSnapshot.Table.sql",
+    "sha256": "8cad5081bbd9992ddf3fc52d9bb2c01fa38e18efe1b829351b8350b829f5d7b6"
+  },
+  {
+    "name": "KVK.SourcePublication",
+    "type": "U",
+    "path": "sql_schema/KVK.SourcePublication.Table.sql",
+    "sha256": "c3c2004f752028afdb2c4607f2888709e40a39c6d49ffb962aabc9489f9dbcc1"
+  },
+  {
+    "name": "KVK.SourceRoster",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceRoster.Table.sql",
+    "sha256": "6b3eaa574710697b8fd7b4cd4d79df59efece990acffd7f649644065ace7000e"
+  },
+  {
+    "name": "KVK.SourceRosterMember",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceRosterMember.Table.sql",
+    "sha256": "45cd7c7b5e7370884282ac3bfc45c0c21804eb9e72e943d9db88f067c7e24c53"
+  },
+  {
+    "name": "KVK.SourceRouting",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceRouting.Table.sql",
+    "sha256": "ce4dfc4a345b6b728c304326f286b3ee7d7260afc59c957cc347b62693a73975"
+  },
+  {
+    "name": "KVK.SourceScanBinding",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceScanBinding.Table.sql",
+    "sha256": "e5452b3672ffa040a590c7c7425bb8e645ce4db369727f6611837045670395e1"
+  },
+  {
+    "name": "KVK.SourceSelection",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceSelection.Table.sql",
+    "sha256": "2389d6273714564f36cc3221432a491196b911a6480ae5caeb71a8767c9ea17f"
+  },
+  {
+    "name": "KVK.SourceUpdate",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceUpdate.Table.sql",
+    "sha256": "bdf354f1c78fb113c04b22d073a0ee5fd6771d41e79f31ec1d5cb8ec5cad432a"
+  },
+  {
+    "name": "KVK.SourceWeightConfig",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceWeightConfig.Table.sql",
+    "sha256": "7e24829d36c9bd07c3eb95fd9f40c2a7d2be113eea7c2df7990aae9c094679dc"
+  },
+  {
+    "name": "KVK.SourceWindowConfig",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceWindowConfig.Table.sql",
+    "sha256": "b17632ecd7d1ce6b29fc72b6ac48f04689fc4aec5a09af45fd1669550b972bef"
+  },
+  {
+    "name": "KVK.sp_KVK_AllPlayers_Ingest",
+    "type": "P",
+    "path": "sql_schema/KVK.sp_KVK_AllPlayers_Ingest.StoredProcedure.sql",
+    "sha256": "6a76c792a90a607a870ffde1cfaec6ac3382b0392c86de579582137e6d4f2841"
+  },
+  {
+    "name": "KVK.sp_KVK_Get_Exports",
+    "type": "P",
+    "path": "sql_schema/KVK.sp_KVK_Get_Exports.StoredProcedure.sql",
+    "sha256": "636ad0f35a3db4f4947b6c95271a9d7fc7faee169ffbb0634c2984756bcff254"
+  },
+  {
+    "name": "KVK.sp_KVK_Ingest_Cleanup",
+    "type": "P",
+    "path": "sql_schema/KVK.sp_KVK_Ingest_Cleanup.StoredProcedure.sql",
+    "sha256": "cef9d45600d93aff33a3f1025bc3862e148a085b6e53a073f6b2ca1d14ad2922"
+  },
+  {
+    "name": "KVK.sp_KVK_Recompute_Windows",
+    "type": "P",
+    "path": "sql_schema/KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql",
+    "sha256": "170d7fc9caee4afa78eab24a6410531716ee5d30aee971857ba2fa0c83ed721d"
+  },
+  {
+    "name": "KVK.vw_FightingDataset",
+    "type": "V",
+    "path": "sql_schema/KVK.vw_FightingDataset.View.sql",
+    "sha256": "cb08b72d074e4bf3a58fdd4a20873126b2d231255e9ff15087ec01bdd62b4bfc"
+  },
+  {
+    "name": "KVK.vw_Player_Overall_KVK_Rank",
+    "type": "V",
+    "path": "sql_schema/KVK.vw_Player_Overall_KVK_Rank.View.sql",
+    "sha256": "b6da73f9630b660e98e9870aa2aa672725e65b22be19ed77bb6bc5c3bc481705"
+  },
+  {
+    "name": "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+    "type": "P",
+    "path": "sql_schema/dbo.ACQUIRE_KS4_IMPORT_LOCK.StoredProcedure.sql",
+    "sha256": "7452033ce771e779021c5bd4f4b3bd9ebdb65cb0aabeda83b611f80be3eebffb"
+  },
+  {
+    "name": "dbo.ALL_GOVS",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_GOVS.Table.sql",
+    "sha256": "4af88d087ce2023ad76c07615ce979fc170384a6a84ff6a175e764a63625f60b"
+  },
+  {
+    "name": "dbo.ALL_GOVS_ALLIANCES",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_GOVS_ALLIANCES.Table.sql",
+    "sha256": "cdee9cf3fe755c03857112bead2a6bacda2a3b309786dee8f3d22aeb57b1f5b3"
+  },
+  {
+    "name": "dbo.ALL_GOVS_ALLIANCES_SYNC_STATE",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_GOVS_ALLIANCES_SYNC_STATE.Table.sql",
+    "sha256": "53508bdb689145b057bbf41087dccfbedc829a5e2f147cf9641423534246ee0f"
+  },
+  {
+    "name": "dbo.ALL_GOVS_NAMES",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_GOVS_NAMES.Table.sql",
+    "sha256": "1ec32afa4f0c7ddd4a294e1a779b968de43fa4c0cf86235ddcede490865707a8"
+  },
+  {
+    "name": "dbo.ALL_STATS_FOR_DASHBAORD",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_STATS_FOR_DASHBAORD.Table.sql",
+    "sha256": "974ce2cfee8d1db268ae71911b8eb779ffc87e921ec1be1a8978ef406028f849"
+  },
+  {
+    "name": "dbo.ALL_STATS_FOR_DASHBOARD",
+    "type": "U",
+    "path": "sql_schema/dbo.ALL_STATS_FOR_DASHBOARD.Table.sql",
+    "sha256": "bf8d8ea09f70df5f3a3a6474dd29fee2e5c1b01baf9e38066ca9ff6cb9f23bbc"
+  },
+  {
+    "name": "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+    "type": "P",
+    "path": "sql_schema/dbo.ARCHIVE_IMPORT_STAGING_FILE.StoredProcedure.sql",
+    "sha256": "aa3b5e4f14e6f84d0de7c48179a0c7a573ca93eb46bf35350bfefe30fbe1fced"
+  },
+  {
+    "name": "dbo.AllianceActivityDaily",
+    "type": "U",
+    "path": "sql_schema/dbo.AllianceActivityDaily.Table.sql",
+    "sha256": "a67b3df2174c21cfe3e1d187ce6c15f970c9f8eb4e865118847a6a296e9a783e"
+  },
+  {
+    "name": "dbo.AllianceActivityDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.AllianceActivityDelta.Table.sql",
+    "sha256": "4bef19853aad22ef1094b6f99ca7441a6643d60fbe98b025af07f119e99f514c"
+  },
+  {
+    "name": "dbo.AllianceActivitySnapshotHeader",
+    "type": "U",
+    "path": "sql_schema/dbo.AllianceActivitySnapshotHeader.Table.sql",
+    "sha256": "2fc0b9e067134b2a282ad3c5886381916cd2268706c6a01be4afb46f55f1c9d7"
+  },
+  {
+    "name": "dbo.AllianceActivitySnapshotRow",
+    "type": "U",
+    "path": "sql_schema/dbo.AllianceActivitySnapshotRow.Table.sql",
+    "sha256": "bd5e5c8b444e6ae1614e2d310c4f8305b1fcc7a2fd1b010bd96e71a899f5da12"
+  },
+  {
+    "name": "dbo.ArkAlliances",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkAlliances.Table.sql",
+    "sha256": "bf1bb7981f096bd3bcc96a0530c94a45d40ae483f7fa26466e0ca6b5df0a7709"
+  },
+  {
+    "name": "dbo.ArkAuditLog",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkAuditLog.Table.sql",
+    "sha256": "21393795b6a36bcaf01b02493481c9e0bb73f04d4ede9204c2941e6b1a3192af"
+  },
+  {
+    "name": "dbo.ArkBans",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkBans.Table.sql",
+    "sha256": "66cdd7d0e66a0407f4061e7ab126b3319cb96facf54cbe6411f186f8e248dccd"
+  },
+  {
+    "name": "dbo.ArkConfig",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkConfig.Table.sql",
+    "sha256": "936c7afc12c7ea617af34671914bd300d3d62552ff0b1511ff4ea6b3a01885d0"
+  },
+  {
+    "name": "dbo.ArkMatchTeams",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkMatchTeams.Table.sql",
+    "sha256": "f06e8c76425e34c8025010c06919e61143779c5573361b8321789502918b8a30"
+  },
+  {
+    "name": "dbo.ArkMatches",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkMatches.Table.sql",
+    "sha256": "8216c05b8f22482598a001959f29747ef4544f7239dc312c1a9318375116c4cf"
+  },
+  {
+    "name": "dbo.ArkReminderPrefs",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkReminderPrefs.Table.sql",
+    "sha256": "837bbdee71390a4648ce03ec27ee1e171831d652bfe676cc0172723013ed6b87"
+  },
+  {
+    "name": "dbo.ArkSignups",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkSignups.Table.sql",
+    "sha256": "9358a068d885eeac7989838caed5be9f21886f4b28487476596885e9300ced5a"
+  },
+  {
+    "name": "dbo.ArkTeamPreferences",
+    "type": "U",
+    "path": "sql_schema/dbo.ArkTeamPreferences.Table.sql",
+    "sha256": "811374a8beadff596e9ca279e52cb47267a2f9c31ca64a2153aa55dee7d4643f"
+  },
+  {
+    "name": "dbo.BotCommandUsage",
+    "type": "U",
+    "path": "sql_schema/dbo.BotCommandUsage.Table.sql",
+    "sha256": "8701944ed8ed1bb0f411dd12b1bf5a6f7036cb63bd867075e99202c1a2a6c9e4"
+  },
+  {
+    "name": "dbo.CLAIM_KS4_IMPORT_FILE",
+    "type": "P",
+    "path": "sql_schema/dbo.CLAIM_KS4_IMPORT_FILE.StoredProcedure.sql",
+    "sha256": "ee46075e0ce2ba4bc5de5201d108acee1bd817090cb852fe902400ce3561f2df"
+  },
+  {
+    "name": "dbo.CREATE_DASH",
+    "type": "P",
+    "path": "sql_schema/dbo.CREATE_DASH.StoredProcedure.sql",
+    "sha256": "7742599ab7a4382cafccc35fce2629e30d8a9822f0055976b9cc89e5dc112abc"
+  },
+  {
+    "name": "dbo.CREATE_DASH2",
+    "type": "P",
+    "path": "sql_schema/dbo.CREATE_DASH2.StoredProcedure.sql",
+    "sha256": "dad8a0ef35f4d13b1491385be57427732476ff01255837bb632ce81f95c3384c"
+  },
+  {
+    "name": "dbo.CREATE_DELTA_TABLES",
+    "type": "P",
+    "path": "sql_schema/dbo.CREATE_DELTA_TABLES.StoredProcedure.sql",
+    "sha256": "57ee6b05d7902ccac98f36f9b0c98d0b10c775d11cdd7085080abca1f938448d"
+  },
+  {
+    "name": "dbo.CREATE_THE_AVERAGES",
+    "type": "P",
+    "path": "sql_schema/dbo.CREATE_THE_AVERAGES.StoredProcedure.sql",
+    "sha256": "092f7c03e660fa3f4765b5dbd9c2a8aa082ef4e164fbfdbb7ba290d71188cd24"
+  },
+  {
+    "name": "dbo.CURRENT_STATS",
+    "type": "U",
+    "path": "sql_schema/dbo.CURRENT_STATS.Table.sql",
+    "sha256": "426a3579072eb9f7692d4372897f4ce31bfc4dcd5ef4d0db4288e7c9f5f13e0c"
+  },
+  {
+    "name": "dbo.CURRENT_TARGETS",
+    "type": "U",
+    "path": "sql_schema/dbo.CURRENT_TARGETS.Table.sql",
+    "sha256": "c80f7f93c1972f1ae5b080bec597cafb38333cee9852559df888ff9ac1cd5f25"
+  },
+  {
+    "name": "dbo.CURRENT_TARGETS_NEW",
+    "type": "U",
+    "path": "sql_schema/dbo.CURRENT_TARGETS_NEW.Table.sql",
+    "sha256": "786a8304dd8bc040786eb9a88a4bac1a1dbb39cb9f702469690bd5dd5fba47c9"
+  },
+  {
+    "name": "dbo.CURRENT_TARGETS_NEW_SEPT24",
+    "type": "U",
+    "path": "sql_schema/dbo.CURRENT_TARGETS_NEW_SEPT24.Table.sql",
+    "sha256": "a253b2fe9b1969bff2a7156672cbf85717753fb2fccfc77aa7f5fc6c3466b8bf"
+  },
+  {
+    "name": "dbo.CaptureLogHealth",
+    "type": "P",
+    "path": "sql_schema/dbo.CaptureLogHealth.StoredProcedure.sql",
+    "sha256": "8bce7aa75e060954dd0b707bc31de629c920dc25447e26555f9cce75359f39b5"
+  },
+  {
+    "name": "dbo.Civilization_Mapping",
+    "type": "U",
+    "path": "sql_schema/dbo.Civilization_Mapping.Table.sql",
+    "sha256": "04cc97e31ff4938c8532fd03af5abbaf20b29cf860b571eeb8ca4d6a1427a833"
+  },
+  {
+    "name": "dbo.D12",
+    "type": "U",
+    "path": "sql_schema/dbo.D12.Table.sql",
+    "sha256": "5a9f293d4fc1e3e5467e923ea0fbb70578f48caaf0fe168b945d4d78b557b2ac"
+  },
+  {
+    "name": "dbo.D12D",
+    "type": "U",
+    "path": "sql_schema/dbo.D12D.Table.sql",
+    "sha256": "07ce6d7e784d41ec6d9874230696f8b550c1fa8f219ef342c5c782ee47f17d17"
+  },
+  {
+    "name": "dbo.D3",
+    "type": "U",
+    "path": "sql_schema/dbo.D3.Table.sql",
+    "sha256": "023516304e543d5101a17ea117bdd556ddf61ad582bc298eb1af589ffa48a9c7"
+  },
+  {
+    "name": "dbo.D3D",
+    "type": "U",
+    "path": "sql_schema/dbo.D3D.Table.sql",
+    "sha256": "fc376039c13f173030dc761f8e15979a5fe8fbdec4d3fe25d1f60a56ae260d89"
+  },
+  {
+    "name": "dbo.D6",
+    "type": "U",
+    "path": "sql_schema/dbo.D6.Table.sql",
+    "sha256": "24003feb2bc6c35e02259f5149b1279d783305af06acfa518a65d8e13182ac58"
+  },
+  {
+    "name": "dbo.D6D",
+    "type": "U",
+    "path": "sql_schema/dbo.D6D.Table.sql",
+    "sha256": "e51947f5d5bf46a39d5c85cb0e8705321d05e1b1f708ea8a89ac331a8f58e364"
+  },
+  {
+    "name": "dbo.DALL",
+    "type": "U",
+    "path": "sql_schema/dbo.DALL.Table.sql",
+    "sha256": "21e5d1aa83acc89cf908073fcd53dcaa146e4327ee703f25bff8d1293d7b0a7f"
+  },
+  {
+    "name": "dbo.DASH",
+    "type": "U",
+    "path": "sql_schema/dbo.DASH.Table.sql",
+    "sha256": "14f7e83ea49f171d9b77a7f7ded2ab8f6e93df606a673a5fbd311f834777173c"
+  },
+  {
+    "name": "dbo.DEADSSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.DEADSSUMMARY.Table.sql",
+    "sha256": "a83490758b98fe3e34a48fa4a7b3f9b2ed019a1d1beab01afd6667cca2741199"
+  },
+  {
+    "name": "dbo.DEADSSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.DEADSSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "e293aa4e418e126bad96f6a271dce3efa0f565adf9ad459723cdd2f07eaebf55"
+  },
+  {
+    "name": "dbo.DeadsDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.DeadsDelta.Table.sql",
+    "sha256": "a558d5a73f6c0ac59f415faa88d570f74750add192f197d8efa861f9e1712c69"
+  },
+  {
+    "name": "dbo.DeadsDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.DeadsDelta_BACKUP.Table.sql",
+    "sha256": "22fada879972901bdccb5f67d6089bcfad8145b69e9165b8aa292b55befde404"
+  },
+  {
+    "name": "dbo.Debug_SqlDiagnostics",
+    "type": "U",
+    "path": "sql_schema/dbo.Debug_SqlDiagnostics.Table.sql",
+    "sha256": "81a32eed2683198f40e8c186ca0dbd2bfa4ff4cd7610ead389dfc8c3002aa386"
+  },
+  {
+    "name": "dbo.DeltaMetrics",
+    "type": "U",
+    "path": "sql_schema/dbo.DeltaMetrics.Table.sql",
+    "sha256": "e69f04376f5393fecd7624a4ac9aefaa3b4b5998d9abcb227428527596854e0e"
+  },
+  {
+    "name": "dbo.DeltaProcessingLog",
+    "type": "U",
+    "path": "sql_schema/dbo.DeltaProcessingLog.Table.sql",
+    "sha256": "1910e774292cb69d0e53dc13a0a53c277966ce149c35684d6a38a19157fa7d7d"
+  },
+  {
+    "name": "dbo.DeploymentRunHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.DeploymentRunHistory.Table.sql",
+    "sha256": "cd26f063a5519a95b54d9f88f26e84b79963cedfa8bb6424664362c48dceb9f2"
+  },
+  {
+    "name": "dbo.DiscordGovernorRegistry",
+    "type": "U",
+    "path": "sql_schema/dbo.DiscordGovernorRegistry.Table.sql",
+    "sha256": "595abcd430044579c896eec5cc2244ce5ae44ff295ef92376a462edf5d52a6ba"
+  },
+  {
+    "name": "dbo.DiscordServerActivityEvents",
+    "type": "U",
+    "path": "sql_schema/dbo.DiscordServerActivityEvents.Table.sql",
+    "sha256": "420feb91c1eda41aaae48528e34c5fd32f7ec04aecf67c7bb40da08b1d104517"
+  },
+  {
+    "name": "dbo.DiscordUserProfilePreference",
+    "type": "U",
+    "path": "sql_schema/dbo.DiscordUserProfilePreference.Table.sql",
+    "sha256": "f54504544d364f281cceff98b2e2c25add76960b7a69f0788e95dce694cce119"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_10",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_10.Table.sql",
+    "sha256": "0cd9c6e6ffc3518c19c31e7b4fd4d89d5a0772f223b787a3b42b23130ba85805"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_11",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_11.Table.sql",
+    "sha256": "90611458df2c769154be7cba066d44a776037b79708a145dbb70241b5cdae889"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_12",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_12.Table.sql",
+    "sha256": "64a0426d6e2f37a9768c68b3216ebf1d4bbc01742baea8f299fcdf620e73892f"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_13",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_13.Table.sql",
+    "sha256": "71c58273927c1a59ff358f8d32b75109e4a4901383109b9b4d4a253321a7f0e5"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_14",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_14.Table.sql",
+    "sha256": "ad22d3f5ea1e7d350fd8bfe4a592bc7c0e5a9a22d4d40e108cced6278a24cf42"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_15",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_15.Table.sql",
+    "sha256": "1c8d15835d6800b51bb51c00758fa46c296fdf985b1f7a5ca1f1f4da4357e62e"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_3",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_3.Table.sql",
+    "sha256": "7632e55a03b15a5f280656893b61f55ee65987e480723a919a52efe824bc0ad9"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_4",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_4.Table.sql",
+    "sha256": "d1ffcaab1449f189402b8363899ffc857cd28a7eb6f640349133156135f43fdb"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_5",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_5.Table.sql",
+    "sha256": "4c7816fd54cc5675772c146a14eabac0b1a95756d467a45887d93b55a565684c"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_6",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_6.Table.sql",
+    "sha256": "9089e7cc6b0c89e2f259027d82f8e1406ea4ba118d190229fd6433a7caaea030"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_7",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_7.Table.sql",
+    "sha256": "616ff8a751d380b7c33f0f3d432d2f99ba3fb4b66f201af12c9f73c79f5ab8b3"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_8",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_8.Table.sql",
+    "sha256": "96ad8b871a739ec82b33cbfccc3bcac1c02fd39cc8a9ee799852c7c0952fb26e"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_9",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_9.Table.sql",
+    "sha256": "b3468b5a8d667be53cf6bcb8310a634fb9445f1a21be78b0a4165f6c99d08da5"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_JUN25",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_JUN25.Table.sql",
+    "sha256": "4636460f0762a0eba9ef4e9fa04b81da3be337dba0c7d3ef5f1026f4650192d5"
+  },
+  {
+    "name": "dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE.Table.sql",
+    "sha256": "bb46b9a3495f9bb28aa7873b8934c36b4cf89ac75025abb31b122751cb27511c"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_CURRENT_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_CURRENT_KVK.Table.sql",
+    "sha256": "63da126ab8b446712b14e61995913ad99385eac46b05fdcf61acd3ebd47e19a7"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_DASHBOARD",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_DASHBOARD.Table.sql",
+    "sha256": "b3259189b9778e0b3a62cf1a5f5dbca314dd7c792223c92763e657699535a8e8"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_FEB24_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_FEB24_KVK.Table.sql",
+    "sha256": "7d806316b28dd5ce0c3bd52169d00b1605249bfdaeea5e1bc709f673921b9ab6"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_JAN25_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_JAN25_KVK.Table.sql",
+    "sha256": "81b65369d40924becfba71613a7c0abbd14168abf96af735e9bcc9f9f2c9e93e"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_JUL23_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_JUL23_KVK.Table.sql",
+    "sha256": "9742f812e36c0674f38cd776f35a47b6414c467683f284af93e5c65a49a89d45"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_10",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_10.Table.sql",
+    "sha256": "f1221f6547729bcd716d44ef051f22f0dc164f08711ba55eb701a991cb704182"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_11",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_11.Table.sql",
+    "sha256": "64ec3390ea9997796e9be9fcc8a95328a89dc1866576d11d0b7c33d35040bec9"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_12",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_12.Table.sql",
+    "sha256": "e9372f72f013a365fe766bed911a6ce11021dfd262888763815e6a50b8f2dc14"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_13",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_13.Table.sql",
+    "sha256": "bc19c6b17fc71abda483e7c86af62d2589dd0e54bf79b5e37144d3bad0d78cd7"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_14",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_14.Table.sql",
+    "sha256": "7d5dcfdf9ce95886b01245f786a1bcd49905f1c06860d77aac3ec384ef9e00fa"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_15",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_15.Table.sql",
+    "sha256": "5a77c695793e9481a1e6e2f5286f362f6c9628e5178ffb03b2d4f612b0585513"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_3",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_3.Table.sql",
+    "sha256": "241164a67641f16b82637767e4c0c1f9203a7b5fafeea2c32c87926a11a556c4"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_4",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_4.Table.sql",
+    "sha256": "19cc71a499768f4a6b8d3e06837844436ef7bc8c216c3586d3f719baf36da6e4"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_5",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_5.Table.sql",
+    "sha256": "779fc490e380ead8c6f234dfb5a2ed31485699b4607d234a1e46ab9dcd93c0d5"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_6",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_6.Table.sql",
+    "sha256": "44a8af7c847a2a38ca97818cbc8f91ce6493fadddcf7d85e2365febb7576adfe"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_7",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_7.Table.sql",
+    "sha256": "7ed96b1f2802da7b156e0c656a9cb882c04cdcba8860bb0a1791b607b44f0df9"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_8",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_8.Table.sql",
+    "sha256": "64086dd14b68fc32ee638aeb954818ecfe8bfd9af7c9ed951c14471e6258a688"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_KVK_9",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_KVK_9.Table.sql",
+    "sha256": "26fcfcde620774f7d39e7df3f4f48f6af277b4a8dad8e22ddf893414fd23dd0a"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_MAR25_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_MAR25_KVK.Table.sql",
+    "sha256": "3be0f55695e4f21d9ca1deb392d46e1a4d889a462d75be6f04d441d49960cf13"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_MAY24_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_MAY24_KVK.Table.sql",
+    "sha256": "cd6c55517b12a0ec4af93f725c1136730451423b332e35d20418fc4b6d255bb0"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_OCT23_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_OCT23_KVK.Table.sql",
+    "sha256": "027598ea79b6d35fcd7fa64510881e1fb883321bd5ebd66fcf0db21a27b101a9"
+  },
+  {
+    "name": "dbo.EXCEL_FOR_SEPT24_KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_FOR_SEPT24_KVK.Table.sql",
+    "sha256": "a8e65857c45153de5300fddc887b5e7a530d2c6b4a5734871df51de6b0f37d67"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS.Table.sql",
+    "sha256": "15e6a94eb64abe1454e746774a2891c0c477f076c288bbc311d3605ac52836ad"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS_NEW",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS_NEW.Table.sql",
+    "sha256": "a4a1b0870986d75b3b9a286f91301d418d6e14b3e6b056e02e45e580f288ca07"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS_NEW_SEPT24",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_CURRENT_KVK_TARGETS_NEW_SEPT24.Table.sql",
+    "sha256": "045e528f39f28fb5e27f5fabb2e847f68246b35e3fb942337172f742ac28d5d5"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_10",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_10.Table.sql",
+    "sha256": "d75c107da125de62e386f3fd77885f19e78a71d4f30ae472db2d05f6a1993feb"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_11",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_11.Table.sql",
+    "sha256": "acad8a163bddabf79b96c315c96d880f4b945553494e3cc37f134ff1f93c2608"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_12",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_12.Table.sql",
+    "sha256": "f251f81f3d96759e485df41502312fc38eeea24086f3901f0c34981abdcbbae0"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_13",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_13.Table.sql",
+    "sha256": "638eb6145fd10896f87d013c4cabaeeab1dd1148235c31ab2502e7c5e1c2c6b2"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_14",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_14.Table.sql",
+    "sha256": "a4f766c0d5f583601c1f8c58328de8729e2cd6727e0a083e0140abae0a0c4373"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_15",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_15.Table.sql",
+    "sha256": "76dd1cefee89270953dc8768c1535f33894d0b7f01b4c1962d3e82d42c9ddd47"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_3",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_3.Table.sql",
+    "sha256": "d56770496818f154601953a18094798cac2fc749cb4f149bd85fad5be9eb0cb0"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_4",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_4.Table.sql",
+    "sha256": "3b7eb9893145d9b42fe9d9152129e8fe2e15918877f58ad29d17b4d026a6c9ee"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_5",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_5.Table.sql",
+    "sha256": "d91927f7fb4b670b6a7aafad6bf520437be82d7633ec4398cb43dc696ee211a8"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_6",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_6.Table.sql",
+    "sha256": "ed9576b82f4fbbab8e6d8bc54d0a6179392ec21eefe6e105ec4be5d1ed2b2b9d"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_7",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_7.Table.sql",
+    "sha256": "05e74ef72c32de4ffff002b94604c872a4100368b08105069b409c6aafabcdb9"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_8",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_8.Table.sql",
+    "sha256": "88a6e10f6c18c01e3e4bc2f28d59b6fc29a8ed88d5524f35cb1ea7afa79c8fd4"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_9",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_9.Table.sql",
+    "sha256": "6258c218631d97a26653b149315dff0c594c67695f379460e6781b5b7f0e1501"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_JAN25",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_JAN25.Table.sql",
+    "sha256": "1c72436c640e468ea9c7bbc6d407adc1ca8125e30dfc54c5eba065706c20a3d1"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_JUN25",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_JUN25.Table.sql",
+    "sha256": "5aa94f2f0f05a0a89f51c68a184c2f94f0a4fb54f1ac6307d580b228eecde217"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25.Table.sql",
+    "sha256": "07b0fbaa61c9eff9889c8c5f932d2babacf1676ea5935952936e3d12e7965b54"
+  },
+  {
+    "name": "dbo.EXCEL_OUTPUT_KVK_TARGETS_TEMPLATE",
+    "type": "U",
+    "path": "sql_schema/dbo.EXCEL_OUTPUT_KVK_TARGETS_TEMPLATE.Table.sql",
+    "sha256": "2145cd5889e26945275bfa28e265b788aa0fc482beb56b42f2384bfb45777ad7"
+  },
+  {
+    "name": "dbo.EXEMPT_FROM_STATS",
+    "type": "U",
+    "path": "sql_schema/dbo.EXEMPT_FROM_STATS.Table.sql",
+    "sha256": "039bfc3b9dc38311b88c5b7339a7f3274637a23ae6f1282d5db46ed858102b60"
+  },
+  {
+    "name": "dbo.ErrorAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.ErrorAudit.Table.sql",
+    "sha256": "34496b7f467c9c44628c5ead4febd2d376b4d452effaea9290a5abde69a552b3"
+  },
+  {
+    "name": "dbo.EventInstances",
+    "type": "U",
+    "path": "sql_schema/dbo.EventInstances.Table.sql",
+    "sha256": "b334fdded33480c94dd58a54f9d0bda1ce363766b8dbb187aa224558d2c84166"
+  },
+  {
+    "name": "dbo.EventOneOffEvents",
+    "type": "U",
+    "path": "sql_schema/dbo.EventOneOffEvents.Table.sql",
+    "sha256": "3ad3bc8fe500a1f997b0e6c5aa9496cc5ef8c0fe735e614982fcd987d420bc0e"
+  },
+  {
+    "name": "dbo.EventOverrides",
+    "type": "U",
+    "path": "sql_schema/dbo.EventOverrides.Table.sql",
+    "sha256": "d679d036648e74015184ae6b3caf36a2e4418401f1d50e43cee667036cc3b984"
+  },
+  {
+    "name": "dbo.EventRecurringRules",
+    "type": "U",
+    "path": "sql_schema/dbo.EventRecurringRules.Table.sql",
+    "sha256": "5043e43efe1a4fce6ae3a36372b59b0c6f49f15d20bcf2e8bc7011610ba82339"
+  },
+  {
+    "name": "dbo.EventSyncLog",
+    "type": "U",
+    "path": "sql_schema/dbo.EventSyncLog.Table.sql",
+    "sha256": "1f867d8c02315f8bffdf3c42dbdbfebb147bbf73e5ac48084f2fc4e938fc3e3d"
+  },
+  {
+    "name": "dbo.ExportAttempt",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportAttempt.Table.sql",
+    "sha256": "582aad07a1de65e109b9937ffefab726da2643fce26c6fae4779985a9e34910a"
+  },
+  {
+    "name": "dbo.ExportAttemptPart",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportAttemptPart.Table.sql",
+    "sha256": "8174bd0df3f4914cfb98e4164ab4d0c20494175069d00a09a0edc201dbb6f699"
+  },
+  {
+    "name": "dbo.ExportExecutionSession",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportExecutionSession.Table.sql",
+    "sha256": "0757c0817ae18a3559ed63c1b6c6fab44fbbccb1b4b4678a646f66a4260da373"
+  },
+  {
+    "name": "dbo.ExportExecutionStream",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportExecutionStream.Table.sql",
+    "sha256": "03a36277e572481a447ff80bf23909bed6aae1dd8372f01a7078863751f19017"
+  },
+  {
+    "name": "dbo.ExportJob",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportJob.Table.sql",
+    "sha256": "35fb7b3cedbaa39a9d8b094cea95b01cd1221a3ecf669847f4a4e680e90adf4b"
+  },
+  {
+    "name": "dbo.ExportJobResource",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportJobResource.Table.sql",
+    "sha256": "a2074f10ea097d32c75042e46bb4f9a0174de0185e7ba34879f95fa8161bb90a"
+  },
+  {
+    "name": "dbo.ExportManagedFileOrigin",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportManagedFileOrigin.Table.sql",
+    "sha256": "a5f3837226950cd8b8d8a638864dba50fc32f84eeccd7f535daa1293e4356a49"
+  },
+  {
+    "name": "dbo.ExportManualFileOrigin",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportManualFileOrigin.Table.sql",
+    "sha256": "082f5ce2b083117ea8c1c16d87a0c45697a9ba24e17738037173510ecd660bc7"
+  },
+  {
+    "name": "dbo.ExportPreparation",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportPreparation.Table.sql",
+    "sha256": "b5cb782d61ad5f7f9cdbcfb0dbe7000452556c627fa7909855b0a8b8d72d495a"
+  },
+  {
+    "name": "dbo.ExportPreparationResource",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportPreparationResource.Table.sql",
+    "sha256": "445cf817120978cdb70f43a07aa7f4aa7726404b79495375c5cdffbe24513b30"
+  },
+  {
+    "name": "dbo.ExportProviderRequest",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportProviderRequest.Table.sql",
+    "sha256": "6d93c8943083f071c7941523238d35d602a3cb0927f626280d70c6343e2ab190"
+  },
+  {
+    "name": "dbo.ExportProviderRequestEvent",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportProviderRequestEvent.Table.sql",
+    "sha256": "6954a5d22926bfd0505511744e3f1481787ec8f10d5e4e73f5e3e62d793d8d9e"
+  },
+  {
+    "name": "dbo.ExportReconciliationProof",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReconciliationProof.Table.sql",
+    "sha256": "47ef6d2677c43ea180289d09004a1661bc706523350a64ad43d91e6e9f99d243"
+  },
+  {
+    "name": "dbo.ExportRequestBudget",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportRequestBudget.Table.sql",
+    "sha256": "fd643b539219cf86c20ca123a18bf9889655c86d6b8b14cedde6e1fe28db4e12"
+  },
+  {
+    "name": "dbo.ExportResource",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportResource.Table.sql",
+    "sha256": "02abff6fa070517f957874cbf8ce24a3683c10ca966b3a9e4d6c325c244784a5"
+  },
+  {
+    "name": "dbo.FIX_IMPORT_STAGING",
+    "type": "P",
+    "path": "sql_schema/dbo.FIX_IMPORT_STAGING.StoredProcedure.sql",
+    "sha256": "ac20aad02bb80aa9fc302a942127b2d9d8cc8ca0656760307b122802cbeabb99"
+  },
+  {
+    "name": "dbo.FallbackImportBatchControl",
+    "type": "U",
+    "path": "sql_schema/dbo.FallbackImportBatchControl.Table.sql",
+    "sha256": "97adff275fd24c7f249b159e9382161fb0015492672876f689ddd82cf32a8ee6"
+  },
+  {
+    "name": "dbo.GOVERNOR_NAMES_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.GOVERNOR_NAMES_PROC.StoredProcedure.sql",
+    "sha256": "43e90ffb9f1fa451c05e379113764db3faa525e1eed4e129c65e40f651d4ff23"
+  },
+  {
+    "name": "dbo.GOVS",
+    "type": "U",
+    "path": "sql_schema/dbo.GOVS.Table.sql",
+    "sha256": "90eea6a5d6d009ff577e1a50bf9ffb6b34ce51ef019ab2b4bbb89e8188d36145"
+  },
+  {
+    "name": "dbo.GovernorInventoryProfile",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorInventoryProfile.Table.sql",
+    "sha256": "95f255d4e743ea26071bb8015442ebc231a70df6031628d58879172359c3c2a1"
+  },
+  {
+    "name": "dbo.GovernorMaterialInventory",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorMaterialInventory.Table.sql",
+    "sha256": "eb402aeb50e193316077674acfb9ec948b847a19e102c6ceb26b28d76c0d5a3c"
+  },
+  {
+    "name": "dbo.GovernorNameHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorNameHistory.Table.sql",
+    "sha256": "61a525d87cd25a3d177c9d6b6fc4ca7a0c05577ca052d31352ae25fe5ded34f2"
+  },
+  {
+    "name": "dbo.GovernorResourceInventory",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorResourceInventory.Table.sql",
+    "sha256": "f0c23e3dee3165d9177381eed1558f0598d945b2b8d1bce93520a4c0f0f23d46"
+  },
+  {
+    "name": "dbo.GovernorSessionLocks",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorSessionLocks.Table.sql",
+    "sha256": "6dcb83d0dcb86549e06cb60e8e1c88175dfb8aca228af61c117f7df2545c8e4b"
+  },
+  {
+    "name": "dbo.GovernorSpeedupInventory",
+    "type": "U",
+    "path": "sql_schema/dbo.GovernorSpeedupInventory.Table.sql",
+    "sha256": "090f2f64816960e542297965ec0b9ec3debbcd18f563f5502a91e7a2e77938ad"
+  },
+  {
+    "name": "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+    "type": "P",
+    "path": "sql_schema/dbo.HASH_KS4_IMPORT_ARCHIVE_FILE.StoredProcedure.sql",
+    "sha256": "ad43f922d85abc9123acb56f2c36533576fd39659755b02f3ad142dc726124ce"
+  },
+  {
+    "name": "dbo.HEALEDSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALEDSUMMARY.Table.sql",
+    "sha256": "5e58ea7d453217849ecb983f3d902ab1a9994d0acee9ce2df64c33872bf99914"
+  },
+  {
+    "name": "dbo.HEALEDSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.HEALEDSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "ead2b7ef0c7e6ef2d2be9de9ec07896f578bda5482128d5e01668c85425c01da"
+  },
+  {
+    "name": "dbo.HEALEDSUMMARY_PROC_OPT",
+    "type": "P",
+    "path": "sql_schema/dbo.HEALEDSUMMARY_PROC_OPT.StoredProcedure.sql",
+    "sha256": "bf9c6a9ae25989b122ac82743125aefb83ecc22b26892ae5cb0b522a1482a651"
+  },
+  {
+    "name": "dbo.HEALED_ALL",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_ALL.Table.sql",
+    "sha256": "91db522259bed1cd5465376563f5aceaaf24f1dfb1911015416f5717172ad04b"
+  },
+  {
+    "name": "dbo.HEALED_D12",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D12.Table.sql",
+    "sha256": "390dc5692b866e83c7bf065516dd186a1a54493f5b0f0e0f536baaf95eebaa9d"
+  },
+  {
+    "name": "dbo.HEALED_D12D",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D12D.Table.sql",
+    "sha256": "16032fa71c94d7e0733bb36e2761ae5a0216a4e10238ed2e1aced4c47d22a49d"
+  },
+  {
+    "name": "dbo.HEALED_D3",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D3.Table.sql",
+    "sha256": "e48773edc7ec8ec8e8a908ca1073dc799a6f60a5027e0afc612815865599ab33"
+  },
+  {
+    "name": "dbo.HEALED_D3D",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D3D.Table.sql",
+    "sha256": "3e4da09592b326bea1061e43d1b186dd85e574e1d34d7c1d4e09736cd1ff6c7a"
+  },
+  {
+    "name": "dbo.HEALED_D6",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D6.Table.sql",
+    "sha256": "268015a877a3fdbcf102202e3a193730c4f655ae0a8099888327a6bc53d105be"
+  },
+  {
+    "name": "dbo.HEALED_D6D",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_D6D.Table.sql",
+    "sha256": "ad953d3cca08d7aacc820d74d9e1be9bc53904857ddfb68dbd040e77f4aefc80"
+  },
+  {
+    "name": "dbo.HEALED_LATEST",
+    "type": "U",
+    "path": "sql_schema/dbo.HEALED_LATEST.Table.sql",
+    "sha256": "50463576d870e71abd207b485898c5c231782c8abc194692a25978c32212b381"
+  },
+  {
+    "name": "dbo.HealedTroopsDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.HealedTroopsDelta.Table.sql",
+    "sha256": "021acd465938020150597f25bf2e30d1759560967a92aa727933429c53fef5a0"
+  },
+  {
+    "name": "dbo.HealedTroopsDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.HealedTroopsDelta_BACKUP.Table.sql",
+    "sha256": "d4ebf3a34f8f87861821e29fcd0f0e87ec088a4dd0a0834a0cd737527d0303d1"
+  },
+  {
+    "name": "dbo.HelpsDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.HelpsDelta.Table.sql",
+    "sha256": "9c2c6fae8ebbc9bee8c7de4aa5079deb0e7ea677cdaaf851d3dd49473f1fe871"
+  },
+  {
+    "name": "dbo.HelpsDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.HelpsDelta_BACKUP.Table.sql",
+    "sha256": "2a1720b103f5f38d412eaa551d87e5b81da40c9b782a898ba6044b7214d74d64"
+  },
+  {
+    "name": "dbo.HoH_Deads",
+    "type": "U",
+    "path": "sql_schema/dbo.HoH_Deads.Table.sql",
+    "sha256": "3dc2d97acebf0c36e90c923d2f765943b293051bd24e5f1f29430b300dc843cd"
+  },
+  {
+    "name": "dbo.ID_",
+    "type": "U",
+    "path": "sql_schema/dbo.ID_.Table.sql",
+    "sha256": "c67e49f94bc625e8e648a0e8ed52e2f97af822f32b71c9560de0f4c82689aa23"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING",
+    "type": "U",
+    "path": "sql_schema/dbo.IMPORT_STAGING.Table.sql",
+    "sha256": "c24527363b0fec37660404c07f9f42771f4c1fd19360200f2e147f6c6785fe11"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING2",
+    "type": "U",
+    "path": "sql_schema/dbo.IMPORT_STAGING2.Table.sql",
+    "sha256": "2502b84c8e9dd5864de0099699025758b8f1788d7b0a861f5617216fe86f3fd4"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING_CSV",
+    "type": "U",
+    "path": "sql_schema/dbo.IMPORT_STAGING_CSV.Table.sql",
+    "sha256": "63bd4df55070c7d06e2834c7cd8353fea9f4576aee6421efcabace0604446391"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING_CSV_RAW",
+    "type": "U",
+    "path": "sql_schema/dbo.IMPORT_STAGING_CSV_RAW.Table.sql",
+    "sha256": "791f11ff96178057a19ef396b6cf6ad047f1816326ba7b9574a189fb2f9f5ab4"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.IMPORT_STAGING_PROC.StoredProcedure.sql",
+    "sha256": "2c5667df33d989bce5a83b2bfd401ef565e86692824250b4c0414ed753e2f9e3"
+  },
+  {
+    "name": "dbo.IMPORT_STAGING_PROC_CORE",
+    "type": "P",
+    "path": "sql_schema/dbo.IMPORT_STAGING_PROC_CORE.StoredProcedure.sql",
+    "sha256": "df01cd3699b3e9f056ab60bd28e276d081ecd6c62ba57ba17d133e1460411898"
+  },
+  {
+    "name": "dbo.INACTIVE_GOVERNORS",
+    "type": "U",
+    "path": "sql_schema/dbo.INACTIVE_GOVERNORS.Table.sql",
+    "sha256": "982e6cf3cd8e7cf942cce1ec64b4f0b2e50a38a1e46e51f39083bc7f43e3f81e"
+  },
+  {
+    "name": "dbo.ImportAuditBatch",
+    "type": "U",
+    "path": "sql_schema/dbo.ImportAuditBatch.Table.sql",
+    "sha256": "3587b618af8231aec70fbedd55c4b7652615d01793fe5de11a2cbbd807e149ce"
+  },
+  {
+    "name": "dbo.ImportAuditPhase",
+    "type": "U",
+    "path": "sql_schema/dbo.ImportAuditPhase.Table.sql",
+    "sha256": "169dcc7774f9bfece4ea578798e96078fa739d02bca78ce104b23f2542cecc80"
+  },
+  {
+    "name": "dbo.IngestionLog",
+    "type": "U",
+    "path": "sql_schema/dbo.IngestionLog.Table.sql",
+    "sha256": "042a4a9784a965be839b5115d1372ee349a40b539f895d2f5b20e3704482a67f"
+  },
+  {
+    "name": "dbo.IntList",
+    "type": "TT",
+    "path": "sql_schema/dbo.IntList.UserDefinedTableType.sql",
+    "sha256": "ef2611cb6fafd121cc41a016dc11b58598d3781c606688b702ca5288297f2c07"
+  },
+  {
+    "name": "dbo.InventoryImportBatch",
+    "type": "U",
+    "path": "sql_schema/dbo.InventoryImportBatch.Table.sql",
+    "sha256": "7b2da93282c0ba2ac2bbc56cafa30cc876e84e837550d625ef41cf2de11a340a"
+  },
+  {
+    "name": "dbo.InventoryReportPreference",
+    "type": "U",
+    "path": "sql_schema/dbo.InventoryReportPreference.Table.sql",
+    "sha256": "ed4d4619491708774f64fe49d30576d8b4764f32366d48608139442c5cf7b9a6"
+  },
+  {
+    "name": "dbo.K12",
+    "type": "U",
+    "path": "sql_schema/dbo.K12.Table.sql",
+    "sha256": "7f1a29a9d1f355df3feaad26fb6d8fa7efc40238ed612689c6864179cbc5157d"
+  },
+  {
+    "name": "dbo.K12D",
+    "type": "U",
+    "path": "sql_schema/dbo.K12D.Table.sql",
+    "sha256": "47707ba41d8cdd8cf53a7b4937577aa855b7ab78c1ec7e5be97ac86d4ab9cf6f"
+  },
+  {
+    "name": "dbo.K3",
+    "type": "U",
+    "path": "sql_schema/dbo.K3.Table.sql",
+    "sha256": "7367eea3073a227b0192ab5585c74ce46e38ddcf3659fe6f97c00896d3020609"
+  },
+  {
+    "name": "dbo.K3D",
+    "type": "U",
+    "path": "sql_schema/dbo.K3D.Table.sql",
+    "sha256": "a655bfc7bab6b2694fdfa94e8d88e1458da78eeb0bb84784e739f969ce469c74"
+  },
+  {
+    "name": "dbo.K412",
+    "type": "U",
+    "path": "sql_schema/dbo.K412.Table.sql",
+    "sha256": "469c3f88f0d3548d0667cfa2f17134679e1b125f97c8a5c2e7676fbdd7f07701"
+  },
+  {
+    "name": "dbo.K412D",
+    "type": "U",
+    "path": "sql_schema/dbo.K412D.Table.sql",
+    "sha256": "273d074caf04cdc0b79f2d746991cf5fe8b14c57e97347d7254ae33f593e47e5"
+  },
+  {
+    "name": "dbo.K43",
+    "type": "U",
+    "path": "sql_schema/dbo.K43.Table.sql",
+    "sha256": "72a6f2c08ac88f413908ceff031967d7d15e5941ac681cead66737768afb97ef"
+  },
+  {
+    "name": "dbo.K43D",
+    "type": "U",
+    "path": "sql_schema/dbo.K43D.Table.sql",
+    "sha256": "aad2b8e091dce8f97aad1b7a85eb4ee954178e7e5ba0aa19fd49d288c864d8cb"
+  },
+  {
+    "name": "dbo.K46",
+    "type": "U",
+    "path": "sql_schema/dbo.K46.Table.sql",
+    "sha256": "e6a7c030da877611bdef3a0e618acfce7072b4a903035196a094d3b5fc36e632"
+  },
+  {
+    "name": "dbo.K46D",
+    "type": "U",
+    "path": "sql_schema/dbo.K46D.Table.sql",
+    "sha256": "711698952c6c28d08f53476dababe7ab30d9194872eaa5c317a4b008eb5e5905"
+  },
+  {
+    "name": "dbo.K4ALL",
+    "type": "U",
+    "path": "sql_schema/dbo.K4ALL.Table.sql",
+    "sha256": "509bcfdcc7acdbc6e859ac6da223d12cd4b53427bcebb57785e31ad3757ce71b"
+  },
+  {
+    "name": "dbo.K512",
+    "type": "U",
+    "path": "sql_schema/dbo.K512.Table.sql",
+    "sha256": "77c7678c8aafdcc2274337bfcfadf9a5d76a62d4a1256927c0a676c28b441d07"
+  },
+  {
+    "name": "dbo.K512D",
+    "type": "U",
+    "path": "sql_schema/dbo.K512D.Table.sql",
+    "sha256": "141f9058d656e011f4db14a95fb3b5f377d01ac9c1d79a0cd3dc26c6e272ef78"
+  },
+  {
+    "name": "dbo.K53",
+    "type": "U",
+    "path": "sql_schema/dbo.K53.Table.sql",
+    "sha256": "95db594c03e30c0e5a91e511115a92289220509ca224e012aa3aca38dae69120"
+  },
+  {
+    "name": "dbo.K53D",
+    "type": "U",
+    "path": "sql_schema/dbo.K53D.Table.sql",
+    "sha256": "b68d024ed96ad5c98b0b13744a40104812052378618f6c0d8c47054d4935caa4"
+  },
+  {
+    "name": "dbo.K56",
+    "type": "U",
+    "path": "sql_schema/dbo.K56.Table.sql",
+    "sha256": "f851904d9c733cfd58235f37d0d4d8be1f31f180e26e79bb2b7e3e53c473f3da"
+  },
+  {
+    "name": "dbo.K56D",
+    "type": "U",
+    "path": "sql_schema/dbo.K56D.Table.sql",
+    "sha256": "d9c01fd259f1d5ebe67faf1e196ab9f4ca9c7b6e98f6923ed52c08ab03b388e8"
+  },
+  {
+    "name": "dbo.K5ALL",
+    "type": "U",
+    "path": "sql_schema/dbo.K5ALL.Table.sql",
+    "sha256": "ede064e889ac9072d2e4a2ec4e68b71ee5349dcb91a2621ce7dfa76a37bb7772"
+  },
+  {
+    "name": "dbo.K6",
+    "type": "U",
+    "path": "sql_schema/dbo.K6.Table.sql",
+    "sha256": "32a4124a06cdc348210bc39323610b65dea7f9bb21ec9700e390bfdf3f76bb3a"
+  },
+  {
+    "name": "dbo.K6D",
+    "type": "U",
+    "path": "sql_schema/dbo.K6D.Table.sql",
+    "sha256": "4efab1ae6c9a04973e592425fb2984a7702b46f64574a23d5178a7e387af4080"
+  },
+  {
+    "name": "dbo.KALL",
+    "type": "U",
+    "path": "sql_schema/dbo.KALL.Table.sql",
+    "sha256": "95587a570d82f089467ecfe0be14c1ef53034fe50371b3f21d7392438dc263a5"
+  },
+  {
+    "name": "dbo.KILL4SUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.KILL4SUMMARY.Table.sql",
+    "sha256": "a922cf7bb688b35fd8c06b2b1e33e1d719bbfbb99098167a1619cf53c0ab936e"
+  },
+  {
+    "name": "dbo.KILL5SUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.KILL5SUMMARY.Table.sql",
+    "sha256": "3fcfa8dbd2088230ecb1de223a56a1212a188fbbe57788fd02239df0450d59d5"
+  },
+  {
+    "name": "dbo.KILLPOINTSSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTSSUMMARY.Table.sql",
+    "sha256": "9f173438e39a27175f73947bf724ee1d9e0bb0bbb462b5d2088c12408d1d46cd"
+  },
+  {
+    "name": "dbo.KILLPOINTSSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.KILLPOINTSSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "fb738672f10879a3f70955e13365bdb667a5169e5ac0a8981ba52e63635ca662"
+  },
+  {
+    "name": "dbo.KILLPOINTS_ALL",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_ALL.Table.sql",
+    "sha256": "98c4cde8c795d9bcc3e80a22d46155e0c88f911177d3fb04697690391aa09fd5"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D12",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D12.Table.sql",
+    "sha256": "3c3e3b684ef7d1120b5e975dfcaadb646924c4e09f254c40dab11f5a4f76dcd3"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D12D",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D12D.Table.sql",
+    "sha256": "e1a1c80324297dd9454208e703ac9a73bac3282f648cb392c004f97d7b1c552f"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D3",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D3.Table.sql",
+    "sha256": "c757dda46f1c391463e5e17409431ed9f98d48c862578ccaf6401d6eec683b0b"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D3D",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D3D.Table.sql",
+    "sha256": "43af0ae451769f679fb5568ea895e7d25857ea5ec207f52f47b3083e184537a5"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D6",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D6.Table.sql",
+    "sha256": "31f5fd04663549f20f85ca82d5d1bee9f76661d30e48af25ae03e68529cd8521"
+  },
+  {
+    "name": "dbo.KILLPOINTS_D6D",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_D6D.Table.sql",
+    "sha256": "dc89fe9dd7b290372a3fa5ccd8a5e566680f7d275f8ce186b875812b0b37e445"
+  },
+  {
+    "name": "dbo.KILLPOINTS_LATEST",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLPOINTS_LATEST.Table.sql",
+    "sha256": "9afe937ff5203232612d50e4f890060b23b8cd683ece5b328c16aeb769fabf58"
+  },
+  {
+    "name": "dbo.KILLSSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.KILLSSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "cc17ab7fc4b9c827f3a0e0960e13767526b90571a786ad9a9f6eda32b6d987b0"
+  },
+  {
+    "name": "dbo.KILLSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.KILLSUMMARY.Table.sql",
+    "sha256": "cb4d38f9137d0747b0f92f8484e875110effbdc9f2395aa8ecb1ed9037479be5"
+  },
+  {
+    "name": "dbo.KS",
+    "type": "U",
+    "path": "sql_schema/dbo.KS.Table.sql",
+    "sha256": "8e27297653e932d226c6a4cdb1395d77a2466b153f566368e5304feec83e8d9c"
+  },
+  {
+    "name": "dbo.KS4_ImportFileClaim",
+    "type": "U",
+    "path": "sql_schema/dbo.KS4_ImportFileClaim.Table.sql",
+    "sha256": "5ba6eb4515656c9de3d1847420b9641ecf99ae5c19fd1260f020dcc2726f62eb"
+  },
+  {
+    "name": "dbo.KS4_ImportFileReceipt",
+    "type": "U",
+    "path": "sql_schema/dbo.KS4_ImportFileReceipt.Table.sql",
+    "sha256": "ee94bca20b3b99752667874b8441dab2d53d47c9bfed24e5cebbc415480e7d93"
+  },
+  {
+    "name": "dbo.KT4SUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.KT4SUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "a06524f97c4bb7c5f6160bcc86c81ddd81cca445748f4791e80d4f114a31f20e"
+  },
+  {
+    "name": "dbo.KT5SUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.KT5SUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "7e2a9593c1922249ec12949f52b579f1f46290d74629cfcf796b31fd5bd86fca"
+  },
+  {
+    "name": "dbo.KVKFinalReportHeader",
+    "type": "U",
+    "path": "sql_schema/dbo.KVKFinalReportHeader.Table.sql",
+    "sha256": "6cc770844adeddcc477e7a02d7d1b29ab2e0428bbb7ee14bf363243a60f5f7cd"
+  },
+  {
+    "name": "dbo.KVKTargetBands",
+    "type": "U",
+    "path": "sql_schema/dbo.KVKTargetBands.Table.sql",
+    "sha256": "8d98633cc263bee865ff63a686d9853c77fd256f1d24db098cccabbe08fe65fc"
+  },
+  {
+    "name": "dbo.KVK_Details",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Details.Table.sql",
+    "sha256": "eab815cce1749236bd7cae6b7e13af32f05b4627a44213a490041ba81c1d64c3"
+  },
+  {
+    "name": "dbo.KVK_Honor_AllPlayers_Raw",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Honor_AllPlayers_Raw.Table.sql",
+    "sha256": "9ab791951c8e33c3ff8f07d1324e4d404b5df3f3442bf76d8c13fca45c596faf"
+  },
+  {
+    "name": "dbo.KVK_Honor_Ranked",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Honor_Ranked.Table.sql",
+    "sha256": "434619ad62ee179e1e0e31b6c7f6834412653b4079ef389af5d3d896a4b6aa5a"
+  },
+  {
+    "name": "dbo.KVK_Honor_Scan",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Honor_Scan.Table.sql",
+    "sha256": "dbd5d35fdaf5d4950ab635fa275710040ad47fd4df7dac4e93e269bc88db8392"
+  },
+  {
+    "name": "dbo.KVK_Target_Publication",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Target_Publication.Table.sql",
+    "sha256": "ba725dbedc8d173de9b816eba74f5d0869159723cbace009e6410bd10abbd1cb"
+  },
+  {
+    "name": "dbo.KVK_Target_Publication_Row",
+    "type": "U",
+    "path": "sql_schema/dbo.KVK_Target_Publication_Row.Table.sql",
+    "sha256": "74bc250a07a06e6bb67fec71c40f397f4b8bc8aa26869bbcc45766153e02f63e"
+  },
+  {
+    "name": "dbo.KillPointsDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.KillPointsDelta.Table.sql",
+    "sha256": "1914187ba847c6b4a0abbcd82a6d3f61797cb0c7ca90e1505ff885602217a250"
+  },
+  {
+    "name": "dbo.KillPointsDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.KillPointsDelta_BACKUP.Table.sql",
+    "sha256": "a9de01e51c360dd9ad7c3f674183db2178661a26d91130579cf2b120b642d56b"
+  },
+  {
+    "name": "dbo.KingdomScanData",
+    "type": "U",
+    "path": "sql_schema/dbo.KingdomScanData.Table.sql",
+    "sha256": "0e8c408d4a6b48259cb06f44560d483dda21a173d07ef04487b1dcb978809395"
+  },
+  {
+    "name": "dbo.KingdomScanData2",
+    "type": "U",
+    "path": "sql_schema/dbo.KingdomScanData2.Table.sql",
+    "sha256": "8f41b6e3a777c697c6bdec56336485e836bd255b49cde32e45b824ca5db78fd1"
+  },
+  {
+    "name": "dbo.KingdomScanData3",
+    "type": "U",
+    "path": "sql_schema/dbo.KingdomScanData3.Table.sql",
+    "sha256": "76459613875204321499e129711e8426ce40120fbd2e19ffdd028b405d59a3e0"
+  },
+  {
+    "name": "dbo.KingdomScanData4",
+    "type": "U",
+    "path": "sql_schema/dbo.KingdomScanData4.Table.sql",
+    "sha256": "02e9b80927aca65158d3e52b6f8b0da6aec8658a8fb1aec91cc4b8a4ca2d59e2"
+  },
+  {
+    "name": "dbo.KingdomScanData5",
+    "type": "U",
+    "path": "sql_schema/dbo.KingdomScanData5.Table.sql",
+    "sha256": "2998c2204c03e0192670487f9bf7d62bb1b6d755c33206274d8c4af46544f92d"
+  },
+  {
+    "name": "dbo.LATEST",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST.Table.sql",
+    "sha256": "cc0c56f61019bce387e700b70f760ae0a21d711669316ad6f30f08e017c6958c"
+  },
+  {
+    "name": "dbo.LATEST_GOVERNORNAME",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_GOVERNORNAME.Table.sql",
+    "sha256": "e45bfef19529efa9dbd5a9af9755e9ede9331b125629476d193bc128794f7421"
+  },
+  {
+    "name": "dbo.LATEST_POWER",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_POWER.Table.sql",
+    "sha256": "c2f08824672fcb7d57332733ad77949c9f440310fe011d15039968e35c6895b9"
+  },
+  {
+    "name": "dbo.LATEST_T4_KILLS",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_T4_KILLS.Table.sql",
+    "sha256": "4a08ae2f05d55601c8bec04247c7f763668d616b785abe118b9c19d7f3abc97c"
+  },
+  {
+    "name": "dbo.LATEST_T4_T5_KILLS",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_T4_T5_KILLS.Table.sql",
+    "sha256": "14dd4aa481a55bbb99c4b09d2bcf145c555e966fd24773e52516d41c09a8dca2"
+  },
+  {
+    "name": "dbo.LATEST_T5_KILLS",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_T5_KILLS.Table.sql",
+    "sha256": "905ce773b45546627286d7d320a9dd694cdede2382ad8874b2503090e9d8f20f"
+  },
+  {
+    "name": "dbo.LeadershipPlayerReviewAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.LeadershipPlayerReviewAudit.Table.sql",
+    "sha256": "d1970ed70aaf1b87a0fcb78043f44e60d6f9409e09fb709bc8c3c697dc9de612"
+  },
+  {
+    "name": "dbo.LeadershipPlayerReviewAuditDaily",
+    "type": "U",
+    "path": "sql_schema/dbo.LeadershipPlayerReviewAuditDaily.Table.sql",
+    "sha256": "e42fd3ac5a72088f89ec4fa27709141b84a24d92386e28532f3443cd5420adf0"
+  },
+  {
+    "name": "dbo.LogBackupTriggerQueue",
+    "type": "U",
+    "path": "sql_schema/dbo.LogBackupTriggerQueue.Table.sql",
+    "sha256": "f069d271715a05983da290d7ad8da44ec60f3b58050c4a9534421d1943eaaed2"
+  },
+  {
+    "name": "dbo.LogHealthSamples",
+    "type": "U",
+    "path": "sql_schema/dbo.LogHealthSamples.Table.sql",
+    "sha256": "49ccc03a6ad26f6dfd3df0c807f3e47d57b0eab7846c77ce00b1eda3a205667d"
+  },
+  {
+    "name": "dbo.MGE_AwardAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_AwardAudit.Table.sql",
+    "sha256": "3b17db9b13289090fe18f838def43dee1f14ffc3000437b722bcd06e91c9a781"
+  },
+  {
+    "name": "dbo.MGE_Awards",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_Awards.Table.sql",
+    "sha256": "5c69321416d0a3ee55a175f3bd882b97204bc360b8e120b12d4ad9092e74c0c1"
+  },
+  {
+    "name": "dbo.MGE_Commanders",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_Commanders.Table.sql",
+    "sha256": "0c31811c587c0bba133e42c7863bfdfaf989f6522e976d68e8bb167d12627930"
+  },
+  {
+    "name": "dbo.MGE_DefaultRules",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_DefaultRules.Table.sql",
+    "sha256": "59e5ddbfea7a780fc6e2d8183f4e81a4e6dc260830d236069869376c6b671865"
+  },
+  {
+    "name": "dbo.MGE_EventCommanderOverrides",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_EventCommanderOverrides.Table.sql",
+    "sha256": "c28a8081bce7310039bed7045d6ba73a23f455074ed6071fbde712b1d012f9f3"
+  },
+  {
+    "name": "dbo.MGE_Events",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_Events.Table.sql",
+    "sha256": "b2cbc2194ef35233b96dbc99cb674594de483e8a6fd672de9d77ee7b39e65d95"
+  },
+  {
+    "name": "dbo.MGE_FinalResults",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_FinalResults.Table.sql",
+    "sha256": "144b27466a2582ef44e7debe44ea5febce092377f03590ef656cb6f2e35a6b2b"
+  },
+  {
+    "name": "dbo.MGE_ResultImports",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_ResultImports.Table.sql",
+    "sha256": "06135e89f8a484720fbc98f12a7f91505da8b71fac4d6dd15d6bebceb627af63"
+  },
+  {
+    "name": "dbo.MGE_RuleAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_RuleAudit.Table.sql",
+    "sha256": "7ee6a1b46f131a3655d009e42015dc358390af5c994de23924aac00253f6656d"
+  },
+  {
+    "name": "dbo.MGE_SignupAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_SignupAudit.Table.sql",
+    "sha256": "5c31acc2db9d84e35b9898b5c784e6a6855fb896b55fd432b0c58b96687c5051"
+  },
+  {
+    "name": "dbo.MGE_Signups",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_Signups.Table.sql",
+    "sha256": "71e2580ab84ba73ac52ce577ef4c2cdb86acee68f1884fd357831ebb1501e866"
+  },
+  {
+    "name": "dbo.MGE_VariantCommanders",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_VariantCommanders.Table.sql",
+    "sha256": "1bb1662ad4c05d40e7c744a7dad0e94ad2f70e11fb8cfd43c631068da50b6478"
+  },
+  {
+    "name": "dbo.MGE_Variants",
+    "type": "U",
+    "path": "sql_schema/dbo.MGE_Variants.Table.sql",
+    "sha256": "527d44f45e485b590745ec404508912682aad4051fd5ac8aba3dedc44b3804f5"
+  },
+  {
+    "name": "dbo.NAMEFIX",
+    "type": "U",
+    "path": "sql_schema/dbo.NAMEFIX.Table.sql",
+    "sha256": "47f454323bece1b6e04f7c33fb837c1171e9e40f285e24c5b4ed7568cfb0fe40"
+  },
+  {
+    "name": "dbo.NVarCharList",
+    "type": "TT",
+    "path": "sql_schema/dbo.NVarCharList.UserDefinedTableType.sql",
+    "sha256": "62ea05cdfa660657d896b430f9dbef30d8ac9f81cf33f5408aaf7639fc9c4629"
+  },
+  {
+    "name": "dbo.NewScan",
+    "type": "U",
+    "path": "sql_schema/dbo.NewScan.Table.sql",
+    "sha256": "faf2f0644a6854c7487e0268ba758f668c6f3fc1219b88973328ffc7084c71f6"
+  },
+  {
+    "name": "dbo.P12",
+    "type": "U",
+    "path": "sql_schema/dbo.P12.Table.sql",
+    "sha256": "adb68464b173a5ea17a05b0373edcd60e92af48750aca70d2ddc4c108a7482fd"
+  },
+  {
+    "name": "dbo.P12D",
+    "type": "U",
+    "path": "sql_schema/dbo.P12D.Table.sql",
+    "sha256": "17c22491d334ac6dc87f52fd42cd33d6b066a7b1961282ace31db70a342527db"
+  },
+  {
+    "name": "dbo.P3",
+    "type": "U",
+    "path": "sql_schema/dbo.P3.Table.sql",
+    "sha256": "021f3d543b514ab470fbbc33e5c32724154d90e7191c0826269796863cbe39a4"
+  },
+  {
+    "name": "dbo.P3D",
+    "type": "U",
+    "path": "sql_schema/dbo.P3D.Table.sql",
+    "sha256": "bfa3d3ea8f034dddf1052cd83c6c3b56112a91fedc629396974809bfdb34e675"
+  },
+  {
+    "name": "dbo.P6",
+    "type": "U",
+    "path": "sql_schema/dbo.P6.Table.sql",
+    "sha256": "117e9a4f1dbc071eaa320509fca7738e820c7857b5d4eb0c98df373aeac405c7"
+  },
+  {
+    "name": "dbo.P6D",
+    "type": "U",
+    "path": "sql_schema/dbo.P6D.Table.sql",
+    "sha256": "b8b89fd1dc5b9c6366daaa04a9b1f9f88cdfcd25f16226b58d20d030feb6dc55"
+  },
+  {
+    "name": "dbo.PALL",
+    "type": "U",
+    "path": "sql_schema/dbo.PALL.Table.sql",
+    "sha256": "d6f1d588dbfa2d1ec0da986dcd92265e99946d5e7462324384909d191a3698cf"
+  },
+  {
+    "name": "dbo.POWERDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.POWERDelta.Table.sql",
+    "sha256": "edc3b020bdb9017565fedbc4bd712fb721e28512a00e36496ef29c57c4ff4100"
+  },
+  {
+    "name": "dbo.POWERDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.POWERDelta_BACKUP.Table.sql",
+    "sha256": "bac6cabe1aa81ac78cd9010ba19b2e1ced42bef858cae8cdcb45b232c460ff1e"
+  },
+  {
+    "name": "dbo.POWERSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.POWERSUMMARY.Table.sql",
+    "sha256": "a755742bb7301d0c0dbfa3b19fc2fb88a55b0930fc094c1b6a2d0269b1de486e"
+  },
+  {
+    "name": "dbo.POWERSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.POWERSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "9871d14489554e54bef736f6f16988dfe84a6c6b0ce6544d46b10bf690dd6205"
+  },
+  {
+    "name": "dbo.POWER_BY_MONTH",
+    "type": "U",
+    "path": "sql_schema/dbo.POWER_BY_MONTH.Table.sql",
+    "sha256": "2c4f233b9d5af46a600f0e28c14ab5848dc7add855f8c4253476d5e3d059b5b0"
+  },
+  {
+    "name": "dbo.PlayerAccountStatus",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerAccountStatus.Table.sql",
+    "sha256": "765b071f52129f986e9f11c0cb5af5423cf13fbdac1008b2d4736f63a195ba4d"
+  },
+  {
+    "name": "dbo.PlayerAccountStatus_StagingCSV",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerAccountStatus_StagingCSV.Table.sql",
+    "sha256": "c6f06558f9b887db608de1f190d3807bb21fc58bda315877e3b17c3e1c189594"
+  },
+  {
+    "name": "dbo.PlayerFortsHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerFortsHistory.Table.sql",
+    "sha256": "95f18a33af73ad056aa92ee837bd8df8193831f75d271e2d22c15ba06eecf999"
+  },
+  {
+    "name": "dbo.PlayerKVKHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerKVKHistory.Table.sql",
+    "sha256": "c495dfb3bf568981acbe8bc1189f158c1ae24e8ad00b2711e9d07fcb46de2dff"
+  },
+  {
+    "name": "dbo.PlayerLocation",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerLocation.Table.sql",
+    "sha256": "8586de04e4baa216950fc69f2a019717ebf82570c3dba9cf73a305310c00e0d3"
+  },
+  {
+    "name": "dbo.PlayerLocation_Staging",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerLocation_Staging.Table.sql",
+    "sha256": "371a36d99a3ce9b5b95868021a08295a75d04ccbf0c3b31c18d1d61973494fec"
+  },
+  {
+    "name": "dbo.PlayerScanMeta",
+    "type": "U",
+    "path": "sql_schema/dbo.PlayerScanMeta.Table.sql",
+    "sha256": "743166d16a81ee0e9a597d1e70e68cf9aab49135852c70ec9c5284022eb52888"
+  },
+  {
+    "name": "dbo.PowerSplit",
+    "type": "U",
+    "path": "sql_schema/dbo.PowerSplit.Table.sql",
+    "sha256": "066f13ddff9b088c15d37f8713186915f859e331460a299183702075173d762f"
+  },
+  {
+    "name": "dbo.PreKvk_ImportHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.PreKvk_ImportHistory.Table.sql",
+    "sha256": "3d4de9fb627e633931c489f012f79287077ef52c63fa95781bae9f087dda1eeb"
+  },
+  {
+    "name": "dbo.PreKvk_Phases",
+    "type": "U",
+    "path": "sql_schema/dbo.PreKvk_Phases.Table.sql",
+    "sha256": "0e6657b94d68f9ab87100065bd1c3f468a968df4581b6f4de3625725ff7e9f89"
+  },
+  {
+    "name": "dbo.PreKvk_Scan",
+    "type": "U",
+    "path": "sql_schema/dbo.PreKvk_Scan.Table.sql",
+    "sha256": "a6cb60d59c7e564f63664c8c4893800160db7add4d9666955b2a146904921621"
+  },
+  {
+    "name": "dbo.PreKvk_Scores",
+    "type": "U",
+    "path": "sql_schema/dbo.PreKvk_Scores.Table.sql",
+    "sha256": "9fae5fac3ba8f294c211fc1be8e0954c2c38f37d464ac794ad252b85d0c57fe0"
+  },
+  {
+    "name": "dbo.PreKvk_Scores_Ranked",
+    "type": "U",
+    "path": "sql_schema/dbo.PreKvk_Scores_Ranked.Table.sql",
+    "sha256": "7db79b6ab11f57ee9c6a6c6759f3c05094747cebb9087f69ea1c2620ac86ba7c"
+  },
+  {
+    "name": "dbo.ProcConfig",
+    "type": "U",
+    "path": "sql_schema/dbo.ProcConfig.Table.sql",
+    "sha256": "9292c6759eb9ca24dda971cdd94886ed8caaeb0c64a6517a1f1c6fa4db80bb28"
+  },
+  {
+    "name": "dbo.ProcConfig_AuditLog",
+    "type": "U",
+    "path": "sql_schema/dbo.ProcConfig_AuditLog.Table.sql",
+    "sha256": "fa1dc613e9f18dd48213bfd4bddc81986d8aeaf90a1e25dbd91d014a5bfb2434"
+  },
+  {
+    "name": "dbo.ProcConfig_Staging",
+    "type": "U",
+    "path": "sql_schema/dbo.ProcConfig_Staging.Table.sql",
+    "sha256": "51c2005e1e35390d3ce6368f12613d4cbfc9f43554faa9956da1a61e35e216f5"
+  },
+  {
+    "name": "dbo.QS_PerfPack_Run",
+    "type": "U",
+    "path": "sql_schema/dbo.QS_PerfPack_Run.Table.sql",
+    "sha256": "98a28ea2fd8e9c5b9db2fa8bc951491997914b965f879b645600ef9ad3d3bb6a"
+  },
+  {
+    "name": "dbo.QS_PerfPack_TopQueries",
+    "type": "U",
+    "path": "sql_schema/dbo.QS_PerfPack_TopQueries.Table.sql",
+    "sha256": "6ca1d9bd84999b7d809357ae664156eaf19527d4713f2435b1ad4dc072f2895c"
+  },
+  {
+    "name": "dbo.QS_PerfPack_Waits",
+    "type": "U",
+    "path": "sql_schema/dbo.QS_PerfPack_Waits.Table.sql",
+    "sha256": "b6835f37e806e236f351808e4b63146aeb3db416b978a3dfb4a8f8feef1f80ac"
+  },
+  {
+    "name": "dbo.RALLY_EXPORT",
+    "type": "U",
+    "path": "sql_schema/dbo.RALLY_EXPORT.Table.sql",
+    "sha256": "7dbf6a17ffdd742e1fe821e20f1f27adaeab59ffc53ccc86d18f3e89994f43c9"
+  },
+  {
+    "name": "dbo.RALLY_JOINED",
+    "type": "U",
+    "path": "sql_schema/dbo.RALLY_JOINED.Table.sql",
+    "sha256": "af57d12d7c4663699ba80fb5ba6f3002e30070f5185b1fd3513002b22cc6ed1b"
+  },
+  {
+    "name": "dbo.RALLY_JOINERS",
+    "type": "U",
+    "path": "sql_schema/dbo.RALLY_JOINERS.Table.sql",
+    "sha256": "8d8fbdb41fa9555e95132abba306f21d636f4da0e12168fec281067baf2b4132"
+  },
+  {
+    "name": "dbo.RALLY_STARTED",
+    "type": "U",
+    "path": "sql_schema/dbo.RALLY_STARTED.Table.sql",
+    "sha256": "07776512f521d4eb108fd61124855489e676126353856e52166784581e60bb49"
+  },
+  {
+    "name": "dbo.RALLY_STARTED_TABLE",
+    "type": "U",
+    "path": "sql_schema/dbo.RALLY_STARTED_TABLE.Table.sql",
+    "sha256": "1d1948aebaf3d1da73a3dc386b5338603c15202148fa579249f7a453d16f6a7e"
+  },
+  {
+    "name": "dbo.RANGEDSUMMARY",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGEDSUMMARY.Table.sql",
+    "sha256": "bd4b9264621b477940b6b3af0380c9dff762e77a50c4d6b40390628fe9edb43c"
+  },
+  {
+    "name": "dbo.RANGEDSUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.RANGEDSUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "d371c508598848b325a5a1d17ff0412bc24d35e8010b5f6f1e6cb39dc89bdda7"
+  },
+  {
+    "name": "dbo.RANGED_ALL",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_ALL.Table.sql",
+    "sha256": "341a85a8fa359be2cec1e4a3826631e20ccdadc4886a383fcbae265fdd52dc8f"
+  },
+  {
+    "name": "dbo.RANGED_D12",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D12.Table.sql",
+    "sha256": "0fbba6868b55afe1eda14d3541ede181212ab008dcd9883b6b3fc41634c3dc66"
+  },
+  {
+    "name": "dbo.RANGED_D12D",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D12D.Table.sql",
+    "sha256": "4f36dd2a81eaa3af9f1c90aebd7b659f689c5bacdc37172b3810b2df00000b51"
+  },
+  {
+    "name": "dbo.RANGED_D3",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D3.Table.sql",
+    "sha256": "1b1630cb35d5129506be49eb2c97c306cff505eb21e328030e23380dedfd64fd"
+  },
+  {
+    "name": "dbo.RANGED_D3D",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D3D.Table.sql",
+    "sha256": "7c55035c855ef04f8c31c92e4b9db41d99c92b99c05d5d2025402b708ff225e3"
+  },
+  {
+    "name": "dbo.RANGED_D6",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D6.Table.sql",
+    "sha256": "d918d448d7cc0981742e37f67de6b47d108747f0d9406e33a007f8af7d54c2cc"
+  },
+  {
+    "name": "dbo.RANGED_D6D",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_D6D.Table.sql",
+    "sha256": "9e7ed9a04853a919282adc543aff793ecd79273f2af5e28a423b69060ca66fb6"
+  },
+  {
+    "name": "dbo.RANGED_LATEST",
+    "type": "U",
+    "path": "sql_schema/dbo.RANGED_LATEST.Table.sql",
+    "sha256": "daff6aeb6f1d47361adc2d2612e03d9cdc68c0e1f69729a8342600901e104332"
+  },
+  {
+    "name": "dbo.RSSASSISTDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.RSSASSISTDelta.Table.sql",
+    "sha256": "47a0fd9d17f8c9ce7cf2cb303df40fcbc8b09affcdcfae8d8190ea988e9d3ab0"
+  },
+  {
+    "name": "dbo.RSSASSISTDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.RSSASSISTDelta_BACKUP.Table.sql",
+    "sha256": "7d22f738f638dba9f25ee265337cbd566ed229c00fe5128c2da17e49c684adad"
+  },
+  {
+    "name": "dbo.RSSGatheredDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.RSSGatheredDelta.Table.sql",
+    "sha256": "daaadaccef61296534f3a1a4513509f3880490d06b4e041db9f93fa7f11bb6e7"
+  },
+  {
+    "name": "dbo.RSSGatheredDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.RSSGatheredDelta_BACKUP.Table.sql",
+    "sha256": "6527bfe1d5ee8863bf7905d4b375374c511736460755d935f6b155252a0017a5"
+  },
+  {
+    "name": "dbo.RallyDailySnapshotHeader",
+    "type": "U",
+    "path": "sql_schema/dbo.RallyDailySnapshotHeader.Table.sql",
+    "sha256": "91e468f155241ee41b3c9c0ff92ad57766ac9fd73bdebcc64a667d60281a6dd3"
+  },
+  {
+    "name": "dbo.RallyData",
+    "type": "U",
+    "path": "sql_schema/dbo.RallyData.Table.sql",
+    "sha256": "969455065de0e8cb5b2abc1480164cd43669ecde496e88205fe9f5f1bd9be260"
+  },
+  {
+    "name": "dbo.RallyData_Raw",
+    "type": "U",
+    "path": "sql_schema/dbo.RallyData_Raw.Table.sql",
+    "sha256": "0ab1cfb7a02387001bd70f27162f427d08f0412d7498134b466659e994610c8a"
+  },
+  {
+    "name": "dbo.RangedPointsDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.RangedPointsDelta.Table.sql",
+    "sha256": "a287db8da1cdd9181b8655f6e6a3390bfc03740cf9bdd1a6fb1cb41fb5b419e3"
+  },
+  {
+    "name": "dbo.RangedPointsDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.RangedPointsDelta_BACKUP.Table.sql",
+    "sha256": "6d712602add518b720d9cc8fcac48824bdc33855668de2a2c2c3b8eb7863192c"
+  },
+  {
+    "name": "dbo.Refresh_PlayerScanMeta",
+    "type": "P",
+    "path": "sql_schema/dbo.Refresh_PlayerScanMeta.StoredProcedure.sql",
+    "sha256": "e822bbd08e6a1797cec43ff9cf1a2ff1e799a6ef5eb0af02ecf5cd66e5830cd2"
+  },
+  {
+    "name": "dbo.SCAN_LIST",
+    "type": "U",
+    "path": "sql_schema/dbo.SCAN_LIST.Table.sql",
+    "sha256": "43b80375765c66ea73ceaca960713f0e0cb5440b0d203fd2ca309c2f81961601"
+  },
+  {
+    "name": "dbo.SP_ExecutionLog",
+    "type": "U",
+    "path": "sql_schema/dbo.SP_ExecutionLog.Table.sql",
+    "sha256": "6bc7f6ba96136f24d9c4106418536a1a1a6518dbd6864275731cfe89435b2f9c"
+  },
+  {
+    "name": "dbo.SP_Stats_for_Upload",
+    "type": "P",
+    "path": "sql_schema/dbo.SP_Stats_for_Upload.StoredProcedure.sql",
+    "sha256": "20893a21a011bd924f38bbf5ef31298ecf6a6c53272c29907b91dbbd600a111d"
+  },
+  {
+    "name": "dbo.SP_TaskStatus",
+    "type": "U",
+    "path": "sql_schema/dbo.SP_TaskStatus.Table.sql",
+    "sha256": "c5cebeba9a988836eda9eb59382e69968b8c01f612e00ace9552c54dc468dd9f"
+  },
+  {
+    "name": "dbo.STAGING_STATS",
+    "type": "U",
+    "path": "sql_schema/dbo.STAGING_STATS.Table.sql",
+    "sha256": "d71a2a0272a42f140debbc475d5431fd6d6e53ae9e17ed471bb049e7504dacad"
+  },
+  {
+    "name": "dbo.STATS",
+    "type": "U",
+    "path": "sql_schema/dbo.STATS.Table.sql",
+    "sha256": "c50954dd9b231fff26d1cbaf2a1c7a119103b8e11ca6471960d2ef31dd4868db"
+  },
+  {
+    "name": "dbo.STATS_FORFEB24KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.STATS_FORFEB24KVK.Table.sql",
+    "sha256": "4018dbfd7a4e1f0c7a7f248eed5b067536f3a02b374776ccd58adea76571d3f1"
+  },
+  {
+    "name": "dbo.STATS_FORJULY23KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.STATS_FORJULY23KVK.Table.sql",
+    "sha256": "c41041965aee009651d1f3cda39145041faf3f1f4112aaad2f7674d8d14de6f9"
+  },
+  {
+    "name": "dbo.STATS_FOROCT23KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.STATS_FOROCT23KVK.Table.sql",
+    "sha256": "f34829e892d69a13c7d9f83edd554e394b817641aad13dda278662096391252d"
+  },
+  {
+    "name": "dbo.STATS_FOR_UPLOAD",
+    "type": "U",
+    "path": "sql_schema/dbo.STATS_FOR_UPLOAD.Table.sql",
+    "sha256": "61ca328dc78c9029cb242b1907ce4aa27aa4825ae0cc8407200b7aaa37145dba"
+  },
+  {
+    "name": "dbo.SUMMARY_CHANGE_EXPORT",
+    "type": "U",
+    "path": "sql_schema/dbo.SUMMARY_CHANGE_EXPORT.Table.sql",
+    "sha256": "3ed297fd3ba9d5a54899c38d33028cd40f84bb3a24bb5e4a5815350769b3314d"
+  },
+  {
+    "name": "dbo.SUMMARY_PROC",
+    "type": "P",
+    "path": "sql_schema/dbo.SUMMARY_PROC.StoredProcedure.sql",
+    "sha256": "3e27322aa71b0d10bf4f4fbc526b4e36fec73501120ccd8ad5f1ae1e920eec95"
+  },
+  {
+    "name": "dbo.SUMMARY_PROC_STATE",
+    "type": "U",
+    "path": "sql_schema/dbo.SUMMARY_PROC_STATE.Table.sql",
+    "sha256": "81759804c0c3cfcf42a2d32c2ab0fa70c5483c0c1613e163e549a1a678ce062f"
+  },
+  {
+    "name": "dbo.SchemaMigrationHistory",
+    "type": "U",
+    "path": "sql_schema/dbo.SchemaMigrationHistory.Table.sql",
+    "sha256": "c68ac901cb28675875de102a0e98d1cca98edc97964a829f17c95e85851b13d9"
+  },
+  {
+    "name": "dbo.SqlHotfixRehearsal",
+    "type": "U",
+    "path": "sql_schema/dbo.SqlHotfixRehearsal.Table.sql",
+    "sha256": "bc0f33a190fbf796a6fbe241758fc37dca4d0e3e5302ba3d9885f601fbf4a391"
+  },
+  {
+    "name": "dbo.T4KillDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.T4KillDelta.Table.sql",
+    "sha256": "8276db82a618dcc4b564e51e8a16ca97adabde2a58375ed8a2f0e89f02f9c5e9"
+  },
+  {
+    "name": "dbo.T4KillDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.T4KillDelta_BACKUP.Table.sql",
+    "sha256": "a853651ebf2789d3525c9b08413cc20ffdf83936a83c24e6ad8e6db33027d9fc"
+  },
+  {
+    "name": "dbo.T4T5KillDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.T4T5KillDelta.Table.sql",
+    "sha256": "f2cca3186a18ecc66d6f0665a3c0f6bd60acdb6ceedb3c0d2c6b4afe3b4ab503"
+  },
+  {
+    "name": "dbo.T4T5KillDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.T4T5KillDelta_BACKUP.Table.sql",
+    "sha256": "8d1405d8761eafbe2c71be04c599a0e22ca839c29e6e0f842ed6b4165b8eaa28"
+  },
+  {
+    "name": "dbo.T5KillDelta",
+    "type": "U",
+    "path": "sql_schema/dbo.T5KillDelta.Table.sql",
+    "sha256": "4b88011889e3952e7d09b5f7d91501158277dc4478d0183e03ad7983522087d4"
+  },
+  {
+    "name": "dbo.T5KillDelta_BACKUP",
+    "type": "U",
+    "path": "sql_schema/dbo.T5KillDelta_BACKUP.Table.sql",
+    "sha256": "6ce11689b3e834b5d7a3081f93d0b52ab7971eb24c63730f51ee7cd89e8b18eb"
+  },
+  {
+    "name": "dbo.TARGETS",
+    "type": "P",
+    "path": "sql_schema/dbo.TARGETS.StoredProcedure.sql",
+    "sha256": "2d5b50bc3bcc268be06e2cace0e1673fd60662d139349f19dc8438ddb69e7b8b"
+  },
+  {
+    "name": "dbo.TARGETS_10",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_10.Table.sql",
+    "sha256": "a14dfe19fc10f727526c44edc282bdde79204dd14a0edd51807378f70e6003b8"
+  },
+  {
+    "name": "dbo.TARGETS_11",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_11.Table.sql",
+    "sha256": "1c5bd1f4955314b66b097d7680e4ecaf107ee6f1da02e69b586c5e1e9385de27"
+  },
+  {
+    "name": "dbo.TARGETS_12",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_12.Table.sql",
+    "sha256": "1325eb12289cca49297b952a38ad3938f08cde56f73b143118f64004c3770143"
+  },
+  {
+    "name": "dbo.TARGETS_13",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_13.Table.sql",
+    "sha256": "c094661410f545eae3fc4e4fe3d25ef46b06210db4e001c9371e49c63d5a9061"
+  },
+  {
+    "name": "dbo.TARGETS_14",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_14.Table.sql",
+    "sha256": "cc4d0518d39b3eeec339d254f745b38ee11bfbf9822212a0b38c53cde7589e76"
+  },
+  {
+    "name": "dbo.TARGETS_15",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_15.Table.sql",
+    "sha256": "ccf8f43af240390f084b7694ef282ad8a02a953f873e9e870116faa1c862f127"
+  },
+  {
+    "name": "dbo.TARGETS_3",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_3.Table.sql",
+    "sha256": "ca23d78bf75c0d816308db692f5d861d74949d39f0282fe616ef7772a47079aa"
+  },
+  {
+    "name": "dbo.TARGETS_4",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_4.Table.sql",
+    "sha256": "a282984fa6d9f9c00d600ccd25b19b202b5dd3c765028df442ebec88112a84ef"
+  },
+  {
+    "name": "dbo.TARGETS_5",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_5.Table.sql",
+    "sha256": "068944f1a2da88fa4764114cf650911dcc4c1fbc57de3f4baa16dc52440858f0"
+  },
+  {
+    "name": "dbo.TARGETS_6",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_6.Table.sql",
+    "sha256": "e600b5ce69d001afb2c6a745fc1418ca9cef23e3429d3ff5a7b88959b34db520"
+  },
+  {
+    "name": "dbo.TARGETS_7",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_7.Table.sql",
+    "sha256": "c4adbe37860f603dabaa747f9c5606b46c8541080fadcfbb12bdf879d70476e4"
+  },
+  {
+    "name": "dbo.TARGETS_8",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_8.Table.sql",
+    "sha256": "4b698612d37e628345ffc8efed9f7480df4a96bfdfe7157a26ee4ba7c3090549"
+  },
+  {
+    "name": "dbo.TARGETS_9",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_9.Table.sql",
+    "sha256": "e3d2696749400dd616797444eae0f3f286a1a05b1493791b5b0d292d877be07f"
+  },
+  {
+    "name": "dbo.TARGETS_FEB24KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_FEB24KVK.Table.sql",
+    "sha256": "ab3112e01981f2785df336b96f5424720be9b48c3fda55ca7812d4450a5f6b0a"
+  },
+  {
+    "name": "dbo.TARGETS_JULY23KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_JULY23KVK.Table.sql",
+    "sha256": "afdbeed74ae48827145aecd42b5620f7fea6a102e3d47080c7f72601fc9a5a41"
+  },
+  {
+    "name": "dbo.TARGETS_JUN25",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_JUN25.Table.sql",
+    "sha256": "68c736ed107211f9b109c2dbb30dccd97d5463f5c6de54d34f3426c864e93f54"
+  },
+  {
+    "name": "dbo.TARGETS_MAR25",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_MAR25.Table.sql",
+    "sha256": "84220fc5be2ad6ef6909cdb1aef74359a0f8f3867316843587481fa644ab0d79"
+  },
+  {
+    "name": "dbo.TARGETS_NEW",
+    "type": "P",
+    "path": "sql_schema/dbo.TARGETS_NEW.StoredProcedure.sql",
+    "sha256": "0ab209f7f992cafb5d6e0f213219c10b86daf98469415f97c42661876db17163"
+  },
+  {
+    "name": "dbo.TARGETS_OCT23KVK",
+    "type": "U",
+    "path": "sql_schema/dbo.TARGETS_OCT23KVK.Table.sql",
+    "sha256": "82e5bc70c882fd61720afcd1957b5328f8e6dd1a3c080d7e71fb5d736e28d913"
+  },
+  {
+    "name": "dbo.TEMPSUM",
+    "type": "U",
+    "path": "sql_schema/dbo.TEMPSUM.Table.sql",
+    "sha256": "2a825ce811510cb254c31364d4a10f864cac4abc9193bc71f12d5971a284350e"
+  },
+  {
+    "name": "dbo.TEST",
+    "type": "P",
+    "path": "sql_schema/dbo.TEST.StoredProcedure.sql",
+    "sha256": "7261da51f1f5c549355dcbf0b18828697f1db976c2385913f7b58659445369dd"
+  },
+  {
+    "name": "dbo.TEST2",
+    "type": "U",
+    "path": "sql_schema/dbo.TEST2.Table.sql",
+    "sha256": "18148c396a1bb5291b873af6fd9f7deff46edf23b99171994651241cab8b7caf"
+  },
+  {
+    "name": "dbo.THE_AVERAGES",
+    "type": "U",
+    "path": "sql_schema/dbo.THE_AVERAGES.Table.sql",
+    "sha256": "713da0f007533d8e6430d018425933fd09cac51bf1df0602bf1d91572139b2b2"
+  },
+  {
+    "name": "dbo.TT",
+    "type": "U",
+    "path": "sql_schema/dbo.TT.Table.sql",
+    "sha256": "5fc6e01dd5c65f15b3d6eb81f8daf8ca30d4838c5495c1cd36b7b61bdbc4fb15"
+  },
+  {
+    "name": "dbo.TempCSVData",
+    "type": "U",
+    "path": "sql_schema/dbo.TempCSVData.Table.sql",
+    "sha256": "98e97636c6ebc48b1b17beea2bf0eafb8a79bd912db3a11b106e21de8034ed48"
+  },
+  {
+    "name": "dbo.Test_csv_table",
+    "type": "U",
+    "path": "sql_schema/dbo.Test_csv_table.Table.sql",
+    "sha256": "7a68ac580baf57d299200b58ab7d7ccb6bcdf872991de5163d12cd00b779510a"
+  },
+  {
+    "name": "dbo.UPDATE_ALL",
+    "type": "P",
+    "path": "sql_schema/dbo.UPDATE_ALL.StoredProcedure.sql",
+    "sha256": "27bf8168e89f5faf122fa629921d76cbf1e83e7ceab46f4b271aec313273bccc"
+  },
+  {
+    "name": "dbo.UPDATE_ALL2",
+    "type": "P",
+    "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
+    "sha256": "2f5cc5da810641e498bbed800cf1d6974721ae3e71276c28a54a9fd0b9f52a93"
+  },
+  {
+    "name": "dbo.UPDATE_RALLY_DATA",
+    "type": "P",
+    "path": "sql_schema/dbo.UPDATE_RALLY_DATA.StoredProcedure.sql",
+    "sha256": "a905fa440ae26746b07ad33dd02692a0c92bc682be1b4a01b0694af1f5a762fb"
+  },
+  {
+    "name": "dbo.Update_ALL_Complete",
+    "type": "U",
+    "path": "sql_schema/dbo.Update_ALL_Complete.Table.sql",
+    "sha256": "d6598e1ac5fcb122cf9c9cf47c34c2dd696cdda49c23a92fc3fd7c24cb6ed974"
+  },
+  {
+    "name": "dbo.VoteSurveyDeletionAudit",
+    "type": "U",
+    "path": "sql_schema/dbo.VoteSurveyDeletionAudit.Table.sql",
+    "sha256": "5590395aff562b10290456eee17641d1b240f843cc255d0c8b02be056ea14486"
+  },
+  {
+    "name": "dbo.ZEROED",
+    "type": "U",
+    "path": "sql_schema/dbo.ZEROED.Table.sql",
+    "sha256": "413e7cd24bf222809387bb9de89f4e01d082f116ff63e73394a52e764b3d6ab4"
+  },
+  {
+    "name": "dbo.cur_RallyDaily",
+    "type": "U",
+    "path": "sql_schema/dbo.cur_RallyDaily.Table.sql",
+    "sha256": "e71517804a3ebdc1a0b2f229c871cd9c8efb052d12c70aee9f4af419d7f71fe2"
+  },
+  {
+    "name": "dbo.cur_RallyTotals_Base",
+    "type": "U",
+    "path": "sql_schema/dbo.cur_RallyTotals_Base.Table.sql",
+    "sha256": "2ed421227cc484b61f1a462f62b8fe5980c94489252d302e341a3524b2fb5f5a"
+  },
+  {
+    "name": "dbo.fn_KVK_Camp_Aggregated",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_KVK_Camp_Aggregated.UserDefinedFunction.sql",
+    "sha256": "c10bb21f27c5651c1792f3f3e0ecd98c88a715bce16162fd10ad8bcff5b007b7"
+  },
+  {
+    "name": "dbo.fn_KVK_Kingdom_Aggregated",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_KVK_Kingdom_Aggregated.UserDefinedFunction.sql",
+    "sha256": "42f1ee2a9b93cabc014e97a88d87e9f3de2c7e37bdaf3cadabf4d655e46c9970"
+  },
+  {
+    "name": "dbo.fn_KVK_Player_Aggregated",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_KVK_Player_Aggregated.UserDefinedFunction.sql",
+    "sha256": "eb1a86e9ed901363d3791ba8c625ae81645ea19803ac915b194fc2c08427d307"
+  },
+  {
+    "name": "dbo.fn_KvkCombatMetrics",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_KvkCombatMetrics.UserDefinedFunction.sql",
+    "sha256": "27fc929ce6d16cb00878e59c84668e802d4429aea2285f9bc9476b235fe3f1c9"
+  },
+  {
+    "name": "dbo.fn_NormalizeGovernorNameKey",
+    "type": "FN",
+    "path": "sql_schema/dbo.fn_NormalizeGovernorNameKey.UserDefinedFunction.sql",
+    "sha256": "184478cc31c3475ab6440b936346b279332ddab0d9244b2269533a0a912c1cac"
+  },
+  {
+    "name": "dbo.fn_PreKvkLatestOverall",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_PreKvkLatestOverall.UserDefinedFunction.sql",
+    "sha256": "d7a0f73a4da66611d9a75dc612ac72de5656b7c31402a760ce01456861062ad1"
+  },
+  {
+    "name": "dbo.fn_PreKvkPhaseDelta",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_PreKvkPhaseDelta.UserDefinedFunction.sql",
+    "sha256": "96cc85bb4283083c7a3fc2c7c9cd0720a9a4494338228944b05d528407886caf"
+  },
+  {
+    "name": "dbo.fn_StatsWindowDeltas",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_StatsWindowDeltas.UserDefinedFunction.sql",
+    "sha256": "8a58a9711efededea303738205c4fbeb4126394c8a2d007c0fc3d71044f4049b"
+  },
+  {
+    "name": "dbo.fn_StatsWindowDeltas_GovCsv",
+    "type": "IF",
+    "path": "sql_schema/dbo.fn_StatsWindowDeltas_GovCsv.UserDefinedFunction.sql",
+    "sha256": "e95c96d2bdc60e7fb891423c62b8678f17f0635cef4ed65f9ab87e94ebdb98d9"
+  },
+  {
+    "name": "dbo.sp_Backfill_PlayerKVKHistory",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Backfill_PlayerKVKHistory.StoredProcedure.sql",
+    "sha256": "41e2e0a1b46f69249b2ca01448adbbeaffa3eea671fe5c9e298ead534496793a"
+  },
+  {
+    "name": "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Build_Prekvk_And_Honor_Rankings.StoredProcedure.sql",
+    "sha256": "61c91befbed0e2a00f369e7e9c39e86bc6c58a9291abce7196054ed262a1646b"
+  },
+  {
+    "name": "dbo.sp_Create_Excel_For_Kvk_Indexes",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Create_Excel_For_Kvk_Indexes.StoredProcedure.sql",
+    "sha256": "ba6a3246f1eb83bfbce8a80fa29748b0924412734fd49796d056a81f3e744621"
+  },
+  {
+    "name": "dbo.sp_ExcelOutput_ByKVK",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_ExcelOutput_ByKVK.StoredProcedure.sql",
+    "sha256": "9cd834f4a598c4c3c7e3730f49574326f3d41a094d82eee73e21393f8de66602"
+  },
+  {
+    "name": "dbo.sp_ImportPlayerLocationFromStaging",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_ImportPlayerLocationFromStaging.StoredProcedure.sql",
+    "sha256": "8d08a3f12c66cc3b8fedb2ac15363ae5be1ad17584ce7e3a71d7a8b47395c5b3"
+  },
+  {
+    "name": "dbo.sp_Import_Rally_AllTime",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Import_Rally_AllTime.StoredProcedure.sql",
+    "sha256": "2a3e90efdcdaf7387888e8f918f0ab792ea4aac75aa68a7412dbd247d0591249"
+  },
+  {
+    "name": "dbo.sp_Import_Rally_Daily",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Import_Rally_Daily.StoredProcedure.sql",
+    "sha256": "7e0663d05235a71499456dda5217151795a367462aa098e0daa48b67ed4d61b7"
+  },
+  {
+    "name": "dbo.sp_Loop_ExcelOutput_ByKVK",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Loop_ExcelOutput_ByKVK.StoredProcedure.sql",
+    "sha256": "182657842feaf70176493e2d59b967ebf4c6e48b1add96d1e451ed0aecc00506"
+  },
+  {
+    "name": "dbo.sp_Maintain_PlayerKVKHistory",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Maintain_PlayerKVKHistory.StoredProcedure.sql",
+    "sha256": "816a16438583ff73fea5367ad60001419a8a90cd8fa57c543024c1d902f93079"
+  },
+  {
+    "name": "dbo.sp_Prep_ExcelExportTable",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Prep_ExcelExportTable.StoredProcedure.sql",
+    "sha256": "e2b770fd2aad2beda65abe2bdd61795da97ca4c437a34e4aada69b3767828f5f"
+  },
+  {
+    "name": "dbo.sp_Prep_ExcelOutputTable",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Prep_ExcelOutputTable.StoredProcedure.sql",
+    "sha256": "c7a3287c3230d646a61a62c5da50a1cef2ce9d62f66392946f9bbcbac8e31b9b"
+  },
+  {
+    "name": "dbo.sp_Prep_TargetTable",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Prep_TargetTable.StoredProcedure.sql",
+    "sha256": "e45d6d1f5438f630451bfc425b0748abeaf40b0c897c72860001d3fd388dd556"
+  },
+  {
+    "name": "dbo.sp_QS_PerfPack",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_QS_PerfPack.StoredProcedure.sql",
+    "sha256": "18535f2cabab67fc37c0032bba24de1f4d4dc06cbcb9f8a37a655fd52e927935"
+  },
+  {
+    "name": "dbo.sp_RallyDaily_TopN",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_RallyDaily_TopN.StoredProcedure.sql",
+    "sha256": "19174b166991adcaef5724924ca186ea5480a5880acd728693c95fc27f2041fd"
+  },
+  {
+    "name": "dbo.sp_Rebuild_ExcelForDashboard",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Rebuild_ExcelForDashboard.StoredProcedure.sql",
+    "sha256": "559b58e47f1718d56ac337aac7a1d7a4f593d35d55eafc2719c7a237085cc0b2"
+  },
+  {
+    "name": "dbo.sp_Rebuild_RALLY_EXPORT",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Rebuild_RALLY_EXPORT.StoredProcedure.sql",
+    "sha256": "d841dce26026bfc2457ebcf962ea7ba5d6809aaf1f07379c06f6bd6dd804f25c"
+  },
+  {
+    "name": "dbo.sp_Rebuild_v_PlayerKVK_Last3",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Rebuild_v_PlayerKVK_Last3.StoredProcedure.sql",
+    "sha256": "352cfe2379d64471b6c0e97e8640b4dea31cc2906ad5458ca8a7e35ddc4cfe02"
+  },
+  {
+    "name": "dbo.sp_RefreshInactiveGovernors",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_RefreshInactiveGovernors.StoredProcedure.sql",
+    "sha256": "f1fe292ef246fa3003059a5d7098a6655d38b40bd1ce625a22896cfde19d4e85"
+  },
+  {
+    "name": "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Refresh_View_EXCEL_FOR_KVK_All.StoredProcedure.sql",
+    "sha256": "bfc0827495e30ac5241b13b05d316084292bfdb77f0cb95d1e4f1f0a51bee804"
+  },
+  {
+    "name": "dbo.sp_Registry_GetAllActive",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_GetAllActive.StoredProcedure.sql",
+    "sha256": "6df5e165b720b54cfeedb21b59a9cfee646957fc9cd52e596dabe73fdb5552d6"
+  },
+  {
+    "name": "dbo.sp_Registry_GetByDiscordID",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_GetByDiscordID.StoredProcedure.sql",
+    "sha256": "ff9f0b0958360c75dff0e20a82b03519834bc2d7aab65634b91ddecf28b94dc0"
+  },
+  {
+    "name": "dbo.sp_Registry_GetByGovernorID",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_GetByGovernorID.StoredProcedure.sql",
+    "sha256": "f00d25915376a9848e905088686d3aeb80b4a8abb1307bb5410ae9fca626ae44"
+  },
+  {
+    "name": "dbo.sp_Registry_Insert",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_Insert.StoredProcedure.sql",
+    "sha256": "43b83296bef0b6aa1198e2a5750f1d1087b6459e9241443b6497215962b15d1a"
+  },
+  {
+    "name": "dbo.sp_Registry_SoftDelete",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_SoftDelete.StoredProcedure.sql",
+    "sha256": "507798da2fb265bfd220d22082010c98d0c3265aabaefb9067679805c4ff1d61"
+  },
+  {
+    "name": "dbo.sp_Registry_UpsertFromImport",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Registry_UpsertFromImport.StoredProcedure.sql",
+    "sha256": "6b750464ce1debfacae893fc21920a230c069684fba901100eb54074cbdcb7a0"
+  },
+  {
+    "name": "dbo.sp_ReplacePlayerLocationFromStaging",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_ReplacePlayerLocationFromStaging.StoredProcedure.sql",
+    "sha256": "1cdc9f09dfd1343ba6662330a224fc80e75b9c7172dc40eb4c82df17f1cbab3c"
+  },
+  {
+    "name": "dbo.sp_Snapshot_PlayerForts",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Snapshot_PlayerForts.StoredProcedure.sql",
+    "sha256": "7dc951cbecd4324a3be7fa71f2164c340f51dacc9d161c6eaf53d9dcc4eedad3"
+  },
+  {
+    "name": "dbo.sp_TARGETS_MASTER",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_TARGETS_MASTER.StoredProcedure.sql",
+    "sha256": "d11cb6f0ad4749d03347e9fefd08d42647b34ff8da650e1b4d57b0f857f55e03"
+  },
+  {
+    "name": "dbo.sp_Upsert_ProcConfig_From_Staging",
+    "type": "P",
+    "path": "sql_schema/dbo.sp_Upsert_ProcConfig_From_Staging.StoredProcedure.sql",
+    "sha256": "e2c470b85daa6d21e8e97ec2fe49b1acfade33775130d24e5e390d13a9c66cae"
+  },
+  {
+    "name": "dbo.stg_RallyAllTime",
+    "type": "U",
+    "path": "sql_schema/dbo.stg_RallyAllTime.Table.sql",
+    "sha256": "33a6447d947aa331e7e839d5a446c2eb3868d30e3d717695e00c8308b3303584"
+  },
+  {
+    "name": "dbo.stg_RallyDaily",
+    "type": "U",
+    "path": "sql_schema/dbo.stg_RallyDaily.Table.sql",
+    "sha256": "ae76244b23a23fd8420334de265d7037a5bc34d803d75cd8f3f43fc8d0b54da6"
+  },
+  {
+    "name": "dbo.usp_ArkRetentionCleanup",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ArkRetentionCleanup.StoredProcedure.sql",
+    "sha256": "14e1fb737d3b420281679cdc09c31f4b629c1c1d378e243fd4886d2ac1fd2c49"
+  },
+  {
+    "name": "dbo.usp_ArkSchemaVerify",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ArkSchemaVerify.StoredProcedure.sql",
+    "sha256": "74776880558094adadaa0f725b7db952fb5279e3d53283b681ccce469f703423"
+  },
+  {
+    "name": "dbo.usp_BackfillKvkFinalReportCompletion",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_BackfillKvkFinalReportCompletion.StoredProcedure.sql",
+    "sha256": "bcfcd7f70d48c984bbb172573b436b9c58e64c2ecbd113f39e9eb73cac2bb744"
+  },
+  {
+    "name": "dbo.usp_BackfillRallyDailySnapshotCompletion",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_BackfillRallyDailySnapshotCompletion.StoredProcedure.sql",
+    "sha256": "a85d5c5e355ac75714c0fecd156e79aa54184602b9d871bc0911d51e4e6544b3"
+  },
+  {
+    "name": "dbo.usp_CleanupLogBackupTriggerQueue",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_CleanupLogBackupTriggerQueue.StoredProcedure.sql",
+    "sha256": "b37608a6c1ac28c791bcbc4891542bde6c481d538412b513eebaa24f388de85b"
+  },
+  {
+    "name": "dbo.usp_ExportExecutionSessionTransition",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportExecutionSessionTransition.StoredProcedure.sql",
+    "sha256": "341cfa5b07adafd8294f52c16973e2618098ae9c622e64cc81253a29083731bb"
+  },
+  {
+    "name": "dbo.usp_ExportExecutionStreamTransition",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
+    "sha256": "fd62793f2ca5e523afdd00851cace2eea162e253c5a3ed8d8cb5df6d7023de25"
+  },
+  {
+    "name": "dbo.usp_ExportManualOutputEnrollmentTransition",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportManualOutputEnrollmentTransition.StoredProcedure.sql",
+    "sha256": "e4facfb2ad61ebc975ca86c839fccc306ee277483ea3ac918d52028d81ff3a87"
+  },
+  {
+    "name": "dbo.usp_ExportOutputEnrollmentTransition",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
+    "sha256": "ce05e66de0153c4c88008d5d94eff6ebce07c2aaf39812d74ed468653c07e179"
+  },
+  {
+    "name": "dbo.usp_ExportProviderRequestEventAppend",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
+    "sha256": "a02859fce33aa2cf1315be554ead18b40ad8776747e096a7f9697cdc74ade0a8"
+  },
+  {
+    "name": "dbo.usp_ExportReconciliationProofIssue",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
+    "sha256": "8d1a300d3ce6dd8688adcdd046103374b137ecb6cd63dc20d5907dd2c577e620"
+  },
+  {
+    "name": "dbo.usp_GetKvkHistorySummaryMetricRanks",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetKvkHistorySummaryMetricRanks.StoredProcedure.sql",
+    "sha256": "b94aaa9e735e934972c88492d6edbc66e5308226e651b2f5428de27fe4783bf6"
+  },
+  {
+    "name": "dbo.usp_GetLeadershipPlayerIdentityHistory",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetLeadershipPlayerIdentityHistory.StoredProcedure.sql",
+    "sha256": "1a454bf9616835d4ffa9ef981fc38511ed256ab5cd6f77f9a3c587cc6d0b2f53"
+  },
+  {
+    "name": "dbo.usp_GetLeadershipPlayerKvkHistory",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetLeadershipPlayerKvkHistory.StoredProcedure.sql",
+    "sha256": "20f1b080077fc56023edb959acb25288c094663bb4e1345a8ec3fde028622a8f"
+  },
+  {
+    "name": "dbo.usp_GetLeadershipPlayerLastActive",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetLeadershipPlayerLastActive.StoredProcedure.sql",
+    "sha256": "84486cd96d0cbb02beddf6687ca2eb9455d1b8f1a914ee174f396d285e7e73b0"
+  },
+  {
+    "name": "dbo.usp_GetLeadershipPlayerLookupDirectory",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetLeadershipPlayerLookupDirectory.StoredProcedure.sql",
+    "sha256": "0c58b52e13e35e155de6f86119197ef30eb27e0d94d16bc739e44e6828d9df97"
+  },
+  {
+    "name": "dbo.usp_GetLeadershipPlayerReview",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetLeadershipPlayerReview.StoredProcedure.sql",
+    "sha256": "608e1050f576c1f082fd6b1a65659a7c2b552e9174696e39a3d100683793735a"
+  },
+  {
+    "name": "dbo.usp_GetPendingLogBackupTriggers",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetPendingLogBackupTriggers.StoredProcedure.sql",
+    "sha256": "ffd95cebc85ec311a11b3026f3ea6b5ee5290f20c60c93b95ed6cd83c067a7a8"
+  },
+  {
+    "name": "dbo.usp_GetPersonalStatsDaily",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetPersonalStatsDaily.StoredProcedure.sql",
+    "sha256": "ac219d6d323af40f6a95ba0101cefa8c01740c21f6ea2730338054e6f24716eb"
+  },
+  {
+    "name": "dbo.usp_GetPlayerStatsWindows",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_GetPlayerStatsWindows.StoredProcedure.sql",
+    "sha256": "82eb49a32cd7c4b374a0ae0e4a6efeb65ca7fcb19f8cb0e8a9bf44c1d7ab4626"
+  },
+  {
+    "name": "dbo.usp_ImportAudit_CompleteBatch",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ImportAudit_CompleteBatch.StoredProcedure.sql",
+    "sha256": "ca242fe297ea62c547f0b1252da6906cd875ef1cea6b6ac4d6ee64f217ae20d2"
+  },
+  {
+    "name": "dbo.usp_ImportAudit_FailBatch",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ImportAudit_FailBatch.StoredProcedure.sql",
+    "sha256": "4a2f4a7b6004b0c7c28d82e53ea3eb569b108ab55d1d84e796d2e68cd845bca9"
+  },
+  {
+    "name": "dbo.usp_ImportAudit_RecordPhase",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ImportAudit_RecordPhase.StoredProcedure.sql",
+    "sha256": "0b2eb8cf13f753a41a3d7fbd150450c1abe427196295408c7fde9d787c5bc8e6"
+  },
+  {
+    "name": "dbo.usp_ImportAudit_StartBatch",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ImportAudit_StartBatch.StoredProcedure.sql",
+    "sha256": "6f6a090f385e7c30e3c34709e36ff3026e3ab45860d1810bd1a6ed352ce7d3e4"
+  },
+  {
+    "name": "dbo.usp_LeadershipPlayerGovernorExists",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_LeadershipPlayerGovernorExists.StoredProcedure.sql",
+    "sha256": "1d490f9a925a2d634a34727745ad5c2a025dc9ff5416abe5cfa57f1352d39981"
+  },
+  {
+    "name": "dbo.usp_MarkLogBackupTriggerProcessed",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_MarkLogBackupTriggerProcessed.StoredProcedure.sql",
+    "sha256": "e29d5d96015d323e911da52da76173bcb9bd327e1e891de85da7b3c05f8135a7"
+  },
+  {
+    "name": "dbo.usp_PurgeLeadershipPlayerReviewAudit",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_PurgeLeadershipPlayerReviewAudit.StoredProcedure.sql",
+    "sha256": "cde5e8d34058140498279eba6947296dacec7b360d4cc93094c1afffb73d8a40"
+  },
+  {
+    "name": "dbo.usp_RecordKvkFinalReportCompletion",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_RecordKvkFinalReportCompletion.StoredProcedure.sql",
+    "sha256": "4c94671ed935bd23216e229f56f9ec2a58fdb87e61eb81f8417550b61dd7b4b9"
+  },
+  {
+    "name": "dbo.usp_RecordLeadershipPlayerReviewAudit",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_RecordLeadershipPlayerReviewAudit.StoredProcedure.sql",
+    "sha256": "337a80a1baff555c801ea3152d26bf2cd6cae2a9f5ae2a80f5435be17d2b6b77"
+  },
+  {
+    "name": "dbo.usp_SetAllianceActivitySnapshotCompletion",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_SetAllianceActivitySnapshotCompletion.StoredProcedure.sql",
+    "sha256": "8bdd7e923dcff15b34b2e3ed966412bee77e9f380eeb63e47af4cf31830c9a31"
+  },
+  {
+    "name": "dbo.usp_UpsertGovernorNameHistoryForScan",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_UpsertGovernorNameHistoryForScan.StoredProcedure.sql",
+    "sha256": "5a663773905c4b38a61d2584176ee2fc0e62203d0d33cef6bd1049f7dd911377"
+  },
+  {
+    "name": "dbo.usp_VoteSurveyAdminDelete",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_VoteSurveyAdminDelete.StoredProcedure.sql",
+    "sha256": "6165bab848842684347988df26c12ada5052a309698a7b11913bab6c34a39361"
+  },
+  {
+    "name": "dbo.usp_update_stats",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_update_stats.StoredProcedure.sql",
+    "sha256": "e24841f619894abdb314ad2fba536ad8a4a4f270b3e0608801446bd9da2b43d5"
+  },
+  {
+    "name": "dbo.vAllianceActivitySnapshots",
+    "type": "V",
+    "path": "sql_schema/dbo.vAllianceActivitySnapshots.View.sql",
+    "sha256": "bde90f322d60fe8e6d0cbed3c30615162e9e0060399b15d3b0c3323b3ee99d1d"
+  },
+  {
+    "name": "dbo.vAllianceActivityWeekFinals",
+    "type": "V",
+    "path": "sql_schema/dbo.vAllianceActivityWeekFinals.View.sql",
+    "sha256": "e36e5fe5cba3d2f860db46423612a0ad816a00aa162f4559a949dace299fdc86"
+  },
+  {
+    "name": "dbo.vAllianceActivity_DailyDelta",
+    "type": "V",
+    "path": "sql_schema/dbo.vAllianceActivity_DailyDelta.View.sql",
+    "sha256": "a8c1aab0b2e664eb170aad3e4e3c31fca9ee7a1dc8b0ece4b400fe1b3e1f866c"
+  },
+  {
+    "name": "dbo.vAllianceActivity_WeeklyDelta",
+    "type": "V",
+    "path": "sql_schema/dbo.vAllianceActivity_WeeklyDelta.View.sql",
+    "sha256": "c604dbc7c72680f395139aa1c0ea395a46826e049aafcf0f55b01f33d36149a8"
+  },
+  {
+    "name": "dbo.vDailyWithWTD_Activity",
+    "type": "V",
+    "path": "sql_schema/dbo.vDailyWithWTD_Activity.View.sql",
+    "sha256": "ee98bd4e3786c1b2998b2e45f270666fecb9a021791805e7c0ad940a713227ee"
+  },
+  {
+    "name": "dbo.vDaily_Activity",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_Activity.View.sql",
+    "sha256": "737b83bb8c2368d955bf1a309d9d70fc9e217de798b02ce88802f85cf8cdaa9f"
+  },
+  {
+    "name": "dbo.vDaily_AllianceActivity",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_AllianceActivity.View.sql",
+    "sha256": "6f5d8d51329e65af269d8348cbddf5b1cf9a10cf7ededb27b3f700ddfe1e684b"
+  },
+  {
+    "name": "dbo.vDaily_Helps",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_Helps.View.sql",
+    "sha256": "cf88d988555c5ec8e54228f11bca4b6478952c273e2882bdcb5a2716133fe9c9"
+  },
+  {
+    "name": "dbo.vDaily_PlayerExport",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_PlayerExport.View.sql",
+    "sha256": "c7c6a1108094f3437a220e5aa79644ce0564892d7b06bd96eca2f4245704506a"
+  },
+  {
+    "name": "dbo.vDaily_RSSAssisted",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_RSSAssisted.View.sql",
+    "sha256": "5385796c9854560c43f5490087d0d5d65c962bea9fd6b76f8c788ad143468ee8"
+  },
+  {
+    "name": "dbo.vDaily_RSSGathered",
+    "type": "V",
+    "path": "sql_schema/dbo.vDaily_RSSGathered.View.sql",
+    "sha256": "cdeb97fc39f6f5cd0aa3b48f572fc3968df8044f6420b5a4aa484ff152b91749"
+  },
+  {
+    "name": "dbo.vFortsCompleted_WeekToDate",
+    "type": "V",
+    "path": "sql_schema/dbo.vFortsCompleted_WeekToDate.View.sql",
+    "sha256": "fb7719fa170a477c725643f4d0bf0ed44506330948a23108dbf6b1cc7685d436"
+  },
+  {
+    "name": "dbo.vWTD_Activity",
+    "type": "V",
+    "path": "sql_schema/dbo.vWTD_Activity.View.sql",
+    "sha256": "853cf91c6db4552848fcbdcebeca987e963a8884af22314dacd923090e1bda89"
+  },
+  {
+    "name": "dbo.vWTD_Helps",
+    "type": "V",
+    "path": "sql_schema/dbo.vWTD_Helps.View.sql",
+    "sha256": "a495656e28dde751a2061bcf6c6b750dd718b027a2ad079745c6959582a59082"
+  },
+  {
+    "name": "dbo.vWTD_RSSAssisted",
+    "type": "V",
+    "path": "sql_schema/dbo.vWTD_RSSAssisted.View.sql",
+    "sha256": "199721bc448a6da29733ff9a1913dc15cd3b7e3eeae4cbfc26bbd2f3c956f182"
+  },
+  {
+    "name": "dbo.vWTD_RSSGathered",
+    "type": "V",
+    "path": "sql_schema/dbo.vWTD_RSSGathered.View.sql",
+    "sha256": "8a294bc32d4300a075865d7a1744187d104cffeb6ee207889492915c451742b1"
+  },
+  {
+    "name": "dbo.vWeekly_AllianceActivity",
+    "type": "V",
+    "path": "sql_schema/dbo.vWeekly_AllianceActivity.View.sql",
+    "sha256": "cbf1b42a999168a57c46afa726c597fea0a85a5320bbd4bacbef2b400b4929ac"
+  },
+  {
+    "name": "dbo.v_Active_Players",
+    "type": "V",
+    "path": "sql_schema/dbo.v_Active_Players.View.sql",
+    "sha256": "c0b0b515e95cae037d1428c53540b588c06a429ec3ecd67a35a303cad27fcc23"
+  },
+  {
+    "name": "dbo.v_EXCEL_FOR_KVK_All",
+    "type": "V",
+    "path": "sql_schema/dbo.v_EXCEL_FOR_KVK_All.View.sql",
+    "sha256": "182c40954f8daae30a01f949861e20283830029066fc35fc979f1d6527f81daa"
+  },
+  {
+    "name": "dbo.v_EXCEL_FOR_KVK_Started",
+    "type": "V",
+    "path": "sql_schema/dbo.v_EXCEL_FOR_KVK_Started.View.sql",
+    "sha256": "7dc2564ecfd639511ea35b0ac7f6a3f9b160136aa62817946cc008ebee63adfc"
+  },
+  {
+    "name": "dbo.v_GovernorNames",
+    "type": "V",
+    "path": "sql_schema/dbo.v_GovernorNames.View.sql",
+    "sha256": "6454baa914ab4169c0e800a24adfa439612424ed1f9d6c23c21dbe1ca482e80f"
+  },
+  {
+    "name": "dbo.v_GovernorNames_Strict",
+    "type": "V",
+    "path": "sql_schema/dbo.v_GovernorNames_Strict.View.sql",
+    "sha256": "1fd80d5f233e4f6ebbc432f613dba61d65324c222567b139021e1a3921797d40"
+  },
+  {
+    "name": "dbo.v_KVK_Honor_Latest",
+    "type": "V",
+    "path": "sql_schema/dbo.v_KVK_Honor_Latest.View.sql",
+    "sha256": "2b33dad10b5225f9d389f4e7147791f60a4c9f7b378a0426a10aaa7649c06e95"
+  },
+  {
+    "name": "dbo.v_KVK_Honor_TopLatest",
+    "type": "V",
+    "path": "sql_schema/dbo.v_KVK_Honor_TopLatest.View.sql",
+    "sha256": "23f01da37fea829c7d38352351ba2da862a1ce69f1f5fc2266788a3bf80afc92"
+  },
+  {
+    "name": "dbo.v_KVK_TARGETS_FOR_BOT",
+    "type": "V",
+    "path": "sql_schema/dbo.v_KVK_TARGETS_FOR_BOT.View.sql",
+    "sha256": "6cd53b43ab73becabb95e7da8d18c9b3b3ea1a412b08593da8b456e2adeb5858"
+  },
+  {
+    "name": "dbo.v_KVK_Under50_Last3_WithLatest",
+    "type": "V",
+    "path": "sql_schema/dbo.v_KVK_Under50_Last3_WithLatest.View.sql",
+    "sha256": "db77a883ed661a6d0a627aeffdc5f3e6a76c32f4eafb25a5ebafb85cbceea907"
+  },
+  {
+    "name": "dbo.v_MGE_SignupReview",
+    "type": "V",
+    "path": "sql_schema/dbo.v_MGE_SignupReview.View.sql",
+    "sha256": "c921bc8e7eec1bed8d56163d3b8f4bef678b6855152a69d71e652af018281b63"
+  },
+  {
+    "name": "dbo.v_PlayerAccounts_Migrate",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerAccounts_Migrate.View.sql",
+    "sha256": "ec9627e08f5470cf209801eeb8529cca2c35f3950f1d4a99e0e8a68905cfe28b"
+  },
+  {
+    "name": "dbo.v_PlayerFortsLatest",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerFortsLatest.View.sql",
+    "sha256": "9609c4347aa6a0676acf2a98ee29767000ff874f4a20f4dde18144ef39642ddb"
+  },
+  {
+    "name": "dbo.v_PlayerFortsLatestWithRank",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerFortsLatestWithRank.View.sql",
+    "sha256": "0dd8425ee9aa95cf6b45bd0ae03ae22d238c29a97abf59dcfcda729d6f5e1074"
+  },
+  {
+    "name": "dbo.v_PlayerKVK_Last3",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerKVK_Last3.View.sql",
+    "sha256": "47aea292c1d2c67b84cd603662c172cfb60ac4fcbdfbafc93024d74b6f167758"
+  },
+  {
+    "name": "dbo.v_PlayerLatestStats",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerLatestStats.View.sql",
+    "sha256": "9d3ba418ca9d43b4c50f7d4979ea5158dee7164df9292f1e91b39e3392e133f4"
+  },
+  {
+    "name": "dbo.v_PlayerProfile",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerProfile.View.sql",
+    "sha256": "4e33143257d54339890ac21d6cedb5980c1b5a7d3f290e0e9c02c3c20a743c56"
+  },
+  {
+    "name": "dbo.v_PlayerScanMeta",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PlayerScanMeta.View.sql",
+    "sha256": "5c8ad928da3422089a1b72948700d1ed44b343af63b766a5d047f7adcaee466e"
+  },
+  {
+    "name": "dbo.v_PreKvk13_All",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PreKvk13_All.View.sql",
+    "sha256": "36d2c0a8e1468d8e948e4ba737a3edce731deee0d758f1dc4bad70cedfe7e01a"
+  },
+  {
+    "name": "dbo.v_PreKvk13_Overall",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PreKvk13_Overall.View.sql",
+    "sha256": "71ca45bfa81c01903e7c200bad533fda501332df7f1f7f7803bddcf32daeef24"
+  },
+  {
+    "name": "dbo.v_PreKvk13_Phase1",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PreKvk13_Phase1.View.sql",
+    "sha256": "085d53be45fe95cc165e3a8c677df79c2b7a61fe8ac4b1898f2f761469fe462f"
+  },
+  {
+    "name": "dbo.v_PreKvk13_Phase2",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PreKvk13_Phase2.View.sql",
+    "sha256": "f490b89013d39a7de00df471a06d5b87c6ef41f98c45939ac4ff5d69efe656b0"
+  },
+  {
+    "name": "dbo.v_PreKvk13_Phase3",
+    "type": "V",
+    "path": "sql_schema/dbo.v_PreKvk13_Phase3.View.sql",
+    "sha256": "2f4e7e623eff82115a29ae98c2da24c596bca2aa8a97a90f0593c70959529c26"
+  },
+  {
+    "name": "dbo.v_RallyDaily_Latest",
+    "type": "V",
+    "path": "sql_schema/dbo.v_RallyDaily_Latest.View.sql",
+    "sha256": "aea00f84f715a6de3a2ac11bbc47a360ef2533b6887188a53a9d9084bcf2d1e4"
+  },
+  {
+    "name": "dbo.v_RallyTotals_Current",
+    "type": "V",
+    "path": "sql_schema/dbo.v_RallyTotals_Current.View.sql",
+    "sha256": "55258f6e6d2778c645b9e946f5a980e5abad640da801d665227a51e34b3f6538"
+  },
+  {
+    "name": "dbo.v_TARGETS_FOR_UPLOAD",
+    "type": "V",
+    "path": "sql_schema/dbo.v_TARGETS_FOR_UPLOAD.View.sql",
+    "sha256": "21decea41cefbac7fe15e979be949002b170f7281972d417257d15fd7d291c00"
+  },
+  {
+    "name": "dbo.vw_All_Governors_Clean",
+    "type": "V",
+    "path": "sql_schema/dbo.vw_All_Governors_Clean.View.sql",
+    "sha256": "2c0014a5984da7df8517de7675a188153d400e2f533530baf2e5cc843033a1f3"
+  },
+  {
+    "name": "dbo.vw_ArkPlayerReport",
+    "type": "V",
+    "path": "sql_schema/dbo.vw_ArkPlayerReport.View.sql",
+    "sha256": "248e63202c82afab5d783533e7718a8dbfdd6e592e8b5118326c964ecbb9ae46"
+  },
+  {
+    "name": "dbo.vw_Governor_KVK_Summary_GlobalLatest",
+    "type": "V",
+    "path": "sql_schema/dbo.vw_Governor_KVK_Summary_GlobalLatest.View.sql",
+    "sha256": "6599c2e1ae1fb30108ff7ba6af0babdd6d0e7c5d5cf9889d71775363ba4a37c3"
+  },
+  {
+    "name": "dbo.vw_Top3_Week",
+    "type": "V",
+    "path": "sql_schema/dbo.vw_Top3_Week.View.sql",
+    "sha256": "e30c219782c97ce37e232448bac3656d2b20508d83e27227182439bca6e0e4d6"
+  },
+  {
+    "name": "dbo.vw_Top3_Yesterday",
+    "type": "V",
+    "path": "sql_schema/dbo.vw_Top3_Yesterday.View.sql",
+    "sha256": "56f84b043ee2db31f6735d9e8390ad8e3f9eebe2d4ad6523a883fc90d2908bdf"
+  }
+]
