@@ -210,6 +210,7 @@ def verify(observed, approved, *, profile):
         EntryRole=1,
         ReaderRole=0,
         AuthorityRole=1,
+        ImpersonateUser=0,
     )
     if observed["target"] != [expected_target]:
         raise SourceConflict("Direct application target/login/SID or roles differ.")

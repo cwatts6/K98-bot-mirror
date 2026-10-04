@@ -428,11 +428,27 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # including names whose exported filenames are sanitized. Installed metadata is separate.
 APPLICATION_SCHEMA_SOURCE_HASH = "73562d08660ee44465e6d407c065329f56af7a14369f8c8b80aac6ac87c79b02"
 LEGACY_PERMISSION_MIGRATION = "20260924_002_export_legacy_module_permissions"
+# USER is the SQL Server securable class for IMPERSONATE. There is no
+# database permission named IMPERSONATE ANY USER. Check other user principals
+# under the actual caller, without executing impersonation or accepting NULL.
+# System namespace users and the caller itself cannot be escalation targets.
+USER_IMPERSONATION_SQL = """(SELECT CASE
+    WHEN COUNT_BIG(*)>1000 THEN NULL
+    WHEN MAX(Allowed)=1 THEN 1
+    WHEN COUNT(Allowed)<>COUNT_BIG(*) THEN NULL
+    ELSE 0 END
+    FROM (SELECT TOP (1001)
+      HAS_PERMS_BY_NAME(p.name,'USER','IMPERSONATE') AS Allowed
+      FROM sys.database_principals p
+      WHERE p.type IN ('S','U','G','C','K','E','X')
+        AND p.principal_id<>USER_ID()
+        AND p.name NOT IN ('sys','INFORMATION_SCHEMA')
+      ORDER BY p.principal_id) AS impersonation_scope)"""
+
 LEGACY_DATABASE_CAPABILITIES = (
     "CONTROL",
     "ALTER ANY ROLE",
     "ALTER ANY USER",
-    "IMPERSONATE ANY USER",
     "ALTER ANY SCHEMA",
     "ALTER ANY CERTIFICATE",
     "ALTER ANY ASYMMETRIC KEY",
@@ -507,14 +523,15 @@ def legacy_permission_queries(source):
     ]
     result = {
         "target": (
-            """SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,
+            f"""SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,
             DB_NAME() AS DatabaseName,USER_NAME() AS Principal,SCHEMA_NAME() AS DefaultSchema,
             CONVERT(int,SERVERPROPERTY('ProductMajorVersion')) AS MajorVersion,
             IS_SRVROLEMEMBER('sysadmin') AS Sysadmin,IS_MEMBER('db_owner') AS DatabaseOwner,
             HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION') AS ViewDefinition,
             IS_ROLEMEMBER('ExportLegacyEntryReader') AS EntryRole,
             IS_ROLEMEMBER('ExportExecutionReader') AS ReaderRole,
-            IS_ROLEMEMBER('ExportExecutionAuthority') AS AuthorityRole""",
+            IS_ROLEMEMBER('ExportExecutionAuthority') AS AuthorityRole,
+            {USER_IMPERSONATION_SQL} AS ImpersonateUser""",
             (),
         ),
         "modules": (
@@ -785,7 +802,8 @@ class ExportExecutionDAL:
                     "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','CONTROL') AS ControlDatabase,"
                     "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY ROLE') AS AlterRole,"
                     "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','ALTER ANY USER') AS AlterUser,"
-                    "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','IMPERSONATE ANY USER') AS ImpersonateUser"
+                    + USER_IMPERSONATION_SQL
+                    + " AS ImpersonateUser"
                 )
                 target = one(cursor)
                 if target is None or target["ViewDefinition"] != 1:

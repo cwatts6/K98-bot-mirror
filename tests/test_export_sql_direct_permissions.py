@@ -98,6 +98,7 @@ def contract(monkeypatch):
             EntryRole=1,
             ReaderRole=0,
             AuthorityRole=1,
+            ImpersonateUser=0,
         )
     ]
     observed["modules"] = [

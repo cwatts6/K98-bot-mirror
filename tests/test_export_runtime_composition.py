@@ -1634,6 +1634,7 @@ def legacy_permission_fixture(monkeypatch):
             EntryRole=1,
             ReaderRole=1,
             AuthorityRole=0,
+            ImpersonateUser=0,
         )
     ]
     observed["modules"] = [

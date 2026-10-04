@@ -1293,6 +1293,7 @@ def verify_legacy_installation_contract(observed, approved, *, profile="reader")
         EntryRole=1,
         ReaderRole=int(profile == "reader"),
         AuthorityRole=int(profile == "application"),
+        ImpersonateUser=0,
     )
     if observed["target"] != [expected_target] or any(
         type(observed["target"][0][k]) is not int
