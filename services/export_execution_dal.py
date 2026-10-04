@@ -460,7 +460,7 @@ def user_impersonation_query(target_query):
     IF ISNULL(HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE'),0)<>1
         THROW 52051,'Complete database permission scope is not visible',1;
     DECLARE @inner nvarchar(max)=N'{inner}';
-    DECLARE @databases TABLE(DatabaseName sysname,CanAccess int);
+    DECLARE @databases TABLE(DatabaseName sysname COLLATE Latin1_General_100_BIN2,CanAccess int);
     INSERT @databases SELECT TOP (1001) name,HAS_DBACCESS(name)
         FROM sys.databases ORDER BY database_id;
     IF (SELECT COUNT_BIG(*) FROM @databases)>1000

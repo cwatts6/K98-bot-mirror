@@ -73,6 +73,7 @@ def test_cross_database_scope_uses_actual_caller_and_fails_closed():
     )
     assert "HAS_DBACCESS(name)" in sql
     assert "FROM sys.databases" in sql
+    assert "DatabaseName sysname COLLATE Latin1_General_100_BIN2" in sql
     assert "HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE')" in sql
     assert "COUNT_BIG(*) FROM @databases)>1000" in sql
     assert "CanAccess IS NULL" in sql
