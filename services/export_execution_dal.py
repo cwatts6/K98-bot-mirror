@@ -446,6 +446,19 @@ USER_IMPERSONATION_SQL = """(SELECT CASE
       ORDER BY p.principal_id) AS impersonation_scope)"""
 
 
+LOGIN_IMPERSONATION_SQL = """(SELECT CASE
+    WHEN HAS_PERMS_BY_NAME(NULL,NULL,'IMPERSONATE ANY LOGIN')=1 THEN 1
+    WHEN HAS_PERMS_BY_NAME(NULL,NULL,'IMPERSONATE ANY LOGIN') IS NULL THEN NULL
+    ELSE (SELECT CASE WHEN COUNT_BIG(*)>1000 THEN NULL
+        WHEN MAX(Allowed)=1 THEN 1
+        WHEN COUNT(Allowed)<>COUNT_BIG(*) THEN NULL ELSE 0 END
+        FROM (SELECT TOP (1001)
+            HAS_PERMS_BY_NAME(p.name,'LOGIN','IMPERSONATE') AS Allowed
+            FROM sys.server_principals p WHERE p.type IN ('S','U','G','C','K','E','X')
+              AND p.sid<>SUSER_SID() ORDER BY p.principal_id) AS login_scope)
+    END)"""
+
+
 def user_impersonation_query(target_query):
     """Check every accessible database under the caller; mutate no persistent state.
 
@@ -456,7 +469,10 @@ def user_impersonation_query(target_query):
     """
     inner = ("SELECT @allowed=" + USER_IMPERSONATION_SQL).replace("'", "''")
     return f"""SET NOCOUNT ON;
-    DECLARE @user_impersonation int=0,@allowed int,@database sysname,@sql nvarchar(max);
+    DECLARE @user_impersonation int=0,@login_impersonation int,@allowed int,@database sysname,@sql nvarchar(max);
+    SET @login_impersonation={LOGIN_IMPERSONATION_SQL};
+    IF @login_impersonation IS NULL
+        THROW 52051,'Server login permission scope is unknown or exceeds its bound',1;
     IF ISNULL(HAS_PERMS_BY_NAME(NULL,NULL,'VIEW ANY DATABASE'),0)<>1
         THROW 52051,'Complete database permission scope is not visible',1;
     DECLARE @inner nvarchar(max)=N'{inner}';
@@ -479,7 +495,9 @@ def user_impersonation_query(target_query):
         IF @allowed=1 SET @user_impersonation=1;
         DELETE FROM @databases WHERE DatabaseName=@database;
     END;
-    """ + target_query.replace(USER_IMPERSONATION_SQL, "@user_impersonation")
+    """ + target_query.replace(USER_IMPERSONATION_SQL, "@user_impersonation").replace(
+        " AS ImpersonateUser", " AS ImpersonateUser,@login_impersonation AS ImpersonateLogin"
+    )
 
 
 LEGACY_DATABASE_CAPABILITIES = (

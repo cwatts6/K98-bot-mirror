@@ -949,6 +949,7 @@ def verify_installation_contract(observed, approved):
         AlterRole=0,
         AlterUser=0,
         ImpersonateUser=0,
+        ImpersonateLogin=0,
     )
     if target != expected_target:
         raise SourceConflict("SQL target, metadata visibility or restricted principal differs.")
@@ -1294,6 +1295,7 @@ def verify_legacy_installation_contract(observed, approved, *, profile="reader")
         ReaderRole=int(profile == "reader"),
         AuthorityRole=int(profile == "application"),
         ImpersonateUser=0,
+        ImpersonateLogin=0,
     )
     if observed["target"] != [expected_target] or any(
         type(observed["target"][0][k]) is not int

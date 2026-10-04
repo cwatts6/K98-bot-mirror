@@ -1528,6 +1528,7 @@ def installation_fixture(*, profile="authority"):
         AlterRole=0,
         AlterUser=0,
         ImpersonateUser=0,
+        ImpersonateLogin=0,
     )
     approved = dict(
         version=2,
@@ -1635,6 +1636,7 @@ def legacy_permission_fixture(monkeypatch):
             ReaderRole=1,
             AuthorityRole=0,
             ImpersonateUser=0,
+            ImpersonateLogin=0,
         )
     ]
     observed["modules"] = [

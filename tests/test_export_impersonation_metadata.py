@@ -100,3 +100,42 @@ def test_signed_unknown_or_present_impersonation_fails_closed(monkeypatch, value
     approved["metadata_hash"] = dal.digest(observed).hex()
     with pytest.raises(SourceConflict):
         verify_legacy_installation_contract(observed, approved)
+
+
+def test_login_impersonation_probe_is_bounded_and_uses_actual_caller():
+    query = dal.LOGIN_IMPERSONATION_SQL
+    assert "HAS_PERMS_BY_NAME(NULL,NULL,'IMPERSONATE ANY LOGIN')" in query
+    assert "HAS_PERMS_BY_NAME(p.name,'LOGIN','IMPERSONATE')" in query
+    assert "TOP (1001)" in query and "COUNT_BIG(*)>1000 THEN NULL" in query
+    assert "COUNT(Allowed)<>COUNT_BIG(*) THEN NULL" in query
+    assert "p.sid<>SUSER_SID()" in query and "EXECUTE AS" not in query
+    full = dal.user_impersonation_query(
+        "SELECT " + dal.USER_IMPERSONATION_SQL + " AS ImpersonateUser"
+    )
+    assert "IF @login_impersonation IS NULL" in full
+    assert "@login_impersonation AS ImpersonateLogin" in full
+
+
+@pytest.mark.parametrize("profile", ["fixed", "signed", "direct"])
+@pytest.mark.parametrize("value", [None, 1])
+def test_unknown_or_present_login_impersonation_fails_closed(monkeypatch, profile, value):
+    from services.export_runtime_composition import verify_legacy_installation_contract
+    from services.export_sql_direct_permissions import verify
+    from tests.test_export_runtime_composition import legacy_permission_fixture
+
+    if profile == "fixed":
+        observed, approved = installation_fixture()
+        observed["target"]["ImpersonateLogin"] = value
+        verify_func = verify_installation_contract
+    elif profile == "signed":
+        observed, approved = legacy_permission_fixture(monkeypatch)
+        observed["target"][0]["ImpersonateLogin"] = value
+        approved["metadata_hash"] = dal.digest(observed).hex()
+        verify_func = verify_legacy_installation_contract
+    else:
+        observed, approved = direct_fixture(monkeypatch)
+        observed["target"][0]["ImpersonateLogin"] = value
+        approved["metadata_hash"] = dal.digest(observed).hex()
+        verify_func = lambda actual, expected: verify(actual, expected, profile="application")
+    with pytest.raises(SourceConflict):
+        verify_func(observed, approved)
