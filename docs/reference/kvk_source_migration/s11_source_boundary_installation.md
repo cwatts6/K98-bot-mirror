@@ -34,8 +34,8 @@ The latter and its K98 parent must be fresh; existing state requires explicit
 reconciliation. New installation paths use a fresh UUID. Plan ACL suggestions
 cannot choose the granted rights: the installer fixes administrator ownership,
 SYSTEM/Administrators full control and application read/execute at immutable
-paths. Private state leaves retain application write access. `.env` stays private
-and content unchanged; edits under the protected source parent become deliberate
+paths. Private state leaves retain application write access. `.env` stays private,
+application-readable and content unchanged; its edits and source changes become deliberate
 administrative operations. The sole key loses ordinary Users access.
 
 The six explicitly allowed legacy root directories are preserved outside source,
@@ -47,6 +47,8 @@ delete, overwrite or copy fallback.
 Before effects, each explicitly reviewed import directory admits at most 1,000
 immediate metadata entries. Every Python file must belong to the sealed plan;
 unreviewed import directories, native modules and loose bytecode are rejected.
+Other Windows executables/scripts, including PowerShell and command files, must
+also appear individually in the independently pinned plan before protection.
 Runtime-excluded state/tooling directories are not traversed by this check.
 The imported `telemetry` package is application source: its files/directories
 must be independently pinned in the plan and later runtime manifests.

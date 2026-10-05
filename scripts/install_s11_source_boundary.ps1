@@ -118,6 +118,9 @@ function VerifySourceDirectory([string]$Path,$KnownPaths,$MovePaths,[string]$Sou
         if($extension -ceq '.py'){
             if(-not $KnownPaths.Contains($entry.FullName)){throw 'Unreviewed Python source refused'}
         } elseif(@('.pyw','.pyc','.pyo','.pyd','.so') -ccontains $extension){throw 'Non-source executable module refused'}
+        elseif(@('.exe','.com','.cmd','.bat','.ps1','.psm1','.psd1','.vbs','.vbe','.js','.jse','.wsf','.wsh','.hta','.dll','.scr','.cpl','.msi','.msp','.lnk','.reg') -ccontains $extension){
+            if(-not $KnownPaths.Contains($entry.FullName)){throw 'Unreviewed executable/script refused'}
+        }
     }
 }
 function ReadBoundedGit([string]$Arguments) {
@@ -274,7 +277,6 @@ try {
     $fileAcl="O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1200a9;;;$sid)"
     $dirAcl="O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;$sid)"
     $privateDir="O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;$sid)"
-    $privateFile="O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;$sid)"
     WriteReceipt @{Stage='installation_started';PlanSHA256=$digest;InstallationId=$installation}
     # Capture the full mutable interpreter ACL closure before any parent can
     # propagate permissions. Stop before effects if the receipt budget is exceeded.
@@ -304,7 +306,7 @@ try {
     }
     foreach($path in @($dependencyPaths | Sort-Object Length -Descending)) { $item=CheckedItem $path; if($item.PSIsContainer){SetProtection $path $dirAcl}else{SetProtection $path $fileAcl} }
     foreach($row in $immutable){SetProtection $row.path $fileAcl}
-    SetProtection $envPath $privateFile
+    SetProtection $envPath $fileAcl
     foreach($name in @('logs','data','downloads')){SetProtection ($root+'\'+$name) $privateDir}
     # Both startup modes now atomically publish inside the private writable logs
     # directory. Retain any historical root PID leaf without using or rewriting it.

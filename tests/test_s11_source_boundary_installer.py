@@ -102,15 +102,18 @@ def test_source_directory_rejects_unreviewed_imports_and_native_modules(tmp_path
         tmp_path,
         r"""
 $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$null=$known.Add($PSCommandPath) # The test harness itself lives in this fixture.
 $moves=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $reviewed=Join-Path $fixture 'reviewed.py';[IO.File]::WriteAllText($reviewed,'reviewed');$null=$known.Add($reviewed)
 VerifySourceDirectory $fixture $known $moves $fixture
-foreach($name in @('discord.py','dotenv.py','sitecustomize.py','module.pyw','native.pyd','cache.pyc')){
+foreach($name in @('discord.py','dotenv.py','sitecustomize.py','module.pyw','native.pyd','cache.pyc','taskkill.exe','tool.com','tool.cmd','tool.bat','tool.ps1','tool.dll','tool.vbs','tool.js','tool.hta','tool.lnk')){
  $unexpected=Join-Path $fixture $name;[IO.File]::WriteAllText($unexpected,'unreviewed')
  $refused=$false;try{VerifySourceDirectory $fixture $known $moves $fixture}catch{$refused=$true}
  if(-not $refused){throw 'Unreviewed executable accepted'}
  [IO.File]::Delete($unexpected)
 }
+$reviewedScript=Join-Path $fixture 'reviewed.ps1';[IO.File]::WriteAllText($reviewedScript,'reviewed');$null=$known.Add($reviewedScript)
+VerifySourceDirectory $fixture $known $moves $fixture
 $unexpected=Join-Path $fixture 'telemetry';$null=[IO.Directory]::CreateDirectory($unexpected)
 $refused=$false;try{VerifySourceDirectory $fixture $known $moves $fixture}catch{$refused=$true}
 if(-not $refused){throw 'Unreviewed package accepted'}
