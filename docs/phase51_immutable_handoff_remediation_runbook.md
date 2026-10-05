@@ -81,7 +81,8 @@ For the isolated evidence run, MINI_AMD may test the production PR branch, but t
 production acceptance point.
 
 Start or restart the bot only through `StartDLBotAfterSQL` / `/ops graceful_restart`, then
-resolve the live PID from `bot_pid.txt` and `BOT_LOCK.json`.
+resolve the live PID from `logs\bot_pid.txt` and `BOT_LOCK.json`. Any root
+`bot_pid.txt` is historical state and must not be used as the live process PID.
 
 ## 6. Run real-token evidence
 
