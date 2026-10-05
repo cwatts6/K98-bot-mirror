@@ -127,9 +127,9 @@ def watchdog_launch(python, root, *, coordination, intake, recovery, plan):
     """Keep flags-off launch unchanged; every S11 launch uses a held Bot gate."""
     from pathlib import Path
 
-    if not (coordination or intake or recovery):
+    if not coordination:
         return [python, str(Path(root) / "DL_bot.py")], False
-    if not coordination or not plan or not Path(plan).is_absolute():
+    if not plan or not Path(plan).is_absolute():
         raise ValueError("Coordinated startup requires an absolute reviewed manual launch plan.")
     return [
         python,

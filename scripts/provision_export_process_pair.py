@@ -9,6 +9,7 @@ import argparse
 import os
 from pathlib import Path
 import runpy
+from uuid import uuid4
 
 
 def publish_pair(plan, raw, templates, bindings, handles, inspect):
@@ -53,7 +54,18 @@ def publish_pair(plan, raw, templates, bindings, handles, inspect):
     for role in ROLES:
         if not pinned_process_alive(handles[role], bindings[role]):
             raise ValueError("Held process exited during publication; retain partial files.")
-    write_new(plan["commit_file"], publication(raw, manifests))
+    # Polling gates must never see a partially written/unprotected release.
+    # MoveFileEx without REPLACE_EXISTING publishes atomically on Windows and
+    # refuses an existing destination. Keep the protected staging file on error.
+    import win32file
+
+    commit_path = Path(plan["commit_file"])
+    pending = commit_path.with_name(commit_path.name + "." + uuid4().hex + ".pending")
+    write_new(pending, publication(raw, manifests))
+    for role in ROLES:
+        if not pinned_process_alive(handles[role], bindings[role]):
+            raise ValueError("Held process exited before release; retain pending publication.")
+    win32file.MoveFileEx(str(pending), str(commit_path), 8)  # MOVEFILE_WRITE_THROUGH only
     return publication(raw, manifests)
 
 

@@ -3,6 +3,8 @@
 Chris selected manual administrative rebinding for the first coordinated rollout.
 This is a startup mechanism, not enrollment or activation authorization. Ordinary
 startup with all S11 flags off retains the existing Bot/watchdog path.
+Intake-only and recovery-only startup also retain that ordinary path when export
+coordination is off; those independently supported modes do not require a pair.
 
 An enabled coordinated launch requires `K98_EXPORT_LAUNCH_PLAN`, an absolute path
 to a reviewed, administrator-owned static plan. The watchdog starts an isolated
@@ -43,7 +45,8 @@ must not be fabricated. Missing static bindings block creation of a usable plan.
    --operator-hold-confirmed`. Publication reopens and retains the exact handles,
    checks executable/token/incarnation, validates the authority manifest and all
    deployment review records, writes fresh administrator-owned manifests and
-   publishes a final commit only after both still-live pins are rechecked.
+   writes and protects a private pending commit, rechecks both still-live pins,
+   then atomically moves it to the final release path without overwriting.
    Release allows authority SQL-session creation; it is an effectful startup
    decision even though the publisher itself opens no SQL/provider connection.
 5. Each gate verifies the protected commit and both manifests against its static

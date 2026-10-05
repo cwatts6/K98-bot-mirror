@@ -221,5 +221,73 @@ def test_flags_off_launch_and_enabled_manual_gate(tmp_path):
     assert enabled[-4:] == ["--role", "bot", "--plan", str(tmp_path / "plan.json")]
     with pytest.raises(ValueError, match="Coordinated"):
         watchdog_launch(
-            "python", tmp_path, coordination=False, intake=True, recovery=False, plan=None
+            "python", tmp_path, coordination=True, intake=True, recovery=False, plan=None
         )
+
+
+@pytest.mark.parametrize("intake,recovery", [(True, False), (False, True), (True, True)])
+def test_independent_intake_and_recovery_keep_ordinary_startup(tmp_path, intake, recovery):
+    assert watchdog_launch(
+        "python", tmp_path, coordination=False, intake=intake, recovery=recovery, plan=None
+    ) == (["python", str(tmp_path / "DL_bot.py")], False)
+
+
+@pytest.mark.parametrize("failure", [None, "destination_exists", "peer_exit"])
+def test_release_becomes_visible_only_after_complete_protected_staging(
+    tmp_path, monkeypatch, failure
+):
+    import win32file
+    import win32security
+
+    import core.export_execution_host as host
+    import core.export_process_identity as identity
+    import scripts.provision_export_process_pair as publisher
+    import scripts.run_export_authority as launcher
+
+    plan, templates, bindings = pair_fixture(tmp_path)
+    commit = Path(plan["commit_file"])
+    protected = set()
+    monkeypatch.setattr(launcher, "manifest_contract", Mock())
+    monkeypatch.setattr(host, "DeploymentBoundary", Mock())
+    monkeypatch.setattr(
+        win32security, "SetNamedSecurityInfo", lambda path, *_: protected.add(Path(path))
+    )
+    monkeypatch.setattr(
+        identity,
+        "pinned_process_alive",
+        Mock(side_effect=[True] * 4 + ([False] if failure == "peer_exit" else [True, True])),
+    )
+
+    def move(source, destination, flags):
+        pending = Path(source)
+        assert flags == 8  # no overwrite/copy fallback
+        assert pending in protected and pending.read_bytes()
+        assert not commit.exists()  # polling gate cannot see staging writes
+        if failure == "destination_exists":
+            commit.write_bytes(b"existing-publication")
+            raise FileExistsError("Do not replace publication")
+        pending.rename(destination)
+
+    mover = Mock(side_effect=move)
+    monkeypatch.setattr(win32file, "MoveFileEx", mover)
+    operation = lambda: publisher.publish_pair(
+        plan,
+        encode(plan),
+        templates,
+        bindings,
+        {role: object() for role in bindings},
+        Mock(side_effect=Path),
+    )
+    if failure:
+        with pytest.raises((FileExistsError, ValueError)):
+            operation()
+        assert len(list(tmp_path.glob("*.pending"))) == 1
+        if failure == "peer_exit":
+            assert not commit.exists()
+            mover.assert_not_called()
+        else:
+            assert commit.read_bytes() == b"existing-publication"
+    else:
+        expected = operation()
+        assert commit.read_bytes() == encode(expected)
+        assert not list(tmp_path.glob("*.pending"))
