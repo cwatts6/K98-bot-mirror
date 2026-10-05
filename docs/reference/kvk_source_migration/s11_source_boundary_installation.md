@@ -52,6 +52,13 @@ administrator ownership and read/execute protection cover their full closure.
 Base Python is verified against reviewed observations and remains unchanged.
 This does not substitute for subsequent ordinary-operator runtime verification.
 
+Both ordinary and coordinated startup publish PID files under the existing
+writable `logs` directory using the shared `BOT_PID_PATH`. Atomic temporary-file
+creation and replacement need a writable parent; granting access only to the old
+root PID leaf would not preserve ordinary startup. Existing root PID leaves are
+retained as historical state, without automated deletion or adoption. Source
+protection requires deploying this aligned Bot/watchdog change first.
+
 `-Apply` additionally requires an elevated named operator,
 `-OperatorHoldConfirmed` and `-BotStopped`. These represent actual operator
 confirmation of no conflicting work held until completion or reconciliation and
@@ -59,11 +66,22 @@ a manually stopped Bot held off; they are not inferred from elapsed time or a
 process inventory. Do not use `/ops graceful_restart` to establish a stopped hold.
 
 Receipts retain action intentions, prior ACLs, completed moves and observed final
-ACLs. Receipt files are created without overwrite. Output is bounded to 20 MiB,
-file hashes to 16 MiB and individual Git/ACL/move operations to 60 seconds. A
-failure retains all partial state and requires reconciliation; no automatic retry
-or rollback occurs. Reviewed native guard tests do not prove production owner
-changes or future Bot/authority identities.
+ACLs. Paths and SDDL strings have explicit dictionary records; subsequent records
+refer to those IDs, retaining the exact restoration inputs without repeatedly
+printing long descriptors. Capacity for remaining per-member action records is
+checked before any effects. Receipt files are created without overwrite. Output
+is bounded to 20 MiB and file hashes to 16 MiB.
+
+The public entry point supervises its own PowerShell child with a 60-second
+deadline reset before each finite operation. A stalled operation stops that
+owned worker, retains the flushed journal and reports incomplete state. Git has
+its own shorter 55-second owned-process limit. There is no fixed duration cap on
+the full installation. Stopping a worker cannot undo an operating-system action
+already issued; intentions without completion records require reconciliation.
+The internal `-Worker` mode is not an operator invocation. Use the public sealed
+command. A failure never retries or rolls back automatically. Native guard and
+PID tests do not prove elevated production owner changes or future process
+identities; ordinary-operator verification follows the separately approved Apply.
 
 After filesystem installation, independently reviewed SQL/runtime registration
 and static manifests, ordinary held-pair startup, actual process rebinding,

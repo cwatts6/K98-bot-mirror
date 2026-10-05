@@ -85,6 +85,7 @@ if os.name == "nt":
 from constants import (
     ALL_KVK_SHEET_ID,
     BOT_LOCK_PATH,
+    BOT_PID_PATH,
     EXIT_CODE_FILE,
     KVK_AUTO_EXPORT,
     LAST_SHUTDOWN_INFO,
@@ -172,11 +173,7 @@ if "idlelib" in sys.modules:
         pass
     sys.exit(1)
 
-BOT_PID_FILE = (
-    Path(LOG_DIR) / "bot_pid.txt"
-    if os.environ.get("K98_EXPORT_MANUAL_REBINDING") == "1"
-    else Path(LOG_DIR).parent / "bot_pid.txt"
-)  # keep path consistent with LOG_DIR/BASE_DIR layout
+BOT_PID_FILE = Path(BOT_PID_PATH)
 
 
 def _write_child_pid_file() -> None:

@@ -9,10 +9,67 @@ param(
     [Parameter(Mandatory=$true)][string]$ExpectedPlanSHA256,
     [switch]$Apply,
     [switch]$OperatorHoldConfirmed,
-    [switch]$BotStopped
+    [switch]$BotStopped,
+    [switch]$Worker,
+    [string]$WorkerProgressPath
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+
+function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$ReceiptPath,[int]$TimeoutMs=60000) {
+    $start=[Diagnostics.ProcessStartInfo]::new()
+    $start.FileName='C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+    $workerCommand='$ErrorActionPreference=''Stop'';$ProgressPreference=''SilentlyContinue'';'+$Command
+    $start.Arguments='-NoProfile -NonInteractive -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($workerCommand))
+    $start.UseShellExecute=$false; $start.CreateNoWindow=$true
+    $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true
+    $process=[Diagnostics.Process]::new();$process.StartInfo=$start
+    $journal=[IO.StreamWriter]::new([IO.File]::Open($ReceiptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read))
+    $bytes=[long]0;$clock=[Diagnostics.Stopwatch]::StartNew();$lastProgress=[long]0;$stamp=[datetime]::MinValue;$started=$false
+    try {
+        if(-not $process.Start()){throw 'Worker launch failed'}
+        $started=$true
+        $lineTask=$process.StandardOutput.ReadLineAsync();$errorTask=$process.StandardError.ReadToEndAsync()
+        while($true) {
+            if(Test-Path -LiteralPath $ProgressPath){$next=(Get-Item -LiteralPath $ProgressPath).LastWriteTimeUtc;if($next -ne $stamp){$stamp=$next;$lastProgress=$clock.ElapsedMilliseconds}}
+            if($clock.ElapsedMilliseconds-$lastProgress -gt $TimeoutMs){throw 'Owned installation operation timeout; retain partial state'}
+            if($lineTask.IsCompleted){
+                $line=$lineTask.GetAwaiter().GetResult()
+                if($null -eq $line){break}
+                $bytes+=[Text.Encoding]::UTF8.GetByteCount($line)+2
+                if($bytes -gt 20MB-4096){throw 'Installation receipt output limit; retain partial state'}
+                $journal.WriteLine($line);$journal.Flush();Write-Output $line
+                $lineTask=$process.StandardOutput.ReadLineAsync()
+            } else {Start-Sleep -Milliseconds 10}
+        }
+        $remaining=[Math]::Max(1,$TimeoutMs-($clock.ElapsedMilliseconds-$lastProgress))
+        if(-not $process.WaitForExit([int]$remaining)){throw 'Worker exit timeout'}
+        if($process.ExitCode -ne 0 -or $errorTask.GetAwaiter().GetResult()){throw 'Worker stopped; retain partial receipts'}
+    } catch {
+        if($started -and -not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)}
+        $stop=@{Stage='STOP_INCOMPLETE_SUPERVISOR';FailureType=$_.Exception.GetType().FullName;Receipt=$ReceiptPath;Progress=$ProgressPath;Next='Retain partial actions; reconcile before retry or start'}|ConvertTo-Json -Compress
+        $journal.WriteLine($stop);$journal.Flush();Write-Output $stop
+        throw 'STOP_INCOMPLETE: retain supervised installation receipt'
+    } finally {$journal.Dispose();$process.Dispose()}
+}
+function BeginOperation {
+    if($script:progressPath){[IO.File]::WriteAllText($script:progressPath,[guid]::NewGuid().ToString('N'))}
+}
+
+# The public entry point supervises only its own child. A fresh progress file
+# resets the deadline before each finite operation, never extending a stalled one.
+if(-not $Worker){
+    $receiptPath=Join-Path $PSScriptRoot ('source-boundary-receipt-'+[guid]::NewGuid().ToString('N')+'.jsonl')
+    $progressPath=$receiptPath+'.progress'
+    $null=[IO.File]::Open($progressPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read).Dispose()
+    $command="& '"+$PSCommandPath.Replace("'","''")+"' -Worker -WorkerProgressPath '"+$progressPath.Replace("'","''")+"' -PlanPath '"+$PlanPath.Replace("'","''")+"' -ExpectedPlanSHA256 '"+$ExpectedPlanSHA256.Replace("'","''")+"'"
+    if($Apply){$command+=' -Apply'};if($OperatorHoldConfirmed){$command+=' -OperatorHoldConfirmed'};if($BotStopped){$command+=' -BotStopped'}
+    InvokeBoundedWorker $command $progressPath $receiptPath
+    return
+}
+$progressPath=$WorkerProgressPath
+if(-not $progressPath -or -not (Test-Path -LiteralPath $progressPath)){throw 'Supervised worker required'}
+BeginOperation
 
 function CanonicalPath([string]$Path) {
     if ($Path -cnotmatch '^[A-Za-z]:\\' -or $Path.Substring(2).Contains(':')) { throw 'Canonical local absolute path required' }
@@ -35,6 +92,7 @@ function CheckedItem([string]$Path) {
     return Get-Item -LiteralPath $Path -Force
 }
 function FileDigest([string]$Path) {
+    BeginOperation
     $item=CheckedItem $Path
     if ($item.PSIsContainer -or $item.Length -gt 16MB) { throw 'Bounded file required' }
     $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
@@ -45,6 +103,7 @@ function FileDigest([string]$Path) {
     } finally {$sha.Dispose();$stream.Dispose()}
 }
 function ReadBoundedGit([string]$Arguments) {
+    BeginOperation
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName=$script:git
     $start.Arguments='-C "'+$script:root+'" '+$Arguments
@@ -54,7 +113,7 @@ function ReadBoundedGit([string]$Arguments) {
     try {
         if(-not $process.Start()){throw 'Git process failed'}
         $output=$process.StandardOutput.ReadToEndAsync(); $errorOutput=$process.StandardError.ReadToEndAsync()
-        if(-not $process.WaitForExit(60000)){ $process.Kill(); throw 'Owned Git operation timeout; reconcile' }
+        if(-not $process.WaitForExit(55000)){ $process.Kill(); throw 'Owned Git operation timeout; reconcile' }
         $text=$output.GetAwaiter().GetResult(); $errorText=$errorOutput.GetAwaiter().GetResult()
         if($process.ExitCode -ne 0 -or $errorText -or [Text.Encoding]::UTF8.GetByteCount($text) -gt 20MB){throw 'Git operation failed/output exceeded'}
         return $text.TrimEnd("`r","`n")
@@ -64,13 +123,22 @@ function WriteReceipt($Value) {
     $line=$Value | ConvertTo-Json -Compress -Depth 6
     $script:receiptBytes+=[Text.Encoding]::UTF8.GetByteCount($line)+2
     if ($script:receiptBytes -gt 20MB) { throw 'Receipt output budget exceeded' }
-    if ($script:receiptWriter) { $script:receiptWriter.WriteLine($line); $script:receiptWriter.Flush() }
-    Write-Output $line
+    [Console]::WriteLine($line)
+}
+function PathId([string]$Path) {
+    if(-not $script:pathIds.ContainsKey($Path)){$id=$script:pathIds.Count;$script:pathIds[$Path]=$id;WriteReceipt @{Stage='path';Id=$id;Value=$Path}}
+    return $script:pathIds[$Path]
+}
+function AclId([string]$SDDL) {
+    if(-not $script:aclIds.ContainsKey($SDDL)){$id=$script:aclIds.Count;$script:aclIds[$SDDL]=$id;WriteReceipt @{Stage='sddl';Id=$id;Value=$SDDL}}
+    return $script:aclIds[$SDDL]
 }
 function SetProtection([string]$Path,[string]$SDDL) {
+    BeginOperation
     $item=CheckedItem $Path
     $before=Get-Acl -LiteralPath $Path
-    WriteReceipt @{Stage='acl_intent';Path=$Path;PriorSDDL=$before.Sddl;ProposedSDDL=$SDDL}
+    $pathId=PathId $Path;$priorId=AclId $before.Sddl;$nextId=AclId $SDDL
+    WriteReceipt @{Stage='acl_intent';PathId=$pathId;PriorAclId=$priorId;ProposedAclId=$nextId}
     $clock=[Diagnostics.Stopwatch]::StartNew()
     if ($item.PSIsContainer) { $acl=[Security.AccessControl.DirectorySecurity]::new() }
     else { $acl=[Security.AccessControl.FileSecurity]::new() }
@@ -82,9 +150,11 @@ function SetProtection([string]$Path,[string]$SDDL) {
     $actualRules=@($actual.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]) | ForEach-Object {"$($_.IdentityReference.Value):$([int]$_.FileSystemRights):$([int]$_.InheritanceFlags):$([int]$_.PropagationFlags):$([int]$_.AccessControlType):$($_.IsInherited)"} | Sort-Object)
     if(($desiredRules -join "`n") -cne ($actualRules -join "`n")){throw 'Applied DACL rights mismatch'}
     if ($clock.ElapsedMilliseconds -gt 60000) { throw 'ACL operation budget exceeded; reconcile' }
-    WriteReceipt @{Stage='acl_completed';Path=$Path;ObservedSDDL=$actual.Sddl;ElapsedMs=$clock.ElapsedMilliseconds}
+    $actualId=AclId $actual.Sddl
+    WriteReceipt @{Stage='acl_completed';PathId=$pathId;ObservedAclId=$actualId;ElapsedMs=$clock.ElapsedMilliseconds}
 }
 function NewProtectedDirectory([string]$Path,[string]$SDDL) {
+    BeginOperation
     if (Test-Path -LiteralPath $Path) { throw 'Fresh installation directory required' }
     $parent=[IO.Path]::GetDirectoryName($Path)
     $null=CheckedItem $parent
@@ -93,7 +163,7 @@ function NewProtectedDirectory([string]$Path,[string]$SDDL) {
     SetProtection $Path $SDDL
 }
 
-$stage='plan'; $receiptWriter=$null; $receiptBytes=[long]0
+$stage='plan'; $receiptBytes=[long]0;$pathIds=@{};$aclIds=@{}
 try {
     $planItem=CheckedItem (CanonicalPath $PlanPath)
     if ($planItem.PSIsContainer -or $planItem.Length -gt 4MB -or $ExpectedPlanSHA256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Bounded sealed plan required' }
@@ -118,12 +188,14 @@ try {
     $immutable=@($plan.immutable_source_files)+@($plan.immutable_config_and_existing_key)
     if ($immutable.Count -lt 3 -or $immutable.Count -gt 4096 -or $plan.immutable_source_directories.Count -gt 1000 -or $plan.preserve_moves.Count -gt 1000) { throw 'Plan row bounds exceeded' }
     foreach($row in $immutable) {
+        BeginOperation
         $path=CanonicalPath $row.path
         if (-not (Inside $path $root) -or (Inside $path ($root+'\.git')) -or (Inside $path ($root+'\venv')) -or -not $seen.Add($path)) { throw 'Immutable source path outside scope or duplicated' }
         $expected=if($row.PSObject.Properties['expected_reviewed_sha256']){$row.expected_reviewed_sha256}else{$row.digest}
         if ($expected -cnotmatch '^[0-9a-f]{64}$' -or (FileDigest $path) -cne $expected -or (Get-Acl -LiteralPath $path).Sddl -cne $row.prior_acl) { throw 'Immutable source/content/ACL drift' }
     }
     foreach($row in $plan.immutable_source_directories) {
+        BeginOperation
         $path=CanonicalPath $row.path
         if (($path -cne $root -and -not (Inside $path $root)) -or (Inside $path ($root+'\.git')) -or (Inside $path ($root+'\venv')) -or -not $seen.Add($path) -or -not (CheckedItem $path).PSIsContainer -or (Get-Acl -LiteralPath $path).Sddl -cne $row.prior_acl) { throw 'Source directory drift/scope mismatch' }
     }
@@ -132,6 +204,7 @@ try {
     if ($plan.existing_environment.path -cne $envPath -or (FileDigest $envPath) -cne $plan.existing_environment.observed_sha256 -or (Get-Acl -LiteralPath $envPath).Sddl -cne $plan.existing_environment.prior_acl) { throw 'Private environment drift' }
     $moveSeen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach($row in $plan.preserve_moves) {
+        BeginOperation
         $from=CanonicalPath $row.source; $to=CanonicalPath $row.destination
         if (-not (Inside $from $root) -or -not (Inside $to $preserve) -or -not $moveSeen.Add($from) -or (Test-Path -LiteralPath $to) -or -not (CheckedItem $from).PSIsContainer -or (Get-Acl -LiteralPath $from).Sddl -cne $row.prior_acl) { throw 'Preservation path/ACL conflict' }
         $null=CheckedItem ([IO.Path]::GetDirectoryName($to).Substring(0,3))
@@ -149,6 +222,7 @@ try {
     $venv=$root+'\venv'; $stack=[Collections.Generic.Stack[string]]::new(); $stack.Push($venv)
     $dependencyPaths=[Collections.Generic.List[string]]::new()
     while($stack.Count) {
+        BeginOperation
         $directory=$stack.Pop(); $null=CheckedItem $directory; $dependencyPaths.Add($directory)
         $entries=@(Get-ChildItem -LiteralPath $directory -Force | Select-Object -First 1001)
         if ($entries.Count -gt 1000) { throw 'Venv per-directory row bound exceeded' }
@@ -160,6 +234,7 @@ try {
     }
     if ((FileDigest ($venv+'\Scripts\python.exe')) -cne $plan.venv_python_sha256 -or (FileDigest ($venv+'\pyvenv.cfg')) -cne $plan.venv_config_sha256) { throw 'Venv identity drift' }
     foreach($row in $plan.base_interpreter_observations) {
+        BeginOperation
         $path=CanonicalPath $row.Path
         if ($path -cne 'C:\Program Files' -and $path -cne 'C:\Program Files\Python311' -and -not (Inside $path 'C:\Program Files\Python311')) { throw 'Base verification scope mismatch' }
         if($row.Present){$null=CheckedItem $path;if((Get-Acl -LiteralPath $path).Sddl -cne $row.SDDL){throw 'Base interpreter ACL drift'};if($row.PSObject.Properties['SHA256'] -and (FileDigest $path) -cne $row.SHA256){throw 'Base interpreter content drift'}}
@@ -179,14 +254,13 @@ try {
     $dirAcl="O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;$sid)"
     $privateDir="O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;$sid)"
     $privateFile="O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;$sid)"
-    # No overwrite of old receipts. Application root is still writable here.
-    $receiptPath=Join-Path $PSScriptRoot ('source-boundary-receipt-'+[guid]::NewGuid().ToString('N')+'.jsonl')
-    $receiptStream=[IO.File]::Open($receiptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
-    $receiptWriter=[IO.StreamWriter]::new($receiptStream)
-    WriteReceipt @{Stage='installation_started';PlanSHA256=$digest;InstallationId=$installation;Receipt=$receiptPath}
+    WriteReceipt @{Stage='installation_started';PlanSHA256=$digest;InstallationId=$installation}
     # Capture the full mutable interpreter ACL closure before any parent can
     # propagate permissions. Stop before effects if the receipt budget is exceeded.
-    foreach($path in $dependencyPaths){WriteReceipt @{Stage='venv_prior_acl';Path=$path;SDDL=(Get-Acl -LiteralPath $path).Sddl}}
+    foreach($path in $dependencyPaths){BeginOperation;$pathId=PathId $path;$aclId=AclId (Get-Acl -LiteralPath $path).Sddl;WriteReceipt @{Stage='venv_prior_acl';PathId=$pathId;AclId=$aclId}}
+    # Reserve worst-case bounded per-member intention/completion records before
+    # effects. Interned paths and SDDL retain exact restoration inputs once.
+    if($receiptBytes+($dependencyPaths.Count+$immutable.Count+1000)*400+1MB -gt 20MB-4096){throw 'Complete receipt capacity insufficient before effects'}
     $k98='C:\ProgramData\K98'
     if(Test-Path -LiteralPath $k98){throw 'Existing K98 parent requires explicit reconciliation'}
     NewProtectedDirectory $k98 $dirAcl
@@ -203,7 +277,7 @@ try {
         while($missing.Count){NewProtectedDirectory ($missing.Pop()) $dirAcl}
         $null=CheckedItem ([IO.Path]::GetDirectoryName($to))
         WriteReceipt @{Stage='move_intent';Source=$from;Destination=$to;PriorSDDL=$row.prior_acl}
-        $moveClock=[Diagnostics.Stopwatch]::StartNew(); [IO.Directory]::Move($from,$to)
+        BeginOperation;$moveClock=[Diagnostics.Stopwatch]::StartNew(); [IO.Directory]::Move($from,$to)
         if($moveClock.ElapsedMilliseconds -gt 60000){throw 'Move budget exceeded; reconcile'}
         WriteReceipt @{Stage='move_completed';Source=$from;Destination=$to}
     }
@@ -211,9 +285,8 @@ try {
     foreach($row in $immutable){SetProtection $row.path $fileAcl}
     SetProtection $envPath $privateFile
     foreach($name in @('logs','data','downloads')){SetProtection ($root+'\'+$name) $privateDir}
-    $pidPath=$root+'\bot_pid.txt'
-    if(-not (Test-Path -LiteralPath $pidPath)){WriteReceipt @{Stage='pid_leaf_creation_intent';Path=$pidPath};$pidStream=[IO.File]::Open($pidPath,[IO.FileMode]::CreateNew);$pidStream.Dispose()}
-    SetProtection $pidPath $privateFile
+    # Both startup modes now atomically publish inside the private writable logs
+    # directory. Retain any historical root PID leaf without using or rewriting it.
     foreach($row in @($plan.immutable_source_directories | Sort-Object {$_.path.Length} -Descending)){SetProtection $row.path $dirAcl}
     foreach($name in @('evidence','spool')){NewProtectedDirectory ($control+'\'+$name) $privateDir}
     if((FileDigest $envPath) -cne $plan.existing_environment.observed_sha256){throw 'Environment content changed'}
@@ -221,4 +294,4 @@ try {
 } catch {
     WriteReceipt @{Stage='STOP_INCOMPLETE';At=$stage;FailureType=$_.Exception.GetType().FullName;Next='Retain all partial receipts; no retry, automatic rollback, Bot start or activation until reconciled'}
     throw 'STOP_INCOMPLETE: retain filesystem installation receipt'
-} finally { if($receiptWriter){$receiptWriter.Dispose()} }
+}

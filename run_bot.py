@@ -16,6 +16,7 @@ sys.dont_write_bytecode = True
 
 # Constants / paths
 from constants import (
+    BOT_PID_PATH,
     EXIT_CODE_FILE,
     LAST_RESTART_INFO,
     LAST_SHUTDOWN_INFO,
@@ -278,7 +279,7 @@ launch_command, manual_rebinding = watchdog_launch(
     recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
     plan=os.environ.get("K98_EXPORT_LAUNCH_PLAN"),
 )
-pid_path = os.path.join(LOG_DIR if manual_rebinding else base_dir, "bot_pid.txt")
+pid_path = BOT_PID_PATH
 
 # Child log handle (optional) - set when launching each child
 _child_log_fh = None

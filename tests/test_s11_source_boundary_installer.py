@@ -1,7 +1,10 @@
 """Native Windows guard tests; none perform administrative installation."""
+import ast
 import os
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -18,12 +21,13 @@ $ErrorActionPreference='Stop'
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile('{script}',[ref]$tokens,[ref]$errors)
 if($errors.Count){{throw 'Installer parse failure'}}
-foreach($name in @('CanonicalPath','Inside','CheckedItem','FileDigest','ReadBoundedGit')){{
+foreach($name in @('CanonicalPath','Inside','CheckedItem','FileDigest','ReadBoundedGit','BeginOperation','InvokeBoundedWorker')){{
  $node=$ast.Find({{param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name}},$false)
  if($null -eq $node){{throw 'Helper missing'}}
  Invoke-Expression $node.Extent.Text
 }}
 $fixture='{fixture}'
+$progressPath=$null
 {body}
 """
     probe = tmp_path / "native-guard-test.ps1"
@@ -71,3 +75,92 @@ $git='C:\Program Files\Git\cmd\git.exe';$root=$fixture
 $refused=$false;try{$null=ReadBoundedGit 'rev-parse HEAD'}catch{$refused=$true}
 if(-not $refused){throw 'Git failure accepted as a binding'}
 """)
+
+
+def test_supervisor_stops_owned_stalled_worker_and_retains_receipt(tmp_path):
+    run_helpers(tmp_path, r"""
+$progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
+$receipt=Join-Path $fixture 'receipt.jsonl'
+$sentinel=Join-Path $fixture 'must-not-finish'
+$command="[Console]::WriteLine('partial');Start-Sleep -Seconds 4;[IO.File]::WriteAllText('"+$sentinel.Replace("'","''")+"','unexpected')"
+$refused=$false
+try{$null=InvokeBoundedWorker $command $progress $receipt 300}catch{$refused=$true;if(-not (Test-Path -LiteralPath $receipt)){throw $_}}
+if(-not $refused -or (Test-Path -LiteralPath $sentinel)){throw 'Stalled worker continued'}
+if(-not (([IO.File]::ReadAllText($receipt)).Contains('STOP_INCOMPLETE_SUPERVISOR'))){throw 'Missing reconciliation receipt'}
+""")
+
+
+def test_supervisor_allows_progress_without_a_total_duration_cap(tmp_path):
+    run_helpers(tmp_path, r"""
+$progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
+$receipt=Join-Path $fixture 'receipt.jsonl'
+$command="1..15 | ForEach-Object {[IO.File]::WriteAllText('"+$progress.Replace("'","''")+"',[guid]::NewGuid().ToString());Start-Sleep -Milliseconds 100};[Console]::WriteLine('completed')"
+$null=InvokeBoundedWorker $command $progress $receipt 1000
+if([IO.File]::ReadAllText($receipt).Trim() -cne 'completed'){throw 'Progressing worker failed'}
+""")
+
+
+def test_public_entry_rejects_bad_plan_without_installation(tmp_path):
+    copy = tmp_path / SCRIPT.name
+    copy.write_bytes(SCRIPT.read_bytes())
+    plan = tmp_path / "plan.json"
+    plan.write_text("{}", encoding="utf-8")
+    result = subprocess.run(
+        [r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", "-NoProfile", "-NonInteractive", "-File", str(copy), "-PlanPath", str(plan), "-ExpectedPlanSHA256", "0" * 64],
+        capture_output=True, text=True, timeout=20,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode != 0
+    receipts = list(tmp_path.glob("source-boundary-receipt-*.jsonl"))
+    assert len(receipts) == 1
+    text = receipts[0].read_text(encoding="utf-8-sig")
+    assert "STOP_INCOMPLETE" in text
+    assert "installation_started" not in text
+
+
+def test_real_pid_writers_use_writable_logs_with_readonly_source(tmp_path):
+    """Execute the actual PID writer bodies without importing either startup module."""
+    import win32api
+    import win32security
+
+    root = tmp_path / "source"
+    logs = root / "logs"
+    logs.mkdir(parents=True)
+    repo = SCRIPT.parents[1]
+    namespace = {"os": os, "Path": Path, "LOG_DIR": str(logs), "logger": Mock(), "log": Mock()}
+    constants = ast.parse((repo / "constants.py").read_text(encoding="utf-8"))
+    pid_constant = next(node for node in constants.body if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "BOT_PID_PATH" for t in node.targets))
+    exec(compile(ast.Module(body=[pid_constant], type_ignores=[]), "constants.py", "exec"), namespace)
+    child = ast.parse((repo / "DL_bot.py").read_text(encoding="utf-8"))
+    selected = [node for node in child.body if (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "BOT_PID_FILE" for t in node.targets)) or (isinstance(node, ast.FunctionDef) and node.name == "_write_child_pid_file")]
+    exec(compile(ast.Module(body=selected, type_ignores=[]), "DL_bot.py", "exec"), namespace)
+    watchdog = ast.parse((repo / "run_bot.py").read_text(encoding="utf-8"))
+    pid_assignment = next(node for node in watchdog.body if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "pid_path" for t in node.targets))
+    pid_write = next(node for node in ast.walk(watchdog) if isinstance(node, ast.Try) and any(isinstance(t, ast.Assign) and any(isinstance(n, ast.Name) and n.id == "tmp_path" for n in t.targets) for t in node.body))
+    namespace["child"] = SimpleNamespace(pid=12345)
+    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), 8)
+    try:
+        sid, _ = win32security.GetTokenInformation(token, win32security.TokenUser)
+    finally:
+        token.Close()
+    original = win32security.GetNamedSecurityInfo(str(root), 1, 4)
+    logs_original = win32security.GetNamedSecurityInfo(str(logs), 1, 4)
+    protected = 4 | win32security.PROTECTED_DACL_SECURITY_INFORMATION
+    state_acl = win32security.ACL()
+    state_acl.AddAccessAllowedAce(2, 0x1F01FF, sid)
+    source_acl = win32security.ACL()
+    source_acl.AddAccessAllowedAce(2, 0x1200A9, sid)
+    try:
+        win32security.SetNamedSecurityInfo(str(logs), 1, protected, None, None, state_acl, None)
+        win32security.SetNamedSecurityInfo(str(root), 1, protected, None, None, source_acl, None)
+        with pytest.raises(PermissionError):
+            (root / "bot_pid.tmp").write_text("blocked")
+        namespace["_write_child_pid_file"]()
+        assert (logs / "bot_pid.txt").read_text() == str(os.getpid())
+        exec(compile(ast.Module(body=[pid_assignment, pid_write], type_ignores=[]), "run_bot.py", "exec"), namespace)
+        assert (logs / "bot_pid.txt").read_text() == "12345"
+        assert not (root / "bot_pid.txt").exists()
+    finally:
+        for path, saved in [(root, original), (logs, logs_original)]:
+            flags = 4 | (win32security.PROTECTED_DACL_SECURITY_INFORMATION if saved.GetSecurityDescriptorControl()[0] & 0x1000 else win32security.UNPROTECTED_DACL_SECURITY_INFORMATION)
+            win32security.SetNamedSecurityInfo(str(path), 1, flags, None, None, saved.GetSecurityDescriptorDacl(), None)
