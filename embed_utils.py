@@ -23,6 +23,7 @@ from discord.utils import format_dt
 from constants import (
     CUSTOM_AVATAR_URL,
     DOWN_ARROW_EMOJI,
+    EMBED_AUDIT_LOG_PATH,
     UP_ARROW_EMOJI,
     VIEW_PRUNE_ON_FORBIDDEN,
     VIEW_TRACKING_FILE,
@@ -708,7 +709,7 @@ class TargetLookupView(View):
         return callback
 
 
-async def log_embed_to_file(embed: discord.Embed, log_path="embed_audit.log"):
+async def log_embed_to_file(embed: discord.Embed, log_path=EMBED_AUDIT_LOG_PATH):
     async with aiofiles.open(log_path, "a", encoding="utf-8") as f:
         await f.write(
             f"[{discord.utils.utcnow().isoformat()}] {embed.title} - {embed.description}\n"

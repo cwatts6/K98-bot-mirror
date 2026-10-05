@@ -102,6 +102,24 @@ function FileDigest([string]$Path) {
         return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant()
     } finally {$sha.Dispose();$stream.Dispose()}
 }
+function VerifySourceDirectory([string]$Path,$KnownPaths,$MovePaths,[string]$SourceRoot) {
+    BeginOperation
+    $entries=@(Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1001)
+    if($entries.Count -gt 1000){throw 'Source directory metadata bound exceeded'}
+    # Match the runtime source-only exclusions without walking state or tooling.
+    $excluded=@('.git','.pytest_cache','.ruff_cache','tests','data','downloads','artifacts','docs','logs','smoke_artifacts','sql','telemetry','assets')
+    foreach($entry in $entries){
+        if($entry.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Source reparse member refused'}
+        if($entry.PSIsContainer){
+            if($KnownPaths.Contains($entry.FullName) -or $MovePaths.Contains($entry.FullName) -or $excluded -ccontains $entry.Name -or ($Path -ceq $SourceRoot -and $entry.Name -ceq 'venv')){continue}
+            throw 'Unreviewed source directory refused'
+        }
+        $extension=$entry.Extension.ToLowerInvariant()
+        if($extension -ceq '.py'){
+            if(-not $KnownPaths.Contains($entry.FullName)){throw 'Unreviewed Python source refused'}
+        } elseif(@('.pyw','.pyc','.pyo','.pyd','.so') -ccontains $extension){throw 'Non-source executable module refused'}
+    }
+}
 function ReadBoundedGit([string]$Arguments) {
     BeginOperation
     $start=[Diagnostics.ProcessStartInfo]::new()
@@ -217,6 +235,9 @@ try {
             if ($entries.Count -gt 1000 -or @($entries | Where-Object {$_.PSIsContainer -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)}).Count -or (@($entries.Name | Sort-Object) -join "`n") -cne (@($row.expected_names | Sort-Object) -join "`n")) { throw 'Cache membership drift' }
         } else { throw 'Unknown preservation category' }
     }
+    # Reject unreviewed executable files/directories before sealing any source.
+    # Read only immediate entries in the finite reviewed import-directory list.
+    foreach($row in $plan.immutable_source_directories){VerifySourceDirectory $row.path $seen $moveSeen $root}
     # Complete bounded metadata closure only under the explicitly approved existing venv.
     # No package contents, keys, business data or other filesystem trees are collected.
     $venv=$root+'\venv'; $stack=[Collections.Generic.Stack[string]]::new(); $stack.Push($venv)

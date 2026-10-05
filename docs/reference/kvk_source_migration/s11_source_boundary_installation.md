@@ -44,6 +44,11 @@ same-volume directory renames. Existing destinations, reparse points, changed
 cache membership and source/hash/ACL drift stop the packet. There is no recursive
 delete, overwrite or copy fallback.
 
+Before effects, each explicitly reviewed import directory admits at most 1,000
+immediate metadata entries. Every Python file must belong to the sealed plan;
+unreviewed import directories, native modules and loose bytecode are rejected.
+Runtime-excluded state/tooling directories are not traversed by this check.
+
 The existing application venv is the only additional metadata closure. Each
 directory admits at most 1,000 immediate entries and the closure at most 50,000
 paths; no package contents or other trees are collected. All venv prior ACLs are
@@ -58,6 +63,10 @@ creation and replacement need a writable parent; granting access only to the old
 root PID leaf would not preserve ordinary startup. Existing root PID leaves are
 retained as historical state, without automated deletion or adoption. Source
 protection requires deploying this aligned Bot/watchdog change first.
+
+Embed audit appends use `logs/embed_audit.log` through the shared
+`EMBED_AUDIT_LOG_PATH`. Any historical root `embed_audit.log` is retained
+untouched; new appends require only the private writable logs parent.
 
 `-Apply` additionally requires an elevated named operator,
 `-OperatorHoldConfirmed` and `-BotStopped`. These represent actual operator

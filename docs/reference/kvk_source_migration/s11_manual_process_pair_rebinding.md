@@ -79,8 +79,9 @@ Every individual pipe wait is bounded; no fixed total operator provisioning or
 workload duration is introduced. No process/session inventory or remote shutdown
 is required.
 
-Coordinated PID publication uses `logs/bot_pid.txt` so source-root replacement
-rights are unnecessary. The ordinary flags-off path retains root `bot_pid.txt`.
+Both coordinated and ordinary flags-off PID publication use `logs/bot_pid.txt`
+so source-root replacement rights are unnecessary. Any retained root
+`bot_pid.txt` is historical state and must not be used as the live process PID.
 Source/config/import ancestors still require the separately reviewed immutable
 installation; logs/data/downloads, private environment access and evidence/spool
 leaves need explicit writable-state dispositions. This mechanism does not install

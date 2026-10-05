@@ -69,6 +69,7 @@ EVENT_TYPE_INDEX_FILE_PATH = os.path.join(DATA_DIR, "event_type_index.json")
 
 # ---------- trackers / state files ----------
 BOT_PID_PATH = os.path.join(LOG_DIR, "bot_pid.txt")
+EMBED_AUDIT_LOG_PATH = os.path.join(LOG_DIR, "embed_audit.log")
 REMINDER_TRACKING_FILE = os.path.join(DATA_DIR, "active_reminders.json")
 RESTART_FLAG_PATH = os.path.join(LOG_DIR, ".restart_flag.json")
 EXIT_CODE_FILE = os.path.join(LOG_DIR, ".exit_code")
