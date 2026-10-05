@@ -5,6 +5,7 @@ import asyncio
 from datetime import UTC, datetime
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -110,10 +111,13 @@ VerifyStateDirectories $fixture
 
 
 def test_bounded_git_reads_report_actual_failure(tmp_path):
+    git_path = shutil.which("git")
+    if git_path is None:
+        pytest.skip("Native Git invocation regression requires Git on PATH")
+    git_literal = git_path.replace("'", "''")
     run_helpers(
         tmp_path,
-        r"""
-$script:git='C:\Program Files\Git\cmd\git.exe';$script:root=$fixture
+        "$script:git='" + git_literal + "';$script:root=$fixture\n" + r"""
 $refused=$false;try{$null=ReadBoundedGit 'rev-parse HEAD'}catch{$refused=$true;if($_.Exception.Message -notlike '*Git operation failed/output exceeded*'){throw $_}}
 if(-not $refused){throw 'Git failure accepted as a binding'}
 """,
@@ -263,6 +267,7 @@ def test_public_entry_rejects_bad_plan_without_installation(tmp_path):
 def test_real_pid_writers_use_writable_logs_with_readonly_source(tmp_path):
     """Execute the actual PID writer bodies without importing either startup module."""
     import aiofiles
+    import ntsecuritycon
     import win32api
     import win32security
 
@@ -310,21 +315,35 @@ def test_real_pid_writers_use_writable_logs_with_readonly_source(tmp_path):
         )
     )
     namespace["child"] = SimpleNamespace(pid=12345)
-    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), 8)
+    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), ntsecuritycon.TOKEN_QUERY)
     try:
         sid, _ = win32security.GetTokenInformation(token, win32security.TokenUser)
     finally:
         token.Close()
-    original = win32security.GetNamedSecurityInfo(str(root), 1, 4)
-    logs_original = win32security.GetNamedSecurityInfo(str(logs), 1, 4)
-    protected = 4 | win32security.PROTECTED_DACL_SECURITY_INFORMATION
+    original = win32security.GetNamedSecurityInfo(
+        str(root), win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION
+    )
+    logs_original = win32security.GetNamedSecurityInfo(
+        str(logs), win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION
+    )
+    protected = (
+        win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION
+    )
     state_acl = win32security.ACL()
-    state_acl.AddAccessAllowedAce(2, 0x1F01FF, sid)
+    state_acl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, sid)
     source_acl = win32security.ACL()
-    source_acl.AddAccessAllowedAce(2, 0x1200A9, sid)
+    source_acl.AddAccessAllowedAce(
+        win32security.ACL_REVISION,
+        ntsecuritycon.FILE_GENERIC_READ | ntsecuritycon.FILE_GENERIC_EXECUTE,
+        sid,
+    )
     try:
-        win32security.SetNamedSecurityInfo(str(logs), 1, protected, None, None, state_acl, None)
-        win32security.SetNamedSecurityInfo(str(root), 1, protected, None, None, source_acl, None)
+        win32security.SetNamedSecurityInfo(
+            str(logs), win32security.SE_FILE_OBJECT, protected, None, None, state_acl, None
+        )
+        win32security.SetNamedSecurityInfo(
+            str(root), win32security.SE_FILE_OBJECT, protected, None, None, source_acl, None
+        )
         with pytest.raises(PermissionError):
             (root / "bot_pid.tmp").write_text("blocked")
         namespace["_write_child_pid_file"]()
@@ -375,11 +394,17 @@ def test_real_pid_writers_use_writable_logs_with_readonly_source(tmp_path):
         assert not (root / "embed_audit.log").exists()
     finally:
         for path, saved in [(root, original), (logs, logs_original)]:
-            flags = 4 | (
+            flags = win32security.DACL_SECURITY_INFORMATION | (
                 win32security.PROTECTED_DACL_SECURITY_INFORMATION
-                if saved.GetSecurityDescriptorControl()[0] & 0x1000
+                if saved.GetSecurityDescriptorControl()[0] & win32security.SE_DACL_PROTECTED
                 else win32security.UNPROTECTED_DACL_SECURITY_INFORMATION
             )
             win32security.SetNamedSecurityInfo(
-                str(path), 1, flags, None, None, saved.GetSecurityDescriptorDacl(), None
+                str(path),
+                win32security.SE_FILE_OBJECT,
+                flags,
+                None,
+                None,
+                saved.GetSecurityDescriptorDacl(),
+                None,
             )
