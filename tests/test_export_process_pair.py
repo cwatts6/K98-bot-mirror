@@ -179,7 +179,8 @@ def test_partial_administrative_publication_retains_files_without_releasing_gate
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
     monkeypatch.setattr(host, "DeploymentBoundary", Mock())
     monkeypatch.setitem(
-        sys.modules, "win32security",
+        sys.modules,
+        "win32security",
         SimpleNamespace(ConvertStringSidToSid=lambda value: value, SetNamedSecurityInfo=Mock()),
     )
     monkeypatch.setattr(
@@ -250,7 +251,8 @@ def test_release_becomes_visible_only_after_complete_protected_staging(
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
     monkeypatch.setattr(host, "DeploymentBoundary", Mock())
     monkeypatch.setitem(
-        sys.modules, "win32security",
+        sys.modules,
+        "win32security",
         SimpleNamespace(
             ConvertStringSidToSid=lambda value: value,
             SetNamedSecurityInfo=lambda path, *_: protected.add(Path(path)),

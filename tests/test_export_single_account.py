@@ -533,7 +533,9 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     connector = Mock(return_value=connection)
     monkeypatch.setattr(admin, "configured_connection", connector)
     monkeypatch.setattr(
-        dal, "ExportExecutionDAL", lambda _: SimpleNamespace(installation_snapshot=lambda: observed)
+        dal,
+        "ExportExecutionDAL",
+        lambda _: SimpleNamespace(installation_snapshot=lambda: observed),
     )
     reply = dict(
         deployment_hash=config["authority"]["deployment_hash"],
