@@ -403,7 +403,9 @@ def test_unlistable_import_directory_cannot_be_silently_omitted(tmp_path, monkey
 
 
 @pytest.mark.parametrize("environment_name", ["venv", ".venv"])
-def test_root_virtual_environment_is_not_application_source(tmp_path, monkeypatch, environment_name):
+def test_root_virtual_environment_is_not_application_source(
+    tmp_path, monkeypatch, environment_name
+):
     _, manifest, state = source_tree(tmp_path, monkeypatch)
     packages = tmp_path / environment_name / "Lib" / "site-packages"
     packages.mkdir(parents=True)
