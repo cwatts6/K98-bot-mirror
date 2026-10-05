@@ -1,0 +1,215 @@
+"""Manual release boundaries; fixtures do not certify installed Windows ACLs."""
+
+from copy import deepcopy
+import hashlib
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+
+from core.export_process_pair import bind_templates, publication, watchdog_launch
+from services.export_execution_protocol import encode
+from tests.test_export_single_account import SID, process_bindings
+
+
+def pair_fixture(tmp_path):
+    bindings = process_bindings()
+    plan = dict(
+        version=1,
+        source_hashes={"DL_bot.py": "b" * 64},
+        application_sid=SID,
+        token_profiles={role: item["token_profile"] for role, item in bindings.items()},
+        python=bindings["bot"]["executable"],
+        python_sha256="a" * 64,
+        templates={
+            role: {"path": str(tmp_path / (role + "-template.json")), "sha256": "c" * 64}
+            for role in bindings
+        },
+        manifests={role: str(tmp_path / (role + ".json")) for role in bindings},
+        commit_file=str(tmp_path / "commit.json"),
+    )
+    authority = dict(
+        source_hashes=deepcopy(plan["source_hashes"]),
+        process_bindings=None,
+        deployment_boundary={"process_bindings": None},
+        runtime_registration={"reviewed": True},
+        sql_contract={"source_expected": "fixed"},
+        authority_sid=SID,
+        bot_sid=SID,
+        pipe_id="reviewed-pipe",
+        trust_model="single_account_application_v1",
+    )
+    bot = dict(
+        source_hashes=deepcopy(plan["source_hashes"]),
+        registration={"reviewed": True},
+        sql_contract=deepcopy(authority["sql_contract"]),
+        authority={
+            key: authority[key] for key in ("authority_sid", "bot_sid", "pipe_id", "trust_model")
+        },
+    )
+    bot["authority"].update(process_bindings=None, deployment_hash=None)
+    return plan, dict(authority=authority, bot=bot), bindings
+
+
+def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contracts(tmp_path):
+    plan, templates, bindings = pair_fixture(tmp_path)
+    original = deepcopy(templates)
+    bound = bind_templates(plan, templates, bindings)
+    assert templates == original
+    assert bound["authority"]["process_bindings"] == bindings
+    assert (
+        bound["bot"]["authority"]["deployment_hash"]
+        == hashlib.sha256(encode(bound["authority"]["deployment_boundary"])).hexdigest()
+    )
+    assert bound["authority"]["sql_contract"] == original["authority"]["sql_contract"]
+    with pytest.raises(ValueError, match="Fresh"):
+        bind_templates(plan, bound, bindings)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "elevation",
+        "identity",
+        "interpreter",
+        "duplicate_pid",
+        "source",
+        "sql",
+        "registration",
+        "alias",
+    ],
+)
+def test_binding_rejects_wrong_identity_or_changed_static_expectations(tmp_path, damage):
+    plan, templates, bindings = pair_fixture(tmp_path)
+    if damage == "elevation":
+        plan["token_profiles"]["bot"]["elevated"] = True
+    elif damage == "identity":
+        bindings["bot"]["token_profile"] = bindings["bot"]["token_profile"] | {"privileges": []}
+    elif damage == "interpreter":
+        bindings["authority"]["sha256"] = "d" * 64
+    elif damage == "duplicate_pid":
+        bindings["bot"]["pid"] = bindings["authority"]["pid"]
+    elif damage == "alias":
+        plan["commit_file"] = plan["manifests"]["bot"]
+    else:
+        key = {"source": "source_hashes", "sql": "sql_contract", "registration": "registration"}[
+            damage
+        ]
+        templates["bot"][key] = {"unreviewed": True}
+    with pytest.raises(ValueError):
+        bind_templates(plan, templates, bindings)
+
+
+@pytest.mark.parametrize("damage", [None, "hash", "pin", "partial"])
+def test_gate_needs_complete_commit_and_exact_original_incarnation(tmp_path, monkeypatch, damage):
+    import core.export_process_identity as identity
+    import scripts.run_export_process_gate as gate
+
+    plan, templates, bindings = pair_fixture(tmp_path)
+    raw = encode(plan)
+    manifests = bind_templates(plan, templates, bindings)
+    for role in bindings:
+        Path(plan["manifests"][role]).write_bytes(encode(manifests[role]))
+    commit = publication(raw, manifests)
+    if damage == "hash":
+        commit["manifests"]["bot"] = "f" * 64
+    if damage == "partial":
+        Path(plan["manifests"]["bot"]).unlink()
+    Path(plan["commit_file"]).write_bytes(encode(commit))
+    observed = deepcopy(bindings["bot"])
+    if damage == "pin":
+        observed["created_filetime"] += 1
+    monkeypatch.setattr(identity, "process_snapshot", Mock(return_value=observed))
+    operation = lambda: gate.wait_for_publication(
+        plan, raw, templates, "bot", object(), bindings["bot"], Mock(side_effect=Path)
+    )
+    if damage:
+        with pytest.raises((ValueError, FileNotFoundError)):
+            operation()
+    else:
+        assert operation() == bindings
+
+
+def test_gate_does_not_read_manifests_until_final_commit(tmp_path, monkeypatch):
+    import core.export_process_identity as identity
+    import scripts.run_export_process_gate as gate
+
+    plan, templates, bindings = pair_fixture(tmp_path)
+    raw = encode(plan)
+    manifests = bind_templates(plan, templates, bindings)
+    monkeypatch.setattr(identity, "process_snapshot", Mock(return_value=bindings["bot"]))
+
+    def publish(_seconds):
+        for role in bindings:
+            Path(plan["manifests"][role]).write_bytes(encode(manifests[role]))
+        Path(plan["commit_file"]).write_bytes(encode(publication(raw, manifests)))
+
+    sleeper = Mock(side_effect=publish)
+    monkeypatch.setattr(gate.time, "sleep", sleeper)
+    assert (
+        gate.wait_for_publication(
+            plan, raw, templates, "bot", object(), bindings["bot"], Mock(side_effect=Path)
+        )
+        == bindings
+    )
+    sleeper.assert_called_once_with(1)
+
+
+def test_partial_administrative_publication_retains_files_without_releasing_gates(
+    tmp_path, monkeypatch
+):
+    import win32security
+
+    import core.export_execution_host as host
+    import core.export_process_identity as identity
+    import scripts.provision_export_process_pair as publisher
+    import scripts.run_export_authority as launcher
+
+    plan, templates, bindings = pair_fixture(tmp_path)
+    monkeypatch.setattr(launcher, "manifest_contract", Mock())
+    monkeypatch.setattr(host, "DeploymentBoundary", Mock())
+    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", Mock())
+    monkeypatch.setattr(
+        identity, "pinned_process_alive", Mock(side_effect=[True, True, True, False])
+    )
+    with pytest.raises(ValueError, match="during publication"):
+        publisher.publish_pair(
+            plan,
+            encode(plan),
+            templates,
+            bindings,
+            {role: object() for role in bindings},
+            Mock(side_effect=Path),
+        )
+    assert all(Path(path).exists() for path in plan["manifests"].values())
+    assert not Path(plan["commit_file"]).exists()
+    with pytest.raises(ValueError, match="already exists"):
+        publisher.publish_pair(
+            plan,
+            encode(plan),
+            templates,
+            bindings,
+            {role: object() for role in bindings},
+            Mock(side_effect=Path),
+        )
+
+
+def test_flags_off_launch_and_enabled_manual_gate(tmp_path):
+    ordinary = watchdog_launch(
+        "python", tmp_path, coordination=False, intake=False, recovery=False, plan=None
+    )
+    assert ordinary == (["python", str(tmp_path / "DL_bot.py")], False)
+    enabled, manual = watchdog_launch(
+        "python",
+        tmp_path,
+        coordination=True,
+        intake=True,
+        recovery=False,
+        plan=str(tmp_path / "plan.json"),
+    )
+    assert manual and enabled[1:3] == ["-I", "-B"]
+    assert enabled[-4:] == ["--role", "bot", "--plan", str(tmp_path / "plan.json")]
+    with pytest.raises(ValueError, match="Coordinated"):
+        watchdog_launch(
+            "python", tmp_path, coordination=False, intake=True, recovery=False, plan=None
+        )

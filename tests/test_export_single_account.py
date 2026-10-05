@@ -325,7 +325,7 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     import core.export_process_identity as identity
     import scripts.run_export_authority as launcher
 
-    own, peer, handle = (SimpleNamespace(Close=Mock()) for _ in range(3))
+    lifetime, own, peer, handle = (SimpleNamespace(Close=Mock()) for _ in range(4))
     pipe = SimpleNamespace(connect=Mock(), receive=Mock(return_value={"version": 1}), send=Mock())
     snapshot = process_bindings()["bot"]
     if failure == "recycled_after_read":
@@ -335,9 +335,11 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     if failure == "peer":
         authenticate.side_effect = ValueError("wrong incarnation")
     monkeypatch.setattr(identity, "authenticate_process_peer", authenticate)
-    opener = Mock(return_value=own)
+    opener = Mock(side_effect=[lifetime, own, own])
     monkeypatch.setattr(identity, "open_pinned_process", opener)
-    monkeypatch.setattr(host, "MessagePipe", lambda *a, **k: pipe)
+    monkeypatch.setattr(identity, "pinned_process_alive", Mock(return_value=True))
+    pipe_factory = Mock(return_value=pipe)
+    monkeypatch.setattr(host, "MessagePipe", pipe_factory)
     broker = SimpleNamespace(dispatch=Mock(return_value="ok"))
     if failure == "dispatch":
         broker.dispatch.side_effect = ValueError("unresolved")
@@ -361,7 +363,83 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     assert peer.Close.call_count == (0 if failure == "peer" else 1)
     assert pipe.receive.call_count == (0 if failure == "peer" else 1)
     handle.Close.assert_called_once()
-    assert own.Close.call_count == opener.call_count == 2
+    assert own.Close.call_count == 2
+    assert opener.call_count == 3
+    lifetime.Close.assert_called_once()
+    pipe_factory.assert_called_once_with(handle, timeout_ms=30000, process=lifetime)
+
+
+@pytest.mark.parametrize("failure", [None, ValueError("unavailable observation")])
+def test_shared_server_exited_bot_returns_to_drain_without_opening_pipe(monkeypatch, failure):
+    import core.export_process_identity as identity
+    import scripts.run_export_authority as launcher
+
+    lifetime = SimpleNamespace(Close=Mock())
+    monkeypatch.setattr(identity, "open_pinned_process", Mock(return_value=lifetime))
+    monkeypatch.setattr(
+        identity, "pinned_process_alive", Mock(return_value=False, side_effect=failure)
+    )
+    make_pipe, broker = Mock(), SimpleNamespace(dispatch=Mock())
+    kwargs = dict(
+        manifest=dict(
+            pipe_id=str(uuid4()),
+            authority_sid=SID,
+            bot_sid=SID,
+            trust_model=TRUST_MODEL,
+            process_bindings=process_bindings(),
+        ),
+        authority=Mock(),
+        make_pipe=make_pipe,
+        authenticate=Mock(),
+        broker=broker,
+    )
+    if failure:
+        with pytest.raises(ValueError, match="unavailable"):
+            launcher.serve(**kwargs)
+    else:
+        assert launcher.serve(**kwargs) is None
+    make_pipe.assert_not_called()
+    broker.dispatch.assert_not_called()
+    lifetime.Close.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "waits,snapshot_failure,expected",
+    [([0], False, False), ([258], False, True), ([258, 0], True, False)],
+)
+def test_pinned_liveness_handles_exit_and_snapshot_race(
+    monkeypatch, waits, snapshot_failure, expected
+):
+    import win32event
+
+    import core.export_process_identity as identity
+
+    descriptor = process_bindings()["bot"]
+    wait = Mock(side_effect=waits)
+    snapshot = Mock(return_value=descriptor)
+    if snapshot_failure:
+        snapshot.side_effect = ValueError("process exited during snapshot")
+    monkeypatch.setattr(win32event, "WaitForSingleObject", wait)
+    monkeypatch.setattr(identity, "process_snapshot", snapshot)
+    handle = object()
+    assert identity.pinned_process_alive(handle, descriptor) is expected
+    assert snapshot.call_count == int(waits[0] == 258)
+    assert all(call.args == (handle, 0) for call in wait.call_args_list)
+
+
+@pytest.mark.parametrize("waits", [[-1], [258, 258]])
+def test_pinned_liveness_never_treats_uncertain_or_wrong_live_identity_as_exit(monkeypatch, waits):
+    import win32event
+
+    import core.export_process_identity as identity
+
+    descriptor = process_bindings()["bot"]
+    monkeypatch.setattr(win32event, "WaitForSingleObject", Mock(side_effect=waits))
+    monkeypatch.setattr(
+        identity, "process_snapshot", Mock(return_value=descriptor | {"created_filetime": 1})
+    )
+    with pytest.raises(ValueError):
+        identity.pinned_process_alive(object(), descriptor)
 
 
 def test_shared_client_requires_explicit_model_and_both_incarnations():

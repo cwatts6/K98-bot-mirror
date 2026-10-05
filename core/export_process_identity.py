@@ -135,6 +135,26 @@ def open_pinned_process(pid, expected):
         raise
 
 
+def pinned_process_alive(process, expected):
+    """Observe only this retained incarnation; exit never authorizes work reuse."""
+    import win32event
+
+    status = win32event.WaitForSingleObject(process, 0)
+    if status == 0:
+        return False
+    if status != 258:
+        raise ValueError("Pinned process liveness observation unavailable.")
+    try:
+        verify_process_snapshot(process_snapshot(process), expected)
+    except ValueError:
+        # Exit can race the snapshot's native token/image reads. Only a
+        # signalled retained handle proves exit; other failures stay closed.
+        if win32event.WaitForSingleObject(process, 0) == 0:
+            return False
+        raise
+    return True
+
+
 def authenticate_process_peer(pipe, expected, *, server):
     import ctypes
     from ctypes import wintypes

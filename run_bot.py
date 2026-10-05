@@ -10,6 +10,10 @@ import threading
 import time
 import traceback
 
+# A coordinated source-only installation cannot create application bytecode
+# before its held child validates the protected source inventory.
+sys.dont_write_bytecode = True
+
 # Constants / paths
 from constants import (
     EXIT_CODE_FILE,
@@ -263,7 +267,18 @@ CRASH_THRESHOLD = 5
 COOLDOWN_AFTER_STORM = 60
 
 recent_crashes: list[float] = []
-pid_path = os.path.join(base_dir, "bot_pid.txt")
+import bot_config
+from core.export_process_pair import watchdog_launch
+
+launch_command, manual_rebinding = watchdog_launch(
+    resolve_python_bin(),
+    base_dir,
+    coordination=bot_config.EXPORT_COORDINATION_ENABLED,
+    intake=bot_config.KVK_SOURCE_INTAKE_ENABLED,
+    recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
+    plan=os.environ.get("K98_EXPORT_LAUNCH_PLAN"),
+)
+pid_path = os.path.join(LOG_DIR if manual_rebinding else base_dir, "bot_pid.txt")
 
 # Child log handle (optional) - set when launching each child
 _child_log_fh = None
@@ -294,7 +309,7 @@ try:
             env["WATCHDOG_PARENT_PID"] = str(os.getpid())
 
             child = subprocess.Popen(
-                [python_bin, bot_path],
+                launch_command,
                 env=env,
                 cwd=base_dir,  # stable CWD for child
                 stdout=child_log_fh or None,
@@ -310,6 +325,9 @@ try:
                     child_log_fh.close()
             except Exception:
                 pass
+            if manual_rebinding:
+                log.error("S11 launch failed; retain evidence and prepare a fresh manual pair.")
+                break
             time.sleep(5)
             continue
 
@@ -347,6 +365,13 @@ try:
 
         # PID file no longer valid
         safe_remove(pid_path)
+
+        if manual_rebinding:
+            log.warning(
+                "S11 child exited. Automatic relaunch is paused: retain authority/session "
+                "receipts, reconcile unfinished work and administratively bind a fresh pair."
+            )
+            break
 
         # Shutdown marker from child/parent
         if os.path.exists(SHUTDOWN_MARKER_FILE):

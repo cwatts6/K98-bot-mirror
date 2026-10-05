@@ -173,7 +173,9 @@ if "idlelib" in sys.modules:
     sys.exit(1)
 
 BOT_PID_FILE = (
-    Path(LOG_DIR).parent / "bot_pid.txt"
+    Path(LOG_DIR) / "bot_pid.txt"
+    if os.environ.get("K98_EXPORT_MANUAL_REBINDING") == "1"
+    else Path(LOG_DIR).parent / "bot_pid.txt"
 )  # keep path consistent with LOG_DIR/BASE_DIR layout
 
 

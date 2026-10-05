@@ -541,54 +541,68 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
         TRUST_MODEL,
         authenticate_process_peer,
         open_pinned_process,
+        pinned_process_alive,
         process_snapshot,
         verify_process_snapshot,
     )
 
     name = "\\\\.\\pipe\\K98Export-" + manifest["pipe_id"]
-    while True:
-        shared = manifest.get("trust_model") == TRUST_MODEL
-        if shared:
-            own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
-            own.Close()
-        handle = make_pipe(
-            name,
-            authority_sid=manifest["authority_sid"],
-            client_sid=manifest["bot_sid"],
-            overlapped=True,
-        )
-        peer = None
-        try:
-            pipe = MessagePipe(handle, timeout_ms=30000)
-            pipe.connect()
+    shared = manifest.get("trust_model") == TRUST_MODEL
+    bot = None
+    if shared:
+        expected_bot = manifest["process_bindings"]["bot"]
+        bot = open_pinned_process(expected_bot["pid"], expected_bot)
+    try:
+        while True:
             if shared:
-                peer = authenticate_process_peer(
-                    handle, manifest["process_bindings"]["bot"], server=False
-                )
-            else:
-                authenticate(
-                    handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"]
-                )
-            message = pipe.receive()
-            if shared:
-                verify_process_snapshot(process_snapshot(peer), manifest["process_bindings"]["bot"])
+                if not pinned_process_alive(bot, expected_bot):
+                    # main owns the drain/session-close decision. Peer exit
+                    # never proves request completion or releases SQL claims.
+                    return
+                own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
+                own.Close()
+            handle = make_pipe(
+                name,
+                authority_sid=manifest["authority_sid"],
+                client_sid=manifest["bot_sid"],
+                overlapped=True,
+            )
+            peer = None
             try:
-                result = broker.dispatch(message)
+                pipe = MessagePipe(handle, timeout_ms=30000, **({"process": bot} if shared else {}))
+                pipe.connect()
+                if shared:
+                    peer = authenticate_process_peer(
+                        handle, manifest["process_bindings"]["bot"], server=False
+                    )
+                else:
+                    authenticate(
+                        handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"]
+                    )
+                message = pipe.receive()
+                if shared:
+                    verify_process_snapshot(process_snapshot(peer), expected_bot)
+                try:
+                    result = broker.dispatch(message)
+                except Exception:
+                    # A lost reply is uncertainty to the caller. Never include SQL,
+                    # provider, credential or private evidence prose in IPC errors.
+                    reply = {"version": 1, "error": "unresolved_action"}
+                else:
+                    reply = {"version": 1, "result": result}
+                pipe.send(reply)
             except Exception:
-                # A lost reply is uncertainty to the caller. Never include SQL,
-                # provider, credential or private evidence prose in IPC errors.
-                reply = {"version": 1, "error": "unresolved_action"}
-            else:
-                reply = {"version": 1, "result": result}
-            pipe.send(reply)
-        except Exception:
-            # A malformed, stalled, unauthenticated or disconnected peer owns
-            # only this connection. Retain all claims and never replay dispatch.
-            pass
-        finally:
-            if peer is not None:
-                peer.Close()
-            handle.Close()
+                # A malformed, stalled, unauthenticated or disconnected peer owns
+                # only this connection. Retain claims and never replay dispatch.
+                # The next iteration independently checks the pinned Bot handle.
+                pass
+            finally:
+                if peer is not None:
+                    peer.Close()
+                handle.Close()
+    finally:
+        if bot is not None:
+            bot.Close()
 
 
 def main(argv=None):
