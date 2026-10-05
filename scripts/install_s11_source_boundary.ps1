@@ -25,29 +25,42 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
     $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true
     $process=[Diagnostics.Process]::new();$process.StartInfo=$start
     $journal=[IO.StreamWriter]::new([IO.File]::Open($ReceiptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read))
-    $bytes=[long]0;$clock=[Diagnostics.Stopwatch]::StartNew();$lastProgress=[long]0;$stamp=[datetime]::MinValue;$started=$false
+    $bytes=[long]0;$errorBytes=[long]0;$clock=[Diagnostics.Stopwatch]::StartNew();$lastProgress=[long]0;$stamp=[datetime]::MinValue;$started=$false
+    $errorBuffer=[char[]]::new(1024);$errorEnded=$false;$exitCode=$null;$failureReason='Worker launch failed'
     try {
         if(-not $process.Start()){throw 'Worker launch failed'}
         $started=$true
-        $lineTask=$process.StandardOutput.ReadLineAsync();$errorTask=$process.StandardError.ReadToEndAsync()
+        $lineTask=$process.StandardOutput.ReadLineAsync();$errorTask=$process.StandardError.ReadAsync($errorBuffer,0,$errorBuffer.Length)
         while($true) {
             if(Test-Path -LiteralPath $ProgressPath){$next=(Get-Item -LiteralPath $ProgressPath).LastWriteTimeUtc;if($next -ne $stamp){$stamp=$next;$lastProgress=$clock.ElapsedMilliseconds}}
-            if($clock.ElapsedMilliseconds-$lastProgress -gt $TimeoutMs){throw 'Owned installation operation timeout; retain partial state'}
+            if($clock.ElapsedMilliseconds-$lastProgress -gt $TimeoutMs){$failureReason='Owned operation timeout';throw $failureReason}
+            if(-not $errorEnded -and $errorTask.IsCompleted){
+                $count=$errorTask.GetAwaiter().GetResult()
+                if($count -eq 0){$errorEnded=$true}else{
+                    $size=[Text.Encoding]::UTF8.GetByteCount($errorBuffer,0,$count);$errorBytes+=$size;$bytes+=$size
+                    if($errorBytes -gt 64KB -or $bytes -gt 20MB-4096){$failureReason='Worker diagnostic output limit';throw $failureReason}
+                    $errorTask=$process.StandardError.ReadAsync($errorBuffer,0,$errorBuffer.Length)
+                }
+            }
             if($lineTask.IsCompleted){
                 $line=$lineTask.GetAwaiter().GetResult()
-                if($null -eq $line){break}
+                if($null -eq $line){if($errorEnded){break};Start-Sleep -Milliseconds 10;continue}
                 $bytes+=[Text.Encoding]::UTF8.GetByteCount($line)+2
-                if($bytes -gt 20MB-4096){throw 'Installation receipt output limit; retain partial state'}
+                if($bytes -gt 20MB-4096){$failureReason='Installation receipt output limit';throw $failureReason}
                 $journal.WriteLine($line);$journal.Flush();Write-Output $line
                 $lineTask=$process.StandardOutput.ReadLineAsync()
             } else {Start-Sleep -Milliseconds 10}
         }
         $remaining=[Math]::Max(1,$TimeoutMs-($clock.ElapsedMilliseconds-$lastProgress))
-        if(-not $process.WaitForExit([int]$remaining)){throw 'Worker exit timeout'}
-        if($process.ExitCode -ne 0 -or $errorTask.GetAwaiter().GetResult()){throw 'Worker stopped; retain partial receipts'}
+        if(-not $process.WaitForExit([int]$remaining)){$failureReason='Worker exit timeout';throw $failureReason}
+        $exitCode=$process.ExitCode
+        if($exitCode -ne 0 -or $errorBytes){$failureReason='Worker nonzero exit or diagnostic output';throw $failureReason}
     } catch {
         if($started -and -not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)}
-        $stop=@{Stage='STOP_INCOMPLETE_SUPERVISOR';FailureType=$_.Exception.GetType().FullName;Receipt=$ReceiptPath;Progress=$ProgressPath;Next='Retain partial actions; reconcile before retry or start'}|ConvertTo-Json -Compress
+        if($started -and $process.HasExited){$exitCode=$process.ExitCode}
+        # Raw host/worker stderr may contain command or configuration text. Retain
+        # bounded counts and a fixed reason, never echo its contents into receipts.
+        $stop=@{Stage='STOP_INCOMPLETE_SUPERVISOR';FailureType=$_.Exception.GetType().FullName;FailureReason=$failureReason;ExitCode=$exitCode;DiagnosticBytes=$errorBytes;DiagnosticsRedacted=$true;Receipt=$ReceiptPath;Progress=$ProgressPath;Next='Retain partial actions; reconcile before retry or start'}|ConvertTo-Json -Compress
         $journal.WriteLine($stop);$journal.Flush();Write-Output $stop
         throw 'STOP_INCOMPLETE: retain supervised installation receipt'
     } finally {$journal.Dispose();$process.Dispose()}
@@ -74,7 +87,7 @@ BeginOperation
 function CanonicalPath([string]$Path) {
     if ($Path -cnotmatch '^[A-Za-z]:\\' -or $Path.Substring(2).Contains(':')) { throw 'Canonical local absolute path required' }
     $absolute=[IO.Path]::GetFullPath($Path).TrimEnd('\')
-    if ($absolute.Length -lt 3 -or $absolute -cne $Path.TrimEnd('\')) { throw 'Noncanonical or root target refused' }
+    if ($absolute.Length -lt 3 -or $absolute -ine $Path.TrimEnd('\')) { throw 'Noncanonical or root target refused' }
     return $absolute
 }
 function Inside([string]$Path,[string]$Root) {
@@ -87,6 +100,7 @@ function CheckedItem([string]$Path) {
             $item=Get-Item -LiteralPath $cursor -Force
             if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse path refused' }
         }
+        if($cursor -ieq [IO.Path]::GetPathRoot($cursor)){break}
         $cursor=[IO.Path]::GetDirectoryName($cursor)
     }
     return Get-Item -LiteralPath $Path -Force
@@ -117,7 +131,7 @@ function VerifySourceDirectory([string]$Path,$KnownPaths,$MovePaths,[string]$Sou
     foreach($entry in $entries){
         if($entry.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Source reparse member refused'}
         if($entry.PSIsContainer){
-            if($KnownPaths.Contains($entry.FullName) -or $MovePaths.Contains($entry.FullName) -or $excluded -ccontains $entry.Name -or ($Path -ceq $SourceRoot -and $entry.Name -ceq 'venv')){continue}
+            if($KnownPaths.Contains($entry.FullName) -or $MovePaths.Contains($entry.FullName) -or $excluded -icontains $entry.Name -or ($Path -ieq $SourceRoot -and $entry.Name -ieq 'venv')){continue}
             throw 'Unreviewed source directory refused'
         }
         $extension=$entry.Extension.ToLowerInvariant()
@@ -151,6 +165,12 @@ function WriteReceipt($Value) {
     $script:receiptBytes+=[Text.Encoding]::UTF8.GetByteCount($line)+2
     if ($script:receiptBytes -gt 20MB) { throw 'Receipt output budget exceeded' }
     [Console]::WriteLine($line)
+}
+function WriteFailureReceipt($Value) {
+    try{WriteReceipt $Value}catch{
+        # A small terminal marker must survive an exhausted receipt budget.
+        [Console]::WriteLine(($Value | ConvertTo-Json -Compress -Depth 6))
+    }
 }
 function PathId([string]$Path) {
     if(-not $script:pathIds.ContainsKey($Path)){$id=$script:pathIds.Count;$script:pathIds[$Path]=$id;WriteReceipt @{Stage='path';Id=$id;Value=$Path}}
@@ -321,6 +341,6 @@ try {
     if((FileDigest $envPath) -cne $plan.existing_environment.observed_sha256){throw 'Environment content changed'}
     WriteReceipt @{Stage='COMPLETED_FILESYSTEM_INSTALLATION_ONLY';BotStarted=$false;SqlConnected=$false;DependenciesInstalled=$false;Enrollment=$false;Activation=$false;Next='Return receipts; ordinary operator verification and static runtime installation remain separate'}
 } catch {
-    WriteReceipt @{Stage='STOP_INCOMPLETE';At=$stage;FailureType=$_.Exception.GetType().FullName;Next='Retain all partial receipts; no retry, automatic rollback, Bot start or activation until reconciled'}
+    WriteFailureReceipt @{Stage='STOP_INCOMPLETE';At=$stage;FailureType=$_.Exception.GetType().FullName;Next='Retain all partial receipts; no retry, automatic rollback, Bot start or activation until reconciled'}
     throw 'STOP_INCOMPLETE: retain filesystem installation receipt'
 }

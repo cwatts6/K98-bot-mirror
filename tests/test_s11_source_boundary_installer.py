@@ -24,7 +24,7 @@ $ErrorActionPreference='Stop'
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile('{script}',[ref]$tokens,[ref]$errors)
 if($errors.Count){{throw 'Installer parse failure'}}
-foreach($name in @('CanonicalPath','Inside','CheckedItem','VerifyStateDirectories','FileDigest','ReadBoundedGit','BeginOperation','InvokeBoundedWorker','VerifySourceDirectory')){{
+foreach($name in @('CanonicalPath','Inside','CheckedItem','VerifyStateDirectories','FileDigest','ReadBoundedGit','BeginOperation','InvokeBoundedWorker','VerifySourceDirectory','WriteReceipt','WriteFailureReceipt')){{
  $node=$ast.Find({{param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name}},$false)
  if($null -eq $node){{throw 'Helper missing'}}
  Invoke-Expression $node.Extent.Text
@@ -49,6 +49,7 @@ $progressPath=$null
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
     assert result.returncode == 0, result.stderr + result.stdout
+    return result
 
 
 def test_reject_noncanonical_escape_network_root_and_stream(tmp_path):
@@ -62,6 +63,8 @@ foreach($bad in @('relative\file','C:\','C:\root\..\outside','\\server\share\fil
 }
 if(Inside 'C:\root-extra\file' 'C:\root'){throw 'Prefix escape accepted'}
 if(-not (Inside 'C:\root\file' 'C:\root')){throw 'Valid child rejected'}
+if((CanonicalPath 'c:\root\file') -ine 'C:\root\file'){throw 'Drive-case spelling rejected'}
+$root=[IO.Path]::GetPathRoot($fixture);if(-not (CheckedItem $root).PSIsContainer){throw 'Filesystem root rejected'}
 """,
     )
 
@@ -110,8 +113,8 @@ def test_bounded_git_reads_report_actual_failure(tmp_path):
     run_helpers(
         tmp_path,
         r"""
-$git='C:\Program Files\Git\cmd\git.exe';$root=$fixture
-$refused=$false;try{$null=ReadBoundedGit 'rev-parse HEAD'}catch{$refused=$true}
+$script:git='C:\Program Files\Git\cmd\git.exe';$script:root=$fixture
+$refused=$false;try{$null=ReadBoundedGit 'rev-parse HEAD'}catch{$refused=$true;if($_.Exception.Message -notlike '*Git operation failed/output exceeded*'){throw $_}}
 if(-not $refused){throw 'Git failure accepted as a binding'}
 """,
     )
@@ -139,6 +142,7 @@ $refused=$false;try{VerifySourceDirectory $fixture $known $moves $fixture}catch{
 if(-not $refused){throw 'Unreviewed package accepted'}
 $null=$known.Add($unexpected);VerifySourceDirectory $fixture $known $moves $fixture
 foreach($name in @('.codex_artifacts','.codex_security_scans','.pre-commit-home')){$null=[IO.Directory]::CreateDirectory((Join-Path $fixture $name))}
+foreach($name in @('Logs','DOWNLOADS','Venv')){$null=[IO.Directory]::CreateDirectory((Join-Path $fixture $name))}
 VerifySourceDirectory $fixture $known $moves $fixture
 """,
     )
@@ -188,6 +192,29 @@ if(-not $refused -or (Test-Path -LiteralPath $sentinel)){throw 'Stalled worker c
 if(-not (([IO.File]::ReadAllText($receipt)).Contains('STOP_INCOMPLETE_SUPERVISOR'))){throw 'Missing reconciliation receipt'}
 """,
     )
+
+
+def test_supervisor_bounds_stderr_and_retains_safe_failure_diagnostics(tmp_path):
+    result = run_helpers(
+        tmp_path,
+        r"""
+$progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
+$receipt=Join-Path $fixture 'stderr-limit.jsonl'
+$command="[Console]::Error.Write(('private-diagnostic-' * 10000));Start-Sleep -Seconds 20"
+$refused=$false;try{$null=InvokeBoundedWorker $command $progress $receipt 10000}catch{$refused=$true}
+if(-not $refused){throw 'Unbounded stderr accepted'}
+$record=([IO.File]::ReadAllText($receipt).Trim() | ConvertFrom-Json)
+if($record.FailureReason -cne 'Worker diagnostic output limit' -or $record.DiagnosticBytes -le 64KB -or -not $record.DiagnosticsRedacted){throw 'Missing bounded diagnostic failure'}
+if(([IO.File]::ReadAllText($receipt)).Contains('private-diagnostic')){throw 'Raw diagnostic leaked'}
+$receipt=Join-Path $fixture 'exit-code.jsonl'
+$refused=$false;try{$null=InvokeBoundedWorker 'exit 7' $progress $receipt 10000}catch{$refused=$true}
+$record=([IO.File]::ReadAllText($receipt).Trim() | ConvertFrom-Json)
+if(-not $refused -or $record.ExitCode -ne 7){throw 'Actual worker exit code missing'}
+$script:receiptBytes=[long]20MB
+WriteFailureReceipt @{Stage='STOP_INCOMPLETE';At='budget';FailureType='test'}
+""",
+    )
+    assert '"Stage":"STOP_INCOMPLETE"' in result.stdout
 
 
 def test_supervisor_allows_progress_without_a_total_duration_cap(tmp_path):
