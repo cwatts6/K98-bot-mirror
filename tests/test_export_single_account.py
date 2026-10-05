@@ -496,7 +496,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         from core.export_process_pair import bind_templates
         from tests.test_export_process_pair import pair_fixture
 
-        plan, templates, bindings = pair_fixture(tmp_path)
+        plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
         plan["source_hashes"] = {}
         templates["authority"].update(
             source_hashes={},

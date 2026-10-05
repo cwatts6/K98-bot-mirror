@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 import hashlib
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -14,7 +14,25 @@ from services.export_execution_protocol import encode
 from tests.test_export_single_account import SID, process_bindings
 
 
-def pair_fixture(tmp_path):
+def pair_fixture(tmp_path, monkeypatch):
+    # Validate real Windows path syntax even on Ubuntu. Only the disposable
+    # fixture volume is mapped to native tmp storage; production validators
+    # and all other paths remain unchanged.
+    native_path = Path
+    volume = PureWindowsPath("C:/K98-pair-fixture") / tmp_path.name
+
+    def fixture_path(value, *, private=False):
+        candidate = PureWindowsPath(value)
+        if candidate.is_relative_to(volume):
+            return native_path(tmp_path).joinpath(*candidate.relative_to(volume).parts)
+        return native_path(value)
+
+    import scripts.provision_export_process_pair as publisher
+    import scripts.run_export_process_gate as gate
+
+    monkeypatch.setattr(sys.modules[__name__], "Path", fixture_path)
+    monkeypatch.setattr(publisher, "Path", fixture_path)
+    monkeypatch.setattr(gate, "Path", fixture_path)
     bindings = process_bindings()
     plan = dict(
         version=1,
@@ -24,11 +42,11 @@ def pair_fixture(tmp_path):
         python=bindings["bot"]["executable"],
         python_sha256="a" * 64,
         templates={
-            role: {"path": str(tmp_path / (role + "-template.json")), "sha256": "c" * 64}
+            role: {"path": str(volume / (role + "-template.json")), "sha256": "c" * 64}
             for role in bindings
         },
-        manifests={role: str(tmp_path / (role + ".json")) for role in bindings},
-        commit_file=str(tmp_path / "commit.json"),
+        manifests={role: str(volume / (role + ".json")) for role in bindings},
+        commit_file=str(volume / "commit.json"),
     )
     authority = dict(
         version=3,
@@ -54,8 +72,10 @@ def pair_fixture(tmp_path):
     return plan, dict(authority=authority, bot=bot), bindings
 
 
-def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contracts(tmp_path):
-    plan, templates, bindings = pair_fixture(tmp_path)
+def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contracts(
+    tmp_path, monkeypatch
+):
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     original = deepcopy(templates)
     bound = bind_templates(plan, templates, bindings)
     assert templates == original
@@ -83,10 +103,13 @@ def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contr
         "nested_model",
         "model",
         "host",
+        "relative_path",
     ],
 )
-def test_binding_rejects_wrong_identity_or_changed_static_expectations(tmp_path, damage):
-    plan, templates, bindings = pair_fixture(tmp_path)
+def test_binding_rejects_wrong_identity_or_changed_static_expectations(
+    tmp_path, monkeypatch, damage
+):
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     if damage == "elevation":
         plan["token_profiles"]["bot"]["elevated"] = True
     elif damage == "identity":
@@ -95,6 +118,8 @@ def test_binding_rejects_wrong_identity_or_changed_static_expectations(tmp_path,
         bindings["authority"]["sha256"] = "d" * 64
     elif damage == "duplicate_pid":
         bindings["bot"]["pid"] = bindings["authority"]["pid"]
+    elif damage == "relative_path":
+        plan["commit_file"] = "relative.json"
     elif damage == "alias":
         plan["commit_file"] = plan["manifests"]["bot"]
     elif damage == "nested_model":
@@ -117,7 +142,7 @@ def test_gate_needs_complete_commit_and_exact_original_incarnation(tmp_path, mon
     import core.export_process_identity as identity
     import scripts.run_export_process_gate as gate
 
-    plan, templates, bindings = pair_fixture(tmp_path)
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     raw = encode(plan)
     manifests = bind_templates(plan, templates, bindings)
     for role in bindings:
@@ -146,7 +171,7 @@ def test_gate_does_not_read_manifests_until_final_commit(tmp_path, monkeypatch):
     import core.export_process_identity as identity
     import scripts.run_export_process_gate as gate
 
-    plan, templates, bindings = pair_fixture(tmp_path)
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     raw = encode(plan)
     manifests = bind_templates(plan, templates, bindings)
     monkeypatch.setattr(identity, "process_snapshot", Mock(return_value=bindings["bot"]))
@@ -175,7 +200,7 @@ def test_partial_administrative_publication_retains_files_without_releasing_gate
     import scripts.provision_export_process_pair as publisher
     import scripts.run_export_authority as launcher
 
-    plan, templates, bindings = pair_fixture(tmp_path)
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
     monkeypatch.setattr(host, "DeploymentBoundary", Mock())
     monkeypatch.setitem(
@@ -245,7 +270,7 @@ def test_release_becomes_visible_only_after_complete_protected_staging(
     import scripts.provision_export_process_pair as publisher
     import scripts.run_export_authority as launcher
 
-    plan, templates, bindings = pair_fixture(tmp_path)
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
     commit = Path(plan["commit_file"])
     protected = set()
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
