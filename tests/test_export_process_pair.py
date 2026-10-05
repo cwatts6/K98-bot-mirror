@@ -3,6 +3,8 @@
 from copy import deepcopy
 import hashlib
 from pathlib import Path
+import sys
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -168,8 +170,6 @@ def test_gate_does_not_read_manifests_until_final_commit(tmp_path, monkeypatch):
 def test_partial_administrative_publication_retains_files_without_releasing_gates(
     tmp_path, monkeypatch
 ):
-    import win32security
-
     import core.export_execution_host as host
     import core.export_process_identity as identity
     import scripts.provision_export_process_pair as publisher
@@ -178,7 +178,10 @@ def test_partial_administrative_publication_retains_files_without_releasing_gate
     plan, templates, bindings = pair_fixture(tmp_path)
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
     monkeypatch.setattr(host, "DeploymentBoundary", Mock())
-    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", Mock())
+    monkeypatch.setitem(
+        sys.modules, "win32security",
+        SimpleNamespace(ConvertStringSidToSid=lambda value: value, SetNamedSecurityInfo=Mock()),
+    )
     monkeypatch.setattr(
         identity, "pinned_process_alive", Mock(side_effect=[True, True, True, False])
     )
@@ -236,9 +239,6 @@ def test_independent_intake_and_recovery_keep_ordinary_startup(tmp_path, intake,
 def test_release_becomes_visible_only_after_complete_protected_staging(
     tmp_path, monkeypatch, failure
 ):
-    import win32file
-    import win32security
-
     import core.export_execution_host as host
     import core.export_process_identity as identity
     import scripts.provision_export_process_pair as publisher
@@ -249,8 +249,12 @@ def test_release_becomes_visible_only_after_complete_protected_staging(
     protected = set()
     monkeypatch.setattr(launcher, "manifest_contract", Mock())
     monkeypatch.setattr(host, "DeploymentBoundary", Mock())
-    monkeypatch.setattr(
-        win32security, "SetNamedSecurityInfo", lambda path, *_: protected.add(Path(path))
+    monkeypatch.setitem(
+        sys.modules, "win32security",
+        SimpleNamespace(
+            ConvertStringSidToSid=lambda value: value,
+            SetNamedSecurityInfo=lambda path, *_: protected.add(Path(path)),
+        ),
     )
     monkeypatch.setattr(
         identity,
@@ -269,7 +273,7 @@ def test_release_becomes_visible_only_after_complete_protected_staging(
         pending.rename(destination)
 
     mover = Mock(side_effect=move)
-    monkeypatch.setattr(win32file, "MoveFileEx", mover)
+    monkeypatch.setitem(sys.modules, "win32file", SimpleNamespace(MoveFileEx=mover))
     operation = lambda: publisher.publish_pair(
         plan,
         encode(plan),

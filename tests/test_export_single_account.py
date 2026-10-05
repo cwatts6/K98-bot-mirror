@@ -4,6 +4,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
@@ -410,8 +411,6 @@ def test_shared_server_exited_bot_returns_to_drain_without_opening_pipe(monkeypa
 def test_pinned_liveness_handles_exit_and_snapshot_race(
     monkeypatch, waits, snapshot_failure, expected
 ):
-    import win32event
-
     import core.export_process_identity as identity
 
     descriptor = process_bindings()["bot"]
@@ -419,7 +418,7 @@ def test_pinned_liveness_handles_exit_and_snapshot_race(
     snapshot = Mock(return_value=descriptor)
     if snapshot_failure:
         snapshot.side_effect = ValueError("process exited during snapshot")
-    monkeypatch.setattr(win32event, "WaitForSingleObject", wait)
+    monkeypatch.setitem(sys.modules, "win32event", SimpleNamespace(WaitForSingleObject=wait))
     monkeypatch.setattr(identity, "process_snapshot", snapshot)
     handle = object()
     assert identity.pinned_process_alive(handle, descriptor) is expected
@@ -429,12 +428,12 @@ def test_pinned_liveness_handles_exit_and_snapshot_race(
 
 @pytest.mark.parametrize("waits", [[-1], [258, 258]])
 def test_pinned_liveness_never_treats_uncertain_or_wrong_live_identity_as_exit(monkeypatch, waits):
-    import win32event
-
     import core.export_process_identity as identity
 
     descriptor = process_bindings()["bot"]
-    monkeypatch.setattr(win32event, "WaitForSingleObject", Mock(side_effect=waits))
+    monkeypatch.setitem(
+        sys.modules, "win32event", SimpleNamespace(WaitForSingleObject=Mock(side_effect=waits))
+    )
     monkeypatch.setattr(
         identity, "process_snapshot", Mock(return_value=descriptor | {"created_filetime": 1})
     )
