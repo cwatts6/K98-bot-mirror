@@ -111,12 +111,42 @@ foreach($name in @('discord.py','dotenv.py','sitecustomize.py','module.pyw','nat
  if(-not $refused){throw 'Unreviewed executable accepted'}
  [IO.File]::Delete($unexpected)
 }
-$unexpected=Join-Path $fixture 'unknown_package';$null=[IO.Directory]::CreateDirectory($unexpected)
+$unexpected=Join-Path $fixture 'telemetry';$null=[IO.Directory]::CreateDirectory($unexpected)
 $refused=$false;try{VerifySourceDirectory $fixture $known $moves $fixture}catch{$refused=$true}
 if(-not $refused){throw 'Unreviewed package accepted'}
 $null=$known.Add($unexpected);VerifySourceDirectory $fixture $known $moves $fixture
 """,
     )
+
+
+def test_runtime_inventory_includes_imported_telemetry_and_rejects_native_shadow(tmp_path):
+    repo = SCRIPT.parents[1]
+    tree = ast.parse((repo / "scripts/run_export_authority.py").read_text(encoding="utf-8"))
+    inventory = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "code_files"
+    )
+    namespace = {"os": os, "Path": Path, "AuthorityStartupError": RuntimeError}
+    exec(
+        compile(ast.Module(body=[inventory], type_ignores=[]), "run_export_authority.py", "exec"),
+        namespace,
+    )
+    package = tmp_path / "telemetry"
+    dal = package / "dal"
+    dal.mkdir(parents=True)
+    members = [
+        "telemetry/__init__.py",
+        "telemetry/service.py",
+        "telemetry/dal/__init__.py",
+        "telemetry/dal/command_usage_dal.py",
+    ]
+    for member in members:
+        (tmp_path / member).write_text("# reviewed fixture\n", encoding="utf-8")
+    assert namespace["code_files"](tmp_path) == set(members)
+    (package / "service.pyd").write_bytes(b"unreviewed fixture")
+    with pytest.raises(RuntimeError, match="Unreviewed executable"):
+        namespace["code_files"](tmp_path, inspect_directory=lambda _: None)
 
 
 def test_supervisor_stops_owned_stalled_worker_and_retains_receipt(tmp_path):

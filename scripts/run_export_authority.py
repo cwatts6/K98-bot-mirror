@@ -130,7 +130,6 @@ def code_files(root, *, inspect_directory=None):
         "logs",
         "smoke_artifacts",
         "sql",
-        "telemetry",
         "assets",
     }
     result = set()

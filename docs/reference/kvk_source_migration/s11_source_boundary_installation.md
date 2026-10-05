@@ -48,6 +48,8 @@ Before effects, each explicitly reviewed import directory admits at most 1,000
 immediate metadata entries. Every Python file must belong to the sealed plan;
 unreviewed import directories, native modules and loose bytecode are rejected.
 Runtime-excluded state/tooling directories are not traversed by this check.
+The imported `telemetry` package is application source: its files/directories
+must be independently pinned in the plan and later runtime manifests.
 
 The existing application venv is the only additional metadata closure. Each
 directory admits at most 1,000 immediate entries and the closure at most 50,000
