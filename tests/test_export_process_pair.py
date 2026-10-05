@@ -29,9 +29,10 @@ def pair_fixture(tmp_path):
         commit_file=str(tmp_path / "commit.json"),
     )
     authority = dict(
+        version=3,
         source_hashes=deepcopy(plan["source_hashes"]),
         process_bindings=None,
-        deployment_boundary={"process_bindings": None},
+        deployment_boundary={"version": 5, "host": "fixture", "process_bindings": None},
         runtime_registration={"reviewed": True},
         sql_contract={"source_expected": "fixed"},
         authority_sid=SID,
@@ -40,14 +41,14 @@ def pair_fixture(tmp_path):
         trust_model="single_account_application_v1",
     )
     bot = dict(
+        version=2,
+        trust_model="single_account_application_v1",
         source_hashes=deepcopy(plan["source_hashes"]),
         registration={"reviewed": True},
         sql_contract=deepcopy(authority["sql_contract"]),
-        authority={
-            key: authority[key] for key in ("authority_sid", "bot_sid", "pipe_id", "trust_model")
-        },
+        authority={key: authority[key] for key in ("authority_sid", "bot_sid", "pipe_id")},
     )
-    bot["authority"].update(process_bindings=None, deployment_hash=None)
+    bot["authority"].update(host="fixture", process_bindings=None, deployment_hash=None)
     return plan, dict(authority=authority, bot=bot), bindings
 
 
@@ -77,6 +78,9 @@ def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contr
         "sql",
         "registration",
         "alias",
+        "nested_model",
+        "model",
+        "host",
     ],
 )
 def test_binding_rejects_wrong_identity_or_changed_static_expectations(tmp_path, damage):
@@ -91,6 +95,12 @@ def test_binding_rejects_wrong_identity_or_changed_static_expectations(tmp_path,
         bindings["bot"]["pid"] = bindings["authority"]["pid"]
     elif damage == "alias":
         plan["commit_file"] = plan["manifests"]["bot"]
+    elif damage == "nested_model":
+        templates["bot"]["authority"]["trust_model"] = "single_account_application_v1"
+    elif damage == "model":
+        templates["bot"]["trust_model"] = "other"
+    elif damage == "host":
+        templates["bot"]["authority"]["host"] = "other"
     else:
         key = {"source": "source_hashes", "sql": "sql_contract", "registration": "registration"}[
             damage

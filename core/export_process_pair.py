@@ -9,7 +9,11 @@ import hashlib
 from pathlib import PureWindowsPath
 import re
 
-from core.export_process_identity import validate_process_bindings, validate_token_profile
+from core.export_process_identity import (
+    TRUST_MODEL,
+    validate_process_bindings,
+    validate_token_profile,
+)
 from services.export_execution_protocol import encode
 
 ROLES = ("authority", "bot")
@@ -79,6 +83,17 @@ def bind_templates(plan, templates, bindings):
         verify_role(bindings[role], role, plan)
     authority, bot = (deepcopy(templates[role]) for role in ROLES)
     boundary = authority["deployment_boundary"]
+    if (
+        authority.get("trust_model") != TRUST_MODEL
+        or bot.get("trust_model") != TRUST_MODEL
+        or authority.get("version") != 3
+        or bot.get("version") != 2
+        or boundary.get("version") != 5
+        or set(bot["authority"])
+        != {"host", "authority_sid", "bot_sid", "pipe_id", "deployment_hash", "process_bindings"}
+        or bot["authority"]["host"] != boundary["host"]
+    ):
+        raise ValueError("Exact shared-account Bot/authority template shapes required.")
     # Only these dynamic fields may be filled. Deployment/review/registration,
     # all seven review records and SQL expectations remain reviewed inputs.
     if any(
@@ -101,7 +116,7 @@ def bind_templates(plan, templates, bindings):
         or bot["sql_contract"] != authority["sql_contract"]
         or any(
             bot["authority"][key] != authority[key]
-            for key in ("authority_sid", "bot_sid", "pipe_id", "trust_model")
+            for key in ("authority_sid", "bot_sid", "pipe_id")
         )
     ):
         raise ValueError("Reviewed Bot and authority contracts differ.")

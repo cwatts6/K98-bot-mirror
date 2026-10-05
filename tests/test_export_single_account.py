@@ -454,7 +454,9 @@ def test_shared_client_requires_explicit_model_and_both_incarnations():
     assert client.process_bindings["authority"]["pid"] == 100
 
 
-@pytest.mark.parametrize("damage", [None, "old_version", "principal", "supervisor_sql"])
+@pytest.mark.parametrize(
+    "damage", [None, "old_version", "principal", "supervisor_sql", "manual_pair"]
+)
 def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     monkeypatch, tmp_path, damage
 ):
@@ -491,6 +493,21 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         export_config_file=str(export),
         export_config_sha256=hashlib.sha256(export.read_bytes()).hexdigest(),
     )
+    if damage == "manual_pair":
+        from core.export_process_pair import bind_templates
+        from tests.test_export_process_pair import pair_fixture
+
+        plan, templates, bindings = pair_fixture(tmp_path)
+        plan["source_hashes"] = {}
+        templates["authority"].update(
+            source_hashes={},
+            runtime_registration=config["registration"],
+            sql_contract=config["sql_contract"],
+            pipe_id=config["authority"]["pipe_id"],
+        )
+        templates["bot"] = deepcopy(config)
+        templates["bot"]["authority"].update(process_bindings=None, deployment_hash=None)
+        config = bind_templates(plan, templates, bindings)["bot"]
     if damage == "old_version":
         config["version"] = 1
     elif damage == "principal":
@@ -520,7 +537,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         dal, "ExportExecutionDAL", lambda _: SimpleNamespace(installation_snapshot=lambda: observed)
     )
     reply = dict(
-        deployment_hash="c" * 64,
+        deployment_hash=config["authority"]["deployment_hash"],
         registration_hash=runtime.RuntimeRegistration(config["registration"]).fingerprint,
         sql_contract_hash=digest(sql).hex(),
     )
@@ -531,7 +548,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     bundle_factory = Mock()
     monkeypatch.setattr(runtime, "ExportRuntime", bundle_factory)
     monkeypatch.setattr(store, "ExportSnapshotStore", Mock())
-    if damage:
+    if damage and damage != "manual_pair":
         with pytest.raises(SourceConflict):
             runtime._prepare_configured_runtime()
         bundle_factory.assert_not_called()
