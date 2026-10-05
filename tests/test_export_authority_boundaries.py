@@ -402,6 +402,36 @@ def test_unlistable_import_directory_cannot_be_silently_omitted(tmp_path, monkey
         launcher.code_files(tmp_path, inspect_directory=lambda p: p)
 
 
+@pytest.mark.parametrize("environment_name", ["venv", ".venv"])
+def test_root_virtual_environment_is_not_application_source(tmp_path, monkeypatch, environment_name):
+    _, manifest, state = source_tree(tmp_path, monkeypatch)
+    packages = tmp_path / environment_name / "Lib" / "site-packages"
+    packages.mkdir(parents=True)
+    (packages / "dependency.py").write_text("VALUE = 'dependency trust root'")
+    (packages / "dependency.pyd").write_bytes(b"native dependency")
+    inspected = []
+
+    def inspect(path, **_):
+        inspected.append(Path(path))
+        assert environment_name not in Path(path).relative_to(tmp_path).parts
+        return Path(path)
+
+    launcher.bootstrap(manifest, script=tmp_path / "scripts/entry.py", inspect_path=inspect)
+    assert state.path == [str(tmp_path)]
+    assert packages not in inspected
+    assert launcher.code_files(tmp_path) == {"services/sample.py"}
+
+
+def test_nested_venv_package_remains_reviewed_application_source(tmp_path):
+    nested = tmp_path / "services" / "venv"
+    nested.mkdir(parents=True)
+    (nested / "__init__.py").write_text("VALUE = 'application package'")
+    assert launcher.code_files(tmp_path) == {"services/venv/__init__.py"}
+    (nested / "shadow.pyd").write_bytes(b"unreviewed application module")
+    with pytest.raises(launcher.AuthorityStartupError, match="artifact"):
+        launcher.code_files(tmp_path, inspect_directory=lambda path: path)
+
+
 @pytest.mark.parametrize("mode_error", [None, ValueError("mode refused"), KeyboardInterrupt()])
 def test_message_mode_access_and_failed_setup_cleanup(monkeypatch, mode_error):
     handle = SimpleNamespace(Close=Mock())

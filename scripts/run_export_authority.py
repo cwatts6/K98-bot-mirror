@@ -141,13 +141,18 @@ def code_files(root, *, inspect_directory=None):
     for directory, subdirectories, filenames in os.walk(
         root, followlinks=False, onerror=unreadable
     ):
+        # The production launcher uses root/venv, while development uses
+        # root/.venv. Both are separately verified interpreter/dependency trust
+        # roots, not application source. Keep nested packages named venv in the
+        # reviewed inventory rather than exempting them throughout the tree.
+        excluded = ignored | {"venv"} if Path(directory) == Path(root) else ignored
         if inspect_directory is not None:
             inspect_directory(Path(directory))
             # os.walk lists directory links but does not yield them with
             # followlinks=False. Inspect before pruning, so an importable alias
             # cannot silently escape the protected source inventory.
             for name in subdirectories:
-                if name not in ignored and not name.startswith("."):
+                if name not in excluded and not name.startswith("."):
                     inspect_directory(Path(directory) / name)
             cache = Path(directory) / "__pycache__"
             if cache.exists():
@@ -162,7 +167,7 @@ def code_files(root, *, inspect_directory=None):
             ):
                 raise AuthorityStartupError("Unreviewed executable import artifact.")
         subdirectories[:] = [
-            name for name in subdirectories if name not in ignored and not name.startswith(".")
+            name for name in subdirectories if name not in excluded and not name.startswith(".")
         ]
         for name in filenames:
             if name.lower().endswith(".py"):
