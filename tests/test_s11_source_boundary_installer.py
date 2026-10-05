@@ -118,6 +118,8 @@ $unexpected=Join-Path $fixture 'telemetry';$null=[IO.Directory]::CreateDirectory
 $refused=$false;try{VerifySourceDirectory $fixture $known $moves $fixture}catch{$refused=$true}
 if(-not $refused){throw 'Unreviewed package accepted'}
 $null=$known.Add($unexpected);VerifySourceDirectory $fixture $known $moves $fixture
+foreach($name in @('.codex_artifacts','.codex_security_scans','.pre-commit-home')){$null=[IO.Directory]::CreateDirectory((Join-Path $fixture $name))}
+VerifySourceDirectory $fixture $known $moves $fixture
 """,
     )
 

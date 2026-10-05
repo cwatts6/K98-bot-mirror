@@ -107,7 +107,7 @@ function VerifySourceDirectory([string]$Path,$KnownPaths,$MovePaths,[string]$Sou
     $entries=@(Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1001)
     if($entries.Count -gt 1000){throw 'Source directory metadata bound exceeded'}
     # Match the runtime source-only exclusions without walking state or tooling.
-    $excluded=@('.git','.pytest_cache','.ruff_cache','tests','data','downloads','artifacts','docs','logs','smoke_artifacts','sql','assets')
+    $excluded=@('.git','.pytest_cache','.ruff_cache','.codex_artifacts','.codex_security_scans','.pre-commit-home','tests','data','downloads','artifacts','docs','logs','smoke_artifacts','sql','assets')
     foreach($entry in $entries){
         if($entry.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Source reparse member refused'}
         if($entry.PSIsContainer){

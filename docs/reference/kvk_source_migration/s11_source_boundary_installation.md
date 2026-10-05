@@ -50,6 +50,11 @@ unreviewed import directories, native modules and loose bytecode are rejected.
 Other Windows executables/scripts, including PowerShell and command files, must
 also appear individually in the independently pinned plan before protection.
 Runtime-excluded state/tooling directories are not traversed by this check.
+The observed hidden `.codex_artifacts`, `.codex_security_scans` and
+`.pre-commit-home` folders are tooling/evidence, consistent with the runtime's
+hidden-directory exclusion. Their contents are retained without collection or
+movement; unknown non-excluded directories still stop the packet. Tracked
+`.github` metadata directories are independently listed in the plan.
 The imported `telemetry` package is application source: its files/directories
 must be independently pinned in the plan and later runtime manifests.
 
