@@ -91,6 +91,12 @@ function CheckedItem([string]$Path) {
     }
     return Get-Item -LiteralPath $Path -Force
 }
+function VerifyStateDirectories([string]$Root) {
+    foreach($name in @('logs','data','downloads')) {
+        $item=CheckedItem (Join-Path $Root $name)
+        if(-not $item.PSIsContainer){throw 'Application state directory required'}
+    }
+}
 function FileDigest([string]$Path) {
     BeginOperation
     $item=CheckedItem $Path
@@ -269,7 +275,7 @@ try {
     if((ReadBoundedGit 'rev-parse HEAD') -cne $plan.source_head){throw 'Installed source mismatch'}
     if((ReadBoundedGit 'branch --show-current') -cne 'main'){throw 'Private main required'}
     if((ReadBoundedGit 'status --porcelain --untracked-files=no') -cne ''){throw 'Tracked source drift'}
-    foreach($name in @('logs','data','downloads')){$null=CheckedItem ($root+'\'+$name)}
+    VerifyStateDirectories $root
     if((Test-Path -LiteralPath $control) -or (Test-Path -LiteralPath 'C:\ProgramData\K98')){throw 'Fresh control parent/root required; reconcile existing state'}
     WriteReceipt @{Stage='preflight_completed';ImmutableFiles=$immutable.Count;VenvMembers=$dependencyPaths.Count;PreserveMoves=$plan.preserve_moves.Count;Apply=[bool]$Apply}
     if(-not $Apply){WriteReceipt @{Stage='COMPLETED_PREVIEW_ONLY';ProductionWritten=$false};return}

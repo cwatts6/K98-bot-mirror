@@ -24,7 +24,7 @@ $ErrorActionPreference='Stop'
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile('{script}',[ref]$tokens,[ref]$errors)
 if($errors.Count){{throw 'Installer parse failure'}}
-foreach($name in @('CanonicalPath','Inside','CheckedItem','FileDigest','ReadBoundedGit','BeginOperation','InvokeBoundedWorker','VerifySourceDirectory')){{
+foreach($name in @('CanonicalPath','Inside','CheckedItem','VerifyStateDirectories','FileDigest','ReadBoundedGit','BeginOperation','InvokeBoundedWorker','VerifySourceDirectory')){{
  $node=$ast.Find({{param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name}},$false)
  if($null -eq $node){{throw 'Helper missing'}}
  Invoke-Expression $node.Extent.Text
@@ -82,6 +82,26 @@ $refused=$false;try{[IO.Directory]::Move($from,$to)}catch{$refused=$true}
 if(-not $refused -or -not (Test-Path -LiteralPath $from)){throw 'Move overwrote destination'}
 $fresh=Join-Path $fixture 'fresh';[IO.Directory]::Move($from,$fresh)
 if((Test-Path -LiteralPath $from) -or -not (Test-Path -LiteralPath $fresh)){throw 'Preservation move failed'}
+""",
+    )
+
+
+def test_state_directory_preflight_rejects_files_and_missing_paths(tmp_path):
+    run_helpers(
+        tmp_path,
+        r"""
+foreach($name in @('logs','data','downloads')){$null=[IO.Directory]::CreateDirectory((Join-Path $fixture $name))}
+VerifyStateDirectories $fixture
+foreach($name in @('logs','data','downloads')){
+ $path=Join-Path $fixture $name;[IO.Directory]::Delete($path)
+ $refused=$false;try{VerifyStateDirectories $fixture}catch{$refused=$true}
+ if(-not $refused){throw 'Missing state directory accepted'}
+ [IO.File]::WriteAllText($path,'retained state')
+ $refused=$false;try{VerifyStateDirectories $fixture}catch{$refused=$true}
+ if(-not $refused -or [IO.File]::ReadAllText($path) -cne 'retained state'){throw 'State file accepted or changed'}
+ [IO.File]::Delete($path);$null=[IO.Directory]::CreateDirectory($path)
+}
+VerifyStateDirectories $fixture
 """,
     )
 
