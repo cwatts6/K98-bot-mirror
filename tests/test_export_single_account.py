@@ -407,7 +407,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         registration=registration_fixture(),
         sql_contract=sql,
         legacy_sql_contract=dict(target, version=1, source={}),
-        application_sql_contract=target.copy(),
+        application_sql_contract=dict(target, version=1),
         spool_root=str(tmp_path / "spool"),
         source_hashes={},
         export_config_file=str(export),

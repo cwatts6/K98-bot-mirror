@@ -7,6 +7,7 @@ the caller's existing settlement transaction under the account/resource locks.
 from datetime import datetime
 import hashlib
 import json
+from pathlib import Path
 import re
 from uuid import UUID
 
@@ -427,6 +428,21 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # LF-normalized manual-registration snapshots; logical names follow SQL declarations,
 # including names whose exported filenames are sanitized. Installed metadata is separate.
 APPLICATION_SCHEMA_SOURCE_HASH = "73562d08660ee44465e6d407c065329f56af7a14369f8c8b80aac6ac87c79b02"
+# Conservative closure from reviewed SQL Git blobs, never installed metadata.
+APPLICATION_ACTIVATION_SCOPE_HASH = (
+    "cd2708b81ad2affcf0986678e18be604fd695cab66e4266684aa7e2edcf2d234"
+)
+
+
+def application_activation_scope():
+    scope = json.loads(
+        (Path(__file__).resolve().parents[1] / "deploy/s11_activation_scope.json").read_bytes()
+    )
+    if digest(scope).hex() != APPLICATION_ACTIVATION_SCOPE_HASH:
+        raise SourceConflict("Reviewed S11 activation dependency scope differs.")
+    return scope["objects"]
+
+
 LEGACY_PERMISSION_MIGRATION = "20260924_002_export_legacy_module_permissions"
 # USER is the SQL Server securable class for IMPERSONATE. There is no
 # database permission named IMPERSONATE ANY USER. Check other user principals
@@ -743,7 +759,7 @@ def legacy_installation_snapshot(cursor, source):
     return result
 
 
-def application_installation_snapshot(cursor):
+def application_installation_snapshot(cursor, *, scope=None):
     """Read complete application metadata/permissions on the caller's session.
 
     No business query/procedure, transaction transition, DDL or data import runs.
@@ -755,6 +771,16 @@ def application_installation_snapshot(cursor):
     from services.export_execution_protocol import encode
 
     result = {"version": 1, "metadata": {}}
+    required = (
+        "SELECT object_id FROM sys.objects WHERE is_ms_shipped=0 "
+        "AND type IN ('U','V','P','FN','IF','TF')"
+        if scope is None
+        else "SELECT OBJECT_ID(value) AS object_id FROM OPENJSON(?)"
+    )
+    parameters = () if scope is None else (json.dumps(scope),)
+    object_filter = (
+        "" if scope is None else " AND o.object_id IN (SELECT OBJECT_ID(value) FROM OPENJSON(?)) "
+    )
     cursor.execute(
         "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,"
         "DB_NAME() AS DatabaseName,USER_NAME() AS Principal,"
@@ -764,10 +790,7 @@ def application_installation_snapshot(cursor):
     if result["target"] is None or result["target"]["ViewDefinition"] != 1:
         raise SourceConflict("Whole application metadata must be visible.")
     for name, query in _METADATA_QUERIES.items():
-        cursor.execute(
-            "WITH required AS (SELECT object_id FROM sys.objects WHERE is_ms_shipped=0 "
-            "AND type IN ('U','V','P','FN','IF','TF')) " + query
-        )
+        cursor.execute("WITH required AS (" + required + ") " + query, *parameters)
         result["metadata"][name] = rows(cursor)
     cursor.execute(
         "SELECT SCHEMA_NAME(t.schema_id)+'.'+t.name AS TypeName,c.column_id AS Ordinal,"
@@ -776,7 +799,13 @@ def application_installation_snapshot(cursor):
         "c.is_nullable AS Nullable,c.collation_name AS Collation "
         "FROM sys.table_types t JOIN sys.columns c ON c.object_id=t.type_table_object_id "
         "JOIN sys.types st ON st.user_type_id=c.user_type_id "
-        "ORDER BY TypeName COLLATE Latin1_General_100_BIN2,c.column_id"
+        + (
+            "WHERE SCHEMA_NAME(t.schema_id)+'.'+t.name IN (SELECT value FROM OPENJSON(?)) "
+            if scope is not None
+            else ""
+        )
+        + "ORDER BY (SCHEMA_NAME(t.schema_id)+'.'+t.name) COLLATE Latin1_General_100_BIN2,c.column_id",
+        *parameters,
     )
     result["metadata"]["table_types"] = rows(cursor)
     cursor.execute(
@@ -787,13 +816,15 @@ def application_installation_snapshot(cursor):
         "d.is_schema_bound_reference AS SchemaBound,d.is_caller_dependent AS CallerDependent,"
         "d.is_ambiguous AS Ambiguous FROM sys.sql_expression_dependencies d "
         "JOIN sys.objects o ON o.object_id=d.referencing_id WHERE o.is_ms_shipped=0 "
-        "ORDER BY ObjectName COLLATE Latin1_General_100_BIN2,MinorID,ServerName,DatabaseName,"
-        "SchemaName,EntityName,ReferencedMinorID"
+        + object_filter
+        + "ORDER BY (OBJECT_SCHEMA_NAME(d.referencing_id)+'.'+OBJECT_NAME(d.referencing_id)) COLLATE Latin1_General_100_BIN2,MinorID,ServerName,DatabaseName,"
+        "SchemaName,EntityName,ReferencedMinorID",
+        *parameters,
     )
     result["metadata"]["dependencies"] = rows(cursor)
     cursor.execute(
         "SELECT SCHEMA_NAME(schema_id)+'.'+name AS ObjectName,base_object_name AS Target "
-        "FROM sys.synonyms ORDER BY ObjectName COLLATE Latin1_General_100_BIN2"
+        "FROM sys.synonyms ORDER BY (SCHEMA_NAME(schema_id)+'.'+name) COLLATE Latin1_General_100_BIN2"
     )
     result["metadata"]["synonyms"] = rows(cursor)
     cursor.execute(
@@ -815,7 +846,9 @@ def application_installation_snapshot(cursor):
         "p.permission_name AS PermissionName,p.subentity_name AS Subentity "
         "FROM sys.objects o CROSS APPLY sys.fn_my_permissions(QUOTENAME(SCHEMA_NAME(o.schema_id))+'.'+QUOTENAME(o.name),'OBJECT') p "
         "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','P','FN','IF','TF') "
-        "ORDER BY ObjectName COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name"
+        + object_filter
+        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name",
+        *parameters,
     )
     result["object_permissions"] = rows(cursor)
     cursor.execute(
@@ -824,7 +857,9 @@ def application_installation_snapshot(cursor):
         "FROM sys.objects o JOIN sys.columns c ON c.object_id=o.object_id "
         "CROSS JOIN (VALUES ('SELECT'),('UPDATE'),('REFERENCES')) p(PermissionName) "
         "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','IF','TF') "
-        "ORDER BY ObjectName COLLATE Latin1_General_100_BIN2,c.name COLLATE Latin1_General_100_BIN2,p.PermissionName"
+        + object_filter
+        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,c.name COLLATE Latin1_General_100_BIN2,p.PermissionName",
+        *parameters,
     )
     result["column_permissions"] = rows(cursor)
     encode(result)

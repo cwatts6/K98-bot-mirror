@@ -438,7 +438,6 @@ def _prepare_configured_runtime():
     from scripts.run_export_authority import code_files
     from services.export_execution_dal import (
         ExportExecutionDAL,
-        application_installation_snapshot,
         installation_migrations,
         legacy_installation_snapshot,
     )
@@ -556,7 +555,8 @@ def _prepare_configured_runtime():
                 profile=config["sql_contract"]["profile"],
             )
             verify_application_installation_contract(
-                application_installation_snapshot(cursor), config["application_sql_contract"]
+                application_snapshot_for_contract(cursor, config["application_sql_contract"]),
+                config["application_sql_contract"],
             )
         finally:
             cursor.close()
@@ -1069,11 +1069,17 @@ def validate_application_installation_contract(approved):
         "permissions_hash",
         "review_id",
     }
+    if isinstance(approved, dict) and approved.get("version") == 2:
+        from services.export_execution_dal import APPLICATION_ACTIVATION_SCOPE_HASH
+
+        fields.add("scope_hash")
+        if approved.get("scope_hash") != APPLICATION_ACTIVATION_SCOPE_HASH:
+            raise SourceConflict("Exact reviewed S11 activation dependency scope required.")
     if (
         not isinstance(approved, dict)
         or set(approved) != fields
         or type(approved["version"]) is not int
-        or approved["version"] != 1
+        or approved["version"] not in (1, 2)
         or approved["database"] != "ROK_TRACKER"
         or any(
             not isinstance(approved[k], str) or not 1 <= len(approved[k]) <= 128
@@ -1088,6 +1094,11 @@ def validate_application_installation_contract(approved):
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")
     uuid_text(approved["review_id"])
+    if approved["version"] == 2:
+        from services.export_execution_dal import application_activation_scope
+
+        if not set(application_activation_scope()) <= {s["name"] for s in approved["sources"]}:
+            raise SourceConflict("Activation dependency scope is outside reviewed SQL sources.")
     names = {s["name"] for s in approved["sources"]}
     modules = {s["name"] for s in approved["sources"] if s["type"] in {"P", "FN", "IF", "TF"}}
     dynamic = approved["dynamic_objects"]
@@ -1110,11 +1121,38 @@ def validate_application_installation_contract(approved):
         names.add(row["name"])
 
 
+def application_contract_scope(approved):
+    """Only the pinned source closure can narrow a protected version-2 contract.
+
+    Version 1 retains its whole-database contract. Dynamic output shapes and all
+    global schema permissions, synonyms and database triggers remain reviewed.
+    """
+    validate_application_installation_contract(approved)
+    if approved["version"] == 1:
+        return None
+    from services.export_execution_dal import application_activation_scope
+
+    scope = application_activation_scope()
+    if any(not set(row["producer_modules"]) <= set(scope) for row in approved["dynamic_objects"]):
+        raise SourceConflict("Dynamic producers must belong to the activation dependency scope.")
+    return sorted(scope + [row["name"] for row in approved["dynamic_objects"]])
+
+
+def application_snapshot_for_contract(cursor, approved):
+    from services.export_execution_dal import application_installation_snapshot
+
+    scope = application_contract_scope(approved)
+    if scope is None:
+        return application_installation_snapshot(cursor)
+    return application_installation_snapshot(cursor, scope=scope)
+
+
 def verify_application_installation_contract(observed, approved):
     """Check whole schema, UDTs, dependencies and effective permissions separately."""
     from services.export_execution_dal import INSTALLATION_METADATA
 
     validate_application_installation_contract(approved)
+    scope = application_contract_scope(approved)
     if (
         not isinstance(observed, dict)
         or set(observed)
@@ -1148,7 +1186,7 @@ def verify_application_installation_contract(observed, approved):
     expected = {
         s["name"]: s["type"]
         for s in approved["sources"] + approved["dynamic_objects"]
-        if s["type"] != "TT"
+        if s["type"] != "TT" and (scope is None or s["name"] in scope)
     }
     objects = metadata["objects"]
     if (
@@ -1165,7 +1203,11 @@ def verify_application_installation_contract(observed, approved):
             not r["ModuleDefinition"] for r in metadata["triggers"] + metadata["database_triggers"]
         )
         or {r["TypeName"] for r in metadata["table_types"]}
-        != {s["name"] for s in approved["sources"] if s["type"] == "TT"}
+        != {
+            s["name"]
+            for s in approved["sources"]
+            if s["type"] == "TT" and (scope is None or s["name"] in scope)
+        }
         or digest(metadata).hex() != approved["metadata_hash"]
     ):
         raise SourceConflict(

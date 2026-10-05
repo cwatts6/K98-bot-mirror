@@ -16,6 +16,12 @@
   ],
   "grants": [
     {
+      "object": "sys.sql_expression_dependencies",
+      "permission": "SELECT",
+      "source": "https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-sql-expression-dependencies-transact-sql",
+      "qualification": "System catalog metadata only; requires existing VIEW DEFINITION. Production separately approved and verified 2026-10-05."
+    },
+    {
       "object": "KVK.KVK_AllPlayers_Stage",
       "permission": "DELETE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_AllPlayers_Stage.Table.sql",

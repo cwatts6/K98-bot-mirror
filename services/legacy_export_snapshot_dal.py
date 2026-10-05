@@ -464,13 +464,14 @@ class LegacySnapshotDAL:
             )
             try:
                 if self.application_sql_contract is not None:
-                    from services.export_execution_dal import application_installation_snapshot
                     from services.export_runtime_composition import (
+                        application_snapshot_for_contract,
                         verify_application_installation_contract,
                     )
 
                     verify_application_installation_contract(
-                        application_installation_snapshot(cursor), self.application_sql_contract
+                        application_snapshot_for_contract(cursor, self.application_sql_contract),
+                        self.application_sql_contract,
                     )
                 yield claim
             finally:
@@ -492,10 +493,10 @@ class LegacySnapshotDAL:
 
             verify_headroom(cursor, settings())
         from services.export_execution_dal import (
-            application_installation_snapshot,
             legacy_installation_snapshot,
         )
         from services.export_runtime_composition import (
+            application_snapshot_for_contract,
             verify_application_installation_contract,
             verify_legacy_installation_contract,
         )
@@ -507,7 +508,8 @@ class LegacySnapshotDAL:
         )
         if self.application_sql_contract is not None:
             verify_application_installation_contract(
-                application_installation_snapshot(cursor), self.application_sql_contract
+                application_snapshot_for_contract(cursor, self.application_sql_contract),
+                self.application_sql_contract,
             )
 
     @staticmethod

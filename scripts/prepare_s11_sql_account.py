@@ -89,7 +89,10 @@ def render(plan, *, server, database, principal, login_sid):
     for entry in entries:
         name, permission = entry["object"], entry["permission"]
         column = entry.get("column")
-        if not re.fullmatch(r"(?:dbo|KVK)\.[A-Za-z0-9_]{1,128}", name):
+        metadata_catalog = name == "sys.sql_expression_dependencies"
+        if metadata_catalog and (permission != "SELECT" or column is not None):
+            raise ValueError("Dependency catalog allows only object SELECT")
+        if not metadata_catalog and not re.fullmatch(r"(?:dbo|KVK)\.[A-Za-z0-9_]{1,128}", name):
             raise ValueError("Allowlisted object required")
         if permission not in {"SELECT", "INSERT", "UPDATE", "DELETE", "EXECUTE"}:
             raise ValueError("Application object permission required")

@@ -421,6 +421,10 @@ def test_direct_renderer_binds_master_user_and_specific_server_grants():
     assert "GRANT EXECUTE ON OBJECT::[dbo].[xp_cmdshell]" in sql
     assert "USE [master];\n" in sql
     assert "GRANT CONNECT TO [S11_ExportApplication];" in sql
+    assert (
+        "GRANT SELECT ON OBJECT::[sys].[sql_expression_dependencies] TO [S11_ExportApplication];"
+        in sql
+    )
     assert "ADD SIGNATURE" not in sql and "CREATE CERTIFICATE" not in sql
     assert "ALTER LOGIN [S11_ExportApplication] ENABLE" not in sql
     assert "IF @@TRANCOUNT>0 ROLLBACK TRANSACTION" in sql
@@ -433,6 +437,43 @@ def test_direct_renderer_binds_master_user_and_specific_server_grants():
             principal="S11_ExportApplication",
             login_sid="0x" + "12" * 16,
         )
+
+
+@pytest.mark.parametrize(
+    "name,permission,column",
+    [
+        ("sys.sql_expression_dependencies", "UPDATE", None),
+        ("sys.sql_expression_dependencies", "SELECT", "referencing_id"),
+        ("sys.sql_modules", "SELECT", None),
+    ],
+)
+def test_renderer_does_not_widen_metadata_catalog_exception(name, permission, column):
+    plan = json.loads(Path("deploy/s11_application_grants.json").read_bytes())
+    plan["grants"][0].update(object=name, permission=permission)
+    if column is not None:
+        plan["grants"][0]["column"] = column
+    with pytest.raises(ValueError):
+        render(
+            plan,
+            server="mini_AMD",
+            database="ROK_TRACKER",
+            principal="S11_ExportApplication",
+            login_sid="0x" + "12" * 16,
+        )
+
+
+def test_direct_contract_includes_only_approved_dependency_catalog_read():
+    rows = direct.application_grant_rows()
+    assert [row for row in rows if row["TargetName"].startswith("sys.")] == [
+        dict(
+            DatabaseName="ROK_TRACKER",
+            SecurableClass="OBJECT",
+            TargetName="sys.sql_expression_dependencies",
+            PermissionName="SELECT",
+            GrantState="G",
+            ColumnName=None,
+        )
+    ]
 
 
 @pytest.mark.parametrize("permissions", [[], ["CONTROL"], ["CONNECT", "CONTROL"]])

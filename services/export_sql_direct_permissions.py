@@ -8,7 +8,7 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 
 DIRECT_SOURCE_HASH = "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "8e9fab0613e7740ebb7d19d0945a4ea416ad0482ba81c37a2b3fb6ccb5f621dc"
+APPLICATION_GRANT_PLAN_HASH = "da0546c5d7abbe94ae782894183f097ca821dee61e2c7a9915eab5c8180a11bc"
 
 
 def application_grant_rows():
