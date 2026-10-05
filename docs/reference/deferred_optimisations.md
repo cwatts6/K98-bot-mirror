@@ -484,3 +484,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: Operator-approved legacy export scope; current `gsheet_module.py` export and compatibility tests; source-period architecture decision for new-source adaptation.
+
+### Deferred Optimisation
+- Area: `scripts/install_s11_source_boundary.ps1` operational limit declarations
+- Type: consistency
+- Description: PR review identified repeated receipt, file-size and operation-time limits. They are currently explicit and regression-tested, but repeated literals could diverge during future maintenance. Three review comments describe this same optional refactor.
+- Suggested Fix: Consolidate bounds into named reviewed constants in a separate installer-maintenance slice, preserving the current per-operation supervision and output limits; test the native helper extraction and public entry point together.
+- Impact: low
+- Risk: medium
+- Dependencies: Existing native Windows installer regressions; no changed limits or fixed overall workload duration; outside the first production rollout.
