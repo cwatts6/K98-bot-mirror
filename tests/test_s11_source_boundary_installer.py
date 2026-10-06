@@ -226,7 +226,7 @@ def test_supervisor_rejects_empty_or_incomplete_successful_workers(tmp_path):
         tmp_path,
         r"""
 $progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
-$commands=@('exit 0', '[Console]::WriteLine(''not-json'')', '[Console]::WriteLine(''{"Stage":"preflight_completed"}'')', '[Console]::WriteLine(''{"Stage":"COMPLETED_FILESYSTEM_INSTALLATION_ONLY"}'')')
+$commands=@('exit 0', '[Console]::WriteLine(''not-json'')', '[Console]::WriteLine(''{"Stage":"preflight_completed"}'')', '[Console]::WriteLine(''{"Stage":"COMPLETED_FILESYSTEM_INSTALLATION_ONLY"}'')', '[Console]::WriteLine(''{"Stage":["COMPLETED_PREVIEW_ONLY"]}'')')
 $ordinal=0
 foreach($command in $commands){
  $receipt=Join-Path $fixture ('missing-completion-'+($ordinal++)+'.jsonl')
@@ -238,6 +238,25 @@ foreach($command in $commands){
 $receipt=Join-Path $fixture 'complete-preview.jsonl'
 $null=InvokeBoundedWorker '[Console]::WriteLine(''{"Stage":"COMPLETED_PREVIEW_ONLY"}'')' $progress $receipt 10000 -ExpectedCompletionStage 'COMPLETED_PREVIEW_ONLY'
 if((Get-Content -LiteralPath $receipt -Tail 1 | ConvertFrom-Json).Stage -cne 'COMPLETED_PREVIEW_ONLY'){throw 'Valid completion rejected'}
+""",
+    )
+
+
+def test_supervisor_file_launch_preserves_literal_arguments(tmp_path):
+    run_helpers(
+        tmp_path,
+        r"""
+$progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
+$receipt=Join-Path $fixture 'file-launch.jsonl'
+$worker=Join-Path $fixture "worker's file.ps1"
+[IO.File]::WriteAllText($worker,'param([string]$PlanPath,[switch]$Worker);if(-not $Worker){throw ''Switch missing''};@{Stage=''COMPLETED_PREVIEW_ONLY'';PlanPath=$PlanPath}|ConvertTo-Json -Compress')
+$literal=Join-Path $fixture 'plan [literal] $().json'
+$null=InvokeBoundedWorker '' $progress $receipt 10000 -ExpectedCompletionStage 'COMPLETED_PREVIEW_ONLY' -WorkerScriptPath $worker -WorkerArguments @('-PlanPath',$literal,'-Worker')
+$record=Get-Content -LiteralPath $receipt -Tail 1 | ConvertFrom-Json
+if($record.PlanPath -cne $literal){throw 'File argument changed or evaluated'}
+$badReceipt=Join-Path $fixture 'must-not-be-created.jsonl'
+$refused=$false;try{$null=InvokeBoundedWorker '' $progress $badReceipt 10000 -WorkerScriptPath $worker -WorkerArguments @('-PlanPath',"bad`"argument")}catch{$refused=$true}
+if(-not $refused -or (Test-Path -LiteralPath $badReceipt)){throw 'Unsafe argument accepted or worker started'}
 """,
     )
 

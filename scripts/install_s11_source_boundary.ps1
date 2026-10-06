@@ -16,11 +16,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 
-function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$ReceiptPath,[int]$TimeoutMs=60000,[string]$ExpectedCompletionStage='') {
+function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$ReceiptPath,[int]$TimeoutMs=60000,[string]$ExpectedCompletionStage='',[string]$WorkerScriptPath='',[string[]]$WorkerArguments=@()) {
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName='C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-    $workerCommand='$ErrorActionPreference=''Stop'';$ProgressPreference=''SilentlyContinue'';'+$Command
-    $start.Arguments='-NoProfile -NonInteractive -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($workerCommand))
+    if($WorkerScriptPath){
+        # Production uses the exact installed script and literal parameter values.
+        # Reject embedded quotes/control characters; double trailing slashes for
+        # Windows argv parsing, without interpolating values into PowerShell code.
+        $arguments=@('-NoProfile','-NonInteractive','-File',$WorkerScriptPath)+$WorkerArguments
+        $quoted=foreach($argument in $arguments){
+            if($argument.IndexOfAny([char[]]@('"',"`r","`n",[char]0)) -ge 0){throw 'Invalid worker argument'}
+            '"'+($argument -replace '(\\+)$','$1$1')+'"'
+        }
+        $start.Arguments=$quoted -join ' '
+    }else{
+        # Only inert native guard fixtures/probes use this command mode.
+        $workerCommand='$ErrorActionPreference=''Stop'';$ProgressPreference=''SilentlyContinue'';'+$Command
+        $start.Arguments='-NoProfile -NonInteractive -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($workerCommand))
+    }
     $start.UseShellExecute=$false; $start.CreateNoWindow=$true
     $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true
     $process=[Diagnostics.Process]::new();$process.StartInfo=$start
@@ -60,7 +73,7 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
         if($ExpectedCompletionStage){
             $failureReason='Missing expected worker completion record'
             $completion=$lastLine | ConvertFrom-Json
-            if($null -eq $completion -or -not $completion.PSObject.Properties['Stage'] -or $completion.Stage -cne $ExpectedCompletionStage){throw $failureReason}
+            if($null -eq $completion -or -not $completion.PSObject.Properties['Stage'] -or $completion.Stage -isnot [string] -or $completion.Stage -cne $ExpectedCompletionStage){throw $failureReason}
         }
     } catch {
         if($started -and -not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)}
@@ -82,10 +95,10 @@ if(-not $Worker){
     $receiptPath=Join-Path $PSScriptRoot ('source-boundary-receipt-'+[guid]::NewGuid().ToString('N')+'.jsonl')
     $progressPath=$receiptPath+'.progress'
     $null=[IO.File]::Open($progressPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read).Dispose()
-    $command="& '"+$PSCommandPath.Replace("'","''")+"' -Worker -WorkerProgressPath '"+$progressPath.Replace("'","''")+"' -PlanPath '"+$PlanPath.Replace("'","''")+"' -ExpectedPlanSHA256 '"+$ExpectedPlanSHA256.Replace("'","''")+"'"
-    if($Apply){$command+=' -Apply'};if($OperatorHoldConfirmed){$command+=' -OperatorHoldConfirmed'};if($BotStopped){$command+=' -BotStopped'}
+    $workerArguments=@('-Worker','-WorkerProgressPath',$progressPath,'-PlanPath',$PlanPath,'-ExpectedPlanSHA256',$ExpectedPlanSHA256)
+    if($Apply){$workerArguments+='-Apply'};if($OperatorHoldConfirmed){$workerArguments+='-OperatorHoldConfirmed'};if($BotStopped){$workerArguments+='-BotStopped'}
     $expectedStage=if($Apply){'COMPLETED_FILESYSTEM_INSTALLATION_ONLY'}else{'COMPLETED_PREVIEW_ONLY'}
-    InvokeBoundedWorker $command $progressPath $receiptPath -ExpectedCompletionStage $expectedStage
+    InvokeBoundedWorker '' $progressPath $receiptPath -ExpectedCompletionStage $expectedStage -WorkerScriptPath $PSCommandPath -WorkerArguments $workerArguments
     return
 }
 $progressPath=$WorkerProgressPath
