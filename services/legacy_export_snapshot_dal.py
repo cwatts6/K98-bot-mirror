@@ -226,6 +226,31 @@ class LegacySnapshotDAL:
                 preparation["State"],
             ) != (account, storage_owner, transitions[stage]):
                 raise SourceConflict("Preparation state/owner changed.")
+            if self.execution_evidence:
+                if stage == "preflight" and preparation["ConsumerKind"] == "config":
+                    # The authority rejects probes while a SQL producer owns its
+                    # snapshot. Defer before claiming account/provider resources.
+                    cursor.execute(
+                        "SELECT TOP (1) p.PreparationID FROM dbo.ExportResource r "
+                        "JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
+                        "WHERE p.AccountKey=? AND r.ResourceKind='sql_snapshot' AND r.OwnerID IS NOT NULL",
+                        account,
+                    )
+                    if one(cursor) is not None:
+                        return None
+                elif stage == "writing":
+                    # Close the opposite ordering: a producer cannot enter SQL
+                    # between a configuration claim and its probe-stream open.
+                    cursor.execute(
+                        "SELECT TOP (1) p.PreparationID FROM dbo.ExportResource r "
+                        "JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
+                        "WHERE r.ResourceKey=? AND p.AccountKey=? AND p.ConsumerKind='config' "
+                        "AND r.OwnerID IS NOT NULL",
+                        "account:" + account,
+                        account,
+                    )
+                    if one(cursor) is not None:
+                        return None
             if stage == "preflight":
                 cursor.execute(
                     "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"

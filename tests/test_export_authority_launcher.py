@@ -19,6 +19,64 @@ from tests.test_export_runtime_composition import registration_fixture
 from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
 
+def test_dispatch_failure_reports_sql_guard_without_private_prose(capsys):
+    import json
+
+    from scripts.run_export_authority import report_dispatch_failure
+
+    sql_error = type("ProgrammingError", (Exception,), {"__module__": "pyodbc"})(
+        "42000",
+        "secret=fixture-private-token; Owned SQL producer must drain before observational probe. (51700)",
+    )
+    wrapped = RuntimeError("fixture-private-connection-string")
+    wrapped.__cause__ = sql_error
+    stream, preparation = str(uuid4()), str(uuid4())
+    report_dispatch_failure(
+        {
+            "action": "open",
+            "stream_id": stream,
+            "scope": {"ObjectID": preparation},
+            "credential": "fixture-private-payload",
+        },
+        wrapped,
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "fixture-private" not in captured.err
+    assert len(captured.err) < 2048
+    record = json.loads(captured.err)
+    assert record["stream_id"] == stream
+    assert record["object_id"] == preparation
+    assert record["exception_types"] == ["RuntimeError", "ProgrammingError"]
+    assert record["sqlstates"] == ["42000"]
+    assert record["sql_numbers"] == [51700]
+    assert record["reason_code"] == "sql_snapshot_owned"
+
+
+def test_dispatch_failure_does_not_echo_malformed_message_or_non_sql_error(capsys):
+    import json
+
+    from scripts.run_export_authority import report_dispatch_failure
+
+    report_dispatch_failure(
+        {"action": ["private"], "stream_id": "private", "scope": "private"},
+        ValueError("42000", "private (51700)"),
+    )
+    text = capsys.readouterr().err
+    assert "private" not in text
+    record = json.loads(text)
+    assert record["action"] == "invalid"
+    assert record["stream_id"] is None and record["object_id"] is None
+    assert record["sqlstates"] == [] and record["sql_numbers"] == []
+
+
+def test_dispatch_failure_logging_error_does_not_replace_original_outcome(monkeypatch):
+    import scripts.run_export_authority as launcher
+
+    monkeypatch.setattr(launcher.sys, "stderr", Mock(write=Mock(side_effect=OSError("private"))))
+    launcher.report_dispatch_failure({"action": "open"}, RuntimeError("private"))
+
+
 @pytest.fixture
 def authority_launch(monkeypatch, tmp_path):
     import json

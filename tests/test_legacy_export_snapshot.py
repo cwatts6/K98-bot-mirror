@@ -15,6 +15,83 @@ from services.legacy_export_snapshot_service import (
 )
 
 
+@pytest.mark.parametrize("stage", ["preflight", "writing"])
+@pytest.mark.parametrize("blocked", [True, False])
+def test_configuration_probe_and_sql_writer_defer_before_ownership(monkeypatch, stage, blocked):
+    """Exercise both ordering windows without provider calls or ownership recovery."""
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_dal as module
+
+    cursor = Mock()
+    resource = dict(
+        ActiveJobID=None,
+        ActivePreparationID=None,
+        ActiveOutputOperationID=None,
+        BlockedReason=None,
+        Fence=0,
+        Version=1,
+        ResourceKey="unused",
+    )
+    preparation = dict(
+        AccountKey="acct",
+        StorageOwner="storage",
+        ConsumerKind="config" if stage == "preflight" else "scan_data",
+        State="pending" if stage == "preflight" else "sql_pending",
+        EnqueueSequence=9,
+        Fence=0,
+        Version=1,
+    )
+    guard_reads = []
+
+    def execute(sql, *parameters):
+        cursor.answer = None
+        if sql.startswith("SELECT * FROM dbo.ExportResource"):
+            cursor.answer = {**resource, "ResourceKey": parameters[0]}
+        elif sql.startswith("SELECT * FROM dbo.ExportPreparation"):
+            cursor.answer = preparation
+        elif sql.startswith("SELECT TOP (1) p.PreparationID"):
+            guard_reads.append((sql, parameters))
+            cursor.answer = {"PreparationID": "already-owned"} if blocked else None
+        return cursor
+
+    cursor.execute.side_effect = execute
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "one", lambda c: c.answer)
+    mutex = Mock()
+    monkeypatch.setattr(module, "_mutex", mutex)
+    writes = Mock(return_value={"Version": 2})
+    monkeypatch.setattr(module, "_cas", writes)
+    dal = LegacySnapshotDAL(Mock(), output_operations=True)
+    dal.execution_evidence = True
+    dal._execution_gate = Mock()
+    claim = dal.claim(
+        str(uuid4()),
+        account="acct",
+        storage_owner="storage",
+        stage=stage,
+        resource_keys=(
+            ("account:acct",) if stage == "preflight" else ("sql_snapshot:legacy_outputs",)
+        ),
+    )
+    assert guard_reads
+    assert mutex.call_args_list[0].args == (cursor, "account:acct")
+    assert (claim is None) == blocked
+    if blocked:
+        writes.assert_not_called()
+        dal._execution_gate.assert_not_called()
+    else:
+        assert claim.fence == 1 and claim.version == 2
+        assert writes.call_count == 2
+        dal._execution_gate.assert_called_once_with(cursor, "acct", probe_only=stage == "writing")
+
+
 def test_evidence_preparation_requires_protected_legacy_sql_contract_before_connecting():
     from unittest.mock import Mock
 

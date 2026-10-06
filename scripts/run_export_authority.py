@@ -8,6 +8,7 @@ process separation preserves lifecycle accounting, not credential isolation.
 """
 
 import argparse
+from datetime import UTC
 import hashlib
 import json
 import os
@@ -20,6 +21,71 @@ from uuid import uuid4
 
 class AuthorityStartupError(RuntimeError):
     """No runtime readiness or provider request may follow this failure."""
+
+
+def report_dispatch_failure(message, error):
+    """Local bounded diagnostics; never echo exception prose or IPC payloads."""
+    from datetime import datetime
+
+    def identifier(value):
+        return (
+            value.lower()
+            if isinstance(value, str)
+            and re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", value)
+            else None
+        )
+
+    message = message if isinstance(message, dict) else {}
+    scope = message.get("scope")
+    scope = scope if isinstance(scope, dict) else {}
+    action = message.get("action")
+    action = (
+        action
+        if isinstance(action, str) and action in {"ready", "open", "execute", "close", "proof"}
+        else "invalid"
+    )
+    types, states, numbers = [], set(), set()
+    reason = None
+    current = error
+    for _ in range(4):
+        if not isinstance(current, BaseException):
+            break
+        name = type(current).__name__
+        types.append(name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) else "Exception")
+        args = current.args
+        if (
+            type(current).__module__ == "pyodbc"
+            and args
+            and isinstance(args[0], str)
+            and re.fullmatch(r"[A-Z0-9]{5}", args[0])
+        ):
+            states.add(args[0])
+            for arg in args[1:5]:
+                if not isinstance(arg, str):
+                    continue
+                text = arg[:4096]
+                numbers.update(int(n) for n in re.findall(r"\((\d{3,6})\)", text)[:8])
+                if "Owned SQL producer must drain before observational probe." in text:
+                    reason = "sql_snapshot_owned"
+        current = current.__cause__ or current.__context__
+    record = {
+        "stage": "AUTHORITY_DISPATCH_FAILED",
+        "observed_utc": datetime.now(UTC).isoformat(),
+        "diagnostic_id": str(uuid4()),
+        "authority_pid": os.getpid(),
+        "action": action,
+        "stream_id": identifier(message.get("stream_id")),
+        "object_id": identifier(scope.get("ObjectID")),
+        "exception_types": types,
+        "sqlstates": sorted(states)[:4],
+        "sql_numbers": sorted(numbers)[:8],
+        "reason_code": reason,
+    }
+    # Reporting failure cannot change an uncertain dispatch outcome or trigger replay.
+    try:
+        print(json.dumps(record, separators=(",", ":")), file=sys.stderr, flush=True)
+    except Exception:
+        pass
 
 
 def windows_sid():
@@ -581,9 +647,10 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                     verify_process_snapshot(process_snapshot(peer), expected_bot)
                 try:
                     result = broker.dispatch(message)
-                except Exception:
+                except Exception as exc:
                     # A lost reply is uncertainty to the caller. Never include SQL,
                     # provider, credential or private evidence prose in IPC errors.
+                    report_dispatch_failure(message, exc)
                     reply = {"version": 1, "error": "unresolved_action"}
                 else:
                     reply = {"version": 1, "result": result}
