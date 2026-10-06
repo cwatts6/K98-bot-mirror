@@ -276,6 +276,140 @@ def test_independent_intake_and_recovery_keep_ordinary_startup(tmp_path, intake,
     ) == (["python", str(tmp_path / "DL_bot.py")], False)
 
 
+def test_watchdog_can_hold_validation_child_with_all_admission_flags_closed(tmp_path):
+    plan = str(tmp_path / "plan.json")
+    command, manual = watchdog_launch(
+        "python",
+        tmp_path,
+        coordination=False,
+        intake=False,
+        recovery=False,
+        plan=plan,
+        startup_validation=True,
+    )
+    assert manual is True  # watchdog pauses instead of replacing an exited bound child
+    assert command == [
+        "python",
+        "-I",
+        "-B",
+        str(tmp_path / "scripts/run_export_process_gate.py"),
+        "--role",
+        "bot",
+        "--plan",
+        plan,
+    ]
+    assert watchdog_launch(
+        "python",
+        tmp_path,
+        coordination=False,
+        intake=False,
+        recovery=False,
+        plan=plan,
+    ) == (["python", str(tmp_path / "DL_bot.py")], False)
+
+
+@pytest.mark.parametrize(
+    "coordination,intake,recovery",
+    [
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+        (True, True, False),
+        (True, False, True),
+        (False, True, True),
+        (True, True, True),
+    ],
+)
+def test_binding_validation_cannot_enable_admission(tmp_path, coordination, intake, recovery):
+    with pytest.raises(ValueError, match="all S11 flags closed"):
+        watchdog_launch(
+            "python",
+            tmp_path,
+            coordination=coordination,
+            intake=intake,
+            recovery=recovery,
+            plan=str(tmp_path / "plan.json"),
+            startup_validation=True,
+        )
+
+
+@pytest.mark.parametrize("plan", [None, "relative-plan.json"])
+def test_binding_validation_needs_absolute_reviewed_plan(tmp_path, plan):
+    with pytest.raises(ValueError, match="absolute reviewed"):
+        watchdog_launch(
+            "python",
+            tmp_path,
+            coordination=False,
+            intake=False,
+            recovery=False,
+            plan=plan,
+            startup_validation=True,
+        )
+
+
+@pytest.mark.parametrize("mode", [None, 1, "1"])
+def test_binding_validation_rejects_nonboolean_mode(tmp_path, mode):
+    with pytest.raises(ValueError, match="boolean"):
+        watchdog_launch(
+            "python",
+            tmp_path,
+            coordination=False,
+            intake=False,
+            recovery=False,
+            plan=str(tmp_path / "plan.json"),
+            startup_validation=mode,
+        )
+
+
+@pytest.mark.parametrize("validation", [False, True])
+def test_real_watchdog_glue_selects_gate_and_supplies_normal_child_environment(
+    tmp_path, validation
+):
+    """Execute only the real launch/env statements, without locks or subprocesses."""
+    import ast
+
+    source = ast.parse((Path(__file__).parents[1] / "run_bot.py").read_text(encoding="utf-8"))
+    selection = next(
+        n
+        for n in source.body
+        if isinstance(n, ast.Assign)
+        and isinstance(n.targets[0], ast.Tuple)
+        and isinstance(n.targets[0].elts[0], ast.Name)
+        and n.targets[0].elts[0].id == "launch_command"
+    )
+    child_start = next(
+        n
+        for n in ast.walk(source)
+        if isinstance(n, ast.Try)
+        and n.body
+        and isinstance(n.body[0], ast.Assign)
+        and isinstance(n.body[0].targets[0], ast.Name)
+        and n.body[0].targets[0].id == "env"
+    )
+    environment = {"K98_EXPORT_LAUNCH_PLAN": str(tmp_path / "plan.json")}
+    if validation:
+        environment["K98_EXPORT_LAUNCH_VALIDATION"] = "1"
+    scope = {
+        "watchdog_launch": watchdog_launch,
+        "resolve_python_bin": lambda: "python",
+        "base_dir": str(tmp_path),
+        "bot_config": SimpleNamespace(
+            EXPORT_COORDINATION_ENABLED=False,
+            KVK_SOURCE_INTAKE_ENABLED=False,
+            KVK_SOURCE_RECOVERY_ENABLED=False,
+        ),
+        "os": SimpleNamespace(environ=environment, getpid=lambda: 123),
+        "child_env_utf8": lambda: dict(environment),
+    }
+    statements = ast.Module(body=[selection, *child_start.body[:3]], type_ignores=[])
+    exec(compile(statements, "watchdog-launch-glue-fixture", "exec"), scope)
+    assert scope["manual_rebinding"] is validation
+    assert scope["launch_command"][1] == ("-I" if validation else str(tmp_path / "DL_bot.py"))
+    assert scope["env"]["WATCHDOG_RUN"] == "1"
+    assert scope["env"]["WATCHDOG_PARENT_PID"] == "123"
+    assert "WATCHDOG_RUN" not in environment  # parent supplies it to its child only
+
+
 @pytest.mark.parametrize("failure", [None, "destination_exists", "peer_exit"])
 def test_release_becomes_visible_only_after_complete_protected_staging(
     tmp_path, monkeypatch, failure

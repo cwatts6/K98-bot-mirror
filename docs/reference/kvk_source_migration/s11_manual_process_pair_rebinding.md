@@ -6,6 +6,19 @@ startup with all S11 flags off retains the existing Bot/watchdog path.
 Intake-only and recovery-only startup also retain that ordinary path when export
 coordination is off; those independently supported modes do not require a pair.
 
+For an approved startup-binding validation before activation, set the process-local
+`K98_EXPORT_LAUNCH_VALIDATION=1` and `K98_EXPORT_LAUNCH_PLAN` to the fresh reviewed
+plan, then invoke the existing `start-bot-after-sql.ps1` wrapper from that ordinary
+PowerShell session. Its usual SQL/network checks precede `run_bot.py`; the new
+settings are inherited by that real watchdog. A process-local `WATCHDOG_CHILD_LOG`
+may retain the held Bot descriptor under the existing writable logs directory.
+All three S11 flags must remain off in this mode. The watchdog supplies the normal
+child startup environment, singleton ownership and supervision, starts the held
+Bot gate, and pauses automatic replacement after its exit. Start only the authority
+gate directly in its separate ordinary terminal. Do not launch the Bot gate directly
+or manually supply `WATCHDOG_RUN`. Remove the process-local validation setting before
+later coordinated activation; it is not a new `.env` credential/configuration path.
+
 An enabled coordinated launch requires `K98_EXPORT_LAUNCH_PLAN`, an absolute path
 to a reviewed, administrator-owned static plan. The watchdog starts an isolated
 held Bot process. The operator starts the authority gate separately under the

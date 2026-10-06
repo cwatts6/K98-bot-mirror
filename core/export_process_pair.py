@@ -128,14 +128,22 @@ def bind_templates(plan, templates, bindings):
     return dict(authority=authority, bot=bot)
 
 
-def watchdog_launch(python, root, *, coordination, intake, recovery, plan):
+def watchdog_launch(
+    python, root, *, coordination, intake, recovery, plan, startup_validation=False
+):
     """Keep flags-off launch unchanged; every S11 launch uses a held Bot gate."""
     from pathlib import Path
 
-    if not coordination:
+    if type(startup_validation) is not bool:
+        raise ValueError("Explicit boolean startup validation required.")
+    if startup_validation and any((coordination, intake, recovery)):
+        raise ValueError("Startup binding validation requires all S11 flags closed.")
+    if not coordination and not startup_validation:
         return [python, str(Path(root) / "DL_bot.py")], False
     if not plan or not Path(plan).is_absolute():
-        raise ValueError("Coordinated startup requires an absolute reviewed manual launch plan.")
+        raise ValueError(
+            "Coordinated or validation startup requires an absolute reviewed launch plan."
+        )
     return [
         python,
         "-I",

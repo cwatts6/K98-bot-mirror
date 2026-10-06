@@ -278,6 +278,7 @@ launch_command, manual_rebinding = watchdog_launch(
     intake=bot_config.KVK_SOURCE_INTAKE_ENABLED,
     recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
     plan=os.environ.get("K98_EXPORT_LAUNCH_PLAN"),
+    startup_validation=os.environ.get("K98_EXPORT_LAUNCH_VALIDATION") == "1",
 )
 pid_path = BOT_PID_PATH
 

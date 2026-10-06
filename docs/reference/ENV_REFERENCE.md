@@ -1,5 +1,17 @@
 # Environment Reference
 
+## S11 startup-binding validation — 2026-10-06
+
+`K98_EXPORT_LAUNCH_VALIDATION=1` is an explicit process-local watchdog validation
+mode, paired with `K98_EXPORT_LAUNCH_PLAN=<fresh protected absolute plan>`. It
+requires `EXPORT_COORDINATION_ENABLED`, `KVK_SOURCE_INTAKE_ENABLED` and
+`KVK_SOURCE_RECOVERY_ENABLED` all off. Invoke the existing startup wrapper from
+the ordinary session carrying these values. The watchdog starts a held Bot gate,
+supplies its normal child environment and pauses automatic replacement on exit.
+Unset validation before a later coordinated activation. An absent setting retains
+normal flags-off startup. It supplies no credentials and authorizes no enrollment
+or source activation. See `kvk_source_migration/s11_manual_process_pair_rebinding.md`.
+
 ## S11 dedicated SQL environment configuration — 2026-10-03
 
 The coordinated application profile uses the existing local/production `.env`; no SQL credential JSON file is required. Retain `SQL_USERNAME`/`SQL_PASSWORD` and `IMPORT_SQL_USERNAME`/`IMPORT_SQL_PASSWORD` for legacy workloads. Add `S11_SQL_USERNAME` and `S11_SQL_PASSWORD` for the dedicated `S11_ExportApplication` login (local test names may have a suffix). Reuse `SQL_SERVER` and `SQL_DATABASE=ROK_TRACKER`; the protected runtime manifest must bind these same target/principal values. Missing or invalid dedicated values stop coordinated startup/work; there is no fallback to legacy or Windows credentials.
