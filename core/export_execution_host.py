@@ -338,31 +338,46 @@ class DeploymentBoundary:
             if found != set(boundary["paths"].values()):
                 raise HostBoundaryError("Every custody path needs an ACL observation.")
         elif kind == "file_access":
+            from core.export_file_access_policy import validate_legacy_file_access
+
             registration = m["runtime_registration"]
             expected = {
                 target
                 for configured in registration["legacy_configuration"].values()
                 for target in configured["destinations"]
             }
+            legacy_ids = set(expected)
             owners = {}
             for pool in registration["pools"]:
                 for target in [pool["index_file_id"], *pool["slot_file_ids"]]:
                     expected.add(target)
                     owners[target] = pool["owner_email"]
+            try:
+                policies = validate_legacy_file_access(
+                    registration.get("legacy_file_access", {}),
+                    legacy_ids=legacy_ids,
+                    pool_ids=set(owners),
+                    authority_email=identity["service_account_email"],
+                )
+            except ValueError as exc:
+                raise HostBoundaryError("Invalid legacy-only sharing expectations.") from exc
             found = set()
             for row in rows:
                 exact(row, "file_id owner_email editors audience observed_utc")
                 instant(row["observed_utc"])
+                policy = policies.get(row["file_id"])
+                editors = policy["editors"] if policy else [identity["service_account_email"]]
+                audiences = {policy["audience"]} if policy else {"private", "anyone_reader"}
                 if (
                     row["file_id"] not in expected
                     or row["file_id"] in found
                     or row["owner_email"]
                     != owners.get(row["file_id"], boundary["review"]["administrators"]["provider"])
-                    or row["editors"] != [identity["service_account_email"]]
-                    or row["audience"] not in {"private", "anyone_reader"}
+                    or row["editors"] != editors
+                    or row["audience"] not in audiences
                 ):
                     raise HostBoundaryError(
-                        "Exact owners, sole authority editor and reader audience required."
+                        "Exact owners and reviewed file editor/audience expectations required."
                     )
                 found.add(row["file_id"])
             if found != expected:

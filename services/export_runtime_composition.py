@@ -717,7 +717,7 @@ class RuntimeRegistration:
         }
         if (
             not isinstance(value, dict)
-            or set(value) != fields
+            or set(value) not in (fields, fields | {"legacy_file_access"})
             or type(value["version"]) is not int
             or value["version"] != 1
             or any(
@@ -793,6 +793,17 @@ class RuntimeRegistration:
             pool_ids.add(pool["pool_id"])
             hashes.add(fingerprint)
             used.update(files)
+        from core.export_file_access_policy import validate_legacy_file_access
+
+        try:
+            validate_legacy_file_access(
+                value.get("legacy_file_access", {}),
+                legacy_ids={f for c in legacy.values() for f in c["destinations"]},
+                pool_ids=used - set(protected),
+                authority_email=value["service_account_email"],
+            )
+        except ValueError as exc:
+            raise SourceConflict("Invalid legacy-only sharing expectations.") from exc
         object.__setattr__(self, "document", bounded_json(value))
 
     def value(self):
