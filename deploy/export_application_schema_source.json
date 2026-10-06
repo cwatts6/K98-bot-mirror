@@ -195,7 +195,7 @@
     "name": "KVK.SourceOutputFile",
     "type": "U",
     "path": "sql_schema/KVK.SourceOutputFile.Table.sql",
-    "sha256": "0235ec9133d5bd20de9038dfa6681782efaeb3b50834da079500c57d5a469885"
+    "sha256": "52804ebadf7322118e02c2c1e00c978a93194f940d2342148806b3e0cd5764c1"
   },
   {
     "name": "KVK.SourceOutputOperation",
@@ -219,7 +219,7 @@
     "name": "KVK.SourceOutputSlot",
     "type": "U",
     "path": "sql_schema/KVK.SourceOutputSlot.Table.sql",
-    "sha256": "f712ac21d46cdc500210bcab7de555dc62f6899e22f04813af408addd23b3c7d"
+    "sha256": "151637421c31c7ecaacbdff12d4091aab3f1e3da0ec841490e9270a5c4d61944"
   },
   {
     "name": "KVK.SourcePeriod",
