@@ -226,7 +226,7 @@ def test_supervisor_rejects_empty_or_incomplete_successful_workers(tmp_path):
         tmp_path,
         r"""
 $progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
-$commands=@('exit 0', '[Console]::WriteLine(''not-json'')', '[Console]::WriteLine(''{"Stage":"preflight_completed"}'')', '[Console]::WriteLine(''{"Stage":"COMPLETED_FILESYSTEM_INSTALLATION_ONLY"}'')', '[Console]::WriteLine(''{"Stage":["COMPLETED_PREVIEW_ONLY"]}'')')
+$commands=@('exit 0', '[Console]::WriteLine(''not-json'')', '[Console]::WriteLine(''{"Stage":"preflight_completed"}'')', '[Console]::WriteLine(''{"Stage":"COMPLETED_FILESYSTEM_INSTALLATION_ONLY"}'')', '[Console]::WriteLine(''{"Stage":["COMPLETED_PREVIEW_ONLY"]}'')', '[Console]::WriteLine(''[{"Stage":"COMPLETED_PREVIEW_ONLY"}]'')')
 $ordinal=0
 foreach($command in $commands){
  $receipt=Join-Path $fixture ('missing-completion-'+($ordinal++)+'.jsonl')

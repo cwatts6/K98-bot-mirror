@@ -72,6 +72,8 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
         if($null -eq $lastLine){$failureReason='Missing worker output';throw $failureReason}
         if($ExpectedCompletionStage){
             $failureReason='Missing expected worker completion record'
+            $recordText=$lastLine.Trim()
+            if(-not $recordText.StartsWith('{',[StringComparison]::Ordinal) -or -not $recordText.EndsWith('}',[StringComparison]::Ordinal)){throw $failureReason}
             $completion=$lastLine | ConvertFrom-Json
             if($null -eq $completion -or -not $completion.PSObject.Properties['Stage'] -or $completion.Stage -isnot [string] -or $completion.Stage -cne $ExpectedCompletionStage){throw $failureReason}
         }
