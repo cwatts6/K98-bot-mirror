@@ -427,6 +427,8 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
 # LF-normalized manual-registration snapshots; logical names follow SQL declarations,
 # including names whose exported filenames are sanitized. Installed metadata is separate.
+# SourceOutputFile and SourceOutputSlot additionally use the exact CHECK-fix table
+# snapshots at SQL commit 9be77b6ae36644707e7679a895ff97f9cc21d82a (SQL PR #93).
 APPLICATION_SCHEMA_SOURCE_HASH = "aa49d288fa68da429fd026b98194afd3bf5d6ced9d4593904b28901aa3d88006"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
