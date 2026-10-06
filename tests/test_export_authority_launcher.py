@@ -16,6 +16,7 @@ from scripts.run_export_authority import (
 )
 from services.export_runtime_composition import RuntimeRegistration
 from tests.test_export_runtime_composition import registration_fixture
+from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
 
 @pytest.fixture
@@ -111,7 +112,6 @@ def test_shared_native_image_rejection_precedes_sql_factory(
 
     import core.export_process_identity as identity
     import scripts.run_export_authority as launcher
-    from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
     path = tmp_path / "fixture-manifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -128,13 +128,13 @@ def test_shared_native_image_rejection_precedes_sql_factory(
     factory.assert_not_called()
 
 
+@pytest.mark.parametrize("operation", ["authority", "enrollment"])
 def test_shared_provider_host_receives_reviewed_native_image(
-    authority_launch, monkeypatch, tmp_path
+    authority_launch, monkeypatch, tmp_path, operation
 ):
     import json
 
     import core.export_process_identity as identity
-    from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
     path = tmp_path / "fixture-manifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -142,7 +142,7 @@ def test_shared_provider_host_receives_reviewed_native_image(
     manifest.update(trust_model=TRUST_MODEL, process_bindings=bindings)
     path.write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setattr(identity, "open_pinned_process", Mock(return_value=Mock()))
-    assert authority_launch.launchers["authority"]() == 0
+    assert authority_launch.launchers[operation]() == 0
     # main imports the host factory from its owning module at startup.
     import core.export_execution_host as host
 

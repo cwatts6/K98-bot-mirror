@@ -68,6 +68,7 @@ def main(argv=None):
         assert_protected_path,
         current_sid,
     )
+    from core.export_process_identity import TRUST_MODEL
     from scripts.run_export_authority import connection_factory, manifest_contract
     from services.export_coordination_dal import ExportCoordinationDAL
     from services.export_execution_authority import ExportExecutionAuthority
@@ -100,6 +101,14 @@ def main(argv=None):
         child_script=manifest["child_script"],
         manifest=args.manifest,
         authority_sid=manifest["authority_sid"],
+        **(
+            {
+                "native_python": manifest["process_bindings"]["authority"]["executable"],
+                "native_python_sha256": manifest["process_bindings"]["authority"]["sha256"],
+            }
+            if manifest.get("trust_model") == TRUST_MODEL
+            else {}
+        ),
     )
     store = PrivateEvidenceStore(manifest["evidence_root"], manifest["storage_owner"])
     session = dal.transition(

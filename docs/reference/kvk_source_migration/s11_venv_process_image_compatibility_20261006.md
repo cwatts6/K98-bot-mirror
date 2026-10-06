@@ -35,6 +35,8 @@ private named-pipe SID/PID authentication, venv/pywin32 resolution and Job Objec
 termination. Only synthetic-file ACL inspection is substituted; this is not a
 production ACL or future process-identity acceptance record. It also exercised
 and corrected pywin32's unnamed-job argument and security API namespace.
+Both authority startup and the separately approved manual-pool enrollment path
+supply the same protected native-image pin to the provider host.
 
 Security routing: Changes review required for the exact Bot mirror and private
 promotion diffs. Deep scan off; no codebase audit. Existing direct-permission and
