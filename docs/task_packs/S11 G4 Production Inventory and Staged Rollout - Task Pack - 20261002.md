@@ -1,5 +1,9 @@
 # S11 G4 — bounded production inventory and staged rollout preparation
 
+## Current source-pin overlay — 2026-10-06
+
+For the initial registration constraint corrections, new packets must use canonical digest `aa49d288fa68da429fd026b98194afd3bf5d6ced9d4593904b28901aa3d88006` and raw manifest SHA256 `68211633b4ab5eafd72168ef5442bdb83b1fdc4753bd1c9cb96b604a79df6110`. This supersedes the October 4 pin instruction below for new packets. The 540 logical names remain unchanged; only `KVK.SourceOutputFile` and `KVK.SourceOutputSlot` source hashes change. Install the two reviewed migrations from [SQL PR #93](https://github.com/cwatts6/K98-bot-SQL-Server/pull/93), then deploy the matching private-main Bot change and independently reviewed runtime contracts. See the [current checkpoint](../reference/kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md#current-registration-constraint-pins--2026-10-06). Preserve historical seals and verify actual merged/deployed heads. Installation, registration, runtime publication and activation remain separate operator checkpoints; this overlay claims none of them completed.
+
 ## Current mandate
 
 Chris accepted and closed the local implementation review and approved **bounded production inventory and staged rollout preparation** on 2026-10-02. Read the [current handoff](../reference/kvk_source_migration/s11_g4_production_inventory_handoff_20261002.md) first. Carry that approval forward without another general approval cycle.
