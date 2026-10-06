@@ -14,7 +14,7 @@ from scripts.run_export_authority import (
     code_files,
     manifest_contract,
 )
-from services.export_runtime_composition import RuntimeRegistration
+from services.export_runtime_composition import LocalAuthorityClient, RuntimeRegistration
 from tests.test_export_runtime_composition import registration_fixture
 from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
@@ -81,6 +81,7 @@ def authority_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(enrollment, "approved_plan", Mock())
     arguments = ["--manifest", str(path)]
     return SimpleNamespace(
+        arguments=arguments,
         dal=dal,
         authority=authority,
         connector=connector,
@@ -126,6 +127,46 @@ def test_shared_native_image_rejection_precedes_sql_factory(
         authority_launch.launchers["authority"]()
     assert reject.call_args.args[1] == bindings["authority"]
     factory.assert_not_called()
+
+
+@pytest.mark.parametrize("entrypoint", ["imported", "run_path"])
+def test_authority_entrypoints_use_canonical_broker_identity(
+    authority_launch, monkeypatch, entrypoint
+):
+    """Exercise the gate's file loader with the real strict local-client check."""
+    import json
+    import runpy
+
+    import scripts.run_export_authority as launcher
+    import services.export_runtime_composition as runtime
+
+    setup = authority_launch
+    monkeypatch.setattr(launcher, "AuthorityBroker", AuthorityBroker)
+    monkeypatch.setattr(runtime, "RuntimeRegistration", RuntimeRegistration)
+    monkeypatch.setattr(runtime, "LocalAuthorityClient", LocalAuthorityClient)
+    setup.authority.enrollment_plan = None
+    manifest_path = Path(setup.arguments[1])
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["runtime_registration"] = registration_fixture()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    if entrypoint == "run_path":
+        loaded = runpy.run_path(launcher.__file__)
+        assert loaded["AuthorityBroker"] is not AuthorityBroker
+        entry = loaded["main"]
+        for name in ("bootstrap", "manifest_contract", "connection_factory", "serve"):
+            entry.__globals__[name] = getattr(launcher, name)
+    else:
+        entry = launcher.main
+    assert entry(setup.arguments) == 0
+    client = setup.factories["TrustedProofIssuer"].call_args.kwargs["client"]
+    assert isinstance(client, LocalAuthorityClient)
+    assert type(client.broker) is AuthorityBroker
+    setup.serve.assert_called_once()
+    assert [call.kwargs["Action"] for call in setup.dal.transition.call_args_list] == [
+        "open",
+        "close",
+    ]
+    setup.connector.assert_not_called()
 
 
 @pytest.mark.parametrize("operation", ["authority", "enrollment"])

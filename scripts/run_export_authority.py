@@ -683,11 +683,14 @@ def main(argv=None):
             dispatch_guard=boundary.recheck,
         )
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
+        from scripts.run_export_authority import AuthorityBroker as RegisteredAuthorityBroker
         from services.export_reconciliation_service import TrustedProofIssuer
         from services.export_runtime_composition import LocalAuthorityClient, RuntimeRegistration
 
         registration = RuntimeRegistration(manifest["runtime_registration"])
-        broker = AuthorityBroker(authority, registration, boundary=boundary)
+        # runpy/direct-script entry points have a separate module class identity.
+        # Use the canonical broker accepted by LocalAuthorityClient after bootstrap.
+        broker = RegisteredAuthorityBroker(authority, registration, boundary=boundary)
         broker.issuer = TrustedProofIssuer(
             authority=authority,
             boundary=boundary,
