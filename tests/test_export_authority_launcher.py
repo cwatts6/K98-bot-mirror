@@ -128,6 +128,30 @@ def test_shared_native_image_rejection_precedes_sql_factory(
     factory.assert_not_called()
 
 
+def test_shared_provider_host_receives_reviewed_native_image(
+    authority_launch, monkeypatch, tmp_path
+):
+    import json
+
+    import core.export_process_identity as identity
+    from tests.test_export_single_account import TRUST_MODEL, process_bindings
+
+    path = tmp_path / "fixture-manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    bindings = process_bindings()
+    manifest.update(trust_model=TRUST_MODEL, process_bindings=bindings)
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(identity, "open_pinned_process", Mock(return_value=Mock()))
+    assert authority_launch.launchers["authority"]() == 0
+    # main imports the host factory from its owning module at startup.
+    import core.export_execution_host as host
+
+    args = host.WindowsExecutionHost.call_args.kwargs
+    assert args["python"] == manifest["python"]
+    assert args["native_python"] == bindings["authority"]["executable"]
+    assert args["native_python_sha256"] == bindings["authority"]["sha256"]
+
+
 @pytest.mark.parametrize("drained", [False, True])
 @pytest.mark.parametrize("serve_error", [None, KeyboardInterrupt, RuntimeError])
 def test_authority_shutdown_reports_retained_session_and_preserves_service_errors(

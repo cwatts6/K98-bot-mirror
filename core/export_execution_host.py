@@ -876,10 +876,9 @@ def inspect_bot_token(
 
 def authenticated_peer(handle, expected_sid, *, expected_pid=None, bot_authority_sid=None):
     import win32api
-    import win32pipe
     import win32security
 
-    win32pipe.ImpersonateNamedPipeClient(handle)
+    win32security.ImpersonateNamedPipeClient(handle)
     try:
         token = win32security.OpenThreadToken(win32api.GetCurrentThread(), 8, True)
         try:
@@ -999,7 +998,16 @@ class WindowsProviderChild:
 
 
 class WindowsExecutionHost:
-    def __init__(self, *, python, child_script, manifest, authority_sid):
+    def __init__(
+        self,
+        *,
+        python,
+        child_script,
+        manifest,
+        authority_sid,
+        native_python=None,
+        native_python_sha256=None,
+    ):
         self.python, self.child_script, self.manifest = map(Path, (python, child_script, manifest))
         if any(
             not p.is_absolute() or not p.is_file()
@@ -1010,19 +1018,57 @@ class WindowsExecutionHost:
             assert_protected_path(path)
         assert_protected_path(self.manifest, private=True)
         self.sid = authority_sid
+        if (native_python is None) != (native_python_sha256 is None):
+            raise HostBoundaryError("Both reviewed native interpreter bindings required.")
+        self.native_python = Path(native_python) if native_python is not None else None
+        self.native_python_sha256 = native_python_sha256
+        self._verify_native_image()
+
+    def _verify_native_image(self):
+        if self.native_python is None:
+            return
+        if (
+            not self.native_python.is_absolute()
+            or not self.native_python.is_file()
+            or not isinstance(self.native_python_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", self.native_python_sha256)
+        ):
+            raise HostBoundaryError("Exact reviewed native interpreter required.")
+        assert_protected_path(self.native_python)
+        if hashlib.sha256(self.native_python.read_bytes()).hexdigest() != self.native_python_sha256:
+            raise HostBoundaryError("Native interpreter differs from reviewed process image.")
 
     def create_suspended(self, identity):
+        import os
+
         import pywintypes
         import win32event
         import win32job
         import win32pipe
         import win32process
 
+        self._verify_native_image()
+        executable = self.native_python or self.python
+        environment = None
+        flags = 0x4 | 0x8000000
+        if self.native_python is not None:
+            # CPython's Windows venv launcher sets this same internal variable.
+            # Launch the pinned image directly so CreateProcess returns the
+            # process that owns the pipe, retaining the reviewed venv prefix.
+            environment = {
+                key: value
+                for key, value in os.environ.items()
+                if key.upper()
+                not in {"__PYVENV_LAUNCHER__", "PYTHONEXECUTABLE", "PYTHONHOME", "PYTHONPATH"}
+            }
+            environment["__PYVENV_LAUNCHER__"] = str(self.python)
+            flags |= 0x400  # CREATE_UNICODE_ENVIRONMENT
+
         name = "\\\\.\\pipe\\K98Export-" + identity
         pipe = create_private_pipe(
             name, authority_sid=self.sid, client_sid=self.sid, overlapped=True
         )
-        job = win32job.CreateJobObject(None, None)
+        job = win32job.CreateJobObject(None, "")  # pywin32 requires an empty unnamed-job string.
         limits = win32job.QueryInformationJobObject(job, 9)
         limits["BasicLimitInformation"]["LimitFlags"] = 0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
         win32job.SetInformationJobObject(job, 9, limits)
@@ -1030,7 +1076,7 @@ class WindowsExecutionHost:
         try:
             command = subprocess.list2cmdline(
                 [
-                    str(self.python),
+                    str(executable),
                     "-I",
                     str(self.child_script),
                     "--manifest",
@@ -1042,13 +1088,13 @@ class WindowsExecutionHost:
                 ]
             )
             process, thread, pid, _ = win32process.CreateProcess(
-                None,
+                str(executable),
                 command,
                 None,
                 None,
                 False,
-                0x4 | 0x8000000,
-                None,
+                flags,
+                environment,
                 str(self.child_script.parent),
                 win32process.STARTUPINFO(),
             )

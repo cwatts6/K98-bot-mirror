@@ -23,6 +23,19 @@ Production source deployment and process publication remain separate decisions.
 Tests cover distinct launcher/image paths, altered image paths and hashes, and
 native-image rejection before any SQL connection factory is created.
 
+Provider containment launches the pinned native authority image directly, with
+CPython's `__PYVENV_LAUNCHER__` set to the reviewed venv executable. Inherited
+interpreter-path overrides are removed case-insensitively. The image hash and
+protected path are checked before each launch, which remains suspended until
+assigned to the kill-on-close Job Object. The exact returned PID owns the pipe;
+SID/PID authentication, retained process handles and descendant-drain checks remain.
+
+The disposable local native regression uses real Windows process creation,
+private named-pipe SID/PID authentication, venv/pywin32 resolution and Job Object
+termination. Only synthetic-file ACL inspection is substituted; this is not a
+production ACL or future process-identity acceptance record. It also exercised
+and corrected pywin32's unnamed-job argument and security API namespace.
+
 Security routing: Changes review required for the exact Bot mirror and private
 promotion diffs. Deep scan off; no codebase audit. Existing direct-permission and
 whole-application SQL contract reviews remain separately qualified.

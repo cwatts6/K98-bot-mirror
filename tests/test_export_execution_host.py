@@ -66,15 +66,13 @@ def test_ipc_authentication_reverts_and_closes_token_when_privileged_bot_is_refu
     token = SimpleNamespace(Close=Mock())
     security = SimpleNamespace(
         TokenUser="user",
+        ImpersonateNamedPipeClient=Mock(),
         OpenThreadToken=lambda *_: token,
         GetTokenInformation=lambda *_: ("bot-sid", 0),
         ConvertSidToStringSid=str,
         RevertToSelf=Mock(),
     )
     monkeypatch.setitem(sys.modules, "win32api", SimpleNamespace(GetCurrentThread=lambda: 1))
-    monkeypatch.setitem(
-        sys.modules, "win32pipe", SimpleNamespace(ImpersonateNamedPipeClient=Mock())
-    )
     monkeypatch.setitem(sys.modules, "win32security", security)
     inspect = Mock(side_effect=HostBoundaryError("privileged"))
     monkeypatch.setattr("core.export_execution_host.inspect_bot_token", inspect)
