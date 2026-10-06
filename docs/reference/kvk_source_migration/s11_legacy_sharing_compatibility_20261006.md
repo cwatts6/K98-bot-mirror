@@ -11,7 +11,7 @@ an S11 index/generation file. Each entry has exactly these fields:
 
 ```json
 {
-  "editors": ["anyone", "other@example.com", "authority@example.iam.gserviceaccount.com"],
+  "editors": ["anyone", "authority@example.iam.gserviceaccount.com", "other@example.com"],
   "audience": "anyone_writer",
   "coordination_scope": "application_writers_only"
 }
