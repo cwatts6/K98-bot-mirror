@@ -361,9 +361,9 @@ def test_binding_validation_rejects_nonboolean_mode(tmp_path, mode):
         )
 
 
-@pytest.mark.parametrize("validation", [False, True])
+@pytest.mark.parametrize("validation,dotenv_marker", [(False, False), (True, False), (False, True)])
 def test_real_watchdog_glue_selects_gate_and_supplies_normal_child_environment(
-    tmp_path, validation
+    tmp_path, validation, dotenv_marker
 ):
     """Execute only the real launch/env statements, without locks or subprocesses."""
     import ast
@@ -401,6 +401,23 @@ def test_real_watchdog_glue_selects_gate_and_supplies_normal_child_environment(
         "os": SimpleNamespace(environ=environment, getpid=lambda: 123),
         "child_env_utf8": lambda: dict(environment),
     }
+    capture = next(
+        n
+        for n in source.body
+        if isinstance(n, ast.Assign)
+        and isinstance(n.targets[0], ast.Name)
+        and n.targets[0].id == "_startup_binding_validation"
+    )
+    config_import = next(
+        n for n in source.body if isinstance(n, ast.ImportFrom) and n.module == "constants"
+    )
+    assert capture.lineno < config_import.lineno
+    exec(
+        compile(ast.Module(body=[capture], type_ignores=[]), "watchdog-intent-fixture", "exec"),
+        scope,
+    )
+    if dotenv_marker:
+        environment["K98_EXPORT_LAUNCH_VALIDATION"] = "1"
     statements = ast.Module(body=[selection, *child_start.body[:3]], type_ignores=[])
     exec(compile(statements, "watchdog-launch-glue-fixture", "exec"), scope)
     assert scope["manual_rebinding"] is validation

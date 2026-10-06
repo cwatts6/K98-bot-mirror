@@ -10,6 +10,9 @@ import threading
 import time
 import traceback
 
+# Capture explicit launcher intent before constants/config can load .env.
+_startup_binding_validation = os.environ.get("K98_EXPORT_LAUNCH_VALIDATION") == "1"
+
 # A coordinated source-only installation cannot create application bytecode
 # before its held child validates the protected source inventory.
 sys.dont_write_bytecode = True
@@ -278,7 +281,7 @@ launch_command, manual_rebinding = watchdog_launch(
     intake=bot_config.KVK_SOURCE_INTAKE_ENABLED,
     recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
     plan=os.environ.get("K98_EXPORT_LAUNCH_PLAN"),
-    startup_validation=os.environ.get("K98_EXPORT_LAUNCH_VALIDATION") == "1",
+    startup_validation=_startup_binding_validation,
 )
 pid_path = BOT_PID_PATH
 
