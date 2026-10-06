@@ -3,6 +3,8 @@
 import copy
 import json
 from pathlib import Path
+import re
+import sqlite3
 
 import pytest
 
@@ -518,6 +520,46 @@ def test_membership_union_has_explicit_collation_for_each_name(contract):
     )
     assert "u.sid=SUSER_SID()" in query
     assert "WHERE u.name=USER_NAME() OR u.name='ExportLegacyEntryReader'" in query
+
+
+@pytest.mark.parametrize(
+    "category", ["grants", "memberships", "application_grants", "token_grants"]
+)
+def test_direct_snapshot_order_covers_projection_and_stabilizes_fingerprint(contract, category):
+    """An omitted field must not leave equal sort keys for distinct fingerprint rows."""
+    observed, approved = contract
+    query, _ = legacy_permission_queries(approved["source"])[category]
+    match = re.search(r"\bORDER BY\s+([A-Za-z_,\s]+)\s*$", query)
+    assert match is not None, "The complete UNION result needs a terminal ORDER BY."
+    fields = tuple(observed[category][0])
+    order = tuple(name.strip() for name in match[1].split(","))
+    assert len(order) == len(set(order)) and set(order) == set(fields)
+
+    # Each row differs from the base in only one projected field. Missing any
+    # sort key would tie two different rows and make their digest order-sensitive.
+    base = {
+        name: 0 if name == "MinorID" else None if name == "ColumnName" else "A" for name in fields
+    }
+    samples = [base]
+    for name in fields:
+        samples.append({**base, name: 1 if name == "MinorID" else "B"})
+    fingerprints = []
+    with sqlite3.connect(":memory:") as connection:
+        connection.create_collation(
+            "Latin1_General_100_BIN2",
+            lambda left, right: (left.encode("utf-16-be") > right.encode("utf-16-be"))
+            - (left.encode("utf-16-be") < right.encode("utf-16-be")),
+        )
+        projections = ",".join(
+            "?" + ("" if name == "MinorID" else " COLLATE Latin1_General_100_BIN2") + " AS " + name
+            for name in fields
+        )
+        statement = " UNION ALL ".join("SELECT " + projections for _ in samples)
+        statement += " ORDER BY " + ",".join(order)
+        for inputs in (samples, list(reversed(samples)), samples[1:] + samples[:1]):
+            rows = connection.execute(statement, [row[name] for row in inputs for name in fields])
+            fingerprints.append(digest([dict(zip(fields, row, strict=True)) for row in rows]))
+    assert len(set(fingerprints)) == 1
 
 
 @pytest.mark.parametrize(
