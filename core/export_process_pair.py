@@ -63,6 +63,11 @@ def validate_plan(plan):
 
 
 def verify_role(descriptor, role, plan):
+    """Compare the native image, not the venv redirector used to launch it.
+
+    plan.python/python_sha256 pin the independently reviewed native process
+    image. The authority manifest separately pins its provider-child launcher.
+    """
     from core.export_process_identity import validate_process_descriptor
 
     if role not in ROLES:

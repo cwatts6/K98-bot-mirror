@@ -104,6 +104,30 @@ def authority_launch(monkeypatch, tmp_path):
     )
 
 
+def test_shared_native_image_rejection_precedes_sql_factory(
+    authority_launch, monkeypatch, tmp_path
+):
+    import json
+
+    import core.export_process_identity as identity
+    import scripts.run_export_authority as launcher
+    from tests.test_export_single_account import TRUST_MODEL, process_bindings
+
+    path = tmp_path / "fixture-manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    bindings = process_bindings()
+    manifest.update(trust_model=TRUST_MODEL, process_bindings=bindings)
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    reject = Mock(side_effect=ValueError("Native image differs from the reviewed binding"))
+    monkeypatch.setattr(identity, "open_pinned_process", reject)
+    factory = Mock(side_effect=AssertionError("SQL factory reached before native image validation"))
+    monkeypatch.setattr(launcher, "connection_factory", factory)
+    with pytest.raises(ValueError, match="Native image"):
+        authority_launch.launchers["authority"]()
+    assert reject.call_args.args[1] == bindings["authority"]
+    factory.assert_not_called()
+
+
 @pytest.mark.parametrize("drained", [False, True])
 @pytest.mark.parametrize("serve_error", [None, KeyboardInterrupt, RuntimeError])
 def test_authority_shutdown_reports_retained_session_and_preserves_service_errors(
@@ -466,18 +490,20 @@ def test_broker_rejects_other_ownerless_scopes(change):
         lambda x: x | {"action": "proof"},
         lambda x: x | {"arbitrary": "extra"},
         lambda x: x | {"scope": scope() | {"Fence": True}},
-        lambda x: x
-        | {
-            "scope": scope()
+        lambda x: (
+            x
             | {
-                "ScopeJson": {
-                    "resources": [
-                        {"key": "destination:file-aaa", "version": 7},
-                        {"key": "account:account-a", "version": 4},
-                    ]
+                "scope": scope()
+                | {
+                    "ScopeJson": {
+                        "resources": [
+                            {"key": "destination:file-aaa", "version": 7},
+                            {"key": "account:account-a", "version": 4},
+                        ]
+                    }
                 }
             }
-        },
+        ),
     ],
 )
 def test_malformed_or_proof_authoring_message_never_reaches_authority(damage):

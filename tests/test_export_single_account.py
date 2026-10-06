@@ -255,7 +255,10 @@ def test_source_inventory_preserves_sql_names_with_sanitized_export_filenames():
 
 
 @pytest.mark.parametrize("enrollment", [False, True])
-def test_shared_launcher_requires_new_version_and_application_sql_profile(monkeypatch, enrollment):
+@pytest.mark.parametrize("venv_launcher", [False, True])
+def test_shared_launcher_requires_new_version_and_application_sql_profile(
+    monkeypatch, enrollment, venv_launcher
+):
     import scripts.run_export_authority as launcher
     from tests.test_export_runtime_composition import registration_fixture
 
@@ -279,7 +282,7 @@ def test_shared_launcher_requires_new_version_and_application_sql_profile(monkey
         authority_sid=SID,
         bot_sid=SID,
         pipe_id=str(uuid4()),
-        python="C:/K98/python.exe",
+        python="C:/K98/venv/Scripts/python.exe" if venv_launcher else "C:/K98/python.exe",
         child_script=str(root / "scripts/run_export_provider_child.py"),
         credentials_file="C:/K98/key.json",
         evidence_root="C:/K98/evidence",

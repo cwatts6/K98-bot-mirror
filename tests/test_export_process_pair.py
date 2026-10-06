@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from core.export_process_pair import bind_templates, publication, watchdog_launch
+from core.export_process_pair import bind_templates, publication, verify_role, watchdog_launch
 from services.export_execution_protocol import encode
 from tests.test_export_single_account import SID, process_bindings
 
@@ -87,6 +87,21 @@ def test_binding_changes_only_explicit_process_fields_and_retains_reviewed_contr
     assert bound["authority"]["sql_contract"] == original["authority"]["sql_contract"]
     with pytest.raises(ValueError, match="Fresh"):
         bind_templates(plan, bound, bindings)
+
+
+def test_native_image_remains_pinned_when_provider_launcher_is_a_venv(tmp_path, monkeypatch):
+    plan, templates, bindings = pair_fixture(tmp_path, monkeypatch)
+    templates["authority"]["python"] = "C:/K98/venv/Scripts/python.exe"
+    bound = bind_templates(plan, templates, bindings)
+    assert bound["authority"]["python"] == templates["authority"]["python"]
+    assert bound["authority"]["process_bindings"] == bindings
+    for role in ("bot", "authority"):
+        with pytest.raises(ValueError, match="Actual process"):
+            verify_role(
+                bindings[role] | {"executable": templates["authority"]["python"]}, role, plan
+            )
+        with pytest.raises(ValueError, match="Actual process"):
+            verify_role(bindings[role] | {"sha256": "d" * 64}, role, plan)
 
 
 @pytest.mark.parametrize(

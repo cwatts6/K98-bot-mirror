@@ -222,12 +222,10 @@ def manifest_contract(manifest, *, script, current_sid, inspect_path, enrollment
         raise AuthorityStartupError("Separate provisioned authority and Bot identities required.")
     if shared and not enrollment:
         validate_process_bindings(manifest["process_bindings"], current_sid)
-        from pathlib import PureWindowsPath
-
-        if PureWindowsPath(manifest["python"]) != PureWindowsPath(
-            manifest["process_bindings"]["authority"]["executable"]
-        ):
-            raise AuthorityStartupError("Supervisor executable differs from approved process.")
+        # python is the reviewed provider-child launcher, including its venv.
+        # Windows may report the base interpreter as the native process image.
+        # The manual plan pins that image separately; main verifies the exact
+        # current authority incarnation before opening any SQL connection.
     if not all(
         re.fullmatch(r"S-\d+(?:-\d+)+", manifest[key]) for key in ("authority_sid", "bot_sid")
     ):
