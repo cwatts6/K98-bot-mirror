@@ -221,6 +221,27 @@ WriteFailureReceipt @{Stage='STOP_INCOMPLETE';At='budget';FailureType='test'}
     assert '"Stage":"STOP_INCOMPLETE"' in result.stdout
 
 
+def test_supervisor_rejects_empty_or_incomplete_successful_workers(tmp_path):
+    run_helpers(
+        tmp_path,
+        r"""
+$progress=Join-Path $fixture 'progress';[IO.File]::WriteAllText($progress,'initial')
+$commands=@('exit 0', '[Console]::WriteLine(''not-json'')', '[Console]::WriteLine(''{"Stage":"preflight_completed"}'')', '[Console]::WriteLine(''{"Stage":"COMPLETED_FILESYSTEM_INSTALLATION_ONLY"}'')')
+$ordinal=0
+foreach($command in $commands){
+ $receipt=Join-Path $fixture ('missing-completion-'+($ordinal++)+'.jsonl')
+ $refused=$false;try{$null=InvokeBoundedWorker $command $progress $receipt 10000 -ExpectedCompletionStage 'COMPLETED_PREVIEW_ONLY'}catch{$refused=$true}
+ if(-not $refused){throw 'Zero-exit incomplete worker accepted'}
+ $last=Get-Content -LiteralPath $receipt -Tail 1 | ConvertFrom-Json
+ if($last.Stage -cne 'STOP_INCOMPLETE_SUPERVISOR' -or $last.ExitCode -ne 0){throw 'Missing exact partial-worker reconciliation receipt'}
+}
+$receipt=Join-Path $fixture 'complete-preview.jsonl'
+$null=InvokeBoundedWorker '[Console]::WriteLine(''{"Stage":"COMPLETED_PREVIEW_ONLY"}'')' $progress $receipt 10000 -ExpectedCompletionStage 'COMPLETED_PREVIEW_ONLY'
+if((Get-Content -LiteralPath $receipt -Tail 1 | ConvertFrom-Json).Stage -cne 'COMPLETED_PREVIEW_ONLY'){throw 'Valid completion rejected'}
+""",
+    )
+
+
 def test_supervisor_allows_progress_without_a_total_duration_cap(tmp_path):
     run_helpers(
         tmp_path,

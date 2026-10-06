@@ -16,7 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 
-function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$ReceiptPath,[int]$TimeoutMs=60000) {
+function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$ReceiptPath,[int]$TimeoutMs=60000,[string]$ExpectedCompletionStage='') {
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName='C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
     $workerCommand='$ErrorActionPreference=''Stop'';$ProgressPreference=''SilentlyContinue'';'+$Command
@@ -26,7 +26,7 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
     $process=[Diagnostics.Process]::new();$process.StartInfo=$start
     $journal=[IO.StreamWriter]::new([IO.File]::Open($ReceiptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read))
     $bytes=[long]0;$errorBytes=[long]0;$clock=[Diagnostics.Stopwatch]::StartNew();$lastProgress=[long]0;$stamp=[datetime]::MinValue;$started=$false
-    $errorBuffer=[char[]]::new(1024);$errorEnded=$false;$exitCode=$null;$failureReason='Worker launch failed'
+    $errorBuffer=[char[]]::new(1024);$errorEnded=$false;$exitCode=$null;$failureReason='Worker launch failed';$lastLine=$null
     try {
         if(-not $process.Start()){throw 'Worker launch failed'}
         $started=$true
@@ -48,6 +48,7 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
                 $bytes+=[Text.Encoding]::UTF8.GetByteCount($line)+2
                 if($bytes -gt 20MB-4096){$failureReason='Installation receipt output limit';throw $failureReason}
                 $journal.WriteLine($line);$journal.Flush();Write-Output $line
+                $lastLine=$line
                 $lineTask=$process.StandardOutput.ReadLineAsync()
             } else {Start-Sleep -Milliseconds 10}
         }
@@ -55,6 +56,12 @@ function InvokeBoundedWorker([string]$Command,[string]$ProgressPath,[string]$Rec
         if(-not $process.WaitForExit([int]$remaining)){$failureReason='Worker exit timeout';throw $failureReason}
         $exitCode=$process.ExitCode
         if($exitCode -ne 0 -or $errorBytes){$failureReason='Worker nonzero exit or diagnostic output';throw $failureReason}
+        if($null -eq $lastLine){$failureReason='Missing worker output';throw $failureReason}
+        if($ExpectedCompletionStage){
+            $failureReason='Missing expected worker completion record'
+            $completion=$lastLine | ConvertFrom-Json
+            if($null -eq $completion -or -not $completion.PSObject.Properties['Stage'] -or $completion.Stage -cne $ExpectedCompletionStage){throw $failureReason}
+        }
     } catch {
         if($started -and -not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)}
         if($started -and $process.HasExited){$exitCode=$process.ExitCode}
@@ -77,7 +84,8 @@ if(-not $Worker){
     $null=[IO.File]::Open($progressPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read).Dispose()
     $command="& '"+$PSCommandPath.Replace("'","''")+"' -Worker -WorkerProgressPath '"+$progressPath.Replace("'","''")+"' -PlanPath '"+$PlanPath.Replace("'","''")+"' -ExpectedPlanSHA256 '"+$ExpectedPlanSHA256.Replace("'","''")+"'"
     if($Apply){$command+=' -Apply'};if($OperatorHoldConfirmed){$command+=' -OperatorHoldConfirmed'};if($BotStopped){$command+=' -BotStopped'}
-    InvokeBoundedWorker $command $progressPath $receiptPath
+    $expectedStage=if($Apply){'COMPLETED_FILESYSTEM_INSTALLATION_ONLY'}else{'COMPLETED_PREVIEW_ONLY'}
+    InvokeBoundedWorker $command $progressPath $receiptPath -ExpectedCompletionStage $expectedStage
     return
 }
 $progressPath=$WorkerProgressPath
