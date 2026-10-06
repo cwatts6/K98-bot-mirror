@@ -118,7 +118,8 @@ def queries(base, source):
         WHERE u.sid=SUSER_SID() AND p.class=1
         UNION ALL SELECT 'master','$application','SERVER','',p.permission_name,p.state,0
         FROM sys.server_permissions p JOIN sys.server_principals u ON u.principal_id=p.grantee_principal_id
-        WHERE u.sid=SUSER_SID() AND NOT(p.class=100 AND p.major_id=0 AND p.permission_name='CONNECT SQL' AND p.state='G')""",
+        WHERE u.sid=SUSER_SID() AND NOT(p.class=100 AND p.major_id=0 AND p.permission_name='CONNECT SQL' AND p.state='G')
+        ORDER BY DatabaseName,PrincipalName,SecurableClass,TargetName,PermissionName,GrantState,MinorID""",
         (),
     )
     result["memberships"] = (
@@ -132,7 +133,8 @@ def queries(base, source):
         JOIN master.sys.database_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()
         UNION ALL SELECT '$server' COLLATE Latin1_General_100_BIN2,r.name COLLATE Latin1_General_100_BIN2 FROM sys.server_role_members m
         JOIN sys.server_principals u ON u.principal_id=m.member_principal_id
-        JOIN sys.server_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()""",
+        JOIN sys.server_principals r ON r.principal_id=m.role_principal_id WHERE u.sid=SUSER_SID()
+        ORDER BY PrincipalName,RoleName""",
         (),
     )
     result["application_grants"] = (
@@ -151,7 +153,8 @@ def queries(base, source):
         p.permission_name,p.state,
         CASE WHEN p.class=1 AND p.minor_id>0 THEN (SELECT name FROM master.sys.columns WHERE object_id=p.major_id AND column_id=p.minor_id) END
         FROM master.sys.database_permissions p JOIN master.sys.database_principals u ON u.principal_id=p.grantee_principal_id
-        WHERE u.sid=SUSER_SID()""",
+        WHERE u.sid=SUSER_SID()
+        ORDER BY DatabaseName,SecurableClass,TargetName,PermissionName,GrantState,ColumnName""",
         (),
     )
     result["token_grants"] = (
@@ -165,7 +168,8 @@ def queries(base, source):
         UNION ALL SELECT p.class_desc,'',p.permission_name,p.state FROM sys.server_permissions p
         JOIN sys.login_token t ON t.principal_id=p.grantee_principal_id WHERE p.state IN('G','W') AND
         (p.state='W' OR p.permission_name='TAKE OWNERSHIP' OR p.permission_name LIKE 'ALTER%' OR p.permission_name LIKE 'CREATE%'
-        OR p.permission_name LIKE 'CONTROL%' OR p.permission_name LIKE 'IMPERSONATE%')""",
+        OR p.permission_name LIKE 'CONTROL%' OR p.permission_name LIKE 'IMPERSONATE%')
+        ORDER BY SecurableClass,TargetName,PermissionName,GrantState""",
         (),
     )
     result["migration"] = (base["migration"][0], (DIRECT_MIGRATION,))
