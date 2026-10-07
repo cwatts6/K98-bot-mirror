@@ -72,6 +72,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Held S11 process; manual rebinding required")
     parser.add_argument("--plan", required=True)
     parser.add_argument("--role", required=True, choices=("bot", "authority"))
+    parser.add_argument("--automatic-issuer")
     args = parser.parse_args(argv)
     plan, raw, inspect = trusted_launch_plan(args.plan)
     templates = load_templates(plan, inspect)
@@ -95,6 +96,36 @@ def main(argv=None):
         flush=True,
     )
     try:
+        if args.automatic_issuer:
+            from core.export_automatic_pair import validate_issuer_record
+            from core.export_execution_host import MessagePipe, open_message_pipe
+            from core.export_process_identity import authenticate_process_peer
+
+            issuer_path = Path(args.automatic_issuer)
+            if (
+                issuer_path.parent != Path(args.plan).parent
+                or issuer_path.name != "AutomaticIssuer.json"
+            ):
+                raise ValueError("Issuer record must belong to this exact incarnation.")
+            inspect(issuer_path, private=True)
+            with issuer_path.open("rb") as source:
+                record_raw = source.read(65537)
+            if len(record_raw) > 65536:
+                raise ValueError("Issuer record exceeds its bound.")
+            record = json.loads(record_raw)
+            issuer = validate_issuer_record(record, plan, raw)
+            connection = open_message_pipe(r"\\.\pipe\K98Export-" + record["pipe_id"])
+            peer = None
+            try:
+                peer = authenticate_process_peer(connection, issuer, server=True)
+                channel = MessagePipe(connection)
+                channel.send(dict(version=1, role=args.role, plan_sha256=record["plan_sha256"]))
+                if channel.receive() != dict(version=1, accepted=True):
+                    raise ValueError("Automatic issuer did not acknowledge this held role.")
+            finally:
+                if peer is not None:
+                    peer.Close()
+                connection.Close()
         bindings = wait_for_publication(
             plan, raw, templates, args.role, handle, descriptor, inspect
         )

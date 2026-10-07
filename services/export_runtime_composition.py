@@ -298,7 +298,9 @@ class ExportRuntime(RuntimeLifetime):
             retirement_recovery=recovery,
         )
         legacy_adapter = LegacyProviderJob(
-            lambda _: recorded_clients(), authority_stream=legacy_streams.delivery
+            lambda _: recorded_clients(),
+            authority_stream=legacy_streams.delivery,
+            legacy_file_access=config.get("legacy_file_access", {}),
         )
         self.coordinator = ExportCoordinator(
             self.dal,

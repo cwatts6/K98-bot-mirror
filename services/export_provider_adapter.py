@@ -227,8 +227,51 @@ class LegacyProviderJob:
     factory must return (Sheets service, Drive service), without provider I/O.
     """
 
-    def __init__(self, clients, *, authority_stream=None):
+    def __init__(self, clients, *, authority_stream=None, legacy_file_access=None):
+        from copy import deepcopy
+
         self.clients, self.authority_stream = clients, authority_stream
+        policies = {} if legacy_file_access is None else legacy_file_access
+        if (
+            not isinstance(policies, dict)
+            or len(policies) > 1024
+            or any(
+                not isinstance(policy, dict)
+                or set(policy) != {"audience", "editors", "coordination_scope"}
+                or policy["audience"] not in {"private", "anyone_reader", "anyone_writer"}
+                or policy["coordination_scope"] != "application_writers_only"
+                for policy in policies.values()
+            )
+        ):
+            raise ValueError("Reviewed legacy sharing policy required.")
+        self.legacy_file_access = deepcopy(policies)
+
+    def _audience(self, file_id, response):
+        from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+        if response.get("nextPageToken") or not isinstance(response.get("permissions"), list):
+            raise SnapshotUnavailable("Complete ACL readback is required.")
+        public = [p for p in response["permissions"] if p["type"] in {"anyone", "domain"}]
+        policy = self.legacy_file_access.get(file_id)
+        allowed_role = "writer" if policy and policy["audience"] == "anyone_writer" else "reader"
+        if any(p["type"] != "anyone" or p["role"] != allowed_role for p in public):
+            raise SnapshotUnavailable("Unapproved output audience.")
+        actual = (
+            ("public_editor" if allowed_role == "writer" else "public_viewer")
+            if public
+            else "private"
+        )
+        if (
+            policy
+            and actual
+            != {
+                "private": "private",
+                "anyone_reader": "public_viewer",
+                "anyone_writer": "public_editor",
+            }[policy["audience"]]
+        ):
+            raise SnapshotUnavailable("Output differs from its registered legacy audience.")
+        return actual
 
     def __call__(self, job, claim, dal, budget, stop, payload):
         from collections import defaultdict
@@ -294,6 +337,11 @@ class LegacyProviderJob:
             and self.authority_stream is not None
         ):
             raise ValueError("Authority stream requires the matching SQL execution-evidence gate.")
+        per_file = bool(self.legacy_file_access)
+        if per_file and (
+            getattr(dal, "execution_evidence", False) is not True or self.authority_stream is None
+        ):
+            raise SnapshotUnavailable("Registered legacy audiences require recorded execution.")
         sheets, drive = self.clients(job)
         stream_owner = (
             self.authority_stream(job, claim, destinations)
@@ -321,25 +369,16 @@ class LegacyProviderJob:
                         fileId=file_id, fields="permissions(type,role),nextPageToken"
                     )
                 )
-                if permissions.get("nextPageToken"):
-                    raise SnapshotUnavailable("Complete ACL readback is required.")
-                public = [
-                    p
-                    for p in permissions.get("permissions", [])
-                    if p["type"] in {"anyone", "domain"}
-                ]
-                if any(p["type"] != "anyone" or p["role"] != "reader" for p in public):
-                    raise SnapshotUnavailable("Unapproved output audience.")
-                audiences[file_id] = "public_viewer" if public else "private"
+                audiences[file_id] = self._audience(file_id, permissions)
                 response = execute(
                     sheets.spreadsheets().get(spreadsheetId=file_id, fields="sheets.properties")
                 )
                 grids[file_id] = response.get("sheets", [])
-            if len(set(audiences.values())) != 1:
+            if not per_file and len(set(audiences.values())) != 1:
                 raise SnapshotUnavailable(
                     "Mixed output audiences require an explicit publication plan."
                 )
-            audience = next(iter(audiences.values()))
+            audience = "legacy_registered" if per_file else next(iter(audiences.values()))
             # Resolve all conflicts before the first mutation/attempt. Checking one
             # tab at a time would partially overwrite an earlier valid destination.
             for output, values in prepared:
@@ -372,6 +411,8 @@ class LegacyProviderJob:
             manifest = dict(
                 export_key=bytes(job["InputHash"]).hex(), preparation_id=metadata["preparation_id"]
             )
+            if per_file:
+                manifest.update(staging_audience="legacy_registered", legacy_audiences=audiences)
             attempt = dal.begin_attempt(claim, manifest, parts)
             for output, values in prepared:
                 file_id, tab, grid_id = output["file_id"], output["tab"], output["grid_id"]
@@ -480,15 +521,13 @@ class LegacyProviderJob:
                         fileId=file_id, fields="permissions(type,role),nextPageToken"
                     )
                 )
-                public = [
-                    p for p in response.get("permissions", []) if p["type"] in {"anyone", "domain"}
-                ]
-                actual = "public_viewer" if public else "private"
-                if (
-                    response.get("nextPageToken")
-                    or actual != audience
-                    or any(p["type"] != "anyone" or p["role"] != "reader" for p in public)
-                ):
+                try:
+                    actual = self._audience(file_id, response)
+                except SnapshotUnavailable as exc:
+                    raise ProviderOutcomeUnknown(
+                        "Output audience changed during delivery."
+                    ) from exc
+                if actual != audiences[file_id]:
                     raise ProviderOutcomeUnknown("Output audience changed during delivery.")
             dal.verified(claim, attempt, audience=audience)
             dal.publication_pending(claim, attempt)
@@ -502,5 +541,6 @@ class LegacyProviderJob:
                 files=list(destinations),
                 audience=audience,
                 remote_id="https://docs.google.com/spreadsheets/d/" + destinations[0],
+                **({"file_audiences": audiences} if per_file else {}),
             ),
         )

@@ -282,6 +282,7 @@ launch_command, manual_rebinding = watchdog_launch(
     recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
     plan=os.environ.get("K98_EXPORT_LAUNCH_PLAN"),
     startup_validation=_startup_binding_validation,
+    automatic_issuer=os.environ.get("K98_EXPORT_AUTOMATIC_ISSUER"),
 )
 pid_path = BOT_PID_PATH
 
@@ -372,6 +373,22 @@ try:
         safe_remove(pid_path)
 
         if manual_rebinding:
+            if os.environ.get("K98_EXPORT_AUTOMATIC_ISSUER"):
+                # The administrator issuer owns fresh-pair creation. Do not
+                # relaunch another child against this incarnation's manifests.
+                log.info("S11 child exited; returning outcome to the automatic startup issuer.")
+                if os.path.exists(SHUTDOWN_MARKER_FILE):
+                    log_restart("scheduled", "graceful")
+                    sys.exit(0)
+                if exit_code == RESTART_EXIT_CODE:
+                    if not wait_for_restart_flag():
+                        log_restart("crash", "exit_15_no_flag")
+                        sys.exit(1)
+                    timestamp, user_id, reason = read_restart_flag_metadata()
+                    safe_remove(RESTART_FLAG_PATH)
+                    write_last_restart_info(timestamp, user_id, reason)
+                    log_restart("manual", "success")
+                sys.exit(exit_code)
             log.warning(
                 "S11 child exited. Automatic relaunch is paused: retain authority/session "
                 "receipts, reconcile unfinished work and administratively bind a fresh pair."

@@ -12,7 +12,7 @@ import runpy
 from uuid import uuid4
 
 
-def publish_pair(plan, raw, templates, bindings, handles, inspect):
+def publish_pair(plan, raw, templates, bindings, handles, inspect, *, write_file=None):
     import win32security
 
     from core.export_execution_host import DeploymentBoundary, assert_protected_path
@@ -39,6 +39,12 @@ def publish_pair(plan, raw, templates, bindings, handles, inspect):
             raise ValueError("Publication destination already exists; retain it, do not overwrite.")
 
     def write_new(path, value):
+        if write_file is not None:
+            # Automatic startup creates administrator-owned bytes atomically,
+            # without a transient ordinary-account file-owner window.
+            write_file(path, encode(value))
+            inspect(path, private=True)
+            return
         with Path(path).open("xb") as destination:
             destination.write(encode(value))
             destination.flush()

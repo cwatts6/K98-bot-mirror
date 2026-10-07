@@ -70,6 +70,27 @@ def account_identity(service_account, project):
     return hashlib.sha256(canonical([service_account.lower(), project]).encode()).hexdigest()
 
 
+def legacy_attempt_audiences(document, files, consumer):
+    """A legacy receipt records each file's audience, never private staging."""
+    generation = document["generation"]
+    values = generation.get("legacy_audiences")
+    if generation.get("staging_audience") != "legacy_registered":
+        if values is not None:
+            raise SourceConflict("Legacy audiences require their explicit staging policy.")
+        return None
+    if (
+        consumer not in {"all_kvk", "scan_data"}
+        or not isinstance(values, dict)
+        or set(values) != set(files)
+        or any(
+            not isinstance(value, str) or value not in {"private", "public_viewer", "public_editor"}
+            for value in values.values()
+        )
+    ):
+        raise SourceConflict("Exact legacy-only per-file audience policy required.")
+    return values
+
+
 def checked_attempt_manifest(attempt, parts):
     """Validate the same pinned attempt from SQL rows or the immutable wire snapshot."""
 
@@ -77,9 +98,13 @@ def checked_attempt_manifest(attempt, parts):
         return value if isinstance(value, str) else bytes(value).hex()
 
     document = json.loads(attempt["ManifestJson"])
+    audiences = legacy_attempt_audiences(
+        document, [p["FileID"] for p in parts], attempt.get("ConsumerKind")
+    )
     if document.get("generation", {}).get("staging_audience", "private") not in {
         "private",
         "public_viewer",
+        "legacy_registered",
     }:
         raise SourceConflict("Unknown durable staging audience.")
     if digest(document).hex() != hex_value(attempt["ManifestHash"]):
@@ -101,6 +126,8 @@ def checked_attempt_manifest(attempt, parts):
         or [p["PartNo"] for p in parts] != list(range(1, len(parts) + 1))
     ):
         raise SourceConflict("Attempt part cardinality or immutable manifest differs.")
+    if audiences is not None and any(p["Role"] != "output" for p in parts):
+        raise SourceConflict("Legacy audience policy cannot cover S11 index or generation parts.")
     return document
 
 
@@ -974,7 +1001,18 @@ class ExportCoordinationDAL:
             ]
             validate_parts(parts, destinations)
             document = {"generation": manifest, "parts": parts}
-            if manifest.get("staging_audience", "private") not in {"private", "public_viewer"} or (
+            legacy_audiences = legacy_attempt_audiences(document, destinations, job["ConsumerKind"])
+            if legacy_audiences is not None and (
+                not self.execution_evidence or any(p["role"] != "output" for p in parts)
+            ):
+                raise SourceConflict(
+                    "Legacy audience policy requires recorded legacy output parts."
+                )
+            if manifest.get("staging_audience", "private") not in {
+                "private",
+                "public_viewer",
+                "legacy_registered",
+            } or (
                 manifest.get("staging_audience") == "public_viewer" and not self.execution_evidence
             ):
                 raise SourceConflict("Recorded execution is required for public staging.")
@@ -1056,10 +1094,17 @@ class ExportCoordinationDAL:
         return attempt, parts
 
     def verified(self, claim, attempt_id, *, audience="private"):
-        if audience not in {"private", "public_viewer"}:
+        if audience not in {"private", "public_viewer", "legacy_registered"}:
             raise ValueError("Verified audience required.")
         with self._owned(claim) as (cursor, job):
             attempt, parts = self._attempt(cursor, claim, attempt_id)
+            audiences = legacy_attempt_audiences(
+                json.loads(attempt["ManifestJson"]),
+                (p["FileID"] for p in parts),
+                job["ConsumerKind"],
+            )
+            if (audience == "legacy_registered") != (audiences is not None):
+                raise SourceConflict("Verified audience differs from the per-file legacy policy.")
             if job["ConsumerKind"] == "new_source":
                 pinned = json.loads(attempt["ManifestJson"])["generation"].get(
                     "staging_audience", "private"
@@ -1079,7 +1124,7 @@ class ExportCoordinationDAL:
                     _cas(
                         cursor,
                         "UPDATE dbo.ExportAttemptPart SET VerificationState='verified',VerifiedUTC=SYSUTCDATETIME(),AclState='"
-                        + audience
+                        + (audiences[p["FileID"]] if audiences is not None else audience)
                         + "',AclCheckedUTC=SYSUTCDATETIME(),Version=Version+1 "
                         "OUTPUT inserted.Version WHERE AttemptID=? AND PartNo=? AND Version=? AND QuarantineState='none'",
                         attempt_id,
@@ -1108,13 +1153,19 @@ class ExportCoordinationDAL:
         with self._owned(claim) as (cursor, job):
             attempt, parts = self._attempt(cursor, claim, attempt_id)
             document = json.loads(attempt["ManifestJson"])
+            audiences = legacy_attempt_audiences(
+                document, [p["FileID"] for p in parts], job["ConsumerKind"]
+            )
             if (
                 attempt["Phase"] != "publication_pending"
                 or receipt.get("export_key") != document["generation"]["export_key"]
                 or receipt.get("fence") != claim.fence
                 or receipt.get("attempt_id") != attempt_id
                 or receipt.get("files") != [p["FileID"] for p in parts]
-                or receipt.get("audience") not in {"private", "public_viewer"}
+                or receipt.get("audience") not in {"private", "public_viewer", "legacy_registered"}
+                or ((receipt.get("audience") == "legacy_registered") != (audiences is not None))
+                or (audiences is not None and receipt.get("file_audiences") != audiences)
+                or (audiences is None and "file_audiences" in receipt)
                 or (
                     document["generation"].get("staging_audience") == "public_viewer"
                     and receipt.get("audience") != "public_viewer"
@@ -1127,7 +1178,7 @@ class ExportCoordinationDAL:
                     cursor,
                     "UPDATE dbo.ExportAttemptPart SET VerificationState='verified',VerifiedUTC=SYSUTCDATETIME(),AclState=?,AclCheckedUTC=SYSUTCDATETIME(),Version=Version+1 "
                     "OUTPUT inserted.Version WHERE AttemptID=? AND PartNo=? AND Version=? AND QuarantineState='none'",
-                    receipt["audience"],
+                    audiences[part["FileID"]] if audiences is not None else receipt["audience"],
                     attempt_id,
                     part["PartNo"],
                     part["Version"],

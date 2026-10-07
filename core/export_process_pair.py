@@ -129,7 +129,15 @@ def bind_templates(plan, templates, bindings):
 
 
 def watchdog_launch(
-    python, root, *, coordination, intake, recovery, plan, startup_validation=False
+    python,
+    root,
+    *,
+    coordination,
+    intake,
+    recovery,
+    plan,
+    startup_validation=False,
+    automatic_issuer=None,
 ):
     """Keep flags-off launch unchanged; every S11 launch uses a held Bot gate."""
     from pathlib import Path
@@ -144,7 +152,7 @@ def watchdog_launch(
         raise ValueError(
             "Coordinated or validation startup requires an absolute reviewed launch plan."
         )
-    return [
+    command = [
         python,
         "-I",
         "-B",
@@ -153,7 +161,12 @@ def watchdog_launch(
         "bot",
         "--plan",
         plan,
-    ], True
+    ]
+    if automatic_issuer is not None:
+        if not Path(automatic_issuer).is_absolute():
+            raise ValueError("Absolute protected automatic issuer record required.")
+        command.extend(["--automatic-issuer", automatic_issuer])
+    return command, True
 
 
 def publication(plan_raw, manifests):
