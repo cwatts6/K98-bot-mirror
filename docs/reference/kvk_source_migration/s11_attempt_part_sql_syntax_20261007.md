@@ -24,8 +24,12 @@ cursor, then asks the explicitly selected local SQL Server compiler to describe
 the emitted statement against an inline table-variable shape. The compiler
 analyzes the batch; it never executes the INSERT or creates persistent objects.
 The test is opt-in with `K98_READ_ONLY_SQL_COMPILER=LOCAL_TEMPDB_COMPILE_ONLY` and
-uses the fixed development endpoint and `tempdb`, checking both before analysis.
-Ordinary CI skips it; local execution establishes the dialect-specific regression.
+uses local LPC (`lpc:localhost\K98DEV`) and `tempdb`, checking the reported server
+identity is `9SX2VF4\K98DEV` and database is `tempdb` before analysis. It is not a
+production test: ordinary CI and production test runs skip the compiler case.
+A separate offline case always checks the actual emitted DAL column and parameter
+binding without connecting to SQL; local compiler execution establishes the
+dialect-specific regression. Do not enable the compiler opt-in on MINI_AMD.
 
 The failed job remains retained and is not replayed by this patch. Protected
 source/runtime pins need renewal after review and merge. Fresh export completion,
