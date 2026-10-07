@@ -1056,7 +1056,7 @@ class ExportCoordinationDAL:
             )
             for number, part in enumerate(parts, 1):
                 cursor.execute(
-                    "INSERT dbo.ExportAttemptPart (AttemptID,PartNo,PartCount,FileID,Role,ManifestHash,GridCount,RowCount,CellCount,VerificationState,AclState,QuarantineState,Version) "
+                    "INSERT dbo.ExportAttemptPart (AttemptID,PartNo,PartCount,FileID,Role,ManifestHash,GridCount,[RowCount],CellCount,VerificationState,AclState,QuarantineState,Version) "
                     "VALUES (?,?,?,?,?,?,?,?,?,'pending','pending','none',1)",
                     attempt_id,
                     number,
