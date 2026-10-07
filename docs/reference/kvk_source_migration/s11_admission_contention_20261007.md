@@ -58,6 +58,9 @@ preparations. A newer configuration reader cannot acquire the account ahead of
 an older writer between its provider and SQL stages, then block that writer's
 SQL admission. All preflight consumers honor the retained account ticket; the
 existing terminal-state exclusions and account mutex remain in place.
+Delivery-job and output-rollover admission use the same waiting-state eligibility,
+so those consumers also defer behind an older SQL-pending writer. The account
+queue is not bypassed through a different admission entry point.
 
 If waiting is interrupted after an acknowledged refusal and before the next
 claim starts, the service uses the existing guarded withdrawal CAS, then

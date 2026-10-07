@@ -1322,7 +1322,7 @@ class SourceOutputPoolDAL:
             if op["State"] != "ready" or op["OwnerID"] is not None:
                 raise SourceConflict("Only ready operations can be admitted.")
             cursor.execute(
-                "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending' UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready') q WHERE Ticket<?",
+                "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending') UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready') q WHERE Ticket<?",
                 op["AccountKey"],
                 op["AccountKey"],
                 op["AccountKey"],

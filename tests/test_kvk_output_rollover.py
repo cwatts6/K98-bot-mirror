@@ -12,6 +12,50 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 from kvk.services.source_output_pool_service import SourceOutputPoolService, capacity
 
 
+def test_older_sql_pending_preparation_blocks_rollover_before_ownership(monkeypatch):
+    from kvk.dal import source_output_pool_dal as mod
+
+    cursor = Mock()
+    queries = []
+
+    def execute(query, *args):
+        queries.append((query, args))
+        cursor.answer = None
+        if query.startswith("SELECT AccountKey"):
+            cursor.answer = dict(AccountKey="acct")
+        elif query.startswith("SELECT * FROM KVK.SourceOutputPool"):
+            cursor.answer = dict(PoolID="pool", Fence=0, Version=1)
+        elif query.startswith("SELECT TOP (1) Ticket"):
+            cursor.answer = dict(Ticket=2)
+        return cursor
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    cursor.execute.side_effect = execute
+    monkeypatch.setattr(mod, "transaction", transaction)
+    monkeypatch.setattr(mod, "one", lambda _: cursor.answer)
+    monkeypatch.setattr(mod, "rows", lambda _: [{"ResourceKey": "account:acct"}])
+    mutex = Mock()
+    writes = Mock()
+    monkeypatch.setattr(mod, "_mutex", mutex)
+    monkeypatch.setattr(mod, "_cas", writes)
+    repo = mod.SourceOutputPoolDAL(Mock())
+    repo.operation = Mock(return_value=dict(PoolID="pool"))
+    repo._operation = Mock(
+        return_value=dict(State="ready", OwnerID=None, AccountKey="acct", EnqueueSequence=9)
+    )
+    repo._execution_gate = Mock()
+    assert repo.claim(str(uuid4())) is None
+    query, args = queries[-1]
+    assert "State IN ('pending','sql_pending')" in query
+    assert args == ("acct", "acct", "acct", 9)
+    assert mutex.call_args_list[0].args == (cursor, "account:acct")
+    writes.assert_not_called()
+    repo._execution_gate.assert_not_called()
+
+
 def test_database_guid_strings_are_canonical_but_file_ids_stay_byte_exact():
     from kvk.dal.source_output_pool_dal import _wire
 

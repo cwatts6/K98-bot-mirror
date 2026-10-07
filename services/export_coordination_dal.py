@@ -793,7 +793,7 @@ class ExportCoordinationDAL:
                         continue
                 if self.preparations:
                     cursor.execute(
-                        "SELECT TOP (1) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending' AND EnqueueSequence<?",
+                        "SELECT TOP (1) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending') AND EnqueueSequence<?",
                         account,
                         job["EnqueueSequence"],
                     )

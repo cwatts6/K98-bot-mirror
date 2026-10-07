@@ -836,3 +836,29 @@ def test_earlier_rollover_blocks_later_job_admission(monkeypatch, consumer, oper
     query, args = cursor.calls[-1]
     assert "State IN ('closing','ready')" in query and args == ("acct", 9)
     assert not any(q.startswith("UPDATE") for q, _ in cursor.calls)
+
+
+def test_older_sql_pending_preparation_blocks_delivery_job_before_ownership(monkeypatch):
+    cursor = Cursor(
+        singles=[
+            dict(
+                ActiveJobID=None,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+                BlockedReason=None,
+            ),
+            {"PreparationID": "older-sql-writer"},
+        ],
+        batches=[[{"JobID": "later"}], [{"ResourceKey": "account:acct"}]],
+    )
+    dal = scripted(monkeypatch, cursor)
+    dal.preparations = True
+    monkeypatch.setattr(mod, "_job", lambda *a: dict(ConsumerKind="scan_data", EnqueueSequence=9))
+    dal._execution_gate = Mock()
+    assert dal.claim_next("acct") is None
+    query, args = cursor.calls[-1]
+    assert "State IN ('pending','sql_pending')" in query
+    assert args == ("acct", 9)
+    assert "sp_getapplock" in cursor.calls[0][0]
+    dal._execution_gate.assert_not_called()
+    assert not any(q.startswith("UPDATE") for q, _ in cursor.calls)
