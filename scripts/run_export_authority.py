@@ -41,9 +41,11 @@ def report_dispatch_failure(message, error):
     action = message.get("action")
     action = (
         action
-        if isinstance(action, str) and action in {"ready", "open", "execute", "close", "proof"}
+        if isinstance(action, str) and action in {"ready", "open", "execute", "close", "prove"}
         else "invalid"
     )
+    request = message.get("request")
+    request = request if isinstance(request, dict) else {}
     types, states, numbers = [], set(), set()
     reason = None
     current = error
@@ -74,8 +76,13 @@ def report_dispatch_failure(message, error):
         "diagnostic_id": str(uuid4()),
         "authority_pid": os.getpid(),
         "action": action,
-        "stream_id": identifier(message.get("stream_id")),
-        "object_id": identifier(scope.get("ObjectID")),
+        "stream_id": identifier(
+            request.get("stream_id") if action == "execute" else message.get("stream_id")
+        ),
+        "object_id": identifier(
+            message.get("object_id") if action == "prove" else scope.get("ObjectID")
+        ),
+        "request_id": identifier(request.get("request_id")) if action == "execute" else None,
         "exception_types": types,
         "sqlstates": sorted(states)[:4],
         "sql_numbers": sorted(numbers)[:8],

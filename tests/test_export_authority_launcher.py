@@ -77,6 +77,36 @@ def test_dispatch_failure_logging_error_does_not_replace_original_outcome(monkey
     launcher.report_dispatch_failure({"action": "open"}, RuntimeError("private"))
 
 
+@pytest.mark.parametrize("action", ["ready", "open", "execute", "close", "prove", "proof"])
+def test_dispatch_diagnostics_follow_real_wire_message_shapes(capsys, action):
+    import json
+
+    from scripts.run_export_authority import report_dispatch_failure
+
+    stream, object_id, request_id = (str(uuid4()) for _ in range(3))
+    message = {"version": 1, "action": action}
+    if action == "open":
+        message.update(stream_id=stream.upper(), scope={"ObjectID": object_id.upper()})
+    elif action == "close":
+        message["stream_id"] = stream.upper()
+    elif action == "execute":
+        message["request"] = {
+            "stream_id": stream.upper(),
+            "request_id": request_id.upper(),
+            "payload": {"private": "fixture-private-payload"},
+        }
+    elif action == "prove":
+        message.update(object_id=object_id.upper(), snapshot_hash="fixture-private-hash")
+    report_dispatch_failure(message, RuntimeError("fixture-private-exception"))
+    output = capsys.readouterr().err
+    assert "fixture-private" not in output
+    record = json.loads(output)
+    assert record["action"] == ("invalid" if action == "proof" else action)
+    assert record["stream_id"] == (stream if action in {"open", "close", "execute"} else None)
+    assert record["object_id"] == (object_id if action in {"open", "prove"} else None)
+    assert record["request_id"] == (request_id if action == "execute" else None)
+
+
 @pytest.fixture
 def authority_launch(monkeypatch, tmp_path):
     import json
