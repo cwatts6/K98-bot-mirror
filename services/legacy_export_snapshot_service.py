@@ -580,18 +580,47 @@ class LegacyExportRuntime:
         claim outcome and must escape immediately; it is never retried here.
         Health probes opt out so their short observation timeout stays intact.
         """
-        deadline = time.monotonic() + 60.0
+        from services.legacy_export_snapshot_dal import _diagnostic_uuid
+
+        started = time.monotonic()
+        deadline = started + 60.0
+
+        def report(outcome, attempt, now, error_type=None):
+            record = dict(
+                preparation_id=_diagnostic_uuid(identifier),
+                stage=kwargs["stage"],
+                outcome=outcome,
+                attempt=attempt + 1,
+                elapsed_ms=max(0, int((now - started) * 1000)),
+                wait_enabled=bool(wait_for_admission),
+            )
+            if error_type is not None:
+                record["error_type"] = (
+                    error_type[:64]
+                    if error_type.isascii() and error_type.isidentifier()
+                    else "UnknownError"
+                )
+            logging.getLogger(__name__).info(
+                "export_admission_result %s",
+                json.dumps(record, sort_keys=True, separators=(",", ":")),
+            )
+
         for attempt in range(61):
-            claim = self.dal.claim(identifier, **kwargs)
+            try:
+                claim = self.dal.claim(identifier, **kwargs)
+            except BaseException as exc:
+                report("unknown", attempt, time.monotonic(), type(exc).__name__)
+                raise
+            now = time.monotonic()
             if claim is not None:
+                report("admitted", attempt, now)
                 return claim
-            remaining = deadline - time.monotonic()
+            remaining = deadline - now
             if not wait_for_admission or attempt == 60 or remaining <= 0:
+                report("confirmed_refusal", attempt, now)
                 return None
             if attempt % 5 == 0:
-                logging.getLogger(__name__).info(
-                    "Export admission waiting stage=%s attempt=%d", kwargs["stage"], attempt + 1
-                )
+                report("waiting", attempt, now)
             time.sleep(min(1.0, remaining))
         return None
 

@@ -93,6 +93,181 @@ def test_configuration_probe_and_sql_writer_defer_before_ownership(monkeypatch, 
         dal._execution_gate.assert_called_once_with(cursor, "acct", probe_only=stage == "writing")
 
 
+@pytest.mark.parametrize(
+    "reason,queue_kind,fail_commit",
+    [
+        ("resource_owned", None, False),
+        ("resource_blocked", None, False),
+        ("sql_writer_active", None, False),
+        ("config_reader_active", None, False),
+        ("older_queue_ticket", "job", False),
+        ("older_queue_ticket", "preparation", False),
+        ("older_queue_ticket", "output_operation", False),
+        ("resource_owned", None, True),
+    ],
+)
+def test_refusal_logs_exact_read_time_owner_or_queue_without_secrets(
+    monkeypatch, caplog, tmp_path, reason, queue_kind, fail_commit
+):
+    from contextlib import contextmanager
+    import hashlib
+    import logging
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_dal as module
+
+    identifier, holder, owner = str(uuid4()), str(uuid4()), str(uuid4())
+    stage = "writing" if reason == "config_reader_active" else "preflight"
+    free = dict(
+        ResourceKey="sql_snapshot:legacy_outputs" if stage == "writing" else "account:acct",
+        ActiveJobID=None,
+        ActivePreparationID=None,
+        ActiveOutputOperationID=None,
+        OwnerID=None,
+        Fence=4,
+        Version=8,
+        BlockedReason=None,
+    )
+    held = dict(
+        free,
+        PreparationID=holder,
+        ActivePreparationID=holder,
+        OwnerID=owner,
+        ResourceKey=(
+            "sql_snapshot:legacy_outputs" if reason == "sql_writer_active" else "account:acct"
+        ),
+        BlockedReason=(
+            "password=DO_NOT_LOG\nrequest=PRIVATE_BODY" if reason == "resource_blocked" else None
+        ),
+    )
+    preparation = dict(
+        AccountKey="acct",
+        StorageOwner="storage",
+        ConsumerKind="config",
+        State="sql_pending" if stage == "writing" else "pending",
+        EnqueueSequence=9,
+        Fence=0,
+        Version=1,
+    )
+    cursor = Mock()
+
+    def execute(sql, *parameters):
+        cursor.answer = None
+        if sql.startswith("SELECT * FROM dbo.ExportResource"):
+            cursor.answer = held if reason.startswith("resource_") else free
+        elif sql.startswith("SELECT * FROM dbo.ExportPreparation"):
+            cursor.answer = preparation
+        elif sql.startswith("SELECT TOP (1) p.PreparationID"):
+            assert "r.OwnerID" in sql and "r.Version" in sql
+            if reason in {"sql_writer_active", "config_reader_active"}:
+                cursor.answer = held
+        elif sql.startswith("SELECT TOP (1) Ticket"):
+            assert "ORDER BY Ticket,QueuedKind,QueuedID" in sql
+            assert "CONVERT(varchar(36),OperationID)" in sql
+            if queue_kind is not None:
+                cursor.answer = dict(Ticket=2, QueuedKind=queue_kind, QueuedID=holder)
+        return cursor
+
+    cursor.execute.side_effect = execute
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+        if fail_commit:
+            raise OSError("password=DO_NOT_LOG lost acknowledgment")
+
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "one", lambda c: c.answer)
+    monkeypatch.setattr(module, "_mutex", Mock())
+    writes = Mock()
+    monkeypatch.setattr(module, "_cas", writes)
+    dal = LegacySnapshotDAL(Mock(), output_operations=True)
+    dal.execution_evidence = True
+    dal._execution_gate = Mock()
+
+    def claim():
+        return dal.claim(
+            identifier,
+            account="acct",
+            storage_owner="storage",
+            stage=stage,
+            resource_keys=(free["ResourceKey"],),
+        )
+
+    with caplog.at_level(logging.INFO):
+        if fail_commit:
+            runtime, _ = producer_runtime(tmp_path)
+            runtime.dal = dal
+            sleep = Mock()
+            monkeypatch.setattr("services.legacy_export_snapshot_service.time.sleep", sleep)
+            with pytest.raises(OSError):
+                runtime._claim_unstarted(
+                    identifier,
+                    account="acct",
+                    storage_owner="storage",
+                    stage=stage,
+                    resource_keys=(free["ResourceKey"],),
+                )
+            sleep.assert_not_called()
+            result = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+            assert result["outcome"] == "unknown" and result["attempt"] == 1
+        else:
+            assert claim() is None
+    entries = [
+        r.getMessage() for r in caplog.records if r.msg.startswith("export_admission_refused")
+    ]
+    assert len(entries) == 1
+    record = json.loads(entries[0].split(" ", 1)[1])
+    assert record["preparation_id"] == identifier
+    assert record["stage"] == stage and record["reason"] == reason
+    assert record["observation"] == "transaction_read_not_commit"
+    assert datetime.fromisoformat(record["observed_utc"]).tzinfo is not None
+    if queue_kind is not None:
+        assert (record["older_ticket"], record["older_kind"], record["older_id"]) == (
+            2,
+            queue_kind,
+            holder,
+        )
+        assert record["ticket"] == 9
+    else:
+        assert record["active_preparation_id"] == holder and record["owner_id"] == owner
+        assert record["fence"] == 4 and record["version"] == 8
+        assert record["resource_sha256"] == hashlib.sha256(held["ResourceKey"].encode()).hexdigest()
+        assert record["blocked"] == (reason == "resource_blocked")
+    assert "DO_NOT_LOG" not in entries[0] and "PRIVATE_BODY" not in entries[0]
+    assert "account:acct" not in entries[0]
+    writes.assert_not_called()
+    dal._execution_gate.assert_not_called()
+
+
+def test_admission_diagnostic_rejects_malformed_ids_and_database_prose(caplog):
+    import logging
+
+    from services.legacy_export_snapshot_dal import _log_admission_refusal
+
+    secret = "credential=DO_NOT_LOG\nforged log line"
+    with caplog.at_level(logging.INFO):
+        _log_admission_refusal(
+            secret,
+            "preflight",
+            "resource_blocked",
+            resource=dict(
+                ResourceKey="account:" + secret,
+                OwnerID=secret,
+                ActivePreparationID=secret,
+                BlockedReason=secret,
+                Fence=secret,
+                Version=secret,
+            ),
+            queue=dict(Ticket=secret, QueuedKind=secret, QueuedID=secret),
+            ticket=secret,
+        )
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["preparation_id"] is None and record["owner_id"] is None
+    assert record["fence"] is None and record["older_kind"] is None
+    assert secret not in caplog.text and "DO_NOT_LOG" not in caplog.text
+
+
 def test_evidence_preparation_requires_protected_legacy_sql_contract_before_connecting():
     from unittest.mock import Mock
 
@@ -204,7 +379,9 @@ def test_health_target_missing_scope_never_claims(tmp_path, destinations):
     dal.claim.assert_not_called()
 
 
-def test_configuration_waits_for_busy_probe_using_same_ticket(tmp_path, monkeypatch):
+def test_configuration_waits_for_busy_probe_using_same_ticket(tmp_path, monkeypatch, caplog):
+    import logging
+
     import services.legacy_export_snapshot_service as module
 
     sleeps = []
@@ -214,9 +391,10 @@ def test_configuration_waits_for_busy_probe_using_same_ticket(tmp_path, monkeypa
     )
     claim = dal.claim.return_value
     dal.claim.side_effect = [None, None, claim]
-    with runtime.configuration_requests(wait_for_admission=True):
-        assert dal.claim.call_count == 3
-        dal.transition.assert_not_called()
+    with caplog.at_level(logging.INFO):
+        with runtime.configuration_requests(wait_for_admission=True):
+            assert dal.claim.call_count == 3
+            dal.transition.assert_not_called()
     assert sleeps == [1.0, 1.0]
     assert {call.args[0] for call in dal.claim.call_args_list} == {dal.request.return_value}
     dal.request.assert_called_once()
@@ -224,6 +402,14 @@ def test_configuration_waits_for_busy_probe_using_same_ticket(tmp_path, monkeypa
     dal.transition.assert_called_once_with(
         claim, expected="preflight", state="completed", release=True
     )
+    records = [
+        json.loads(r.getMessage().split(" ", 1)[1])
+        for r in caplog.records
+        if r.msg.startswith("export_admission_result")
+    ]
+    assert [r["outcome"] for r in records] == ["waiting", "admitted"]
+    assert records[-1]["attempt"] == 3
+    assert all(r["preparation_id"] == dal.request.return_value for r in records)
 
 
 def test_health_probe_refusal_does_not_wait(tmp_path, monkeypatch):
@@ -288,7 +474,8 @@ def test_configuration_failure_after_admission_is_not_replayed(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize("exception", [OSError("unknown claim outcome"), KeyboardInterrupt()])
-def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, exception):
+def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, exception, caplog):
+    import logging
     from unittest.mock import Mock
 
     import services.legacy_export_snapshot_service as module
@@ -297,12 +484,16 @@ def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, e
     monkeypatch.setattr(module.time, "sleep", sleep)
     runtime, dal = producer_runtime(tmp_path)
     dal.claim.side_effect = exception
-    with pytest.raises(type(exception)):
+    with caplog.at_level(logging.INFO), pytest.raises(type(exception)):
         runtime.begin_writer("all_kvk")
     dal.claim.assert_called_once()
     sleep.assert_not_called()
     dal.withdraw_unstarted.assert_not_called()
     dal.connect.assert_not_called()
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["outcome"] == "unknown" and record["attempt"] == 1
+    assert record["error_type"] == type(exception).__name__
+    assert "unknown claim outcome" not in caplog.text
 
 
 def test_writer_waits_at_both_admission_stages_before_sql(tmp_path, monkeypatch):

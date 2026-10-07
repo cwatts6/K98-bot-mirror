@@ -28,3 +28,20 @@ activation changes are included. Deployment still requires refreshed protected
 source/runtime pins through the existing promotion process. The retained failed
 export job is not replayed. Production acceptance requires a successful fresh
 ProcConfig import and a fresh export with recorded provider completion.
+
+Admission diagnostics now identify the decision at read time, rather than
+inferring it from a later resource query. `export_admission_refused` records one
+of `resource_owned`, `resource_blocked`, `sql_writer_active`,
+`config_reader_active`, or `older_queue_ticket`, with a UTC observation time,
+request preparation ID, holder IDs, fence/version, and oldest eligible queue
+ticket/type/ID where applicable. Resource keys are represented by SHA256, and
+blocked-reason prose, account names, request bodies and credentials are omitted.
+The same existing guard queries project diagnostic columns; no extra query is
+issued. Selecting the oldest queue blocker does not change queue eligibility.
+
+These DAL events are explicitly transaction-read observations, not commit proof.
+`export_admission_result` separately records an acknowledged admission/refusal,
+or an unknown outcome, with the same preparation ID, stage, attempt and elapsed
+time. Unknown outcomes include only a bounded exception class, never its message.
+This distinguishes a resource refusal from a subsequent lost acknowledgment and
+lets the operator correlate retained SQL evidence without replaying execution.

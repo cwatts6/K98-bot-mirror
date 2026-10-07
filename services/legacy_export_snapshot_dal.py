@@ -6,11 +6,69 @@ Unknown commits leave durable ownership blocked for authoritative reconciliation
 
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from datetime import UTC, datetime
+import hashlib
 import json
-from uuid import uuid4
+import logging
+from uuid import UUID, uuid4
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, transaction
 from services.export_coordination_dal import _cas, _mutex, bounded_json
+
+
+def _diagnostic_uuid(value):
+    try:
+        return str(UUID(str(value))) if value is not None else None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _diagnostic_counter(value):
+    return value if type(value) is int and 0 <= value <= 2**63 - 1 else None
+
+
+def _log_admission_refusal(identifier, stage, reason, *, resource=None, queue=None, ticket=None):
+    """Bounded read-time facts, never commit proof or arbitrary database prose."""
+    record = dict(
+        preparation_id=_diagnostic_uuid(identifier),
+        stage=stage,
+        reason=reason,
+        observation="transaction_read_not_commit",
+        observed_utc=datetime.now(UTC).isoformat(),
+        ticket=_diagnostic_counter(ticket),
+    )
+    if resource is not None:
+        key = resource.get("ResourceKey")
+        record.update(
+            resource_sha256=(
+                hashlib.sha256(key.encode("utf-8")).hexdigest()
+                if isinstance(key, str) and len(key) <= 256
+                else None
+            ),
+            resource_kind=(
+                key.split(":", 1)[0]
+                if isinstance(key, str)
+                and key.split(":", 1)[0] in {"account", "destination", "sql_snapshot"}
+                else None
+            ),
+            active_job_id=_diagnostic_uuid(resource.get("ActiveJobID")),
+            active_preparation_id=_diagnostic_uuid(resource.get("ActivePreparationID")),
+            active_output_operation_id=_diagnostic_uuid(resource.get("ActiveOutputOperationID")),
+            owner_id=_diagnostic_uuid(resource.get("OwnerID")),
+            fence=_diagnostic_counter(resource.get("Fence")),
+            version=_diagnostic_counter(resource.get("Version")),
+            blocked=bool(resource.get("BlockedReason")),
+        )
+    if queue is not None:
+        kind = queue.get("QueuedKind")
+        record.update(
+            older_ticket=_diagnostic_counter(queue.get("Ticket")),
+            older_kind=kind if kind in {"job", "preparation", "output_operation"} else None,
+            older_id=_diagnostic_uuid(queue.get("QueuedID")),
+        )
+    logging.getLogger(__name__).info(
+        "export_admission_refused %s", json.dumps(record, sort_keys=True, separators=(",", ":"))
+    )
 
 
 @dataclass(frozen=True)
@@ -213,6 +271,12 @@ class LegacySnapshotDAL:
                     or resource.get("ActiveOutputOperationID") is not None
                     or resource["BlockedReason"]
                 ):
+                    _log_admission_refusal(
+                        identifier,
+                        stage,
+                        "resource_blocked" if resource["BlockedReason"] else "resource_owned",
+                        resource=resource,
+                    )
                     return None
                 resources.append(resource)
             cursor.execute(
@@ -231,41 +295,75 @@ class LegacySnapshotDAL:
                     # The authority rejects probes while a SQL producer owns its
                     # snapshot. Defer before claiming account/provider resources.
                     cursor.execute(
-                        "SELECT TOP (1) p.PreparationID FROM dbo.ExportResource r "
+                        "SELECT TOP (1) p.PreparationID,r.ResourceKey,r.ActiveJobID,"
+                        "r.ActivePreparationID,r.ActiveOutputOperationID,r.OwnerID,"
+                        "r.Fence,r.Version,r.BlockedReason FROM dbo.ExportResource r "
                         "JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
-                        "WHERE p.AccountKey=? AND r.ResourceKind='sql_snapshot' AND r.OwnerID IS NOT NULL",
+                        "WHERE p.AccountKey=? AND r.ResourceKind='sql_snapshot' AND r.OwnerID IS NOT NULL "
+                        "ORDER BY r.ResourceKey",
                         account,
                     )
-                    if one(cursor) is not None:
+                    conflicting = one(cursor)
+                    if conflicting is not None:
+                        _log_admission_refusal(
+                            identifier,
+                            stage,
+                            "sql_writer_active",
+                            resource=conflicting,
+                            ticket=preparation["EnqueueSequence"],
+                        )
                         return None
                 elif stage == "writing":
                     # Close the opposite ordering: a producer cannot enter SQL
                     # between a configuration claim and its probe-stream open.
                     cursor.execute(
-                        "SELECT TOP (1) p.PreparationID FROM dbo.ExportResource r "
+                        "SELECT TOP (1) p.PreparationID,r.ResourceKey,r.ActiveJobID,"
+                        "r.ActivePreparationID,r.ActiveOutputOperationID,r.OwnerID,"
+                        "r.Fence,r.Version,r.BlockedReason FROM dbo.ExportResource r "
                         "JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
                         "WHERE r.ResourceKey=? AND p.AccountKey=? AND p.ConsumerKind='config' "
                         "AND r.OwnerID IS NOT NULL",
                         "account:" + account,
                         account,
                     )
-                    if one(cursor) is not None:
+                    conflicting = one(cursor)
+                    if conflicting is not None:
+                        _log_admission_refusal(
+                            identifier,
+                            stage,
+                            "config_reader_active",
+                            resource=conflicting,
+                            ticket=preparation["EnqueueSequence"],
+                        )
                         return None
             if stage == "preflight":
                 cursor.execute(
-                    "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"
+                    "SELECT TOP (1) Ticket,QueuedKind,QueuedID FROM (SELECT EnqueueSequence AS Ticket,"
+                    "'job' AS QueuedKind,CONVERT(varchar(36),JobID) AS QueuedID "
+                    "FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT "
+                    "EnqueueSequence,'preparation',CONVERT(varchar(36),PreparationID) "
+                    "FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"
                     + (
-                        " UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready')"
+                        " UNION ALL SELECT EnqueueSequence,'output_operation',CONVERT(varchar(36),OperationID) "
+                        "FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready')"
                         if self.output_operations
                         else ""
                     )
-                    + ") q WHERE Ticket<?",
+                    + ") q WHERE Ticket<? ORDER BY Ticket,QueuedKind,QueuedID",
                     account,
                     account,
                     *((account,) if self.output_operations else ()),
                     preparation["EnqueueSequence"],
                 )
-                if one(cursor):
+                older = one(cursor)
+                if older:
+                    _log_admission_refusal(
+                        identifier,
+                        stage,
+                        "older_queue_ticket",
+                        queue=older,
+                        ticket=preparation["EnqueueSequence"],
+                    )
                     return None
             self._execution_gate(cursor, account, probe_only=stage == "writing")
             fence = max(preparation["Fence"], *(r["Fence"] for r in resources)) + 1
