@@ -378,6 +378,7 @@ try:
                 # relaunch another child against this incarnation's manifests.
                 log.info("S11 child exited; returning outcome to the automatic startup issuer.")
                 if os.path.exists(SHUTDOWN_MARKER_FILE):
+                    safe_remove(SHUTDOWN_MARKER_FILE)
                     log_restart("scheduled", "graceful")
                     sys.exit(0)
                 if exit_code == RESTART_EXIT_CODE:
