@@ -7,11 +7,13 @@ the coordinator database remains the ownership authority.
 
 import asyncio
 from dataclasses import dataclass
+import json
 import logging
 import threading
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import JobSpec, bounded_json
+from services.export_failure_diagnostics import failure_record
 from services.export_request_budget import BudgetCompletionUnknown, RequestBudget
 from services.export_snapshot_store import SnapshotReceipt
 
@@ -122,12 +124,14 @@ class ExportCoordinator:
             if claim is None:
                 continue
             processed += 1
+            stage = "authorization"
             try:
                 job = self.dal.authorize(claim)
                 adapter = self.adapters.get(job["ConsumerKind"])
                 if adapter is None:
                     raise SourceConflict("Required consumer adapter is unavailable.")
                 snapshot = None
+                stage = "snapshot"
                 if job["SpoolKey"] is not None:
                     if self.storage is None:
                         raise SourceConflict("Registered durable storage is unavailable.")
@@ -145,6 +149,7 @@ class ExportCoordinator:
                     if snapshot is None:
                         raise SourceConflict("Legacy/daily execution requires a complete snapshot.")
                     LegacySnapshot.load(snapshot)
+                stage = "delivery"
                 adapter(
                     job,
                     claim,
@@ -161,12 +166,24 @@ class ExportCoordinator:
                         self.dal.fail(claim, retain_claims=True)
                     else:
                         self.dal.fail(claim)
-                except Exception:
+                except Exception as terminal_error:
                     # Commit acknowledgment loss or newer durable state: retain it.
                     # Never release independently after a failed terminal write.
                     logger.warning("Export stop retained ownership job=%s", claim.job_id)
+                    logger.warning(
+                        "export_terminal_record_failed %s",
+                        json.dumps(
+                            failure_record(
+                                terminal_error, job_id=claim.job_id, stage="terminal_record"
+                            )
+                        ),
+                    )
                 logger.warning(
                     "Export worker stopped job=%s error_type=%s", claim.job_id, type(exc).__name__
+                )
+                logger.warning(
+                    "export_worker_failed %s",
+                    json.dumps(failure_record(exc, job_id=claim.job_id, stage=stage)),
                 )
                 if not isinstance(exc, Exception):
                     raise
