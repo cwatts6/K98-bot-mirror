@@ -93,6 +93,92 @@ def test_configuration_probe_and_sql_writer_defer_before_ownership(monkeypatch, 
         dal._execution_gate.assert_called_once_with(cursor, "acct", probe_only=stage == "writing")
 
 
+@pytest.mark.parametrize("consumer", ["config", "scan_data"])
+@pytest.mark.parametrize("older_state", ["pending", "sql_pending"])
+def test_preflight_preserves_older_writer_ticket_across_consumers(
+    monkeypatch, caplog, consumer, older_state
+):
+    from contextlib import contextmanager
+    import logging
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_dal as module
+
+    old_id, new_id = str(uuid4()), str(uuid4())
+    older_waiting = [dict(Ticket=2, QueuedKind="preparation", QueuedID=old_id)]
+    cursor = Mock()
+    calls = []
+
+    def execute(sql, *parameters):
+        cursor.answer = None
+        calls.append(sql)
+        if sql.startswith("SELECT * FROM dbo.ExportResource"):
+            cursor.answer = dict(
+                ResourceKey=parameters[0],
+                ActiveJobID=None,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+                OwnerID=None,
+                BlockedReason=None,
+                Fence=4,
+                Version=8,
+            )
+        elif sql.startswith("SELECT * FROM dbo.ExportPreparation"):
+            cursor.answer = dict(
+                AccountKey="acct",
+                StorageOwner="storage",
+                ConsumerKind=consumer,
+                State="pending",
+                EnqueueSequence=3,
+                Fence=0,
+                Version=1,
+            )
+        elif sql.startswith("SELECT TOP (1) Ticket"):
+            assert "State IN ('pending','sql_pending')" in sql
+            assert "WHERE Ticket<? ORDER BY Ticket,QueuedKind,QueuedID" in sql
+            assert parameters == ("acct", "acct", "acct", 3)
+            if older_state in {"pending", "sql_pending"} and older_waiting:
+                cursor.answer = older_waiting[0]
+        return cursor
+
+    cursor.execute.side_effect = execute
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    writes = Mock(return_value={"Version": 2})
+    mutex = Mock(side_effect=lambda *_: calls.append("account_mutex"))
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "one", lambda c: c.answer)
+    monkeypatch.setattr(module, "_mutex", mutex)
+    monkeypatch.setattr(module, "_cas", writes)
+    dal = LegacySnapshotDAL(Mock(), output_operations=True)
+    dal.execution_evidence = True
+    dal._execution_gate = Mock()
+
+    def claim():
+        return dal.claim(
+            new_id,
+            account="acct",
+            storage_owner="storage",
+            stage="preflight",
+            resource_keys=("account:acct",),
+        )
+
+    with caplog.at_level(logging.INFO):
+        assert claim() is None
+    writes.assert_not_called()
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["reason"] == "older_queue_ticket"
+    assert record["older_id"] == old_id and record["older_ticket"] == 2
+    assert calls[0] == "account_mutex"
+    # The older writer leaves the waiting states before this reader is admitted.
+    older_waiting.clear()
+    assert claim().preparation_id == new_id
+    assert writes.call_count == 2
+
+
 def test_sql_waiters_cannot_overtake_original_ticket_order(monkeypatch, caplog):
     from contextlib import contextmanager
     import logging

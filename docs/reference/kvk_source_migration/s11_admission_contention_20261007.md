@@ -53,6 +53,12 @@ mutex before claiming the shared SQL snapshot. `older_sql_ticket` records its
 ID and ticket. This adds one read to SQL-stage admission, without schema or
 permission changes; a newer polling thread cannot overtake the older writer.
 
+Preflight ordering includes older `sql_pending` writers as well as `pending`
+preparations. A newer configuration reader cannot acquire the account ahead of
+an older writer between its provider and SQL stages, then block that writer's
+SQL admission. All preflight consumers honor the retained account ticket; the
+existing terminal-state exclusions and account mutex remain in place.
+
 If waiting is interrupted after an acknowledged refusal and before the next
 claim starts, the service uses the existing guarded withdrawal CAS, then
 propagates the interruption. `wait_aborted_withdrawn` means withdrawal returned

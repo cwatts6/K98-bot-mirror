@@ -339,12 +339,14 @@ class LegacySnapshotDAL:
                         )
                         return None
             if stage == "preflight":
+                # A writer retains its original ticket while waiting for SQL.
+                # New provider/configuration readers must not move ahead of it.
                 cursor.execute(
                     "SELECT TOP (1) Ticket,QueuedKind,QueuedID FROM (SELECT EnqueueSequence AS Ticket,"
                     "'job' AS QueuedKind,CONVERT(varchar(36),JobID) AS QueuedID "
                     "FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT "
                     "EnqueueSequence,'preparation',CONVERT(varchar(36),PreparationID) "
-                    "FROM dbo.ExportPreparation WHERE AccountKey=? AND State='pending'"
+                    "FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending')"
                     + (
                         " UNION ALL SELECT EnqueueSequence,'output_operation',CONVERT(varchar(36),OperationID) "
                         "FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready')"
