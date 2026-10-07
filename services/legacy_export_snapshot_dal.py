@@ -15,6 +15,8 @@ from uuid import UUID, uuid4
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, transaction
 from services.export_coordination_dal import _cas, _mutex, bounded_json
 
+logger = logging.getLogger(__name__)
+
 
 def _diagnostic_uuid(value):
     try:
@@ -66,7 +68,7 @@ def _log_admission_refusal(identifier, stage, reason, *, resource=None, queue=No
             older_kind=kind if kind in {"job", "preparation", "output_operation"} else None,
             older_id=_diagnostic_uuid(queue.get("QueuedID")),
         )
-    logging.getLogger(__name__).info(
+    logger.info(
         "export_admission_refused %s", json.dumps(record, sort_keys=True, separators=(",", ":"))
     )
 
@@ -361,6 +363,28 @@ class LegacySnapshotDAL:
                         identifier,
                         stage,
                         "older_queue_ticket",
+                        queue=older,
+                        ticket=preparation["EnqueueSequence"],
+                    )
+                    return None
+            else:
+                # Writers released provider admission before entering this SQL
+                # queue. Preserve their original ticket order when the shared
+                # snapshot becomes free, rather than racing polling threads.
+                cursor.execute(
+                    "SELECT TOP (1) EnqueueSequence AS Ticket,'preparation' AS QueuedKind,"
+                    "CONVERT(varchar(36),PreparationID) AS QueuedID "
+                    "FROM dbo.ExportPreparation WHERE AccountKey=? AND State='sql_pending' "
+                    "AND EnqueueSequence<? ORDER BY EnqueueSequence,PreparationID",
+                    account,
+                    preparation["EnqueueSequence"],
+                )
+                older = one(cursor)
+                if older:
+                    _log_admission_refusal(
+                        identifier,
+                        stage,
+                        "older_sql_ticket",
                         queue=older,
                         ticket=preparation["EnqueueSequence"],
                     )

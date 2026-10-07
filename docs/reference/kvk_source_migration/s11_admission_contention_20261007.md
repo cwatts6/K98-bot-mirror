@@ -32,12 +32,13 @@ ProcConfig import and a fresh export with recorded provider completion.
 Admission diagnostics now identify the decision at read time, rather than
 inferring it from a later resource query. `export_admission_refused` records one
 of `resource_owned`, `resource_blocked`, `sql_writer_active`,
-`config_reader_active`, or `older_queue_ticket`, with a UTC observation time,
+`config_reader_active`, `older_queue_ticket`, or `older_sql_ticket`, with a UTC observation time,
 request preparation ID, holder IDs, fence/version, and oldest eligible queue
 ticket/type/ID where applicable. Resource keys are represented by SHA256, and
 blocked-reason prose, account names, request bodies and credentials are omitted.
-The same existing guard queries project diagnostic columns; no extra query is
-issued. Selecting the oldest queue blocker does not change queue eligibility.
+Diagnostic projections add no extra query to the pre-existing guard checks.
+The SQL-stage FIFO check described below adds one read. Selecting the oldest
+queue blocker does not change queue eligibility.
 
 These DAL events are explicitly transaction-read observations, not commit proof.
 `export_admission_result` separately records an acknowledged admission/refusal,
@@ -45,3 +46,17 @@ or an unknown outcome, with the same preparation ID, stage, attempt and elapsed
 time. Unknown outcomes include only a bounded exception class, never its message.
 This distinguishes a resource refusal from a subsequent lost acknowledgment and
 lets the operator correlate retained SQL evidence without replaying execution.
+
+SQL-stage waiters are ordered by their original account ticket too. Writing
+admission checks for an older `sql_pending` preparation under the same account
+mutex before claiming the shared SQL snapshot. `older_sql_ticket` records its
+ID and ticket. This adds one read to SQL-stage admission, without schema or
+permission changes; a newer polling thread cannot overtake the older writer.
+
+If waiting is interrupted after an acknowledged refusal and before the next
+claim starts, the service uses the existing guarded withdrawal CAS, then
+propagates the interruption. `wait_aborted_withdrawn` means withdrawal returned
+successfully; `withdrawal_unknown` retains a failed/lost withdrawal acknowledgment
+for reconciliation. An exception from the claim itself never enters this cleanup
+path. Abrupt process/host loss still requires authoritative reconciliation; this
+does not infer safety from elapsed time or automatically adopt abandoned tickets.

@@ -21,6 +21,8 @@ from uuid import UUID
 
 from services.export_snapshot_store import SnapshotReceipt
 
+logger = logging.getLogger(__name__)
+
 
 class SnapshotUnavailable(ValueError):
     """Missing generation evidence is an unavailable output, never a fallback."""
@@ -600,7 +602,7 @@ class LegacyExportRuntime:
                     if error_type.isascii() and error_type.isidentifier()
                     else "UnknownError"
                 )
-            logging.getLogger(__name__).info(
+            logger.info(
                 "export_admission_result %s",
                 json.dumps(record, sort_keys=True, separators=(",", ":")),
             )
@@ -615,13 +617,25 @@ class LegacyExportRuntime:
             if claim is not None:
                 report("admitted", attempt, now)
                 return claim
-            remaining = deadline - now
-            if not wait_for_admission or attempt == 60 or remaining <= 0:
-                report("confirmed_refusal", attempt, now)
-                return None
-            if attempt % 5 == 0:
-                report("waiting", attempt, now)
-            time.sleep(min(1.0, remaining))
+            try:
+                remaining = deadline - now
+                if not wait_for_admission or attempt == 60 or remaining <= 0:
+                    report("confirmed_refusal", attempt, now)
+                    return None
+                if attempt % 5 == 0:
+                    report("waiting", attempt, now)
+                time.sleep(min(1.0, remaining))
+            except BaseException as exc:
+                # The preceding claim returned an acknowledged refusal. No
+                # provider/SQL execution or subsequent claim began, so the
+                # existing guarded CAS can withdraw this unstarted ticket.
+                try:
+                    self.dal.withdraw_unstarted(identifier)
+                except BaseException as cleanup:
+                    report("withdrawal_unknown", attempt, time.monotonic(), type(cleanup).__name__)
+                    raise
+                report("wait_aborted_withdrawn", attempt, time.monotonic(), type(exc).__name__)
+                raise
         return None
 
     def begin_writer(self, kind):

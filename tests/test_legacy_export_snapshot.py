@@ -93,6 +93,98 @@ def test_configuration_probe_and_sql_writer_defer_before_ownership(monkeypatch, 
         dal._execution_gate.assert_called_once_with(cursor, "acct", probe_only=stage == "writing")
 
 
+def test_sql_waiters_cannot_overtake_original_ticket_order(monkeypatch, caplog):
+    from contextlib import contextmanager
+    import logging
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_dal as module
+
+    old_id, new_id = str(uuid4()), str(uuid4())
+    waiting = {old_id: 2, new_id: 3}
+    current = {}
+    cursor = Mock()
+    queue_reads = []
+
+    def execute(sql, *parameters):
+        cursor.answer = None
+        if sql.startswith("SELECT * FROM dbo.ExportResource"):
+            cursor.answer = dict(
+                ResourceKey=parameters[0],
+                ActiveJobID=None,
+                ActivePreparationID=None,
+                ActiveOutputOperationID=None,
+                OwnerID=None,
+                Fence=4,
+                Version=8,
+                BlockedReason=None,
+            )
+        elif sql.startswith("SELECT * FROM dbo.ExportPreparation"):
+            current["id"] = parameters[0]
+            cursor.answer = dict(
+                AccountKey="acct",
+                StorageOwner="storage",
+                ConsumerKind="scan_data",
+                State="sql_pending",
+                EnqueueSequence=waiting[parameters[0]],
+                Fence=0,
+                Version=1,
+            )
+        elif sql.startswith("SELECT TOP (1) EnqueueSequence AS Ticket"):
+            assert "State='sql_pending'" in sql
+            assert "AccountKey=?" in sql and "EnqueueSequence<?" in sql
+            assert "ORDER BY EnqueueSequence,PreparationID" in sql
+            assert parameters == ("acct", waiting[current["id"]])
+            queue_reads.append(current["id"])
+            older = [
+                (ticket, identifier)
+                for identifier, ticket in waiting.items()
+                if ticket < waiting[current["id"]]
+            ]
+            if older:
+                ticket, identifier = min(older)
+                cursor.answer = dict(Ticket=ticket, QueuedKind="preparation", QueuedID=identifier)
+        return cursor
+
+    cursor.execute.side_effect = execute
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    mutex = Mock()
+    writes = Mock(return_value={"Version": 2})
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "one", lambda c: c.answer)
+    monkeypatch.setattr(module, "_mutex", mutex)
+    monkeypatch.setattr(module, "_cas", writes)
+    dal = LegacySnapshotDAL(Mock())
+
+    def claim(identifier):
+        return dal.claim(
+            identifier,
+            account="acct",
+            storage_owner="storage",
+            stage="writing",
+            resource_keys=("sql_snapshot:legacy_outputs",),
+        )
+
+    with caplog.at_level(logging.INFO):
+        assert claim(new_id) is None
+    writes.assert_not_called()
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["reason"] == "older_sql_ticket"
+    assert record["older_id"] == old_id and record["older_ticket"] == 2
+    assert claim(old_id).preparation_id == old_id
+    assert writes.call_count == 2
+    # Simulate the older writer leaving SQL-pending state after completing.
+    waiting.pop(old_id)
+    assert claim(new_id).preparation_id == new_id
+    assert writes.call_count == 4
+    assert queue_reads == [new_id, old_id, new_id]
+    assert mutex.call_args_list[0].args == (cursor, "account:acct")
+
+
 @pytest.mark.parametrize(
     "reason,queue_kind,fail_commit",
     [
@@ -494,6 +586,54 @@ def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, e
     assert record["outcome"] == "unknown" and record["attempt"] == 1
     assert record["error_type"] == type(exception).__name__
     assert "unknown claim outcome" not in caplog.text
+
+
+@pytest.mark.parametrize("stage", ["preflight", "writing"])
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_interrupted_confirmed_refusal_wait_withdraws_unstarted_ticket(
+    tmp_path, monkeypatch, caplog, stage, interruption
+):
+    import logging
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    runtime, dal = producer_runtime(tmp_path)
+    sleep = Mock(side_effect=interruption())
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    dal.claim.return_value = None
+    identifier = str(uuid4())
+    keys = ("account:acct",) if stage == "preflight" else ("sql_snapshot:legacy_outputs",)
+    with caplog.at_level(logging.INFO), pytest.raises(interruption):
+        runtime._claim_unstarted(
+            identifier, account="acct", storage_owner="storage", stage=stage, resource_keys=keys
+        )
+    dal.claim.assert_called_once()
+    dal.withdraw_unstarted.assert_called_once_with(identifier)
+    dal.connect.assert_not_called()
+    dal.transition.assert_not_called()
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["outcome"] == "wait_aborted_withdrawn"
+
+
+def test_interrupted_wait_withdrawal_failure_is_not_retried(tmp_path, monkeypatch, caplog):
+    import logging
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    runtime, dal = producer_runtime(tmp_path)
+    monkeypatch.setattr(module.time, "sleep", Mock(side_effect=KeyboardInterrupt()))
+    dal.claim.return_value = None
+    dal.withdraw_unstarted.side_effect = OSError("withdrawal acknowledgment lost")
+    with caplog.at_level(logging.INFO), pytest.raises(OSError, match="acknowledgment lost"):
+        runtime.begin_writer("all_kvk")
+    dal.claim.assert_called_once()
+    dal.withdraw_unstarted.assert_called_once()
+    dal.connect.assert_not_called()
+    record = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert record["outcome"] == "withdrawal_unknown"
+    assert "acknowledgment lost" not in caplog.text
 
 
 def test_writer_waits_at_both_admission_stages_before_sql(tmp_path, monkeypatch):
