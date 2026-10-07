@@ -636,7 +636,7 @@ def run_proc_config_import(
         try:
             from services.legacy_export_snapshot_service import configuration_requests
 
-            with configuration_requests():
+            with configuration_requests(wait_for_admission=True):
                 sheet_service = _get_sheet_service()
                 ok_sheets, sheet_errors = _validate_sheet_schemas(sheet_service)
             if not ok_sheets:
@@ -675,7 +675,7 @@ def run_proc_config_import(
     try:
         from services.legacy_export_snapshot_service import configuration_requests, writer_scope
 
-        with configuration_requests():
+        with configuration_requests(wait_for_admission=True):
             sheet = _get_sheet_service()
 
             logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, KVK_SHEET_ID)

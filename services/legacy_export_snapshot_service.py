@@ -14,7 +14,9 @@ from decimal import Decimal
 from functools import wraps
 import hashlib
 import json
+import logging
 import math
+import time
 from uuid import UUID
 
 from services.export_snapshot_store import SnapshotReceipt
@@ -256,14 +258,14 @@ def verify_producer_cursor(cursor):
 
 
 @contextmanager
-def configuration_requests():
+def configuration_requests(*, wait_for_admission=False):
     runtime = _writer_runtime()
     if runtime is None:
         yield
     else:
         if current_owner() is not None and not current_owner().closed:
             raise SnapshotUnavailable("Collect provider configuration before SQL writer admission.")
-        with runtime.configuration_requests():
+        with runtime.configuration_requests(wait_for_admission=wait_for_admission):
             yield
 
 
@@ -502,7 +504,7 @@ class LegacyExportRuntime:
         return preferred if preferred in destinations else min(destinations)
 
     @contextmanager
-    def configuration_requests(self):
+    def configuration_requests(self, *, wait_for_admission=False):
         from uuid import uuid4
 
         from services.export_provider_adapter import ProviderAdapter, use_provider
@@ -531,12 +533,13 @@ class LegacyExportRuntime:
                 {"account:" + self.account, *("destination:" + d for d in scope["destinations"])}
             )
         )
-        claim = self.dal.claim(
+        claim = self._claim_unstarted(
             identifier,
             account=self.account,
             storage_owner=self.store.storage_owner,
             stage="preflight",
             resource_keys=keys,
+            wait_for_admission=wait_for_admission,
         )
         if claim is None:
             self.dal.withdraw_unstarted(identifier)
@@ -570,6 +573,28 @@ class LegacyExportRuntime:
             self.dal.uncertain(claim)
             raise
 
+    def _claim_unstarted(self, identifier, *, wait_for_admission=True, **kwargs):
+        """Wait only after an acknowledged refusal, before any execution starts.
+
+        Keep the same durable queue ticket. An exception can mean an unknown
+        claim outcome and must escape immediately; it is never retried here.
+        Health probes opt out so their short observation timeout stays intact.
+        """
+        deadline = time.monotonic() + 60.0
+        for attempt in range(61):
+            claim = self.dal.claim(identifier, **kwargs)
+            if claim is not None:
+                return claim
+            remaining = deadline - time.monotonic()
+            if not wait_for_admission or attempt == 60 or remaining <= 0:
+                return None
+            if attempt % 5 == 0:
+                logging.getLogger(__name__).info(
+                    "Export admission waiting stage=%s attempt=%d", kwargs["stage"], attempt + 1
+                )
+            time.sleep(min(1.0, remaining))
+        return None
+
     def begin_writer(self, kind):
         from uuid import uuid4
 
@@ -584,7 +609,7 @@ class LegacyExportRuntime:
             actor="system:legacy_writer",
             reason=kind,
         )
-        claim = self.dal.claim(
+        claim = self._claim_unstarted(
             identifier,
             account=self.account,
             storage_owner=self.store.storage_owner,
@@ -597,7 +622,7 @@ class LegacyExportRuntime:
                 "Writer unavailable: account admission refused before execution."
             )
         claim = self.dal.transition(claim, expected="preflight", state="sql_pending", release=True)
-        claim = self.dal.claim(
+        claim = self._claim_unstarted(
             identifier,
             account=self.account,
             storage_owner=self.store.storage_owner,

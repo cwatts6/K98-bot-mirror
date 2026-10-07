@@ -204,6 +204,129 @@ def test_health_target_missing_scope_never_claims(tmp_path, destinations):
     dal.claim.assert_not_called()
 
 
+def test_configuration_waits_for_busy_probe_using_same_ticket(tmp_path, monkeypatch):
+    import services.legacy_export_snapshot_service as module
+
+    sleeps = []
+    monkeypatch.setattr(module.time, "sleep", sleeps.append)
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": ["file-a"]}}
+    )
+    claim = dal.claim.return_value
+    dal.claim.side_effect = [None, None, claim]
+    with runtime.configuration_requests(wait_for_admission=True):
+        assert dal.claim.call_count == 3
+        dal.transition.assert_not_called()
+    assert sleeps == [1.0, 1.0]
+    assert {call.args[0] for call in dal.claim.call_args_list} == {dal.request.return_value}
+    dal.request.assert_called_once()
+    dal.withdraw_unstarted.assert_not_called()
+    dal.transition.assert_called_once_with(
+        claim, expected="preflight", state="completed", release=True
+    )
+
+
+def test_health_probe_refusal_does_not_wait(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    sleep = Mock()
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": ["file-a"]}}
+    )
+    dal.claim.return_value = None
+    with pytest.raises(SnapshotUnavailable, match="admission refused"):
+        with runtime.configuration_requests():
+            pytest.fail("Refused probe must not execute")
+    sleep.assert_not_called()
+    dal.claim.assert_called_once()
+    dal.withdraw_unstarted.assert_called_once()
+
+
+def test_admission_deadline_withdraws_before_any_execution(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    sleep = Mock()
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    clock = iter([100.0, 161.0])
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(clock))
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": ["file-a"]}}
+    )
+    dal.claim.return_value = None
+    with pytest.raises(SnapshotUnavailable, match="admission refused"):
+        with runtime.configuration_requests(wait_for_admission=True):
+            pytest.fail("Expired admission must not execute")
+    sleep.assert_not_called()
+    dal.claim.assert_called_once()
+    dal.withdraw_unstarted.assert_called_once()
+
+
+def test_configuration_failure_after_admission_is_not_replayed(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    sleep = Mock()
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": ["file-a"]}}
+    )
+    claim = dal.claim.return_value
+    with pytest.raises(OSError, match="execution outcome unknown"):
+        with runtime.configuration_requests(wait_for_admission=True):
+            raise OSError("execution outcome unknown")
+    dal.claim.assert_called_once()
+    dal.uncertain.assert_called_once_with(claim)
+    dal.transition.assert_not_called()
+    dal.withdraw_unstarted.assert_not_called()
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("exception", [OSError("unknown claim outcome"), KeyboardInterrupt()])
+def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, exception):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    sleep = Mock()
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    runtime, dal = producer_runtime(tmp_path)
+    dal.claim.side_effect = exception
+    with pytest.raises(type(exception)):
+        runtime.begin_writer("all_kvk")
+    dal.claim.assert_called_once()
+    sleep.assert_not_called()
+    dal.withdraw_unstarted.assert_not_called()
+    dal.connect.assert_not_called()
+
+
+def test_writer_waits_at_both_admission_stages_before_sql(tmp_path, monkeypatch):
+    import services.legacy_export_snapshot_service as module
+
+    sleeps = []
+    monkeypatch.setattr(module.time, "sleep", sleeps.append)
+    runtime, dal = producer_runtime(tmp_path)
+    claim = dal.claim.return_value
+    dal.claim.side_effect = [None, claim, None, claim]
+    owner = runtime.begin_writer("all_kvk")
+    assert owner.claim is claim
+    assert sleeps == [1.0, 1.0]
+    assert [call.kwargs["stage"] for call in dal.claim.call_args_list] == [
+        "preflight",
+        "preflight",
+        "writing",
+        "writing",
+    ]
+    dal.request.assert_called_once()
+    dal.connect.assert_called_once()
+    dal.withdraw_unstarted.assert_not_called()
+
+
 def test_later_failed_producer_invalidates_earlier_pipeline_capture(tmp_path):
     from services.legacy_export_snapshot_service import _captures, admitted_writer, use_runtime
 
@@ -758,12 +881,15 @@ def test_writer_setup_failure_marks_durable_claim_uncertain(tmp_path, failure):
 
 
 @pytest.mark.parametrize("stage", ["preflight", "writing"])
-def test_refused_unstarted_operation_is_withdrawn_without_executing(tmp_path, stage):
+def test_refused_unstarted_operation_is_withdrawn_without_executing(tmp_path, stage, monkeypatch):
+    import services.legacy_export_snapshot_service as module
+
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
     from services.legacy_export_snapshot_service import admitted_writer, use_runtime
 
     runtime, dal = producer_runtime(tmp_path)
     claim = dal.claim.return_value
-    dal.claim.side_effect = [None] if stage == "preflight" else [claim, None]
+    dal.claim.side_effect = [None] * 61 if stage == "preflight" else [claim] + [None] * 61
     ran = []
 
     @admitted_writer("all_kvk")
