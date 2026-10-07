@@ -1729,17 +1729,33 @@ def check_basic_gsheets_access(
 ):
     from services.legacy_export_snapshot_service import _writer_runtime, configuration_requests
 
-    if _writer_runtime() is not None:
+    runtime = _writer_runtime()
+    if runtime is not None:
+        stage = "target_selection"
         try:
+            sheet_id = runtime.configuration_health_destination(sheet_id)
+            stage = "admission"
             with configuration_requests():
                 from services.export_provider_adapter import recorded_clients
 
+                stage = "client_construction"
                 sheets, _ = recorded_clients()
+                stage = "request"
                 current_provider().execute(
                     sheets.spreadsheets().get(spreadsheetId=sheet_id, fields="spreadsheetId")
                 )
-            return True, "GSheets access confirmed through the S11 authority"
-        except Exception:
+                stage = "closure"
+            return (
+                True,
+                "GSheets access confirmed through the S11 authority (registered configuration)",
+            )
+        except Exception as exc:
+            error_type = type(exc).__name__
+            if len(error_type) > 64 or not error_type.isascii() or not error_type.isidentifier():
+                error_type = "Exception"
+            logger.warning(
+                "[HEALTH][S11] Probe unresolved stage=%s error_type=%s", stage, error_type
+            )
             # The owned preparation retains uncertainty. Health polling must not
             # fall back to the copied legacy key or retry an unresolved action.
             return False, "S11 provider access is unresolved; inspect retained evidence"

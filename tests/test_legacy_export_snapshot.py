@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+import json
 from uuid import uuid4
 
 import pytest
@@ -148,7 +149,7 @@ def test_evidence_session_checks_same_connection_before_producer_and_preserves_t
     assert connection.autocommit is True
 
 
-def producer_runtime(tmp_path, *, capture=None):
+def producer_runtime(tmp_path, *, capture=None, configuration=None):
     from contextlib import nullcontext
     from dataclasses import replace
     from unittest.mock import Mock
@@ -172,10 +173,35 @@ def producer_runtime(tmp_path, *, capture=None):
         coordinator=Mock(preparations=True),
         account="acct",
         store=ExportSnapshotStore(tmp_path, "storage"),
-        configuration={"all_kvk": scope},
+        configuration={"all_kvk": scope} if configuration is None else configuration,
         capture=capture or Mock(return_value=outputs),
     )
     return runtime, dal
+
+
+@pytest.mark.parametrize("preferred", ["registered-z", "unregistered", ""])
+def test_health_target_uses_immutable_configuration_without_admission(tmp_path, preferred):
+    configuration = {"config": {"destinations": ["registered-z", "registered-a"]}}
+    runtime, dal = producer_runtime(tmp_path, configuration=configuration)
+    configuration["config"]["destinations"].append("unregistered")
+
+    assert runtime.configuration_health_destination(preferred) == (
+        "registered-z" if preferred == "registered-z" else "registered-a"
+    )
+    dal.request.assert_not_called()
+    dal.claim.assert_not_called()
+
+
+@pytest.mark.parametrize("destinations", [None, [], [""]])
+def test_health_target_missing_scope_never_claims(tmp_path, destinations):
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": destinations}}
+    )
+
+    with pytest.raises(SnapshotUnavailable, match="health scope"):
+        runtime.configuration_health_destination("unregistered")
+    dal.request.assert_not_called()
+    dal.claim.assert_not_called()
 
 
 def test_later_failed_producer_invalidates_earlier_pipeline_capture(tmp_path):
@@ -203,7 +229,6 @@ def test_later_failed_producer_invalidates_earlier_pipeline_capture(tmp_path):
 @pytest.mark.parametrize("consumer,season", [("all_kvk", 7), ("scan_data", None)])
 @pytest.mark.parametrize("state", ["captured", "materialized"])
 def test_submission_returns_only_job_id_from_dal_job_row(tmp_path, consumer, season, state):
-    import json
 
     runtime, dal = producer_runtime(tmp_path)
     registration = dict(consumer=consumer, kvk_no=season, destinations=["file-a"])

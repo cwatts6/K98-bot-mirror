@@ -453,7 +453,7 @@ def test_s11_provider_getters_cannot_fall_back_to_copied_legacy_key(monkeypatch,
 
 @pytest.mark.parametrize("failed", [False, True])
 def test_s11_health_uses_one_owned_authority_request_without_credential_fallback(
-    monkeypatch, failed
+    monkeypatch, caplog, failed
 ):
     from contextlib import nullcontext
     from unittest.mock import Mock
@@ -461,12 +461,14 @@ def test_s11_health_uses_one_owned_authority_request_without_credential_fallback
     import services.export_provider_adapter as provider
     import services.legacy_export_snapshot_service as legacy
 
-    monkeypatch.setattr(legacy, "_writer_runtime", lambda: object())
+    runtime = Mock()
+    runtime.configuration_health_destination.return_value = "registered-config"
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
     monkeypatch.setattr(legacy, "configuration_requests", lambda: nullcontext())
     sheets = Mock()
     adapter = Mock()
     if failed:
-        adapter.execute.side_effect = RuntimeError("unknown response")
+        adapter.execute.side_effect = RuntimeError("unknown response SECRET_EXCEPTION_PAYLOAD")
     monkeypatch.setattr(provider, "recorded_clients", lambda: (sheets, object()))
     monkeypatch.setattr(gm, "current_provider", lambda: adapter)
     fallback = Mock(side_effect=AssertionError("legacy key used"))
@@ -481,3 +483,101 @@ def test_s11_health_uses_one_owned_authority_request_without_credential_fallback
     )
     adapter.execute.assert_called_once()
     fallback.assert_not_called()
+    if failed:
+        assert "stage=request error_type=RuntimeError" in caplog.text
+        assert "SECRET_EXCEPTION_PAYLOAD" not in caplog.text
+
+
+@pytest.mark.parametrize("preferred", ["registered-config", "kingdom-summary", ""])
+def test_s11_health_selects_registered_probe_before_admission(monkeypatch, preferred):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    from services.export_execution_protocol import ProviderRequest
+    import services.export_provider_adapter as provider
+    import services.legacy_export_snapshot_service as legacy
+
+    dal = Mock(execution_evidence=False)
+    runtime = legacy.LegacyExportRuntime(
+        dal=dal,
+        store=SimpleNamespace(storage_owner="fixture"),
+        coordinator=SimpleNamespace(preparations=True, execution_evidence=False),
+        account="fixture-account",
+        configuration={"config": {"destinations": ["registered-config"]}},
+    )
+    execution = Mock(return_value={"spreadsheetId": "registered-config"})
+    forbidden = Mock(side_effect=AssertionError("local credential or HTTP fallback"))
+    adapter = provider.ProviderAdapter(
+        budget=forbidden,
+        authorize=Mock(),
+        destinations=["registered-config"],
+        execution=execution,
+        stream_id=str(uuid4()),
+    )
+    boundaries = []
+
+    @contextmanager
+    def admitted():
+        boundaries.append("entered")
+        try:
+            with provider.use_provider(adapter):
+                yield
+        except Exception:
+            boundaries.append("uncertain")
+            raise
+        else:
+            boundaries.append("completed")
+
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
+    monkeypatch.setattr(legacy, "configuration_requests", admitted)
+    monkeypatch.setattr(gm, "get_gsheet_client", forbidden)
+    monkeypatch.setattr(gm.Credentials, "from_service_account_file", forbidden)
+
+    ok, message = gm.check_basic_gsheets_access.__wrapped__("unused", preferred)
+
+    assert ok
+    assert boundaries == ["entered", "completed"]
+    typed = ProviderRequest.parse(execution.call_args.args[0])
+    assert typed.target == "registered-config" and typed.operation == "sheets.get"
+    assert not typed.mutation and execution.call_count == 1
+    forbidden.assert_not_called()
+    dal.request.assert_not_called()
+
+
+def test_s11_health_missing_registered_target_fails_before_claim(monkeypatch, caplog):
+    from unittest.mock import Mock
+
+    import services.export_provider_adapter as provider
+    import services.legacy_export_snapshot_service as legacy
+    from services.legacy_export_snapshot_service import SnapshotUnavailable
+
+    runtime = Mock()
+    runtime.configuration_health_destination.side_effect = SnapshotUnavailable("missing scope")
+    forbidden = Mock(side_effect=AssertionError("admission, credentials or client construction"))
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
+    monkeypatch.setattr(legacy, "configuration_requests", forbidden)
+    monkeypatch.setattr(provider, "recorded_clients", forbidden)
+    monkeypatch.setattr(gm, "get_gsheet_client", forbidden)
+
+    ok, message = gm.check_basic_gsheets_access.__wrapped__("unused", "unregistered")
+
+    assert not ok and "unresolved" in message
+    assert "stage=target_selection error_type=SnapshotUnavailable" in caplog.text
+    forbidden.assert_not_called()
+
+
+def test_legacy_health_keeps_requested_sheet(monkeypatch):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as legacy
+
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: None)
+    client = Mock()
+    monkeypatch.setattr(gm, "get_gsheet_client", lambda _credentials: client)
+
+    ok, message = gm.check_basic_gsheets_access.__wrapped__("legacy", "kingdom-summary")
+
+    assert ok and message == "GSheets access OK"
+    client.open_by_key.assert_called_once_with("kingdom-summary")

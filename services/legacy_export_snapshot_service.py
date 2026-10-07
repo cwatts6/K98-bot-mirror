@@ -489,6 +489,18 @@ class LegacyExportRuntime:
         ):
             raise ValueError("Configuration preparation and coordinator evidence gates differ.")
 
+    def configuration_health_destination(self, preferred):
+        """Select a representative from the immutable admitted health scope."""
+        scope = json.loads(self.configuration).get("config", {})
+        destinations = scope.get("destinations")
+        if (
+            not isinstance(destinations, list)
+            or not destinations
+            or any(not isinstance(value, str) or not value for value in destinations)
+        ):
+            raise SnapshotUnavailable("Registered configuration health scope is unavailable.")
+        return preferred if preferred in destinations else min(destinations)
+
     @contextmanager
     def configuration_requests(self):
         from uuid import uuid4
