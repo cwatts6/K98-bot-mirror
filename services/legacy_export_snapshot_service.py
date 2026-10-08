@@ -678,6 +678,22 @@ class LegacyExportRuntime:
             try:
                 claim = self.dal.claim(identifier, **kwargs)
             except CoordinationLockRefused as exc:
+                if exc.result in {-2, -3, -999} and exc.transaction_released:
+                    # A terminal attributed refusal with acknowledged rollback
+                    # and close cannot have admitted this attempt. The caller is
+                    # abandoning its exact ticket; leave no pending queue blocker.
+                    # The DAL CAS still rejects admitted/owned or captured work.
+                    try:
+                        self.dal.withdraw_unstarted(identifier)
+                    except BaseException as cleanup:
+                        report(
+                            "withdrawal_unknown", attempt, time.monotonic(), type(cleanup).__name__
+                        )
+                        raise
+                    report(
+                        "terminal_refusal_withdrawn", attempt, time.monotonic(), type(exc).__name__
+                    )
+                    raise
                 if exc.result != -1 or not exc.transaction_released:
                     report("unknown", attempt, time.monotonic(), type(exc).__name__)
                     raise
