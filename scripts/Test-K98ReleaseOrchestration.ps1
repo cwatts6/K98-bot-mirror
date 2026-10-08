@@ -42,4 +42,31 @@ foreach($case in $cases) {
     Assert (($script:events -join ',') -ceq $case.expected) ('Unexpected replay/order: '+$case.name)
     Assert ((Test-Path (Join-Path $directory 'source.complete.json')) -eq ((-not $case.fails) -or [bool]$case.complete)) ('Wrong completion: '+$case.name)
 }
-[pscustomobject]@{Status='PASS';Cases=$cases.Count;Evidence=$root;ProductionTouched=$false}|ConvertTo-Json -Compress
+foreach($name in @('Get-BytesHash','Read-Pinned','Read-IncarnationIssuer')) {
+    $definition=$ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$true)
+    if($null -eq $definition){throw ('Missing production function: '+$name)}
+    . ([scriptblock]::Create($definition.Extent.Text))
+}
+function Assert-AdminPath([string]$Path){$script:inspected=$Path}
+function Read-Control([string]$Path){$script:issuerReads++;return $Path}
+$planPath=Join-Path $root 'pinned-plan.json'
+$commitPath=Join-Path $root 'runtime\seed\Commit.json'
+$planBytes=[Text.UTF8Encoding]::new($false).GetBytes((@{commit_file=$commitPath}|ConvertTo-Json -Compress))
+[IO.File]::WriteAllBytes($planPath,$planBytes)
+$policy=[pscustomobject]@{seed_plan=@{path=$planPath;sha256=(Get-BytesHash $planBytes)}}
+$nonce=[guid]::NewGuid().ToString()
+$expected=Join-Path (Join-Path (Join-Path $root 'runtime') $nonce) 'AutomaticIssuer.json'
+foreach($policyLocation in @('runtime\seed\Policy.json','elsewhere\Policy.json')) {
+    # A policy's storage location must not select the runtime incarnation root.
+    $script:manifest=@{policy=@{path=(Join-Path $root $policyLocation)}}
+    $script:issuerReads=0
+    $actual=Read-IncarnationIssuer $policy $nonce
+    Assert ($actual -ceq $expected) 'Issuer location did not follow pinned commit_file'
+    Assert ($script:inspected -ceq $planPath) 'Seed plan ACL was not checked'
+    Assert ($script:issuerReads -eq 1) 'Issuer record not read exactly once'
+}
+[IO.File]::AppendAllText($planPath,' ')
+$script:issuerReads=0;$failed=$false
+try {$null=Read-IncarnationIssuer $policy $nonce} catch {$failed=$true}
+Assert ($failed -and $script:issuerReads -eq 0) 'Altered plan reached issuer lookup'
+[pscustomobject]@{Status='PASS';Cases=($cases.Count+3);Evidence=$root;ProductionTouched=$false}|ConvertTo-Json -Compress

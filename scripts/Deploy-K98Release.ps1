@@ -76,6 +76,14 @@ function Read-Control([string]$Path) {
     if((Get-Item -LiteralPath $Path).Length -gt 65536){throw 'Control record exceeds bound'}
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
+function Read-IncarnationIssuer($Policy,[string]$Incarnation) {
+    Assert-AdminPath $Policy.seed_plan.path
+    $planRaw=Read-Pinned $Policy.seed_plan.path $Policy.seed_plan.sha256 1MB
+    $plan=[Text.Encoding]::UTF8.GetString($planRaw)|ConvertFrom-Json
+    if(-not [IO.Path]::IsPathRooted($plan.commit_file)){throw 'Absolute pinned plan commit path required'}
+    $runtimeRoot=Split-Path -Parent (Split-Path -Parent $plan.commit_file)
+    Read-Control (Join-Path (Join-Path $runtimeRoot $Incarnation) 'AutomaticIssuer.json')
+}
 function Invoke-ReleaseScript($Invocation) {
     $member=@($script:manifest.members|Where-Object {$_.name -ceq $Invocation.file})
     if($member.Count -ne 1 -or $Invocation.file -notmatch '\.ps1$'){throw 'Unlisted release script'}
@@ -172,8 +180,7 @@ $previous=Read-Control $journals[-1].FullName
 if($previous.policy_sha256 -cne $manifest.policy.sha256){throw 'Current incarnation policy differs'}
 if($journals[-1].Name -notmatch '^incarnation-[0-9]{20}-([0-9a-f-]{36})\.json$'){throw 'Invalid incarnation filename'}
 $incarnation=$Matches[1]
-$runtimeRoot=Split-Path -Parent (Split-Path -Parent $manifest.policy.path)
-$issuerRecord=Read-Control (Join-Path (Join-Path $runtimeRoot $incarnation) 'AutomaticIssuer.json')
+$issuerRecord=Read-IncarnationIssuer $policy $incarnation
 if($issuerRecord.plan_sha256 -cne $previous.publication.plan_sha256){throw 'Issuer publication differs'}
 $issuerProcess=$null
 try {
