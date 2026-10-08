@@ -5,6 +5,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 import csv
 from datetime import UTC, datetime
+from itertools import chain
 import json
 import logging
 import os
@@ -35,7 +36,26 @@ def read_restart_history(count: int = 5) -> list[dict[str, str]]:
     for path in paths:
         try:
             with open(path, encoding="utf-8-sig", newline="") as stream:
-                recent.extend(csv.DictReader(stream))
+                reader = csv.reader(stream)
+                first = next((row for row in reader if row), None)
+                if first is None:
+                    continue
+                if first[0] == "Timestamp":
+                    fields = first
+                    records = reader
+                else:
+                    # The watchdog and audit appender both write headerless rows.
+                    fields = [
+                        "Timestamp",
+                        "Reason",
+                        "UserId",
+                        "Status",
+                        "WS Code",
+                        "WS Reason",
+                        "WS Time",
+                    ]
+                    records = chain([first], reader)
+                recent.extend(dict(zip(fields, row, strict=False)) for row in records if row)
         except FileNotFoundError:
             continue
     return list(recent)

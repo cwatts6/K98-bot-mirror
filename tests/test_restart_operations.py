@@ -32,6 +32,32 @@ def test_restart_history_preserves_legacy_and_reads_runtime_independent_of_cwd(
     assert old.read_text() == "Timestamp,Reason\nold,legacy\n"
 
 
+def test_restart_history_retains_first_headerless_watchdog_event(tmp_path, monkeypatch):
+    runtime = tmp_path / "runtime.csv"
+    runtime.write_text(
+        "2026-10-08T12:00:00+00:00,watchdog,SYSTEM,success\n"
+        '2026-10-08T12:01:00+00:00,"slash,restart",123,success,,,\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(restart_operations, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(runtime))
+    rows = restart_operations.read_restart_history(20)
+    assert len(rows) == 2
+    assert rows[0] == dict(
+        Timestamp="2026-10-08T12:00:00+00:00", Reason="watchdog", UserId="SYSTEM", Status="success"
+    )
+    assert rows[1]["Reason"] == "slash,restart"
+    assert rows[1]["WS Code"] == ""
+
+
+def test_restart_history_empty_files_are_not_events(tmp_path, monkeypatch):
+    runtime = tmp_path / "runtime.csv"
+    runtime.write_text("\n\n", encoding="utf-8")
+    monkeypatch.setattr(restart_operations, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(runtime))
+    assert restart_operations.read_restart_history() == []
+
+
 @pytest.mark.asyncio
 async def test_restart_audit_uses_runtime_path_outside_source_root(tmp_path, monkeypatch):
     target = tmp_path / "logs" / "restart_log.csv"
