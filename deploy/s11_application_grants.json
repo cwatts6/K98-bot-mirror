@@ -1,0 +1,1099 @@
+{
+  "version": 2,
+  "recommended_principal": "S11_ExportApplication",
+  "profile": "application",
+  "roles": [
+    "ExportExecutionAuthority",
+    "ExportLegacyEntryReader"
+  ],
+  "database_permissions": [
+    "CONNECT",
+    "VIEW DEFINITION"
+  ],
+  "server_permissions": [
+    "ADMINISTER BULK OPERATIONS",
+    "VIEW SERVER PERFORMANCE STATE"
+  ],
+  "grants": [
+    {
+      "object": "sys.sql_expression_dependencies",
+      "permission": "SELECT",
+      "source": "https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-sql-expression-dependencies-transact-sql",
+      "qualification": "System catalog metadata only; requires existing VIEW DEFINITION. Production separately approved and verified 2026-10-05."
+    },
+    {
+      "object": "KVK.KVK_AllPlayers_Stage",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_AllPlayers_Stage.Table.sql",
+      "source_sha256": "40308839257db05883e2156a516253a30a4443a55b2a3b81814139668d730329"
+    },
+    {
+      "object": "KVK.KVK_AllPlayers_Stage",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_AllPlayers_Stage.Table.sql",
+      "source_sha256": "40308839257db05883e2156a516253a30a4443a55b2a3b81814139668d730329"
+    },
+    {
+      "object": "KVK.KVK_AllPlayers_Stage",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_AllPlayers_Stage.Table.sql",
+      "source_sha256": "40308839257db05883e2156a516253a30a4443a55b2a3b81814139668d730329"
+    },
+    {
+      "object": "KVK.KVK_CampMap",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_CampMap.Table.sql",
+      "source_sha256": "daba60805d03634ebbed329a4170c82ffd00b327d65b8b5f98e5fb8a29f6746a"
+    },
+    {
+      "object": "KVK.KVK_CampMap",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_CampMap.Table.sql",
+      "source_sha256": "daba60805d03634ebbed329a4170c82ffd00b327d65b8b5f98e5fb8a29f6746a"
+    },
+    {
+      "object": "KVK.KVK_CampMap",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_CampMap.Table.sql",
+      "source_sha256": "daba60805d03634ebbed329a4170c82ffd00b327d65b8b5f98e5fb8a29f6746a"
+    },
+    {
+      "object": "KVK.KVK_DKPWeights",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_DKPWeights.Table.sql",
+      "source_sha256": "feba3b61f50725340ba7e46e022a5e22122601f993be18ef051c17174ae72cb8"
+    },
+    {
+      "object": "KVK.KVK_DKPWeights",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_DKPWeights.Table.sql",
+      "source_sha256": "feba3b61f50725340ba7e46e022a5e22122601f993be18ef051c17174ae72cb8"
+    },
+    {
+      "object": "KVK.KVK_DKPWeights",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_DKPWeights.Table.sql",
+      "source_sha256": "feba3b61f50725340ba7e46e022a5e22122601f993be18ef051c17174ae72cb8"
+    },
+    {
+      "object": "KVK.KVK_Ingest_Diagnostics",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Ingest_Diagnostics.Table.sql",
+      "source_sha256": "4d5c3cb8429b66d41f25559145da8e4c19ce8c6d251d4e2c5eb2e5b21e3ffd93"
+    },
+    {
+      "object": "KVK.KVK_Ingest_Diagnostics",
+      "permission": "SELECT",
+      "column": "DiagnosticID",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Ingest_Diagnostics.Table.sql",
+      "source_sha256": "4d5c3cb8429b66d41f25559145da8e4c19ce8c6d251d4e2c5eb2e5b21e3ffd93"
+    },
+    {
+      "object": "KVK.KVK_Ingest_Negatives",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Ingest_Negatives.Table.sql",
+      "source_sha256": "60db19fa79fa0c70d97fcab95af84b22532f83f7c861ea828b3fee8532727ef7"
+    },
+    {
+      "object": "KVK.KVK_Windows",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Windows.Table.sql",
+      "source_sha256": "12db89cb90954f557e3d17d115271fa355a4291c154bf34616e5157f65aacffa"
+    },
+    {
+      "object": "KVK.KVK_Windows",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Windows.Table.sql",
+      "source_sha256": "12db89cb90954f557e3d17d115271fa355a4291c154bf34616e5157f65aacffa"
+    },
+    {
+      "object": "KVK.KVK_Windows",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_Windows.Table.sql",
+      "source_sha256": "12db89cb90954f557e3d17d115271fa355a4291c154bf34616e5157f65aacffa"
+    },
+    {
+      "object": "KVK.SeasonSource",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SeasonSource.Table.sql",
+      "source_sha256": "470c2d14d2d5cef4f6339ea96cb0606550e14124d42f52c1ab3ab4b86263d5af"
+    },
+    {
+      "object": "KVK.SeasonSource",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SeasonSource.Table.sql",
+      "source_sha256": "470c2d14d2d5cef4f6339ea96cb0606550e14124d42f52c1ab3ab4b86263d5af"
+    },
+    {
+      "object": "KVK.SeasonSource",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SeasonSource.Table.sql",
+      "source_sha256": "470c2d14d2d5cef4f6339ea96cb0606550e14124d42f52c1ab3ab4b86263d5af"
+    },
+    {
+      "object": "KVK.SourceAction",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAction.Table.sql",
+      "source_sha256": "d23b3fb9a0ae4e356fc82815ecf1409d926592c9b221c39453b06a47f757775d"
+    },
+    {
+      "object": "KVK.SourceAction",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAction.Table.sql",
+      "source_sha256": "d23b3fb9a0ae4e356fc82815ecf1409d926592c9b221c39453b06a47f757775d"
+    },
+    {
+      "object": "KVK.SourceAdminReview",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAdminReview.Table.sql",
+      "source_sha256": "0c1d664ba479777d60d96709565cca4e791273ebd6ed1ca32e0eb37bfb67e39c"
+    },
+    {
+      "object": "KVK.SourceAdminReview",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAdminReview.Table.sql",
+      "source_sha256": "0c1d664ba479777d60d96709565cca4e791273ebd6ed1ca32e0eb37bfb67e39c"
+    },
+    {
+      "object": "KVK.SourceAdminReview",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAdminReview.Table.sql",
+      "source_sha256": "0c1d664ba479777d60d96709565cca4e791273ebd6ed1ca32e0eb37bfb67e39c"
+    },
+    {
+      "object": "KVK.SourceAggregateReport",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAggregateReport.Table.sql",
+      "source_sha256": "38a67bad42b5e15d62e24f246fed8a4caa68962fd5b8b406ecae3536a6c2b1f6"
+    },
+    {
+      "object": "KVK.SourceAggregateReport",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAggregateReport.Table.sql",
+      "source_sha256": "38a67bad42b5e15d62e24f246fed8a4caa68962fd5b8b406ecae3536a6c2b1f6"
+    },
+    {
+      "object": "KVK.SourceAggregateReport",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAggregateReport.Table.sql",
+      "source_sha256": "38a67bad42b5e15d62e24f246fed8a4caa68962fd5b8b406ecae3536a6c2b1f6"
+    },
+    {
+      "object": "KVK.SourceAggregateRevision",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAggregateRevision.Table.sql",
+      "source_sha256": "86192791bf11d9d4d76f36048aa16b442d9c83bfa845f442b808e03c4c785335"
+    },
+    {
+      "object": "KVK.SourceAggregateRevision",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceAggregateRevision.Table.sql",
+      "source_sha256": "86192791bf11d9d4d76f36048aa16b442d9c83bfa845f442b808e03c4c785335"
+    },
+    {
+      "object": "KVK.SourceArtifact",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceArtifact.Table.sql",
+      "source_sha256": "143c0c94a83156bb1e8d32c7e9b703a3d27eae8e9e3ee1d17569bdd1dc226775"
+    },
+    {
+      "object": "KVK.SourceArtifact",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceArtifact.Table.sql",
+      "source_sha256": "143c0c94a83156bb1e8d32c7e9b703a3d27eae8e9e3ee1d17569bdd1dc226775"
+    },
+    {
+      "object": "KVK.SourceCampConfig",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCampConfig.Table.sql",
+      "source_sha256": "3e69e6e17ff4fda20f98556cc5867636cdadef045f798a4f5dff2aabb04eec7e"
+    },
+    {
+      "object": "KVK.SourceCampConfig",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCampConfig.Table.sql",
+      "source_sha256": "3e69e6e17ff4fda20f98556cc5867636cdadef045f798a4f5dff2aabb04eec7e"
+    },
+    {
+      "object": "KVK.SourceCampConfig",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCampConfig.Table.sql",
+      "source_sha256": "3e69e6e17ff4fda20f98556cc5867636cdadef045f798a4f5dff2aabb04eec7e"
+    },
+    {
+      "object": "KVK.SourceCompleteSelection",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCompleteSelection.Table.sql",
+      "source_sha256": "77f5991773db35770d445fb2302b20f75ca58dd921b100bcceabcb0c1ae4dd3b"
+    },
+    {
+      "object": "KVK.SourceCompleteSelection",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCompleteSelection.Table.sql",
+      "source_sha256": "77f5991773db35770d445fb2302b20f75ca58dd921b100bcceabcb0c1ae4dd3b"
+    },
+    {
+      "object": "KVK.SourceCompleteSelection",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCompleteSelection.Table.sql",
+      "source_sha256": "77f5991773db35770d445fb2302b20f75ca58dd921b100bcceabcb0c1ae4dd3b"
+    },
+    {
+      "object": "KVK.SourceConfigRequest",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceConfigRequest.Table.sql",
+      "source_sha256": "1d347c17d6f6ebc02d41a61be48f1d86c8a9093d26df2d0c31221adb27a7a419"
+    },
+    {
+      "object": "KVK.SourceConfigRequest",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceConfigRequest.Table.sql",
+      "source_sha256": "1d347c17d6f6ebc02d41a61be48f1d86c8a9093d26df2d0c31221adb27a7a419"
+    },
+    {
+      "object": "KVK.SourceConfigRequest",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceConfigRequest.Table.sql",
+      "source_sha256": "1d347c17d6f6ebc02d41a61be48f1d86c8a9093d26df2d0c31221adb27a7a419"
+    },
+    {
+      "object": "KVK.SourceConfigVersion",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceConfigVersion.Table.sql",
+      "source_sha256": "f2e61ffcfe73953f1d0e8e1613794bb1b25fe62923a2b9973ff86b27dc93e69d"
+    },
+    {
+      "object": "KVK.SourceConfigVersion",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceConfigVersion.Table.sql",
+      "source_sha256": "f2e61ffcfe73953f1d0e8e1613794bb1b25fe62923a2b9973ff86b27dc93e69d"
+    },
+    {
+      "object": "KVK.SourceDelivery",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceDelivery.Table.sql",
+      "source_sha256": "8069ce457d202011a6a16ea72d5ecddd76127699e816ae41ce9dead8565a10df"
+    },
+    {
+      "object": "KVK.SourceDelivery",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceDelivery.Table.sql",
+      "source_sha256": "8069ce457d202011a6a16ea72d5ecddd76127699e816ae41ce9dead8565a10df"
+    },
+    {
+      "object": "KVK.SourceDelivery",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceDelivery.Table.sql",
+      "source_sha256": "8069ce457d202011a6a16ea72d5ecddd76127699e816ae41ce9dead8565a10df"
+    },
+    {
+      "object": "KVK.SourceExportIntent",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntent.Table.sql",
+      "source_sha256": "7871416abfbb3f3daf9b24487618386e56d4212afe3d987b71cbd7f388609104"
+    },
+    {
+      "object": "KVK.SourceExportIntent",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntent.Table.sql",
+      "source_sha256": "7871416abfbb3f3daf9b24487618386e56d4212afe3d987b71cbd7f388609104"
+    },
+    {
+      "object": "KVK.SourceExportIntent",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntent.Table.sql",
+      "source_sha256": "7871416abfbb3f3daf9b24487618386e56d4212afe3d987b71cbd7f388609104"
+    },
+    {
+      "object": "KVK.SourceExportIntentPublication",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntentPublication.Table.sql",
+      "source_sha256": "bfedad47fa9fd064e03521e62a1bc44e568bdde0e84d5ebe9fd032f126495426"
+    },
+    {
+      "object": "KVK.SourceExportIntentPublication",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntentPublication.Table.sql",
+      "source_sha256": "bfedad47fa9fd064e03521e62a1bc44e568bdde0e84d5ebe9fd032f126495426"
+    },
+    {
+      "object": "KVK.SourceImportAttempt",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceImportAttempt.Table.sql",
+      "source_sha256": "e0c24592315a08af0c61070371a25e527b285e6382e305a17254477cc37d8b45"
+    },
+    {
+      "object": "KVK.SourceImportAttempt",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceImportAttempt.Table.sql",
+      "source_sha256": "e0c24592315a08af0c61070371a25e527b285e6382e305a17254477cc37d8b45"
+    },
+    {
+      "object": "KVK.SourceImportAttempt",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceImportAttempt.Table.sql",
+      "source_sha256": "e0c24592315a08af0c61070371a25e527b285e6382e305a17254477cc37d8b45"
+    },
+    {
+      "object": "KVK.SourceLogicalScan",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceLogicalScan.Table.sql",
+      "source_sha256": "021c50ff46315f75cf9cc1b551bff1e5cfe679aaebb72957727a6560d0d00aa8"
+    },
+    {
+      "object": "KVK.SourceLogicalScan",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceLogicalScan.Table.sql",
+      "source_sha256": "021c50ff46315f75cf9cc1b551bff1e5cfe679aaebb72957727a6560d0d00aa8"
+    },
+    {
+      "object": "KVK.SourceObservation",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceObservation.Table.sql",
+      "source_sha256": "e8a685b9a79edf0ec75e758db69f5c7288dfa0066bd4d0e9ae3ea0c09d5411b9"
+    },
+    {
+      "object": "KVK.SourceObservation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceObservation.Table.sql",
+      "source_sha256": "e8a685b9a79edf0ec75e758db69f5c7288dfa0066bd4d0e9ae3ea0c09d5411b9"
+    },
+    {
+      "object": "KVK.SourceObservation",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceObservation.Table.sql",
+      "source_sha256": "e8a685b9a79edf0ec75e758db69f5c7288dfa0066bd4d0e9ae3ea0c09d5411b9"
+    },
+    {
+      "object": "KVK.SourceObservationRevision",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceObservationRevision.Table.sql",
+      "source_sha256": "96b3ef49b4a423c5abdf22914c893499a36c648c3f0ab0864d760a0e761ffb85"
+    },
+    {
+      "object": "KVK.SourceObservationRevision",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceObservationRevision.Table.sql",
+      "source_sha256": "96b3ef49b4a423c5abdf22914c893499a36c648c3f0ab0864d760a0e761ffb85"
+    },
+    {
+      "object": "KVK.SourceOutputDisposition",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputDisposition.Table.sql",
+      "source_sha256": "9bc918d5a48cbcee01092ca6988e3bd1144cc5e90c7051e896b10219bdde48ca"
+    },
+    {
+      "object": "KVK.SourceOutputDisposition",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputDisposition.Table.sql",
+      "source_sha256": "9bc918d5a48cbcee01092ca6988e3bd1144cc5e90c7051e896b10219bdde48ca"
+    },
+    {
+      "object": "KVK.SourceOutputFile",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputFile.Table.sql",
+      "source_sha256": "a20d559cfbed7d4cac73fe26d2ebde94818675d3820144078962a0618f8c4d98"
+    },
+    {
+      "object": "KVK.SourceOutputOperation",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputOperation.Table.sql",
+      "source_sha256": "6f9b2a261582e1201a50621fc5c40dbed0135c1786c3e62a51bb0a231fd64dcc"
+    },
+    {
+      "object": "KVK.SourceOutputOperation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputOperation.Table.sql",
+      "source_sha256": "6f9b2a261582e1201a50621fc5c40dbed0135c1786c3e62a51bb0a231fd64dcc"
+    },
+    {
+      "object": "KVK.SourceOutputOperation",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputOperation.Table.sql",
+      "source_sha256": "6f9b2a261582e1201a50621fc5c40dbed0135c1786c3e62a51bb0a231fd64dcc"
+    },
+    {
+      "object": "KVK.SourceOutputOperationResource",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputOperationResource.Table.sql",
+      "source_sha256": "341eea9df6779a75a3f5288c7cfa7734352c552e9be01c64f2b8ff885c729039"
+    },
+    {
+      "object": "KVK.SourceOutputOperationResource",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputOperationResource.Table.sql",
+      "source_sha256": "341eea9df6779a75a3f5288c7cfa7734352c552e9be01c64f2b8ff885c729039"
+    },
+    {
+      "object": "KVK.SourceOutputPool",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputPool.Table.sql",
+      "source_sha256": "395a9a826d2252a3db42e2cffd0806f99951f1a2f8d7930a03107ebf16d51abf"
+    },
+    {
+      "object": "KVK.SourceOutputPool",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputPool.Table.sql",
+      "source_sha256": "395a9a826d2252a3db42e2cffd0806f99951f1a2f8d7930a03107ebf16d51abf"
+    },
+    {
+      "object": "KVK.SourceOutputSlot",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputSlot.Table.sql",
+      "source_sha256": "181803a3477ca57542c094da5a89380047cb383e246c1818bab76ab2d371e5ef"
+    },
+    {
+      "object": "KVK.SourceOutputSlot",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputSlot.Table.sql",
+      "source_sha256": "181803a3477ca57542c094da5a89380047cb383e246c1818bab76ab2d371e5ef"
+    },
+    {
+      "object": "KVK.SourcePeriod",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePeriod.Table.sql",
+      "source_sha256": "f883680aa9c441b5126959b7691da3676694cfb51d855bee63c2534869a4ea1b"
+    },
+    {
+      "object": "KVK.SourcePeriod",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePeriod.Table.sql",
+      "source_sha256": "f883680aa9c441b5126959b7691da3676694cfb51d855bee63c2534869a4ea1b"
+    },
+    {
+      "object": "KVK.SourcePlayerResult",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePlayerResult.Table.sql",
+      "source_sha256": "210ffa512f316ec2782e36a25ba7945965ac10b70d309b21644444458c3d8d82"
+    },
+    {
+      "object": "KVK.SourcePlayerResult",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePlayerResult.Table.sql",
+      "source_sha256": "210ffa512f316ec2782e36a25ba7945965ac10b70d309b21644444458c3d8d82"
+    },
+    {
+      "object": "KVK.SourcePlayerSnapshot",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePlayerSnapshot.Table.sql",
+      "source_sha256": "1db3d0f95f881d64aa4728d4d7760aa8026653406cbcb1eb3ed3b809d4d9fefa"
+    },
+    {
+      "object": "KVK.SourcePlayerSnapshot",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePlayerSnapshot.Table.sql",
+      "source_sha256": "1db3d0f95f881d64aa4728d4d7760aa8026653406cbcb1eb3ed3b809d4d9fefa"
+    },
+    {
+      "object": "KVK.SourcePublication",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePublication.Table.sql",
+      "source_sha256": "93a42044b9f7ea4910b97881f92a462f454b48c7a47ab3680a1a5667c0fc23f1"
+    },
+    {
+      "object": "KVK.SourcePublication",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePublication.Table.sql",
+      "source_sha256": "93a42044b9f7ea4910b97881f92a462f454b48c7a47ab3680a1a5667c0fc23f1"
+    },
+    {
+      "object": "KVK.SourcePublication",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourcePublication.Table.sql",
+      "source_sha256": "93a42044b9f7ea4910b97881f92a462f454b48c7a47ab3680a1a5667c0fc23f1"
+    },
+    {
+      "object": "KVK.SourceRoster",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRoster.Table.sql",
+      "source_sha256": "3e41db81cc7626b7a2b0698c20168e97f81b8bac552a7dfe0568ed1d28e7a325"
+    },
+    {
+      "object": "KVK.SourceRoster",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRoster.Table.sql",
+      "source_sha256": "3e41db81cc7626b7a2b0698c20168e97f81b8bac552a7dfe0568ed1d28e7a325"
+    },
+    {
+      "object": "KVK.SourceRosterMember",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRosterMember.Table.sql",
+      "source_sha256": "345535d995084e8da368a86f630101ea8e9b7eb60441d3159a7fe26cef6635a9"
+    },
+    {
+      "object": "KVK.SourceRosterMember",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRosterMember.Table.sql",
+      "source_sha256": "345535d995084e8da368a86f630101ea8e9b7eb60441d3159a7fe26cef6635a9"
+    },
+    {
+      "object": "KVK.SourceRouting",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRouting.Table.sql",
+      "source_sha256": "54887bc736ebb86243ecf3a8c7a2f919c3a9b91a02dca7d7f96662e1058b15d2"
+    },
+    {
+      "object": "KVK.SourceRouting",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceRouting.Table.sql",
+      "source_sha256": "54887bc736ebb86243ecf3a8c7a2f919c3a9b91a02dca7d7f96662e1058b15d2"
+    },
+    {
+      "object": "KVK.SourceScanBinding",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceScanBinding.Table.sql",
+      "source_sha256": "6c78c37f4fb374d72a691fc970401c5777b3d85f05778d777b143584b044ec26"
+    },
+    {
+      "object": "KVK.SourceScanBinding",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceScanBinding.Table.sql",
+      "source_sha256": "6c78c37f4fb374d72a691fc970401c5777b3d85f05778d777b143584b044ec26"
+    },
+    {
+      "object": "KVK.SourceSelection",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceSelection.Table.sql",
+      "source_sha256": "4a5d5a11dfee1289fd856e97f3c1515234d51801c6dbf9ed60dae65daa31d010"
+    },
+    {
+      "object": "KVK.SourceSelection",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceSelection.Table.sql",
+      "source_sha256": "4a5d5a11dfee1289fd856e97f3c1515234d51801c6dbf9ed60dae65daa31d010"
+    },
+    {
+      "object": "KVK.SourceSelection",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceSelection.Table.sql",
+      "source_sha256": "4a5d5a11dfee1289fd856e97f3c1515234d51801c6dbf9ed60dae65daa31d010"
+    },
+    {
+      "object": "KVK.SourceUpdate",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceUpdate.Table.sql",
+      "source_sha256": "f6fd17f271525e339c80af04c1661ae981cdbc83a387c818f6fd6de671cab7e6"
+    },
+    {
+      "object": "KVK.SourceUpdate",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceUpdate.Table.sql",
+      "source_sha256": "f6fd17f271525e339c80af04c1661ae981cdbc83a387c818f6fd6de671cab7e6"
+    },
+    {
+      "object": "KVK.SourceUpdate",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceUpdate.Table.sql",
+      "source_sha256": "f6fd17f271525e339c80af04c1661ae981cdbc83a387c818f6fd6de671cab7e6"
+    },
+    {
+      "object": "KVK.SourceWeightConfig",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceWeightConfig.Table.sql",
+      "source_sha256": "7cba26ef9aa31ac8f176cd198598fc1b32310652465b15f38c7e0880559694e4"
+    },
+    {
+      "object": "KVK.SourceWeightConfig",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceWeightConfig.Table.sql",
+      "source_sha256": "7cba26ef9aa31ac8f176cd198598fc1b32310652465b15f38c7e0880559694e4"
+    },
+    {
+      "object": "KVK.SourceWeightConfig",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceWeightConfig.Table.sql",
+      "source_sha256": "7cba26ef9aa31ac8f176cd198598fc1b32310652465b15f38c7e0880559694e4"
+    },
+    {
+      "object": "KVK.SourceWindowConfig",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceWindowConfig.Table.sql",
+      "source_sha256": "dde3f92f90ac782463dcbcc0bc2f8096e5b9d6a31ea5702503aeaf13d26322e9"
+    },
+    {
+      "object": "KVK.SourceWindowConfig",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceWindowConfig.Table.sql",
+      "source_sha256": "dde3f92f90ac782463dcbcc0bc2f8096e5b9d6a31ea5702503aeaf13d26322e9"
+    },
+    {
+      "object": "KVK.sp_KVK_AllPlayers_Ingest",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.sp_KVK_AllPlayers_Ingest.StoredProcedure.sql",
+      "source_sha256": "b5be98136336da43c8d2647294878c659e61e52e102e909d2906fe06b9bdc33a"
+    },
+    {
+      "object": "KVK.sp_KVK_Get_Exports",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.sp_KVK_Get_Exports.StoredProcedure.sql",
+      "source_sha256": "372ceb4ac13b06aa52c2328e19b38ad02f06120560dc0c365d3f968e1f35c511"
+    },
+    {
+      "object": "KVK.sp_KVK_Recompute_Windows",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql",
+      "source_sha256": "223d539151e091a85152e01c365da3f648746423f6e770440941c962bdaa5b69"
+    },
+    {
+      "object": "dbo.ALL_GOVS",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ALL_GOVS.Table.sql",
+      "source_sha256": "eff354927ca5d1b9bbb17de090561076426efba6b78c214ac70e3c2623e1b2c6"
+    },
+    {
+      "object": "dbo.ALL_GOVS_ALLIANCES",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ALL_GOVS_ALLIANCES.Table.sql",
+      "source_sha256": "e37190ed2d92445fe8e907d6be91b4675211c862be96e1ca0f2ef8acf6c3dbe3"
+    },
+    {
+      "object": "dbo.ALL_GOVS_NAMES",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ALL_GOVS_NAMES.Table.sql",
+      "source_sha256": "056def27e0a24ff11724aa5cfec6b9d07d94358466991d3db742af074629d8d0"
+    },
+    {
+      "object": "dbo.ALL_STATS_FOR_DASHBAORD",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ALL_STATS_FOR_DASHBAORD.Table.sql",
+      "source_sha256": "6c3da1bb4f34ba70d049102d6c90b9bbeef326991e5d96a681509c4c47c5f579"
+    },
+    {
+      "object": "dbo.EXEMPT_FROM_STATS",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.EXEMPT_FROM_STATS.Table.sql",
+      "source_sha256": "9a0c87815ab4361dc711ce89c01ed599c92939e03d2cccf2bfbc0c6150fb8627"
+    },
+    {
+      "object": "dbo.EXEMPT_FROM_STATS",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.EXEMPT_FROM_STATS.Table.sql",
+      "source_sha256": "9a0c87815ab4361dc711ce89c01ed599c92939e03d2cccf2bfbc0c6150fb8627"
+    },
+    {
+      "object": "dbo.EXEMPT_FROM_STATS",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.EXEMPT_FROM_STATS.Table.sql",
+      "source_sha256": "9a0c87815ab4361dc711ce89c01ed599c92939e03d2cccf2bfbc0c6150fb8627"
+    },
+    {
+      "object": "dbo.ExportAttempt",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttempt.Table.sql",
+      "source_sha256": "e64ff2797119e554bd71b8b246f8d9d93bbb424499e6b8856d6868706fdc9e49"
+    },
+    {
+      "object": "dbo.ExportAttempt",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttempt.Table.sql",
+      "source_sha256": "e64ff2797119e554bd71b8b246f8d9d93bbb424499e6b8856d6868706fdc9e49"
+    },
+    {
+      "object": "dbo.ExportAttempt",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttempt.Table.sql",
+      "source_sha256": "e64ff2797119e554bd71b8b246f8d9d93bbb424499e6b8856d6868706fdc9e49"
+    },
+    {
+      "object": "dbo.ExportAttemptPart",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttemptPart.Table.sql",
+      "source_sha256": "da4bf5dcd42997e92faf5cae9f93c1009ba8fd2b46d27ccf094f24f77adddb6e"
+    },
+    {
+      "object": "dbo.ExportAttemptPart",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttemptPart.Table.sql",
+      "source_sha256": "da4bf5dcd42997e92faf5cae9f93c1009ba8fd2b46d27ccf094f24f77adddb6e"
+    },
+    {
+      "object": "dbo.ExportAttemptPart",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportAttemptPart.Table.sql",
+      "source_sha256": "da4bf5dcd42997e92faf5cae9f93c1009ba8fd2b46d27ccf094f24f77adddb6e"
+    },
+    {
+      "object": "dbo.ExportExecutionSession",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionSession.Table.sql",
+      "source_sha256": "0c84a0997b6b86d7b3ff990f3a5453d73a193d178a39941cf97eaf6c7c00f0f7"
+    },
+    {
+      "object": "dbo.ExportExecutionStream",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionStream.Table.sql",
+      "source_sha256": "566e28a2e929b395de791a604feb9091deb30bcd5a43d52cd9065943688bcf47"
+    },
+    {
+      "object": "dbo.ExportJob",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportJob.Table.sql",
+      "source_sha256": "7f048ed691c30d0179f0ead899d77ae4c68b018c83b6e42852d38c1ec894b9ce"
+    },
+    {
+      "object": "dbo.ExportJob",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportJob.Table.sql",
+      "source_sha256": "7f048ed691c30d0179f0ead899d77ae4c68b018c83b6e42852d38c1ec894b9ce"
+    },
+    {
+      "object": "dbo.ExportJob",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportJob.Table.sql",
+      "source_sha256": "7f048ed691c30d0179f0ead899d77ae4c68b018c83b6e42852d38c1ec894b9ce"
+    },
+    {
+      "object": "dbo.ExportJobResource",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportJobResource.Table.sql",
+      "source_sha256": "280594949f9d069e7572cff129dd456e167c02ab8563fa55b400d7a8864848db"
+    },
+    {
+      "object": "dbo.ExportJobResource",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportJobResource.Table.sql",
+      "source_sha256": "280594949f9d069e7572cff129dd456e167c02ab8563fa55b400d7a8864848db"
+    },
+    {
+      "object": "dbo.ExportManagedFileOrigin",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportManagedFileOrigin.Table.sql",
+      "source_sha256": "b6e8c4804d3c3085565803b25e96699fe8a336d7c538d082d17b03416dc5bf80"
+    },
+    {
+      "object": "dbo.ExportManualFileOrigin",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportManualFileOrigin.Table.sql",
+      "source_sha256": "a157075ef47447eb911f0f72692eb8c61beb60e5d4f98261ce30b06889579459"
+    },
+    {
+      "object": "dbo.ExportPreparation",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
+      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+    },
+    {
+      "object": "dbo.ExportPreparation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
+      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+    },
+    {
+      "object": "dbo.ExportPreparation",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
+      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+    },
+    {
+      "object": "dbo.ExportPreparationResource",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparationResource.Table.sql",
+      "source_sha256": "69442b02bcb289a6f2d693593d8197e3db7977fb291790d0771f0f513054d082"
+    },
+    {
+      "object": "dbo.ExportPreparationResource",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparationResource.Table.sql",
+      "source_sha256": "69442b02bcb289a6f2d693593d8197e3db7977fb291790d0771f0f513054d082"
+    },
+    {
+      "object": "dbo.ExportProviderRequest",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportProviderRequest.Table.sql",
+      "source_sha256": "d49e9d5faccdd975008b2f6ed08ae9172b7451c097ad3fd88242807ed078a3bc"
+    },
+    {
+      "object": "dbo.ExportProviderRequestEvent",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportProviderRequestEvent.Table.sql",
+      "source_sha256": "5d85e81c3286c5d4fe839c3862cf7ae28f22216a7f1ab6c93d763b3d9be1e0b0"
+    },
+    {
+      "object": "dbo.ExportReconciliationProof",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReconciliationProof.Table.sql",
+      "source_sha256": "655aefc606f7c27f8764c27d559c9ef6eac74949a1b290ed8ed6a779bc72a736"
+    },
+    {
+      "object": "dbo.ExportRequestBudget",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportRequestBudget.Table.sql",
+      "source_sha256": "bb775de05fbc81ecd2427b02a7e999011205f18023281ee395931d73a52451ab"
+    },
+    {
+      "object": "dbo.ExportRequestBudget",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportRequestBudget.Table.sql",
+      "source_sha256": "bb775de05fbc81ecd2427b02a7e999011205f18023281ee395931d73a52451ab"
+    },
+    {
+      "object": "dbo.ExportRequestBudget",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportRequestBudget.Table.sql",
+      "source_sha256": "bb775de05fbc81ecd2427b02a7e999011205f18023281ee395931d73a52451ab"
+    },
+    {
+      "object": "dbo.ExportResource",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportResource.Table.sql",
+      "source_sha256": "2929a8f34f6ff77a615140ae22d84678babf3d7bf2ea480849a76e0c5e3c8b0d"
+    },
+    {
+      "object": "dbo.ExportResource",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportResource.Table.sql",
+      "source_sha256": "2929a8f34f6ff77a615140ae22d84678babf3d7bf2ea480849a76e0c5e3c8b0d"
+    },
+    {
+      "object": "dbo.ExportResource",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportResource.Table.sql",
+      "source_sha256": "2929a8f34f6ff77a615140ae22d84678babf3d7bf2ea480849a76e0c5e3c8b0d"
+    },
+    {
+      "object": "dbo.FallbackImportBatchControl",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.FallbackImportBatchControl.Table.sql",
+      "source_sha256": "511abb7791b645b03d878650a552f080887184ac0c05a448bd11fcf2a9cf003f"
+    },
+    {
+      "object": "dbo.FallbackImportBatchControl",
+      "permission": "SELECT",
+      "column": "ControlId",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.FallbackImportBatchControl.Table.sql",
+      "source_sha256": "511abb7791b645b03d878650a552f080887184ac0c05a448bd11fcf2a9cf003f"
+    },
+    {
+      "object": "dbo.INACTIVE_GOVERNORS",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.INACTIVE_GOVERNORS.Table.sql",
+      "source_sha256": "948dac365a2dea6bcbc7824e39737673df136e6fd80f740e9676beb1d52290eb"
+    },
+    {
+      "object": "dbo.KS",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KS.Table.sql",
+      "source_sha256": "865e98130af4a2c1382d2165b98850a2fa567c4ddadd60e81d714c21c73bf923"
+    },
+    {
+      "object": "dbo.KS4_ImportFileClaim",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KS4_ImportFileClaim.Table.sql",
+      "source_sha256": "c5e50652c38f73bfc13cc20e2852b1e202ca5cb26838e701c7304207caf4774a"
+    },
+    {
+      "object": "dbo.KS4_ImportFileReceipt",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KS4_ImportFileReceipt.Table.sql",
+      "source_sha256": "4602ad41085eba954e47e7d66b0207f2a5ec2c69f12a9682f38254b9d49f573b"
+    },
+    {
+      "object": "dbo.KVKTargetBands",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVKTargetBands.Table.sql",
+      "source_sha256": "240a9b6c4ab28f28aed41aa6b48bf65d0c4e5aa841cd4697ca2823ab106d41e7"
+    },
+    {
+      "object": "dbo.KVKTargetBands",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVKTargetBands.Table.sql",
+      "source_sha256": "240a9b6c4ab28f28aed41aa6b48bf65d0c4e5aa841cd4697ca2823ab106d41e7"
+    },
+    {
+      "object": "dbo.KVKTargetBands",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVKTargetBands.Table.sql",
+      "source_sha256": "240a9b6c4ab28f28aed41aa6b48bf65d0c4e5aa841cd4697ca2823ab106d41e7"
+    },
+    {
+      "object": "dbo.KVK_Details",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVK_Details.Table.sql",
+      "source_sha256": "b87eb9b449dd9214b748b7cb0f4967851986debb63f6fabffa7e274892b35fe5"
+    },
+    {
+      "object": "dbo.KVK_Details",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVK_Details.Table.sql",
+      "source_sha256": "b87eb9b449dd9214b748b7cb0f4967851986debb63f6fabffa7e274892b35fe5"
+    },
+    {
+      "object": "dbo.KVK_Details",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KVK_Details.Table.sql",
+      "source_sha256": "b87eb9b449dd9214b748b7cb0f4967851986debb63f6fabffa7e274892b35fe5"
+    },
+    {
+      "object": "dbo.KingdomScanData4",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.KingdomScanData4.Table.sql",
+      "source_sha256": "61f12202055004cfde8da6ca1f389c62967d5e2a03862ebcfedd98baa0b250e1"
+    },
+    {
+      "object": "dbo.LogBackupTriggerQueue",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.LogBackupTriggerQueue.Table.sql",
+      "source_sha256": "a0a03b00af7d96f6746eeecccd54bce45bc5833b40e64c3959470dff9d791139"
+    },
+    {
+      "object": "dbo.POWER_BY_MONTH",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.POWER_BY_MONTH.Table.sql",
+      "source_sha256": "8f801915741f11d37094f64254c4469f9881d6f2416888071538edf191315966"
+    },
+    {
+      "object": "dbo.ProcConfig",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcConfig.Table.sql",
+      "source_sha256": "62f1c7966fc88e0b39df87e7e56b75383c6ecdf45317be57e700747c259489a7"
+    },
+    {
+      "object": "dbo.ProcConfig_Staging",
+      "permission": "DELETE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcConfig_Staging.Table.sql",
+      "source_sha256": "f50218600cc071630fa461bf515edb95700a595174a561fa312ffc5173e13f6c"
+    },
+    {
+      "object": "dbo.ProcConfig_Staging",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcConfig_Staging.Table.sql",
+      "source_sha256": "f50218600cc071630fa461bf515edb95700a595174a561fa312ffc5173e13f6c"
+    },
+    {
+      "object": "dbo.ProcConfig_Staging",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcConfig_Staging.Table.sql",
+      "source_sha256": "f50218600cc071630fa461bf515edb95700a595174a561fa312ffc5173e13f6c"
+    },
+    {
+      "object": "dbo.RALLY_EXPORT",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RALLY_EXPORT.Table.sql",
+      "source_sha256": "5ddd6f6ce142c3a154fc897cc0ea7b139448f1676ef7822b06aaa0d3416f0dfd"
+    },
+    {
+      "object": "dbo.SCAN_LIST",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SCAN_LIST.Table.sql",
+      "source_sha256": "63e1c62f0d018f55e452ab32bed05f1fbcdab1de3faf79cfc54cb800ae1ae3cf"
+    },
+    {
+      "object": "dbo.SP_Stats_for_Upload",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SP_Stats_for_Upload.StoredProcedure.sql",
+      "source_sha256": "c348ea6adb6819b5d11dbf6a7f5782dade03ab4ed1f9e360ab089e3d90d5cdbb"
+    },
+    {
+      "object": "dbo.SP_TaskStatus",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SP_TaskStatus.Table.sql",
+      "source_sha256": "b7ad76d8009a81c1e065dda51d36d922e242d387ede34dd98bf8df5153acc340"
+    },
+    {
+      "object": "dbo.STATS_FOR_UPLOAD",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.STATS_FOR_UPLOAD.Table.sql",
+      "source_sha256": "16bf2a6d6fb0a3fdc98d78957405aba9c884e6f74b8f6b1024fc2a651320c387"
+    },
+    {
+      "object": "dbo.SUMMARY_CHANGE_EXPORT",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SUMMARY_CHANGE_EXPORT.Table.sql",
+      "source_sha256": "9deed7e6b86c446f98ed083dd47b3506e9f883ce172aac63580795208861c003"
+    },
+    {
+      "object": "dbo.SchemaMigrationHistory",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SchemaMigrationHistory.Table.sql",
+      "source_sha256": "0105278be8f487facceb09ccc15d9c654d49eb2afa0f90c41e83ff7bc2543ca7"
+    },
+    {
+      "object": "dbo.UPDATE_ALL2",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.UPDATE_ALL2.StoredProcedure.sql",
+      "source_sha256": "41564b882265e0d0be0eaec5f7f184b912caa9bd5f71fbf3ad7e081e844d83bc"
+    },
+    {
+      "object": "dbo.sp_TARGETS_MASTER",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.sp_TARGETS_MASTER.StoredProcedure.sql",
+      "source_sha256": "2ea82ec000c3e4d578c45871e3b107869ac885a3ad41af961a41292db7f31705"
+    },
+    {
+      "object": "dbo.sp_Upsert_ProcConfig_From_Staging",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.sp_Upsert_ProcConfig_From_Staging.StoredProcedure.sql",
+      "source_sha256": "fcd5db517349bf9f767d71ba893c1019ff6201652e9c2de8ed3f33668bf759e9"
+    },
+    {
+      "object": "dbo.usp_ExportExecutionSessionTransition",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionSessionTransition.StoredProcedure.sql",
+      "source_sha256": "787ed16f0874826e59a20c1a5c37d401529b6381157e24a8b80b8734e6080b8d"
+    },
+    {
+      "object": "dbo.usp_ExportExecutionStreamTransition",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
+      "source_sha256": "8b75b9022cf2a4718ab2e6e8975137b209392b11ad8a3e7cff322e3dc46503d6"
+    },
+    {
+      "object": "dbo.usp_ExportManualOutputEnrollmentTransition",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportManualOutputEnrollmentTransition.StoredProcedure.sql",
+      "source_sha256": "b8f9df85cb382b043c1672242de58558f6a64b6ef14655988ffa1887782b3563"
+    },
+    {
+      "object": "dbo.usp_ExportOutputEnrollmentTransition",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
+      "source_sha256": "813865c1537ad0be386d4cb26bf57c5bdb4f6b278be8210fe03f746a2ba3efa3"
+    },
+    {
+      "object": "dbo.usp_ExportProviderRequestEventAppend",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
+      "source_sha256": "45fcc041f5cdcfc2074e647d9bf728256533e6c8bbc685542207bf980b84d5d0"
+    },
+    {
+      "object": "dbo.usp_ExportReconciliationProofIssue",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
+      "source_sha256": "4ea1e5ba462edbd725d7f624e026215ece47cb6bef42806d41e474a1ce4f62bb"
+    },
+    {
+      "object": "dbo.usp_MarkLogBackupTriggerProcessed",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_MarkLogBackupTriggerProcessed.StoredProcedure.sql",
+      "source_sha256": "74b32aa572c7b10f027a653fc8f75d0047fffb95da8141e628365cbd129334a9"
+    },
+    {
+      "object": "dbo.v_PlayerAccounts_Migrate",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.v_PlayerAccounts_Migrate.View.sql",
+      "source_sha256": "a92ac5085d5f9aedc36cda86ec7213bebe4442ba7b4f4c27995b09feb3af6e0a"
+    },
+    {
+      "object": "dbo.v_TARGETS_FOR_UPLOAD",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.v_TARGETS_FOR_UPLOAD.View.sql",
+      "source_sha256": "e047e79c92fb2e0fb55254f1b25a544af5d8120a36a7388c034d5e2d0b79742f"
+    }
+  ],
+  "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
+  "permission_model": "direct_application_v1",
+  "legacy_source_sha256": "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6",
+  "master_database_permissions": [
+    "CONNECT"
+  ],
+  "master_object_permissions": [
+    {
+      "object": "dbo.xp_cmdshell",
+      "permission": "EXECUTE"
+    },
+    {
+      "object": "dbo.xp_fileexist",
+      "permission": "EXECUTE"
+    }
+  ]
+}

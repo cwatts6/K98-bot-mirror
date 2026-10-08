@@ -1,0 +1,15 @@
+-- verify_calendar_task7_command_refresh_smoke.sql
+-- 1) validate latest sync/generate/publish footprints exist
+-- 2) ensure EventInstances windows valid
+-- 3) ensure no duplicate logical instances
+-- 4) ensure EffectiveHash present
+-- 5) report counts for operator review
+
+-- Example checks:
+-- SELECT TOP 20 * FROM dbo.EventSyncLog ORDER BY SyncID DESC;
+-- SELECT COUNT(*) invalid_windows FROM dbo.EventInstances WHERE EndUTC <= StartUTC;
+-- SELECT SourceKind, SourceID, StartUTC, COUNT(*) c
+-- FROM dbo.EventInstances
+-- GROUP BY SourceKind, SourceID, StartUTC
+-- HAVING COUNT(*) > 1;
+-- SELECT COUNT(*) missing_hash FROM dbo.EventInstances WHERE EffectiveHash IS NULL;
