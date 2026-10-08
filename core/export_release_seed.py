@@ -108,7 +108,12 @@ def successor_seed(previous, source_hashes, *, deployment_id, review_id, pipe_id
     validate_plan(plan)
     target = PureWindowsPath(plan["commit_file"]).parent
     policy = values["AutomaticStartupPolicy.json"]
+    old_state = PureWindowsPath(old_policy["state_directory"])
+    new_state = old_state.parent / deployment_id
+    if not old_state.is_absolute() or new_state == old_state:
+        raise ValueError("Fresh absolute sibling state directory required.")
     policy.update(
+        state_directory=str(new_state),
         source_hashes=deepcopy(source_hashes),
         seed_plan=dict(
             path=str(target / "ManualProcessPairPlan-CANDIDATE.json"),

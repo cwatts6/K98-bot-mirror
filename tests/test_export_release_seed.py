@@ -1,6 +1,7 @@
 from copy import deepcopy
 import hashlib
 import json
+from pathlib import PureWindowsPath
 from uuid import uuid4
 
 import pytest
@@ -52,7 +53,7 @@ def test_successor_preserves_observations_flags_and_contracts(tmp_path, monkeypa
     assert previous == original
     values = {name: json.loads(raw) for name, raw in payload.items()}
     policy = values["AutomaticStartupPolicy.json"]
-    assert policy["state_directory"] == "C:/K98/history/" + new_id
+    assert PureWindowsPath(policy["state_directory"]) == PureWindowsPath("C:/K98/history") / new_id
     assert policy["flags"] == original["AutomaticStartupPolicy.json"]["flags"]
     assert (
         policy["predecessor"]["policy_sha256"]
@@ -70,6 +71,47 @@ def test_successor_preserves_observations_flags_and_contracts(tmp_path, monkeypa
         hashlib.sha256(payload["ManualProcessPairPlan-CANDIDATE.json"]).hexdigest()
         == policy["seed_plan"]["sha256"]
     )
+
+
+@pytest.mark.parametrize("old_name", ["custom-history", "reviewed-deployment"])
+def test_successor_state_is_fresh_sibling_even_without_uuid(tmp_path, monkeypatch, old_name):
+    previous = predecessor(tmp_path, monkeypatch)
+    old_policy = previous["AutomaticStartupPolicy.json"]
+    old_policy["state_directory"] = "C:/K98/history/" + old_name
+    new_id = str(uuid4())
+    payload = successor_seed(
+        previous,
+        {"DL_bot.py": "a" * 64},
+        deployment_id=new_id,
+        review_id=str(uuid4()),
+        pipe_id=str(uuid4()),
+    )
+    policy = json.loads(payload["AutomaticStartupPolicy.json"])
+    old_state = PureWindowsPath(old_policy["state_directory"])
+    new_state = PureWindowsPath(policy["state_directory"])
+    assert new_state == old_state.parent / new_id
+    assert new_state != old_state
+    assert policy["predecessor"] == {
+        "state_directory": old_policy["state_directory"],
+        "policy_sha256": hashlib.sha256(encode(old_policy)).hexdigest(),
+    }
+
+
+@pytest.mark.parametrize("invalid", ["relative/history", "same-successor"])
+def test_successor_rejects_relative_or_reused_state(tmp_path, monkeypatch, invalid):
+    previous = predecessor(tmp_path, monkeypatch)
+    new_id = str(uuid4())
+    previous["AutomaticStartupPolicy.json"]["state_directory"] = (
+        "C:/K98/history/" + new_id if invalid == "same-successor" else invalid
+    )
+    with pytest.raises(ValueError, match="sibling state"):
+        successor_seed(
+            previous,
+            {"DL_bot.py": "a" * 64},
+            deployment_id=new_id,
+            review_id=str(uuid4()),
+            pipe_id=str(uuid4()),
+        )
 
 
 @pytest.mark.parametrize(
