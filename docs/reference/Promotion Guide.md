@@ -40,6 +40,13 @@ Environment note:
 
 ## Standard Process
 
+For the protected S11 runtime, use the [S11 deployment and restart
+contract](S11%20Deployment%20and%20Restart%20Contract.md) when preparing a release
+packet. Its runner coordinates a reviewed packet with `/ops graceful_restart`;
+ordinary restart does not pull source or run migrations. The current older
+issuer requires a separately reviewed initial cutover. Do not substitute an
+unreviewed manifest or an old startup seed for that cutover.
+
 ### 1. Validate Mirror Branch
 
 Before running the branch checks, use `k98-pr-review` for merge readiness and `k98-test-selection`

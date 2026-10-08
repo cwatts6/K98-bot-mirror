@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from collections.abc import Awaitable, Callable
+import csv
 from datetime import UTC, datetime
 import json
 import logging
 import os
 from typing import Any
 
-from constants import EXIT_CODE_FILE, RESTART_EXIT_CODE, RESTART_FLAG_PATH
+from constants import (
+    BASE_DIR,
+    EXIT_CODE_FILE,
+    RESTART_EXIT_CODE,
+    RESTART_FLAG_PATH,
+    RESTART_LOG_FILE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +25,20 @@ AsyncStep = Callable[[], Awaitable[Any]]
 FlushLogs = Callable[[], Any]
 ForceExit = Callable[[int], Any]
 DEFAULT_BOT_CLOSE_TIMEOUT_SECONDS = 10.0
+
+
+def read_restart_history(count: int = 5) -> list[dict[str, str]]:
+    """Read legacy history followed by the writable runtime log; never migrate on read."""
+    recent = deque(maxlen=max(1, min(int(count or 5), 20)))
+    legacy = os.path.join(BASE_DIR, "restart_log.csv")
+    paths = dict.fromkeys(os.path.abspath(path) for path in (legacy, RESTART_LOG_FILE))
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8-sig", newline="") as stream:
+                recent.extend(csv.DictReader(stream))
+        except FileNotFoundError:
+            continue
+    return list(recent)
 
 
 def _utcnow_iso() -> str:
@@ -60,7 +82,7 @@ async def write_restart_request(
     if append_csv_line is not None:
         try:
             await append_csv_line(
-                "restart_log.csv",
+                RESTART_LOG_FILE,
                 [
                     restart_flag["timestamp"],
                     restart_flag["reason"],

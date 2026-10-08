@@ -9,6 +9,48 @@ import pytest
 from core import restart_operations
 
 
+def test_restart_history_preserves_legacy_and_reads_runtime_independent_of_cwd(
+    tmp_path, monkeypatch
+):
+    legacy = tmp_path / "source"
+    logs = legacy / "logs"
+    logs.mkdir(parents=True)
+    old = legacy / "restart_log.csv"
+    new = logs / "restart_log.csv"
+    old.write_text("Timestamp,Reason\nold,legacy\n", encoding="utf-8")
+    new.write_text("Timestamp,Reason\nnew,runtime\n", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setattr(restart_operations, "BASE_DIR", str(legacy))
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(new))
+    assert restart_operations.read_restart_history(2) == [
+        {"Timestamp": "old", "Reason": "legacy"},
+        {"Timestamp": "new", "Reason": "runtime"},
+    ]
+    assert restart_operations.read_restart_history(1) == [{"Timestamp": "new", "Reason": "runtime"}]
+    assert old.read_text() == "Timestamp,Reason\nold,legacy\n"
+
+
+@pytest.mark.asyncio
+async def test_restart_audit_uses_runtime_path_outside_source_root(tmp_path, monkeypatch):
+    target = tmp_path / "logs" / "restart_log.csv"
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(target))
+    calls = []
+
+    async def append(path, row):
+        calls.append(path)
+
+    await restart_operations.write_restart_request(
+        reason="test",
+        user_id="123",
+        append_csv_line=append,
+        restart_flag_path=str(tmp_path / "logs" / "restart.json"),
+        exit_code_file=str(tmp_path / "logs" / "exit"),
+    )
+    assert calls == [str(target)]
+
+
 @pytest.mark.asyncio
 async def test_write_restart_request_persists_flag_exit_code_and_audit(tmp_path):
     restart_flag_path = tmp_path / ".restart_flag.json"
@@ -37,7 +79,7 @@ async def test_write_restart_request_persists_flag_exit_code_and_audit(tmp_path)
     assert exit_code_file.read_text(encoding="utf-8") == "15"
     assert audit_calls == [
         (
-            "restart_log.csv",
+            restart_operations.RESTART_LOG_FILE,
             ["2026-05-28T12:00:00+00:00", "slash_graceful_restart", "123", "success", "", "", ""],
         )
     ]

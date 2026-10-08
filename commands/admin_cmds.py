@@ -49,7 +49,11 @@ from commands.telemetry_cmds import (
     _usage_detail_value_ac,
     start_bot_time,
 )
-from core.restart_operations import run_cooperative_restart, write_restart_request
+from core.restart_operations import (
+    read_restart_history,
+    run_cooperative_restart,
+    write_restart_request,
+)
 
 from embed_utils import FailuresView, HistoryView, generate_summary_embed
 from event_calendar.service import get_calendar_service
@@ -930,18 +934,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
     async def view_restart_log(ctx, count: int = 5):
         await safe_defer(ctx, ephemeral=True)
 
-        log_file = "restart_log.csv"
-        if not os.path.exists(log_file):
-            await ctx.interaction.edit_original_response(content="⚠️ No restart log found.")
-            return
-
         # Clamp count to keep the embed manageable
         count = max(1, min(int(count or 5), 20))
 
         try:
-            with open(log_file, encoding="utf-8", newline="") as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
+            rows = await asyncio.to_thread(read_restart_history, count)
 
             if not rows:
                 await ctx.interaction.edit_original_response(

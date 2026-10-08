@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from core.export_automatic_pair import validate_issuer_record
-from scripts.run_export_startup_issuer import acknowledge_role, read_previous
+from scripts.run_export_startup_issuer import acknowledge_role, read_previous, release_history
 from tests.test_export_process_pair import pair_fixture
 
 
@@ -32,6 +32,37 @@ def history(tmp_path, bindings):
 
 def test_empty_history_has_no_session_to_reconcile(tmp_path):
     assert read_previous(tmp_path, "a" * 64, lambda p, **kw: p, "fixture") is None
+
+
+def test_successor_inherits_exact_predecessor_without_relabeling_history(tmp_path, monkeypatch):
+    _, _, bindings = pair_fixture(tmp_path, monkeypatch)
+    sid = bindings["bot"]["token_profile"]["user_sid"]
+    old = tmp_path / "old"
+    new = tmp_path / "new"
+    old.mkdir()
+    new.mkdir()
+    path, value = history(old, bindings)
+    path.write_text(json.dumps(value), encoding="utf-8")
+    policy = dict(
+        state_directory=str(new), predecessor=dict(state_directory=str(old), policy_sha256="a" * 64)
+    )
+    observed, directory = release_history(policy, "b" * 64, lambda p, **kw: p, sid)
+    assert observed == value
+    assert observed["policy_sha256"] == "a" * 64
+    assert directory == str(old)
+    assert not list(new.iterdir())
+
+
+def test_empty_or_unrelated_predecessor_cannot_authorize_new_release(tmp_path):
+    new = tmp_path / "new"
+    old = tmp_path / "old"
+    new.mkdir()
+    old.mkdir()
+    policy = dict(
+        state_directory=str(new), predecessor=dict(state_directory=str(old), policy_sha256="a" * 64)
+    )
+    with pytest.raises(ValueError, match="no retained"):
+        release_history(policy, "b" * 64, lambda p, **kw: p, "fixture")
 
 
 @pytest.mark.parametrize(

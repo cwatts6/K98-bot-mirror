@@ -52,7 +52,7 @@ def load_seed(policy, inspect):
     return plan, templates, records
 
 
-def read_previous(directory, policy_hash, inspect, application_sid):
+def read_previous(directory, policy_hash, inspect, application_sid) -> dict[str, Any] | None:
     candidates = []
     for path in Path(directory).glob("incarnation-*.json"):
         candidates.append(path)
@@ -96,6 +96,35 @@ def read_previous(directory, policy_hash, inspect, application_sid):
     return value
 
 
+def release_history(
+    policy, policy_hash, inspect, application_sid
+) -> tuple[dict[str, Any] | None, str]:
+    """A reviewed successor may inherit only the exact predecessor's last identity."""
+    directory = policy["state_directory"]
+    previous = read_previous(directory, policy_hash, inspect, application_sid)
+    if previous is not None or "predecessor" not in policy:
+        return previous, directory
+    predecessor = policy["predecessor"]
+    if (
+        not isinstance(predecessor, dict)
+        or set(predecessor) != {"state_directory", "policy_sha256"}
+        or not isinstance(predecessor["policy_sha256"], str)
+        or not re.fullmatch(r"[0-9a-f]{64}", predecessor["policy_sha256"])
+        or not isinstance(predecessor["state_directory"], str)
+        or not Path(predecessor["state_directory"]).is_absolute()
+        or Path(predecessor["state_directory"]).parent != Path(directory).parent
+        or Path(predecessor["state_directory"]) == Path(directory)
+    ):
+        raise ValueError("Exact sibling predecessor history required.")
+    inspect(predecessor["state_directory"], private=True)
+    previous = read_previous(
+        predecessor["state_directory"], predecessor["policy_sha256"], inspect, application_sid
+    )
+    if previous is None:
+        raise ValueError("Predecessor has no retained process identity.")
+    return previous, predecessor["state_directory"]
+
+
 def acknowledge_role(pipe, created, role, plan, raw):
     import ctypes
     from ctypes import wintypes
@@ -135,6 +164,11 @@ def acknowledge_role(pipe, created, role, plan, raw):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Protected S11 automatic startup issuer")
     parser.add_argument("--policy", default=r"C:\ProgramData\K98\S11\AutomaticStartupPolicy.json")
+    parser.add_argument(
+        "--drain-only",
+        action="store_true",
+        help="Acknowledge a staged release after a proven prior stop; launch nothing",
+    )
     args = parser.parse_args(argv)
     launcher = runpy.run_path(str(Path(__file__).with_name("run_export_authority.py")))
     inspect = administrative_inspector(launcher)
@@ -171,7 +205,11 @@ def main(argv=None):
     policy_raw = policy_path.read_bytes()
     policy = json.loads(policy_raw)
     if (
-        set(policy) != {"version", "source_hashes", "seed_plan", "state_directory", "flags"}
+        set(policy)
+        not in (
+            {"version", "source_hashes", "seed_plan", "state_directory", "flags"},
+            {"version", "source_hashes", "seed_plan", "state_directory", "flags", "predecessor"},
+        )
         or type(policy["version"]) is not int
         or policy["version"] != 1
     ):
@@ -202,9 +240,7 @@ def main(argv=None):
         mutex = startup_mutex(host["machine_guid"], sid)
         inspect(policy["state_directory"], private=True)
         policy_hash = hashlib.sha256(policy_raw).hexdigest()
-        previous: dict[str, Any] | None = read_previous(
-            policy["state_directory"], policy_hash, inspect, sid
-        )
+        previous, history_directory = release_history(policy, policy_hash, inspect, sid)
         connect = launcher["connection_factory"](authority)
         verify_installation_contract(
             ExportExecutionDAL(connect).installation_snapshot(
@@ -213,7 +249,32 @@ def main(argv=None):
             authority["sql_contract"],
         )
         reconciler = StartupReconciler(connect, authority["runtime_registration"], host)
-        termination = TerminatedPair(previous["bindings"]) if previous else None
+        from core.export_deployment_handoff import previous_termination, record_termination
+
+        termination = previous_termination(history_directory, previous, inspect)
+        if args.drain_only:
+            from core.export_deployment_handoff import acknowledge_deployment, requested_release
+
+            if previous is None or history_directory != policy["state_directory"]:
+                raise ValueError("Drain-only requires this release's retained incarnation.")
+            deployment = requested_release(
+                policy["state_directory"], policy_hash, previous, inspect
+            )
+            if deployment is None:
+                raise ValueError("No protected deployment request is staged.")
+            termination.verify()
+            reconciler.prepare(
+                previous_hash=previous["publication"]["manifests"]["authority"],
+                termination=termination,
+            )
+            acknowledge_deployment(
+                deployment,
+                previous=previous,
+                termination=termination,
+                state_directory=policy["state_directory"],
+                write_file=lambda path, raw: write_new_protected(path, raw, sid),
+            )
+            return 0
         sequence = previous["sequence"] if previous else 0
         recent_crashes = []
         while True:
@@ -302,7 +363,7 @@ def main(argv=None):
                     finally:
                         pipe.Close()
                 expected = publication(new_raw, bind_templates(new_plan, new_templates, bindings))
-                previous = dict(
+                previous = dict[str, Any](
                     version=1,
                     sequence=sequence,
                     policy_sha256=policy_hash,
@@ -344,11 +405,47 @@ def main(argv=None):
                     time.sleep(0.5)
                 termination = TerminatedPair(bindings, handles)
                 termination.verify()
+                from core.export_deployment_handoff import (
+                    acknowledge_deployment,
+                    requested_release,
+                )
+
+                deployment = (
+                    requested_release(policy["state_directory"], policy_hash, previous, inspect)
+                    if exit_code == 15
+                    else None
+                )
+                record_termination(
+                    policy["state_directory"],
+                    previous,
+                    termination,
+                    lambda path, raw: write_new_protected(path, raw, sid),
+                )
+                # Native exit is a durable fact even if SQL reconciliation fails.
+                # A stop receipt alone never authorizes a deployment or replay.
                 reconciler.prepare(
                     previous_hash=commit["manifests"]["authority"], termination=termination
                 )
                 for role in created:
                     release_created_role(created[role])
+                if deployment is not None:
+                    acknowledge_deployment(
+                        deployment,
+                        previous=previous,
+                        termination=termination,
+                        state_directory=policy["state_directory"],
+                        write_file=lambda path, raw: write_new_protected(path, raw, sid),
+                    )
+                    print(
+                        json.dumps(
+                            dict(
+                                stage="DEPLOYMENT_HANDOFF_READY",
+                                release_id=deployment["request"]["release_id"],
+                            )
+                        ),
+                        flush=True,
+                    )
+                    return 0
                 if exit_code == 0:
                     print(
                         json.dumps(
@@ -378,6 +475,9 @@ def main(argv=None):
                     ),
                     flush=True,
                 )
+                # finally closes native handles before the next loop iteration.
+                # Retain their protected observation, never reuse closed handles.
+                termination = previous_termination(policy["state_directory"], previous, inspect)
             except BaseException as error:
                 if not (directory / "commit.json").exists():
                     for item in created.values():

@@ -36,6 +36,54 @@ def test_clean_readiness_changes_no_jobs_or_resources(monkeypatch):
             assert call.args[0].count("?") == len(call.args) - 1
 
 
+def test_restart_keeps_uncertain_preparation_quarantined(monkeypatch, caplog):
+    reconciler, _, connections = setup(monkeypatch)
+    observations = iter(
+        [
+            {"Held": 1},
+            {"UnsafeHeld": 0},
+            {"Held": 0},
+            {"Held": 1},
+            {"UnsafeHeld": 0},
+            {"Held": 0},
+            {"OpenSessions": 0},
+        ]
+    )
+    monkeypatch.setattr(module, "one", lambda _: next(observations))
+    native = Mock()
+    monkeypatch.setattr(TerminatedPair, "verify", native)
+    transitions = Mock()
+    monkeypatch.setattr(module, "ExportExecutionDAL", transitions)
+    reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
+    assert native.call_count == 2
+    transitions.assert_not_called()
+    assert "resources_quarantined=1 replay_enabled=false" in caplog.text
+    for connection in connections:
+        for call in connection.cursor.return_value.execute.call_args_list:
+            assert call.args[0].startswith("SELECT")
+            assert call.args[0].count("?") == len(call.args) - 1
+
+
+@pytest.mark.parametrize("unsafe", [None, {}, {"UnsafeHeld": 1}, {"UnsafeHeld": False}])
+def test_restart_never_bypasses_unexplained_ownership(monkeypatch, unsafe):
+    reconciler, _, _ = setup(monkeypatch)
+    observations = iter([{"Held": 1}, unsafe])
+    monkeypatch.setattr(module, "one", lambda _: next(observations))
+    native = Mock()
+    monkeypatch.setattr(TerminatedPair, "verify", native)
+    with pytest.raises(SourceConflict, match="quarantined"):
+        reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
+    native.assert_not_called()
+
+
+def test_quarantined_preparation_does_not_bypass_open_provider_stream(monkeypatch):
+    reconciler, _, _ = setup(monkeypatch)
+    observations = iter([{"Held": 1}, {"UnsafeHeld": 0}, {"Held": 1}])
+    monkeypatch.setattr(module, "one", lambda _: next(observations))
+    with pytest.raises(SourceConflict, match="stream closure"):
+        reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
+
+
 @pytest.mark.parametrize("held,streams", [(1, 0), (0, 1)])
 def test_unresolved_work_prevents_any_session_transition(monkeypatch, held, streams):
     reconciler, connect, _ = setup(monkeypatch, held=held, streams=streams)
