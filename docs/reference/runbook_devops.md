@@ -11,6 +11,30 @@ Purpose: summarize deployment, promotion, configuration, and maintenance guidanc
 
 Use `Promotion Guide.md` for the detailed mirror-to-production process.
 
+## Protected S11 deployment — current process
+
+Follow the [operator Promotion Guide](Promotion%20Guide.md) and
+[S11 release contract](S11%20Deployment%20and%20Restart%20Contract.md).
+The protected runtime pins source hashes and startup policy together. Runtime
+patches therefore use the fixed `Update-K98.ps1` command, which automatically
+prepares a reviewed release definition for `Deploy-K98Release.ps1`;
+a manual pull in the live checkout is not a complete deployment. The runner asks
+for `/ops graceful_restart`, verifies the old pair drained, then installs matching
+source/policy and verifies one successor start. Ordinary restart uses installed
+source and does not deploy a merged PR.
+
+Batch compatible patches into one deployment if useful. A documentation/test-only
+merge needs no bot deployment unless it changes installed operational material.
+SQL steps are included only for required reviewed migrations. Never replay prior
+cutover or recovery as a routine patch step. Routine preparation is automatic;
+the operator does not build manifests, calculate hashes or edit commands. SQL,
+dependency and configuration releases retain separately reviewed steps. The
+updater still awaits native/live acceptance; consult the Promotion Guide status.
+
+The setup/dependency commands below are development/initial-setup guidance, not
+instructions to mutate the running protected installation. Production dependency
+changes require explicit inclusion in the reviewed release.
+
 ## Local Setup
 
 ```powershell

@@ -217,8 +217,10 @@ if($AlreadyStopped -and -not(Test-Path -LiteralPath $receiptPath)) {
     $null=Read-Pinned $issuerScript $policy.source_hashes.'scripts/run_export_startup_issuer.py' 2MB
     & $manifest.issuer_launcher.path -I -B $issuerScript --policy $manifest.policy.path --drain-only
     if($LASTEXITCODE -ne 0){throw 'Stopped-release drain could not be verified; no source changes applied'}
-} else {
+} elseif(-not(Test-Path -LiteralPath $receiptPath)) {
     Write-Host 'Release staged. Run /ops graceful_restart in Discord. Waiting for protected drain receipt.'
+} else {
+    Write-Host 'Protected drain already verified. Continuing this release; do not restart again.'
 }
 $clock=[Diagnostics.Stopwatch]::StartNew()
 while(-not(Test-Path -LiteralPath $receiptPath)) {

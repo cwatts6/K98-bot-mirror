@@ -1,5 +1,13 @@
 # K98 Bot Reference Docs
 
+> **S11 deployment routing — 2026-10-08:** Use the [Promotion Guide](Promotion%20Guide.md)
+> for copy-and-paste operator steps and the
+> [S11 contract](S11%20Deployment%20and%20Restart%20Contract.md) for release semantics.
+> Initial cutover and normal restart are accepted. Runtime source and startup
+> policy updates use the protected runner; ordinary restart does not pull code.
+> Older rollout checkpoints below are retained history, not the current deployment
+> procedure. Current commit/held-work evidence belongs in the latest S11 handover.
+
 > **Publication checkpoint — 2026-10-02:** [Bot PR #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL PR #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) are authorized, open and ready for review; **leave unmerged**. See the [current PR review checkpoint](kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md) for final checks, review fixes and source-pin qualifications. This supersedes older draft/publication-pending text. Bounded production inventory remains approved; merge, deployment and activation remain separate.
 
 ## Local review accepted; production inventory approved — 2026-10-02

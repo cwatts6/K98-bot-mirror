@@ -1,5 +1,14 @@
 # Developer Quickstart
 
+> **S11 deployment process — 2026-10-08:** Protected initial cutover and normal
+> graceful restart on MINI_AMD are complete. For runtime updates use the
+> [operator Promotion Guide](docs/reference/Promotion%20Guide.md) and
+> [S11 release contract](docs/reference/S11%20Deployment%20and%20Restart%20Contract.md).
+> Source and its protected startup policy must be updated together after drain;
+> a live `git pull` or ordinary restart alone does not deploy a reviewed change.
+> Older rollout-status entries below are historical. The latest S11 handover
+> supplies current runtime state; preserve held work and activation flags.
+
 > **Publication checkpoint — 2026-10-02:** [Bot PR #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL PR #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) are authorized, open and ready for review; **leave unmerged**. See the [current PR review checkpoint](docs/reference/kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md) for final checks, review fixes and source-pin qualifications. This supersedes older draft/publication-pending text. Bounded production inventory remains approved; merge, deployment and activation remain separate.
 
 ## Local review accepted; production inventory approved — 2026-10-02

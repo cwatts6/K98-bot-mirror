@@ -1,5 +1,17 @@
 # Shutdown Runbook
 
+## Protected S11 restart and release handoff — 2026-10-08
+
+This entry supersedes the older rollout status below. Normal graceful restart is
+accepted on MINI_AMD and restarts the installed release without a source pull.
+For routine deployment, run the fixed `Update-K98.ps1` command first, then
+issue `/ops graceful_restart` once when it requests it. The runner requires a
+protected drain receipt and old issuer exit before installing source/seed; absent
+PIDs alone are not shutdown proof. Preserve quarantined claims and closed flags.
+Do not use force-restart, old cutover scripts or manual task starts to bypass a
+stopped release. Follow [Promotion Guide](Promotion%20Guide.md) failure/resume steps
+and the [S11 contract](S11%20Deployment%20and%20Restart%20Contract.md).
+
 ## Current S11 checkpoint — 2026-09-29
 
 Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.

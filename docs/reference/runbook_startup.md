@@ -1,5 +1,17 @@
 # Startup Runbook
 
+## Protected S11 startup and deployment — 2026-10-08
+
+This entry supersedes the older rollout status below. MINI_AMD completed initial
+protected cutover and a normal `/ops graceful_restart`. Consult the latest S11
+handover for the running commit and current held work; do not repeat cutover.
+Ordinary restart launches the installed release. Runtime updates require matching
+source hashes and startup policy through the reviewed release runner; do not
+manually pull/switch the running checkout or independently start the task during
+deployment. Follow the [Promotion Guide](Promotion%20Guide.md) and
+[S11 contract](S11%20Deployment%20and%20Restart%20Contract.md).
+Readiness must distinguish Discord availability from degraded import/export state.
+
 ## Current S11 checkpoint — 2026-09-29
 
 Read the [current validation handoff](kvk_source_migration/s11_g4_validation_handoff_20260929.md) first and use the [new-chat starter](../task_packs/S11%20G4%20Controlled%20Validation%20-%20Chat%20Starter%20-%2020260929.md) for the next chat. It supersedes earlier dated S11 next-step, OAuth/fresh-identity, fresh-file and restore-incomplete statements below. Their original bodies remain historical evidence; general engineering/runbook requirements still apply.

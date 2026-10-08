@@ -502,3 +502,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: low
 - Risk: low
 - Dependencies: Existing contention redaction and bounded-volume regressions; optional maintenance, not a blocker to the first contention slice.
+
+### Deferred Optimisation
+- Area: S11 release authoring around `scripts/prepare_k98_release.py` and `core/export_release_seed.py`
+- Type: architecture
+- Description: The generic runner and successor-seed helper exist, but each runtime release still requires manual assembly of source/seed/start/readiness adapters and operator transfer instructions. PR616 required over forty minutes of bespoke preparation/review, then failed live preflight with an ownership error that omitted the failing path and owner. This is a demonstrated delivery/usability failure, not optional maintenance. Static review and packaging success were insufficient evidence of operational readiness.
+- Suggested Fix: After this defect is deployed, meet the operator's mandatory usability requirement: a manual update, including creation of its release package, must be as simple as the previous git-pull step. Provide a stable script/command with no per-release hand-crafted manifests, hashes, paths or edits. Either automate preparation and coordinated deployment reliably, or explicitly redesign/remove the coordinated startup source-policy update requirement while retaining necessary ownership and no-replay safeguards. A bespoke packet-authoring workflow is not an acceptable permanent solution.
+- Impact: high
+- Risk: medium
+- Dependencies: The 2026-10-08 continuation supersedes the original ordering: reusable updater first, orphan-queue fix immediately next and its deployment used for first live acceptance. Local updater implementation now exists; elevated native and live acceptance remain outstanding. Current source/policy controls remain in force; no implicit removal.

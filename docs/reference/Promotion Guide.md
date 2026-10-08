@@ -1,333 +1,220 @@
-# Mirror To Production Promotion Guide
+# K98 promotion and deployment — operator runbook
 
-Purpose: promote a validated mirror branch from `K98-bot-mirror` to the private production
-repository `K98-bot`.
+Use this sequence for the protected S11 runtime. A merge or development-PC pull does not deploy the bot. The [S11 deployment and restart contract](S11%20Deployment%20and%20Restart%20Contract.md) defines the protected release protocol.
 
-## Why This Exists
+## Current release — 8 October 2026
 
-Mirror and production may have unrelated Git histories. Do not push mirror branch history directly
-to production. Production PR branches must be based on `production/main`; apply only the file delta
-from the mirror branch.
+**Stats-cache recovery succeeded at20:18 UTC.** After the recorded manual
+supersession and exact ticket405 withdrawal, a normal
+`/kvk_admin refresh_stats_cache` was admitted on its first attempt, acknowledged
+the durable SQL checkpoint and snapshot capture, and rebuilt the415-record KVK16
+cache with `status=refreshed` in31.1seconds. Last-KVK cache also succeeded.
+Do not repeat either recovery script or restart for this completed recovery.
 
-Do not use:
+The source date remains29September because it records source-scan provenance,
+not the cache-build time. This result proves the normal stats SQL/cache path
+works; it does not prove newer data ingestion or provider/export delivery.
+Intake/recovery flags remain false. The historical SQL outcome remains recorded
+as unknown in the supersession audit.
 
-```powershell
-git push production <mirror-feature-branch>
-```
+PR616 source and startup seed are installed; bot startup, independent successor
+native verification and matching SQL session are observed. The generic release
+runner still lacks a successful final release receipt and is **not live accepted**.
+A successful manual recovery does not close that separate deployment-tooling gap.
 
-Use the patch-based promotion script instead.
+### What happens next
 
-## Codex Skills
+No further incident recovery action is required for the accepted stats-cache run.
+Next engineering work is acceptance of the simplified updater, followed immediately
+by prevention/reconciliation of orphan queue entries. Routine patches use a fixed-command
+workflow without bespoke operator-authored packets, or the coordinated startup
+source policy must be reconsidered. Broader S11/provider acceptance remains
+separate; do not change activation flags on the strength of this cache result.
 
-Use the local Codex skills as promotion guardrails:
+[The S11 handover](../../.codex_artifacts/s11-runtime-contracts-20261004/S11-GoLive-Handover-20261008.md)
+retains the exact receipts, logs and completed recovery commands as history.
 
-- `k98-pr-review`: use before merge to confirm the mirror change is ready for handoff.
-- `k98-test-selection`: use before promotion to verify the focused and broad validation plan.
-- `k98-sql-validation`: use when SQL-facing bot changes, SQL repo changes, `ProcConfig`, DAL
-  assumptions, staging/output tables, imports, exports, or SQL-backed caches are involved.
-- `k98-promotion-check`: use before creating the production branch or PR, and again before bot
-  machine deployment when SQL, config, dependency, startup, scheduler, persistence, or cache risks
-  exist.
-- `k98-deferred-optimisation-capture`: use when promotion review finds out-of-scope cleanup or
-  follow-up work that should not be mixed into the active promotion.
+### Why not just git pull?
 
-Environment note:
+Git still supplies the application source. The protected S11 startup also pins
+the approved source-file hashes and startup policy. Updating the checkout alone
+does not update that matching policy or coordinate shutdown and one successor start.
+It can leave the installed source inconsistent with the approved startup contract.
 
-- The local dev machine / mirror workspace uses the `.venv` folder, so commands in this guide
-  appear as `.\.venv\Scripts\...`.
-- The bot machine uses the `venv` folder, so commands in this guide appear as
-  `.\venv\Scripts\...`.
+The release folder contains the instructions and checks for that coordinated
+update: stop/drain, install the exact private-main source, install its matching
+startup policy, start and verify. It is not a replacement source-control system.
+A reviewed source step may use Git; an uncoordinated pull in the live checkout is
+not the complete deployment operation.
 
-## Standard Process
+The reusable updater now implements automatic package creation locally. Native
+elevated rehearsal and the first successful real release remain acceptance gates.
+The earlier generic-runner attempt reached a running successor but failed its
+final verification. Local tests do not close that live-acceptance gap.
 
-For the protected S11 runtime, use the [S11 deployment and restart
-contract](S11%20Deployment%20and%20Restart%20Contract.md) when preparing a release
-packet. Its runner coordinates a reviewed packet with `/ops graceful_restart`;
-ordinary restart does not pull source or run migrations. The current older
-issuer requires a separately reviewed initial cutover. Do not substitute an
-unreviewed manifest or an old startup seed for that cutover.
+**Required tooling outcome:** a manual update must be
+as straightforward as the previous `git pull` workflow. A stable script may
+prepare and deploy the release, but the operator must not handcraft manifests,
+adapters, hashes or commands for each patch. If the source-policy design cannot
+support that workflow, review redesign/removal of the coordinated source-policy
+update requirement. This is an unresolved usability requirement, not optional
+polish. The updater is the first priority, immediately followed by the orphan-queue fix.
+That fix must be the first real release used for live acceptance. Changing the
+source-policy requirement remains a separate reviewed decision.
 
-### 1. Validate Mirror Branch
+**How often:** use this path when actually installing runtime changes, including
+small fixes. Several compatible PRs can share one deployment. Documentation and
+test-only merges do not require a bot restart/deployment unless they change
+installed operational material. A source-only release has no SQL migration step.
+The requirement is coordinated source/policy installation, not a fresh manual
+design exercise or a repeat of prior recovery for each patch.
 
-Before running the branch checks, use `k98-pr-review` for merge readiness and `k98-test-selection`
-to confirm the validation plan. If SQL-facing work is present, use `k98-sql-validation` and keep the
-SQL repo evidence with the promotion notes.
+For future releases, the updater obtains and validates fresh bindings automatically;
+no operator copies commit, seed or receipt values from a previous release.
 
-```powershell
-cd C:\discord_file_downloader
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-.\dev.ps1
+## Machine and shell
 
-git fetch origin
-git switch codex/<branch-name>
-git pull origin codex/<branch-name>
-git status
-git log --oneline origin/main..HEAD
-git diff --name-status origin/main...HEAD
-git diff --stat origin/main...HEAD
+| Work | Machine | Window |
+| --- | --- | --- |
+| Code, tests, PRs and local pulls | Development PC | Normal PowerShell; development Python is `.venv\Scripts\python.exe` |
+| Install the reviewed updater once | MINI_AMD | Supplied installer outside the live repository |
+| Automatic preparation and deployment | MINI_AMD | **Windows PowerShell 5.1, Run as administrator**, under the reviewed deployment account |
+| Restart request and command checks | Discord | Operator account |
 
-cd C:\K98-bot-SQL-Server
-git pull
-git status
-git log --oneline -5
-```
+Deployment requires **Windows PowerShell**, not PowerShell 7 (`pwsh`). Do not activate the bot virtual environment or run `dev.ps1` for deployment.
 
-If there are SQL differences, run:
-```powershell
-cd C:\K98-bot-SQL-Server
-git restore .
-git pull
-```
+On MINI_AMD, do not manually pull/switch the live checkout, install packages, run formatters, reset/clean Git, start the task or restart ahead of the runner. The packet owns changes after the old process pair drains. Tests belong on the development PC or a separately reviewed isolated checkout.
 
-### 2. Run Local Validation
+## Step 1 — Validate and prepare both PRs
 
-Use `k98-test-selection` to choose focused tests in addition to the baseline gates below. Document
-any skipped validation with a reason before promotion.
+**Where:** Codex on the development PC. Skip if both PRs are already merged.
 
-Use targeted validation for small changes and full validation before production promotion:
-
-```powershell
-cd C:\discord_file_downloader
-.\.venv\Scripts\python.exe scripts/validate_architecture_boundaries.py
-.\.venv\Scripts\python.exe scripts/validate_deferred_items.py
-.\.venv\Scripts\python.exe scripts/select_tests.py
-.\.venv\Scripts\python.exe scripts/smoke_imports.py
-.\.venv\Scripts\python.exe scripts/validate_command_registration.py
-.\.venv\Scripts\python.exe -m pre_commit run -a
-.\.venv\Scripts\python.exe -m pytest -q tests
-git diff --check
-git status
-```
-
-For command-surface changes, also confirm:
-
-- `scripts/validate_command_registration.py` reports the expected primary/grouped baseline.
-- If a new top-level command or command group was approved, the production PR includes the
-  operator approval rationale, the `APPROVED_TOP_LEVEL_COMMANDS` update, and the matching
-  `docs/reference/canonical_command_reference.md` update.
-- If grouped subcommands changed, the canonical command table, grouped summary, smoke references,
-  command versions, usage tracking, permissions, and command-cache behavior were reviewed.
-- When useful for review, attach or paste the Markdown inventory generated with:
-
-```powershell
-.\.venv\Scripts\python.exe scripts/validate_command_registration.py `
-  --format markdown `
-  --output command-registration-inventory.md
-```
-
-If pre-commit reformats files or makes other changes:
-```powershell
-git add -A
-git commit
-git push
-```
-
-### 3. Confirm Remotes
-
-```powershell
-git remote -v
-```
-
-Expected:
+Copy this prompt into the implementation chat:
 
 ```text
-origin     -> K98-bot-mirror
-production -> K98-bot
+Prepare this K98 change for merge. Read AGENTS.md and required references. Use
+k98-pr-review, k98-test-selection, applicable SQL validation, security routing and
+k98-promotion-check. Validate the mirror change, then patch-promote its file delta
+onto private production/main and open the private PR. Do not push mirror history
+to production. Address, reply to and resolve review comments appropriately; request
+another review and verify final-head CI and zero unresolved threads. Report both
+exact heads and readiness. Do not merge or deploy. Preserve activation flags and
+retained uncertain work. Do not repeat successful operational evidence.
 ```
 
-Add production if missing:
+Codex uses `scripts/promote-to-production.ps1` to create the initial private PR branch from `production/main`, apply the validated mirror delta, validate, commit and push. That is repository promotion, not deployment. Corrections must remain equivalent between PRs.
 
-```powershell
-git remote add production https://github.com/cwatts6/K98-bot.git
-git fetch production
-```
+**Continue when:** both final heads have completed review and required checks, zero unresolved threads and a recorded promotion-readiness verdict.
 
-### 4. Promote Branch
+## Step 2 — Merge and update the development PC
 
-Before creating the production branch, use `k98-promotion-check` to verify remotes, branch state,
-validation evidence, SQL/config sequencing, bot-machine readiness, and rollback notes. Do not
-promote if it reports blocking issues.
-
-```powershell
-cd C:\discord_file_downloader
-git config core.quotePath false
-
-.\scripts\promote-to-production.ps1 `
-  -SourceBranch codex/<branch-name> `
-  -ProductionBranch prod/<branch-name>
-```
-
-The script:
-
-- verifies remotes
-- fetches `origin` and `production`
-- creates `prod/<branch-name>` from `production/main`
-- applies the file delta from `origin/main..origin/<branch-name>`
-- runs validation against the promoted file list
-- commits and pushes the promoted branch to `production`
-
-If validation modifies files, review the changes, fix the mirror branch first where appropriate,
-and rerun promotion.
-
-### 5. Open Production PR
-
-Include the `k98-promotion-check` verdict, validation summary, SQL/config notes, and rollback notes
-in the production PR body.
-
-Open:
-
-```text
-K98-bot: prod/<branch-name> -> main
-```
-
-### 6. Test on local BOT Machine before merge
-
-```powershell
-cd C:\discord_file_downloader
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\venv\Scripts\Activate.ps1
-.\dev.ps1
-git merge --quit
-git switch main
-git fetch
-git switch prod/<branch-name>
-git pull
-pre-commit run -a
-pytest -vv tests --durations=30 --durations-min=1.0 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
-```
-
-GitHub should allow a normal comparison because the branch is based on `K98-bot/main`.
-
-#### If needed to push again
-1.
-```powershell
-git switch main
-git branch -D prod/<branch-name>
-```
-
-2.
-```powershell
-cd C:\discord_file_downloader
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-.\dev.ps1
-
-git fetch origin
-git switch codex/<branch-name>
-git pull origin codex/<branch-name>
-
-.\scripts\promote-to-production.ps1 `
-  -SourceBranch codex/<branch-name> `
-  -ProductionBranch prod/<branch-name>
-```
-
-3. (on the bot machine)
-```powershell
-cd C:\discord_file_downloader
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\venv\Scripts\Activate.ps1
-.\dev.ps1
-
-git merge --abort 2>$null
-git fetch origin
-git switch prod/<branch-name>
-git reset --hard origin/prod/<branch-name>
-git clean -fd
-git status
-git log --oneline -5
-pre-commit run -a
-pytest -vv tests --durations=30 --durations-min=1.0 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
-```
-
-
-### 7. Merge And Deploy
-
-Before bot-machine deployment, rerun or refresh `k98-promotion-check` when the change includes SQL,
-config, dependency, startup, scheduler, persistence, rehydration, or cache implications.
+**Where:** GitHub, then normal PowerShell on the **development PC only**.
 
 1. Merge the mirror PR into `K98-bot-mirror/main`.
-Then update local mirror main:
-```powershell
-git switch main
-git pull origin main
-git status
-```
-
-2. Merge the production PR into `K98-bot/main`.
-3. Deploy only from `K98-bot/main` on the bot machine.
-
-Deployment machine:
+2. Merge the private PR into `K98-bot/main`.
+3. If the development PC is not already updated, paste:
 
 ```powershell
-cd C:\discord_file_downloader
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\venv\Scripts\Activate.ps1
-.\dev.ps1
-git switch main
-git pull
-Git-CleanupMerged
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
-pre-commit run -a
-pytest -vv tests --durations=30 --durations-min=1.0 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
-git status
-```
-
-If validation changes files on the production branch, commit and push those intended changes before
-deploying.
-
-```powershell
-git add -A
-git commit
-git push
-```
-
-### 8. Post-Production Sync & Alignment (NEW)
-
-```powershell
-cd C:\discord_file_downloader
+$ErrorActionPreference = 'Stop'
+Set-Location -LiteralPath 'C:\discord_file_downloader'
+$changes = @(git status --porcelain)
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read Git status.' }
+if ($changes.Count -ne 0) { throw 'Local changes exist. Return the output to Codex; do not reset or clean.' }
 git fetch origin
+if ($LASTEXITCODE -ne 0) { throw 'Mirror fetch failed.' }
 git fetch production
+if ($LASTEXITCODE -ne 0) { throw 'Private production fetch failed.' }
 git switch main
-git reset --hard origin/main
-git clean -fd
-
-cd C:\K98-bot-SQL-Server
-git pull
+if ($LASTEXITCODE -ne 0) { throw 'Switch to main failed.' }
+git pull --ff-only origin main
+if ($LASTEXITCODE -ne 0) { throw 'Fast-forward pull failed. Return the output to Codex.' }
+git status --short
+git log -1 --oneline
+git rev-parse production/main
 ```
 
+**Expected:** clean local main and the refreshed private-main SHA. Mirror/private hashes may differ because their Git histories differ. Do not rerun branch promotion after merging to deploy the same delta.
 
-### 9. Cleanup
+## Step 3 — Run the fixed updater on MINI_AMD
+
+**Implementation status:** the reusable updater is under local validation and review.
+It is not installed or live-accepted yet. Do not run a draft copy against production.
+The orphan-queue fix is the first real release intended to accept this workflow.
+
+After the reviewed tool is installed once, every routine source-only release uses
+this same block in **Windows PowerShell 5.1, Run as administrator**, on MINI_AMD:
 
 ```powershell
-cd C:\discord_file_downloader
-git switch main
-git pull origin main
-git branch --delete codex/<branch-name>
-git branch --delete prod/<branch-name>
-git fetch origin --prune
-git fetch production --prune
-
-cd C:\K98-bot-SQL-Server
-git switch main
-git pull
-git status
-git fetch origin --prune
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+& 'C:\ProgramData\K98\S11\updater\Update-K98.ps1'
 ```
 
-## Troubleshooting
+The updater fetches private production `main`, checks the running installation,
+prepares the release and matching startup policy automatically, and stages the
+protected handoff. It prints the selected commit. If already current, it exits
+without requesting a restart. No release ID, commit, manifest, hash or adapter is
+entered or edited by the operator. No Codex chat or development-PC package transfer
+is required for each routine update.
 
-### Empty Patch
+If only package preparation is wanted, the same command accepts `-PrepareOnly`.
+Later run the normal command above. It refreshes unused preparation automatically
+so an intervening normal restart cannot leave stale process/session bindings.
+After deployment intent is recorded, it retains and resumes that exact release.
 
-The source branch has no file changes compared with `origin/main`, or the wrong source branch was
-provided.
+## Step 4 — Restart once when prompted
 
-### Patch Conflict
+In Discord, run `/ops graceful_restart` **only when the updater prompts**. Leave
+PowerShell open. The updater verifies drain, installs the pinned source and matching
+policy, starts one successor and verifies its native/SQL/startup evidence. It saves
+its transcript and release receipts automatically. Check `/ops show_command_versions`
+after success. Deployment success does not certify provider/import health.
 
-The file delta from the mirror branch does not apply cleanly to `production/main`. Resolve the
-compatibility issue in the mirror branch or update production first, then rerun promotion.
+These are the two routine operator actions: **run the unchanged update script;
+request the prompted restart**. Small patches use exactly the same path as larger
+source-only releases. Package preparation is part of the script, not another task.
 
-### Archive Changes
+On interruption, retain the output and receipts. The same command finds the saved
+release and verifies completed steps before continuing. It must not request another
+restart once the drain receipt exists, rerun an uncertain apply, or issue another
+start after lost acknowledgement. An unresolved outcome remains stopped for precise
+reconciliation; do not delete control files, manually pull, or start the task.
 
-The script refuses archive changes by default. Use `-AllowArchiveChanges` only when archived files
-are intentionally part of the promotion.
+## One-time updater installation
+
+The reviewed implementation supplies one automatically built
+`Install-K98UpdateTool.ps1`. Its preparation command on the development PC is
+`python -m scripts.package_k98_update_tool`; the operator does not write a tool
+manifest. The release handoff supplies the exact reviewed installer and checksum.
+Installing it on MINI_AMD creates the protected tool directory only: it does not
+change running source, startup policy, task configuration, SQL or activation flags.
+It can therefore prepare the first release containing the updater without modifying
+the live checkout first. This installation is not repeated for ordinary releases.
+
+## Release boundaries and exceptional changes
+
+Normal bot and SQL changes go through their Git repositories and review first.
+The source-only updater selects private `K98-bot/main`; it does not deploy mirror
+history, uncommitted live edits, dependencies, configuration or SQL migrations.
+A release requiring SQL uses explicit reviewed migration IDs and the correct
+SQL-before-bot order where needed, with outcome receipts and no blind replay.
+
+A rare emergency should normally be a small Git hotfix through this same routine
+path. A direct-code emergency mode is a separate future design: explicit invocation,
+exact patch/before-state capture, minimum validation, matching source-policy update,
+controlled restart and mandatory reconciliation back into Git. It is not implemented
+or implicitly enabled by this updater. Ordinary restart cannot legitimize uncommitted
+changes to pinned source.
+
+## Ordinary restart — no deployment
+
+Run `/ops graceful_restart` once in Discord. It restarts the **installed** release; it does not pull source or run migrations. No deployment packet is needed. Do not repeat the accepted normal-restart test merely because another change merged.
+
+## Repository and validation rules
+
+- `origin` is the scrubbed mirror; `production` is private `K98-bot`. Never push mirror history to production.
+- Deploy only an exact reviewed private-main commit. Review SQL-facing contracts against `C:\K98-bot-SQL-Server`.
+- Use the K98 review, test-selection, SQL-validation, security-routing and promotion-check skills as applicable. Preserve exact diff review and test evidence.
+- Run or justify architecture, deferred-item, test-selection, security-routing, smoke-import, registration, lint and appropriate pytest/log-hygiene checks before promotion. Runtime changes require appropriate focused/full validation; deployment is not the place to auto-format source.
+- Never discover and execute all pending migration files. Include only required reviewed migration IDs and retain successful receipts.
+- Cleanup is optional development maintenance after evidence retention, not a deployment step. No blanket reset/clean, SQL `git restore .`, or live-checkout branch testing belongs in this runbook.
+- Merge, deployment, recovery and activation are different outcomes. No automatic merge or activation is implied.

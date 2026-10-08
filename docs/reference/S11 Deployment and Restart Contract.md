@@ -1,9 +1,16 @@
 # S11 deployment and restart contract
 
 This contract covers the reusable handoff, release runner and packet preparation.
-It is not an executable production release packet. Each release must supply its
-reviewed installation/verification scripts; the current older issuer also needs
-the initial cutover described below. Merging this code does not deploy a release.
+Routine source-only updates use one versioned, reviewed updater which generates
+release metadata and matching seed automatically. The operator runs the same
+command and requests one restart when prompted; no per-release script authoring,
+manifest editing or Codex session is required. This implementation is not yet
+installed or live-accepted; the orphan-queue fix is its intended first live release.
+An installation still using the older
+issuer needs the initial cutover described below. MINI_AMD completed that cutover
+on 2026-10-08; consult the latest handover before selecting a deployment path.
+Merging this code does not deploy a release. For copy-and-paste operator steps,
+use the [Promotion Guide](Promotion%20Guide.md).
 
 ## Operator workflow
 
@@ -18,8 +25,15 @@ then asks the operator to run `/ops graceful_restart`. After that command drains
 the existing pair, the release script installs the selected SQL migration(s),
 production-main source and matching seed, starts once, and verifies readiness.
 
-The manifest is prepared as part of release review. Operators do not manually
-edit hashes, process IDs, scheduled-task arguments or source inventories.
+For routine source-only updates, the installed `Update-K98.ps1` fetches private
+production main and prepares the manifest automatically from authenticated source
+and the protected installation. `-PrepareOnly` prepares without deploying; the
+unchanged normal command refreshes unused preparation before recording deployment
+intent, then retains that exact package for all resumes. The reviewed updater uses
+fixed apply/verify adapters and preserves SQL/dependency observations and flags.
+Operators do not manually edit hashes, process IDs, scheduled-task arguments or
+source inventories. The generic packaging interface remains available for releases
+with separately reviewed migration, dependency or configuration changes.
 The release author uses `python -m scripts.prepare_k98_release --specification
 <reviewed-spec.json> --output <fresh-directory>` to package the runner, selected
 files and canonical `release.json`. The command returns the manifest and runner
@@ -110,8 +124,10 @@ not-ready outcomes. A failed start is not an automatic rollback of SQL.
   exclusion, real retained process handles and the offline start path.
 - Release adapters must prove exact production-main source, explicit SQL ledger
   checks, seed integrity and one-start/readiness behaviour before the packet is
-  approved for operational use. They are release-specific reviewed files, not
-  commands selected by the bot or discovered from pending migration filenames.
+  approved for operational use. Routine source-only releases reuse reviewed tool
+  code with generated exact bindings. SQL steps require explicit reviewed migration
+  identities. Neither path accepts commands selected by the bot or discovers
+  executable migrations from pending filenames.
 - The initial bootstrap must preserve the currently uncertain preparation and
   obtain actual old-process termination evidence. It cannot fabricate a stop
   receipt merely to make the new path accept the old release.
@@ -119,8 +135,9 @@ not-ready outcomes. A failed start is not an automatic rollback of SQL.
 
 ## Initial cutover and release-specific checks
 
-The previously installed issuer does not understand deployment requests. Do not
-run the new runner against that issuer and expect a graceful handoff. The first
+This section applies only to an installation that has not completed initial cutover.
+The legacy issuer does not understand deployment requests. Do not run the new
+runner against that issuer and expect a graceful handoff. The first
 production packet must retain the current native process handles before shutdown,
 observe both exits, preserve the uncertain preparation, exclude old scheduled
 starts and stop the old issuer before changing its source. Missing PIDs are not
