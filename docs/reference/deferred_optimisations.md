@@ -493,3 +493,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: low
 - Risk: medium
 - Dependencies: Existing native Windows installer regressions; no changed limits or fixed overall workload duration; outside the first production rollout.
+
+### Deferred Optimisation
+- Area: `services/export_contention.py::retry_coordination` structured outcome logging
+- Type: consistency
+- Description: Private PR616 identified three similar log payloads for recovered, exhausted and non-retryable coordination outcomes. Current behavior is tested; no schema drift or runtime defect was identified.
+- Suggested Fix: During the next logging-focused change, consider a small shared outcome emitter while preserving severity, optional sanitized error facts, timing and exactly one summary per retry operation.
+- Impact: low
+- Risk: low
+- Dependencies: Existing contention redaction and bounded-volume regressions; optional maintenance, not a blocker to the first contention slice.
