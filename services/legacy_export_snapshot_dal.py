@@ -12,7 +12,12 @@ import json
 import logging
 from uuid import UUID, uuid4
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest, one, transaction
+from kvk.dal.new_source_import_dal import SourceConflict, digest, one
+from services.export_contention import (
+    admission_diagnostics_enabled,
+    retry_coordination,
+    transaction,
+)
 from services.export_coordination_dal import _cas, _mutex, bounded_json
 
 logger = logging.getLogger(__name__)
@@ -31,6 +36,8 @@ def _diagnostic_counter(value):
 
 def _log_admission_refusal(identifier, stage, reason, *, resource=None, queue=None, ticket=None):
     """Bounded read-time facts, never commit proof or arbitrary database prose."""
+    if not admission_diagnostics_enabled.get():
+        return
     record = dict(
         preparation_id=_diagnostic_uuid(identifier),
         stage=stage,
@@ -207,6 +214,7 @@ class LegacySnapshotDAL:
                 )
             return str(result["PreparationID"]).lower()
 
+    @retry_coordination
     def withdraw_unstarted(self, identifier):
         """Withdraw this refused operation, never reclaim an admitted/old writer.
 
@@ -469,10 +477,12 @@ class LegacySnapshotDAL:
             raise SourceConflict("Preparation owner/fence/version changed.")
         return row
 
+    @retry_coordination
     def authorize(self, claim):
         with transaction(self.connect) as cursor:
             return self._authorize(cursor, claim)
 
+    @retry_coordination
     def transition(
         self, claim, *, expected, state, generation=None, release=False, external_cursor=None
     ):
@@ -513,7 +523,7 @@ class LegacySnapshotDAL:
                     raise SourceConflict("Committed generation evidence cannot be replaced.")
             version = _cas(
                 cursor,
-                "UPDATE dbo.ExportPreparation SET State=?,GenerationJson=COALESCE(?,GenerationJson),Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND OwnerID=? AND Fence=? AND Version=? AND State=?",
+                "UPDATE dbo.ExportPreparation SET State=?,GenerationJson=COALESCE(CAST(? AS nvarchar(max)),GenerationJson),Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND OwnerID=? AND Fence=? AND Version=? AND State=?",
                 state,
                 bounded_json(generation) if generation is not None else None,
                 claim.preparation_id,
@@ -547,6 +557,7 @@ class LegacySnapshotDAL:
                 version,
             )
 
+    @retry_coordination
     def uncertain(self, claim):
         with transaction(self.connect) as cursor:
             self._authorize(cursor, claim)
@@ -569,6 +580,7 @@ class LegacySnapshotDAL:
                     version,
                 )
 
+    @retry_coordination
     def captured(self, claim, receipt):
         with transaction(self.connect) as cursor:
             row = self._authorize(cursor, claim)

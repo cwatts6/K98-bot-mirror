@@ -19,6 +19,11 @@ import math
 import time
 from uuid import UUID
 
+from services.export_contention import (
+    CoordinationLockRefused,
+    admission_diagnostics_enabled,
+    sql_error_facts,
+)
 from services.export_snapshot_store import SnapshotReceipt
 
 logger = logging.getLogger(__name__)
@@ -247,7 +252,7 @@ def record_writer_completion(*, cursor=None, **evidence):
         require_runtime().checkpoint_writer(owner, evidence, cursor=cursor)
 
 
-def verify_producer_cursor(cursor):
+def verify_producer_cursor(cursor, *, before_side_effects=False):
     """Actual connection gate; a separate snapshot guard session is insufficient."""
     runtime = _writer_runtime()
     if runtime is None:
@@ -256,7 +261,58 @@ def verify_producer_cursor(cursor):
     if owner is None:
         raise SnapshotUnavailable("Actual SQL producer has no admitted writer owner.")
     runtime._require_writer(owner)
-    runtime.dal.verify_producer_cursor(owner.claim, cursor)
+    _writer_event(owner, "pre_execution_authorization", "requested")
+    try:
+        runtime.dal.verify_producer_cursor(owner.claim, cursor)
+    except BaseException as error:
+        _writer_event(owner, "pre_execution_authorization", "failed", error)
+        if (
+            before_side_effects
+            and not owner.producer_authorized
+            and isinstance(error, CoordinationLockRefused)
+            and error.result == -1
+            and error.transaction_released
+        ):
+            owner.safe_pre_execution_refusal = True
+        raise
+    owner.producer_authorized = True
+    _writer_event(owner, "pre_execution_authorization", "confirmed")
+
+
+def _writer_event(owner, stage, outcome, error=None):
+    from services.legacy_export_snapshot_dal import _diagnostic_counter, _diagnostic_uuid
+
+    claim = owner.claim
+    record = dict(
+        preparation_id=_diagnostic_uuid(claim.preparation_id),
+        owner_id=_diagnostic_uuid(claim.owner),
+        fence=_diagnostic_counter(claim.fence),
+        version=_diagnostic_counter(claim.version),
+        writer_kind=owner.kind if owner.kind in {"all_kvk", "scan_data", "config"} else None,
+        stage=stage,
+        outcome=outcome,
+    )
+    if error is not None:
+        record.update(sql_error_facts(error))
+    logger.log(
+        logging.WARNING if error is not None else logging.INFO,
+        "export_writer_stage %s",
+        json.dumps(record, sort_keys=True),
+    )
+
+
+def record_writer_stage(stage):
+    """Local observation only; a log never substitutes for a durable receipt."""
+    if stage not in {
+        "producer_entered",
+        "producer_returned",
+        "commit_requested",
+        "commit_confirmed",
+    }:
+        raise ValueError("Unknown producer diagnostic stage.")
+    owner = current_owner()
+    if owner is not None:
+        _writer_event(owner, stage, "observed_not_durable_proof")
 
 
 @contextmanager
@@ -328,8 +384,16 @@ def writer_scope(kind, *, owner_token=None):
     token = _owner.set(owner)
     try:
         yield owner
-    except BaseException:
-        runtime.uncertain_writer(owner)
+    except BaseException as original:
+        _writer_event(owner, "writer_body", "failed", original)
+        try:
+            if owner.safe_pre_execution_refusal and isinstance(original, CoordinationLockRefused):
+                runtime.refused_writer(owner)
+            else:
+                runtime.uncertain_writer(owner)
+        except BaseException as cleanup:
+            _writer_event(owner, "uncertain_cleanup", "failed", cleanup)
+        # Retain the actual failure even when uncertainty persistence/close fails.
         raise
     else:
         if owner.failed:
@@ -460,6 +524,8 @@ class WriterOwner:
     closed: bool = False
     failed: bool = False
     completion: dict | None = None
+    producer_authorized: bool = False
+    safe_pre_execution_refusal: bool = False
 
 
 class LegacyExportRuntime:
@@ -608,11 +674,21 @@ class LegacyExportRuntime:
             )
 
         for attempt in range(61):
+            diagnostic_token = admission_diagnostics_enabled.set(attempt % 30 == 0)
             try:
                 claim = self.dal.claim(identifier, **kwargs)
+            except CoordinationLockRefused as exc:
+                if exc.result != -1 or not exc.transaction_released:
+                    report("unknown", attempt, time.monotonic(), type(exc).__name__)
+                    raise
+                # The exact ticket is unchanged by the acknowledged rollback.
+                # This existing outer wait owns the budget; no nested retry loop.
+                claim = None
             except BaseException as exc:
                 report("unknown", attempt, time.monotonic(), type(exc).__name__)
                 raise
+            finally:
+                admission_diagnostics_enabled.reset(diagnostic_token)
             now = time.monotonic()
             if claim is not None:
                 report("admitted", attempt, now)
@@ -622,7 +698,7 @@ class LegacyExportRuntime:
                 if not wait_for_admission or attempt == 60 or remaining <= 0:
                     report("confirmed_refusal", attempt, now)
                     return None
-                if attempt % 5 == 0:
+                if attempt % 30 == 0:
                     report("waiting", attempt, now)
                 time.sleep(min(1.0, remaining))
             except BaseException as exc:
@@ -693,7 +769,9 @@ class LegacyExportRuntime:
                 if connection is not None:
                     connection.close()
             raise
-        return WriterOwner(claim, connection, guard, kind, self)
+        owner = WriterOwner(claim, connection, guard, kind, self)
+        _writer_event(owner, "writer_admission", "confirmed")
+        return owner
 
     def _require_writer(self, owner):
         if not isinstance(owner, WriterOwner) or owner.runtime is not self:
@@ -724,6 +802,21 @@ class LegacyExportRuntime:
         finally:
             self._close_writer(owner)
 
+    def refused_writer(self, owner):
+        """Release only this live, explicitly unstarted writer after lock refusal.
+
+        This proof cannot be reconstructed after restart and never applies to a
+        retained uncertain preparation. A failed release keeps durable ownership.
+        """
+        self._require_writer(owner)
+        if owner.closed or owner.producer_authorized or not owner.safe_pre_execution_refusal:
+            raise SnapshotUnavailable("Exact live pre-execution refusal required.")
+        self._close_writer(owner)
+        owner.claim = self.dal.transition(
+            owner.claim, expected="writing", state="unavailable", release=True
+        )
+        _writer_event(owner, "pre_execution_refusal", "withdrawal_commit_acknowledged")
+
     def checkpoint_writer(self, owner, evidence, *, cursor=None):
         self._require_writer(owner)
         if owner.closed:
@@ -740,12 +833,22 @@ class LegacyExportRuntime:
             registration_sha256=configuration_digest(scope),
             producer=json.loads(_json(evidence)),
         )
-        owner.claim = self.dal.transition(
-            owner.claim,
-            expected="writing",
-            state="committed",
-            generation=pending,
-            external_cursor=cursor,
+        _writer_event(owner, "durable_checkpoint", "requested")
+        try:
+            owner.claim = self.dal.transition(
+                owner.claim,
+                expected="writing",
+                state="committed",
+                generation=pending,
+                external_cursor=cursor,
+            )
+        except BaseException as error:
+            _writer_event(owner, "durable_checkpoint", "failed", error)
+            raise
+        _writer_event(
+            owner,
+            "durable_checkpoint",
+            "pending_caller_commit" if cursor is not None else "commit_acknowledged",
         )
         owner.completion = pending
 
@@ -764,6 +867,7 @@ class LegacyExportRuntime:
             pending = owner.completion
             if pending is None:
                 raise SnapshotUnavailable("Producer did not acknowledge complete SQL output.")
+            _writer_event(owner, "snapshot_capture", "requested")
             sections, planned = self.capture(owner.connection, scope)
             proof = dict(
                 pending,
@@ -784,17 +888,24 @@ class LegacyExportRuntime:
             )
             receipt = snapshot.persist(self.store)
             self.dal.captured(owner.claim, receipt)
+            _writer_event(owner, "snapshot_capture", "commit_acknowledged")
             collection = _captures.get()
             if collection is not None:
                 collection.append(
                     (scope["consumer"], scope.get("kvk_no"), owner.claim.preparation_id)
                 )
-        except BaseException:
+        except BaseException as original:
             # No automatic recapture after a post-commit/spool/receipt failure.
             # An unknown acknowledgment leaves its durable row/claim intact.
+            _writer_event(owner, "writer_completion", "failed", original)
+            try:
+                self._close_writer(owner)
+            except BaseException as cleanup:
+                _writer_event(owner, "writer_close", "failed", cleanup)
             raise
         finally:
-            self._close_writer(owner)
+            if not owner.closed:
+                self._close_writer(owner)
 
     def enqueue_snapshot(self, preparation_id):
         from services.export_coordination_dal import JobSpec

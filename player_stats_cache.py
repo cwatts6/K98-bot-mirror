@@ -470,18 +470,25 @@ def _execute_sp_with_retries(
 
             sp_start = time.perf_counter()
             cur = cn.cursor()
-            from services.legacy_export_snapshot_service import verify_producer_cursor
+            from services.legacy_export_snapshot_service import (
+                record_writer_stage,
+                verify_producer_cursor,
+            )
 
-            verify_producer_cursor(cur)
+            verify_producer_cursor(cur, before_side_effects=True)
 
             # Set query timeout
             cur.execute(f"SET LOCK_TIMEOUT {_SP_EXECUTION_TIMEOUT * 1000};")  # milliseconds
 
             # Execute stored procedure
+            record_writer_stage("producer_entered")
             cur.execute(_SQL_EXEC_SP)
+            record_writer_stage("producer_returned")
 
             # Explicitly commit the transaction
+            record_writer_stage("commit_requested")
             cn.commit()
+            record_writer_stage("commit_confirmed")
             record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
 
             sp_duration = time.perf_counter() - sp_start
@@ -1080,8 +1087,7 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
 
             except Exception as e:
                 logger.error(
-                    "build_player_stats_cache failed while building cache from SQL "
-                    "(error_code=%s)",
+                    "build_player_stats_cache failed while building cache from SQL (error_code=%s)",
                     _safe_error_code(e),
                 )
 

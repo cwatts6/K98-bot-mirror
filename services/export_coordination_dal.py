@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
 import json
+import logging
 import re
 from uuid import uuid4
 
@@ -23,6 +24,9 @@ from kvk.dal.new_source_import_dal import (
     transaction,
 )
 from kvk.models.source_integration import identity
+from services.export_contention import CoordinationLockRefused, sql_error_facts
+
+logger = logging.getLogger(__name__)
 
 
 def bounded_json(value):
@@ -231,12 +235,39 @@ def _job(cursor, job_id):
 
 
 def _mutex(cursor, key):
-    cursor.execute(
-        "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
-        "@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0;"
-        "IF @r<0 THROW 51400,'Export admission busy',1;",
-        "k98-export:" + hashlib.sha256(key.encode()).hexdigest(),
-    )
+    resource_hash = hashlib.sha256(key.encode()).hexdigest()
+    try:
+        cursor.execute(
+            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
+            "@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0;"
+            "IF @r<0 BEGIN DECLARE @m nvarchar(2048)=CONCAT("
+            "'K98_COORDINATION_LOCK result=',@r,' session=',@@SPID,"
+            "' xact=',XACT_STATE(),' count=',@@TRANCOUNT); THROW 51400,@m,1; END;",
+            "k98-export:" + resource_hash,
+        )
+    except Exception as original:
+        # Classify only the exact diagnostic emitted above, never error 51400
+        # alone (also used by other locks), SQLSTATE, or arbitrary 'busy' text.
+        facts = sql_error_facts(original)
+        text = " ".join(v[:8192] for v in original.args[1:5] if isinstance(v, str))
+        match = re.search(
+            r"K98_COORDINATION_LOCK result=(-1|-2|-3|-999) session=(\d{1,5}) xact=(-1|0|1) count=(\d{1,10})(?!\d)",
+            text,
+        )
+        if match and 51400 in facts["native_errors"] and facts["sqlstate"] == "42000":
+            result, session, state, count = map(int, match.groups())
+            raise CoordinationLockRefused(
+                result=result,
+                session=session,
+                transaction_state=state,
+                transaction_count=count,
+                resource_hash=resource_hash,
+            ) from original
+        logger.warning(
+            "export_mutex_error %s",
+            json.dumps(dict(resource_sha256=resource_hash, **facts), sort_keys=True),
+        )
+        raise
 
 
 def _cas(cursor, sql, *args):
