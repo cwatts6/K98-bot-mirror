@@ -41,7 +41,17 @@ def read_restart_history(count: int = 5) -> list[dict[str, str]]:
                 if first is None:
                     continue
                 if first[0] == "Timestamp":
-                    fields = first
+                    aliases = {
+                        "UserID": "UserId",
+                        "user_id": "UserId",
+                        "WS_Code": "WS Code",
+                        "ws_code": "WS Code",
+                        "WS_Description": "WS Reason",
+                        "ws_reason": "WS Reason",
+                        "WS_Timestamp": "WS Time",
+                        "ws_time": "WS Time",
+                    }
+                    fields = [aliases.get(field, field) for field in first]
                     records = reader
                 else:
                     # The watchdog and audit appender both write headerless rows.
@@ -107,7 +117,7 @@ async def write_restart_request(
                     restart_flag["timestamp"],
                     restart_flag["reason"],
                     restart_flag["user_id"],
-                    "success",
+                    "requested",
                     "",
                     "",
                     "",

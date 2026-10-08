@@ -58,6 +58,58 @@ def test_restart_history_empty_files_are_not_events(tmp_path, monkeypatch):
     assert restart_operations.read_restart_history() == []
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        "UserID,Status,WS_Code,WS_Description,WS_Timestamp",
+        "UserId,Status,WS Code,WS Reason,WS Time",
+        "user_id,Status,ws_code,ws_reason,ws_time",
+    ],
+)
+def test_restart_history_normalizes_runtime_header_aliases(tmp_path, monkeypatch, headers):
+    runtime = tmp_path / "runtime.csv"
+    runtime.write_text(
+        f"Timestamp,Reason,{headers}\n"
+        "2026-10-08T12:00:00+00:00,manual,123,success,1006,connection lost,disconnect-time\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(restart_operations, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(runtime))
+    [row] = restart_operations.read_restart_history()
+    assert row["UserId"] == "123"
+    assert row["WS Code"] == "1006"
+    assert row["WS Reason"] == "connection lost"
+    assert row["WS Time"] == "disconnect-time"
+
+
+@pytest.mark.asyncio
+async def test_restart_request_is_not_reported_as_completed(tmp_path, monkeypatch):
+    import csv
+
+    runtime = tmp_path / "runtime.csv"
+    monkeypatch.setattr(restart_operations, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(restart_operations, "RESTART_LOG_FILE", str(runtime))
+
+    async def append(path, row):
+        with open(path, "a", newline="", encoding="utf-8") as stream:
+            csv.writer(stream).writerow(row)
+
+    await restart_operations.write_restart_request(
+        reason="slash_graceful_restart",
+        user_id="123",
+        append_csv_line=append,
+        restart_flag_path=str(tmp_path / "request.json"),
+        exit_code_file=str(tmp_path / "exit"),
+    )
+    # A failed replacement startup must leave only an honest pending request.
+    assert [row["Status"] for row in restart_operations.read_restart_history()] == ["requested"]
+    await append(runtime, ["later", "slash_graceful_restart", "123", "success", "", "", ""])
+    assert [row["Status"] for row in restart_operations.read_restart_history()] == [
+        "requested",
+        "success",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_restart_audit_uses_runtime_path_outside_source_root(tmp_path, monkeypatch):
     target = tmp_path / "logs" / "restart_log.csv"
@@ -106,7 +158,7 @@ async def test_write_restart_request_persists_flag_exit_code_and_audit(tmp_path)
     assert audit_calls == [
         (
             restart_operations.RESTART_LOG_FILE,
-            ["2026-05-28T12:00:00+00:00", "slash_graceful_restart", "123", "success", "", "", ""],
+            ["2026-05-28T12:00:00+00:00", "slash_graceful_restart", "123", "requested", "", "", ""],
         )
     ]
 

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import asyncio
-import csv
 import io
 import json
 import os
@@ -958,7 +957,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
             else:
                 embed_color = discord.Color.orange()
 
-            embed = discord.Embed(title="📜 Recent Bot Restarts", color=embed_color)
+            embed = discord.Embed(title="📜 Recent Bot Restart Events", color=embed_color)
 
             # Add fields newest → oldest
             for row in reversed(selected):
@@ -986,7 +985,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
                 embed.add_field(name=f"🕒 {ts}", value=desc, inline=False)
 
-            embed.set_footer(text=f"Showing last {len(selected)} restarts")
+            embed.set_footer(
+                text=f"Showing last {len(selected)} restart events (request / completion)"
+            )
             await ctx.interaction.edit_original_response(
                 content=None, embed=_validated_operator_embed(embed)
             )

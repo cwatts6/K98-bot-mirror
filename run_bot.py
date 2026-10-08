@@ -388,7 +388,7 @@ try:
                     timestamp, user_id, reason = read_restart_flag_metadata()
                     safe_remove(RESTART_FLAG_PATH)
                     write_last_restart_info(timestamp, user_id, reason)
-                    log_restart("manual", "success")
+                    log.info("Restart handed to issuer; completion is recorded by the next Bot.")
                 sys.exit(exit_code)
             log.warning(
                 "S11 child exited. Automatic relaunch is paused: retain authority/session "
@@ -420,7 +420,7 @@ try:
                     write_last_restart_info(timestamp, user_id, reason)
                 except Exception as e:
                     log.warning("Failed handling restart flag cleanup: %s", e)
-                log_restart("manual", "success")
+                log.info("Restart requested; completion is recorded by the next Bot.")
             else:
                 log.warning(
                     "Exit code %s without .restart_flag — counting as crash", RESTART_EXIT_CODE

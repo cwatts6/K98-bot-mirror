@@ -86,6 +86,7 @@ def test_shutdown_marker_does_not_mask_next_crash_or_restart(
     if flag_present:
         assert not restart.exists()
         record_restart.assert_called_once_with("timestamp", "operator", "requested")
-        log_restart.assert_called_once_with("manual", "success")
+        # The child has exited; no replacement Bot has reported ready yet.
+        log_restart.assert_not_called()
     else:
         record_restart.assert_not_called()
