@@ -218,6 +218,125 @@ def test_explicit_direct_contract_has_no_signing_inputs(contract):
     assert "certificate_pins" not in approved
 
 
+@pytest.fixture
+def file_visibility_contract(contract, monkeypatch):
+    """Synthetic bodies exercise the same finite, three-module amendment."""
+    observed, approved = copy.deepcopy(contract)
+    postimages = {}
+    historical = {}
+    for name in direct.FILE_VISIBILITY_MODULE_HASHES:
+        before = f"CREATE PROCEDURE {name} AS SELECT 10;"
+        after = f"CREATE PROCEDURE {name} AS SELECT 20;"
+        historical[name] = before
+        postimages[name] = legacy_definition_hash(after)
+        approved["source"]["modules"].append(
+            dict(
+                name=name,
+                definition_sha256=legacy_definition_hash(before),
+                object_type="P",
+                execute_as=None,
+            )
+        )
+        observed["modules"].append(
+            dict(
+                ObjectName=name,
+                ObjectType="P",
+                ModuleDefinition=after,
+                AnsiNulls=1,
+                QuotedIdentifier=1,
+                ExecuteAsPrincipal=None,
+                OwnerName="dbo",
+            )
+        )
+        observed["module_permissions"].extend(
+            dict(ObjectName=name, PermissionName=right, Allowed=int(right == "ALTER"))
+            for right in ("EXECUTE", "ALTER", "CONTROL", "TAKE OWNERSHIP")
+        )
+    monkeypatch.setattr(direct, "FILE_VISIBILITY_MODULE_HASHES", postimages)
+    monkeypatch.setattr(direct, "DIRECT_SOURCE_HASH", digest(approved["source"]).hex())
+    approved["module_amendment"] = direct.FILE_VISIBILITY_MIGRATION
+    observed["migration"].append(
+        dict(
+            MigrationId=direct.FILE_VISIBILITY_MIGRATION,
+            ChecksumSha256=direct.FILE_VISIBILITY_CHECKSUM,
+            Status="Applied",
+        )
+    )
+    approved["metadata_hash"] = digest(observed).hex()
+    return observed, approved, historical
+
+
+def test_file_visibility_amendment_requires_exact_postimages_and_receipt(file_visibility_contract):
+    observed, approved, _ = file_visibility_contract
+    assert (
+        verify_legacy_installation_contract(observed, approved, profile="application")
+        == digest(observed).hex()
+    )
+    query, params = legacy_permission_queries(approved["source"])["migration"]
+    assert "MigrationId IN (?,?)" in query
+    assert params == (direct.DIRECT_MIGRATION, direct.FILE_VISIBILITY_MIGRATION)
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+        "dbo.CLAIM_KS4_IMPORT_FILE",
+        "dbo.IMPORT_STAGING_PROC_CORE",
+    ),
+)
+@pytest.mark.parametrize("change", ("downgrade", "other_body", "owner", "set_flag", "context"))
+def test_file_visibility_amendment_refuses_module_drift_with_resealed_fingerprint(
+    file_visibility_contract, name, change
+):
+    observed, approved, historical = file_visibility_contract
+    row = next(r for r in observed["modules"] if r["ObjectName"] == name)
+    if change == "downgrade":
+        row["ModuleDefinition"] = historical[name]
+    elif change == "other_body":
+        row["ModuleDefinition"] += " SELECT 30;"
+    elif change == "owner":
+        row["OwnerName"] = "other"
+    elif change == "set_flag":
+        row["QuotedIdentifier"] = 0
+    else:
+        row["ExecuteAsPrincipal"] = 1
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="source/context/owner"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
+@pytest.mark.parametrize("field,value", (("ChecksumSha256", "0" * 64), ("Status", "Failed")))
+def test_file_visibility_amendment_refuses_wrong_receipt(file_visibility_contract, field, value):
+    observed, approved, _ = file_visibility_contract
+    observed["migration"][-1][field] = value
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="migration receipt"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
+def test_file_visibility_amendment_cannot_be_selected_by_installed_hash(file_visibility_contract):
+    observed, approved, _ = file_visibility_contract
+    del approved["module_amendment"]
+    with pytest.raises(SourceConflict, match="source/context/owner"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
+def test_file_visibility_amendment_refuses_arbitrary_amendment(file_visibility_contract):
+    _, approved, _ = file_visibility_contract
+    approved["module_amendment"] = "unreviewed"
+    with pytest.raises(SourceConflict, match="Complete reviewed"):
+        validate_legacy_installation_contract(approved)
+
+
+def test_file_visibility_amendment_preserves_privilege_checks(file_visibility_contract):
+    observed, approved, _ = file_visibility_contract
+    observed["application_grants"][0]["GrantState"] = "W"
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="grant plan"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
 @pytest.mark.parametrize(
     "category,field,value",
     [
@@ -547,8 +666,10 @@ def test_direct_snapshot_order_covers_projection_and_stabilizes_fingerprint(cont
     with sqlite3.connect(":memory:") as connection:
         connection.create_collation(
             "Latin1_General_100_BIN2",
-            lambda left, right: (left.encode("utf-16-be") > right.encode("utf-16-be"))
-            - (left.encode("utf-16-be") < right.encode("utf-16-be")),
+            lambda left, right: (
+                (left.encode("utf-16-be") > right.encode("utf-16-be"))
+                - (left.encode("utf-16-be") < right.encode("utf-16-be"))
+            ),
         )
         projections = ",".join(
             "?" + ("" if name == "MinorID" else " COLLATE Latin1_General_100_BIN2") + " AS " + name

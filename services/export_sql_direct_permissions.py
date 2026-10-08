@@ -9,6 +9,15 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 DIRECT_SOURCE_HASH = "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
 APPLICATION_GRANT_PLAN_HASH = "da0546c5d7abbe94ae782894183f097ca821dee61e2c7a9915eab5c8180a11bc"
+FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
+FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
+# Canonical UTF-16LE definition hashes of the reviewed migration's exact
+# postimages. This is a behavior amendment, not a compatibility spelling.
+FILE_VISIBILITY_MODULE_HASHES = {
+    "dbo.ARCHIVE_IMPORT_STAGING_FILE": "38728ea3d84bc6ab29b285b25c8b8ecfd68b3bef60efa056839c8a1333838a19",
+    "dbo.CLAIM_KS4_IMPORT_FILE": "9c943af3c4cb0de499177a4144a962ee8049defda8dfcb6cc52077899d85516a",
+    "dbo.IMPORT_STAGING_PROC_CORE": "5ee53d89a555d6e44c3953d92acafe67ad832c9523dc0b7cdd594f9152fe4bfb",
+}
 
 
 def application_grant_rows():
@@ -56,6 +65,9 @@ def validate_contract(approved):
         "migration_hash",
         "metadata_hash",
     }
+    amended = isinstance(approved, dict) and "module_amendment" in approved
+    if amended:
+        fields.add("module_amendment")
     if (
         not isinstance(approved, dict)
         or set(approved) != fields
@@ -75,6 +87,14 @@ def validate_contract(approved):
             for k in ("migration_hash", "metadata_hash")
         )
         or digest(approved["source"]).hex() != DIRECT_SOURCE_HASH
+        or (
+            amended
+            and (
+                approved["module_amendment"] != FILE_VISIBILITY_MIGRATION
+                or not set(FILE_VISIBILITY_MODULE_HASHES)
+                <= {m["name"] for m in approved["source"]["modules"]}
+            )
+        )
     ):
         raise SourceConflict("Complete reviewed direct-permission SQL contract required.")
 
@@ -172,7 +192,15 @@ def queries(base, source):
         ORDER BY SecurableClass,TargetName,PermissionName,GrantState""",
         (),
     )
-    result["migration"] = (base["migration"][0], (DIRECT_MIGRATION,))
+    # The historical source and grants stay immutable. Read only these two
+    # fixed ledger rows; selecting the amendment remains an explicit protected
+    # contract decision, with exact postimages and checksum checked below.
+    result["migration"] = (
+        base["migration"][0].replace(
+            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?) ORDER BY MigrationId"
+        ),
+        (DIRECT_MIGRATION, FILE_VISIBILITY_MIGRATION),
+    )
     return result
 
 
@@ -189,6 +217,7 @@ def verify(observed, approved, *, profile):
     if profile != "application":
         raise SourceConflict("Direct privileges require the explicit shared application profile.")
     source = approved["source"]
+    amended = approved.get("module_amendment") == FILE_VISIBILITY_MIGRATION
     query_set = legacy_permission_queries(source)
     if (
         not isinstance(observed, dict)
@@ -227,6 +256,11 @@ def verify(observed, approved, *, profile):
         raise SourceConflict("Exact reviewed legacy module closure required.")
     for row in observed["modules"]:
         m = modules[row["ObjectName"]]
+        expected_definitions = (
+            (FILE_VISIBILITY_MODULE_HASHES[row["ObjectName"]],)
+            if amended and row["ObjectName"] in FILE_VISIBILITY_MODULE_HASHES
+            else (m["definition_sha256"], *m.get("compatible_definition_sha256", []))
+        )
         if (
             set(row)
             != {
@@ -245,8 +279,7 @@ def verify(observed, approved, *, profile):
             or row["AnsiNulls"] != 1
             or type(row["QuotedIdentifier"]) is not int
             or row["QuotedIdentifier"] != 1
-            or legacy_definition_hash(row["ModuleDefinition"])
-            not in (m["definition_sha256"], *m.get("compatible_definition_sha256", []))
+            or legacy_definition_hash(row["ModuleDefinition"]) not in expected_definitions
         ):
             raise SourceConflict("Direct legacy module source/context/owner differs.")
     grants = source["grants"]
@@ -314,16 +347,22 @@ def verify(observed, approved, *, profile):
         )
     ):
         raise SourceConflict("Direct privileges differ from the exact reviewed grant plan.")
-    if not _exact(
-        observed["migration"],
-        [
+    expected_migrations = [
+        dict(
+            MigrationId=DIRECT_MIGRATION,
+            ChecksumSha256=approved["migration_hash"],
+            Status="Applied",
+        )
+    ]
+    if amended:
+        expected_migrations.append(
             dict(
-                MigrationId=DIRECT_MIGRATION,
-                ChecksumSha256=approved["migration_hash"],
+                MigrationId=FILE_VISIBILITY_MIGRATION,
+                ChecksumSha256=FILE_VISIBILITY_CHECKSUM,
                 Status="Applied",
             )
-        ],
-    ):
+        )
+    if not _exact(observed["migration"], expected_migrations):
         raise SourceConflict("Exact direct-permission migration receipt required.")
     if digest(observed).hex() != approved["metadata_hash"]:
         raise SourceConflict(
