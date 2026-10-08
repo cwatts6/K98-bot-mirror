@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 
+from services.export_contention import CoordinationLockRefused
 from services.export_coordination_dal import ExportCoordinationDAL, JobSpec
 
 
@@ -306,9 +307,9 @@ def test_sql_two_workers_cannot_both_claim(sql_dal):
     def claim():
         try:
             return sql_dal.claim_next(account, storage_owner="synthetic:S10B")
-        except Exception as exc:
+        except CoordinationLockRefused as exc:
             # Only the deliberate nonblocking admission contention is expected.
-            if "Export admission busy" not in str(exc):
+            if exc.result != -1:
                 raise
             return None
 

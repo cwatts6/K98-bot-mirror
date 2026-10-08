@@ -70,7 +70,6 @@ def clock(monkeypatch):
 def test_safe_retry_releases_connection_before_wait_and_recovers(monkeypatch, caplog):
     clock(monkeypatch)
     connections = []
-    producer = Mock()
 
     @module.retry_coordination
     def authorize():
@@ -86,8 +85,23 @@ def test_safe_retry_releases_connection_before_wait_and_recovers(monkeypatch, ca
     connections[0].rollback.assert_called_once()
     for cn in connections:
         cn.close.assert_called_once()
-    producer.assert_not_called()
     assert len(caplog.records) == 1 and '"outcome": "recovered"' in caplog.text
+
+
+@pytest.mark.parametrize("result", [-1, -2, -3, -999, None])
+def test_existing_sql_worker_accepts_only_attributed_timeout(result):
+    from tests.test_kvk_export_sql_integration import test_sql_two_workers_cannot_both_claim
+
+    error = refusal(result) if result is not None else RuntimeError("Export admission busy")
+    dal = Mock()
+    dal.claim_next.side_effect = [object(), error]
+    if result == -1:
+        test_sql_two_workers_cannot_both_claim(dal)
+        assert dal.claim_next.call_count == 2
+    else:
+        with pytest.raises(type(error)) as caught:
+            test_sql_two_workers_cannot_both_claim(dal)
+        assert caught.value is error
 
 
 @pytest.mark.parametrize("result", [-2, -3, -999])
