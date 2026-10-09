@@ -4,14 +4,14 @@ Use this sequence for the protected S11 runtime. A merge or development-PC pull 
 
 ## Current release — 8 October 2026
 
-**Stats-cache recovery succeeded at20:18 UTC.** After the recorded manual
-supersession and exact ticket405 withdrawal, a normal
+**Stats-cache recovery succeeded at 20:18 UTC.** After the recorded manual
+supersession and exact ticket 405 withdrawal, a normal
 `/kvk_admin refresh_stats_cache` was admitted on its first attempt, acknowledged
-the durable SQL checkpoint and snapshot capture, and rebuilt the415-record KVK16
-cache with `status=refreshed` in31.1seconds. Last-KVK cache also succeeded.
+the durable SQL checkpoint and snapshot capture, and rebuilt the 415-record KVK16
+cache with `status=refreshed` in 31.1 seconds. Last-KVK cache also succeeded.
 Do not repeat either recovery script or restart for this completed recovery.
 
-The source date remains29September because it records source-scan provenance,
+The source date remains 29 September because it records source-scan provenance,
 not the cache-build time. This result proves the normal stats SQL/cache path
 works; it does not prove newer data ingestion or provider/export delivery.
 Intake/recovery flags remain false. The historical SQL outcome remains recorded
@@ -180,6 +180,16 @@ start after lost acknowledgement. An unresolved outcome remains stopped for prec
 reconciliation; do not delete control files, manually pull, or start the task.
 
 ## One-time updater installation
+
+The completion message distinguishes source/startup verification from functional
+health. The current read-only verifier classifies import/export as **degraded**
+when fresh functional evidence is unavailable, and identifies observed runtime
+admission failures separately. It never infers healthy import/export from startup
+markers, cached data or a live SQL session. The protected `readiness-status.json`,
+final `verified.json` and transcript retain that classification. A degraded result
+does not request another restart or repeat an import/export; check the affected
+feature before accepting its functional health. This implements the release
+contract's explicit healthy/degraded reporting, not a provider-delivery test.
 
 The reviewed implementation supplies one automatically built
 `Install-K98UpdateTool.ps1`. Its preparation command on the development PC is

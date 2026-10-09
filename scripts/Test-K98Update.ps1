@@ -79,4 +79,42 @@ Reject {Assert-Held} '*Open provider stream blocks release*'
 Assert-Held -SuccessorRunning;$passed++
 $script:streams=@([pscustomobject]@{StreamID='stream';SessionID='old-session'})
 Reject {Assert-Held -SuccessorRunning} '*unexpected session*'
+# Online markers and a successful SQL/native check do not prove import/export health.
+$online="[BOOT] full_startup_sequence completed successfully`nLogged in as bot"
+$health=Import-ExportStatus $online
+Check ($health.status -ceq 'degraded') 'Startup-only evidence was treated as healthy'
+Check ($health.reason -ceq 'fresh_import_export_health_evidence_unavailable') 'Missing evidence not explicit'
+Check (-not $health.provider_delivery_verified) 'Provider delivery incorrectly certified'
+foreach($failure in @('S11 export admission remains closed','Export admission disabled:','Export coordinator unavailable')) {
+ $health=Import-ExportStatus ($online+"`n"+$failure)
+ Check ($health.reason -ceq 'runtime_admission_unavailable') 'Runtime failure not classified'
+}
+# Exercise the full readiness gate with a real temporary log and stub only the
+# separately tested native/SQL/source boundaries. Old log markers are excluded.
+$null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'logs'))
+$logPath=Join-Path $fixture 'logs\log.txt'
+$oldText=$online+"`n"
+[IO.File]::WriteAllText($logPath,$oldText,[Text.UTF8Encoding]::new($false))
+$script:offset=([Text.Encoding]::UTF8.GetByteCount($oldText))
+$c=[pscustomobject]@{root=$fixture;target='b'*40;release_id='fixture-release';new_pins=@{}}
+$script:statusRecord=$null
+function Assert-Drained {param([switch]$SuccessorRunning)}
+function Assert-Source($Pins,$Commit) {}
+function Seed-Complete {return $true}
+function Verify-Native {}
+function Read-Json([string]$Path,[string]$Expected='') {
+ if($Path.EndsWith('start-requested.json')){return @{log_offset=$script:offset}}
+ return $script:statusRecord
+}
+function Test-Path {param([string]$LiteralPath);return $null -ne $script:statusRecord}
+function Write-Record([string]$Path,$Value){$script:statusRecord=$Value}
+Check (-not(Check-Readiness)) 'Old startup markers satisfied new readiness'
+Check ($null -eq $statusRecord) 'Incomplete startup wrote a readiness status'
+[IO.File]::AppendAllText($logPath,$online)
+Check (Check-Readiness) 'Online successor did not produce explicit degraded readiness'
+Check ($statusRecord.import_export.status -ceq 'degraded') 'Status receipt omitted degradation'
+Check ($statusRecord.release_id -ceq 'fixture-release') 'Status receipt not release-bound'
+Check (Check-Readiness) 'Repeated verification did not retain matching status'
+[IO.File]::AppendAllText($logPath,"`nExport coordinator unavailable")
+Reject {Check-Readiness} '*Readiness classification changed*'
 [pscustomobject]@{Status='PASS';Cases=$passed;Evidence=$fixture;ProductionTouched=$false}|ConvertTo-Json -Compress
