@@ -513,8 +513,11 @@
       "calls": [
         "dbo.UPDATE_ALL2"
       ],
-      "source_sha256": "f0bd8dbcb568a628011a025e62d8c59e9f3d77f405f7bdaca7e41d1438d69fd1",
-      "definition_sha256": "47c438a8dc4a48c83eb327299e4df63b2d8d78f098916a7aebe3bcd84317ead1"
+      "source_sha256": "bcfe6fb93200f5b0493d59c183f061446d3948b2b46c67f850a4d989304695fc",
+      "definition_sha256": "f11f8395fd4837e4decd4b5573b9dc7d1573abf4c8bf24944265d78e8fcf0c68",
+      "compatible_definition_sha256": [
+        "034ca049c92a8b8ea654edca21f03269afae4884d398ea7d26e7ab0aade0b81e"
+      ]
     },
     {
       "name": "dbo.usp_UpsertGovernorNameHistoryForScan",
