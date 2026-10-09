@@ -313,3 +313,52 @@ async def test_required_notification_failure_propagates_without_false_export_fai
         c.args[0].get("event") == "run_all_exports" and c.args[0].get("status") == "failed"
         for c in telemetry.call_args_list
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proc_success", [False, True])
+async def test_target_cache_follows_proc_config_and_precedes_export(monkeypatch, proc_success):
+    import processing_pipeline as pp
+    from stats_alerts import processing_notifications as notifications
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    stages = []
+    monkeypatch.setattr(
+        pp,
+        "run_stats_copy_archive",
+        AsyncMock(return_value=(True, "SQL", {"excel": True, "archive": True, "sql": True})),
+    )
+
+    async def ready(*args):
+        stages.append("stats_ready")
+
+    async def proc(*args):
+        stages.append("proc_config")
+        return proc_success, "config"
+
+    async def targets():
+        assert proc_success and stages[-1] == "proc_config"
+        stages.append("targets")
+
+    def export(*args, **kwargs):
+        stages.append("export")
+        return False, "Google unavailable"
+
+    monkeypatch.setattr(notifications, "bot_data_ready", ready)
+    monkeypatch.setattr(pp, "_run_proc_config_step", proc)
+    monkeypatch.setattr(pp, "warm_target_cache", targets)
+    monkeypatch.setattr(pp, "run_all_exports", export)
+    result = await pp.execute_processing_pipeline(
+        1,
+        seed=1,
+        user=AsyncMock(),
+        filename="fixture.xlsx",
+        channel_id=0,
+        notification_run_id="exact-run",
+    )
+    assert stages == (
+        ["stats_ready", "proc_config", "targets", "export"]
+        if proc_success
+        else ["stats_ready", "proc_config"]
+    )
+    assert result[2] is True and result[4] is proc_success

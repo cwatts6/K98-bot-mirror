@@ -17,9 +17,10 @@ New coordinated processing runs have two independent outcomes:
 Configure `GSHEETS_EXPORT_CHANNEL_ID` to the agreed player-readable analysis
 channel before rollout. There is no fallback to the stats channel. A missing
 channel or permission produces an actionable notification failure; it does not
-fail the import or repeat the export. Auxiliary name/target cache warmers keep
-their existing behavior; the readiness claim certifies the player-stats generation,
-not a new target-publication guarantee.
+fail the import or repeat the export. The name cache warms with player stats.
+The target cache warms after confirmed ProcConfig completion, which publishes its
+SQL targets, and before export. The early readiness claim certifies the
+player-stats generation, not a new target-publication guarantee.
 
 ## Durable correlation and recovery
 

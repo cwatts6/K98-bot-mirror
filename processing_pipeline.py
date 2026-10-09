@@ -431,13 +431,12 @@ async def execute_processing_pipeline(
         emit_telemetry_event(
             {"event": "cache_build_failed", "filename": filename, "error_type": type(exc).__name__}
         )
-    for warmer in (warm_name_cache, warm_target_cache):
-        try:
-            await warmer()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("[CACHE] Auxiliary cache refresh failed")
+    try:
+        await warm_name_cache()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[CACHE] Name cache refresh failed")
     if notification_run_id:
         from stats_alerts.processing_notifications import bot_data_ready
 
@@ -723,6 +722,15 @@ async def execute_processing_pipeline(
             success_proc_import,
             str(out_archive or ""),
         )
+
+    # ProcConfig publishes targets; refresh their cache after that prerequisite,
+    # before an unrelated export failure can prevent current command lookups.
+    try:
+        await warm_target_cache()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[CACHE] target refresh failed after ProcConfig; inspect target cache")
 
     # 3) Google Sheets exports — offload to thread, but bounded by EXPORT_TIMEOUT
     await send_status_embed(
