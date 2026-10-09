@@ -532,14 +532,19 @@ def execute_update_all2_with_log_management(
         if export_preparation_id is None:
             cursor.execute(
                 "EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?, @CompletedFileName = ?",
-                param1, param2, completed_filename,
+                param1,
+                param2,
+                completed_filename,
             )
         else:
             from services.export_coordination_dal import identity
 
             cursor.execute(
                 "EXEC dbo.usp_S11RunStatsImport @param1=?, @param2=?, @CompletedFileName=?, @PreparationID=?",
-                param1, param2, completed_filename, identity(export_preparation_id),
+                param1,
+                param2,
+                completed_filename,
+                identity(export_preparation_id),
             )
 
         # Consume all result sets. The final 8-column summary must stay last.
