@@ -2,7 +2,7 @@
 
 Use this sequence for the protected S11 runtime. A merge or development-PC pull does not deploy the bot. The [S11 deployment and restart contract](S11%20Deployment%20and%20Restart%20Contract.md) defines the protected release protocol.
 
-## Current release — 8 October 2026
+## Current release — 9 October 2026
 
 **Stats-cache recovery succeeded at 20:18 UTC.** After the recorded manual
 supersession and exact ticket 405 withdrawal, a normal
@@ -17,16 +17,20 @@ works; it does not prove newer data ingestion or provider/export delivery.
 Intake/recovery flags remain false. The historical SQL outcome remains recorded
 as unknown in the supersession audit.
 
-PR616 source and startup seed are installed; bot startup, independent successor
-native verification and matching SQL session are observed. The generic release
-runner still lacks a successful final release receipt and is **not live accepted**.
-A successful manual recovery does not close that separate deployment-tooling gap.
+The first updater release completed on 9 October: exact production source, matching
+startup seed, successor native/SQL identity and final readiness were verified.
+Import/export remains degraded: preparation ticket 486 is uncertain and retains the
+blocked snapshot claim. Read-only evidence confirms startup tickets 686–688 are
+unavailable, with no pending/sql_pending requests through 688. Captured work remains
+retained. None of this establishes the uncertain SQL outcome or permits releasing
+its claim. Do not repeat deployment, imports or recovery.
 
 ### What happens next
 
 No further incident recovery action is required for the accepted stats-cache run.
-Next engineering work is acceptance of the simplified updater, followed immediately
-by prevention/reconciliation of orphan queue entries. Routine patches use a fixed-command
+Next engineering work is acceptance of updater ownership-preflight and Git-index
+corrections. Queue prevention is installed; the uncertain claim needs separate
+authoritative reconciliation. Routine patches use a fixed-command
 workflow without bespoke operator-authored packets, or the coordinated startup
 source policy must be reconsidered. Broader S11/provider acceptance remains
 separate; do not change activation flags on the strength of this cache result.
@@ -49,10 +53,9 @@ startup policy, start and verify. It is not a replacement source-control system.
 A reviewed source step may use Git; an uncoordinated pull in the live checkout is
 not the complete deployment operation.
 
-The reusable updater now implements automatic package creation locally. Native
-elevated rehearsal and the first successful real release remain acceptance gates.
-The earlier generic-runner attempt reached a running successor but failed its
-final verification. Local tests do not close that live-acceptance gap.
+The reusable updater completed its first real release after manual owner and
+Git-index repair. The corrections automate those prerequisites and bookkeeping;
+their local tests do not establish elevated protected-file creation or production acceptance.
 
 **Required tooling outcome:** a manual update must be
 as straightforward as the previous `git pull` workflow. A stable script may
@@ -60,8 +63,8 @@ prepare and deploy the release, but the operator must not handcraft manifests,
 adapters, hashes or commands for each patch. If the source-policy design cannot
 support that workflow, review redesign/removal of the coordinated source-policy
 update requirement. This is an unresolved usability requirement, not optional
-polish. The updater is the first priority, immediately followed by the orphan-queue fix.
-That fix must be the first real release used for live acceptance. Changing the
+polish. The updater corrections are the first priority. The orphan-queue fix was
+included in the first real release. Changing the
 source-policy requirement remains a separate reviewed decision.
 
 **How often:** use this path when actually installing runtime changes, including
@@ -139,9 +142,10 @@ git rev-parse production/main
 
 ## Step 3 — Run the fixed updater on MINI_AMD
 
-**Implementation status:** the reusable updater is under local validation and review.
-It is not installed or live-accepted yet. Do not run a draft copy against production.
-The orphan-queue fix is the first real release intended to accept this workflow.
+**Implementation status:** the installed updater completed its first release.
+Ownership/index corrections are under local validation and review; they are not
+installed by merging this change. Do not run a draft copy against production or
+reuse the unused-updater repair for an installation with deployment history.
 
 After the reviewed tool is installed once, every routine source-only release uses
 this same block in **Windows PowerShell 5.1, Run as administrator**, on MINI_AMD:
@@ -162,6 +166,17 @@ If only package preparation is wanted, the same command accepts `-PrepareOnly`.
 Later run the normal command above. It refreshes unused preparation automatically
 so an intervening normal restart cannot leave stale process/session bindings.
 After deployment intent is recorded, it retains and resumes that exact release.
+
+The corrected adapter checks changed-file ownership before prompting for a drain.
+It accepts only authenticated predecessor content and existing safe permissions,
+creates a fresh protected file where permitted, and retains strict runtime and
+ancestor protection. It preserves authenticated bytes, DACL/group and ordinary
+metadata; changing an old object's owner alone would leave prior handles effective.
+Application-owned directories or nonordinary file metadata require separate review.
+After source application it normalizes only verified release-member index entries,
+then requires unchanged target hashes, an empty staged diff and clean tracked status.
+An interrupted index-only step can converge under the same intent and drain proof.
+Unexpected edits, owners or permissions stop the update; they are not silently repaired.
 
 ## Step 4 — Restart once when prompted
 

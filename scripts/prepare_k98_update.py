@@ -207,6 +207,32 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
         members.append(
             dict(
                 path=path,
+                # Existing runtime files must retain the installed exact pin.
+                # Non-runtime files may have Git's LF or CRLF checkout form.
+                # These authenticated preimages constrain ownership preparation;
+                # live content never supplies its own expected digest.
+                before_sha256=(
+                    [previous["AutomaticStartupPolicy.json"]["source_hashes"][path]]
+                    if path in previous["AutomaticStartupPolicy.json"]["source_hashes"]
+                    else (
+                        sorted(
+                            {
+                                sha256(raw)
+                                for raw in (
+                                    (old,)
+                                    if b"\0" in old
+                                    else (
+                                        old,
+                                        old.replace(b"\r\n", b"\n"),
+                                        old.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"),
+                                    )
+                                )
+                            }
+                        )
+                        if old is not None
+                        else []
+                    )
+                ),
                 target_sha256=sha256(new) if new is not None else None,
                 runtime=runtime,
                 deleted=new is None,

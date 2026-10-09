@@ -101,6 +101,44 @@ def test_add_delete_and_document_changes_have_exact_payload_and_pin_effects():
         "core/new.py",
         "docs/operator.md",
     }
+    assert next(member for member in plan["source_members"] if member["deleted"])[
+        "before_sha256"
+    ] == [sha256(b"old\n")]
+    assert all(not member["before_sha256"] for member in plan["source_members"] if member["added"])
+
+
+def test_custody_preimages_come_from_git_and_keep_runtime_exact():
+    blobs = {
+        (BEFORE, "core/example.py"): b"old\n",
+        (AFTER, "core/example.py"): b"new\n",
+        (BEFORE, "README-DEV.md"): b"before\n",
+        (AFTER, "README-DEV.md"): b"after\n",
+    }
+    plan, _ = source_plan(
+        inventory(),
+        BEFORE,
+        AFTER,
+        ["core/example.py", "README-DEV.md"],
+        lambda *key: blobs.get(key),
+    )
+    members = {member["path"]: member for member in plan["source_members"]}
+    assert members["core/example.py"]["before_sha256"] == [sha256(b"old\r\n")]
+    assert set(members["README-DEV.md"]["before_sha256"]) == {
+        sha256(b"before\n"),
+        sha256(b"before\r\n"),
+    }
+    assert sha256(b"after\n") not in members["README-DEV.md"]["before_sha256"]
+
+
+def test_binary_custody_preimage_does_not_allow_newline_conversion():
+    plan, _ = source_plan(
+        {"AutomaticStartupPolicy.json": {"source_hashes": {}}},
+        BEFORE,
+        AFTER,
+        ["assets/example.bin"],
+        lambda commit, name: b"old\0\n" if commit == BEFORE else b"new\0\n",
+    )
+    assert plan["source_members"][0]["before_sha256"] == [sha256(b"old\0\n")]
 
 
 @pytest.mark.parametrize(

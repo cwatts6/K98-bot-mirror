@@ -4,8 +4,10 @@ This contract covers the reusable handoff, release runner and packet preparation
 Routine source-only updates use one versioned, reviewed updater which generates
 release metadata and matching seed automatically. The operator runs the same
 command and requests one restart when prompted; no per-release script authoring,
-manifest editing or Codex session is required. This implementation is not yet
-installed or live-accepted; the orphan-queue fix is its intended first live release.
+manifest editing or Codex session is required. The first source/startup release
+succeeded on 2026-10-09, including the orphan-queue fix. Routine-update usability
+still requires acceptance of the ownership/index corrections below; that first
+release needed manual intervention. Do not repeat its restart or recovery.
 An installation still using the older
 issuer needs the initial cutover described below. MINI_AMD completed that cutover
 on 2026-10-08; consult the latest handover before selecting a deployment path.
@@ -111,8 +113,34 @@ An immutable intent precedes each apply. If an interrupted step is not confirmed
 by its verifier, the runner does not repeat it. `-Resume` first verifies the same
 manifest and the actual state, so a committed migration or completed source
 update is not replayed merely because the runner lost its acknowledgement.
+The source verifier has one narrow resumable bookkeeping operation: when HEAD,
+branch, all target hashes and deletions independently match, the staged diff is
+empty, and only authenticated release members appear modified, it may normalize
+those exact index paths. This requires the same protected source intent, verified
+drain and disabled predecessor task. It rechecks hashes, empty staged diff and
+tracked cleanliness afterward. It never reapplies source or starts a process.
 Readiness probes must be bounded and distinguish healthy, online/degraded and
 not-ready outcomes. A failed start is not an automatic rollback of SQL.
+
+### Ownership preflight
+
+Before requesting a drain, the source adapter establishes administrative custody
+for existing changed non-runtime files. The repository root, existing ancestors
+and previously pinned runtime paths must already be protected. Only an already
+trusted file owner or the exact configured application owner is allowed.
+Files must match authenticated predecessor hashes (the installed exact runtime pin,
+or Git blob/checkout newline forms for non-runtime text). Binary preimages stay exact.
+Reparse points, hardlinks, unexpected owners, null/writable non-administrative ACLs
+and conflicting new paths are refused. Replacement candidates additionally reject
+alternate streams and unsupported attributes.
+A retained native handle excludes data writes while a fresh, atomically secured
+file receives the authenticated bytes, existing DACL/group and ordinary metadata.
+The fresh Administrators-owned object atomically replaces the old file under its
+protected parent. Prior owner security handles therefore cannot change the accepted
+object. Bytes and permissions are checked again. Failed preparation retains unique
+scratch files; completed preparation is idempotent. The application SID never
+becomes trusted, and altered content is not repaired. Application-owned directories
+remain refused: recursive custody migration is outside the routine source update.
 
 ## Validation and release requirements
 

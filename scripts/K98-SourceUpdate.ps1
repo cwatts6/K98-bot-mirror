@@ -161,10 +161,10 @@ function Git([string]$Arguments) {
   if($key -notmatch '^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|symlinks|ignorecase|autocrlf|safecrlf|eol|longpaths|quotepath)|remote\.[a-zA-Z0-9_-]+\.(url|fetch)|branch\.[a-zA-Z0-9_/-]+\.(remote|merge)|user\.(name|email)|pull\.rebase|fetch\.prune)$'){throw 'Git configuration outside reviewed non-executable allowlist'}
  }
  $null=Read-Bytes $config $beforeHash 65536
- $writes=$Arguments -match '(^| )(fetch|merge|update-ref)( |$)'
+ $writes=$Arguments -match '(^| )(fetch|merge|update-ref|add)( |$)'
  $existing=if($writes){Git-MetadataPaths $metadata}else{$null}
  $result=Invoke-GitWorker $Arguments
- if($writes){Seal-NewGitMetadata $metadata $existing}
+ if($writes){Seal-NewGitMetadata $metadata $existing;Assert-GitMetadata $metadata}
  return $result
 }
 function Git-MetadataPaths([string]$Path) {
@@ -195,6 +195,9 @@ function Seal-NewGitMetadata([string]$Path,$Existing) {
 }
 function Assert-Source($Pins,[string]$Head) {
  if((Git 'rev-parse HEAD') -cne $Head -or (Git 'branch --show-current') -cne 'main' -or (Git 'status --porcelain --untracked-files=no')){throw 'Private main source state differs'}
+ Assert-SourcePins $Pins
+}
+function Assert-SourcePins($Pins) {
  $watch=[Diagnostics.Stopwatch]::StartNew();$count=0
  foreach($p in $Pins.PSObject.Properties) {
   if(++$count -gt 1000 -or $watch.Elapsed.TotalSeconds -gt 60){throw 'Source verification bound exceeded'}
@@ -202,6 +205,184 @@ function Assert-Source($Pins,[string]$Head) {
   if(-not $path.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Source path escaped repository'}
   $null=Read-Bytes $path $p.Value 2MB
  }
+}
+function Assert-SourcePreimage([string]$Path,$Hashes) {
+ if(@($Hashes).Count -lt 1 -or @($Hashes).Count -gt 3 -or @($Hashes | Where-Object {$_ -cnotmatch '^[a-f0-9]{64}$'}).Count){throw 'Authenticated predecessor hashes required'}
+ $item=Get-Item -LiteralPath $Path -Force
+ if($item -is [IO.DirectoryInfo] -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 2MB){throw 'Invalid predecessor file'}
+ $bytes=[IO.File]::ReadAllBytes($Path)
+ if($bytes.Length -gt 2MB -or (Hash $bytes) -cnotin @($Hashes)){throw ('Source predecessor bytes differ: '+$Path)}
+}
+function Open-SourceCustodyHandle([string]$Path,[bool]$Directory) {
+ if(-not ('K98.SourceCustody' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using Microsoft.Win32.SafeHandles;
+namespace K98 {
+ public static class SourceCustody {
+  [StructLayout(LayoutKind.Sequential)]
+  private struct Info {
+   public uint Attributes, CreationLow, CreationHigh, AccessLow, AccessHigh,
+    WriteLow, WriteHigh, Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
+  }
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  private static extern SafeFileHandle CreateFileW(string path, uint access,
+   uint share, IntPtr security, uint creation, uint flags, IntPtr template);
+  [DllImport("kernel32.dll", SetLastError=true)]
+  private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out Info info);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  private static extern bool MoveFileExW(string existing, string replacement, uint flags);
+  public static SafeFileHandle Open(string path, bool directory) {
+   // READ_DATA/LIST_DIRECTORY | READ_CONTROL. Exclude data writes; allow DELETE
+   // so a fresh protected object can replace this object under a trusted parent.
+   // Open the reparse object itself, then refuse it before reading or sealing.
+   var handle=CreateFileW(path, 0x20001, 5, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+   if(handle.IsInvalid) { var error=Marshal.GetLastWin32Error(); handle.Dispose(); throw new Win32Exception(error); }
+   try {
+    Info info;
+    if(!GetFileInformationByHandle(handle,out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    if((info.Attributes & 0x400)!=0 || ((info.Attributes & 0x10)!=0)!=directory)
+     throw new InvalidOperationException("Source custody type/reparse mismatch");
+    if(!directory && info.Links!=1) throw new InvalidOperationException("Source custody hardlinks refused");
+    return handle;
+   } catch { handle.Dispose(); throw; }
+  }
+  public static void Replace(string fresh, string destination) {
+   // Same-directory atomic rename of the NEW object. ReplaceFile would preserve
+   // security metadata from the old object; owner-only writes retain old handles.
+   if(!MoveFileExW(fresh,destination,9)) throw new Win32Exception(Marshal.GetLastWin32Error());
+  }
+ }
+}
+'@
+ }
+ return [K98.SourceCustody]::Open($Path,$Directory)
+}
+function Write-SourceCopy([string]$Path,[byte[]]$Bytes,$Acl) {
+ $stream=[IO.FileStream]::new($Path,[IO.FileMode]::CreateNew,[Security.AccessControl.FileSystemRights]::Write,[IO.FileShare]::None,4096,[IO.FileOptions]::WriteThrough,$Acl)
+ try{$stream.Write($Bytes,0,$Bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+}
+function Install-SourceCopy([string]$Fresh,[string]$Path) {[K98.SourceCustody]::Replace($Fresh,$Path)}
+function Initialize-SourceOwner([string]$Path,[bool]$Directory,$Hashes) {
+ # Never promote the old object's authority: prior WRITE_DAC handles survive an
+ # owner change. A file can be replaced by an authenticated protected copy;
+ # directories require prior custody rather than an implicit recursive migration.
+ Assert-Protected (Split-Path -Parent $Path)
+ $held=Open-SourceCustodyHandle $Path $Directory
+ try {
+ $item=Get-Item -LiteralPath $Path -Force
+ if(($item -is [IO.DirectoryInfo]) -ne $Directory -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Source custody type/reparse mismatch'}
+ $acl=Get-Acl -LiteralPath $Path
+ $owner=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+ $trusted=@('S-1-5-18','S-1-5-32-544','S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+ if($owner -notin $trusted -and $owner -cne $c.sid){throw ('Unrecognized source owner: '+$Path)}
+ if($Directory -and $owner -notin $trusted){throw ('Source directory requires established administrative custody: '+$Path)}
+ if($null -eq ([Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorBinaryForm(),0)).DiscretionaryAcl){throw 'Source custody null DACL refused'}
+ foreach($ace in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
+  if($ace.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow -and
+     $ace.IdentityReference.Value -notin $trusted -and ([long]$ace.FileSystemRights -band 0x500d0156) -ne 0){throw ('Source custody write access differs: '+$Path)}
+ }
+ if(-not $Directory){Assert-SourcePreimage $Path $Hashes}
+ if($owner -cnotin $trusted) {
+  if(@(Get-Item -LiteralPath $Path -Stream * | Where-Object {$_.Stream -cne ':$DATA'}).Count){throw 'Source custody alternate streams refused'}
+  if(([long]$item.Attributes -band (-bnot 0x20a6)) -ne 0){throw 'Source custody file attributes require separate review'}
+  $sections=[Security.AccessControl.AccessControlSections]::Access -bor [Security.AccessControl.AccessControlSections]::Group
+  $before=$acl.GetSecurityDescriptorSddlForm($sections)
+  $bytes=[IO.File]::ReadAllBytes($Path)
+  if((Hash $bytes) -cnotin @($Hashes)){throw 'Source predecessor bytes changed'}
+  $fresh=Join-Path (Split-Path -Parent $Path) ('.k98-custody-'+[guid]::NewGuid().ToString('N'))
+  $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+  Write-SourceCopy $fresh $bytes $acl
+  # Preserve bytes, DACL/group, ordinary attributes and timestamps on the fresh
+  # protected object. A failed preparation retains its unique scratch file.
+  [IO.File]::SetCreationTimeUtc($fresh,$item.CreationTimeUtc)
+  [IO.File]::SetLastWriteTimeUtc($fresh,$item.LastWriteTimeUtc)
+  [IO.File]::SetLastAccessTimeUtc($fresh,$item.LastAccessTimeUtc)
+  [IO.File]::SetAttributes($fresh,$item.Attributes)
+  $null=Read-Bytes $fresh (Hash $bytes) 2MB
+  if((Get-Acl -LiteralPath $fresh).GetSecurityDescriptorSddlForm($sections) -cne $before){throw 'Fresh source permissions differ'}
+  # The new object is already independently protected and authenticated. Close
+  # our original read handle for Windows replacement compatibility; the trusted
+  # parent denies application-created destination entries. Old security handles
+  # can only affect the discarded object (or cause replacement to fail closed).
+  $held.Dispose()
+  Install-SourceCopy $fresh $Path
+  $after=Get-Acl -LiteralPath $Path
+  if($after.GetSecurityDescriptorSddlForm($sections) -cne $before){throw ('Source permissions changed during custody establishment: '+$Path)}
+  Write-Host ('Established fresh administrative source custody: '+$Path)
+ }
+ Assert-Protected $Path
+ if($Directory){Assert-GitDirectoryInheritance $Path}else{Assert-SourcePreimage $Path $Hashes}
+ } finally {$held.Dispose()}
+}
+function Initialize-UpdateCustody {
+ Assert-Protected $c.root
+ $clock=[Diagnostics.Stopwatch]::StartNew();$visited=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+ foreach($m in $c.source_members) {
+  if($clock.Elapsed.TotalSeconds -gt 60 -or $visited.Count -gt 4096){throw 'Source custody preparation exceeded bound'}
+  $path=Source-MemberPath $m.path
+  if($m.added -and (Test-Path -LiteralPath $path)){throw ('New tracked path already exists; reconcile before restart: '+$m.path)}
+  $parent=$c.root;$parts=$m.path.Split('/')
+  for($i=0;$i -lt $parts.Length-1;$i++) {
+   $next=Join-Path $parent $parts[$i]
+   if(-not(Test-Path -LiteralPath $next)){break}
+   if(-not(Test-Path -LiteralPath $next -PathType Container)){throw 'Source parent is not a directory'}
+   # Check the stored spelling while the parent is already trusted.
+   $found=$false;$count=0
+   foreach($name in [IO.Directory]::EnumerateDirectories($parent)) {
+    if(++$count -gt 10000){throw 'Directory spelling inventory exceeds bound'}
+    $leaf=[IO.Path]::GetFileName($name)
+    if($leaf.Equals($parts[$i],[StringComparison]::OrdinalIgnoreCase)) {
+     if($leaf -cne $parts[$i]){throw 'Live parent spelling differs'}
+     $found=$true;break
+    }
+   }
+   if(-not $found){throw 'Source parent changed during custody preparation'}
+   if($visited.Add($next)){Initialize-SourceOwner $next $true @()}
+   $parent=$next
+  }
+  if(-not $m.added) {
+   # Runtime custody was already established by the installed source policy;
+   # never adopt a newly application-owned executable as routine prerequisite repair.
+   if($null -ne $c.old_pins.PSObject.Properties[$m.path]){Assert-Protected $path}
+   Initialize-SourceOwner $path $false $m.before_sha256
+  }
+ }
+}
+function Assert-TargetContents {
+ if((Git 'rev-parse HEAD') -cne $c.target -or (Git 'branch --show-current') -cne 'main'){throw 'Target private main differs'}
+ if(Git 'diff --cached --name-only --no-ext-diff --'){throw 'Staged changes refuse index reconciliation'}
+ Assert-SourcePins $c.new_pins
+ foreach($m in $c.source_members) {
+  $path=Source-MemberPath $m.path
+  if($m.deleted){if(Test-Path -LiteralPath $path){throw 'Deleted member exists'}}else{$null=Read-Bytes $path $m.target_sha256 2MB}
+ }
+}
+function Complete-SourceIndex {
+ # May resume index bookkeeping only after independent exact-content checks.
+ # No source rewrite/merge/restart is performed by this convergence step.
+ Assert-TargetContents
+ $dirty=Git 'diff-files --name-only --no-ext-diff -z --'
+ if(-not $dirty){return}
+ $paths=@($dirty.Split([char]0) | Where-Object {$_})
+ foreach($path in $paths) {
+  $member=@($c.source_members | Where-Object {$_.path -ceq $path -and -not $_.deleted})
+  if($member.Count -ne 1){throw ('Unrelated modified path refuses index reconciliation: '+$path)}
+ }
+ $intent=Read-Json (Join-Path $PSScriptRoot '.receipts\source.intent.json')
+ if($intent.stage -cne 'starting' -or $intent.step -cne 'source' -or $intent.release_id -cne $c.release_id){throw 'Exact source intent required for index reconciliation'}
+ Assert-Drained;$null=Assert-Task $c.old_gate.Path $true
+ foreach($path in $paths) {
+  # Source-MemberPath rejects quoting/metacharacter ambiguity. Literal pathspecs
+  # and -- restrict normalization to this authenticated existing member.
+  $null=Source-MemberPath $path
+  $null=Git ('--literal-pathspecs add --renormalize -- "'+$path+'"')
+ }
+ Assert-TargetContents
+ if(Git 'status --porcelain --untracked-files=no'){throw 'Tracked source remains modified after exact index reconciliation'}
 }
 function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly) {
  foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'))) {
@@ -246,11 +427,15 @@ function Assert-ParentSpelling([string]$RelativePath) {
   $current=$next
  }
 }
+function Source-MemberPath([string]$RelativePath) {
+  if($RelativePath -notmatch '^[A-Za-z0-9_ .()/+-]+$' -or $RelativePath -match '(^|/)[.]{1,2}(/|$)'){throw 'Unsafe source member path'}
+  $path=[IO.Path]::GetFullPath((Join-Path $c.root $RelativePath))
+  if(-not $path.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Source member escaped repository'}
+  return $path
+}
 function Assert-UpdatePaths {
  foreach($m in $c.source_members) {
-  if($m.path -notmatch '^[A-Za-z0-9_ .()/+-]+$' -or $m.path -match '(^|/)[.]{1,2}(/|$)'){throw 'Unsafe source member path'}
-  $path=[IO.Path]::GetFullPath((Join-Path $c.root $m.path))
-  if(-not $path.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Source member escaped repository'}
+  $path=Source-MemberPath $m.path
   if($m.added -and (Test-Path -LiteralPath $path)){throw ('New tracked path already exists; reconcile before restart: '+$m.path)}
   Assert-ParentSpelling $m.path
   # Walk to the existing parent for newly added paths. Check every ancestor
@@ -445,7 +630,7 @@ try {
    Assert-Predecessor
    if(Test-Path -LiteralPath $drainPath){Assert-Drained -SuccessorRunning:(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json'));exit 0}
    Assert-Held
-   Assert-Source $c.old_pins $c.before;Assert-UpdatePaths;Verify-Native -Preflight;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path
+   Assert-Source $c.old_pins $c.before;Initialize-UpdateCustody;Assert-UpdatePaths;Verify-Native -Preflight;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path
    & $c.venv.path -I -B -c 'import win32file, win32api, win32security' | Out-Host
    if($LASTEXITCODE -ne 0){throw 'Installed venv native dependencies unavailable; bot remains running'}
    if((Test-Path -LiteralPath $c.new_seed_directory) -or (Test-Path -LiteralPath $c.new_state_directory)){throw 'Successor state already exists without drain receipt'}
@@ -455,7 +640,7 @@ try {
   }
   'VerifySource' {
    $head=Git 'rev-parse HEAD'
-   if($head -ceq $c.target){Assert-Source $c.new_pins $c.target;foreach($m in $c.source_members){$path=Join-Path $c.root $m.path;if($m.deleted){if(Test-Path -LiteralPath $path){throw 'Deleted member exists'}}else{$null=Read-Bytes $path $m.target_sha256 2MB}};exit 0}
+   if($head -ceq $c.target){Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0}
    if($head -ceq $c.before){Assert-Source $c.old_pins $c.before;exit 10}
    throw 'Unrecognized source outcome'
   }
@@ -477,7 +662,7 @@ try {
     [IO.File]::WriteAllBytes($path,$bytes)
     $null=Read-Bytes $path $m.target_sha256 2MB
    }
-   Assert-Source $c.new_pins $c.target;exit 0
+   Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0
   }
   'VerifySeed' {
    if(Seed-Complete){exit 0};exit 10
