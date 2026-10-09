@@ -101,8 +101,12 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
 
 @pytest.mark.parametrize("terminal", ["confirmed", "failed", "cancelled"])
 def test_late_uncertain_handoff_preserves_authoritative_terminal_outcome(journal, terminal):
-    row = new_run(journal, sheets=terminal)
-    assert journal.patch(row["run_id"], handoff=True, sheets="uncertain")["sheets"] == terminal
+    row = new_run(journal, sheets=terminal, completed_at=100, duration_seconds=10)
+    updated = journal.patch(
+        row["run_id"], handoff=True, sheets="uncertain", completed_at=200, duration_seconds=20
+    )
+    assert updated["sheets"] == terminal
+    assert updated["completed_at"] == 100 and updated["duration_seconds"] == 10
 
 
 @pytest.mark.asyncio

@@ -958,7 +958,7 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
                 if success_export == "pending"
                 else ("uncertain" if success_proc_import is True else "failed")
             )
-            await patch_run(
+            handoff = await patch_run(
                 notification_run_id,
                 handoff=True,
                 sheets=sheets_state,
@@ -978,13 +978,17 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
                     else {}
                 ),
             )
-            if sheets_state in {"failed", "uncertain"}:
+            if (
+                handoff
+                and handoff["sheets"] == sheets_state
+                and sheets_state in {"failed", "uncertain"}
+            ):
                 event(
                     notification_run_id,
                     "export",
                     sheets_state,
                     "inspect_pipeline_and_exact_job_evidence",
-                    duration=round((utcnow() - start_time).total_seconds(), 1),
+                    duration=handoff.get("duration_seconds"),
                 )
         except Exception as exc:
             event(notification_run_id, "handoff", "held", "inspect_notification_journal", error=exc)

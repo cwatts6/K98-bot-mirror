@@ -109,6 +109,9 @@ class NotificationStore:
             if row.get("sheets") in {"confirmed", "failed", "cancelled"}:
                 # A late pipeline handoff cannot replace authoritative job evidence.
                 patch.pop("sheets", None)
+                if patch.get("handoff"):
+                    patch.pop("completed_at", None)
+                    patch.pop("duration_seconds", None)
             if row.get("sheets") in {"confirmed", "failed", "uncertain", "cancelled"} and patch.get(
                 "sheets"
             ) in {"pending", "waiting", "ready", "running"}:
