@@ -37,6 +37,65 @@ async def test_coordinated_timeout_waits_for_actual_sql_thread():
 COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("setting_fails", [False, True])
+async def test_import_sets_connection_timeout_before_cursor(monkeypatch, setting_fails):
+    from core import export_sql_connection
+    from services import legacy_export_snapshot_service
+
+    events = []
+
+    class Cursor:
+        __slots__ = ()  # A real pyodbc cursor has no writable timeout attribute.
+
+    class Connection:
+        autocommit = False
+        _timeout = 15
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        @property
+        def timeout(self):
+            return self._timeout
+
+        @timeout.setter
+        def timeout(self, value):
+            events.append(("timeout", value))
+            if setting_fails:
+                raise RuntimeError("timeout configuration refused")
+            self._timeout = value
+
+        def cursor(self):
+            events.append(("cursor", self.timeout))
+            return Cursor()
+
+    connection = Connection()
+    monkeypatch.setattr(export_sql_connection, "producer_connection", lambda _: connection)
+    monkeypatch.setattr(legacy_export_snapshot_service, "admitted_writer", lambda _: lambda f: f)
+    monkeypatch.setattr(legacy_export_snapshot_service, "verify_producer_cursor", lambda _: None)
+
+    def before_procedure(*args):
+        events.append(("counter", connection.timeout))
+        raise RuntimeError("stop before executing import")
+
+    monkeypatch.setattr(sm, "fetch_update_all2_last_counter", before_procedure)
+    monkeypatch.setattr(sm, "_fetch_immutable_import_outcome", lambda _: None)
+    with legacy_export_snapshot_service.use_runtime(object()):
+        ok, _, _ = await sm.run_sql_procedure(
+            rank=1590, seed="C", completed_filename=COMPLETED_FILENAME, timeout_seconds=600
+        )
+    assert not ok
+    assert events == (
+        [("timeout", 595)]
+        if setting_fails
+        else [("timeout", 595), ("cursor", 595), ("counter", 595)]
+    )
+
+
 @pytest.mark.skip(reason="Integration test requiring live DB — not suitable for unit test suite")
 @pytest.mark.asyncio
 async def test_run_sql_procedure_timeout_emits_telemetry(caplog):

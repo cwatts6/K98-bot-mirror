@@ -320,15 +320,14 @@ async def run_sql_procedure(
             # autocommit mode so the counter/control queries do not create an
             # ambient transaction before the public procedure is invoked.
             conn.autocommit = True
+            # pyodbc query timeouts belong to the connection and are inherited
+            # by new cursors. This is a dedicated producer connection; the
+            # runtime's separate coordination connections retain their limit.
+            conn.timeout = max(1, int(timeout_seconds) - 5)
             cur = conn.cursor()
             from services.legacy_export_snapshot_service import verify_producer_cursor
 
             verify_producer_cursor(cur)
-            try:
-                cur.timeout = max(1, int(timeout_seconds) - 5)
-            except Exception:
-                pass
-
             original_counter = fetch_update_all2_last_counter(cur, TASK_NAME)
             expected_counter = original_counter + 1
             logger.info(f"[SQL_PROC] Executing procedure with expected counter: {expected_counter}")
