@@ -137,6 +137,12 @@ class DeliveryTracker:
             guild_id=positive_id(getattr(getattr(actual, "guild", None), "id", None)),
         )
 
+    async def before_dispatch(self, channel_id=None, *, operation="send", message_id=None):
+        self.enter(channel_id, operation=operation, message_id=message_id)
+
+    async def after_dispatch(self, message, channel=None, *, operation="send"):
+        self.receipt(message, channel, operation=operation)
+
     def skip(self, reason):
         self.update(outcome="skipped", reason=reason)
 

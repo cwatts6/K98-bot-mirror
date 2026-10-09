@@ -4,11 +4,11 @@ This change is source work, not authorization to replay, settle or restart any
 historical job. The successful 9 October export remains complete. Only imports
 registered with the new exact execution receipt participate in automatic handling.
 
-SQL import and Google delivery are separate outcomes. The planned notification
-change reports fresh SQL/cache stats in the normal stats channel with existing
-mention/cap rules. A separate configurable Sheets channel receives analysis links
-and export outcomes without mentions. That notification change is a subsequent
-delivery; the outcome foundation described here does not yet implement it.
+SQL import and Google delivery are separate outcomes. Fresh SQL/cache stats use
+the normal stats channel and existing mention/cap rules. A separate configurable
+Sheets channel receives analysis links and export outcomes without mentions.
+See [notification operation and resolution](s11_notifications.md) for that separate
+delivery layer and its local administrator command.
 
 ## What recovers automatically
 

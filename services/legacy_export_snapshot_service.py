@@ -1015,7 +1015,7 @@ class LegacyExportRuntime:
         if (scope["kvk_no"], scope["primary_sheet"]) != (kvk_no, sheet_name):
             raise SnapshotUnavailable("Requested season/destination has no matching registration.")
 
-    def submit(self, *, consumer, kvk_no=None, preparation_id=None):
+    def resolve_preparation(self, *, consumer, kvk_no=None, preparation_id=None):
         if preparation_id is None:
             owner = _owner.get()
             if owner is not None and not owner.closed:
@@ -1039,4 +1039,11 @@ class LegacyExportRuntime:
         row = self.dal.read(preparation_id)
         if (row["ConsumerKind"], row["KVK_NO"]) != (consumer, kvk_no):
             raise SnapshotUnavailable("Capture belongs to another consumer or season.")
-        return self.enqueue_snapshot(preparation_id)
+        return preparation_id
+
+    def submit(self, *, consumer, kvk_no=None, preparation_id=None):
+        return self.enqueue_snapshot(
+            self.resolve_preparation(
+                consumer=consumer, kvk_no=kvk_no, preparation_id=preparation_id
+            )
+        )

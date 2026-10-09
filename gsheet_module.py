@@ -1240,6 +1240,7 @@ def run_all_exports(
     credentials_file: str = CREDENTIALS_FILE,
     notify_channel: Any | None = None,
     bot_loop: asyncio.AbstractEventLoop | None = None,
+    notification_run_id: str | None = None,
 ):
     from services.legacy_export_snapshot_service import _writer_runtime
 
@@ -1248,8 +1249,28 @@ def run_all_exports(
         return _render_run_all_exports(
             server, database, username, password, credentials_file, notify_channel, bot_loop
         )
-    job_id = runtime.submit(consumer="scan_data", kvk_no=None)
-    return False, f"Queued export job {job_id}; provider completion is pending."
+    from services.export_submission import ExportSubmission
+
+    preparation_id = runtime.resolve_preparation(consumer="scan_data", kvk_no=None)
+    if notification_run_id:
+        from services.processing_notification_store import notification_store
+
+        # Persist before enqueue; after a lost acknowledgment the observer can read
+        # this exact preparation's JobID without submitting another export.
+        try:
+            notification_store().patch(notification_run_id, preparation_id=preparation_id)
+        except Exception as exc:
+            from services.processing_notification_service import event
+
+            event(
+                notification_run_id,
+                "export_correlation",
+                "held",
+                "inspect_exact_export_job_and_journal",
+                error=exc,
+            )
+    job_id = runtime.submit(consumer="scan_data", kvk_no=None, preparation_id=preparation_id)
+    return ExportSubmission(job_id, preparation_id)
 
 
 def _render_run_all_exports(
@@ -1919,7 +1940,7 @@ def _render_run_kvk_export_test(
         meta["primary"] = {
             "spreadsheet_id": getattr(ss, "id", None),
             "spreadsheet_url": getattr(ss, "url", None)
-            or f"https://docs.google.com/spreadsheets/d/{getattr(ss,'id','')}",
+            or f"https://docs.google.com/spreadsheets/d/{getattr(ss, 'id', '')}",
             "written_tabs": written_tabs,
             "skipped_tabs": skipped_tabs,
         }

@@ -677,12 +677,12 @@ async def send_kvk_embed(
 
             await asyncio.to_thread(require_current_read, preview.public_read)
         if _delivery and channel is not None:
-            _delivery.enter(getattr(channel, "id", None))
+            await _delivery.before_dispatch(getattr(channel, "id", None))
         sent = await channel.send(
             content=content, embeds=preview.payload, allowed_mentions=allowed_mentions
         )
         if _delivery:
-            _delivery.receipt(sent)
+            await _delivery.after_dispatch(sent)
     except Exception as exc:
         if _delivery:
             _delivery.failure(exc)

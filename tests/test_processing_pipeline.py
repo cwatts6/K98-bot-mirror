@@ -55,6 +55,7 @@ async def test_each_pipeline_outcome_emits_one_truthful_summary(monkeypatch, fai
 @pytest.mark.asyncio
 async def test_pipeline_keeps_queued_export_distinct_from_completion(monkeypatch):
     import processing_pipeline as pp
+    from services.export_submission import ExportSubmission
 
     _patch_lightweight_pipeline_boundaries(monkeypatch)
 
@@ -65,7 +66,7 @@ async def test_pipeline_keeps_queued_export_distinct_from_completion(monkeypatch
     monkeypatch.setattr(
         pp,
         "run_all_exports",
-        lambda *a, **k: (False, "Queued export job exact-job; provider completion is pending."),
+        lambda *a, **k: ExportSubmission("exact-job", "exact-preparation"),
     )
     sent = AsyncMock()
     monkeypatch.setattr(pp, "send_status_embed", sent)
@@ -133,10 +134,6 @@ def _patch_lightweight_pipeline_boundaries(monkeypatch):
     monkeypatch.setattr("processing_pipeline.send_embed_safe", fake_send_embed_safe)
     monkeypatch.setattr("processing_pipeline.get_channel_safe", lambda *a, **k: None)
     monkeypatch.setattr("processing_pipeline.build_player_stats_cache", fake_build_cache)
-    monkeypatch.setattr("processing_pipeline.build_lastkvk_player_stats_cache", fake_build_cache)
-    monkeypatch.setattr(
-        "processing_pipeline.read_json_safe", lambda *a, **k: {"_meta": {"count": 0}}
-    )
     monkeypatch.setattr(
         "processing_pipeline.run_maintenance_with_isolation",
         fake_run_maintenance_with_isolation,
@@ -227,3 +224,45 @@ async def test_run_stats_copy_archive_unexpected_shape(monkeypatch):
     )
     # success flags should be False/None coerced
     assert isinstance(res[5], str)  # combined_log should be string
+
+
+@pytest.mark.asyncio
+async def test_stats_ready_precedes_google_dependency_and_survives_its_failure(monkeypatch):
+    from unittest.mock import Mock
+
+    import processing_pipeline as pp
+    from stats_alerts import processing_notifications as notifications
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    stages = []
+    cache = {"_meta": {"generated_at": "fresh"}}
+    monkeypatch.setattr(
+        pp,
+        "run_stats_copy_archive",
+        AsyncMock(return_value=(True, "SQL", {"excel": True, "archive": True, "sql": True})),
+    )
+    monkeypatch.setattr(pp, "build_player_stats_cache", AsyncMock(return_value=cache))
+
+    async def ready(bot, run_id, output):
+        assert output is cache
+        stages.append("stats_ready")
+
+    async def maintenance(kind, **kwargs):
+        stages.append(kind)
+        return (False, "Google unavailable") if kind == "proc_import" else (True, "OK")
+
+    monkeypatch.setattr(notifications, "bot_data_ready", ready)
+    monkeypatch.setattr(pp, "run_maintenance_with_isolation", maintenance)
+    exporter = Mock(side_effect=AssertionError("dependent export must not run"))
+    monkeypatch.setattr(pp, "run_all_exports", exporter)
+    result = await pp.execute_processing_pipeline(
+        1,
+        seed=1,
+        user=AsyncMock(),
+        filename="fixture.xlsx",
+        channel_id=0,
+        notification_run_id="new-run",
+    )
+    assert stages.index("stats_ready") < stages.index("proc_import")
+    assert result[2] is True and result[4] is False
+    exporter.assert_not_called()

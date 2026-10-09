@@ -71,7 +71,6 @@ async def test_run_step_with_sync_and_async(monkeypatch):
     monkeypatch.setattr(pp, "run_all_exports", fake_run_all_exports)
     monkeypatch.setattr(pp, "run_maintenance_with_isolation", fake_run_maintenance_with_isolation)
     monkeypatch.setattr(pp, "preflight_from_env_sync", lambda *a, **k: None)
-    monkeypatch.setattr(pp, "read_json_safe", lambda *a, **k: {"_meta": {"count": 0}})
 
     # monkeypatch send_embed_safe to a no-op to avoid discord usage
     async def fake_send_embed_safe(*args, **kwargs):
@@ -118,7 +117,7 @@ async def test_run_step_with_sync_and_async(monkeypatch):
         1, seed=42, user=fake_user, filename="f2.xlsx", channel_id=0, save_path=None
     )
     assert isinstance(result2, tuple)
-    # dict-form is an unrecognized shape — pipeline coerces to failure
+    # dict-form is an unrecognized shape â€” pipeline coerces to failure
     assert result2[0] is False
     assert result2[1] is False
     assert result2[2] is False

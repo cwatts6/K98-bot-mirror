@@ -95,8 +95,30 @@ def test_scan_entrypoint_enqueues_without_sql_or_provider(monkeypatch):
     with use_runtime(runtime):
         ok, message = gm.run_all_exports(None, None, None, None)
     assert ok is False and message.startswith("Queued export job retained-job")
-    runtime.submit.assert_called_once_with(consumer="scan_data", kvk_no=None)
+    runtime.submit.assert_called_once_with(
+        consumer="scan_data", kvk_no=None, preparation_id=runtime.resolve_preparation.return_value
+    )
     legacy.assert_not_called()
+
+
+def test_submission_records_preparation_before_lost_enqueue_ack(monkeypatch):
+    from unittest.mock import Mock
+
+    from services import processing_notification_store as module
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime, store = Mock(), Mock()
+    runtime.resolve_preparation.return_value = "exact-preparation"
+
+    def submit(**kwargs):
+        store.patch.assert_called_once_with("exact-run", preparation_id="exact-preparation")
+        raise TimeoutError("enqueue acknowledgment lost")
+
+    runtime.submit.side_effect = submit
+    monkeypatch.setattr(module, "notification_store", lambda: store)
+    with use_runtime(runtime), pytest.raises(TimeoutError):
+        gm.run_all_exports(None, None, None, None, notification_run_id="exact-run")
+    runtime.submit.assert_called_once()
 
 
 class _FakeCredentials:

@@ -27,7 +27,7 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     # Patch the embed sender used by processing_pipeline (it was imported at module import time)
     monkeypatch.setattr(processing_pipeline, "send_embed_safe", mock_send_embed_safe)
 
-    # Also intercept send_status_embed — this is where Context is merged into the fields dict
+    # Also intercept send_status_embed â€” this is where Context is merged into the fields dict
     # via {**context_field, **status_map}. Capture those calls so we can assert Context is present.
     status_embed_calls = []
 
@@ -73,17 +73,14 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
 
     # Mock run_step to handle run_stats_copy_archive, run_all_exports, and read_json_safe centrally
     async def mock_run_step(func, *args, offload_sync_to_thread=False, name=None, **kwargs):
-        # run_stats_copy_archive → return canonical 3-tuple (success, log, steps).
+        # run_stats_copy_archive â†’ return canonical 3-tuple (success, log, steps).
         # Check the explicit `name` kwarg first (most reliable), then fall back to func.__name__.
         func_name = name or getattr(func, "__name__", "")
         if func_name.endswith("run_stats_copy_archive"):
             return True, "ARCHIVE_LOG", {"excel": True, "archive": True, "sql": True}
-        # run_all_exports → success
+        # run_all_exports â†’ success
         if func_name == "run_all_exports" or func is processing_pipeline.run_all_exports:
             return True, "EXPORT_LOG"
-        # read_json_safe -> return empty dict
-        if func_name == "read_json_safe" or func is processing_pipeline.read_json_safe:
-            return {}
         # preflight or other helpers: no-op
         return None
 
@@ -134,7 +131,7 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     ]
     assert context_values, 'No send_status_embed call included the expected "Context" field'
     assert any(
-        # Discord/embed_utils may markdown-escape underscores in filenames (e.g. _ → \_),
+        # Discord/embed_utils may markdown-escape underscores in filenames (e.g. _ â†’ \_),
         # so accept either the original or the escaped form.
         (filename in context or filename.replace("_", r"\_") in context)
         and str(rank) in context

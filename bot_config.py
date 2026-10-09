@@ -89,7 +89,7 @@ def _env_list_int(name: str, default=None, strict: bool | None = None) -> list[i
                     msg = f"[CONFIG] {name} contains a non-integer entry (JSON): {s!r}"
                     if strict:
                         raise ValueError(msg)
-                    logger.warning(msg + " — skipping")
+                    logger.warning(msg + " â€” skipping")
             return out
         # if it's valid JSON but not a list, fall through to CSV handling
     except Exception:
@@ -108,7 +108,7 @@ def _env_list_int(name: str, default=None, strict: bool | None = None) -> list[i
             msg = f"[CONFIG] {name} contains a non-integer entry: {p!r}"
             if strict:
                 raise ValueError(msg)
-            logger.warning(msg + " — skipping")
+            logger.warning(msg + " â€” skipping")
 
     return out
 
@@ -187,6 +187,7 @@ PLAYER_LOCATION_CHANNEL_ID = _env_int("PLAYER_LOCATION_CHANNEL_ID")
 DISCORD_BOT_TOKEN = _get_env("DISCORD_BOT_TOKEN", required=True)
 
 STATS_ALERT_CHANNEL_ID = _env_int("STATS_ALERT_CHANNEL_ID")
+GSHEETS_EXPORT_CHANNEL_ID = _env_int("GSHEETS_EXPORT_CHANNEL_ID")
 
 KVK_EVENT_CHANNEL_ID = _env_int("KVK_EVENT_CHANNEL_ID")
 KVK_NOTIFICATION_CHANNEL_ID = _env_int("KVK_NOTIFICATION_CHANNEL_ID")
@@ -208,6 +209,7 @@ __all__ = [
     "DELETE_AFTER_DOWNLOAD_CHANNEL_ID",
     "DISCORD_BOT_TOKEN",
     "FORT_RALLY_CHANNEL_ID",
+    "GSHEETS_EXPORT_CHANNEL_ID",
     "GUILD_ID",
     "HONOR_CHANNEL_ID",
     "INVENTORY_ADMIN_DEBUG_CHANNEL_ID",

@@ -114,6 +114,8 @@ async def log_processing_result(
     combined_log: str,
     start_time: datetime,
     summary_log_path: str,
+    *,
+    managed_notifications: bool = False,
 ) -> None:
     """Log processing results, send status embed, and optionally post a stats update.
 
@@ -245,7 +247,7 @@ async def log_processing_result(
     )
 
     # Only send embed when we have a valid channel object
-    if notify_channel is not None:
+    if notify_channel is not None and not managed_notifications:
         try:
             await send_embed(
                 notify_channel,
@@ -267,7 +269,7 @@ async def log_processing_result(
             )
         except Exception:
             logger.exception("[EMBED] Failed to send processing result embed")
-    else:
+    elif notify_channel is None:
         logger.warning(
             "[NOTIFY] No available channel to send processing embed; skipping embed send."
         )
@@ -295,7 +297,7 @@ async def log_processing_result(
             logger.exception("[LOG] Failed to append to FAILED_LOG")
 
     # Post stats update embed if all steps succeeded (unchanged behavior)
-    if all(
+    if not managed_notifications and all(
         value is True
         for value in [
             success_excel,

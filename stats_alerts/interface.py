@@ -130,12 +130,24 @@ async def _send_stats_update_embed(
     mark_unverified()
 
 
-async def send_stats_update_embed(bot: Any, timestamp: str, is_kvk: bool, is_test: bool = False):
+async def send_stats_update_embed(
+    bot: Any, timestamp: str, is_kvk: bool, is_test: bool = False, *, _delivery=None
+):
     """Publish once through the existing selectors and return per-attempt evidence."""
     if not is_test:
         from kvk.services.new_source_recovery_service import wake_recovery
 
         wake_recovery()
+    if _delivery is not None:
+        try:
+            await _send_stats_update_embed(
+                bot, timestamp, is_kvk, is_test=is_test, _delivery=_delivery
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _delivery.failure(exc)
+        return _delivery.result()
     return await _send_stats_update_embed(
         bot, timestamp, is_kvk, is_test=is_test, return_outcome=True
     )

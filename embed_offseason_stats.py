@@ -333,8 +333,8 @@ async def send_offseason_stats_embed_v2(
     if before_send is not None:
         await before_send()
     if _delivery:
-        _delivery.enter(getattr(ch, "id", None))
+        await _delivery.before_dispatch(getattr(ch, "id", None))
     message = await ch.send(content=content, embeds=embeds_to_send, allowed_mentions=allowed)
     if _delivery:
-        _delivery.receipt(message)
+        await _delivery.after_dispatch(message)
     return message if return_receipt else None

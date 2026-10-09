@@ -491,10 +491,10 @@ async def send_kingdom_summary(
 
     try:
         if _delivery and channel is not None:
-            _delivery.enter(getattr(channel, "id", None))
+            await _delivery.before_dispatch(getattr(channel, "id", None))
         sent = await channel.send(embed=embed, content=content, allowed_mentions=allowed_mentions)
         if _delivery:
-            _delivery.receipt(sent)
+            await _delivery.after_dispatch(sent)
         logger.info("[KINGDOM SUMMARY] Sent summary to channel %s", getattr(channel, "id", "?"))
     except Exception as exc:
         if _delivery:

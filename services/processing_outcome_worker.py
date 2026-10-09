@@ -21,6 +21,7 @@ async def observe_processing_outcomes():
     from services.legacy_export_snapshot_service import drain_thread
 
     unavailable = False
+    notifications_unavailable = False
     while True:
         try:
             await drain_thread(recover_failures)
@@ -38,6 +39,23 @@ async def observe_processing_outcomes():
                     type(exc).__name__,
                 )
             unavailable = True
+        try:
+            from bot_loader import bot
+            from stats_alerts.processing_notifications import observe_notifications
+
+            await observe_notifications(bot)
+            if notifications_unavailable:
+                logger.info("processing_notifications available=true action=resume_registered_runs")
+            notifications_unavailable = False
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if not notifications_unavailable:
+                logger.warning(
+                    "processing_notifications available=false error_type=%s action=inspect_journal_and_protected_runtime",
+                    type(exc).__name__,
+                )
+            notifications_unavailable = True
         await asyncio.sleep(30)
 
 
