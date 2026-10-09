@@ -20,6 +20,7 @@ Apply this file in place of the existing stats_module.py.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 import os
@@ -191,6 +192,23 @@ def _details_from_update_all2_phase(row: dict) -> dict:
         except Exception:
             details["sql_details"] = raw_details
     return details
+
+
+def _completion_phase_evidence(phases: list[dict]) -> list[dict]:
+    """Encode SQL DATETIME2 phase fields without changing the audit rows.
+
+    UPDATE_ALL2 supplies UTC wall times as naive datetimes. Preserve their
+    precision and any explicit offset; never reinterpret them as host-local time.
+    Other values still pass through the checkpoint's strict JSON validation.
+    """
+    evidence = []
+    for phase in phases:
+        encoded = dict(phase)
+        for key in ("started_at_utc", "completed_at_utc"):
+            if isinstance(encoded.get(key), datetime):
+                encoded[key] = encoded[key].isoformat()
+        evidence.append(encoded)
+    return evidence
 
 
 # === Excel Processing ===
@@ -418,7 +436,7 @@ async def run_sql_procedure(
             record_writer_completion(
                 procedure="dbo.UPDATE_ALL2",
                 completed_filename=completed_filename,
-                phases=result.get("phase_results") or [],
+                phases=_completion_phase_evidence(result.get("phase_results") or []),
             )
             if import_metadata:
                 _delete_import_metadata()

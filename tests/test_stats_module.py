@@ -1,6 +1,7 @@
 # tests/test_stats_module.py
 import asyncio
 import csv
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -568,9 +569,25 @@ async def test_run_sql_procedure_reconciles_terminal_identity_without_retry(
 
 
 @pytest.mark.asyncio
-async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(monkeypatch):
+@pytest.mark.parametrize("coordinated", [False, True])
+async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(
+    monkeypatch, tmp_path, coordinated
+):
+    from unittest.mock import Mock
+
+    from core import export_sql_connection
+    from services import legacy_export_snapshot_service as snapshots
+    from tests.test_legacy_export_snapshot import producer_runtime
+    from update_all2_log_manager import _parse_update_all2_phase_rows
+
     wrapper_calls = []
     deleted = []
+    started = datetime(2026, 10, 9, 19, 20, 20, 123000)
+    finished = datetime(2026, 10, 9, 19, 22, 27, 456000)
+    phases = _parse_update_all2_phase_rows(
+        ["PhaseName", "PhaseStatus", "StartedAtUtc", "CompletedAtUtc", "DurationMs"],
+        [("phase_b", "completed", started, finished, 127333)],
+    )
 
     class FakeCursor:
         timeout = 0
@@ -606,7 +623,7 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         wrapper_calls.append((param1, param2, completed_filename))
         return {
             "success": True,
-            "phase_results": [],
+            "phase_results": phases,
             "trigger_results": {},
             "log_before": 1.0,
             "log_after": 1.0,
@@ -616,6 +633,8 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     connection = FakeConnection()
     monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
     monkeypatch.setattr(stats_module, "_conn_trusted", lambda: connection)
+    monkeypatch.setattr(export_sql_connection, "producer_connection", lambda _: connection)
+    monkeypatch.setattr(snapshots, "verify_producer_cursor", lambda _: None)
     monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 7)
     monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
     monkeypatch.setattr(stats_module, "execute_update_all2_with_log_management", execute_wrapper)
@@ -629,12 +648,16 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     monkeypatch.setattr(stats_module, "WAIT_SECONDS", 0)
     monkeypatch.setattr(stats_module, "MAX_RETRIES", 1)
 
-    success, message, _extra = await stats_module.run_sql_procedure(
-        rank=1,
-        seed="A",
-        completed_filename=COMPLETED_FILENAME,
-        import_metadata=metadata,
-    )
+    scope = dict(consumer="scan_data", destinations=["file-a"])
+    capture = Mock(return_value=((snapshots.OutputSection("data", ("id",), ((1,),)),), scope))
+    runtime, dal = producer_runtime(tmp_path, capture=capture, configuration={"scan_data": scope})
+    with snapshots.use_runtime(runtime if coordinated else None):
+        success, message, _extra = await stats_module.run_sql_procedure(
+            rank=1,
+            seed="A",
+            completed_filename=COMPLETED_FILENAME,
+            import_metadata=metadata,
+        )
 
     assert success is True
     assert "Counter reached 8" in message
@@ -643,6 +666,44 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     assert connection.commit_called is False
     assert deleted == [True]
     assert metadata["_fallback_import_control_id"] == 456
+    assert metadata["_update_all2_phase_results"] is phases
+    assert phases[0]["started_at_utc"] is started
+    assert phases[0]["completed_at_utc"] is finished
+    if coordinated:
+        committed = [
+            call.kwargs["generation"]
+            for call in dal.transition.call_args_list
+            if call.kwargs.get("expected") == "writing"
+        ]
+        assert len(committed) == 1
+        evidence = committed[0]["producer"]
+        assert evidence["completed_filename"] == COMPLETED_FILENAME
+        assert evidence["phases"][0]["started_at_utc"] == "2026-10-09T19:20:20.123000"
+        assert evidence["phases"][0]["completed_at_utc"] == "2026-10-09T19:22:27.456000"
+        assert evidence["phases"][0]["duration_ms"] == 127333
+        capture.assert_called_once()
+        dal.captured.assert_called_once()
+        dal.uncertain.assert_not_called()
+
+
+def test_completion_phase_evidence_preserves_nulls_offsets_and_strict_json():
+    from services.legacy_export_snapshot_service import _json
+
+    timestamp = datetime(2026, 10, 9, 20, 0, 0, 123456, timezone(timedelta(hours=1)))
+    rows = [{"started_at_utc": timestamp, "completed_at_utc": None, "rows_out": 0}]
+    encoded = stats_module._completion_phase_evidence(rows)
+    assert encoded == [
+        {
+            "started_at_utc": "2026-10-09T20:00:00.123456+01:00",
+            "completed_at_utc": None,
+            "rows_out": 0,
+        }
+    ]
+    assert rows[0]["started_at_utc"] is timestamp
+    assert _json(encoded)
+    assert stats_module._completion_phase_evidence([]) == []
+    with pytest.raises(TypeError):
+        _json(stats_module._completion_phase_evidence([{"unexpected": object()}]))
 
 
 def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeypatch):
