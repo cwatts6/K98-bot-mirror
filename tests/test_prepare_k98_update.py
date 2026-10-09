@@ -96,6 +96,10 @@ def test_add_delete_and_document_changes_have_exact_payload_and_pin_effects():
         "deleted"
     ]
     assert payload["docs/operator.md"] == b"instructions\n"
+    assert {member["path"] for member in plan["source_members"] if member["added"]} == {
+        "core/new.py",
+        "docs/operator.md",
+    }
 
 
 @pytest.mark.parametrize(
@@ -237,6 +241,83 @@ def test_cli_checks_unchanged_unpinned_git_paths_before_blob_acquisition(
         main()
     assert trees_read == [BEFORE, AFTER]
     assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize(
+    "damage", [None, "oid", "kind", "size", "truncated", "separator", "suffix"]
+)
+def test_cli_batch_objects_are_verified_before_preparation(tmp_path, monkeypatch, damage):
+    import subprocess
+    import sys
+    from types import SimpleNamespace
+
+    from scripts import prepare_k98_update as updater
+
+    observation = tmp_path / "observation.json"
+    observation.write_text(
+        json.dumps(
+            {
+                "bindings": {
+                    "before": BEFORE,
+                    "target": AFTER,
+                    "root": str(tmp_path),
+                    "git_path": "git",
+                },
+                "seed": inventory(),
+            }
+        )
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prepare", "--observation", str(observation), "--output", str(tmp_path / "output")],
+    )
+    contents = {BEFORE: b"old\n\x00", AFTER: b"new\n\x00"}
+    oids = {BEFORE: b"a" * 40, AFTER: b"b" * 40}
+    records = [oids[rev] + b" blob 5\n" + contents[rev] + b"\n" for rev in (BEFORE, AFTER)]
+    batch = b"".join(records)
+    if damage == "oid":
+        batch = b"c" * 40 + batch[40:]
+    elif damage == "kind":
+        batch = batch.replace(b" blob ", b" tree ", 1)
+    elif damage == "size":
+        batch = batch.replace(b" blob 5\n", b" blob 6\n", 1)
+    elif damage == "truncated":
+        batch = batch[:-3]
+    elif damage == "separator":
+        batch = batch[:-1] + b"x"
+    elif damage == "suffix":
+        batch += b"extra"
+
+    def git(args, **kwargs):
+        if "diff" in args:
+            return SimpleNamespace(stdout=b"core/example.py\0")
+        if "ls-tree" in args:
+            return SimpleNamespace(
+                stdout=b"100644 blob " + oids[args[-1]] + b" 5\tcore/example.py\0"
+            )
+        assert "cat-file" in args
+        assert kwargs["input"] == oids[BEFORE] + b"\n" + oids[AFTER] + b"\n"
+        return SimpleNamespace(stdout=batch)
+
+    prepared = []
+
+    def prepare(_observation, _changes, read_blob, *_args, **_kwargs):
+        prepared.append({rev: read_blob(rev, "core/example.py") for rev in (BEFORE, AFTER)})
+        return {}
+
+    monkeypatch.setattr(subprocess, "run", git)
+    monkeypatch.setattr(updater, "prepare_update", prepare)
+    if damage is None:
+        updater.main()
+        assert prepared == [contents]
+    else:
+        with pytest.raises(
+            ValueError,
+            match=r"Git object changed|Truncated Git object stream|Unexpected Git object stream suffix",
+        ):
+            updater.main()
+        assert prepared == []
 
 
 def test_two_successor_seeds_rebind_gate_without_reusing_release_identity(tmp_path, monkeypatch):
