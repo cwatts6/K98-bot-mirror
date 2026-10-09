@@ -83,8 +83,9 @@ async def test_registration_failure_stops_before_prompt_or_import(monkeypatch, r
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("handoff_error", [False, True])
 async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
-    journal, monkeypatch
+    journal, monkeypatch, handoff_error
 ):
     import bot_config
     import processing_pipeline as pipeline
@@ -97,6 +98,10 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
     run_ids = [row["run_id"] for row in rows]
     monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
     monkeypatch.setattr(core, "register_run", Mock(side_effect=run_ids))
+    if handoff_error:
+        monkeypatch.setattr(
+            core, "patch_run", AsyncMock(side_effect=core.NotificationTransitionFailed("disk"))
+        )
     monkeypatch.setattr(storage, "notification_store", lambda: journal)
     monkeypatch.setattr(pipeline, "get_channel_safe", lambda *a: object())
     monkeypatch.setattr(pipeline, "send_embed_safe", AsyncMock())
@@ -119,8 +124,23 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
     )
     message = SimpleNamespace(id=123, channel=SimpleNamespace(id=987), author="uploader")
     for name in ("first.xlsx", "second.xlsx"):
-        await pipeline.handle_file_processing(object(), message, name, None)
+        if handoff_error:
+            with pytest.raises(core.NotificationTransitionFailed):
+                await pipeline.handle_file_processing(object(), message, name, None)
+        else:
+            await pipeline.handle_file_processing(object(), message, name, None)
     assert [job["processing_run_id"] for job in queue["jobs"]] == run_ids
+    if handoff_error:
+        pipeline.log_processing_result.assert_not_awaited()
+        assert (
+            sum(
+                call.args[1] == "Processing notification needs attention"
+                for call in pipeline.send_embed_safe.call_args_list
+            )
+            == 2
+        )
+        assert all(not journal.get(run_id).get("handoff") for run_id in run_ids)
+        return
     for run_id in run_ids:
         row = journal.get(run_id)
         assert row["sheets"] == "uncertain"
@@ -483,3 +503,134 @@ def test_unchanged_export_observation_preserves_admin_preview(journal, monkeypat
     token = journal.token(row)
     assert journal.token(core.observe_export(row)) == token
     assert journal.token(journal.get(row["run_id"])) == token
+
+
+@pytest.mark.asyncio
+async def test_stats_retry_reaches_failed_primary_after_acknowledged_summary(journal, monkeypatch):
+    import time
+
+    from stats_alerts import interface, processing_notifications as service
+
+    row = new_run(
+        journal,
+        stats="ready",
+        stats_delivery="retry_pending",
+        ready_at=time.time(),
+        cache_generation="same",
+        is_kvk=True,
+        stats_timestamp="now",
+    )
+    monkeypatch.setattr(service, "_current_cache_generation", lambda: "same")
+    monkeypatch.setattr(interface, "is_kvk_fighting_open", lambda: True)
+    monkeypatch.setattr(interface, "clear_prekvk_message", AsyncMock())
+    monkeypatch.setattr(interface, "sent_today_any", lambda *a: False)
+    monkeypatch.setattr(interface, "read_counts_for", lambda *a: 0)
+    monkeypatch.setattr(interface, "claim_send", lambda *a, **kw: True)
+    from kvk.services import new_source_recovery_service
+
+    monkeypatch.setattr(new_source_recovery_service, "wake_recovery", lambda: None)
+    destination = channel(10)
+    bot = SimpleNamespace(get_channel=lambda _: destination)
+    summary_sends = []
+    primary_attempts = []
+
+    async def summary(*args, _delivery, **kwargs):
+        await _delivery.before_dispatch(10)
+        summary_sends.append(True)
+        await _delivery.after_dispatch(destination.message, destination)
+
+    async def primary(*args, _delivery, **kwargs):
+        primary_attempts.append(True)
+        if len(primary_attempts) == 1:
+            raise ValueError("preview failed before dispatch")
+        await _delivery.before_dispatch(10)
+        await _delivery.after_dispatch(destination.message, destination)
+
+    monkeypatch.setattr(interface, "ks_mod", summary)
+    monkeypatch.setattr(interface.kvk_mod, "send_kvk_embed", primary)
+    await service.publish_stats(bot, row)
+    assert journal.get(row["run_id"])["stats_delivery"] == "retry_pending"
+    await service.publish_stats(bot, journal.get(row["run_id"]))
+    final = journal.get(row["run_id"])
+    assert len(summary_sends) == 1 and len(primary_attempts) == 2
+    assert final["stats_delivery"] == "complete"
+    assert final["components"]["kingdom_summary_daily"]["state"] == "acknowledged"
+    assert final["components"]["fighting"]["state"] == "acknowledged"
+
+
+@pytest.mark.asyncio
+async def test_required_fact_patch_retries_transient_failure_with_same_changes(
+    journal, monkeypatch
+):
+    from services import processing_notification_service as core
+
+    row = new_run(journal)
+    original = journal.patch
+    calls = []
+
+    def flaky(run_id, **changes):
+        calls.append(dict(changes))
+        if len(calls) == 1:
+            raise OSError("temporarily unavailable")
+        return original(run_id, **changes)
+
+    monkeypatch.setattr(journal, "patch", flaky)
+    result = await core.patch_run(row["run_id"], stats="ready", handoff=True)
+    assert result["stats"] == "ready" and result["handoff"]
+    assert calls == [dict(stats="ready", handoff=True)] * 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error,attempts", [(OSError("disk"), 3), (NotificationHeld("invalid"), 1)])
+async def test_required_fact_patch_exhaustion_propagates(journal, monkeypatch, error, attempts):
+    from services import processing_notification_service as core
+
+    row = new_run(journal)
+    patch = Mock(side_effect=error)
+    monkeypatch.setattr(journal, "patch", patch)
+    with pytest.raises(core.NotificationTransitionFailed):
+        await core.patch_run(row["run_id"], handoff=True)
+    assert patch.call_count == attempts
+    assert not journal.get(row["run_id"]).get("handoff")
+
+
+@pytest.mark.asyncio
+async def test_readiness_write_failure_does_not_replace_verified_fact(journal, monkeypatch):
+    from services import processing_notification_service as core
+    from stats_alerts import kvk_meta, processing_notifications as service
+
+    row = new_run(journal)
+    output = {
+        "_meta": dict(
+            source="SQL:dbo.STATS_FOR_UPLOAD",
+            generated_at="same",
+            source_refresh_status="refreshed",
+            source_refresh_succeeded=True,
+            cache_write_status="written",
+        )
+    }
+    monkeypatch.setattr(kvk_meta, "is_currently_kvk", lambda: True)
+    patch = Mock(side_effect=OSError("disk"))
+    monkeypatch.setattr(journal, "patch", patch)
+    publish = AsyncMock()
+    monkeypatch.setattr(service, "publish_stats", publish)
+    with pytest.raises(core.NotificationTransitionFailed):
+        await service.bot_data_ready(object(), row["run_id"], output)
+    assert patch.call_count == 3
+    assert all(call.kwargs["stats"] == "ready" for call in patch.call_args_list)
+    publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_intervention_uses_real_sender_contract(monkeypatch):
+    from unittest.mock import create_autospec
+
+    from embed_utils import send_embed_safe
+    import processing_pipeline as pipeline
+
+    sender = create_autospec(send_embed_safe)
+    monkeypatch.setattr(pipeline, "send_embed_safe", sender)
+    run_id = str(uuid4())
+    await pipeline._notification_intervention("user", "admin channel", run_id)
+    assert sender.call_args.args[2]["Processing run"] == run_id
+    assert "Do not repeat" in sender.call_args.args[2]["Admin action"]

@@ -1,5 +1,6 @@
 """Durable processing facts and exact export observation; no Discord rendering."""
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -7,11 +8,17 @@ import re
 import time
 from uuid import uuid4
 
+from filelock import Timeout as FileLockTimeout
+
 from services.legacy_export_snapshot_service import caller_runtime, drain_thread
 from services.processing_notification_store import NotificationHeld, notification_store
 
 logger = logging.getLogger(__name__)
 TERMINAL_EXPORTS = {"confirmed", "failed", "uncertain", "cancelled"}
+
+
+class NotificationTransitionFailed(RuntimeError):
+    """A required notification fact could not be durably recorded."""
 
 
 def event(
@@ -78,11 +85,29 @@ def register_run(*, source_message_id, source_channel_id, summary_channel_id, sh
 async def patch_run(run_id, **changes):
     if not run_id:
         return None
-    try:
-        return await drain_thread(notification_store().patch, run_id, **changes)
-    except Exception as exc:
-        event(run_id, "journal", "held", "inspect_notification_journal_and_disk", error=exc)
-        return None
+    # Only idempotent fact patches retry here; Discord dispatch and business work do not.
+    for attempt in range(3):
+        try:
+            return await drain_thread(notification_store().patch, run_id, **changes)
+        except Exception as exc:
+            if isinstance(exc, (OSError, FileLockTimeout)) and attempt < 2:
+                event(
+                    run_id,
+                    "journal",
+                    "retry_pending",
+                    f"retry_fact_patch_{attempt + 2}_of_3",
+                    error=exc,
+                )
+                await asyncio.sleep(0.25 * (attempt + 1))
+                continue
+            event(
+                run_id,
+                "journal",
+                "held",
+                "repair_journal_inspect_exact_run_do_not_repeat_import",
+                error=exc,
+            )
+            raise NotificationTransitionFailed("Required notification fact was not saved.") from exc
 
 
 def cache_generation(output):

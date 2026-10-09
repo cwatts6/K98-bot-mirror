@@ -34,6 +34,14 @@ prompting or importing and reports that no import started. Repair runtime/journa
 availability first, then resubmit that unprocessed file. Missing a Sheets delivery
 channel still does not block processing after registration.
 
+Required fact updates retry transient disk/lock failures at most three times with
+short delays. This repeats only the same journal patch, never SQL, export or a
+Discord send. Exhaustion or invalid evidence raises to the pipeline, which reports
+the exact run and repair action and stops dependent work. Verified readiness is
+not silently rewritten as unavailable. Repair the journal, inspect the exact run
+and correlated logs, then reconcile or explicitly close its notifications; never
+repeat the import/export to reconstruct a lost notification fact.
+
 The existing supervised outcome observer checks up to 16 runs per 30-second cycle
 in rotation. It never imports data, enqueues an export or calls Google. A lost
 enqueue acknowledgment is reconciled by reading the registered preparation's exact

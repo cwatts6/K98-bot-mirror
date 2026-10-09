@@ -9,6 +9,7 @@ import discord
 from services.legacy_export_snapshot_service import drain_thread
 from services.processing_notification_service import (
     TERMINAL_EXPORTS,
+    NotificationTransitionFailed,
     _current_cache_generation,
     cache_generation,
     event,
@@ -50,6 +51,10 @@ async def bot_data_ready(bot, run_id, output):
             event(run_id, "bot_data", "ready", "publish_existing_stats_route")
             await publish_stats(bot, row)
     except asyncio.CancelledError:
+        raise
+    except NotificationTransitionFailed:
+        # Do not replace verified readiness with a fabricated unavailable result.
+        # The pipeline reports the intervention and stops dependent work.
         raise
     except Exception as exc:
         if not ready_recorded:

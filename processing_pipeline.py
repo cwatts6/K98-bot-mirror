@@ -74,6 +74,24 @@ BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
 _EMBED_LOG_TRIM = int(os.getenv("EMBED_LOG_TRIM", str(_DEFAULT_MAX_LOG_EMBED_CHARS)))
 
 
+async def _notification_intervention(user, notify_channel, run_id):
+    await send_embed_safe(
+        user,
+        "Processing notification needs attention",
+        {
+            "Processing run": run_id,
+            "Reason": "A required notification update could not be saved.",
+            "Admin action": (
+                "Preserve the journal and repair disk, locking or permissions. Inspect this exact "
+                "run with processing_notifications.py status and correlated logs; reconcile or "
+                "close its notifications after inspection. Do not repeat the import or export."
+            ),
+        },
+        color=0xF1C40F,
+        fallback_channel=notify_channel,
+    )
+
+
 async def _run_proc_config_step(step_meta):
     from services.legacy_export_snapshot_service import _writer_runtime
 
@@ -420,9 +438,14 @@ async def execute_processing_pipeline(
         except Exception:
             logger.exception("[CACHE] Auxiliary cache refresh failed")
     if notification_run_id:
+        from services.processing_notification_service import NotificationTransitionFailed
         from stats_alerts.processing_notifications import bot_data_ready
 
-        await bot_data_ready(bot, notification_run_id, cache_output)
+        try:
+            await bot_data_ready(bot, notification_run_id, cache_output)
+        except NotificationTransitionFailed:
+            await _notification_intervention(user, notify_channel, notification_run_id)
+            raise
 
     if success_sql:
         # Keep a single stats refresh after the heavy UPDATE_ALL2 step
@@ -1009,6 +1032,8 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
                 )
         except Exception as exc:
             event(notification_run_id, "handoff", "held", "inspect_notification_journal", error=exc)
+            await _notification_intervention(user, notify_channel, notification_run_id)
+            raise
 
     await log_processing_result(
         bot,
