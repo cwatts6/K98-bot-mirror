@@ -89,7 +89,7 @@ def _env_list_int(name: str, default=None, strict: bool | None = None) -> list[i
                     msg = f"[CONFIG] {name} contains a non-integer entry (JSON): {s!r}"
                     if strict:
                         raise ValueError(msg)
-                    logger.warning(msg + " â€” skipping")
+                    logger.warning(msg + " — skipping")
             return out
         # if it's valid JSON but not a list, fall through to CSV handling
     except Exception:
@@ -108,7 +108,7 @@ def _env_list_int(name: str, default=None, strict: bool | None = None) -> list[i
             msg = f"[CONFIG] {name} contains a non-integer entry: {p!r}"
             if strict:
                 raise ValueError(msg)
-            logger.warning(msg + " â€” skipping")
+            logger.warning(msg + " — skipping")
 
     return out
 
