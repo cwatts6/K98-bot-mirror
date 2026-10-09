@@ -189,12 +189,35 @@ function Assert-Source($Pins,[string]$Head) {
   $null=Read-Bytes $path $p.Value 2MB
  }
 }
+function Assert-ParentSpelling([string]$RelativePath) {
+ $current=$c.root
+ $parts=$RelativePath.Split('/')
+ for($i=0;$i -lt $parts.Length-1;$i++) {
+  Assert-Protected $current
+  $next=Join-Path $current $parts[$i]
+  if(-not(Test-Path -LiteralPath $next -PathType Container)){return}
+  # Enumerate stored names: constructing DirectoryInfo from the requested path
+  # can preserve the caller's casing instead of the actual Windows spelling.
+  $found=$false;$count=0
+  foreach($directory in [IO.Directory]::EnumerateDirectories($current)) {
+   if(++$count -gt 10000){throw 'Directory spelling inventory exceeds bound'}
+   $name=[IO.Path]::GetFileName($directory)
+   if($name.Equals($parts[$i],[StringComparison]::OrdinalIgnoreCase)) {
+    if($name -cne $parts[$i]){throw ('Live parent spelling differs; reconcile before restart: '+$RelativePath)}
+    $found=$true;break
+   }
+  }
+  if(-not $found){throw 'Live parent changed during spelling check'}
+  $current=$next
+ }
+}
 function Assert-UpdatePaths {
  foreach($m in $c.source_members) {
   if($m.path -notmatch '^[A-Za-z0-9_ .()/+-]+$' -or $m.path -match '(^|/)[.]{1,2}(/|$)'){throw 'Unsafe source member path'}
   $path=[IO.Path]::GetFullPath((Join-Path $c.root $m.path))
   if(-not $path.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Source member escaped repository'}
   if($m.added -and (Test-Path -LiteralPath $path)){throw ('New tracked path already exists; reconcile before restart: '+$m.path)}
+  Assert-ParentSpelling $m.path
   # Walk to the existing parent for newly added paths. Check every ancestor
   # before stopping the bot; never infer parent type from PSIsContainer.
   $parent=Split-Path -Parent $path
