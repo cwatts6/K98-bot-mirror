@@ -30,6 +30,12 @@ Reject {Assert-UpdatePaths} ('*Protected owner differs: '+$deny+'*')
 $script:deny=''
 $c.source_members=@([pscustomobject]@{path='new/deep/file.py';deleted=$false;added=$true})
 Assert-UpdatePaths;$passed++
+$null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'corex'))
+[IO.File]::WriteAllText((Join-Path $fixture 'corex\note.txt'),'untracked fixture')
+$c.source_members=@([pscustomobject]@{path='CoreX/helper.py';deleted=$false;added=$true})
+Reject {Assert-UpdatePaths} '*Live parent spelling differs*'
+$c.source_members=@([pscustomobject]@{path='corex/helper.py';deleted=$false;added=$true})
+Assert-UpdatePaths;$passed++
 $c.source_members=@([pscustomobject]@{path='docs/reference/note.md';deleted=$false;added=$true})
 Reject {Assert-UpdatePaths} '*New tracked path already exists*'
 $c.source_members=@([pscustomobject]@{path='docs/reference';deleted=$false;added=$true})

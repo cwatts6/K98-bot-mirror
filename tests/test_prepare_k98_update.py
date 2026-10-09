@@ -399,6 +399,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
             tools,
         )
         package = Path(result["manifest"]).parent
+        assert not (package.parent / "inputs").exists()
         manifest_raw = Path(result["manifest"]).read_bytes()
         manifest = json.loads(manifest_raw)
         validate_manifest(manifest)

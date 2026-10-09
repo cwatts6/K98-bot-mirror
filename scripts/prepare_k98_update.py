@@ -291,12 +291,6 @@ def prepare_update(
     destination = Path(destination)
     mkdir, write = output_writers(config["sid"], secure_output=secure_output)
     mkdir(destination)
-    inputs = destination / "inputs"
-    mkdir(inputs)
-    for name, raw in files.items():
-        write(inputs / name, raw)
-    specification = inputs / "specification.json"
-    write(specification, encode(manifest))
     # Match the existing packager's exact canonical manifest protocol while
     # creating native administrative custody atomically, before any bytes exist.
     package = destination / "package"
