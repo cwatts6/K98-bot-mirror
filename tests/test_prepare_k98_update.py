@@ -5,6 +5,7 @@ from pathlib import PureWindowsPath
 import pytest
 
 from scripts.prepare_k98_update import (
+    TOOL_SOURCE_PATHS,
     check_source_only,
     ordinary_path,
     release_seed,
@@ -216,6 +217,55 @@ def test_ordinary_bot_and_queue_changes_remain_routine():
     check_source_only(
         ["DL_bot.py", "commands/kvk_admin.py", "services/legacy_export_snapshot_service.py"]
     )
+
+
+@pytest.mark.parametrize("path", sorted(TOOL_SOURCE_PATHS))
+@pytest.mark.parametrize("before_bytes", [None, b"old tool\n"])
+def test_exact_installed_tool_copy_can_be_added_or_updated(path, before_bytes):
+    reviewed = b"reviewed tool\n"
+    blobs = {
+        (BEFORE, "core/example.py"): b"old\n",
+        (AFTER, "core/example.py"): b"old\n",
+        (BEFORE, path): before_bytes,
+        (AFTER, path): reviewed,
+    }
+    plan, payload = source_plan(
+        inventory(b"old\n"),
+        BEFORE,
+        AFTER,
+        [path],
+        lambda *key: blobs.get(key),
+        tool_sources={path: reviewed},
+    )
+    assert payload[path] == reviewed
+    assert plan["source_members"][0]["added"] is (before_bytes is None)
+
+
+@pytest.mark.parametrize("target", [None, b"different target\n"])
+def test_tool_copy_exception_refuses_deletion_and_mismatch(target):
+    path = "scripts/prepare_k98_update.py"
+    with pytest.raises(ValueError, match="differs from the installed"):
+        source_plan(
+            {"AutomaticStartupPolicy.json": {"source_hashes": {}}},
+            BEFORE,
+            AFTER,
+            [path],
+            lambda commit, _: b"old" if commit == BEFORE else target,
+            tool_sources={path: b"reviewed\n"},
+        )
+
+
+def test_tool_exception_cannot_allow_startup_helper_changes():
+    path = "core/export_release_seed.py"
+    with pytest.raises(ValueError, match="non-routine"):
+        source_plan(
+            inventory(),
+            BEFORE,
+            AFTER,
+            [path],
+            lambda *_: pytest.fail("Read blob"),
+            tool_sources={path: b"reviewed\n"},
+        )
 
 
 def test_missing_diff_member_cannot_create_mixed_source_policy():
@@ -479,9 +529,16 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
             (str(index + 1) * 40, "DL_bot.py"): raw,
             (str(index + 2) * 40, "DL_bot.py"): content,
         }
+        # First rollout adds the externally installed tool; the next ordinary
+        # update retains it while still deriving a fresh seed and release ID.
+        for path in TOOL_SOURCE_PATHS:
+            tool_raw = (tools / Path(path).name).read_bytes()
+            blobs[str(index + 2) * 40, path] = tool_raw
+            if index:
+                blobs[str(index + 1) * 40, path] = tool_raw
         result = prepare_update(
             observation,
-            ["DL_bot.py"],
+            ["DL_bot.py", *(sorted(TOOL_SOURCE_PATHS) if not index else [])],
             lambda *key: blobs.get(key),
             tmp_path / f"update-{index}",
             tools,
@@ -527,6 +584,11 @@ def test_one_time_tool_installer_contains_complete_self_checked_payload(tmp_path
     }
     manifest = json.loads(payload.pop("update-tool.json"))
     assert set(manifest["files"]) == set(payload)
+    assert {Path(path).name for path in TOOL_SOURCE_PATHS} <= set(payload)
+    for path in TOOL_SOURCE_PATHS:
+        assert payload[Path(path).name] == (
+            Path(__file__).resolve().parents[1] / path
+        ).read_bytes().replace(b"\r\n", b"\n")
     for name, expected in manifest["files"].items():
         assert sha256(payload[name]) == expected
     assert result["production_changed"] is False

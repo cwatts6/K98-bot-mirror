@@ -157,7 +157,7 @@ try {
    # the live checkout. They can prepare the first release containing the tool.
    $toolManifest=Read-Json $toolManifestPath
    if($toolManifest.version -ne 1){throw 'Unsupported installed update tool'}
-   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','verify_k98_update_pair.py','EmptyGitConfig.txt')
+   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
    if(@($toolManifest.files.PSObject.Properties).Count -ne $required.Count){throw 'Exact update tool inventory required'}
    foreach($name in $required){$null=Read-Bytes (Join-Path $PSScriptRoot $name) $toolManifest.files.$name 2MB}
   } else {

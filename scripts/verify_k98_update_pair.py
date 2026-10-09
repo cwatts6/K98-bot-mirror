@@ -17,7 +17,7 @@ def read(path, expected=None, limit=1048576):
     with Path(path).open("rb") as stream:
         raw = stream.read(limit + 1)
     if not raw or len(raw) > limit:
-        raise ValueError("File exceeds verification bound")
+        raise ValueError("File is empty or exceeds verification bound")
     if expected is not None and hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError("Pinned bytes differ")
     return raw
