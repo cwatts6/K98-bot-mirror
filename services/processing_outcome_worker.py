@@ -4,16 +4,24 @@ import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+_failure_cursor = None
 
 
 def recover_failures():
+    global _failure_cursor
     from services.legacy_export_snapshot_service import caller_runtime
     from services.stats_import_outcome_service import outcome_dal, settle_known_failure
 
     with caller_runtime() as runtime:
         if runtime is None:
             return
-        for preparation_id in outcome_dal(runtime).pending_failures():
+        dal = outcome_dal(runtime)
+        scope = (dal.account, dal.storage_owner)
+        after = _failure_cursor[1] if _failure_cursor and _failure_cursor[0] == scope else None
+        for preparation_id in dal.pending_failures(after=after):
+            # Scheduling only: each settlement still revalidates exact SQL evidence.
+            # Advance before a held/error result so it cannot starve later receipts.
+            _failure_cursor = (scope, preparation_id)
             settle_known_failure(runtime, preparation_id)
 
 

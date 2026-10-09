@@ -175,15 +175,17 @@ class StatsImportOutcomeDAL:
                 explanation=explanation,
             )
 
-    def pending_failures(self, limit=16):
+    def pending_failures(self, limit=16, *, after=None):
         if type(limit) is not int or not 1 <= limit <= 32:
             raise ValueError("Bounded outcome discovery required.")
+        after = identity(after) if after is not None else None
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT TOP (?) e.PreparationID FROM dbo.StatsImportExecution e JOIN dbo.ExportPreparation p ON p.PreparationID=e.PreparationID WHERE e.Resolution IS NULL AND e.State IN ('prepared','rolled_back') AND p.State IN ('writing','uncertain') AND p.JobID IS NULL AND p.SpoolKey IS NULL AND p.AccountKey=? AND p.StorageOwner=? AND p.ConsumerKind='scan_data' ORDER BY e.UpdatedUTC,e.PreparationID",
+                "SELECT TOP (?) e.PreparationID FROM dbo.StatsImportExecution e JOIN dbo.ExportPreparation p ON p.PreparationID=e.PreparationID WHERE e.Resolution IS NULL AND e.State IN ('prepared','rolled_back') AND p.State IN ('writing','uncertain') AND p.JobID IS NULL AND p.SpoolKey IS NULL AND p.AccountKey=? AND p.StorageOwner=? AND p.ConsumerKind='scan_data' ORDER BY CASE WHEN e.PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,e.PreparationID",
                 limit,
                 self.account,
                 self.storage_owner,
+                after,
             )
             return [identity(r["PreparationID"]) for r in rows(cursor)]
 

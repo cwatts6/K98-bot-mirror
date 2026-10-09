@@ -25,8 +25,11 @@ It never repeats an import. A still-live writer can also finish a known complete
 SQL checkpoint/capture while it holds the original snapshot guard. Unknown capture
 or spool acknowledgments are retained.
 
-The observer checks at most 16 eligible receipts every 30 seconds. Restart resumes
-discovery; elapsed time and absence of a process never prove a SQL outcome.
+The observer checks at most 16 eligible receipts every 30 seconds, rotating by
+immutable preparation ID so held entries cannot starve later safe failures. The
+in-memory cursor resets on restart or account/storage change; it controls discovery
+order only and never authorizes settlement. Restart resumes discovery; elapsed
+time and absence of a process never prove a SQL outcome.
 Failed SQL skips cache rebuilding, maintenance, configuration import and export.
 Failed configuration import skips its dependent export. A failed ancillary
 notification cannot release or reacquire export ownership.
