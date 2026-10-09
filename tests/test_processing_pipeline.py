@@ -266,3 +266,50 @@ async def test_stats_ready_precedes_google_dependency_and_survives_its_failure(m
     assert stages.index("stats_ready") < stages.index("proc_import")
     assert result[2] is True and result[4] is False
     exporter.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_stage", ["readiness", "after_enqueue"])
+async def test_required_notification_failure_propagates_without_false_export_failure(
+    monkeypatch, failure_stage
+):
+    import processing_pipeline as pp
+    from services import processing_notification_service as core
+    from services.export_submission import ExportSubmission
+    from stats_alerts import processing_notifications as notifications
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    monkeypatch.setattr(
+        pp,
+        "run_stats_copy_archive",
+        AsyncMock(return_value=(True, "SQL", {"excel": True, "archive": True, "sql": True})),
+    )
+    monkeypatch.setattr(pp, "_run_proc_config_step", AsyncMock(return_value=(True, "config")))
+    failure = core.NotificationTransitionFailed("journal")
+    monkeypatch.setattr(
+        notifications,
+        "bot_data_ready",
+        AsyncMock(side_effect=failure if failure_stage == "readiness" else None),
+    )
+    monkeypatch.setattr(core, "patch_run", AsyncMock(side_effect=failure))
+    export = Mock(return_value=ExportSubmission("exact-job", "exact-preparation"))
+    monkeypatch.setattr(pp, "run_all_exports", export)
+    intervention, telemetry = AsyncMock(), Mock()
+    monkeypatch.setattr(pp, "_notification_intervention", intervention)
+    monkeypatch.setattr(pp, "emit_telemetry_event", telemetry)
+    with pytest.raises(core.NotificationTransitionFailed):
+        await pp.execute_processing_pipeline(
+            1,
+            seed=1,
+            user="operator",
+            filename="fixture.xlsx",
+            channel_id=0,
+            notification_run_id="exact-run",
+        )
+    intervention.assert_awaited_once()
+    assert intervention.call_args.args[2] == "exact-run"
+    assert export.call_count == (failure_stage == "after_enqueue")
+    assert not any(
+        c.args[0].get("event") == "run_all_exports" and c.args[0].get("status") == "failed"
+        for c in telemetry.call_args_list
+    )

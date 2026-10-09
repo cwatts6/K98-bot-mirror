@@ -7,6 +7,7 @@ import traceback
 from typing import Literal
 
 from services.legacy_export_snapshot_service import bound_runtime, collect_producer_captures
+from services.processing_notification_service import NotificationTransitionFailed
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -438,7 +439,6 @@ async def execute_processing_pipeline(
         except Exception:
             logger.exception("[CACHE] Auxiliary cache refresh failed")
     if notification_run_id:
-        from services.processing_notification_service import NotificationTransitionFailed
         from stats_alerts.processing_notifications import bot_data_ready
 
         try:
@@ -782,6 +782,10 @@ async def execute_processing_pipeline(
             success_export, out_export = False, "Export timed out (see logs)."
     except asyncio.CancelledError:
         # Propagate cancellation so shutdown is responsive
+        raise
+    except NotificationTransitionFailed:
+        # Enqueue may already have succeeded. A journal error is not an export failure.
+        await _notification_intervention(user, notify_channel, notification_run_id)
         raise
     except Exception as exc:
         logger.exception("[EXPORT] Unhandled error during run_all_exports")
