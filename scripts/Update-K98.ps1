@@ -64,11 +64,8 @@ try {
   } else {
    $savedManifest=Read-Json $prepared.manifest $prepared.manifest_sha256
    $savedPolicy=Read-Json $savedManifest.policy.path $savedManifest.policy.sha256
-   $request=Join-Path $savedPolicy.state_directory 'deployment-request.json'
-   $drained=Join-Path $savedPolicy.state_directory ('deployment-drained-'+$savedManifest.release_id+'.json')
-   $receipts=Join-Path (Join-Path $savedPolicy.state_directory ('release-'+$savedManifest.release_id)) '.receipts'
-   if(-not(Test-Path -LiteralPath $request) -and -not(Test-Path -LiteralPath $drained) -and -not(Test-Path -LiteralPath $receipts)) {
-    # Preparation and preflight have not crossed the durable deployment request.
+   if(Test-UpdateCanRefresh $savedPolicy.state_directory $savedManifest.release_id -PrepareOnly:$PrepareOnly) {
+    # Preparation has not crossed durable staging or deployment intent.
     # Refresh observations automatically: a normal restart since PrepareOnly
     # must not strand the operator with a stale native process/session binding.
     # Retain the unused package; remove only its active pointer.

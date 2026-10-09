@@ -189,6 +189,17 @@ function Assert-Source($Pins,[string]$Head) {
   $null=Read-Bytes $path $p.Value 2MB
  }
 }
+function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly) {
+ # Staging precedes task disablement. Its presence is sufficient to retain
+ # same-release ownership even when the request/receipt was never written.
+ foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'),('release-'+$ReleaseId))) {
+  if(Test-Path -LiteralPath (Join-Path $StateDirectory $name)) {
+   if($PrepareOnly){throw 'Deployment already staged or requested; rerun Update-K98.ps1 without -PrepareOnly to resume the same release.'}
+   return $false
+  }
+ }
+ return $true
+}
 function Assert-ParentSpelling([string]$RelativePath) {
  $current=$c.root
  $parts=$RelativePath.Split('/')

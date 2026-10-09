@@ -298,7 +298,6 @@ def prepare_update(
     config["old_pins"] = previous["AutomaticStartupPolicy.json"]["source_hashes"]
     config["flags"] = previous["AutomaticStartupPolicy.json"]["flags"]
     files = dict(seed)
-    tools = Path(tool_directory)
     files["Release-Step.ps1"] = (tools / "K98-SourceUpdate.ps1").read_bytes()
     files["Verify-NewPair.py"] = (tools / "verify_k98_update_pair.py").read_bytes()
     files["EmptyGitConfig.txt"] = b""
