@@ -209,11 +209,19 @@ def release_seed(previous, pins, gate):
     gate = gate.replace(old_directory, new_directory).replace(
         old_hash, sha256(payload["AutomaticStartupPolicy.json"])
     )
+    replacements = {}
     for path, old_digest in old["source_hashes"].items():
         if old_digest in gate:
             if path not in pins:
                 raise ValueError("Launch-gate source member cannot be removed by a routine update.")
-            gate = gate.replace(old_digest, pins[path])
+            if replacements.setdefault(old_digest, pins[path]) != pins[path]:
+                raise ValueError(
+                    "Ambiguous launch-gate source hashes require a non-routine release."
+                )
+    if replacements:
+        # Match the original text once: a replacement digest can itself be a
+        # different predecessor digest and must never be rewritten again.
+        gate = re.sub("|".join(map(re.escape, replacements)), lambda m: replacements[m[0]], gate)
     payload["Start-ReviewedAutomaticStartup.ps1"] = gate.encode("utf-8")
     return payload
 

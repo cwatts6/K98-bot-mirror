@@ -425,7 +425,7 @@ try {
    throw 'Unrecognized source outcome'
   }
   'ApplySource' {
-   Assert-Drained;Assert-Source $c.old_pins $c.before;Assert-UpdatePaths;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path $true
+   Assert-Drained;Assert-Source $c.old_pins $c.before;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path $true
    Assert-UpdatePaths
    Prepare-SourceParents
    if((Git 'rev-parse refs/remotes/origin/main') -cne $c.target){throw 'Acquired private-main target changed'}

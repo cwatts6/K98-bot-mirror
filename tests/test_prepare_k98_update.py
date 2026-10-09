@@ -353,6 +353,35 @@ def test_two_successor_seeds_rebind_gate_without_reusing_release_identity(tmp_pa
     assert len(histories) == 3
 
 
+@pytest.mark.parametrize("scenario", ["ambiguous", "same", "cascade", "removed"])
+def test_gate_digest_bindings_do_not_alias_or_cascade(tmp_path, monkeypatch, scenario):
+    original = predecessor(tmp_path, monkeypatch)
+    policy = original["AutomaticStartupPolicy.json"]
+    gate = f"$policy='{PureWindowsPath(policy['seed_plan']['path'])}'\n$policyHash='{sha256(encode(policy))}'\n"
+    old_pins = {
+        "DL_bot.py": "a" * 64,
+        "core/other.py": ("b" if scenario == "cascade" else "a") * 64,
+    }
+    first = release_seed(original, old_pins, gate)
+    gate = first.pop("Start-ReviewedAutomaticStartup.ps1").decode()
+    previous = {name: json.loads(raw) for name, raw in first.items()}
+    gate += "\n".join(f"# {path}={digest}" for path, digest in old_pins.items())
+    pins = {"DL_bot.py": "b" * 64, "core/other.py": "c" * 64}
+    if scenario == "same":
+        pins["core/other.py"] = "b" * 64
+    elif scenario == "ambiguous":
+        pins["core/other.py"] = "a" * 64
+    elif scenario == "removed":
+        del pins["core/other.py"]
+    if scenario in {"ambiguous", "removed"}:
+        with pytest.raises(ValueError, match=r"launch-gate|Launch-gate"):
+            release_seed(previous, pins, gate)
+    else:
+        result = release_seed(previous, pins, gate)["Start-ReviewedAutomaticStartup.ps1"].decode()
+        for path, digest in pins.items():
+            assert f"# {path}={digest}" in result
+
+
 def test_seed_preparation_refuses_unbound_gate(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="gate"):
         release_seed(
