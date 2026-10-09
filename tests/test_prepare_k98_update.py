@@ -445,6 +445,66 @@ def test_one_time_tool_installer_contains_complete_self_checked_payload(tmp_path
         package(tmp_path)
 
 
+@pytest.mark.parametrize(
+    "extra", [None, "core/local.py", "core/helper.pyd", "core/__pycache__/note.txt"]
+)
+def test_live_preflight_uses_complete_production_bootstrap_inventory(tmp_path, monkeypatch, extra):
+    from pathlib import Path
+    import runpy
+    import sys
+    from types import SimpleNamespace
+
+    from scripts import verify_k98_update_pair as verifier
+
+    original_run = runpy.run_path
+    bootstrap_path = Path(__file__).resolve().parents[1] / "scripts/run_export_authority.py"
+    authority = original_run(str(bootstrap_path))
+    runtime = tmp_path / "scripts/run_export_authority.py"
+    runtime.parent.mkdir()
+    runtime.write_bytes(bootstrap_path.read_bytes())
+    core = tmp_path / "core/known.py"
+    core.parent.mkdir()
+    core.write_bytes(b"pass\n")
+    pins = {
+        path.relative_to(tmp_path).as_posix(): sha256(path.read_bytes()) for path in (runtime, core)
+    }
+    policy = {"source_hashes": pins, "flags": {"intake": False, "recovery": False}}
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_bytes(encode(policy))
+    config = {
+        "root": str(tmp_path),
+        "old_policy": {"Path": str(policy_path), "SHA256": sha256(encode(policy))},
+        "old_pins": pins,
+        "flags": policy["flags"],
+    }
+    if extra:
+        extra_path = tmp_path / extra
+        extra_path.parent.mkdir(exist_ok=True)
+        extra_path.write_bytes(b"untracked")
+    inspected = []
+
+    def inspect(path, **_kwargs):
+        inspected.append(Path(path))
+        return Path(path)
+
+    def bootstrap(path, **kwargs):
+        return authority["bootstrap"](path, inspect_path=inspect, **kwargs)
+
+    # Substitute native ACL inspection only; run the actual production bootstrap
+    # enumeration, forbidden-artifact, exact-set and source-hash checks.
+    monkeypatch.setattr(verifier.runpy, "run_path", lambda path: {"bootstrap": bootstrap})
+    with monkeypatch.context() as state:
+        state.setattr(sys, "flags", SimpleNamespace(isolated=True))
+        state.setattr(sys, "path", list(sys.path))
+        state.setattr(sys, "dont_write_bytecode", sys.dont_write_bytecode)
+        if extra:
+            with pytest.raises(authority["AuthorityStartupError"]):
+                verifier.verify_live_source(config, predecessor=True)
+        else:
+            assert verifier.verify_live_source(config, predecessor=True) == policy
+    assert core.parent in inspected
+
+
 def test_installer_ignores_inherited_user_module_search(tmp_path):
     import os
     from pathlib import Path

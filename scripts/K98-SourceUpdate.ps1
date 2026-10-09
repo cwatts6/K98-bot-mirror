@@ -315,13 +315,15 @@ function Seed-Complete {
  $null=Assert-Task $newGate
  return $true
 }
-function Verify-Native {
+function Verify-Native([switch]$Preflight) {
  $member=@($c.extra_members | Where-Object {$_.name -ceq 'Verify-NewPair.py'})
  if($member.Count -ne 1){throw 'Native verifier not sealed'}
  $script=Join-Path $PSScriptRoot $member[0].name
  $null=Read-Bytes $script $member[0].sha256
  $null=Read-Bytes $c.venv.path $c.venv.sha256 4MB
- & $c.venv.path -I -B $script --bindings (Join-Path $PSScriptRoot 'ReleaseBindings.json') --sha256 $ExpectedBindingsSHA256 | Out-Host
+ $verifyArguments=@('-I','-B',$script,'--bindings',(Join-Path $PSScriptRoot 'ReleaseBindings.json'),'--sha256',$ExpectedBindingsSHA256)
+ if($Preflight){$verifyArguments+='--preflight'}
+ & $c.venv.path @verifyArguments | Out-Host
  if($LASTEXITCODE -ne 0){throw 'New native publication not verified'}
 }
 function New-Journal {
@@ -385,7 +387,7 @@ try {
    Assert-Predecessor
    if(Test-Path -LiteralPath $drainPath){Assert-Drained -SuccessorRunning:(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json'));exit 0}
    Assert-Held
-   Assert-Source $c.old_pins $c.before;Assert-UpdatePaths;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path
+   Assert-Source $c.old_pins $c.before;Assert-UpdatePaths;Verify-Native -Preflight;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path
    & $c.venv.path -I -B -c 'import win32file, win32api, win32security' | Out-Host
    if($LASTEXITCODE -ne 0){throw 'Installed venv native dependencies unavailable; bot remains running'}
    if((Test-Path -LiteralPath $c.new_seed_directory) -or (Test-Path -LiteralPath $c.new_state_directory)){throw 'Successor state already exists without drain receipt'}
