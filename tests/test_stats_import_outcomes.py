@@ -235,3 +235,68 @@ def test_registration_uses_output_acknowledgment_when_nocount_is_on(monkeypatch)
     cursor.fetchone.return_value = None
     with pytest.raises(SourceConflict):
         dal.prepare(claim, "stats_" + uuid4().hex + ".ready.csv")
+
+
+@pytest.mark.parametrize(
+    "observation", ["prepared", "absent", "unavailable", "wrong_owner", "running"]
+)
+def test_lost_registration_ack_is_reconciled_without_reinserting(monkeypatch, observation):
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from services import legacy_export_snapshot_service as snapshots
+
+    prep, owner_id = str(uuid4()), str(uuid4())
+    filename = "stats_" + uuid4().hex + ".ready.csv"
+    owner = SimpleNamespace(
+        stats_execution_registered=False,
+        claim=SimpleNamespace(preparation_id=prep, owner=owner_id, fence=3),
+    )
+    dal = Mock()
+    dal.prepare.side_effect = UncertainCommit("acknowledgment lost")
+    evidence = dict(
+        PreparationID=prep,
+        OwnerID=owner_id,
+        Fence=3,
+        CompletedFileName=filename,
+        State="prepared",
+        Resolution=None,
+    )
+    if observation == "absent":
+        evidence = None
+    elif observation == "unavailable":
+        dal.read.side_effect = TimeoutError("database unavailable")
+    elif observation == "wrong_owner":
+        evidence["OwnerID"] = str(uuid4())
+    elif observation == "running":
+        evidence["State"] = "running"
+    dal.read.return_value = evidence
+    monkeypatch.setattr(snapshots, "current_owner", lambda: owner)
+    monkeypatch.setattr(snapshots, "require_runtime", lambda: object())
+    monkeypatch.setattr(service, "outcome_dal", lambda _: dal)
+    if observation == "prepared":
+        assert service.register_execution(filename) == prep
+    else:
+        with pytest.raises((UncertainCommit, TimeoutError, SourceConflict)):
+            service.register_execution(filename)
+    assert owner.stats_execution_registered is (observation != "absent")
+    dal.prepare.assert_called_once()
+    dal.read.assert_called_once_with(prep)
+
+
+def test_uncertain_registration_cannot_use_unregistered_cleanup(tmp_path):
+    from services import legacy_export_snapshot_service as snapshots
+    from tests.test_legacy_export_snapshot import producer_runtime
+
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"scan_data": dict(consumer="scan_data", destinations=["file-a"])}
+    )
+    with snapshots.use_runtime(runtime):
+        owner = runtime.begin_writer("scan_data")
+        owner.stats_import_context = True
+        owner.stats_execution_registered = True
+        calls_before = list(dal.transition.call_args_list)
+        try:
+            with pytest.raises(snapshots.SnapshotUnavailable, match="unstarted"):
+                runtime.unstarted_stats_writer(owner)
+            assert dal.transition.call_args_list == calls_before
+        finally:
+            runtime._close_writer(owner)

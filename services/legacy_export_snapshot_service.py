@@ -869,6 +869,7 @@ class LegacyExportRuntime:
             or owner.kind != "scan_data"
             or not owner.stats_import_context
             or owner.stats_execution_dispatched
+            or owner.stats_execution_registered
             or owner.completion is not None
         ):
             raise SnapshotUnavailable("Exact live unstarted stats invocation required.")

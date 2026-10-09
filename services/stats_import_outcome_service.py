@@ -3,7 +3,7 @@
 import json
 import logging
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit
 from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def event(preparation_id, stage, outcome, *, action, error=None, **facts):
 
 
 def settle_known_failure(runtime, preparation_id):
-    """Only a durable rolled-back receipt admits unattended release; never replay."""
+    """Only a proven unstarted/rolled-back receipt admits release; never replay."""
     dal = outcome_dal(runtime)
     try:
         preview = dal.inspect(preparation_id)
@@ -89,7 +89,35 @@ def register_execution(completed_filename):
     owner = current_owner()
     if owner is None:
         return None
-    outcome_dal(require_runtime()).prepare(owner.claim, completed_filename)
+    dal = outcome_dal(require_runtime())
+    try:
+        dal.prepare(owner.claim, completed_filename)
+    except UncertainCommit as exc:
+        # A lost INSERT commit acknowledgment is not proof of no registration.
+        # Keep cleanup on the evidence-based path unless a fresh read proves absence.
+        owner.stats_execution_registered = True
+        event(
+            owner.claim.preparation_id,
+            "execution_registration",
+            "held",
+            action="read_exact_receipt_before_dispatch",
+            error=exc,
+        )
+        evidence = dal.read(owner.claim.preparation_id)
+        if evidence is None:
+            owner.stats_execution_registered = False
+            raise
+        if (
+            str(evidence["PreparationID"]).lower() != owner.claim.preparation_id
+            or str(evidence["OwnerID"]).lower() != owner.claim.owner
+            or evidence["Fence"] != owner.claim.fence
+            or evidence["CompletedFileName"] != completed_filename
+            or evidence["State"] != "prepared"
+            or evidence["Resolution"] is not None
+        ):
+            raise SourceConflict(
+                "Uncertain registration differs from this exact unstarted import."
+            ) from exc
     owner.stats_execution_registered = True
     event(owner.claim.preparation_id, "execution_registration", "prepared", action="execute once")
     return owner.claim.preparation_id
