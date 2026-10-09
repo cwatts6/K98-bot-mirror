@@ -580,62 +580,148 @@ async def execute_processing_pipeline(
     if success_sql:
         logger.info("🛠️ Running ProcConfig import after confirmed SQL import")
 
-        # Only do the headroom wait if the SQL step actually ran (major writes)
-        if success_sql:
+        try:
+            # Ensure log headroom (auto-trigger + bounded wait if LOG_BACKUP)
+            # Use run_step to offload sync preflight to a thread for consistent telemetry
+            await asyncio.wait_for(
+                run_step(
+                    preflight_from_env_sync,
+                    server=os.environ.get("SQL_SERVER") or SERVER,
+                    database=os.environ.get("SQL_DATABASE") or DATABASE,
+                    username=os.environ.get("SQL_USERNAME") or USERNAME,
+                    password=os.environ.get("SQL_PASSWORD") or PASSWORD,
+                    warn_threshold=85.0,
+                    abort_threshold=95.0,
+                    wait_on_log_backup=True,
+                    max_wait_seconds=150,
+                    poll_interval_seconds=5.0,
+                    offload_sync_to_thread=True,
+                    name="preflight_from_env_sync",
+                    meta=step_meta,
+                ),
+                timeout=180.0,
+            )
+        except LogHeadroomError as e:
+            logger.warning("[PROC_IMPORT] Skipping ProcConfig import: %s", e)
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (SQL log not ready)", "Details": str(e)},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
+        except TimeoutError:
+            # Offloaded preflight thread may still run; mark telemetry so ops can inspect.
+            logger.exception("[PROC_IMPORT] preflight timed out; skipping ProcConfig import")
+            emit_telemetry_event(
+                {"event": "proc_import_preflight", "status": "timeout", "filename": filename}
+            )
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (preflight timeout)"},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("[PROC_IMPORT] preflight_from_env_sync failed (treating as skip)")
+            emit_telemetry_event(
+                {
+                    "event": "proc_import_preflight",
+                    "status": "failed",
+                    "filename": filename,
+                    "error_type": type(exc).__name__,
+                    "traceback": traceback.format_exc()[:2000],
+                }
+            )
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (preflight error)"},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
+        else:
             try:
-                # Ensure log headroom (auto-trigger + bounded wait if LOG_BACKUP)
-                # Use run_step to offload sync preflight to a thread for consistent telemetry
-                await asyncio.wait_for(
-                    run_step(
-                        preflight_from_env_sync,
-                        server=os.environ.get("SQL_SERVER") or SERVER,
-                        database=os.environ.get("SQL_DATABASE") or DATABASE,
-                        username=os.environ.get("SQL_USERNAME") or USERNAME,
-                        password=os.environ.get("SQL_PASSWORD") or PASSWORD,
-                        warn_threshold=85.0,
-                        abort_threshold=95.0,
-                        wait_on_log_backup=True,
-                        max_wait_seconds=150,
-                        poll_interval_seconds=5.0,
-                        offload_sync_to_thread=True,
-                        name="preflight_from_env_sync",
-                        meta=step_meta,
-                    ),
-                    timeout=180.0,
-                )
-            except LogHeadroomError as e:
-                logger.warning("[PROC_IMPORT] Skipping ProcConfig import: %s", e)
-                success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (SQL log not ready)", "Details": str(e)},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
-            except TimeoutError:
-                # Offloaded preflight thread may still run; mark telemetry so ops can inspect.
-                logger.exception("[PROC_IMPORT] preflight timed out; skipping ProcConfig import")
-                emit_telemetry_event(
-                    {"event": "proc_import_preflight", "status": "timeout", "filename": filename}
-                )
-                success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (preflight timeout)"},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
+                ok, out = await _run_proc_config_step(step_meta)
+                success_proc_import = bool(ok)
+                if not ok:
+                    out_text = _safe_trim(out, 4000)
+                    logger.exception("[PROC_IMPORT] proc_import failed: %s", out_text)
+
+                    # Detect possible orphaned offload (subprocess timeout) by inspecting output
+                    orphan_possible = False
+                    try:
+                        if isinstance(out, str) and (
+                            "timed out" in out.lower() or "timeout" in out.lower()
+                        ):
+                            orphan_possible = True
+                    except Exception:
+                        orphan_possible = False
+
+                    telemetry_payload = {
+                        "event": "proc_import",
+                        "status": "failed",
+                        "filename": filename,
+                        "detail": _safe_trim(out, 2000),
+                    }
+                    if orphan_possible:
+                        # Attempt to find offload by meta to provide offload id/pid to operators
+                        try:
+                            off = find_offload_by_meta(step_meta)
+                            telemetry_payload["orphaned_offload_possible"] = True
+                            telemetry_payload["offload_id"] = off.get("offload_id") if off else None
+                            telemetry_payload["pid"] = off.get("pid") if off else None
+                        except Exception:
+                            telemetry_payload["orphaned_offload_possible"] = True
+                            telemetry_payload["offload_id"] = None
+                            telemetry_payload["pid"] = None
+                    else:
+                        telemetry_payload["orphaned_offload_possible"] = False
+
+                    emit_telemetry_event(telemetry_payload)
+
+                    # If orphan suspected, include in status embed for admins
+                    if telemetry_payload.get("orphaned_offload_possible"):
+                        off_text = f"id={telemetry_payload.get('offload_id') or 'unknown'} pid={telemetry_payload.get('pid') or 'unknown'}"
+                        await send_status_embed(
+                            "🛠️ ProcConfig Import",
+                            {
+                                "Status": "Failed (offload may be orphaned)",
+                                "Offload": off_text,
+                                "Log": _safe_trim(out, _EMBED_LOG_TRIM),
+                            },
+                            False,
+                            user,
+                            notify_channel,
+                            context_field=context_field,
+                        )
+                    else:
+                        emit_telemetry_event(
+                            {
+                                "event": "proc_import",
+                                "status": "failed",
+                                "filename": filename,
+                                "detail": _safe_trim(out, 2000),
+                            }
+                        )
+                else:
+                    logger.info("[PROC_IMPORT] proc_import completed")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.exception("[PROC_IMPORT] preflight_from_env_sync failed (treating as skip)")
+                logger.exception("[PROC_IMPORT] Unhandled error during run_proc_config_import")
                 emit_telemetry_event(
                     {
-                        "event": "proc_import_preflight",
+                        "event": "proc_import",
                         "status": "failed",
                         "filename": filename,
                         "error_type": type(exc).__name__,
@@ -643,105 +729,15 @@ async def execute_processing_pipeline(
                     }
                 )
                 success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (preflight error)"},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
-            else:
-                try:
-                    ok, out = await _run_proc_config_step(step_meta)
-                    success_proc_import = bool(ok)
-                    if not ok:
-                        out_text = _safe_trim(out, 4000)
-                        logger.exception("[PROC_IMPORT] proc_import failed: %s", out_text)
 
-                        # Detect possible orphaned offload (subprocess timeout) by inspecting output
-                        orphan_possible = False
-                        try:
-                            if isinstance(out, str) and (
-                                "timed out" in out.lower() or "timeout" in out.lower()
-                            ):
-                                orphan_possible = True
-                        except Exception:
-                            orphan_possible = False
-
-                        telemetry_payload = {
-                            "event": "proc_import",
-                            "status": "failed",
-                            "filename": filename,
-                            "detail": _safe_trim(out, 2000),
-                        }
-                        if orphan_possible:
-                            # Attempt to find offload by meta to provide offload id/pid to operators
-                            try:
-                                off = find_offload_by_meta(step_meta)
-                                telemetry_payload["orphaned_offload_possible"] = True
-                                telemetry_payload["offload_id"] = (
-                                    off.get("offload_id") if off else None
-                                )
-                                telemetry_payload["pid"] = off.get("pid") if off else None
-                            except Exception:
-                                telemetry_payload["orphaned_offload_possible"] = True
-                                telemetry_payload["offload_id"] = None
-                                telemetry_payload["pid"] = None
-                        else:
-                            telemetry_payload["orphaned_offload_possible"] = False
-
-                        emit_telemetry_event(telemetry_payload)
-
-                        # If orphan suspected, include in status embed for admins
-                        if telemetry_payload.get("orphaned_offload_possible"):
-                            off_text = f"id={telemetry_payload.get('offload_id') or 'unknown'} pid={telemetry_payload.get('pid') or 'unknown'}"
-                            await send_status_embed(
-                                "🛠️ ProcConfig Import",
-                                {
-                                    "Status": "Failed (offload may be orphaned)",
-                                    "Offload": off_text,
-                                    "Log": _safe_trim(out, _EMBED_LOG_TRIM),
-                                },
-                                False,
-                                user,
-                                notify_channel,
-                                context_field=context_field,
-                            )
-                        else:
-                            emit_telemetry_event(
-                                {
-                                    "event": "proc_import",
-                                    "status": "failed",
-                                    "filename": filename,
-                                    "detail": _safe_trim(out, 2000),
-                                }
-                            )
-                    else:
-                        logger.info("[PROC_IMPORT] proc_import completed")
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    logger.exception("[PROC_IMPORT] Unhandled error during run_proc_config_import")
-                    emit_telemetry_event(
-                        {
-                            "event": "proc_import",
-                            "status": "failed",
-                            "filename": filename,
-                            "error_type": type(exc).__name__,
-                            "traceback": traceback.format_exc()[:2000],
-                        }
-                    )
-                    success_proc_import = False
-
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Completed" if success_proc_import else "Failed"},
-                    success_proc_import is True,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Completed" if success_proc_import else "Failed"},
+                success_proc_import is True,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
     if success_proc_import is not True:
         logger.warning(
             "processing_pipeline_stopped stage=proc_config outcome=failed_or_unproven "
