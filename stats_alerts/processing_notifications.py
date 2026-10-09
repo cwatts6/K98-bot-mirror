@@ -257,6 +257,7 @@ async def update_queue(bot, row):
 
     changed = False
     async with live_queue_lock:
+        row = await drain_thread(notification_store().get, row["run_id"])
         for job in live_queue["jobs"]:
             if job.get("processing_run_id") == row["run_id"]:
                 status = f"Stats: {row['stats']}; Sheets: {row['sheets']}"

@@ -1076,7 +1076,13 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
                 if notification_run_id
                 else job["filename"] == filename and job["user"] == str(message.author)
             ):
-                job["status"] = f"{status_icon} {timestamp}"
+                if notification_run_id:
+                    # Read inside the queue lock so a completed observer cannot be
+                    # overwritten by this caller's earlier pending submission result.
+                    latest = await drain_thread(notification_store().get, notification_run_id)
+                    job["status"] = f"Stats: {latest['stats']}; Sheets: {latest['sheets']}"
+                else:
+                    job["status"] = f"{status_icon} {timestamp}"
                 break
         live_queue["jobs"] = live_queue["jobs"][-5:]
     await update_live_queue_embed(bot, NOTIFY_CHANNEL_ID)

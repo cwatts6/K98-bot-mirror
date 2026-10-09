@@ -84,8 +84,9 @@ async def test_registration_failure_stops_before_prompt_or_import(monkeypatch, r
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("handoff_error", [False, True])
+@pytest.mark.parametrize("observer_finished", [False, True])
 async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
-    journal, monkeypatch, handoff_error
+    journal, monkeypatch, handoff_error, observer_finished
 ):
     import bot_config
     import processing_pipeline as pipeline
@@ -117,10 +118,31 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
         ]
     }
     monkeypatch.setattr(pipeline, "live_queue", queue)
+    if observer_finished:
+
+        async def finish_observer(*args, **kwargs):
+            import time
+
+            for run_id in run_ids:
+                if journal.get(run_id).get("handoff"):
+                    journal.patch(run_id, sheets="confirmed", closed=True, completed_at=time.time())
+
+        monkeypatch.setattr(
+            pipeline, "log_processing_result", AsyncMock(side_effect=finish_observer)
+        )
     monkeypatch.setattr(
         pipeline,
         "execute_processing_pipeline",
-        AsyncMock(return_value=(True, True, True, False, True, "submission acknowledgment lost")),
+        AsyncMock(
+            return_value=(
+                True,
+                True,
+                True,
+                "pending" if observer_finished else False,
+                True,
+                "submission outcome",
+            )
+        ),
     )
     message = SimpleNamespace(id=123, channel=SimpleNamespace(id=987), author="uploader")
     for name in ("first.xlsx", "second.xlsx"):
@@ -143,9 +165,11 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
         return
     for run_id in run_ids:
         row = journal.get(run_id)
-        assert row["sheets"] == "uncertain"
+        assert row["sheets"] == ("confirmed" if observer_finished else "uncertain")
         assert row["handoff"] and row["stats"] == "ready"
         assert row["completed_at"] >= row["created"]
+    if observer_finished:
+        assert all("Sheets: confirmed" in job["status"] for job in queue["jobs"])
 
 
 @pytest.mark.parametrize("terminal", ["confirmed", "failed", "cancelled"])
