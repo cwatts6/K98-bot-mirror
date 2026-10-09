@@ -56,6 +56,10 @@ def check_source_only(paths):
     for path in paths:
         ordinary_path(path)
         lower = path.casefold()
+        if "__pycache__" in lower.split("/") or lower.endswith(
+            (".pyw", ".pyc", ".pyd", ".pyo", ".so")
+        ):
+            raise ValueError(f"Release includes a bootstrap-forbidden import artifact: {path}")
         if lower.startswith(
             ("requirements", "sql/", "migrations/", "config/", ".env")
         ) or lower in {"pyproject.toml", "poetry.lock", "uv.lock", "pipfile", "pipfile.lock"}:

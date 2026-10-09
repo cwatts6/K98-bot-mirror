@@ -30,7 +30,6 @@ AFTER = "b" * 40
         "nested/docs/helper.py",
         "nested/tests/helper.py",
         "nested/.hidden/helper.py",
-        "nested/__pycache__/helper.py",
         "Assets/helper.py",
         "core/HELPER.PY",
         "nested/venv/helper.py",
@@ -132,6 +131,28 @@ def test_windows_path_ambiguity_is_refused(path):
 def test_non_source_updates_cannot_silently_enter_routine_mode(path):
     with pytest.raises(ValueError, match="non-source"):
         check_source_only([path])
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "core/helper.pyw",
+        "core/helper.pyc",
+        "core/helper.pyd",
+        "core/helper.pyo",
+        "core/helper.so",
+        "core/helper.PYD",
+        "core/__pycache__/helper.py",
+        "core/__pycache__/note.txt",
+        "__pycache__/note.txt",
+    ],
+)
+def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
+    def forbidden_read(*_):
+        pytest.fail("Forbidden release reached source preparation")
+
+    with pytest.raises(ValueError, match="bootstrap-forbidden"):
+        source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
 
 
 def test_missing_diff_member_cannot_create_mixed_source_policy():
