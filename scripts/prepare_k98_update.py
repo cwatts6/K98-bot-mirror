@@ -56,6 +56,10 @@ def check_source_only(paths):
     for path in paths:
         ordinary_path(path)
         lower = path.casefold()
+        # The installed preparer uses the predecessor inventory rules. A new
+        # enumerator requires a coordinated tooling/contract release instead.
+        if lower == "scripts/run_export_authority.py":
+            raise ValueError(f"Bootstrap contract change requires a non-routine release: {path}")
         if "__pycache__" in lower.split("/") or lower.endswith(
             (".pyw", ".pyc", ".pyd", ".pyo", ".so")
         ):
