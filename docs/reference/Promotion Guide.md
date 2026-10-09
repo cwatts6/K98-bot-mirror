@@ -209,6 +209,9 @@ the live checkout first. This installation is not repeated for ordinary releases
 Normal bot and SQL changes go through their Git repositories and review first.
 The source-only updater selects private `K98-bot/main`; it does not deploy mirror
 history, uncommitted live edits, dependencies, configuration or SQL migrations.
+Changes to `scripts/run_export_authority.py` also require a coordinated non-routine
+release: the installed preparer must agree with the successor bootstrap inventory
+rules. Routine preparation rejects such changes before requesting a drain.
 A release requiring SQL uses explicit reviewed migration IDs and the correct
 SQL-before-bot order where needed, with outcome receipts and no blind replay.
 

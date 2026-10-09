@@ -159,6 +159,17 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
 
 
+@pytest.mark.parametrize(
+    "path", ["scripts/run_export_authority.py", "Scripts/RUN_EXPORT_AUTHORITY.PY"]
+)
+def test_bootstrap_contract_changes_are_rejected_before_blob_reads(path):
+    def forbidden_read(*_):
+        pytest.fail("Bootstrap contract change reached source preparation")
+
+    with pytest.raises(ValueError, match=r"Bootstrap contract change.*non-routine"):
+        source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
+
+
 def test_missing_diff_member_cannot_create_mixed_source_policy():
     blobs = {
         (BEFORE, "core/example.py"): b"old\n",
