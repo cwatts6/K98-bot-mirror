@@ -12,6 +12,16 @@ function Check([bool]$value,[string]$message){if(-not $value){throw $message};$s
 function Reject([scriptblock]$call,[string]$pattern){try{& $call;throw 'TEST_DID_NOT_REJECT'}catch{if($_.Exception.Message -notlike $pattern){throw};$script:passed++}}
 $fixture=Join-Path (Split-Path -Parent $PSScriptRoot) ('.codex_artifacts\update-test-'+[guid]::NewGuid().ToString('N'))
 $null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'docs\reference'))
+Check (Test-UpdateCanRefresh $fixture 'no-deployment' -PrepareOnly) 'Unstaged preparation must remain refreshable'
+foreach($marker in @('deployment-request.json','deployment-drained-test.json','release-test')) {
+ $state=Join-Path $fixture ([guid]::NewGuid().ToString('N'))
+ $null=[IO.Directory]::CreateDirectory($state)
+ $path=Join-Path $state $marker
+ if($marker -eq 'release-test'){$null=[IO.Directory]::CreateDirectory($path)}else{[IO.File]::WriteAllText($path,'{}')}
+ Check (-not(Test-UpdateCanRefresh $state 'test')) 'Started deployment must retain its active release'
+ Reject {Test-UpdateCanRefresh $state 'test' -PrepareOnly} '*without -PrepareOnly*'
+ Check (Test-Path -LiteralPath $path) 'Resume classification must preserve existing evidence'
+}
 $file=Join-Path $fixture 'docs\reference\note.md'
 [IO.File]::WriteAllText($file,'fixture')
 $trusted=[Security.AccessControl.DirectorySecurity]::new()
