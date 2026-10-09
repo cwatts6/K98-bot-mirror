@@ -455,6 +455,7 @@ def execute_update_all2_with_log_management(
     param2: str | None = None,
     *,
     completed_filename: str,
+    export_preparation_id: str | None = None,
     post_trigger_wait: float = 2.0,
     max_post_trigger_wait: float = 30.0,
 ) -> dict[str, Any]:
@@ -528,12 +529,18 @@ def execute_update_all2_with_log_management(
             }
         )
 
-        cursor.execute(
-            "EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?, @CompletedFileName = ?",
-            param1,
-            param2,
-            completed_filename,
-        )
+        if export_preparation_id is None:
+            cursor.execute(
+                "EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?, @CompletedFileName = ?",
+                param1, param2, completed_filename,
+            )
+        else:
+            from services.export_coordination_dal import identity
+
+            cursor.execute(
+                "EXEC dbo.usp_S11RunStatsImport @param1=?, @param2=?, @CompletedFileName=?, @PreparationID=?",
+                param1, param2, completed_filename, identity(export_preparation_id),
+            )
 
         # Consume all result sets. The final 8-column summary must stay last.
         try:

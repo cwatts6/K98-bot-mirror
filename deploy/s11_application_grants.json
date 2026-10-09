@@ -16,12 +16,6 @@
   ],
   "grants": [
     {
-      "object": "sys.sql_expression_dependencies",
-      "permission": "SELECT",
-      "source": "https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-sql-expression-dependencies-transact-sql",
-      "qualification": "System catalog metadata only; requires existing VIEW DEFINITION. Production separately approved and verified 2026-10-05."
-    },
-    {
       "object": "KVK.KVK_AllPlayers_Stage",
       "permission": "DELETE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.KVK_AllPlayers_Stage.Table.sql",
@@ -1008,6 +1002,24 @@
       "source_sha256": "0105278be8f487facceb09ccc15d9c654d49eb2afa0f90c41e83ff7bc2543ca7"
     },
     {
+      "object": "dbo.StatsImportExecution",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.StatsImportExecution.Table.sql",
+      "source_sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
+    },
+    {
+      "object": "dbo.StatsImportExecution",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.StatsImportExecution.Table.sql",
+      "source_sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
+    },
+    {
+      "object": "dbo.StatsImportExecution",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.StatsImportExecution.Table.sql",
+      "source_sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
+    },
+    {
       "object": "dbo.UPDATE_ALL2",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.UPDATE_ALL2.StoredProcedure.sql",
@@ -1078,11 +1090,17 @@
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.v_TARGETS_FOR_UPLOAD.View.sql",
       "source_sha256": "e047e79c92fb2e0fb55254f1b25a544af5d8120a36a7388c034d5e2d0b79742f"
+    },
+    {
+      "object": "sys.sql_expression_dependencies",
+      "permission": "SELECT",
+      "source": "https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-sql-expression-dependencies-transact-sql",
+      "qualification": "System catalog metadata only; requires existing VIEW DEFINITION. Production separately approved and verified 2026-10-05."
     }
   ],
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
-  "legacy_source_sha256": "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6",
+  "legacy_source_sha256": "31d158bce8d33440eafb5e12ad4d38d6e55b01d0a090f67051444ba2b48e6a55",
   "master_database_permissions": [
     "CONNECT"
   ],

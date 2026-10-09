@@ -201,7 +201,12 @@ def contract(monkeypatch):
         dict(OwnedSchemas=0, OwnedObjects=0, OwnedPrincipals=0, OwnedServerPrincipals=0)
     ]
     observed["migration"] = [
-        dict(MigrationId=direct.DIRECT_MIGRATION, ChecksumSha256="a" * 64, Status="Applied")
+        dict(MigrationId=direct.DIRECT_MIGRATION, ChecksumSha256="a" * 64, Status="Applied"),
+        dict(
+            MigrationId=direct.STATS_OUTCOME_MIGRATION,
+            ChecksumSha256=direct.STATS_OUTCOME_CHECKSUM,
+            Status="Applied",
+        ),
     ]
     approved["metadata_hash"] = digest(observed).hex()
     return observed, approved
@@ -273,8 +278,12 @@ def test_file_visibility_amendment_requires_exact_postimages_and_receipt(file_vi
         == digest(observed).hex()
     )
     query, params = legacy_permission_queries(approved["source"])["migration"]
-    assert "MigrationId IN (?,?)" in query
-    assert params == (direct.DIRECT_MIGRATION, direct.FILE_VISIBILITY_MIGRATION)
+    assert "MigrationId IN (?,?,?)" in query
+    assert params == (
+        direct.DIRECT_MIGRATION,
+        direct.FILE_VISIBILITY_MIGRATION,
+        direct.STATS_OUTCOME_MIGRATION,
+    )
 
 
 @pytest.mark.parametrize(
@@ -618,10 +627,31 @@ def test_real_direct_manifest_is_pinned_and_only_changes_permission_delivery():
     root = Path("C:/K98-bot-SQL-Server")
     old = json.loads((root / "deploy/export_legacy_module_permission_manifest.json").read_bytes())
     new = json.loads((root / "deploy/export_legacy_direct_permission_manifest.json").read_bytes())
-    validate_legacy_permission_source(new)
+    with pytest.raises(SourceConflict):
+        validate_legacy_permission_source(new)
     assert new["modules"] == old["modules"] and new["roots"] == old["roots"]
     assert new["signatures"] == []
     assert {g["principal"] for g in new["grants"]} == {"ExportLegacyEntryReader", "$application"}
+
+
+def test_outcome_source_pin_is_explicit_and_rejects_changes():
+    source = json.loads(Path("deploy/export_stats_import_outcome_source.json").read_bytes())
+    validate_legacy_permission_source(source)
+    wrapper = next(m for m in source["modules"] if m["name"] == "dbo.usp_S11RunStatsImport")
+    assert wrapper["calls"] == ["dbo.UPDATE_ALL2"]
+    assert wrapper["execute_as"] is None
+    assert source["signatures"] == []
+    wrapper["definition_sha256"] = "0" * 64
+    with pytest.raises(SourceConflict):
+        validate_legacy_permission_source(source)
+
+
+def test_outcome_migration_receipt_cannot_be_omitted_or_resealed(contract):
+    observed, approved = contract
+    observed["migration"] = [observed["migration"][0]]
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="migration receipt"):
+        verify_legacy_installation_contract(observed, approved, profile="application")
 
 
 def test_membership_union_has_explicit_collation_for_each_name(contract):

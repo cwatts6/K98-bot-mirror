@@ -183,13 +183,14 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     for group_name, mapping in phase5a_moves.items():
         assert set(mapping).isdisjoint(names)
         assert set(mapping.values()).issubset(grouped[group_name])
-    assert len(grouped["ops"]) == 24
+    assert len(grouped["ops"]) == 25
+    assert "import_resolution" in grouped["ops"]
     assert "test_embed" not in grouped["ops"]
     assert "test_embed" not in names
     assert "dispatch_test" in grouped["prekvk"]
     assert len(grouped["prekvk"]) == 3
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 101
+    assert sum(len(commands) for commands in grouped.values()) == 102
     assert all(len(commands) <= 25 for commands in grouped.values())
     assert "calendar" in names
     assert "honor_rankings" in names

@@ -423,17 +423,18 @@ def _proof_acknowledgment(values, result, columns):
 # S11 source-manifest pin is generated from the separately reviewed SQL delivery.
 # It is not learned from the installed database or accepted from a Bot IPC caller.
 LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc6141eddc9b7fc0dbaf68"
-# Canonical JSON digest of deploy/export_application_schema_source.json: 540
+# Canonical JSON digest of deploy/export_application_schema_source.json: 542
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
 # LF-normalized manual-registration snapshots; logical names follow SQL declarations,
 # including names whose exported filenames are sanitized. Installed metadata is separate.
 # SourceOutputFile and SourceOutputSlot additionally use the exact CHECK-fix table
 # snapshots at SQL commit 9be77b6ae36644707e7679a895ff97f9cc21d82a (SQL PR #93).
-APPLICATION_SCHEMA_SOURCE_HASH = "aa49d288fa68da429fd026b98194afd3bf5d6ced9d4593904b28901aa3d88006"
+# Outcome receipts add StatsImportExecution/usp_S11RunStatsImport and amend
+# UPDATE_ALL2 from migration 20261009_001; independently approved installed
+# metadata and effective privileges are still mandatory before admission.
+APPLICATION_SCHEMA_SOURCE_HASH = "3efb9903610742fbc2f4f19a9871b2255d93f30e34b71bb21c3dfe4be6a0c48d"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
-APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "cd2708b81ad2affcf0986678e18be604fd695cab66e4266684aa7e2edcf2d234"
-)
+APPLICATION_ACTIVATION_SCOPE_HASH = "d30f2795213180f850b31e38939441349b346fba9a27e46d6e49db1b746d915f"
 
 
 def application_activation_scope():

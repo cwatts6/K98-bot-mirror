@@ -56,9 +56,14 @@ async def test_both_proc_config_branches_keep_runtime_in_thread(monkeypatch, sql
     result = await pp.execute_processing_pipeline(
         1, seed=1, user=AsyncMock(), filename="test.xlsx", channel_id=0, save_path=None
     )
-    assert result[4] is True
-    offload.assert_awaited_once()
-    assert offload.call_args.kwargs["prefer_process"] is False
+    if sql_success:
+        assert result[4] is True
+        offload.assert_awaited_once()
+        assert offload.call_args.kwargs["prefer_process"] is False
+    else:
+        assert result[3:5] == (None, None)
+        offload.assert_not_awaited()
+        isolated.assert_not_awaited()
     assert all(call.args[0] != "proc_import" for call in isolated.call_args_list)
 
 

@@ -1710,16 +1710,16 @@
     "sha256": "c2f08824672fcb7d57332733ad77949c9f440310fe011d15039968e35c6895b9"
   },
   {
-    "name": "dbo.LATEST_T4_KILLS",
-    "type": "U",
-    "path": "sql_schema/dbo.LATEST_T4_KILLS.Table.sql",
-    "sha256": "4a08ae2f05d55601c8bec04247c7f763668d616b785abe118b9c19d7f3abc97c"
-  },
-  {
     "name": "dbo.LATEST_T4&T5_KILLS",
     "type": "U",
     "path": "sql_schema/dbo.LATEST_T4_T5_KILLS.Table.sql",
     "sha256": "14dd4aa481a55bbb99c4b09d2bcf145c555e966fd24773e52516d41c09a8dca2"
+  },
+  {
+    "name": "dbo.LATEST_T4_KILLS",
+    "type": "U",
+    "path": "sql_schema/dbo.LATEST_T4_KILLS.Table.sql",
+    "sha256": "4a08ae2f05d55601c8bec04247c7f763668d616b785abe118b9c19d7f3abc97c"
   },
   {
     "name": "dbo.LATEST_T5_KILLS",
@@ -2274,6 +2274,12 @@
     "sha256": "bc0f33a190fbf796a6fbe241758fc37dca4d0e3e5302ba3d9885f601fbf4a391"
   },
   {
+    "name": "dbo.StatsImportExecution",
+    "type": "U",
+    "path": "sql_schema/dbo.StatsImportExecution.Table.sql",
+    "sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
+  },
+  {
     "name": "dbo.T4KillDelta",
     "type": "U",
     "path": "sql_schema/dbo.T4KillDelta.Table.sql",
@@ -2481,7 +2487,7 @@
     "name": "dbo.UPDATE_ALL2",
     "type": "P",
     "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-    "sha256": "2f5cc5da810641e498bbed800cf1d6974721ae3e71276c28a54a9fd0b9f52a93"
+    "sha256": "f5d820cbad487273c04b9eda54f231c1451d7762c47e119d3f51cf7ae5725f26"
   },
   {
     "name": "dbo.UPDATE_RALLY_DATA",
@@ -2932,6 +2938,12 @@
     "type": "P",
     "path": "sql_schema/dbo.usp_RecordLeadershipPlayerReviewAudit.StoredProcedure.sql",
     "sha256": "337a80a1baff555c801ea3152d26bf2cd6cae2a9f5ae2a80f5435be17d2b6b77"
+  },
+  {
+    "name": "dbo.usp_S11RunStatsImport",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_S11RunStatsImport.StoredProcedure.sql",
+    "sha256": "f0bd8dbcb568a628011a025e62d8c59e9f3d77f405f7bdaca7e41d1438d69fd1"
   },
   {
     "name": "dbo.usp_SetAllianceActivitySnapshotCompletion",

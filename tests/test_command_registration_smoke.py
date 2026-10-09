@@ -147,9 +147,10 @@ def test_register_commands_smoke(monkeypatch):
     registered_names = [name for name in registered_top_level if name]
     assert len(registered_names) == 36
     ops_options = registered_groups["ops"]["options"]
-    assert len(ops_options) == 24
+    assert len(ops_options) == 25
+    assert "import_resolution" in {option["name"] for option in ops_options}
     assert "test_embed" not in {option["name"] for option in ops_options}
-    assert sum(len(group.get("options", [])) for group in registered_groups.values()) == 101
+    assert sum(len(group.get("options", [])) for group in registered_groups.values()) == 102
     assert all(len(group.get("options", [])) <= 25 for group in registered_groups.values())
     assert "test_embed" in {option["name"] for option in registered_groups["kvk_admin"]["options"]}
     assert "dispatch_test" in {option["name"] for option in registered_groups["prekvk"]["options"]}

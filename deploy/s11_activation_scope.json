@@ -245,7 +245,9 @@
     "dbo.vw_ArkPlayerReport",
     "dbo.vw_Governor_KVK_Summary_GlobalLatest",
     "dbo.vw_Top3_Week",
-    "dbo.vw_Top3_Yesterday"
+    "dbo.vw_Top3_Yesterday",
+    "dbo.usp_S11RunStatsImport",
+    "dbo.StatsImportExecution"
   ],
   "objects": [
     "KVK.KVK_AllPlayers_Raw",
@@ -540,6 +542,7 @@
     "dbo.SUMMARY_PROC",
     "dbo.SUMMARY_PROC_STATE",
     "dbo.SchemaMigrationHistory",
+    "dbo.StatsImportExecution",
     "dbo.T4KillDelta",
     "dbo.T4T5KillDelta",
     "dbo.T5KillDelta",
@@ -626,6 +629,7 @@
     "dbo.usp_PurgeLeadershipPlayerReviewAudit",
     "dbo.usp_RecordKvkFinalReportCompletion",
     "dbo.usp_RecordLeadershipPlayerReviewAudit",
+    "dbo.usp_S11RunStatsImport",
     "dbo.usp_SetAllianceActivitySnapshotCompletion",
     "dbo.usp_UpsertGovernorNameHistoryForScan",
     "dbo.usp_VoteSurveyAdminDelete",
@@ -1700,6 +1704,7 @@
       "dbo.STATS",
       "dbo.STATS_FOR_UPLOAD",
       "dbo.SUMMARY_PROC",
+      "dbo.StatsImportExecution",
       "dbo.THE_AVERAGES",
       "dbo.Update_ALL_Complete",
       "dbo.ZEROED",
@@ -2403,6 +2408,15 @@
     "dbo.vw_Top3_Yesterday": [
       "dbo.AllianceActivityDelta",
       "dbo.AllianceActivitySnapshotHeader"
+    ],
+    "dbo.usp_S11RunStatsImport": [
+      "dbo.ExportPreparation",
+      "dbo.ExportResource",
+      "dbo.StatsImportExecution",
+      "dbo.UPDATE_ALL2"
+    ],
+    "dbo.StatsImportExecution": [
+      "dbo.ExportPreparation"
     ]
   }
 }

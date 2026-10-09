@@ -6,11 +6,13 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 
-DIRECT_SOURCE_HASH = "c018e31d759239840e6f43679c9e05d5f9bddfdad166e9d299d76e3c6b1799e6"
+DIRECT_SOURCE_HASH = "31d158bce8d33440eafb5e12ad4d38d6e55b01d0a090f67051444ba2b48e6a55"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "da0546c5d7abbe94ae782894183f097ca821dee61e2c7a9915eab5c8180a11bc"
+APPLICATION_GRANT_PLAN_HASH = "932a98e47066943408781d6aa29bd7cba08acc16d0e3e8e6a1318021f3eaabb7"
 FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
 FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
+STATS_OUTCOME_MIGRATION = "20261009_001_stats_import_outcomes"
+STATS_OUTCOME_CHECKSUM = "6e0bb2c04a5fe4e8e4eb67e821b3d7c490f474b5188a59c5892c25c68e5a885c"
 # Canonical UTF-16LE definition hashes of the reviewed migration's exact
 # postimages. This is a behavior amendment, not a compatibility spelling.
 FILE_VISIBILITY_MODULE_HASHES = {
@@ -192,14 +194,13 @@ def queries(base, source):
         ORDER BY SecurableClass,TargetName,PermissionName,GrantState""",
         (),
     )
-    # The historical source and grants stay immutable. Read only these two
-    # fixed ledger rows; selecting the amendment remains an explicit protected
-    # contract decision, with exact postimages and checksum checked below.
+    # The new source pin requires the outcome migration. Historical migration
+    # receipts remain separate; no installed hash can select its own contract.
     result["migration"] = (
         base["migration"][0].replace(
-            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?) ORDER BY MigrationId"
+            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?) ORDER BY MigrationId"
         ),
-        (DIRECT_MIGRATION, FILE_VISIBILITY_MIGRATION),
+        (DIRECT_MIGRATION, FILE_VISIBILITY_MIGRATION, STATS_OUTCOME_MIGRATION),
     )
     return result
 
@@ -352,7 +353,12 @@ def verify(observed, approved, *, profile):
             MigrationId=DIRECT_MIGRATION,
             ChecksumSha256=approved["migration_hash"],
             Status="Applied",
-        )
+        ),
+        dict(
+            MigrationId=STATS_OUTCOME_MIGRATION,
+            ChecksumSha256=STATS_OUTCOME_CHECKSUM,
+            Status="Applied",
+        ),
     ]
     if amended:
         expected_migrations.append(
