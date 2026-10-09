@@ -311,8 +311,8 @@
     {
       "name": "dbo.UPDATE_ALL2",
       "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-      "source_sha256": "f5d820cbad487273c04b9eda54f231c1451d7762c47e119d3f51cf7ae5725f26",
-      "definition_sha256": "d5a52ea5b2ead249a271bf73a84e966e76fb8ddbe3a1da086bdec9ff1b8df290",
+      "source_sha256": "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a",
+      "definition_sha256": "4a5640dbdf811d645ba9ed83062f08408f5d02e6c9c2338585042b031af080bc",
       "object_type": "P",
       "execute_as": null,
       "calls": [

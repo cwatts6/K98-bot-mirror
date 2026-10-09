@@ -6,13 +6,13 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 
-DIRECT_SOURCE_HASH = "31d158bce8d33440eafb5e12ad4d38d6e55b01d0a090f67051444ba2b48e6a55"
+DIRECT_SOURCE_HASH = "00aafdc8d4375b617278c194408c41296ce0143ee2ba736e029db6e907621332"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "932a98e47066943408781d6aa29bd7cba08acc16d0e3e8e6a1318021f3eaabb7"
+APPLICATION_GRANT_PLAN_HASH = "4168ee4023315a47c8a424de233a7b5d4e751001fde644e7580c47f8a5391016"
 FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
 FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
 STATS_OUTCOME_MIGRATION = "20261009_001_stats_import_outcomes"
-STATS_OUTCOME_CHECKSUM = "6e0bb2c04a5fe4e8e4eb67e821b3d7c490f474b5188a59c5892c25c68e5a885c"
+STATS_OUTCOME_CHECKSUM = "cf40276a3e32de6ee05b6bddcd2f96b12a90e4e04d2942e8d18280719c0426a5"
 # Canonical UTF-16LE definition hashes of the reviewed migration's exact
 # postimages. This is a behavior amendment, not a compatibility spelling.
 FILE_VISIBILITY_MODULE_HASHES = {

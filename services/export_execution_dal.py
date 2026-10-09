@@ -432,7 +432,7 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # Outcome receipts add StatsImportExecution/usp_S11RunStatsImport and amend
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
-APPLICATION_SCHEMA_SOURCE_HASH = "3efb9903610742fbc2f4f19a9871b2255d93f30e34b71bb21c3dfe4be6a0c48d"
+APPLICATION_SCHEMA_SOURCE_HASH = "c1d5b708e58bd2416e271538e701fd354db3627e281d41fa9ee4cdd0eb60c9e1"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = "d30f2795213180f850b31e38939441349b346fba9a27e46d6e49db1b746d915f"
 

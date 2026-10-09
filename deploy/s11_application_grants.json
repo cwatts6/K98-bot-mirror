@@ -1100,7 +1100,7 @@
   ],
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
-  "legacy_source_sha256": "31d158bce8d33440eafb5e12ad4d38d6e55b01d0a090f67051444ba2b48e6a55",
+  "legacy_source_sha256": "00aafdc8d4375b617278c194408c41296ce0143ee2ba736e029db6e907621332",
   "master_database_permissions": [
     "CONNECT"
   ],

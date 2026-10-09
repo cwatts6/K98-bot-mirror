@@ -2487,7 +2487,7 @@
     "name": "dbo.UPDATE_ALL2",
     "type": "P",
     "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-    "sha256": "f5d820cbad487273c04b9eda54f231c1451d7762c47e119d3f51cf7ae5725f26"
+    "sha256": "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a"
   },
   {
     "name": "dbo.UPDATE_RALLY_DATA",
