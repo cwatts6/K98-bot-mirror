@@ -194,10 +194,12 @@ function Assert-UpdatePaths {
   if($m.path -notmatch '^[A-Za-z0-9_ .()/+-]+$' -or $m.path -match '(^|/)[.]{1,2}(/|$)'){throw 'Unsafe source member path'}
   $path=[IO.Path]::GetFullPath((Join-Path $c.root $m.path))
   if(-not $path.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Source member escaped repository'}
+  if($m.added -and (Test-Path -LiteralPath $path)){throw ('New tracked path already exists; reconcile before restart: '+$m.path)}
   # Walk to the existing parent for newly added paths. Check every ancestor
   # before stopping the bot; never infer parent type from PSIsContainer.
   $parent=Split-Path -Parent $path
   while(-not(Test-Path -LiteralPath $parent)){$parent=Split-Path -Parent $parent}
+  if(-not(Test-Path -LiteralPath $parent -PathType Container)){throw ('Source parent is not a directory; reconcile before restart: '+$m.path)}
   Assert-Protected $parent
   Assert-GitDirectoryInheritance $parent
   if(Test-Path -LiteralPath $path){Assert-Protected $path}

@@ -25,11 +25,17 @@ Check ($visited.Contains((Join-Path $fixture 'docs'))) 'Ancestor traversal skipp
 Check ($visited.Contains([IO.Path]::GetPathRoot($file))) 'Ancestor traversal did not reach volume root'
 $script:deny=Join-Path $fixture 'docs'
 Reject {Assert-Protected $file} ('*Protected owner differs: '+$deny+'*')
-$c=[pscustomobject]@{root=$fixture;source_members=@([pscustomobject]@{path='docs/reference/note.md';deleted=$false})}
+$c=[pscustomobject]@{root=$fixture;source_members=@([pscustomobject]@{path='docs/reference/note.md';deleted=$false;added=$false})}
 Reject {Assert-UpdatePaths} ('*Protected owner differs: '+$deny+'*')
 $script:deny=''
-$c.source_members=@([pscustomobject]@{path='new/deep/file.py';deleted=$false})
+$c.source_members=@([pscustomobject]@{path='new/deep/file.py';deleted=$false;added=$true})
 Assert-UpdatePaths;$passed++
+$c.source_members=@([pscustomobject]@{path='docs/reference/note.md';deleted=$false;added=$true})
+Reject {Assert-UpdatePaths} '*New tracked path already exists*'
+$c.source_members=@([pscustomobject]@{path='docs/reference';deleted=$false;added=$true})
+Reject {Assert-UpdatePaths} '*New tracked path already exists*'
+$c.source_members=@([pscustomobject]@{path='docs/reference/note.md/child.py';deleted=$false;added=$true})
+Reject {Assert-UpdatePaths} '*Source parent is not a directory*'
 $c.source_members=@([pscustomobject]@{path='../outside.py';deleted=$false})
 Reject {Assert-UpdatePaths} '*Unsafe source member*'
 

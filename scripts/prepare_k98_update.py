@@ -168,6 +168,7 @@ def source_plan(previous, before, target, changes, read_blob):
                 target_sha256=sha256(new) if new is not None else None,
                 runtime=runtime,
                 deleted=new is None,
+                added=old is None,
             )
         )
     if sum(map(len, payload.values())) > 64 * 1024 * 1024:
