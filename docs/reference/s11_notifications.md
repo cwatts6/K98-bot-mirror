@@ -29,6 +29,10 @@ preparation/job IDs, cache generation and individual Discord receipts. Preserve
 this file across updates and restarts. Its atomic replacement and OS file lock
 protect updates; an invalid journal is retained and fails closed for notifications.
 Do not delete or replace it with an empty file to clear a problem.
+When a coordinated run cannot register durable tracking, processing stops before
+prompting or importing and reports that no import started. Repair runtime/journal
+availability first, then resubmit that unprocessed file. Missing a Sheets delivery
+channel still does not block processing after registration.
 
 The existing supervised outcome observer checks up to 16 runs per 30-second cycle
 in rotation. It never imports data, enqueues an export or calls Google. A lost

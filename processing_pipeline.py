@@ -848,6 +848,27 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
 
     # Cache notify channel for consistent fallback behavior in this processing run
     notify_channel = get_channel_safe(bot, NOTIFY_CHANNEL_ID)
+    if managed_notifications and not notification_run_id:
+        logger.error(
+            "processing_registration outcome=blocked source_message_id=%s source_channel_id=%s next_action=repair_runtime_or_notification_journal_before_resubmission",
+            message.id,
+            channel_id,
+        )
+        await send_embed_safe(
+            user,
+            "File processing not started",
+            {
+                "Reason": "Durable completion tracking is unavailable. No import was started.",
+                "Admin action": (
+                    "Check protected runtime availability and data/processing_outcomes.json. "
+                    "Repair disk/permissions or resolve old journal entries, then submit this file again."
+                ),
+            },
+            0xE74C3C,
+            bot=bot,
+            fallback_channel=notify_channel,
+        )
+        raise RuntimeError("Processing notification registration unavailable; no import started.")
     if notify_channel is None:
         logger.warning(
             "[HANDLE_FILE] NOTIFY_CHANNEL_ID not resolvable; initial notify embed will rely on followup/DM fallback."

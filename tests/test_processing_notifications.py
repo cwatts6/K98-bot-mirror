@@ -54,6 +54,35 @@ def client():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("registration", [None, OSError("journal unavailable")])
+async def test_registration_failure_stops_before_prompt_or_import(monkeypatch, registration):
+    import bot_config
+    import processing_pipeline as pipeline
+    from services import processing_notification_service as core
+
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
+    register = (
+        Mock(side_effect=registration)
+        if isinstance(registration, Exception)
+        else Mock(return_value=None)
+    )
+    monkeypatch.setattr(core, "register_run", register)
+    monkeypatch.setattr(pipeline, "get_channel_safe", lambda *a: object())
+    sender, prompt, process = AsyncMock(), AsyncMock(), AsyncMock()
+    monkeypatch.setattr(pipeline, "send_embed_safe", sender)
+    monkeypatch.setattr(pipeline, "prompt_admin_inputs", prompt)
+    monkeypatch.setattr(pipeline, "execute_processing_pipeline", process)
+    message = SimpleNamespace(id=123, channel=SimpleNamespace(id=987), author="uploader")
+    with pytest.raises(RuntimeError, match="no import started"):
+        await pipeline.handle_file_processing(object(), message, "fixture.xlsx", None)
+    prompt.assert_not_awaited()
+    process.assert_not_awaited()
+    sender.assert_awaited_once()
+    assert sender.call_args.args[1] == "File processing not started"
+    assert "Admin action" in sender.call_args.args[2]
+
+
+@pytest.mark.asyncio
 async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
     journal, monkeypatch
 ):
