@@ -172,7 +172,7 @@ async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
         assert all("Sheets: confirmed" in job["status"] for job in queue["jobs"])
 
 
-@pytest.mark.parametrize("terminal", ["confirmed", "failed", "cancelled"])
+@pytest.mark.parametrize("terminal", ["confirmed", "failed", "cancelled", "uncertain"])
 def test_late_uncertain_handoff_preserves_authoritative_terminal_outcome(journal, terminal):
     row = new_run(journal, sheets=terminal, completed_at=100, duration_seconds=10)
     updated = journal.patch(
@@ -180,6 +180,15 @@ def test_late_uncertain_handoff_preserves_authoritative_terminal_outcome(journal
     )
     assert updated["sheets"] == terminal
     assert updated["completed_at"] == 100 and updated["duration_seconds"] == 10
+
+
+def test_uncertain_timing_can_advance_on_authoritative_confirmation(journal):
+    row = new_run(journal, sheets="uncertain", completed_at=100, duration_seconds=10)
+    updated = journal.patch(
+        row["run_id"], handoff=True, sheets="confirmed", completed_at=200, duration_seconds=20
+    )
+    assert updated["sheets"] == "confirmed"
+    assert updated["completed_at"] == 200 and updated["duration_seconds"] == 20
 
 
 @pytest.mark.asyncio

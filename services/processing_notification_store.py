@@ -112,6 +112,16 @@ class NotificationStore:
                 if patch.get("handoff"):
                     patch.pop("completed_at", None)
                     patch.pop("duration_seconds", None)
+            if (
+                row.get("sheets") == "uncertain"
+                and patch.get("sheets") == "uncertain"
+                and patch.get("handoff")
+                and row.get("completed_at") is not None
+            ):
+                # Preserve first observation timing, while still allowing later
+                # authoritative confirmation/failure to advance an uncertain job.
+                patch.pop("completed_at", None)
+                patch.pop("duration_seconds", None)
             if row.get("sheets") in {"confirmed", "failed", "uncertain", "cancelled"} and patch.get(
                 "sheets"
             ) in {"pending", "waiting", "ready", "running"}:
