@@ -12,16 +12,6 @@ function Check([bool]$value,[string]$message){if(-not $value){throw $message};$s
 function Reject([scriptblock]$call,[string]$pattern){try{& $call;throw 'TEST_DID_NOT_REJECT'}catch{if($_.Exception.Message -notlike $pattern){throw};$script:passed++}}
 $fixture=Join-Path (Split-Path -Parent $PSScriptRoot) ('.codex_artifacts\update-test-'+[guid]::NewGuid().ToString('N'))
 $null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'docs\reference'))
-Check (Test-UpdateCanRefresh $fixture 'no-deployment' -PrepareOnly) 'Unstaged preparation must remain refreshable'
-foreach($marker in @('deployment-request.json','deployment-drained-test.json','release-test')) {
- $state=Join-Path $fixture ([guid]::NewGuid().ToString('N'))
- $null=[IO.Directory]::CreateDirectory($state)
- $path=Join-Path $state $marker
- if($marker -eq 'release-test'){$null=[IO.Directory]::CreateDirectory($path)}else{[IO.File]::WriteAllText($path,'{}')}
- Check (-not(Test-UpdateCanRefresh $state 'test')) 'Started deployment must retain its active release'
- Reject {Test-UpdateCanRefresh $state 'test' -PrepareOnly} '*without -PrepareOnly*'
- Check (Test-Path -LiteralPath $path) 'Resume classification must preserve existing evidence'
-}
 $file=Join-Path $fixture 'docs\reference\note.md'
 [IO.File]::WriteAllText($file,'fixture')
 $trusted=[Security.AccessControl.DirectorySecurity]::new()
@@ -30,6 +20,27 @@ $untrusted=[Security.AccessControl.DirectorySecurity]::new()
 $untrusted.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-545'))
 $script:deny='';$script:visited=[Collections.Generic.List[string]]::new()
 function Get-Acl([string]$LiteralPath){$script:visited.Add($LiteralPath);if($LiteralPath -ceq $script:deny){return $script:untrusted};return $script:trusted}
+Check (Test-UpdateCanRefresh $fixture 'no-deployment' -PrepareOnly) 'Unstaged preparation must remain refreshable'
+foreach($marker in @('deployment-request.json','deployment-drained-test.json','release-test')) {
+ $state=Join-Path $fixture ([guid]::NewGuid().ToString('N'))
+ $null=[IO.Directory]::CreateDirectory($state)
+ $path=Join-Path $state $marker
+ if($marker -eq 'release-test'){$null=[IO.Directory]::CreateDirectory($path);[IO.File]::WriteAllText((Join-Path $path '.release.json'),'{}')}else{[IO.File]::WriteAllText($path,'{}')}
+ Check (-not(Test-UpdateCanRefresh $state 'test')) 'Started deployment must retain its active release'
+ Reject {Test-UpdateCanRefresh $state 'test' -PrepareOnly} '*without -PrepareOnly*'
+ Check (Test-Path -LiteralPath $path) 'Resume classification must preserve existing evidence'
+}
+$emptyState=Join-Path $fixture 'empty-stage-state'
+$emptyStage=Join-Path $emptyState 'release-test'
+$null=[IO.Directory]::CreateDirectory($emptyStage)
+Check (Test-UpdateCanRefresh $emptyState 'test' -PrepareOnly) 'Empty pre-manifest stage must permit fresh preparation'
+Check (Test-Path -LiteralPath $emptyStage) 'Empty historical stage must not be deleted'
+$script:deny=$emptyStage
+Reject {Test-UpdateCanRefresh $emptyState 'test'} '*Protected owner differs*'
+$script:deny=''
+[IO.File]::WriteAllText((Join-Path $emptyStage 'unexpected.bin'),'partial')
+Check (-not(Test-UpdateCanRefresh $emptyState 'test')) 'Missing manifest alone must not allow refresh'
+Reject {Test-UpdateCanRefresh $emptyState 'test' -PrepareOnly} '*without -PrepareOnly*'
 Assert-Protected $file
 Check ($visited.Contains((Join-Path $fixture 'docs'))) 'Ancestor traversal skipped docs'
 Check ($visited.Contains([IO.Path]::GetPathRoot($file))) 'Ancestor traversal did not reach volume root'
