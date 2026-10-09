@@ -231,6 +231,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
         guild_ids=[GUILD_ID],
     )
 
+    from commands.import_resolution import attach_import_resolution
+
+    attach_import_resolution(ops_group)
+
     @ops_group.command(
         name="summary", description="View today's file processing summary", guild_ids=[GUILD_ID]
     )

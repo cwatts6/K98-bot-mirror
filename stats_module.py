@@ -1,4 +1,4 @@
-﻿# stats_module.py
+# stats_module.py
 """
 Stats processing orchestration (updated offload usage).
 
@@ -328,9 +328,20 @@ async def run_sql_procedure(
 
     from services.legacy_export_snapshot_service import admitted_writer, record_writer_completion
 
+    execution_id = None
+    execution_owner = None
+    metadata_consumed = False
+
     @admitted_writer("scan_data")
     def _proc_and_get_expected_counter() -> int:
+        nonlocal execution_id, execution_owner, metadata_consumed
         from core.export_sql_connection import producer_connection
+        from services.legacy_export_snapshot_service import current_owner
+
+        owner = current_owner()
+        execution_owner = owner
+        if owner is not None:
+            owner.stats_import_context = True
 
         with producer_connection(_conn_trusted) as conn:
             # UPDATE_ALL2 owns its Phase A/Phase B transactions and rejects any
@@ -346,6 +357,12 @@ async def run_sql_procedure(
             from services.legacy_export_snapshot_service import verify_producer_cursor
 
             verify_producer_cursor(cur)
+            from services.stats_import_outcome_service import register_execution
+
+            preparation_id = register_execution(completed_filename)
+            execution_id = preparation_id
+            if preparation_id is not None and isinstance(import_metadata, dict):
+                import_metadata["_export_preparation_id"] = preparation_id
             original_counter = fetch_update_all2_last_counter(cur, TASK_NAME)
             expected_counter = original_counter + 1
             logger.info(f"[SQL_PROC] Executing procedure with expected counter: {expected_counter}")
@@ -353,15 +370,32 @@ async def run_sql_procedure(
             try:
                 # ⭐ DEFENSE LAYER 1: Wrap UPDATE_ALL2 with log management ⭐
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
+                if owner is not None:
+                    owner.stats_execution_dispatched = True
                 result = execute_update_all2_with_log_management(
                     cur,
                     param1=rank,
                     param2=seed,
                     completed_filename=completed_filename,
+                    **(
+                        {"export_preparation_id": preparation_id}
+                        if preparation_id is not None
+                        else {}
+                    ),
                 )
 
                 if not result["success"]:
                     raise RuntimeError(f"UPDATE_ALL2 failed: {result.get('error', 'unknown')}")
+
+                if preparation_id is not None:
+                    from services.legacy_export_snapshot_service import require_runtime
+                    from services.stats_import_outcome_service import outcome_dal
+
+                    receipt = outcome_dal(require_runtime()).read(preparation_id)
+                    if not receipt or receipt["State"] != "completed":
+                        raise RuntimeError(
+                            "Exact SQL completion receipt is missing; dependent stages refused."
+                        )
 
                 # This metadata row describes a completed SQL import. Write it
                 # only after UPDATE_ALL2 succeeds so a failed procedure cannot
@@ -440,6 +474,7 @@ async def run_sql_procedure(
             )
             if import_metadata:
                 _delete_import_metadata()
+                metadata_consumed = True
             return expected_counter
 
     # Offload the blocking DB work via python-callable offload helper
@@ -451,6 +486,52 @@ async def run_sql_procedure(
         raise
     except Exception as e:
         logger.exception("SQL procedure execution failed")
+        preparation_id = execution_id
+        if preparation_id is not None:
+            from services.legacy_export_snapshot_service import require_runtime
+            from services.stats_import_outcome_service import event, outcome_dal
+
+            try:
+                runtime = require_runtime()
+                outcome = await _offload_callable_py(
+                    outcome_dal(runtime).read,
+                    preparation_id,
+                    name="exact_import_outcome",
+                )
+                preparation = await _offload_callable_py(
+                    runtime.dal.read, preparation_id, name="exact_capture_outcome"
+                )
+                if (
+                    outcome
+                    and outcome["State"] == "completed"
+                    and preparation["State"] == "captured"
+                    and execution_owner is not None
+                    and str(preparation["OwnerID"]).lower() == execution_owner.claim.owner
+                    and preparation["Fence"] == execution_owner.claim.fence
+                ):
+                    runtime.collect_capture(execution_owner)
+                    if import_metadata and not metadata_consumed:
+                        _delete_import_metadata()
+                    event(
+                        preparation_id,
+                        "pipeline_reconciliation",
+                        "completed",
+                        action="continue dependent stages",
+                        import_replayed=False,
+                    )
+                    return (
+                        True,
+                        "[SUCCESS] Exact SQL completion and captured output verified after lost acknowledgment; import was not repeated.",
+                        None,
+                    )
+            except Exception as recovery_error:
+                event(
+                    preparation_id,
+                    "pipeline_reconciliation",
+                    "held",
+                    action="ops import_resolution: status",
+                    error=recovery_error,
+                )
         emit_telemetry_event(
             {
                 "event": "sql_proc",
@@ -489,6 +570,13 @@ async def run_sql_procedure(
             )
         return False, f"[ERROR] SQL execution failed: {e}", None
 
+    if execution_id is not None:
+        # The exact execution receipt was checked before checkpointing and the
+        # admitted writer returned only after durable capture. A global counter
+        # from another run cannot substitute for either fact.
+        return True, "[SUCCESS] Exact SQL completion and captured output verified.", None
+
+    # Legacy non-coordinated callers retain their original polling contract.
     # expected_counter may be wrapped by some helpers; ensure int
     try:
         expected_counter = int(_unwrap_offload_result(expected_counter))
@@ -639,18 +727,20 @@ async def _run_stats_copy_archive_unlocked(
             if not phase_name:
                 continue
             await _offload_callable_py(
-                lambda row=row, phase_name=phase_name: import_audit_service.record_phase_best_effort(
-                    audit_ref,
-                    phase_name=phase_name,
-                    phase_status=str(row.get("phase_status") or "completed"),
-                    started_at_utc=row.get("started_at_utc"),
-                    completed_at_utc=row.get("completed_at_utc"),
-                    rows_in=row.get("rows_in"),
-                    rows_out=row.get("rows_out"),
-                    duration_ms=row.get("duration_ms"),
-                    error_type=row.get("error_type"),
-                    error_text=row.get("error_text"),
-                    details=_details_from_update_all2_phase(row),
+                lambda row=row, phase_name=phase_name: (
+                    import_audit_service.record_phase_best_effort(
+                        audit_ref,
+                        phase_name=phase_name,
+                        phase_status=str(row.get("phase_status") or "completed"),
+                        started_at_utc=row.get("started_at_utc"),
+                        completed_at_utc=row.get("completed_at_utc"),
+                        rows_in=row.get("rows_in"),
+                        rows_out=row.get("rows_out"),
+                        duration_ms=row.get("duration_ms"),
+                        error_type=row.get("error_type"),
+                        error_text=row.get("error_text"),
+                        details=_details_from_update_all2_phase(row),
+                    )
                 ),
                 name="import_audit_update_all2_phase",
                 meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "phase": phase_name},

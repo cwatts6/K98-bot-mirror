@@ -569,9 +569,11 @@ async def test_run_sql_procedure_reconciles_terminal_identity_without_retry(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("coordinated", [False, True])
+@pytest.mark.parametrize(
+    "coordinated, lost_capture_ack", [(False, False), (True, False), (True, True)]
+)
 async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(
-    monkeypatch, tmp_path, coordinated
+    monkeypatch, tmp_path, coordinated, lost_capture_ack
 ):
     from unittest.mock import Mock
 
@@ -618,8 +620,9 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     async def direct_offload(fn, *args, **kwargs):
         return fn(*args)
 
-    def execute_wrapper(cur, *, param1, param2, completed_filename):
+    def execute_wrapper(cur, *, param1, param2, completed_filename, export_preparation_id=None):
         assert connection.autocommit is True
+        assert (export_preparation_id is not None) is coordinated
         wrapper_calls.append((param1, param2, completed_filename))
         return {
             "success": True,
@@ -651,6 +654,17 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     scope = dict(consumer="scan_data", destinations=["file-a"])
     capture = Mock(return_value=((snapshots.OutputSection("data", ("id",), ((1,),)),), scope))
     runtime, dal = producer_runtime(tmp_path, capture=capture, configuration={"scan_data": scope})
+    from services import stats_import_outcome_service as outcomes
+
+    receipts = Mock()
+    receipts.read.return_value = {"State": "completed"}
+    monkeypatch.setattr(outcomes, "outcome_dal", lambda _runtime: receipts)
+    if lost_capture_ack:
+        claim = dal.claim.return_value
+        dal.read.return_value = {"State": "captured", "OwnerID": claim.owner, "Fence": claim.fence}
+        dal.captured.side_effect = OSError("commit acknowledgment lost")
+    captures = []
+    token = snapshots._captures.set(captures)
     with snapshots.use_runtime(runtime if coordinated else None):
         success, message, _extra = await stats_module.run_sql_procedure(
             rank=1,
@@ -658,9 +672,10 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
             completed_filename=COMPLETED_FILENAME,
             import_metadata=metadata,
         )
+    snapshots._captures.reset(token)
 
     assert success is True
-    assert "Counter reached 8" in message
+    assert ("Exact SQL completion" if coordinated else "Counter reached 8") in message
     assert wrapper_calls == [(1, "A", COMPLETED_FILENAME)]
     assert connection.autocommit is True
     assert connection.commit_called is False
@@ -670,6 +685,10 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     assert phases[0]["started_at_utc"] is started
     assert phases[0]["completed_at_utc"] is finished
     if coordinated:
+        receipts.prepare.assert_called_once()
+        assert receipts.read.call_count == (2 if lost_capture_ack else 1)
+        assert receipts.read.call_args.args == (receipts.prepare.call_args.args[0].preparation_id,)
+        assert captures[-1] == ("scan_data", None, dal.request.return_value)
         committed = [
             call.kwargs["generation"]
             for call in dal.transition.call_args_list

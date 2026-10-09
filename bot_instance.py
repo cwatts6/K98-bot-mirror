@@ -1802,6 +1802,9 @@ async def _run_ready_runtime_services() -> None:
         )
     register_recovery(task_monitor)
     register_exports(task_monitor)
+    from services.processing_outcome_worker import register_processing_outcomes
+
+    register_processing_outcomes(task_monitor)
 
     # Start heartbeat now that the loop is running
     try:

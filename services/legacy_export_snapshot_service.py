@@ -387,10 +387,31 @@ def writer_scope(kind, *, owner_token=None):
     except BaseException as original:
         _writer_event(owner, "writer_body", "failed", original)
         try:
-            if owner.safe_pre_execution_refusal and isinstance(original, CoordinationLockRefused):
+            recovered = False
+            if owner.stats_execution_registered and owner.stats_execution_dispatched:
+                from services.stats_import_outcome_service import recover_completed_writer
+
+                try:
+                    recovered = recover_completed_writer(runtime, owner)
+                except Exception as recovery_error:
+                    _writer_event(owner, "completion_recovery", "failed", recovery_error)
+            if recovered:
+                if not owner.closed:
+                    runtime._close_writer(owner)
+            elif (
+                owner.stats_import_context
+                and not owner.stats_execution_dispatched
+                and not owner.stats_execution_registered
+            ):
+                runtime.unstarted_stats_writer(owner)
+            elif owner.safe_pre_execution_refusal and isinstance(original, CoordinationLockRefused):
                 runtime.refused_writer(owner)
             else:
                 runtime.uncertain_writer(owner)
+                if owner.stats_execution_registered:
+                    from services.stats_import_outcome_service import settle_known_failure
+
+                    settle_known_failure(runtime, owner.claim.preparation_id)
         except BaseException as cleanup:
             _writer_event(owner, "uncertain_cleanup", "failed", cleanup)
         # Retain the actual failure even when uncertainty persistence/close fails.
@@ -526,6 +547,9 @@ class WriterOwner:
     completion: dict | None = None
     producer_authorized: bool = False
     safe_pre_execution_refusal: bool = False
+    stats_execution_registered: bool = False
+    stats_import_context: bool = False
+    stats_execution_dispatched: bool = False
 
 
 class LegacyExportRuntime:
@@ -833,6 +857,28 @@ class LegacyExportRuntime:
         )
         _writer_event(owner, "pre_execution_refusal", "withdrawal_commit_acknowledged")
 
+    def unstarted_stats_writer(self, owner):
+        """Live proof that this invocation never entered the SQL import wrapper.
+
+        This proof is not reconstructed from age or process absence after restart.
+        The normal exact-owner/version CAS still refuses any changed preparation.
+        """
+        self._require_writer(owner)
+        if (
+            owner.closed
+            or owner.kind != "scan_data"
+            or not owner.stats_import_context
+            or owner.stats_execution_dispatched
+            or owner.stats_execution_registered
+            or owner.completion is not None
+        ):
+            raise SnapshotUnavailable("Exact live unstarted stats invocation required.")
+        self._close_writer(owner)
+        owner.claim = self.dal.transition(
+            owner.claim, expected="writing", state="unavailable", release=True
+        )
+        _writer_event(owner, "pre_import_failure", "withdrawal_commit_acknowledged")
+
     def checkpoint_writer(self, owner, evidence, *, cursor=None):
         self._require_writer(owner)
         if owner.closed:
@@ -905,11 +951,7 @@ class LegacyExportRuntime:
             receipt = snapshot.persist(self.store)
             self.dal.captured(owner.claim, receipt)
             _writer_event(owner, "snapshot_capture", "commit_acknowledged")
-            collection = _captures.get()
-            if collection is not None:
-                collection.append(
-                    (scope["consumer"], scope.get("kvk_no"), owner.claim.preparation_id)
-                )
+            self.collect_capture(owner)
         except BaseException as original:
             # No automatic recapture after a post-commit/spool/receipt failure.
             # An unknown acknowledgment leaves its durable row/claim intact.
@@ -922,6 +964,14 @@ class LegacyExportRuntime:
         finally:
             if not owner.closed:
                 self._close_writer(owner)
+
+    def collect_capture(self, owner):
+        self._require_writer(owner)
+        scope = json.loads(self.configuration)[owner.kind]
+        collection = _captures.get()
+        capture = (scope["consumer"], scope.get("kvk_no"), owner.claim.preparation_id)
+        if collection is not None and capture not in collection:
+            collection.append(capture)
 
     def enqueue_snapshot(self, preparation_id):
         from services.export_coordination_dal import JobSpec

@@ -184,7 +184,7 @@ async def run_step(
 @collect_producer_captures
 async def execute_processing_pipeline(
     rank: int, *, seed: int, user, filename: str, channel_id: int, save_path: str | None = None
-) -> tuple[bool, bool, bool, bool | Literal["pending"], bool | None, str]:
+) -> tuple[bool, bool, bool, bool | Literal["pending"] | None, bool | None, str]:
     """
     Orchestrates the file -> SQL -> Sheets processing pipeline.
 
@@ -229,6 +229,24 @@ async def execute_processing_pipeline(
     # 1) Excel copy + archive + SQL
     # Provide meta for telemetry so downstream run_block events include filename/rank/seed
     step_meta = {"filename": filename, "rank": rank, "seed": seed}
+
+    def finish(excel, archive, sql, export, proc_import, log):
+        try:
+            emit_telemetry_event(
+                {
+                    "event": "processing_pipeline_summary",
+                    "excel": excel,
+                    "archive": archive,
+                    "sql": sql,
+                    "export": export,
+                    "proc_import": proc_import,
+                    "duration_seconds": (utcnow() - start_ts).total_seconds(),
+                    "filename": filename,
+                }
+            )
+        except Exception:
+            logger.exception("[TELEMETRY] Failed to emit processing summary telemetry")
+        return excel, archive, sql, export, proc_import, log
 
     # Some versions of run_stats_copy_archive may not accept a 'meta' kwarg.
     # Only include it when the callee supports it to avoid TypeError.
@@ -340,6 +358,30 @@ async def execute_processing_pipeline(
         )
     except Exception:
         logger.exception("[STATUS_EMBED] failed to send Stats Copy Archive embed")
+
+    if success_sql is not True:
+        logger.warning(
+            "processing_pipeline_stopped stage=sql outcome=failed_or_unproven "
+            "dependent_stages=cache,maintenance,proc_config,export action=inspect_import_outcome "
+            "excel=%s archive=%s sql=%s",
+            success_excel,
+            success_archive,
+            success_sql,
+        )
+        await send_status_embed(
+            "⏸️ Dependent Steps Skipped",
+            {
+                "Reason": "SQL import did not confirm success. Cache refresh, ProcConfig and export were not started.",
+                "Next action": "Inspect the import error. If a preparation is held, use /ops import_resolution with its preparation ID.",
+            },
+            False,
+            user,
+            notify_channel,
+            context_field=context_field,
+        )
+        return finish(
+            success_excel, success_archive, success_sql, None, None, str(out_archive or "")
+        )
 
     # 1b) Rebuild player_stats_cache.json as soon as SQL is updated
     #     (Cache is SQL-sourced; does NOT depend on Google Sheets)
@@ -535,173 +577,79 @@ async def execute_processing_pipeline(
 
     # 2) ProcConfig import — insert a bounded headroom wait between steps
     success_proc_import: bool | None = None
-    if success_excel:
-        logger.info("🛠️ Running ProcConfig import after successful Excel export")
+    if success_sql:
+        logger.info("🛠️ Running ProcConfig import after confirmed SQL import")
 
-        # Only do the headroom wait if the SQL step actually ran (major writes)
-        if success_sql:
-            try:
-                # Ensure log headroom (auto-trigger + bounded wait if LOG_BACKUP)
-                # Use run_step to offload sync preflight to a thread for consistent telemetry
-                await asyncio.wait_for(
-                    run_step(
-                        preflight_from_env_sync,
-                        server=os.environ.get("SQL_SERVER") or SERVER,
-                        database=os.environ.get("SQL_DATABASE") or DATABASE,
-                        username=os.environ.get("SQL_USERNAME") or USERNAME,
-                        password=os.environ.get("SQL_PASSWORD") or PASSWORD,
-                        warn_threshold=85.0,
-                        abort_threshold=95.0,
-                        wait_on_log_backup=True,
-                        max_wait_seconds=150,
-                        poll_interval_seconds=5.0,
-                        offload_sync_to_thread=True,
-                        name="preflight_from_env_sync",
-                        meta=step_meta,
-                    ),
-                    timeout=180.0,
-                )
-            except LogHeadroomError as e:
-                logger.warning("[PROC_IMPORT] Skipping ProcConfig import: %s", e)
-                success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (SQL log not ready)", "Details": str(e)},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
-            except TimeoutError:
-                # Offloaded preflight thread may still run; mark telemetry so ops can inspect.
-                logger.exception("[PROC_IMPORT] preflight timed out; skipping ProcConfig import")
-                emit_telemetry_event(
-                    {"event": "proc_import_preflight", "status": "timeout", "filename": filename}
-                )
-                success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (preflight timeout)"},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.exception("[PROC_IMPORT] preflight_from_env_sync failed (treating as skip)")
-                emit_telemetry_event(
-                    {
-                        "event": "proc_import_preflight",
-                        "status": "failed",
-                        "filename": filename,
-                        "error_type": type(exc).__name__,
-                        "traceback": traceback.format_exc()[:2000],
-                    }
-                )
-                success_proc_import = False
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Skipped (preflight error)"},
-                    False,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
-            else:
-                try:
-                    ok, out = await _run_proc_config_step(step_meta)
-                    success_proc_import = bool(ok)
-                    if not ok:
-                        out_text = _safe_trim(out, 4000)
-                        logger.exception("[PROC_IMPORT] proc_import failed: %s", out_text)
-
-                        # Detect possible orphaned offload (subprocess timeout) by inspecting output
-                        orphan_possible = False
-                        try:
-                            if isinstance(out, str) and (
-                                "timed out" in out.lower() or "timeout" in out.lower()
-                            ):
-                                orphan_possible = True
-                        except Exception:
-                            orphan_possible = False
-
-                        telemetry_payload = {
-                            "event": "proc_import",
-                            "status": "failed",
-                            "filename": filename,
-                            "detail": _safe_trim(out, 2000),
-                        }
-                        if orphan_possible:
-                            # Attempt to find offload by meta to provide offload id/pid to operators
-                            try:
-                                off = find_offload_by_meta(step_meta)
-                                telemetry_payload["orphaned_offload_possible"] = True
-                                telemetry_payload["offload_id"] = (
-                                    off.get("offload_id") if off else None
-                                )
-                                telemetry_payload["pid"] = off.get("pid") if off else None
-                            except Exception:
-                                telemetry_payload["orphaned_offload_possible"] = True
-                                telemetry_payload["offload_id"] = None
-                                telemetry_payload["pid"] = None
-                        else:
-                            telemetry_payload["orphaned_offload_possible"] = False
-
-                        emit_telemetry_event(telemetry_payload)
-
-                        # If orphan suspected, include in status embed for admins
-                        if telemetry_payload.get("orphaned_offload_possible"):
-                            off_text = f"id={telemetry_payload.get('offload_id') or 'unknown'} pid={telemetry_payload.get('pid') or 'unknown'}"
-                            await send_status_embed(
-                                "🛠️ ProcConfig Import",
-                                {
-                                    "Status": "Failed (offload may be orphaned)",
-                                    "Offload": off_text,
-                                    "Log": _safe_trim(out, _EMBED_LOG_TRIM),
-                                },
-                                False,
-                                user,
-                                notify_channel,
-                                context_field=context_field,
-                            )
-                        else:
-                            emit_telemetry_event(
-                                {
-                                    "event": "proc_import",
-                                    "status": "failed",
-                                    "filename": filename,
-                                    "detail": _safe_trim(out, 2000),
-                                }
-                            )
-                    else:
-                        logger.info("[PROC_IMPORT] proc_import completed")
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    logger.exception("[PROC_IMPORT] Unhandled error during run_proc_config_import")
-                    emit_telemetry_event(
-                        {
-                            "event": "proc_import",
-                            "status": "failed",
-                            "filename": filename,
-                            "error_type": type(exc).__name__,
-                            "traceback": traceback.format_exc()[:2000],
-                        }
-                    )
-                    success_proc_import = False
-
-                await send_status_embed(
-                    "🛠️ ProcConfig Import",
-                    {"Status": "Completed" if success_proc_import else "Failed"},
-                    success_proc_import is True,
-                    user,
-                    notify_channel,
-                    context_field=context_field,
-                )
+        try:
+            # Ensure log headroom (auto-trigger + bounded wait if LOG_BACKUP)
+            # Use run_step to offload sync preflight to a thread for consistent telemetry
+            await asyncio.wait_for(
+                run_step(
+                    preflight_from_env_sync,
+                    server=os.environ.get("SQL_SERVER") or SERVER,
+                    database=os.environ.get("SQL_DATABASE") or DATABASE,
+                    username=os.environ.get("SQL_USERNAME") or USERNAME,
+                    password=os.environ.get("SQL_PASSWORD") or PASSWORD,
+                    warn_threshold=85.0,
+                    abort_threshold=95.0,
+                    wait_on_log_backup=True,
+                    max_wait_seconds=150,
+                    poll_interval_seconds=5.0,
+                    offload_sync_to_thread=True,
+                    name="preflight_from_env_sync",
+                    meta=step_meta,
+                ),
+                timeout=180.0,
+            )
+        except LogHeadroomError as e:
+            logger.warning("[PROC_IMPORT] Skipping ProcConfig import: %s", e)
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (SQL log not ready)", "Details": str(e)},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
+        except TimeoutError:
+            # Offloaded preflight thread may still run; mark telemetry so ops can inspect.
+            logger.exception("[PROC_IMPORT] preflight timed out; skipping ProcConfig import")
+            emit_telemetry_event(
+                {"event": "proc_import_preflight", "status": "timeout", "filename": filename}
+            )
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (preflight timeout)"},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("[PROC_IMPORT] preflight_from_env_sync failed (treating as skip)")
+            emit_telemetry_event(
+                {
+                    "event": "proc_import_preflight",
+                    "status": "failed",
+                    "filename": filename,
+                    "error_type": type(exc).__name__,
+                    "traceback": traceback.format_exc()[:2000],
+                }
+            )
+            success_proc_import = False
+            await send_status_embed(
+                "🛠️ ProcConfig Import",
+                {"Status": "Skipped (preflight error)"},
+                False,
+                user,
+                notify_channel,
+                context_field=context_field,
+            )
         else:
-            # SQL step didn’t run; run ProcConfig normally (no headroom wait needed)
             try:
                 ok, out = await _run_proc_config_step(step_meta)
                 success_proc_import = bool(ok)
@@ -709,6 +657,7 @@ async def execute_processing_pipeline(
                     out_text = _safe_trim(out, 4000)
                     logger.exception("[PROC_IMPORT] proc_import failed: %s", out_text)
 
+                    # Detect possible orphaned offload (subprocess timeout) by inspecting output
                     orphan_possible = False
                     try:
                         if isinstance(out, str) and (
@@ -725,6 +674,7 @@ async def execute_processing_pipeline(
                         "detail": _safe_trim(out, 2000),
                     }
                     if orphan_possible:
+                        # Attempt to find offload by meta to provide offload id/pid to operators
                         try:
                             off = find_offload_by_meta(step_meta)
                             telemetry_payload["orphaned_offload_possible"] = True
@@ -739,6 +689,7 @@ async def execute_processing_pipeline(
 
                     emit_telemetry_event(telemetry_payload)
 
+                    # If orphan suspected, include in status embed for admins
                     if telemetry_payload.get("orphaned_offload_possible"):
                         off_text = f"id={telemetry_payload.get('offload_id') or 'unknown'} pid={telemetry_payload.get('pid') or 'unknown'}"
                         await send_status_embed(
@@ -753,6 +704,17 @@ async def execute_processing_pipeline(
                             notify_channel,
                             context_field=context_field,
                         )
+                    else:
+                        emit_telemetry_event(
+                            {
+                                "event": "proc_import",
+                                "status": "failed",
+                                "filename": filename,
+                                "detail": _safe_trim(out, 2000),
+                            }
+                        )
+                else:
+                    logger.info("[PROC_IMPORT] proc_import completed")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -776,6 +738,30 @@ async def execute_processing_pipeline(
                 notify_channel,
                 context_field=context_field,
             )
+    if success_proc_import is not True:
+        logger.warning(
+            "processing_pipeline_stopped stage=proc_config outcome=failed_or_unproven "
+            "dependent_stages=export action=inspect_proc_config_error import_replay=false"
+        )
+        await send_status_embed(
+            "⏸️ Export Skipped",
+            {
+                "Reason": "ProcConfig did not confirm success. No export was submitted.",
+                "Next action": "Inspect the ProcConfig error and preparation ID; do not repeat the committed import.",
+            },
+            False,
+            user,
+            notify_channel,
+            context_field=context_field,
+        )
+        return finish(
+            success_excel,
+            success_archive,
+            success_sql,
+            None,
+            success_proc_import,
+            str(out_archive or ""),
+        )
 
     # 3) Google Sheets exports — offload to thread, but bounded by EXPORT_TIMEOUT
     await send_status_embed(
@@ -874,24 +860,7 @@ async def execute_processing_pipeline(
 
     combined_log = f"{out_archive}\n\n{out_export}"
 
-    # Emit telemetry summary
-    try:
-        emit_telemetry_event(
-            {
-                "event": "processing_pipeline_summary",
-                "excel": success_excel,
-                "archive": success_archive,
-                "sql": success_sql,
-                "export": success_export,
-                "proc_import": bool(success_proc_import),
-                "duration_seconds": (utcnow() - start_ts).total_seconds(),
-                "filename": filename,
-            }
-        )
-    except Exception:
-        logger.exception("[TELEMETRY] Failed to emit processing summary telemetry")
-
-    return (
+    return finish(
         success_excel,
         success_archive,
         success_sql,
@@ -1054,4 +1023,27 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
         except Exception:
             logger.exception("Unexpected error during message deletion")
 
-    logger.info("[🟢 DONE] All steps completed. ✅ Monitoring for next file...")
+    logger.info(
+        "processing_handoff outcome=%s export=%s duration_seconds=%.1f action=%s",
+        (
+            "awaiting_export"
+            if success_export == "pending"
+            else (
+                "completed"
+                if all(
+                    value is True
+                    for value in (
+                        success_excel,
+                        success_archive,
+                        success_sql,
+                        success_export,
+                        success_proc_import,
+                    )
+                )
+                else "incomplete"
+            )
+        ),
+        success_export,
+        (utcnow() - start_time).total_seconds(),
+        "await_durable_confirmation" if success_export == "pending" else "inspect_step_outcomes",
+    )
