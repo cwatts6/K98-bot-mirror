@@ -34,6 +34,11 @@ The existing supervised outcome observer checks up to 16 runs per 30-second cycl
 in rotation. It never imports data, enqueues an export or calls Google. A lost
 enqueue acknowledgment is reconciled by reading the registered preparation's exact
 JobID. Terminal events log the run, job, outcome, next action and full elapsed time.
+If submission fails, the outcome is uncertain until exact job evidence resolves it;
+an existing preparation alone does not mean the export was queued. If the required
+pre-enqueue correlation cannot be saved, submission stops before any new export
+job is requested. Repair the journal and inspect the retained preparation; never
+repeat the stats import to repair a notification.
 The pending admin summary is edited on completion, and the live queue matches the
 run UUID rather than a possibly repeated filename.
 

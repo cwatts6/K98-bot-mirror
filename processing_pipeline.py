@@ -908,11 +908,13 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     async with live_queue_lock:
         for job in live_queue["jobs"]:
             if (
-                job.get("source_message_id") == getattr(message, "id", None)
-                if job.get("source_message_id")
-                else not job.get("processing_run_id")
+                not job.get("processing_run_id")
                 and job["filename"] == filename
                 and job["user"] == str(message.author)
+                and (
+                    not job.get("source_message_id")
+                    or job["source_message_id"] == getattr(message, "id", None)
+                )
             ):
                 job["status"] = "⚙️ Processing..."
                 job["processing_run_id"] = notification_run_id
@@ -953,7 +955,7 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
             current = await drain_thread(notification_store().get, notification_run_id)
             sheets_state = (
                 "pending"
-                if current.get("preparation_id")
+                if success_export == "pending"
                 else ("uncertain" if success_proc_import is True else "failed")
             )
             await patch_run(

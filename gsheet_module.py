@@ -1269,6 +1269,7 @@ def run_all_exports(
                 "inspect_exact_export_job_and_journal",
                 error=exc,
             )
+            raise
     job_id = runtime.submit(consumer="scan_data", kvk_no=None, preparation_id=preparation_id)
     return ExportSubmission(job_id, preparation_id)
 

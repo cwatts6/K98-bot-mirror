@@ -106,6 +106,9 @@ class NotificationStore:
     def patch(self, run_id, **changes):
         def change(row):
             patch = dict(changes)
+            if row.get("sheets") in {"confirmed", "failed", "cancelled"}:
+                # A late pipeline handoff cannot replace authoritative job evidence.
+                patch.pop("sheets", None)
             if row.get("sheets") in {"confirmed", "failed", "uncertain", "cancelled"} and patch.get(
                 "sheets"
             ) in {"pending", "waiting", "ready", "running"}:

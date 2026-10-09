@@ -54,6 +54,58 @@ def client():
 
 
 @pytest.mark.asyncio
+async def test_submission_failure_handoff_and_multiple_attachment_queue_binding(
+    journal, monkeypatch
+):
+    import bot_config
+    import processing_pipeline as pipeline
+    from services import (
+        processing_notification_service as core,
+        processing_notification_store as storage,
+    )
+
+    rows = [new_run(journal, preparation_id=str(uuid4()), stats="ready") for _ in range(2)]
+    run_ids = [row["run_id"] for row in rows]
+    monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
+    monkeypatch.setattr(core, "register_run", Mock(side_effect=run_ids))
+    monkeypatch.setattr(storage, "notification_store", lambda: journal)
+    monkeypatch.setattr(pipeline, "get_channel_safe", lambda *a: object())
+    monkeypatch.setattr(pipeline, "send_embed_safe", AsyncMock())
+    monkeypatch.setattr(pipeline, "prompt_admin_inputs", AsyncMock(return_value=(1, 1)))
+    monkeypatch.setattr(pipeline, "load_cached_input", lambda: None)
+    monkeypatch.setattr(pipeline, "log_processing_result", AsyncMock())
+    monkeypatch.setattr(pipeline, "update_live_queue_embed", AsyncMock())
+    monkeypatch.setattr(pipeline, "live_queue_lock", asyncio.Lock())
+    queue = {
+        "jobs": [
+            dict(source_message_id=123, filename=name, user="uploader", status="queued")
+            for name in ("first.xlsx", "second.xlsx")
+        ]
+    }
+    monkeypatch.setattr(pipeline, "live_queue", queue)
+    monkeypatch.setattr(
+        pipeline,
+        "execute_processing_pipeline",
+        AsyncMock(return_value=(True, True, True, False, True, "submission acknowledgment lost")),
+    )
+    message = SimpleNamespace(id=123, channel=SimpleNamespace(id=987), author="uploader")
+    for name in ("first.xlsx", "second.xlsx"):
+        await pipeline.handle_file_processing(object(), message, name, None)
+    assert [job["processing_run_id"] for job in queue["jobs"]] == run_ids
+    for run_id in run_ids:
+        row = journal.get(run_id)
+        assert row["sheets"] == "uncertain"
+        assert row["handoff"] and row["stats"] == "ready"
+        assert row["completed_at"] >= row["created"]
+
+
+@pytest.mark.parametrize("terminal", ["confirmed", "failed", "cancelled"])
+def test_late_uncertain_handoff_preserves_authoritative_terminal_outcome(journal, terminal):
+    row = new_run(journal, sheets=terminal)
+    assert journal.patch(row["run_id"], handoff=True, sheets="uncertain")["sheets"] == terminal
+
+
+@pytest.mark.asyncio
 async def test_restart_after_pending_updates_same_summary_and_posts_sheets_once(
     journal, monkeypatch
 ):

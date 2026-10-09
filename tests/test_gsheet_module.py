@@ -121,6 +121,21 @@ def test_submission_records_preparation_before_lost_enqueue_ack(monkeypatch):
     runtime.submit.assert_called_once()
 
 
+def test_submission_stops_before_enqueue_when_correlation_cannot_be_saved(monkeypatch):
+    from unittest.mock import Mock
+
+    from services import processing_notification_store as module
+    from services.legacy_export_snapshot_service import use_runtime
+
+    runtime, store = Mock(), Mock()
+    runtime.resolve_preparation.return_value = "exact-preparation"
+    store.patch.side_effect = OSError("journal unavailable")
+    monkeypatch.setattr(module, "notification_store", lambda: store)
+    with use_runtime(runtime), pytest.raises(OSError, match="journal unavailable"):
+        gm.run_all_exports(None, None, None, None, notification_run_id="exact-run")
+    runtime.submit.assert_not_called()
+
+
 class _FakeCredentials:
     @staticmethod
     def from_service_account_file(*_args, **_kwargs):
