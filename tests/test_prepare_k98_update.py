@@ -186,6 +186,59 @@ def test_changed_paths_cannot_case_alias_retained_inventory(path):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
 
 
+@pytest.mark.parametrize("added", ["Docs/helper.py", "docs/OPERATOR.md"])
+def test_cli_checks_unchanged_unpinned_git_paths_before_blob_acquisition(
+    tmp_path, monkeypatch, added
+):
+    import subprocess
+    import sys
+    from types import SimpleNamespace
+
+    from scripts.prepare_k98_update import main
+
+    observation = tmp_path / "observation.json"
+    observation.write_text(
+        json.dumps(
+            {
+                "bindings": {
+                    "before": BEFORE,
+                    "target": AFTER,
+                    "root": str(tmp_path),
+                    "git_path": "git",
+                },
+                "seed": inventory(),
+            }
+        )
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prepare", "--observation", str(observation), "--output", str(tmp_path / "output")],
+    )
+    trees_read = []
+
+    def git(args, **_kwargs):
+        if "diff" in args:
+            return SimpleNamespace(stdout=added.encode() + b"\0")
+        if "ls-tree" in args:
+            trees_read.append(args[-1])
+            paths = ["core/example.py", "docs/operator.md"]
+            if args[-1] == AFTER:
+                paths.append(added)
+            return SimpleNamespace(
+                stdout=b"".join(
+                    b"100644 blob " + b"a" * 40 + b" 1\t" + path.encode() + b"\0" for path in paths
+                )
+            )
+        pytest.fail("Case collision reached blob acquisition")
+
+    monkeypatch.setattr(subprocess, "run", git)
+    with pytest.raises(ValueError, match="Case-colliding source inventory"):
+        main()
+    assert trees_read == [BEFORE, AFTER]
+    assert not (tmp_path / "output").exists()
+
+
 def test_two_successor_seeds_rebind_gate_without_reusing_release_identity(tmp_path, monkeypatch):
     original = predecessor(tmp_path, monkeypatch)
     previous = deepcopy(original)

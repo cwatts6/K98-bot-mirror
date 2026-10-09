@@ -181,7 +181,7 @@ restart once the drain receipt exists, rerun an uncertain apply, or issue anothe
 start after lost acknowledgement. An unresolved outcome remains stopped for precise
 reconciliation; do not delete control files, manually pull, or start the task.
 
-## One-time updater installation
+## Deployment completion status
 
 The completion message distinguishes source/startup verification from functional
 health. The current read-only verifier classifies import/export as **degraded**
@@ -192,6 +192,8 @@ final `verified.json` and transcript retain that classification. A degraded resu
 does not request another restart or repeat an import/export; check the affected
 feature before accepting its functional health. This implements the release
 contract's explicit healthy/degraded reporting, not a provider-delivery test.
+
+## One-time updater installation
 
 The reviewed implementation supplies one automatically built
 `Install-K98UpdateTool.ps1`. Its preparation command on the development PC is
