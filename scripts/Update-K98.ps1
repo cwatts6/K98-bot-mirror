@@ -181,9 +181,12 @@ try {
  if(Test-Path -LiteralPath $stage){$launch+='-Resume'}
  & $powershell @launch | Out-Host
  if($LASTEXITCODE -ne 0){throw 'Update stopped. Evidence is retained; no automatic second start or source replay.'}
- Write-Record (Join-Path $work 'verified.json') @{release_id=$prepared.release_id;target=$prepared.target;verified_utc=[datetime]::UtcNow.ToString('o')}
+ $readiness=Read-Json (Join-Path $stage 'readiness-status.json')
+ if($readiness.release_id -cne $prepared.release_id -or $readiness.target -cne $prepared.target -or $readiness.discord_status -cne 'online' -or $readiness.import_export.status -cne 'degraded'){throw 'Explicit release readiness classification is missing or differs'}
+ Write-Record (Join-Path $work 'verified.json') @{release_id=$prepared.release_id;target=$prepared.target;verified_utc=[datetime]::UtcNow.ToString('o');readiness=$readiness}
  Remove-Item -LiteralPath $active
- Write-Host ('Update verified: '+$prepared.target+'. Check your ordinary Discord command. No package cleanup is needed.')
+ Write-Warning ('Source/startup update verified WITH DEGRADED IMPORT/EXPORT STATUS: '+$readiness.import_export.reason)
+ Write-Host ('Deployed '+$prepared.target+'. Discord is online. Check the affected feature before accepting functional health. No package cleanup is needed.')
 } finally {
  $null=Stop-Transcript
  $lock.Dispose()

@@ -18,6 +18,44 @@ BEFORE = "a" * 40
 AFTER = "b" * 40
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "assets/helper.py",
+        "data/helper.py",
+        "downloads/helper.py",
+        "artifacts/helper.py",
+        "logs/helper.py",
+        "smoke_artifacts/helper.py",
+        "nested/docs/helper.py",
+        "nested/tests/helper.py",
+        "nested/.hidden/helper.py",
+        "nested/__pycache__/helper.py",
+        "Assets/helper.py",
+        "core/HELPER.PY",
+        "nested/venv/helper.py",
+        "core/.helper.py",
+        "core/note.txt",
+    ],
+)
+def test_update_pins_match_actual_bootstrap_inventory(tmp_path, path):
+    from scripts.run_export_authority import code_files
+
+    member = tmp_path / path
+    member.parent.mkdir(parents=True, exist_ok=True)
+    member.write_bytes(b"pass\n")
+    previous = {"AutomaticStartupPolicy.json": {"source_hashes": {}}}
+    plan, payload = source_plan(
+        previous,
+        BEFORE,
+        AFTER,
+        [path],
+        lambda commit, name: b"pass\n" if commit == AFTER and name == path else None,
+    )
+    assert set(plan["new_pins"]) == code_files(tmp_path)
+    assert payload[path] == b"pass\n"
+
+
 def inventory(raw=b"old\r\n"):
     return {"AutomaticStartupPolicy.json": {"source_hashes": {"core/example.py": sha256(raw)}}}
 

@@ -62,6 +62,36 @@ def check_source_only(paths):
             raise ValueError(f"Release includes a non-source contract change: {path}")
 
 
+def bootstrap_source_path(path):
+    """Match run_export_authority.code_files, including case-sensitive pruning.
+
+    Kept local because the installed predecessor bootstraps the first updater.
+    A filesystem parity regression checks this against the real enumerator.
+    """
+    parts = path.split("/")
+    ignored = {
+        ".venv",
+        ".git",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        "tests",
+        "data",
+        "downloads",
+        "artifacts",
+        "docs",
+        "logs",
+        "smoke_artifacts",
+        "sql",
+        "assets",
+    }
+    return (
+        parts[-1].lower().endswith(".py")
+        and not (len(parts) > 1 and parts[0] == "venv")
+        and not any(part in ignored or part.startswith(".") for part in parts[:-1])
+    )
+
+
 def source_plan(previous, before, target, changes, read_blob):
     """Build exact source hashes using authenticated Git blobs, not live new bytes.
 
@@ -103,9 +133,7 @@ def source_plan(previous, before, target, changes, read_blob):
             raise ValueError(f"Changed-path inventory differs: {path}")
         if any(raw is not None and len(raw) > 2 * 1024 * 1024 for raw in (old, new)):
             raise ValueError(f"Source member exceeds bound: {path}")
-        runtime = path in pins or (
-            path.endswith(".py") and not path.startswith(("tests/", "docs/"))
-        )
+        runtime = bootstrap_source_path(path)
         if new is None:
             pins.pop(path, None)
         else:

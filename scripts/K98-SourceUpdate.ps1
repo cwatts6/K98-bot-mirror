@@ -333,6 +333,16 @@ function Assert-NewSession($Journal) {
  $sessions=Sessions
  if($sessions.Count -ne 1 -or $sessions[0].ManifestHash.ToLowerInvariant() -cne $Journal.publication.manifests.authority -or $sessions[0].SessionID -ceq $c.old_session.SessionID -or $sessions[0].AuthorityPrincipal -cne 'S11_ExportApplication' -or $sessions[0].Version -ne 1){throw 'Fresh successor SQL session differs'}
 }
+function Import-ExportStatus([string]$StartupText) {
+ # Only examine the bounded successor log interval. Startup/SQL-session success
+ # is not a successful import or provider probe. Missing evidence is degradation,
+ # never an inferred healthy result. Do not run business work to test deployment.
+ $reason='fresh_import_export_health_evidence_unavailable'
+ if($StartupText -match 'S11 export admission remains closed|Export admission disabled:|Export coordinator unavailable') {
+  $reason='runtime_admission_unavailable'
+ }
+ return @{status='degraded';import_status='degraded';export_status='degraded';reason=$reason;provider_delivery_verified=$false}
+}
 function Check-Readiness {
  Assert-Drained -SuccessorRunning;Assert-Source $c.new_pins $c.target
  if(-not(Seed-Complete)){throw 'Successor seed missing'}
@@ -346,7 +356,15 @@ function Check-Readiness {
   $reader=[IO.StreamReader]::new($stream);$text=$reader.ReadToEnd()
  }finally{$stream.Dispose()}
  if($text -notmatch '\[BOOT\] full_startup_sequence completed successfully' -or $text -notmatch 'Logged in as'){return $false}
- Write-Host ('READY: online; exact source '+$c.target+'; retained work and activation flags preserved; import/export health not certified by deployment.')
+ $health=Import-ExportStatus $text
+ $status=@{release_id=$c.release_id;target=$c.target;discord_status='online';import_export=$health}|ConvertTo-Json -Depth 5 -Compress|ConvertFrom-Json
+ $statusPath=Join-Path $PSScriptRoot 'readiness-status.json'
+ if(Test-Path -LiteralPath $statusPath) {
+  $prior=Read-Json $statusPath
+  if(-not(Same $prior $status)){throw 'Readiness classification changed; preserve evidence for review'}
+ } else {Write-Record $statusPath $status}
+ Write-Warning ('DEPLOYED WITH DEGRADED IMPORT/EXPORT STATUS: '+$health.reason+'. No import/export or provider delivery is certified.')
+ Write-Host ('READY: Discord online; exact source '+$c.target+'; import=degraded; export=degraded; retained work and activation flags preserved.')
  return $true
 }
 
