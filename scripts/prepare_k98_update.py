@@ -56,10 +56,29 @@ def check_source_only(paths):
     for path in paths:
         ordinary_path(path)
         lower = path.casefold()
-        # The installed preparer uses the predecessor inventory rules. A new
-        # enumerator requires a coordinated tooling/contract release instead.
-        if lower == "scripts/run_export_authority.py":
-            raise ValueError(f"Bootstrap contract change requires a non-routine release: {path}")
+        # Preparation runs installed tooling with predecessor helpers, while
+        # the successor consumes the resulting seed. Keep both contract sides
+        # unchanged; upgrading this boundary needs a coordinated release.
+        if lower.startswith(
+            ("core/export_", "services/export_", "scripts/run_export_", "scripts/provision_export_")
+        ) or lower in {
+            "run_bot.py",
+            "bot_config.py",
+            "constants.py",
+            "core/__init__.py",
+            "services/__init__.py",
+            "scripts/__init__.py",
+            "scripts/prepare_k98_release.py",
+            "scripts/prepare_k98_update.py",
+            "scripts/verify_k98_update_pair.py",
+            "scripts/package_k98_update_tool.py",
+            "scripts/update-k98.ps1",
+            "scripts/k98-sourceupdate.ps1",
+            "scripts/deploy-k98release.ps1",
+        }:
+            raise ValueError(
+                f"Startup/update contract change requires a non-routine release: {path}"
+            )
         if "__pycache__" in lower.split("/") or lower.endswith(
             (".pyw", ".pyc", ".pyd", ".pyo", ".so")
         ):

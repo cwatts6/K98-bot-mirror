@@ -160,14 +160,62 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
 
 
 @pytest.mark.parametrize(
-    "path", ["scripts/run_export_authority.py", "Scripts/RUN_EXPORT_AUTHORITY.PY"]
+    "path",
+    [
+        "scripts/run_export_authority.py",
+        "Scripts/RUN_EXPORT_AUTHORITY.PY",
+        "core/export_release_seed.py",
+        "core/export_process_pair.py",
+        "core/export_automatic_pair.py",
+        "core/export_process_identity.py",
+        "core/export_startup_windows.py",
+        "services/export_execution_protocol.py",
+        "services/export_runtime_composition.py",
+        "services/export_startup_reconciliation.py",
+        "scripts/run_export_startup_issuer.py",
+        "scripts/run_export_process_gate.py",
+        "scripts/provision_export_process_pair.py",
+        "scripts/prepare_k98_release.py",
+        "scripts/prepare_k98_update.py",
+        "scripts/verify_k98_update_pair.py",
+        "scripts/package_k98_update_tool.py",
+        "scripts/K98-SourceUpdate.ps1",
+        "scripts/Deploy-K98Release.ps1",
+        "scripts/Update-K98.ps1",
+        "run_bot.py",
+        "bot_config.py",
+        "constants.py",
+        "core/__init__.py",
+        "services/__init__.py",
+        "scripts/__init__.py",
+    ],
 )
-def test_bootstrap_contract_changes_are_rejected_before_blob_reads(path):
+def test_startup_contract_changes_are_rejected_before_blob_reads(path):
     def forbidden_read(*_):
         pytest.fail("Bootstrap contract change reached source preparation")
 
-    with pytest.raises(ValueError, match=r"Bootstrap contract change.*non-routine"):
+    with pytest.raises(ValueError, match=r"Startup/update contract change.*non-routine"):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
+
+
+def test_predecessor_preparer_rejects_target_generator_and_consumer_changes():
+    def forbidden_read(*_):
+        pytest.fail("Target contract code must not run or supply seed inputs")
+
+    with pytest.raises(ValueError, match="non-routine"):
+        source_plan(
+            inventory(),
+            BEFORE,
+            AFTER,
+            ["core/export_release_seed.py", "scripts/run_export_startup_issuer.py"],
+            forbidden_read,
+        )
+
+
+def test_ordinary_bot_and_queue_changes_remain_routine():
+    check_source_only(
+        ["DL_bot.py", "commands/kvk_admin.py", "services/legacy_export_snapshot_service.py"]
+    )
 
 
 def test_missing_diff_member_cannot_create_mixed_source_policy():
