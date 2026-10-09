@@ -230,6 +230,24 @@ async def execute_processing_pipeline(
     # Provide meta for telemetry so downstream run_block events include filename/rank/seed
     step_meta = {"filename": filename, "rank": rank, "seed": seed}
 
+    def finish(excel, archive, sql, export, proc_import, log):
+        try:
+            emit_telemetry_event(
+                {
+                    "event": "processing_pipeline_summary",
+                    "excel": excel,
+                    "archive": archive,
+                    "sql": sql,
+                    "export": export,
+                    "proc_import": proc_import,
+                    "duration_seconds": (utcnow() - start_ts).total_seconds(),
+                    "filename": filename,
+                }
+            )
+        except Exception:
+            logger.exception("[TELEMETRY] Failed to emit processing summary telemetry")
+        return excel, archive, sql, export, proc_import, log
+
     # Some versions of run_stats_copy_archive may not accept a 'meta' kwarg.
     # Only include it when the callee supports it to avoid TypeError.
     rs_kwargs: dict = {}
@@ -361,7 +379,9 @@ async def execute_processing_pipeline(
             notify_channel,
             context_field=context_field,
         )
-        return success_excel, success_archive, success_sql, None, None, str(out_archive or "")
+        return finish(
+            success_excel, success_archive, success_sql, None, None, str(out_archive or "")
+        )
 
     # 1b) Rebuild player_stats_cache.json as soon as SQL is updated
     #     (Cache is SQL-sourced; does NOT depend on Google Sheets)
@@ -738,7 +758,7 @@ async def execute_processing_pipeline(
             notify_channel,
             context_field=context_field,
         )
-        return (
+        return finish(
             success_excel,
             success_archive,
             success_sql,
@@ -844,24 +864,7 @@ async def execute_processing_pipeline(
 
     combined_log = f"{out_archive}\n\n{out_export}"
 
-    # Emit telemetry summary
-    try:
-        emit_telemetry_event(
-            {
-                "event": "processing_pipeline_summary",
-                "excel": success_excel,
-                "archive": success_archive,
-                "sql": success_sql,
-                "export": success_export,
-                "proc_import": bool(success_proc_import),
-                "duration_seconds": (utcnow() - start_ts).total_seconds(),
-                "filename": filename,
-            }
-        )
-    except Exception:
-        logger.exception("[TELEMETRY] Failed to emit processing summary telemetry")
-
-    return (
+    return finish(
         success_excel,
         success_archive,
         success_sql,

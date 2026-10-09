@@ -1,9 +1,55 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 # Use pytest-asyncio for async tests
 pytest_plugins = ("pytest_asyncio",)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failed_stage", ["sql", "proc_config", None])
+async def test_each_pipeline_outcome_emits_one_truthful_summary(monkeypatch, failed_stage):
+    import processing_pipeline as pp
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    monkeypatch.setattr(
+        pp,
+        "run_stats_copy_archive",
+        AsyncMock(
+            return_value=(
+                True,
+                "archive",
+                {"excel": True, "archive": True, "sql": failed_stage != "sql"},
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        pp,
+        "_run_proc_config_step",
+        AsyncMock(return_value=(failed_stage != "proc_config", "config")),
+    )
+    monkeypatch.setattr(pp, "MAINT_WORKER_MODE", "thread")
+    telemetry = Mock()
+    monkeypatch.setattr(pp, "emit_telemetry_event", telemetry)
+    result = await pp.execute_processing_pipeline(
+        1, seed=1, user=AsyncMock(), filename="fixture.xlsx", channel_id=0
+    )
+    summaries = [
+        c.args[0]
+        for c in telemetry.call_args_list
+        if c.args[0].get("event") == "processing_pipeline_summary"
+    ]
+    assert len(summaries) == 1
+    summary = summaries[0]
+    assert [summary[k] for k in ("excel", "archive", "sql", "export", "proc_import")] == list(
+        result[:5]
+    )
+    assert summary["filename"] == "fixture.xlsx"
+    assert summary["duration_seconds"] >= 0
+    if failed_stage:
+        assert summary["export"] is None
+    if failed_stage == "sql":
+        assert summary["proc_import"] is None
 
 
 @pytest.mark.asyncio
