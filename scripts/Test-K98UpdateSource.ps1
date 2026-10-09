@@ -32,6 +32,8 @@ function Write-SourceCopy([string]$Path,[byte[]]$Bytes,$Acl) {
  if($script:raced){$script:acls[$script:heldPath].AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new('Everyone','Write','Allow'))}
 }
 $realInstall=${function:Install-SourceCopy}
+$realSourceCopyAcl=${function:Set-SourceCopyAcl}
+function Set-SourceCopyAcl([string]$Path,$Acl){$script:acls[$Path]=$Acl}
 function Install-SourceCopy([string]$Fresh,[string]$Path) {
  & $script:realInstall $Fresh $Path
  $script:acls[$Path]=$script:acls[$Fresh];$script:sealed.Add($Path)
@@ -111,6 +113,20 @@ Remove-Item -LiteralPath $hardlink
 $acls[$leaf].SetSecurityDescriptorSddlForm('O:BAG:BAD:NO_ACCESS_CONTROL')
 Reject {Initialize-SourceOwner $leaf $false @($digest)} '*null DACL refused*'
 $acls[$leaf]=$trusted
+
+# Real FileStream/ACL regression without requiring an administrative owner.
+# Preserve the exact descriptor, including the auto-inherited control flag.
+$aclOriginal=Join-Path $fixture 'acl-original.txt';$aclCopy=Join-Path $fixture 'acl-copy.txt'
+[IO.File]::WriteAllBytes($aclOriginal,$raw)
+$originalAcl=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $aclOriginal
+$originalAcl.SetAccessRuleProtection($false,$false)
+Set-Acl -LiteralPath $aclOriginal -AclObject $originalAcl
+$originalAcl=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $aclOriginal
+$copyStream=[IO.FileStream]::new($aclCopy,[IO.FileMode]::CreateNew,[Security.AccessControl.FileSystemRights]::Write,[IO.FileShare]::None,4096,[IO.FileOptions]::WriteThrough,$originalAcl)
+try{$copyStream.Write($raw,0,$raw.Length);$copyStream.Flush($true)}finally{$copyStream.Dispose()}
+& $realSourceCopyAcl $aclCopy $originalAcl
+$copiedAcl=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $aclCopy
+Check (-not $copiedAcl.AreAccessRulesProtected -and $copiedAcl.Sddl -ceq $originalAcl.Sddl) 'Native inherited descriptor differs after copy'
 
 $docs=Join-Path $fixture 'docs';$reference=Join-Path $docs 'reference'
 $null=[IO.Directory]::CreateDirectory($reference)

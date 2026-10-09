@@ -266,6 +266,14 @@ function Write-SourceCopy([string]$Path,[byte[]]$Bytes,$Acl) {
  try{$stream.Write($Bytes,0,$Bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
 }
 function Install-SourceCopy([string]$Fresh,[string]$Path) {[K98.SourceCustody]::Replace($Fresh,$Path)}
+function Set-SourceCopyAcl([string]$Path,$Acl) {
+ # FileStream creation can omit SE_DACL_AUTO_INHERITED. Reapply the captured
+ # descriptor only to the NEW protected object, never to its former owner.
+ $copy=[Security.AccessControl.FileSecurity]::new()
+ $sections=[Security.AccessControl.AccessControlSections]::Owner -bor [Security.AccessControl.AccessControlSections]::Group -bor [Security.AccessControl.AccessControlSections]::Access
+ $copy.SetSecurityDescriptorBinaryForm($Acl.GetSecurityDescriptorBinaryForm(),$sections)
+ Set-Acl -LiteralPath $Path -AclObject $copy
+}
 function Initialize-SourceOwner([string]$Path,[bool]$Directory,$Hashes) {
  # Never promote the old object's authority: prior WRITE_DAC handles survive an
  # owner change. A file can be replaced by an authenticated protected copy;
@@ -303,6 +311,7 @@ function Initialize-SourceOwner([string]$Path,[bool]$Directory,$Hashes) {
   [IO.File]::SetLastAccessTimeUtc($fresh,$item.LastAccessTimeUtc)
   [IO.File]::SetAttributes($fresh,$item.Attributes)
   $null=Read-Bytes $fresh (Hash $bytes) 2MB
+  Set-SourceCopyAcl $fresh $acl
   if((Get-Acl -LiteralPath $fresh).GetSecurityDescriptorSddlForm($sections) -cne $before){throw 'Fresh source permissions differ'}
   # The new object is already independently protected and authenticated. Close
   # our original read handle for Windows replacement compatibility; the trusted

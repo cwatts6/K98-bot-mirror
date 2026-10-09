@@ -13,7 +13,7 @@ if(-not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Securit
 
 # Authenticate the exact reviewed library in memory before loading definitions.
 # Normalize only checkout line endings; never execute a second path-based read.
-$expectedLibrary='9472dcf710a4c541c091aefa63d6bb022ae973073705a58fc8bd5eb099113a37'
+$expectedLibrary='59e02fa2b05b0379ba112b3e95ff716c18024f0eef6a1608b0d1773a5f8f9788'
 $libraryPath=Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1'
 $libraryBytes=[IO.File]::ReadAllBytes($libraryPath)
 if($libraryBytes.Length -gt 128KB){throw 'Rehearsal library exceeds bound'}
@@ -35,12 +35,20 @@ function Reject([scriptblock]$Call,[string]$Pattern,[string]$Name){
 }
 function New-ApplicationFile([string]$Name,[byte[]]$Bytes,[bool]$Inherited=$false,[bool]$Writable=$false){
  if($Name -cnotmatch '^[a-z-]+\.(txt|py)$'){throw 'Fixture filename differs'}
- $acl=if($Inherited){[Security.AccessControl.FileSecurity]::new()}else{New-Acl $false}
+ $acl=New-Acl $false
  $acl.SetOwner([Security.Principal.SecurityIdentifier]::new($script:c.sid))
  $acl.SetGroup([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
  if($Writable){$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($script:c.sid),[Security.AccessControl.FileSystemRights]::Write,[Security.AccessControl.AccessControlType]::Allow))}
  $path=Join-Path $script:c.root $Name
  Write-SourceCopy $path $Bytes $acl
+ if($Inherited){
+  # A blank FileSecurity creates a protected empty DACL instead of the intended
+  # inherited fixture. Enable inheritance explicitly on this synthetic file.
+  $inheritedAcl=Get-Acl -LiteralPath $path
+  foreach($rule in @($inheritedAcl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier]))){$inheritedAcl.RemoveAccessRuleSpecific($rule)}
+  $inheritedAcl.SetAccessRuleProtection($false,$false)
+  Set-Acl -LiteralPath $path -AclObject $inheritedAcl
+ }
  return $path
 }
 $created=$false
