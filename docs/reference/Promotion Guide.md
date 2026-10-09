@@ -4,6 +4,20 @@ Use this sequence for the protected S11 runtime. A merge or development-PC pull 
 
 ## Current release — 9 October 2026
 
+**18:35 UTC update:** the latest exact committed-import preparation was settled
+with two metadata changes and no import replay or restart. Its imported data and
+pending archive record remain intact; the operator accepts superseding unfinished
+reports/exports with a fresh source scan. Earlier incident blocks below are history,
+not instructions to repeat recovery. Other historical SQL outcomes remain unknown.
+
+The import connection timeout fix and updater custody/index corrections are in the
+mirror PR. Complete the reviewed one-time used-updater upgrade, promote the source
+through private production main, then deploy with the normal updater. Hold the next
+upload until that deployment succeeds. Intake/recovery remain false; permanent
+failure classification and dependent-stage gating remain follow-up work.
+
+### Earlier deployment and cache evidence
+
 **Stats-cache recovery succeeded at 20:18 UTC.** After the recorded manual
 supersession and exact ticket 405 withdrawal, a normal
 `/kvk_admin refresh_stats_cache` was admitted on its first attempt, acknowledged
@@ -28,9 +42,9 @@ its claim. Do not repeat deployment, imports or recovery.
 ### What happens next
 
 No further incident recovery action is required for the accepted stats-cache run.
-Next engineering work is acceptance of updater ownership-preflight and Git-index
-corrections. Queue prevention is installed; the uncertain claim needs separate
-authoritative reconciliation. Routine patches use a fixed-command
+Updater ownership-preflight and Git-index corrections have passed local validation
+and elevated custody rehearsal. Queue prevention is installed; the exact incident
+settlements are recorded in the current overlay above. Routine patches use a fixed-command
 workflow without bespoke operator-authored packets, or the coordinated startup
 source policy must be reconsidered. Broader S11/provider acceptance remains
 separate; do not change activation flags on the strength of this cache result.
@@ -55,7 +69,8 @@ not the complete deployment operation.
 
 The reusable updater completed its first real release after manual owner and
 Git-index repair. The corrections automate those prerequisites and bookkeeping;
-their local tests do not establish elevated protected-file creation or production acceptance.
+the elevated custody rehearsal now establishes protected-file creation, while
+production acceptance of the corrected updater remains a separate step.
 
 **Required tooling outcome:** a manual update must be
 as straightforward as the previous `git pull` workflow. A stable script may
