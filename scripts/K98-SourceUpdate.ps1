@@ -190,10 +190,20 @@ function Assert-Source($Pins,[string]$Head) {
  }
 }
 function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly) {
- # Staging precedes task disablement. Its presence is sufficient to retain
- # same-release ownership even when the request/receipt was never written.
- foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'),('release-'+$ReleaseId))) {
+ foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'))) {
   if(Test-Path -LiteralPath (Join-Path $StateDirectory $name)) {
+   if($PrepareOnly){throw 'Deployment already staged or requested; rerun Update-K98.ps1 without -PrepareOnly to resume the same release.'}
+   return $false
+  }
+ }
+ $stage=Join-Path $StateDirectory ('release-'+$ReleaseId)
+ if(Test-Path -LiteralPath $stage) {
+  Assert-Protected $stage
+  # The runner writes its manifest before disabling the task. An empty,
+  # protected directory with no request/drain evidence is pre-mutation only.
+  # Retain even partial/unknown contents; never infer safety from a missing
+  # manifest alone and never delete the historical staging directory.
+  if(@(Get-ChildItem -LiteralPath $stage -Force | Select-Object -First 1).Count) {
    if($PrepareOnly){throw 'Deployment already staged or requested; rerun Update-K98.ps1 without -PrepareOnly to resume the same release.'}
    return $false
   }
