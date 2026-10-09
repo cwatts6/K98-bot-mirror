@@ -96,6 +96,18 @@ def bootstrap_source_path(path):
     )
 
 
+def check_case_aliases(paths):
+    """Check every file/directory spelling, including unchanged non-runtime paths."""
+    spellings = {}
+    for path in sorted(set(paths)):
+        parts = path.split("/")
+        for depth in range(1, len(parts) + 1):
+            prefix = "/".join(parts[:depth])
+            folded_prefix = prefix.casefold()
+            if spellings.setdefault(folded_prefix, prefix) != prefix:
+                raise ValueError(f"Case-colliding source inventory: {path}")
+
+
 def source_plan(previous, before, target, changes, read_blob):
     """Build exact source hashes using authenticated Git blobs, not live new bytes.
 
@@ -118,15 +130,7 @@ def source_plan(previous, before, target, changes, read_blob):
     # Windows aliases apply to retained files and directory components too.
     # Refuse even case-only rename releases before drain rather than relying on
     # Git's case-insensitive checkout behavior to repair the installed tree.
-    spellings = {}
-    for path in sorted(set(pins) | set(changes)):
-        ordinary_path(path)
-        parts = path.split("/")
-        for depth in range(1, len(parts) + 1):
-            prefix = "/".join(parts[:depth])
-            folded_prefix = prefix.casefold()
-            if spellings.setdefault(folded_prefix, prefix) != prefix:
-                raise ValueError(f"Case-colliding source inventory: {path}")
+    check_case_aliases(set(pins) | set(changes))
     conventions = {}
     for path, digest in pins.items():
         ordinary_path(path)
@@ -422,6 +426,7 @@ def main():
         set(changes) | set(observation["seed"]["AutomaticStartupPolicy.json"]["source_hashes"])
     )
     objects = {}
+    complete_inventory = set()
     for commit in (before, target):
         tree = git("ls-tree", "-r", "-l", "-z", commit)
         if len(tree) > 4 * 1024 * 1024:
@@ -430,6 +435,7 @@ def main():
         for entry in tree.rstrip(b"\0").split(b"\0"):
             header, path_raw = entry.split(b"\t", 1)
             path = path_raw.decode("utf-8")
+            complete_inventory.add(path)
             if path not in wanted:
                 continue
             mode, kind, oid, length = header.split()
@@ -440,6 +446,10 @@ def main():
             ):
                 raise ValueError(f"Unsupported source object: {path}")
             objects[(commit, path)] = (oid, int(length))
+    # ls-tree already supplies the full bounded inventories. Include unchanged
+    # docs/assets/etc. before filtering blobs, since their directory spelling
+    # controls what the case-insensitive checkout and bootstrap will see.
+    check_case_aliases(complete_inventory)
     if sum(size for _, size in objects.values()) > 128 * 1024 * 1024:
         raise ValueError("Git source inventory exceeds bound.")
     # One subprocess for all blobs avoids per-file process startup overhead.
