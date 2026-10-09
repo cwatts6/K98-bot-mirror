@@ -143,9 +143,10 @@ git rev-parse production/main
 ## Step 3 — Run the fixed updater on MINI_AMD
 
 **Implementation status:** the installed updater completed its first release.
-Ownership/index corrections are under local validation and review; they are not
-installed by merging this change. Do not run a draft copy against production or
-reuse the unused-updater repair for an installation with deployment history.
+Ownership/index corrections have passed local review and the elevated custody
+rehearsal; they are not installed by merging this change. The one-time used-updater
+handoff below installs the reviewed tool before deployment. Do not reuse the
+unused-updater repair for an installation with deployment history.
 
 After the reviewed tool is installed once, every routine source-only release uses
 this same block in **Windows PowerShell 5.1, Run as administrator**, on MINI_AMD:
@@ -209,6 +210,25 @@ feature before accepting its functional health. This implements the release
 contract's explicit healthy/degraded reporting, not a provider-delivery test.
 
 ## One-time updater installation
+
+### Upgrade the already-used October 9 installation
+
+The reviewed `Upgrade-K98InstalledUpdater.ps1` is specific to the inventoried
+`cd112e19` package. Place it beside the handoff's exact `Install-K98UpdateTool.ps1`;
+the upgrade helper authenticates the installer and uses its payload and ACL builders,
+without invoking the initial installer against the existing tool. Close other updater
+PowerShell windows, then run the upgrade helper in elevated Windows PowerShell 5.1.
+
+It holds the existing operator lock, refuses an active update or deployment request,
+checks every installed member, stages and verifies the complete new package, and
+retains the predecessor in `C:\ProgramData\K98\S11\updater-before-custody-cd112e19`.
+It does not change bot source, SQL, scheduled tasks or startup policy. Interrupted
+staging and the gap between the two directory moves resume with the same helper;
+unexpected content is refused. A completed repeat verifies both packages and exits.
+Keep the backup and staging evidence. Once production promotion is complete, use
+the normal updater command above to deploy the timeout/source changes.
+
+### First installation only
 
 The reviewed implementation supplies one automatically built
 `Install-K98UpdateTool.ps1`. Its preparation command on the development PC is
