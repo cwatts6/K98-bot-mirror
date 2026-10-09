@@ -23,27 +23,44 @@ def read(path, expected=None, limit=1048576):
     return raw
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--bindings", required=True)
-    parser.add_argument("--sha256", required=True)
-    args = parser.parse_args()
-    if not sys.flags.isolated:
-        raise ValueError("Isolated Python required")
-    config = json.loads(read(args.bindings, args.sha256))
+def verify_live_source(config, *, predecessor=False):
+    """Use the real bootstrap's complete inventory and custody checks, read-only."""
     root = Path(config["root"])
-    policy_path = Path(config["new_seed_directory"]) / "AutomaticStartupPolicy.json"
-    policy = json.loads(read(policy_path, config["new_policy_sha256"]))
-    if policy != config["new_policy"] or policy["flags"] != config["flags"]:
-        raise ValueError("Successor policy or flags differ")
-    # Authenticate the bootstrap code before executing it. bootstrap then validates
-    # administrative ACLs and the complete source inventory before adding sys.path.
+    policy_path = (
+        Path(config["old_policy"]["Path"])
+        if predecessor
+        else Path(config["new_seed_directory"]) / "AutomaticStartupPolicy.json"
+    )
+    policy_hash = config["old_policy"]["SHA256"] if predecessor else config["new_policy_sha256"]
+    pins = config["old_pins"] if predecessor else config["new_pins"]
+    policy = json.loads(read(policy_path, policy_hash))
+    if policy["source_hashes"] != pins or policy["flags"] != config["flags"]:
+        raise ValueError("Source policy or flags differ")
+    if not predecessor and policy != config["new_policy"]:
+        raise ValueError("Successor policy differs")
     authority_path = root / "scripts/run_export_authority.py"
-    read(authority_path, config["new_pins"]["scripts/run_export_authority.py"])
+    read(authority_path, pins["scripts/run_export_authority.py"])
     authority = runpy.run_path(str(authority_path))
     authority["bootstrap"](
         str(policy_path), script=str(root / "scripts/run_export_startup_issuer.py")
     )
+    return policy
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--bindings", required=True)
+    parser.add_argument("--sha256", required=True)
+    parser.add_argument("--preflight", action="store_true")
+    args = parser.parse_args()
+    if not sys.flags.isolated:
+        raise ValueError("Isolated Python required")
+    config = json.loads(read(args.bindings, args.sha256))
+    policy = verify_live_source(config, predecessor=args.preflight)
+    if args.preflight:
+        print(json.dumps(dict(stage="PREDECESSOR_LIVE_SOURCE_VERIFIED", sql_connected=False)))
+        return
+    policy_path = Path(config["new_seed_directory"]) / "AutomaticStartupPolicy.json"
     from core.export_process_identity import open_pinned_process
     from core.export_startup_windows import administrative_path
 

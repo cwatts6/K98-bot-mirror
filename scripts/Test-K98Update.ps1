@@ -56,13 +56,16 @@ foreach($key in @('include.path','core.sshcommand','filter.x.smudge','credential
 }
 
 # A base interpreter without win32file must never be selected by the verifier.
-function Fake-Venv {$script:venvCalls++;$global:LASTEXITCODE=0}
+function Fake-Venv {$script:venvCalls++;$script:verifyArgs=@($args);$global:LASTEXITCODE=0}
 function Fake-Base {throw 'BASE_PYTHON_SELECTED'}
 $script:venvCalls=0
 $c=[pscustomobject]@{venv=@{path='Fake-Venv';sha256='a'*64};old_plan=@{Python='Fake-Base'};extra_members=@([pscustomobject]@{name='Verify-NewPair.py';sha256='b'*64})}
 $ExpectedBindingsSHA256='c'*64
 Verify-Native
 Check ($venvCalls -eq 1) 'Native verifier did not use installed venv'
+Check ('--preflight' -notin $verifyArgs) 'Successor verification selected predecessor'
+Verify-Native -Preflight
+Check ('--preflight' -in $verifyArgs) 'Preflight did not select complete predecessor source check'
 
 # Retained cohorts may gain new captures, but an existing held/captured row
 # cannot disappear or change during deployment.
