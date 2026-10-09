@@ -88,8 +88,11 @@ def package(output, source=None):
         "Deploy-K98Release.ps1",
         "prepare_k98_update.py",
         "verify_k98_update_pair.py",
+        "package_k98_update_tool.py",
     )
-    files = {name: (source / name).read_bytes() for name in names}
+    # Ship Git's LF form even from a Windows CRLF checkout, so exact target
+    # blob comparison during the first routine release is reproducible.
+    files = {name: (source / name).read_bytes().replace(b"\r\n", b"\n") for name in names}
     files["EmptyGitConfig.txt"] = b""
     manifest = dict(
         version=1, files={name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}

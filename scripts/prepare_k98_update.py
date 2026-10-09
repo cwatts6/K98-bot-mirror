@@ -20,6 +20,18 @@ if __name__ == "__main__" and not __package__:
 from core.export_release_seed import successor_seed
 from services.export_execution_protocol import encode
 
+TOOL_SOURCE_PATHS = frozenset(
+    "scripts/" + name
+    for name in (
+        "Update-K98.ps1",
+        "K98-SourceUpdate.ps1",
+        "Deploy-K98Release.ps1",
+        "prepare_k98_update.py",
+        "verify_k98_update_pair.py",
+        "package_k98_update_tool.py",
+    )
+)
+
 
 def sha256(raw):
     return hashlib.sha256(raw).hexdigest()
@@ -51,10 +63,12 @@ def ordinary_path(path):
     return path
 
 
-def check_source_only(paths):
+def check_source_only(paths, *, tool_copies=()):
     """Routine mode cannot silently install dependencies, SQL or environment."""
     for path in paths:
         ordinary_path(path)
+        if path in TOOL_SOURCE_PATHS and path in tool_copies:
+            continue  # source_plan must compare the target with installed bytes.
         lower = path.casefold()
         # Preparation runs installed tooling with predecessor helpers, while
         # the successor consumes the resulting seed. Keep both contract sides
@@ -131,7 +145,7 @@ def check_case_aliases(paths):
                 raise ValueError(f"Case-colliding source inventory: {path}")
 
 
-def source_plan(previous, before, target, changes, read_blob):
+def source_plan(previous, before, target, changes, read_blob, *, tool_sources=None):
     """Build exact source hashes using authenticated Git blobs, not live new bytes.
 
     ``changes`` contains ordinary add/modify/delete paths; renames are represented
@@ -145,7 +159,8 @@ def source_plan(previous, before, target, changes, read_blob):
         raise ValueError("Source is already current.")
     if not changes or len(changes) > 4096 or len(set(changes)) != len(changes):
         raise ValueError("Bounded unique changed paths required.")
-    check_source_only(changes)
+    tool_sources = tool_sources or {}
+    check_source_only(changes, tool_copies=tool_sources)
     folded = [path.casefold() for path in changes]
     if len(set(folded)) != len(folded):
         raise ValueError("Case-colliding source paths refused.")
@@ -172,6 +187,10 @@ def source_plan(previous, before, target, changes, read_blob):
     members, payload = [], {}
     for path in sorted(changes):
         old, new = read_blob(before, path), read_blob(target, path)
+        if path in TOOL_SOURCE_PATHS and (new is None or new != tool_sources.get(path)):
+            raise ValueError(
+                f"Target updater copy differs from the installed reviewed tool: {path}"
+            )
         if old == new or (old is None and new is None):
             raise ValueError(f"Changed-path inventory differs: {path}")
         if any(raw is not None and len(raw) > 2 * 1024 * 1024 for raw in (old, new)):
@@ -255,7 +274,15 @@ def prepare_update(
     """
     previous = observation["seed"]
     config = deepcopy(observation["bindings"])
-    plan, payload = source_plan(previous, config["before"], config["target"], changes, read_blob)
+    tools = Path(tool_directory)
+    tool_sources = {
+        path: (tools / Path(path).name).read_bytes()
+        for path in changes
+        if path in TOOL_SOURCE_PATHS
+    }
+    plan, payload = source_plan(
+        previous, config["before"], config["target"], changes, read_blob, tool_sources=tool_sources
+    )
     config.update(plan)
     seed = release_seed(previous, plan["new_pins"], observation["gate"])
     config["release_id"] = str(uuid4())
@@ -447,7 +474,7 @@ def main():
         .rstrip("\0")
         .split("\0")
     )
-    check_source_only(changes)
+    check_source_only(changes, tool_copies=TOOL_SOURCE_PATHS)
     requested = sorted(
         set(changes) | set(observation["seed"]["AutomaticStartupPolicy.json"]["source_hashes"])
     )

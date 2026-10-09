@@ -203,6 +203,10 @@ Installing it on MINI_AMD creates the protected tool directory only: it does not
 change running source, startup policy, task configuration, SQL or activation flags.
 It can therefore prepare the first release containing the updater without modifying
 the live checkout first. This installation is not repeated for ordinary releases.
+The first release may copy the updater scripts into the checkout only when their
+target bytes exactly match the authenticated installed tool. This also permits
+the matching runner copy; deletion, differing bytes and seed/startup helper changes
+remain refused. The installer carries all six reviewed script copies for this check.
 
 ## Release boundaries and exceptional changes
 
