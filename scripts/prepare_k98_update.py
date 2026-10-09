@@ -115,6 +115,18 @@ def source_plan(previous, before, target, changes, read_blob):
     if len(set(folded)) != len(folded):
         raise ValueError("Case-colliding source paths refused.")
     pins = deepcopy(previous["AutomaticStartupPolicy.json"]["source_hashes"])
+    # Windows aliases apply to retained files and directory components too.
+    # Refuse even case-only rename releases before drain rather than relying on
+    # Git's case-insensitive checkout behavior to repair the installed tree.
+    spellings = {}
+    for path in sorted(set(pins) | set(changes)):
+        ordinary_path(path)
+        parts = path.split("/")
+        for depth in range(1, len(parts) + 1):
+            prefix = "/".join(parts[:depth])
+            folded_prefix = prefix.casefold()
+            if spellings.setdefault(folded_prefix, prefix) != prefix:
+                raise ValueError(f"Case-colliding source inventory: {path}")
     conventions = {}
     for path, digest in pins.items():
         ordinary_path(path)
