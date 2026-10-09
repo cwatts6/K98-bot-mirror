@@ -109,10 +109,10 @@ try {
   $remote=Git 'remote get-url origin'
   if($remote -notmatch '^https://github\.com/cwatts6/K98-bot(?:\.git)?$'){throw 'Production origin must be private cwatts6/K98-bot'}
   # Use Git's installed credential manager, never a helper named by user config.
-  $credential='C:\Program Files\Git\mingw64\bin\git-credential-manager.exe'
-  Assert-Protected $credential
+  $credential=Get-GitCredentialManager
+  $helper=$credential.Replace('\','/').Replace(' ','\ ')
   Write-Host 'Checking private main and preparing this update automatically...'
-  $null=Git ('-c credential.helper= -c credential.helper="C:/Program\ Files/Git/mingw64/bin/git-credential-manager.exe" fetch --no-tags --no-recurse-submodules origin +refs/heads/main:refs/remotes/origin/main')
+  $null=Git ('-c credential.helper= -c credential.helper="'+$helper+'" fetch --no-tags --no-recurse-submodules origin +refs/heads/main:refs/remotes/origin/main')
   $target=Git 'rev-parse refs/remotes/origin/main'
   if($before -ceq $target){Write-Host 'Already current. No restart required.';return}
   $null=Git ('merge-base --is-ancestor '+$before+' '+$target)

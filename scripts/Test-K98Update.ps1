@@ -10,6 +10,24 @@ foreach($definition in $definitions){. ([scriptblock]::Create($definition.Extent
 $passed=0
 function Check([bool]$value,[string]$message){if(-not $value){throw $message};$script:passed++}
 function Reject([scriptblock]$call,[string]$pattern){try{& $call;throw 'TEST_DID_NOT_REJECT'}catch{if($_.Exception.Message -notlike $pattern){throw};$script:passed++}}
+# Resolve only known Git layouts and preserve custody failure instead of fallback.
+$script:helperPresent=@();$script:helperChecked='';$script:helperDenied=$false
+function Test-Path {param([string]$LiteralPath);return $LiteralPath -cin $script:helperPresent}
+function Assert-Protected([string]$Path){$script:helperChecked=$Path;if($script:helperDenied){throw 'fixture custody denied'}}
+function Get-Item {param([string]$LiteralPath,[switch]$Force,[string]$ErrorAction);return [pscustomobject]@{PSIsContainer=$false}}
+$ucrt='C:\Program Files\Git\ucrt64\bin\git-credential-manager.exe'
+$mingw='C:\Program Files\Git\mingw64\bin\git-credential-manager.exe'
+foreach($candidate in @($ucrt,$mingw)) {
+ $script:helperPresent=@($candidate)
+ Check ((Get-GitCredentialManager) -ceq $candidate) 'Installed Git layout not resolved'
+ Check ($script:helperChecked -ceq $candidate) 'Credential helper custody skipped'
+}
+$script:helperPresent=@($ucrt,$mingw);$script:helperDenied=$true
+Reject {Get-GitCredentialManager} '*custody denied*'
+$script:helperDenied=$false;$script:helperPresent=@('C:\untrusted\git-credential-manager.exe')
+Reject {Get-GitCredentialManager} '*missing from supported*'
+Remove-Item Function:\Test-Path,Function:\Get-Item,Function:\Assert-Protected
+foreach($definition in $definitions){. ([scriptblock]::Create($definition.Extent.Text.Replace('$PSScriptRoot',("'"+$PSScriptRoot.Replace("'","''")+"'"))))}
 $fixture=Join-Path (Split-Path -Parent $PSScriptRoot) ('.codex_artifacts\update-test-'+[guid]::NewGuid().ToString('N'))
 $null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'docs\reference'))
 $file=Join-Path $fixture 'docs\reference\note.md'

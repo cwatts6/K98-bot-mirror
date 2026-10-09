@@ -79,6 +79,20 @@ function Same($Actual,$Expected) {
  }
  return ([string]$Actual -ceq [string]$Expected)
 }
+function Get-GitCredentialManager {
+ # Fixed installation locations only: never execute a helper from PATH or config.
+ foreach($path in @(
+  'C:\Program Files\Git\ucrt64\bin\git-credential-manager.exe',
+  'C:\Program Files\Git\mingw64\bin\git-credential-manager.exe'
+ )) {
+  if(Test-Path -LiteralPath $path) {
+   Assert-Protected $path
+   if(-not(Get-Item -LiteralPath $path -Force -ErrorAction Stop).PSIsContainer){return $path}
+   throw 'Git Credential Manager path is not a file'
+  }
+ }
+ throw 'Git Credential Manager missing from supported protected Git installation locations'
+}
 function Invoke-GitWorker([string]$Arguments) {
  $null=Read-Bytes $c.git_path $c.git_sha256 2MB
  $empty=Join-Path $PSScriptRoot 'EmptyGitConfig.txt'
