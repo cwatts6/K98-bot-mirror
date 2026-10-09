@@ -27,7 +27,7 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     # Patch the embed sender used by processing_pipeline (it was imported at module import time)
     monkeypatch.setattr(processing_pipeline, "send_embed_safe", mock_send_embed_safe)
 
-    # Also intercept send_status_embed â€” this is where Context is merged into the fields dict
+    # Also intercept send_status_embed — this is where Context is merged into the fields dict
     # via {**context_field, **status_map}. Capture those calls so we can assert Context is present.
     status_embed_calls = []
 
