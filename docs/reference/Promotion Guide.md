@@ -31,8 +31,10 @@ workflow without bespoke operator-authored packets, or the coordinated startup
 source policy must be reconsidered. Broader S11/provider acceptance remains
 separate; do not change activation flags on the strength of this cache result.
 
-[The S11 handover](../../.codex_artifacts/s11-runtime-contracts-20261004/S11-GoLive-Handover-20261008.md)
-retains the exact receipts, logs and completed recovery commands as history.
+The operator's local S11 handover retains the exact receipts, logs and completed
+recovery commands as history. It is local-only evidence, excluded from Git, at
+`.codex_artifacts/s11-runtime-contracts-20261004/S11-GoLive-Handover-20261008.md`
+on the development PC; it is not a repository document or deployment input.
 
 ### Why not just git pull?
 
