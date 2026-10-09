@@ -271,6 +271,9 @@ function Set-SourceCopyAcl([string]$Path,$Acl) {
  # descriptor only to the NEW protected object, never to its former owner.
  $copy=[Security.AccessControl.FileSecurity]::new()
  $sections=[Security.AccessControl.AccessControlSections]::Owner -bor [Security.AccessControl.AccessControlSections]::Group -bor [Security.AccessControl.AccessControlSections]::Access
+ # Set-Acl itself adds AI to some protected explicit descriptors. Leave an
+ # already exact fresh copy untouched; only reconcile a creation mismatch.
+ if((Microsoft.PowerShell.Security\Get-Acl -LiteralPath $Path).GetSecurityDescriptorSddlForm($sections) -ceq $Acl.GetSecurityDescriptorSddlForm($sections)){return}
  $copy.SetSecurityDescriptorBinaryForm($Acl.GetSecurityDescriptorBinaryForm(),$sections)
  Set-Acl -LiteralPath $Path -AclObject $copy
 }

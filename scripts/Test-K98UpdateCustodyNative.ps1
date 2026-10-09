@@ -13,7 +13,7 @@ if(-not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Securit
 
 # Authenticate the exact reviewed library in memory before loading definitions.
 # Normalize only checkout line endings; never execute a second path-based read.
-$expectedLibrary='59e02fa2b05b0379ba112b3e95ff716c18024f0eef6a1608b0d1773a5f8f9788'
+$expectedLibrary='1066070a2bc74b21f77ee8c8fcc9ff91d63698400894483eb27e0b0d556a9112'
 $libraryPath=Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1'
 $libraryBytes=[IO.File]::ReadAllBytes($libraryPath)
 if($libraryBytes.Length -gt 128KB){throw 'Rehearsal library exceeds bound'}

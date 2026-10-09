@@ -128,6 +128,19 @@ try{$copyStream.Write($raw,0,$raw.Length);$copyStream.Flush($true)}finally{$copy
 $copiedAcl=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $aclCopy
 Check (-not $copiedAcl.AreAccessRulesProtected -and $copiedAcl.Sddl -ceq $originalAcl.Sddl) 'Native inherited descriptor differs after copy'
 
+# A protected explicit D:P descriptor must not gain AI through Set-Acl.
+$explicitCopy=Join-Path $fixture 'acl-explicit.txt'
+$nativeSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$explicitAcl=[Security.AccessControl.FileSecurity]::new()
+$explicitAcl.SetSecurityDescriptorSddlForm(('O:'+ $nativeSid +'G:'+ $nativeSid +'D:P(A;;FA;;;'+ $nativeSid +')'))
+$explicitStream=[IO.FileStream]::new($explicitCopy,[IO.FileMode]::CreateNew,[Security.AccessControl.FileSystemRights]::Write,[IO.FileShare]::None,4096,[IO.FileOptions]::WriteThrough,$explicitAcl)
+try{$explicitStream.Write($raw,0,$raw.Length);$explicitStream.Flush($true)}finally{$explicitStream.Dispose()}
+$explicitBefore=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $explicitCopy
+Check ($explicitBefore.Sddl -ceq $explicitAcl.Sddl) 'Native explicit fixture descriptor differs'
+& $realSourceCopyAcl $explicitCopy $explicitAcl
+$explicitAfter=Microsoft.PowerShell.Security\Get-Acl -LiteralPath $explicitCopy
+Check ($explicitAfter.Sddl -ceq $explicitBefore.Sddl) 'Native explicit descriptor changed during reconciliation'
+
 $docs=Join-Path $fixture 'docs';$reference=Join-Path $docs 'reference'
 $null=[IO.Directory]::CreateDirectory($reference)
 $junction=Join-Path $fixture 'junction'
