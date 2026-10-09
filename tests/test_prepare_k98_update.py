@@ -177,6 +177,15 @@ def test_case_colliding_changes_are_refused():
         source_plan(inventory(), BEFORE, AFTER, ["core/a.py", "core/A.py"], lambda *_: b"unused")
 
 
+@pytest.mark.parametrize("path", ["Core/example.py", "core/EXAMPLE.py", "Core/new.py"])
+def test_changed_paths_cannot_case_alias_retained_inventory(path):
+    def forbidden_read(*_):
+        pytest.fail("Case collision reached blob access")
+
+    with pytest.raises(ValueError, match="Case-colliding source inventory"):
+        source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
+
+
 def test_two_successor_seeds_rebind_gate_without_reusing_release_identity(tmp_path, monkeypatch):
     original = predecessor(tmp_path, monkeypatch)
     previous = deepcopy(original)
