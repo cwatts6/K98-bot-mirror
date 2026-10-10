@@ -44,6 +44,73 @@ def test_successor_manifest_is_explicit_and_bounded(fault):
             validate_manifest(value)
 
 
+@pytest.mark.parametrize("version", [1, 2, 3])
+@pytest.mark.parametrize("selected", [False, True])
+def test_superseded_own_stage_stops_before_member_copy_or_preflight(tmp_path_factory, version, selected):
+    ps = shutil.which("powershell.exe")
+    if not ps:
+        pytest.skip("Windows PowerShell required")
+    # Keep the fixture below PS5.1's legacy path limit, as on the target host.
+    tmp_path = tmp_path_factory.mktemp("early")
+    value = {1: specification, 2: amendment, 3: successor}[version]()
+    state = tmp_path / "state"
+    root = state / ("release-" + value["release_id"])
+    own = root
+    if version == 3:
+        own = own / ("amendment-" + value["amendment"]["parent_amendment_id"])
+    if version in (2, 3):
+        own = own / ("amendment-" + value["amendment"]["id"])
+    own.mkdir(parents=True)
+    (state / ("deployment-drained-" + value["release_id"] + ".json")).write_text("{}")
+    if selected:
+        (own / ".amendment-selected.json").write_text("{}")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(value))
+    runner = Path(__file__).resolve().parents[1] / "scripts/Deploy-K98Release.ps1"
+    source = runner.read_text(encoding="utf-8")
+    start = source.index("$script:staged=Join-Path $policy.state_directory")
+    end = source.index("$members=@($manifest.members)", start)
+    script = tmp_path / "early.ps1"
+    script.write_text(
+        r"""
+param([string]$Runner,[string]$ManifestPath,[string]$State)
+$ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+$env:PSModulePath='C:\Windows\System32\WindowsPowerShell\v1.0\Modules'
+$ast=[Management.Automation.Language.Parser]::ParseFile($Runner,[ref]$null,[ref]$null)
+$fn=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Assert-OriginalReleaseUnselected'},$true)
+. ([scriptblock]::Create($fn.Extent.Text))
+function Assert-ReleaseAmendment($Current,[string]$Stage){}
+function Assert-AmendmentSelection([string]$Path,$Current,[string]$Hash){}
+$manifest=Get-Content -LiteralPath $ManifestPath -Raw|ConvertFrom-Json
+$releaseId=$manifest.release_id;$ExpectedSHA256='fixture'
+$policy=@{state_directory=$State}
+""" + source[start:end] + "\nWrite-Output 'MEMBER_COPY_AND_PREFLIGHT_REACHABLE'\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            ps,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-Runner",
+            str(runner),
+            "-ManifestPath",
+            str(manifest_path),
+            "-State",
+            str(state),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert (result.returncode == 0) == (not selected), result.stdout + result.stderr
+    assert ("MEMBER_COPY_AND_PREFLIGHT_REACHABLE" in result.stdout) == (not selected)
+    if selected:
+        assert "superseded" in result.stderr
+
+
 @pytest.mark.parametrize(
     "fault",
     [

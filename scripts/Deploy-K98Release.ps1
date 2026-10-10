@@ -209,7 +209,6 @@ Assert-AdminPath $powershell
 $executionLock=Enter-ReleaseExecution (Join-Path $policy.state_directory ('deployment-'+$releaseId+'.lock'))
 try {
 $script:staged=Join-Path $policy.state_directory ('release-'+$releaseId)
-if($manifest.version -eq 1){Assert-OriginalReleaseUnselected $manifest $staged}
 $amendmentSelection=$null
 if($manifest.version -eq 3) {
     if(([guid]$manifest.amendment.parent_amendment_id).ToString() -cne $manifest.amendment.parent_amendment_id){throw 'Canonical parent amendment required'}
@@ -224,6 +223,7 @@ if($manifest.version -in @(2,3)) {
     }
     $script:staged=Join-Path $staged ('amendment-'+$manifest.amendment.id)
 }
+Assert-OriginalReleaseUnselected $manifest $staged
 $members=@($manifest.members)
 if($members.Count -lt 1 -or $members.Count -gt 128){throw 'Bounded release member inventory required'}
 $seen=@{}
