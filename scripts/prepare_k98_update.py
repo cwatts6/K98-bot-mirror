@@ -41,6 +41,14 @@ SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
 
 def combined_description(raw, before):
     """A reviewed target-tree descriptor, never a live/generated hash assertion."""
+    value = validate_combined_description(raw)
+    if before not in value["bot_predecessors"]:
+        raise ValueError(f"Combined release does not support installed Bot predecessor {before}.")
+    return value
+
+
+def validate_combined_description(raw):
+    """Validate committed metadata without claiming installed compatibility."""
     if len(raw) > 65536:
         raise ValueError("Combined release description exceeds bound.")
     value = json.loads(raw)
@@ -59,9 +67,8 @@ def combined_description(raw, before):
         not isinstance(predecessors, list)
         or not 1 <= len(predecessors) <= 16
         or any(not isinstance(x, str) or not re.fullmatch(r"[a-f0-9]{40}", x) for x in predecessors)
-        or before not in predecessors
     ):
-        raise ValueError(f"Combined release does not support installed Bot predecessor {before}.")
+        raise ValueError("Bounded exact Bot predecessor commits required.")
     if not isinstance(value["sql_commit"], str) or not re.fullmatch(
         r"[a-f0-9]{40}", value["sql_commit"]
     ):

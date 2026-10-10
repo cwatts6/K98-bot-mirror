@@ -32,6 +32,12 @@ Each profile lives at `migrations/<id>.release.json`; the SQL repository's
 `docs/module-release.md` defines its format. No operational release description
 or migration is added by the updater implementation itself.
 
+Descriptor-only pull requests trigger updater CI. The metadata check validates
+the actual descriptor's shape, exact commit/hash fields and explicit migration
+order. Installed-predecessor compatibility, private SQL acquisition and live SQL
+preconditions remain preparation checks before drain; CI does not claim those
+production observations.
+
 The first profile supports existing unsigned ordinary stored procedures/views and
 explicit new object EXECUTE/SELECT grants. It refuses sealed startup objects or
 principals, whole-database startup contracts, schema/data migrations, identities,

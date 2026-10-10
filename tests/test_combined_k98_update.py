@@ -57,6 +57,22 @@ def test_sql_order_and_unicode_bytes_remain_exact():
     assert all(m["sha256"] == sha256(payload[m["name"]]) for m in binding["members"])
 
 
+def test_committed_descriptor_ci_validation_reads_actual_input(tmp_path):
+    from scripts.validate_k98_release_description import main
+
+    path = tmp_path / "k98-release.json"
+    args = ["--descriptor", str(path)]
+    assert main(args) == 0
+    d, _, _ = fixture()
+    path.write_text(json.dumps(d))
+    assert main(args) == 0
+    d["sql_commit"] = "main"
+    path.write_text(json.dumps(d))
+    assert main(args) == 1
+    path.write_text('{"version":')
+    assert main(args) == 1
+
+
 @pytest.mark.parametrize("damage", ["profile", "before", "commit", "order", "extra", "hash"])
 def test_unreviewed_release_description_refused(damage):
     d, _, _ = fixture()
