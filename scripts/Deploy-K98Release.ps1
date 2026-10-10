@@ -118,11 +118,39 @@ function Invoke-ReleaseSteps($Steps,[string]$Receipts,[string]$ReleaseId) {
     }
 }
 
+function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
+    # One explicit amendment of a drained version-one release before any step
+    # completed. SQL reconciliation belongs to the reviewed new preflight.
+    $a=$Current.amendment
+    if((($a.PSObject.Properties.Name|Sort-Object) -join ',') -cne 'base_manifest_sha256,failed_step_id,id' -or
+       ([guid]$a.id).ToString() -cne $a.id -or $a.base_manifest_sha256 -cnotmatch '^[a-f0-9]{64}$' -or
+       $a.failed_step_id -cnotmatch '^[a-z0-9-]{1,60}$'){throw 'Exact release amendment reference required'}
+    Assert-AdminPath $BaseStage
+    $baseFile=Join-Path $BaseStage '.release.json';Assert-AdminPath $baseFile
+    $base=[Text.Encoding]::UTF8.GetString((Read-Pinned $baseFile $a.base_manifest_sha256 65536))|ConvertFrom-Json
+    if($base.version -ne 1){throw 'Only an original version-one release can be amended'}
+    foreach($field in @('release_id','host','application_sid','repository')) {
+        if($base.$field -cne $Current.$field){throw ('Amendment changes original '+$field)}
+    }
+    foreach($field in @('policy','issuer_launcher')) {
+        if($base.$field.path -cne $Current.$field.path -or $base.$field.sha256 -cne $Current.$field.sha256){throw ('Amendment changes original '+$field)}
+    }
+    if($base.steps[0].kind -cne 'sql' -or $base.steps[0].id -cne $a.failed_step_id){throw 'Amendment requires the original first SQL step'}
+    $directory=Join-Path $BaseStage '.receipts';Assert-AdminPath $directory
+    $entries=@(Get-ChildItem -LiteralPath $directory -Force)
+    $expected=$a.failed_step_id+'.intent.json'
+    if($entries.Count -ne 1 -or $entries[0].PSIsContainer -or $entries[0].Name -cne $expected){throw 'Original release progressed beyond its first SQL intent; amendment refused'}
+    $intent=Read-Control $entries[0].FullName
+    if($intent.stage -cne 'starting' -or $intent.release_id -cne $Current.release_id -or $intent.step -cne $a.failed_step_id){throw 'Original SQL intent differs'}
+    if(Test-Path -LiteralPath (Join-Path $BaseStage 'start-requested.json')){throw 'An original start request prohibits amendment'}
+}
+
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if(-not ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Run the release script in an administrative PowerShell'}
 $raw=Read-Pinned $ManifestPath $ExpectedSHA256 65536
 $script:manifest=[Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
-if($manifest.version -ne 1 -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
+if($manifest.version -notin @(1,2) -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
+if(($manifest.version -eq 2) -ne ($manifest.PSObject.Properties.Name -ccontains 'amendment')){throw 'Release version and amendment fields differ'}
 $releaseId=([guid]$manifest.release_id).ToString()
 if($releaseId -cne $manifest.release_id){throw 'Canonical release ID required'}
 Assert-AdminPath $manifest.policy.path
@@ -131,6 +159,17 @@ $policy=[Text.Encoding]::UTF8.GetString($policyRaw)|ConvertFrom-Json
 Assert-AdminPath $policy.state_directory
 Assert-AdminPath $powershell
 $script:staged=Join-Path $policy.state_directory ('release-'+$releaseId)
+$amendmentSelection=$null
+if($manifest.version -eq 2) {
+    Assert-ReleaseAmendment $manifest $staged
+    if(-not(Test-Path -LiteralPath (Join-Path $policy.state_directory ('deployment-drained-'+$releaseId+'.json')))){throw 'Existing protected drain required before amendment'}
+    $amendmentSelection=Join-Path $staged '.amendment-selected.json'
+    if(Test-Path -LiteralPath $amendmentSelection) {
+        $selected=Read-Control $amendmentSelection
+        if($selected.amendment_id -cne $manifest.amendment.id -or $selected.manifest_sha256 -cne $ExpectedSHA256.ToLowerInvariant()){throw 'Another amendment is selected; preserve its outcome'}
+    }
+    $script:staged=Join-Path $staged ('amendment-'+$manifest.amendment.id)
+}
 $members=@($manifest.members)
 if($members.Count -lt 1 -or $members.Count -gt 128){throw 'Bounded release member inventory required'}
 $seen=@{}
@@ -174,6 +213,9 @@ foreach($member in $members) {
     $null=Read-Pinned $destination $member.sha256 16MB
 }
 if((Invoke-ReleaseScript $manifest.preflight) -ne 0){throw 'Release preflight failed; no restart requested'}
+if($null -ne $amendmentSelection -and -not(Test-Path -LiteralPath $amendmentSelection)) {
+    Write-NewRecord $amendmentSelection @{amendment_id=$manifest.amendment.id;manifest_sha256=$ExpectedSHA256.ToLowerInvariant();release_id=$releaseId}
+}
 $journals=@(Get-ChildItem -LiteralPath $policy.state_directory -Filter 'incarnation-*.json' -File|Sort-Object Name)
 if($journals.Count -lt 1 -or $journals.Count -gt 1000){throw 'Existing reviewed incarnation required; bootstrap is separate'}
 $previous=Read-Control $journals[-1].FullName
