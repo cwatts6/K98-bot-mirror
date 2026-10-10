@@ -69,7 +69,9 @@ function Write-NewBytes([string]$Path,[byte[]]$Bytes) {
     Assert-AdminPath $Path
 }
 function Write-NewRecord([string]$Path,$Value) {
-    Write-NewBytes $Path ([Text.UTF8Encoding]::new($false).GetBytes(($Value|ConvertTo-Json -Depth 30 -Compress)))
+    $pending=Join-Path (Split-Path -Parent $Path) ('pending-'+[guid]::NewGuid().ToString('N'))
+    Write-NewBytes $pending ([Text.UTF8Encoding]::new($false).GetBytes(($Value|ConvertTo-Json -Depth 30 -Compress)))
+    [IO.File]::Move($pending,$Path)
 }
 function Read-Control([string]$Path) {
     Assert-AdminPath $Path
@@ -100,21 +102,34 @@ function Invoke-ReleaseScript($Invocation) {
     return $LASTEXITCODE
 }
 
-function Invoke-ReleaseSteps($Steps,[string]$Receipts,[string]$ReleaseId) {
+function Invoke-ReleaseSteps($Steps,[string]$Receipts,[string]$ReleaseId,[int]$ProtocolVersion=1) {
     foreach($step in $steps) {
         $intent=Join-Path $receipts ($step.id+'.intent.json')
         $done=Join-Path $receipts ($step.id+'.complete.json')
+        if($ProtocolVersion -eq 4) {
+            foreach($pair in @(@($intent,'starting'),@($done,'verified'))) {
+                if(Test-Path -LiteralPath $pair[0]) {
+                    $record=Read-Control $pair[0]
+                    if($record.release_id -cne $ReleaseId -or $record.step -cne $step.id -or $record.stage -cne $pair[1]){throw ('Receipt identity differs: '+$pair[0])}
+                }
+            }
+        }
+        $clock=[Diagnostics.Stopwatch]::StartNew()
         $observed=Invoke-ReleaseScript $step.verify
         if($observed -eq 0) {
             if(-not(Test-Path -LiteralPath $done)){Write-NewRecord $done @{stage='verified';release_id=$releaseId;step=$step.id}}
             continue
         }
-        if($observed -ne 10){throw ('Outcome unresolved at '+$step.id+'; no later step executed')}
-        if((Test-Path -LiteralPath $intent) -or (Test-Path -LiteralPath $done)){throw ('Previously observed '+$step.id+' has no confirmed current result; retained for outcome review, not automatically replayed')}
-        Write-NewRecord $intent @{stage='starting';release_id=$releaseId;step=$step.id}
+        # v4's fixed adapters reserve 11 for a PROVEN rollback or a bounded,
+        # independently verified continuation. Never permit a second start.
+        $safe=$ProtocolVersion -eq 4 -and $observed -eq 11 -and $step.kind -cne 'start'
+        if($observed -ne 10 -and -not $safe){throw ('Outcome unresolved at '+$step.id+'; no later step executed. Run Update-K98.ps1 -Status and retain this transcript.')}
+        if((Test-Path -LiteralPath $done) -or ((Test-Path -LiteralPath $intent) -and -not $safe)){throw ('Previously observed '+$step.id+' has no confirmed current result; retained for outcome review, not automatically replayed')}
+        if(-not(Test-Path -LiteralPath $intent)){Write-NewRecord $intent @{stage='starting';release_id=$releaseId;step=$step.id}}
         if((Invoke-ReleaseScript $step.apply) -ne 0){throw ('Apply failed at '+$step.id+'; retain evidence and resume only through verification')}
         if((Invoke-ReleaseScript $step.verify) -ne 0){throw ('Postcondition unconfirmed at '+$step.id+'; later steps remain stopped')}
-        Write-NewRecord $done @{stage='verified';release_id=$releaseId;step=$step.id}
+        Write-NewRecord $done @{stage='verified';release_id=$releaseId;step=$step.id;elapsed_seconds=$clock.Elapsed.TotalSeconds}
+        if($ProtocolVersion -eq 4){Write-Host ('Stage '+$step.id+' verified in '+[math]::Round($clock.Elapsed.TotalSeconds,2)+' seconds.')}
     }
 }
 
@@ -197,7 +212,7 @@ $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if(-not ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Run the release script in an administrative PowerShell'}
 $raw=Read-Pinned $ManifestPath $ExpectedSHA256 65536
 $script:manifest=[Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
-if($manifest.version -notin @(1,2,3) -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
+if($manifest.version -notin @(1,2,3,4) -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
 if(($manifest.version -in @(2,3)) -ne ($manifest.PSObject.Properties.Name -ccontains 'amendment')){throw 'Release version and amendment fields differ'}
 $releaseId=([guid]$manifest.release_id).ToString()
 if($releaseId -cne $manifest.release_id){throw 'Canonical release ID required'}
@@ -339,6 +354,6 @@ if($null -ne $issuerProcess) {
 $receipts=Join-Path $staged '.receipts'
 if(-not(Test-Path -LiteralPath $receipts)){$null=[IO.Directory]::CreateDirectory($receipts,(New-ControlAcl $true))}
 Assert-AdminPath $receipts
-Invoke-ReleaseSteps $steps $receipts $releaseId
+Invoke-ReleaseSteps $steps $receipts $releaseId $manifest.version
 Write-Host ('Release verified: '+$releaseId)
 } finally {$executionLock.Dispose()}

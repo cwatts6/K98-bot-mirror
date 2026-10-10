@@ -475,6 +475,8 @@ S4B is accepted and merged; the current closeout record and archived pack supers
 
 ## Post-S6 active navigation
 
+- [Normal combined Bot and SQL updater](Combined%20Updater.md)
+
 - [Settled integration requirements](kvk_source_migration/post_s6_integration_requirements.md)
 - [Closeout and next-slice carry-forward manifest](kvk_source_migration/post_s6_handoff_log.md)
 - [S7 task pack](../task_packs/archive/Codex%20Task%20Pack%20-%20KVK%20Source%20Migration%20S7%20Integration%20Contract%20and%20Implementation%20Planning.md)

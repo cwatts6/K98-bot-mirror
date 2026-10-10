@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$PrepareOnly)
+param([switch]$PrepareOnly,[switch]$Status)
 # Routine operator entrypoint: run this same script, then the prompted Discord
 # restart. No release-specific arguments, packet editing or hash entry.
 Set-StrictMode -Version Latest
@@ -40,6 +40,28 @@ Assert-UpdaterCustody $library
 . $library -Action Library
 $script:c=[pscustomobject]@{root=$root;sid=$identity.User.Value;git_path='C:\Program Files\Git\cmd\git.exe';git_sha256=''}
 $updates='C:\ProgramData\K98\S11\updates'
+if($Status) {
+ if($PrepareOnly){throw 'Choose -Status or -PrepareOnly'}
+ $active=Join-Path $updates 'active.json'
+ if(-not(Test-Path -LiteralPath $active)){Write-Host 'No active update. Historical evidence is retained under the updates directory.';return}
+ $saved=Read-Json $active
+ if($saved.directory -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$'){throw 'Saved update path differs'}
+ $prepared=Read-Json (Join-Path $saved.directory 'prepared.json')
+ $manifest=Read-Json $prepared.manifest $prepared.manifest_sha256
+ if($saved.release_id -cne $manifest.release_id -or $prepared.release_id -cne $manifest.release_id){throw 'Active release identity differs'}
+ if(Test-Path -LiteralPath (Join-Path $saved.directory 'verified.json')) {
+  $verified=Read-Json (Join-Path $saved.directory 'verified.json')
+  if($verified.release_id -cne $prepared.release_id -or $verified.target -cne $prepared.target){throw 'Closeout identity differs'}
+  Write-Host ('VERIFIED_HISTORICAL: '+$prepared.target+'; no deployment action required.');return
+ }
+ $member=@($manifest.members|Where-Object {$_.name -ceq 'Release-Step.ps1'})
+ if($member.Count -ne 1){throw 'Status adapter is not in the retained package'}
+ $adapter=Join-Path (Split-Path -Parent $prepared.manifest) 'Release-Step.ps1'
+ $null=Read-Bytes $adapter $member[0].sha256 2MB
+ & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $adapter -Action Status -ExpectedBindingsSHA256 $prepared.bindings_sha256 | Out-Host
+ if($LASTEXITCODE -ne 0){throw 'Status unresolved. Retain the named evidence; no state was changed.'}
+ return
+}
 if(-not(Test-Path -LiteralPath $updates)){New-Directory $updates}
 Assert-Protected $updates
 # Prevent two operator windows from preparing or deploying concurrently. The
@@ -57,10 +79,13 @@ try {
   $work=$saved.directory
   if($work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$'){throw 'Saved update path differs'}
   $prepared=Read-Json (Join-Path $work 'prepared.json')
+  if($saved.release_id -cne $prepared.release_id){throw 'Saved release identity differs'}
   if(Test-Path -LiteralPath (Join-Path $work 'verified.json')) {
    # Only the pointer is removed. All immutable release evidence is retained.
+   $verified=Read-Json (Join-Path $work 'verified.json')
+   if($verified.release_id -cne $prepared.release_id -or $verified.target -cne $prepared.target){throw 'Retained closeout identity differs'}
    Remove-Item -LiteralPath $active
-   $prepared=$null
+   Write-Host ('Previously completed release '+$prepared.target+' verified; no restart required.');return
   } else {
    $savedManifest=Read-Json $prepared.manifest $prepared.manifest_sha256
    $savedPolicy=Read-Json $savedManifest.policy.path $savedManifest.policy.sha256
@@ -137,7 +162,7 @@ try {
   $resources=Rows ("SELECT TOP (129) r.ResourceKey,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID,r.OwnerID,r.Fence,r.BlockedReason,r.Version FROM dbo.ExportResource r JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID WHERE p.AccountKey='"+$account+"' AND p.State IN ('captured','materialized','uncertain') ORDER BY r.ResourceKey;")
   $bindings=@{
    root=$root;host=$env:COMPUTERNAME;sid=$c.sid;account=$account;before=$before;target=$target
-   git_path=$c.git_path;git_sha256=$c.git_sha256;venv=@{path=$venvPath;sha256=$venvHash}
+   git_path=$c.git_path;git_sha256=$c.git_sha256;credential_manager=$credential;venv=@{path=$venvPath;sha256=$venvHash}
    old_policy=@{Path=$policyPath;SHA256=$policyHash;StateDirectory=$policy.state_directory}
    old_plan=@{Path=$policy.seed_plan.path;SHA256=$policy.seed_plan.sha256;Python=$plan.python;PythonSHA256=$plan.python_sha256}
    old_gate=@{Path=$gatePath;SHA256=(Hash $gateBytes)}
@@ -154,7 +179,7 @@ try {
    # the live checkout. They can prepare the first release containing the tool.
    $toolManifest=Read-Json $toolManifestPath
    if($toolManifest.version -ne 1){throw 'Unsupported installed update tool'}
-   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
+   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
    if(@($toolManifest.files.PSObject.Properties).Count -ne $required.Count){throw 'Exact update tool inventory required'}
    foreach($name in $required){$null=Read-Bytes (Join-Path $PSScriptRoot $name) $toolManifest.files.$name 2MB}
   } else {
@@ -165,6 +190,13 @@ try {
   # The generator creates administrative custody atomically, before any bytes.
   Assert-Protected $work
   $prepared=Read-Json (Join-Path $work 'prepared.json')
+  $candidateManifest=Read-Json $prepared.manifest $prepared.manifest_sha256
+  $preflight=Join-Path (Split-Path -Parent $prepared.manifest) 'Release-Step.ps1'
+  $entry=@($candidateManifest.members|Where-Object {$_.name -ceq 'Release-Step.ps1'})
+  if($entry.Count -ne 1){throw 'Preparation adapter missing'}
+  $null=Read-Bytes $preflight $entry[0].sha256 2MB
+  & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $preflight -Action Preflight -ExpectedBindingsSHA256 $prepared.bindings_sha256 | Out-Host
+  if($LASTEXITCODE -ne 0){throw ('Preparation compatibility checks failed; bot remains running. Evidence: '+$work)}
   Write-Record $active @{directory=$work;release_id=$prepared.release_id}
   Write-Host ('Prepared automatically in '+[math]::Round($clock.Elapsed.TotalSeconds,1)+' seconds. Target '+$target)
  }
@@ -174,16 +206,22 @@ try {
  $null=Read-Bytes $runner $prepared.runner_sha256 2MB
  $oldPolicy=Read-Json $manifest.policy.path $manifest.policy.sha256
  $stage=Join-Path $oldPolicy.state_directory ('release-'+$manifest.release_id)
- $launch=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$runner,'-ManifestPath',$prepared.manifest,'-ExpectedSHA256',$prepared.manifest_sha256)
- if(Test-Path -LiteralPath $stage){$launch+='-Resume'}
- & $powershell @launch | Out-Host
- if($LASTEXITCODE -ne 0){throw 'Update stopped. Evidence is retained; no automatic second start or source replay.'}
- $readiness=Read-Json (Join-Path $stage 'readiness-status.json')
+ $readiness=Get-CompletedUpdateReadiness $prepared $manifest $stage
+ if($null -eq $readiness) {
+  $launch=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$runner,'-ManifestPath',$prepared.manifest,'-ExpectedSHA256',$prepared.manifest_sha256)
+  if(Test-Path -LiteralPath $stage){$launch+='-Resume'}
+  & $powershell @launch | Out-Host
+  if($LASTEXITCODE -ne 0){throw 'Update stopped. Evidence is retained; no automatic second start or source replay. Run Update-K98.ps1 -Status and inspect this transcript.'}
+  $readiness=Get-CompletedUpdateReadiness $prepared $manifest $stage
+ } else {Write-Host 'All stages already completed. Finalizing retained historical evidence; no SQL, source or start operation is being repeated.'}
+ if($null -eq $readiness){throw 'Runner completion lacks exact stage receipts; preserve evidence'}
  if($readiness.release_id -cne $prepared.release_id -or $readiness.target -cne $prepared.target -or $readiness.discord_status -cne 'online' -or $readiness.import_export.status -cne 'degraded'){throw 'Explicit release readiness classification is missing or differs'}
- Write-Record (Join-Path $work 'verified.json') @{release_id=$prepared.release_id;target=$prepared.target;verified_utc=[datetime]::UtcNow.ToString('o');readiness=$readiness}
+ # c is initialized before both new/resume paths; closeout uses the same atomic
+ # publication and never needs a second start or SQL/business operation.
+ Write-AtomicRecord (Join-Path $work 'verified.json') @{release_id=$prepared.release_id;target=$prepared.target;verified_utc=[datetime]::UtcNow.ToString('o');readiness=$readiness}
  Remove-Item -LiteralPath $active
  Write-Warning ('Source/startup update verified WITH DEGRADED IMPORT/EXPORT STATUS: '+$readiness.import_export.reason)
- Write-Host ('Deployed '+$prepared.target+'. Discord is online. Check the affected feature before accepting functional health. No package cleanup is needed.')
+ Write-Host ('Deployment '+$prepared.target+' is complete. Discord was online at the recorded readiness check. Check the affected feature before accepting functional health. No package cleanup is needed.')
 } finally {
  $null=Stop-Transcript
  $lock.Dispose()

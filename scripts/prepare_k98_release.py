@@ -18,6 +18,53 @@ def digest(raw):
 
 
 def validate_manifest(value):
+    """Generic reviewed packets retain the non-replaying v1-v3 protocol."""
+    _validate_manifest(value, versions=(1, 2, 3))
+
+
+def validate_updater_manifest(value):
+    """V4 continuation is reserved for the normal updater's fixed adapters."""
+    _validate_manifest(value, versions=(4,))
+    bindings = [m for m in value["members"] if m["name"] == "ReleaseBindings.json"]
+    if len(bindings) != 1:
+        raise ValueError("Updater requires exact release bindings.")
+    binding_hash = bindings[0]["sha256"]
+
+    def invocation(action, migration=None):
+        arguments = dict(Action=action, ExpectedBindingsSHA256=binding_hash)
+        if migration is not None:
+            arguments["MigrationId"] = migration
+        return dict(file="Release-Step.ps1", arguments=arguments)
+
+    expected = []
+    for index, step in enumerate(s for s in value["steps"] if s["kind"] == "sql"):
+        migration = step["apply"]["arguments"].get("MigrationId")
+        if not isinstance(migration, str) or not re.fullmatch(
+            r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+", migration
+        ):
+            raise ValueError("Updater SQL step requires exact migration identity.")
+        expected.append(
+            dict(
+                id=f"sql-{index:02d}",
+                kind="sql",
+                apply=invocation("ApplySql", migration),
+                verify=invocation("VerifySql", migration),
+            )
+        )
+    for kind, apply, verify in (
+        ("source", "ApplySource", "VerifySource"),
+        ("seed", "ApplySeed", "VerifySeed"),
+        ("start", "ApplyStart", "VerifyStart"),
+        ("readiness", "AwaitReadiness", "VerifyReadiness"),
+    ):
+        expected.append(
+            dict(id=kind, kind=kind, apply=invocation(apply), verify=invocation(verify))
+        )
+    if value["preflight"] != invocation("Preflight") or value["steps"] != expected:
+        raise ValueError("V4 requires the exact normal-updater adapter layout.")
+
+
+def _validate_manifest(value, *, versions):
     """Validate the runner's bounded, ordered release protocol before packaging."""
     fields = {
         "version",
@@ -35,7 +82,7 @@ def validate_manifest(value):
         fields.add("amendment")
     if not isinstance(value, dict) or set(value) != fields:
         raise ValueError("Exact release manifest fields required.")
-    if type(value["version"]) is not int or value["version"] not in (1, 2, 3):
+    if type(value["version"]) is not int or value["version"] not in versions:
         raise ValueError("Unsupported release version.")
     if value["version"] in (2, 3):
         amendment = value["amendment"]
@@ -203,7 +250,9 @@ def main(argv=None):
     print(
         json.dumps(
             prepare(
-                args.specification, args.output, Path(__file__).with_name("Deploy-K98Release.ps1")
+                args.specification,
+                args.output,
+                Path(__file__).with_name("Deploy-K98Release.ps1"),
             )
         )
     )

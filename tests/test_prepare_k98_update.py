@@ -530,7 +530,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
     from uuid import uuid4
 
     from core.export_release_seed import successor_seed
-    from scripts.prepare_k98_release import validate_manifest
+    from scripts.prepare_k98_release import validate_updater_manifest
     from scripts.prepare_k98_update import prepare_update
 
     initial = predecessor(tmp_path, monkeypatch)
@@ -585,7 +585,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
         assert not (package.parent / "inputs").exists()
         manifest_raw = Path(result["manifest"]).read_bytes()
         manifest = json.loads(manifest_raw)
-        validate_manifest(manifest)
+        validate_updater_manifest(manifest)
         assert result["manifest_sha256"] == sha256(manifest_raw)
         assert result["release_id"] not in identities
         identities.add(result["release_id"])

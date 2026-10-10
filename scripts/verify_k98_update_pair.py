@@ -1,7 +1,8 @@
 """Verify the release's first protected publication and three live native identities.
 
 Read-only. Invoke with the pinned installed venv Python after the runner seals this artifact.
-No application entry point, SQL connection, recovery or provider work is invoked.
+No application entry point, recovery or provider work is invoked. With --sql-contracts,
+read-only SQL observations are checked by the complete existing startup comparators.
 """
 
 import argparse
@@ -52,13 +53,20 @@ def main():
     parser.add_argument("--bindings", required=True)
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--sql-contracts", action="store_true")
     args = parser.parse_args()
     if not sys.flags.isolated:
         raise ValueError("Isolated Python required")
     config = json.loads(read(args.bindings, args.sha256))
     policy = verify_live_source(config, predecessor=args.preflight)
+    if args.sql_contracts:
+        verify_sql_contracts(config, policy)
     if args.preflight:
-        print(json.dumps(dict(stage="PREDECESSOR_LIVE_SOURCE_VERIFIED", sql_connected=False)))
+        print(
+            json.dumps(
+                dict(stage="PREDECESSOR_LIVE_SOURCE_VERIFIED", sql_connected=args.sql_contracts)
+            )
+        )
         return
     policy_path = Path(config["new_seed_directory"]) / "AutomaticStartupPolicy.json"
     from core.export_process_identity import open_pinned_process
@@ -75,7 +83,8 @@ def main():
         raise ValueError("Exactly one first successor required; no second start")
     path = journals[0]
     match = re.fullmatch(
-        r"incarnation-([0-9]{20})-([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\.json", path.name
+        r"incarnation-([0-9]{20})-([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\.json",
+        path.name,
     )
     if match is None:
         raise ValueError("Canonical journal filename required")
@@ -123,7 +132,7 @@ def main():
                     sequence=sequence,
                     authority_manifest=publication["manifests"]["authority"],
                     discord_ready_verified=False,
-                    sql_connected=False,
+                    sql_connected=args.sql_contracts,
                 )
             ),
             flush=True,
@@ -131,6 +140,67 @@ def main():
     finally:
         for handle in handles:
             handle.Close()
+
+
+def verify_sql_contracts(config, policy):
+    """Reuse complete startup comparators without constructing the runtime/IPC."""
+    from functools import partial
+
+    from core.export_startup_windows import administrative_path
+    from kvk.dal.new_source_admin_dal import configured_connection
+    from services.export_execution_dal import (
+        ExportExecutionDAL,
+        installation_migrations,
+        legacy_installation_snapshot,
+    )
+    from services.export_runtime_composition import (
+        application_snapshot_for_contract,
+        verify_application_installation_contract,
+        verify_installation_contract,
+        verify_legacy_installation_contract,
+    )
+
+    plan = json.loads(
+        read(
+            administrative_path(policy["seed_plan"]["path"], private=True),
+            policy["seed_plan"]["sha256"],
+        )
+    )
+    ref = plan["templates"]["bot"]
+    bot = json.loads(
+        read(administrative_path(ref["path"], private=True), ref["sha256"], 4 * 1024 * 1024)
+    )
+    approved = bot["sql_contract"]
+    factory = partial(configured_connection, sql_profile=approved["profile"])
+    verify_installation_contract(
+        ExportExecutionDAL(factory).installation_snapshot(
+            **(
+                {"migrations": installation_migrations(approved)}
+                if approved["version"] == 4
+                else {}
+            )
+        ),
+        approved,
+    )
+    connection = factory()
+    try:
+        connection.autocommit = True
+        cursor = connection.cursor()
+        try:
+            verify_legacy_installation_contract(
+                legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"]),
+                bot["legacy_sql_contract"],
+                profile=approved["profile"],
+            )
+            verify_application_installation_contract(
+                application_snapshot_for_contract(cursor, bot["application_sql_contract"]),
+                bot["application_sql_contract"],
+            )
+        finally:
+            cursor.close()
+    finally:
+        connection.close()
+    print(json.dumps(dict(stage="UNCHANGED_STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
 
 
 if __name__ == "__main__":

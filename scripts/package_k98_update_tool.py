@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+import re
 
 INSTALLER = r"""[CmdletBinding()]
 param()
@@ -80,13 +81,14 @@ Write-Host 'Then run /ops graceful_restart once, only when prompted.'
 """
 
 
-def package(output, source=None):
+def package(output, source=None, *, previous_manifest=None):
     source = Path(source) if source else Path(__file__).parent
     names = (
         "Update-K98.ps1",
         "K98-SourceUpdate.ps1",
         "Deploy-K98Release.ps1",
         "prepare_k98_update.py",
+        "prepare_k98_release.py",
         "verify_k98_update_pair.py",
         "package_k98_update_tool.py",
     )
@@ -101,7 +103,8 @@ def package(output, source=None):
         json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode()
     payload = json.dumps(
-        {name: base64.b64encode(raw).decode("ascii") for name, raw in files.items()}, sort_keys=True
+        {name: base64.b64encode(raw).decode("ascii") for name, raw in files.items()},
+        sort_keys=True,
     ).encode()
     script = INSTALLER.replace("__PAYLOAD__", base64.b64encode(payload).decode("ascii")).encode()
     output = Path(output)
@@ -109,19 +112,57 @@ def package(output, source=None):
     target = output / "Install-K98UpdateTool.ps1"
     with target.open("xb") as stream:
         stream.write(script)
+    upgrade = None
+    if previous_manifest is not None:
+        previous_raw = Path(previous_manifest).read_bytes()
+        previous = json.loads(previous_raw)
+        required = set(names) - {"prepare_k98_release.py"}
+        inventory = set(previous.get("files", {})) - {"EmptyGitConfig.txt"}
+        if previous.get("version") != 1 or inventory not in (required, set(names)):
+            raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
+        old_hash = hashlib.sha256(previous_raw).hexdigest()
+        new_hash = hashlib.sha256(files["update-tool.json"]).hexdigest()
+        template = (source / "Upgrade-K98InstalledUpdater.ps1").read_text(encoding="utf-8")
+        # Generated defaults bind one reviewed old/new pair. The operator still
+        # runs one fixed filename without calculating or substituting hashes.
+        replacements = dict(
+            (
+                ("cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871", old_hash),
+                (
+                    "ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30",
+                    hashlib.sha256(script).hexdigest(),
+                ),
+                ("6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b", new_hash),
+            )
+        )
+        for old in replacements:
+            if template.count(old) != 1:
+                raise ValueError("Upgrade template pin is missing or ambiguous.")
+        # Match only original placeholders. An installed predecessor hash can
+        # equal an old target placeholder and must not be replaced a second time.
+        template = re.sub(
+            "|".join(re.escape(old) for old in replacements),
+            lambda match: replacements[match.group(0)],
+            template,
+        )
+        upgrade = output / "Upgrade-K98InstalledUpdater.ps1"
+        with upgrade.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(template)
     return dict(
         installer=str(target.resolve()),
         sha256=hashlib.sha256(script).hexdigest(),
         status="BUILT_NOT_INSTALLED",
         production_changed=False,
+        upgrade=str(upgrade.resolve()) if upgrade else None,
     )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=".codex_artifacts/k98-update-tool")
+    parser.add_argument("--previous-manifest")
     args = parser.parse_args()
-    print(json.dumps(package(args.output)))
+    print(json.dumps(package(args.output, previous_manifest=args.previous_manifest)))
 
 
 if __name__ == "__main__":

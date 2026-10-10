@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
- [Parameter(Mandatory=$true)][ValidateSet('Library','Preflight','VerifySource','ApplySource','VerifySeed','ApplySeed','VerifyStart','ApplyStart','VerifyReadiness','AwaitReadiness')][string]$Action,
- [string]$ExpectedBindingsSHA256
+ [Parameter(Mandatory=$true)][ValidateSet('Library','Preflight','VerifySource','ApplySource','VerifySeed','ApplySeed','VerifyStart','ApplyStart','VerifyReadiness','AwaitReadiness','VerifySql','ApplySql','Status')][string]$Action,
+ [string]$ExpectedBindingsSHA256,
+ [string]$MigrationId
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -65,6 +66,38 @@ function Write-New([string]$Path,[byte[]]$Bytes) {
 function Write-Record([string]$Path,$Value) {
  Write-New $Path ([Text.UTF8Encoding]::new($false).GetBytes(($Value|ConvertTo-Json -Depth 30 -Compress)))
 }
+function Write-AtomicRecord([string]$Path,$Value) {
+ $pending=Join-Path (Split-Path -Parent $Path) ('pending-'+[guid]::NewGuid().ToString('N'))
+ Write-Record $pending $Value
+ [IO.File]::Move($pending,$Path)
+}
+function Get-CompletedUpdateReadiness($Prepared,$Manifest,[string]$Stage) {
+ if(-not(Test-Path -LiteralPath $Stage)){return $null}
+ $null=Read-Bytes (Join-Path $Stage '.release.json') $Prepared.manifest_sha256 65536
+ if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'A selected historical amendment requires its own finalization evidence'}
+ foreach($step in $Manifest.steps) {
+  $path=Join-Path (Join-Path $Stage '.receipts') ($step.id+'.complete.json')
+  if(-not(Test-Path -LiteralPath $path)){return $null}
+  $record=Read-Json $path
+  if($record.release_id -cne $Prepared.release_id -or $record.step -cne $step.id -or $record.stage -cne 'verified'){throw ('Historical completion receipt differs: '+$path)}
+ }
+ $readiness=Read-Json (Join-Path $Stage 'readiness-status.json')
+ if($readiness.release_id -cne $Prepared.release_id -or $readiness.target -cne $Prepared.target -or $readiness.discord_status -cne 'online' -or $readiness.import_export.status -cne 'degraded'){throw 'Historical readiness classification differs'}
+ return $readiness
+}
+function Invoke-UpdateSql([string]$Operation,[string]$Id) {
+ if($null -eq $c.PSObject.Properties['sql']){return 0}
+ foreach($m in $c.sql.members){$null=Read-Bytes (Join-Path $PSScriptRoot $m.name) $m.sha256 2MB}
+ $items=@($c.sql.profiles|Where-Object {-not $Id -or $_.id -ceq $Id})
+ if($Id -and $items.Count -ne 1){throw 'Exact selected SQL migration required'}
+ foreach($item in $items) {
+  & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Deploy-SqlMigration.ps1') -ServerName 'MINI_AMD' -DatabaseName 'ROK_TRACKER' -MigrationId $item.id -ProfilePath (Join-Path $PSScriptRoot $item.file) -ProfileSHA256 $item.sha256 -ExpectedCommit $c.sql.commit -ReleaseId $c.release_id -Operation $Operation | Out-Host
+  $code=$LASTEXITCODE
+  if($Id){return $code}
+  if($code -ne 0){throw ('SQL preflight refused: '+$item.id+'; see expected/observed values above. No drain requested.')}
+ }
+ return 0
+}
 function Same($Actual,$Expected) {
  if($null -eq $Actual -or $null -eq $Expected){return ($null -eq $Actual -and $null -eq $Expected)}
  if($Expected -is [array]) {
@@ -111,7 +144,8 @@ function Invoke-GitWorker([string]$Arguments) {
   $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
   if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Git timed out; retain intent and verify outcome'}
   $out=$stdout.GetAwaiter().GetResult();$err=$stderr.GetAwaiter().GetResult()
-  if($process.ExitCode -ne 0 -or $out.Length -gt 1MB -or $err.Length -gt 1MB){throw ('Git failed/bounds exceeded: '+$process.ExitCode)}
+  if($out.Length -gt 1MB -or $err.Length -gt 1MB){throw 'Git output bounds exceeded; inspect Git configuration before drain'}
+  if($process.ExitCode -ne 0){throw ('Git exit='+$process.ExitCode+' command='+$Arguments+' diagnostic='+$err.Substring(0,[math]::Min(2000,$err.Length))+'. Check the pinned Git executable, private origin and reviewed configuration before drain.')}
   return $out.Trim()
  }finally{$process.Dispose()}
 }
@@ -158,7 +192,7 @@ function Git([string]$Arguments) {
  foreach($record in $settings.Split([char]0)) {
   if(-not $record){continue}
   $key=($record -split "`n",2)[0]
-  if($key -notmatch '^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|symlinks|ignorecase|autocrlf|safecrlf|eol|longpaths|quotepath)|remote\.[a-zA-Z0-9_-]+\.(url|fetch)|branch\.[a-zA-Z0-9_/-]+\.(remote|merge)|user\.(name|email)|pull\.rebase|fetch\.prune)$'){throw 'Git configuration outside reviewed non-executable allowlist'}
+  if($key -notmatch '^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|symlinks|ignorecase|autocrlf|safecrlf|eol|longpaths|quotepath)|remote\.[a-zA-Z0-9_-]+\.(url|fetch)|branch\.[a-zA-Z0-9_/-]+\.(remote|merge)|user\.(name|email)|pull\.rebase|fetch\.prune)$'){throw ('Git configuration outside reviewed non-executable allowlist: '+$key+'; review this setting before drain')}
  }
  $null=Read-Bytes $config $beforeHash 65536
  $writes=$Arguments -match '(^| )(fetch|merge|update-ref|add)( |$)'
@@ -396,6 +430,64 @@ function Complete-SourceIndex {
  Assert-TargetContents
  if(Git 'status --porcelain --untracked-files=no'){throw 'Tracked source remains modified after exact index reconciliation'}
 }
+function Assert-ContinuationIntent([string]$Step) {
+ $intent=Read-Json (Join-Path $PSScriptRoot ('.receipts\'+$Step+'.intent.json'))
+ if($intent.stage -cne 'starting' -or $intent.step -cne $Step -or $intent.release_id -cne $c.release_id){throw ('Exact continuation intent required: '+$Step)}
+ Assert-Drained
+ if(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json')){throw 'Source/seed continuation forbidden after start intent'}
+}
+function Assert-SourceContinuation {
+ Assert-ContinuationIntent 'source';$null=Assert-Task $c.old_gate.Path $true
+ if((Git 'rev-parse HEAD') -cne $c.target -or (Git 'branch --show-current') -cne 'main' -or (Git 'diff --cached --name-only --no-ext-diff --')){throw 'Source continuation requires committed private target and unchanged index'}
+ $changed=@($c.source_members|ForEach-Object {$_.path})
+ foreach($p in $c.old_pins.PSObject.Properties){if($p.Name -cnotin $changed){$null=Read-Bytes (Source-MemberPath $p.Name) $p.Value 2MB}}
+ foreach($path in @((Git 'diff-files --name-only --no-ext-diff -z --').Split([char]0)|Where-Object {$_})) {if($path -cnotin $changed){throw ('Unrelated source drift: '+$path)}}
+ foreach($m in $c.source_members) {
+  $path=Source-MemberPath $m.path;Assert-ParentSpelling $m.path
+  if($m.deleted){if(Test-Path -LiteralPath $path){throw ('Deleted member exists: '+$m.path)};continue}
+  $actual=Hash (Read-Bytes $path '' 2MB)
+  if($actual -cne $m.target_sha256 -and $actual -cnotin @($m.checkout_sha256)){throw ('Source '+$m.path+' expected='+$m.target_sha256+' observed='+$actual+'; unsupported drift, preserve transcript')}
+ }
+}
+function Install-TargetSourceBytes {
+ foreach($m in $c.source_members) {
+  if($m.deleted){continue}
+  $path=Source-MemberPath $m.path
+  $handle=Open-SourceCustodyHandle $path $false
+  try {
+   $actual=Hash (Read-Bytes $path '' 2MB)
+   if($actual -ceq $m.target_sha256){continue}
+   if($actual -cnotin @($m.checkout_sha256)){throw ('Source changed before byte installation: '+$m.path)}
+   $bytes=Read-Bytes (Join-Path $PSScriptRoot $m.payload) $m.target_sha256 2MB
+   $fresh=Join-Path (Split-Path -Parent $path) ('k98-pending-'+[guid]::NewGuid().ToString('N'))
+   Write-New $fresh $bytes
+   # Match the established custody replacement: Windows requires our original
+   # read handle closed; the independently protected parent prevents substitution.
+   $handle.Dispose()
+   Install-SourceCopy $fresh $path
+   $null=Read-Bytes $path $m.target_sha256 2MB
+  }finally{$handle.Dispose()}
+ }
+}
+function Assert-PartialSeed {
+ Assert-ContinuationIntent 'seed';Assert-Source $c.new_pins $c.target
+ $task=Task
+ $gate=if($task.Definition.Actions.Item(1).Arguments.Contains($newGate)){$newGate}else{$c.old_gate.Path}
+ $null=Assert-Task $gate $true
+ foreach($directory in @($c.new_seed_directory,$c.new_state_directory)) {
+  if(Test-Path -LiteralPath $directory){Assert-Protected $directory}
+ }
+ if(Test-Path -LiteralPath $c.new_state_directory) {
+  if(@(Get-ChildItem -LiteralPath $c.new_state_directory -Force|Select-Object -First 1).Count){throw 'Nonempty successor history prohibits seed continuation'}
+ }
+ if(Test-Path -LiteralPath $c.new_seed_directory) {
+  foreach($item in @(Get-ChildItem -LiteralPath $c.new_seed_directory -Force)) {
+   $member=@($c.seed_members|Where-Object {$_.name -ceq $item.Name})
+   if($item.PSIsContainer -or $member.Count -ne 1){throw ('Unknown partial seed member: '+$item.Name)}
+   $null=Read-Bytes $item.FullName $member[0].sha256 2MB
+  }
+ }
+}
 function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly) {
  foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'))) {
   if(Test-Path -LiteralPath (Join-Path $StateDirectory $name)) {
@@ -578,6 +670,7 @@ function Verify-Native([switch]$Preflight) {
  $null=Read-Bytes $c.venv.path $c.venv.sha256 4MB
  $verifyArguments=@('-I','-B',$script,'--bindings',(Join-Path $PSScriptRoot 'ReleaseBindings.json'),'--sha256',$ExpectedBindingsSHA256)
  if($Preflight){$verifyArguments+='--preflight'}
+ if($null -ne $c.PSObject.Properties['sql']){$verifyArguments+='--sql-contracts'}
  & $c.venv.path @verifyArguments | Out-Host
  if($LASTEXITCODE -ne 0){throw 'New native publication not verified'}
 }
@@ -638,7 +731,34 @@ try {
  $drainPath=Join-Path $c.old_policy.StateDirectory ('deployment-drained-'+$c.release_id+'.json')
  $newGate=Join-Path $c.new_seed_directory 'Start-ReviewedAutomaticStartup.ps1'
  switch($Action) {
+  'VerifySql' {exit (Invoke-UpdateSql 'Verify' $MigrationId)}
+  'ApplySql' {Assert-Drained;$null=Assert-Task $c.old_gate.Path $true;exit (Invoke-UpdateSql 'Apply' $MigrationId)}
+  'Status' {
+   # Status performs protected reads and SQL observation only. It never calls
+   # source/seed/start verifiers which may finish installation bookkeeping.
+   $manifest=Read-Json (Join-Path $PSScriptRoot 'release.json')
+   $stage=Join-Path $c.old_policy.StateDirectory ('release-'+$c.release_id)
+   $receipts=Join-Path $stage '.receipts'
+   $unresolved=$false
+   foreach($s in $manifest.steps) {
+    $state='unstarted'
+    $done=Join-Path $receipts ($s.id+'.complete.json');$intent=Join-Path $receipts ($s.id+'.intent.json')
+    foreach($pair in @(@($intent,'starting'),@($done,'verified'))) {
+     if(Test-Path -LiteralPath $pair[0]) {
+      $record=Read-Json $pair[0]
+      if($record.release_id -cne $c.release_id -or $record.step -cne $s.id -or $record.stage -cne $pair[1]){throw ('Receipt identity differs: '+$pair[0])}
+      $state=if($pair[1] -ceq 'verified'){'verified_historical'}else{'intent_outcome_unconfirmed'}
+     }
+    }
+    Write-Host ($s.id+': '+$state+'; evidence='+$receipts)
+    if($s.kind -ceq 'sql'){$sqlResult=Invoke-UpdateSql 'Status' $s.verify.arguments.MigrationId;if($sqlResult -notin @(0,10,11)){$unresolved=$true}}
+   }
+   if(Test-Path -LiteralPath (Join-Path $receipts 'readiness.complete.json')){Write-Host 'ONLINE_AT_READINESS_BOOKKEEPING_PENDING: run the same updater to finalize; historical readiness is not a fresh liveness check.'}
+   Write-Host 'Next action: run the same updater to verify and continue. Unknown outcomes require transcript/evidence review; do not delete receipts or restart again.'
+   if($unresolved){exit 20};exit 0
+  }
   'Preflight' {
+   $null=Invoke-UpdateSql 'Preflight' ''
    Assert-Predecessor
    if(Test-Path -LiteralPath $drainPath){Assert-Drained -SuccessorRunning:(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json'));exit 0}
    Assert-Held
@@ -652,11 +772,15 @@ try {
   }
   'VerifySource' {
    $head=Git 'rev-parse HEAD'
-   if($head -ceq $c.target){Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0}
+   if($head -ceq $c.target){
+    try {Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0}
+    catch {Assert-SourceContinuation;exit 11}
+   }
    if($head -ceq $c.before){Assert-Source $c.old_pins $c.before;exit 10}
    throw 'Unrecognized source outcome'
   }
   'ApplySource' {
+   if((Git 'rev-parse HEAD') -ceq $c.target){Assert-SourceContinuation;Install-TargetSourceBytes;Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0}
    Assert-Drained;Assert-Source $c.old_pins $c.before;$null=Read-Bytes $c.venv.path $c.venv.sha256 4MB;$null=Assert-Task $c.old_gate.Path $true
    Assert-UpdatePaths
    Prepare-SourceParents
@@ -670,21 +794,30 @@ try {
     # Git creates source under the admin token; apply explicit custody and the
     # authenticated byte convention before any new source is executed.
     Set-Acl -LiteralPath $path -AclObject (New-Acl $false)
-    $bytes=Read-Bytes (Join-Path $PSScriptRoot $m.payload) $m.target_sha256 2MB
-    [IO.File]::WriteAllBytes($path,$bytes)
-    $null=Read-Bytes $path $m.target_sha256 2MB
    }
+   Assert-SourceContinuation;Install-TargetSourceBytes
    Complete-SourceIndex;Assert-Source $c.new_pins $c.target;exit 0
   }
   'VerifySeed' {
-   if(Seed-Complete){exit 0};exit 10
+   try {if(Seed-Complete){exit 0}}catch {
+    Assert-PartialSeed;exit 11
+   }
+   if(Test-Path -LiteralPath (Join-Path $PSScriptRoot '.receipts\seed.intent.json')){Assert-PartialSeed;exit 11};exit 10
   }
   'ApplySeed' {
-   Assert-Drained;Assert-Source $c.new_pins $c.target;$task=Assert-Task $c.old_gate.Path $true
-   if((Test-Path -LiteralPath $c.new_seed_directory) -or (Test-Path -LiteralPath $c.new_state_directory)){throw 'Partial seed must not be overwritten'}
-   New-Directory $c.new_seed_directory;New-Directory $c.new_state_directory
-   foreach($m in $c.seed_members){$bytes=Read-Bytes (Join-Path $PSScriptRoot $m.name) $m.sha256;Write-New (Join-Path $c.new_seed_directory $m.name) $bytes}
-   Write-New (Join-Path $PSScriptRoot 'task-before.xml') ([Text.UTF8Encoding]::new($false).GetBytes($task.Xml))
+   Assert-PartialSeed;$task=Task
+   foreach($directory in @($c.new_seed_directory,$c.new_state_directory)){if(-not(Test-Path -LiteralPath $directory)){New-Directory $directory}}
+   foreach($m in $c.seed_members){
+    $target=Join-Path $c.new_seed_directory $m.name
+    if(Test-Path -LiteralPath $target){$null=Read-Bytes $target $m.sha256;continue}
+    $bytes=Read-Bytes (Join-Path $PSScriptRoot $m.name) $m.sha256
+    # Scratch stays outside the seed, so a killed write is retained evidence,
+    # never mistaken for a completed member on the next invocation.
+    $pending=Join-Path $PSScriptRoot ('pending-'+[guid]::NewGuid().ToString('N'))
+    Write-New $pending $bytes;[IO.File]::Move($pending,$target)
+   }
+   $beforeTask=Join-Path $PSScriptRoot 'task-before.xml'
+   if(-not(Test-Path -LiteralPath $beforeTask)){Write-New $beforeTask ([Text.UTF8Encoding]::new($false).GetBytes($task.Xml))}
    $d=$task.Definition;$d.Settings.Enabled=$false;$d.Actions.Item(1).Arguments='-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$newGate+'"'
    $service=New-Object -ComObject 'Schedule.Service';$service.Connect()
    $sddl='O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;'+$c.sid+')'
@@ -716,7 +849,7 @@ try {
    }while($watch.Elapsed.TotalSeconds -lt 120)
    throw 'One start requested but not confirmed; do not start again'
   }
-  'VerifyReadiness' {if(Check-Readiness){exit 0};exit 10}
+  'VerifyReadiness' {if(Check-Readiness){exit 0};exit 11}
   'AwaitReadiness' {
    $watch=[Diagnostics.Stopwatch]::StartNew()
    do {if(Check-Readiness){exit 0};Start-Sleep -Seconds 3}while($watch.Elapsed.TotalSeconds -lt 180)
