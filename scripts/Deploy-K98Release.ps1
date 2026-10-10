@@ -124,7 +124,7 @@ function Assert-AmendmentSelection([string]$Path,$Current,[string]$Hash) {
 }
 
 function Assert-OriginalReleaseUnselected($Current,[string]$Stage) {
-    if($Current.version -eq 1 -and (Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json'))){throw 'Original release was superseded by an amendment; use only the selected amendment launcher'}
+    if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'Release was superseded by an amendment; use only the selected amendment launcher'}
 }
 
 function Enter-ReleaseExecution([string]$Path) {
@@ -137,16 +137,29 @@ function Enter-ReleaseExecution([string]$Path) {
 }
 
 function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
-    # One explicit amendment of a drained version-one release before any step
-    # completed. SQL reconciliation belongs to the reviewed new preflight.
+    # One initial amendment or one explicitly pinned successor to that amendment.
+    # Both ancestors must remain at their first SQL intent, with no completed step.
+    # SQL transaction reconciliation belongs to the reviewed new preflight.
     $a=$Current.amendment
-    if((($a.PSObject.Properties.Name|Sort-Object) -join ',') -cne 'base_manifest_sha256,failed_step_id,id' -or
+    $fields=if($Current.version -eq 3){'base_manifest_sha256,failed_step_id,id,parent_amendment_id'}else{'base_manifest_sha256,failed_step_id,id'}
+    if((($a.PSObject.Properties.Name|Sort-Object) -join ',') -cne $fields -or
        ([guid]$a.id).ToString() -cne $a.id -or $a.base_manifest_sha256 -cnotmatch '^[a-f0-9]{64}$' -or
        $a.failed_step_id -cnotmatch '^[a-z0-9-]{1,60}$'){throw 'Exact release amendment reference required'}
     Assert-AdminPath $BaseStage
     $baseFile=Join-Path $BaseStage '.release.json';Assert-AdminPath $baseFile
     $base=[Text.Encoding]::UTF8.GetString((Read-Pinned $baseFile $a.base_manifest_sha256 65536))|ConvertFrom-Json
-    if($base.version -ne 1){throw 'Only an original version-one release can be amended'}
+    $ancestorApplyHash=$null;$ancestorStep=$null
+    if($Current.version -eq 3) {
+        if(([guid]$a.parent_amendment_id).ToString() -cne $a.parent_amendment_id -or $a.parent_amendment_id -ceq $a.id -or
+           $base.version -ne 2 -or $base.amendment.id -cne $a.parent_amendment_id){throw 'Exact selected version-two parent required; amendment depth is bounded'}
+        $rootStage=Split-Path -Parent $BaseStage
+        if((Split-Path -Leaf $BaseStage) -cne ('amendment-'+$a.parent_amendment_id)){throw 'Parent amendment path differs'}
+        Assert-ReleaseAmendment $base $rootStage
+        Assert-AmendmentSelection (Join-Path $rootStage '.amendment-selected.json') $base $a.base_manifest_sha256
+        $original=[Text.Encoding]::UTF8.GetString((Read-Pinned (Join-Path $rootStage '.release.json') $base.amendment.base_manifest_sha256 65536))|ConvertFrom-Json
+        $ancestorStep=$original.steps[0].id
+        $ancestorApplyHash=@($original.members|Where-Object {$_.name -ceq $original.steps[0].apply.file})[0].sha256
+    } elseif($Current.version -ne 2 -or $base.version -ne 1){throw 'Only an original version-one release can be amended'}
     foreach($field in @('release_id','host','application_sid','repository')) {
         if($base.$field -cne $Current.$field){throw ('Amendment changes original '+$field)}
     }
@@ -164,12 +177,12 @@ function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
        $oldApply[0].sha256 -ceq $newApply[0].sha256){throw 'Amendment requires a different pinned corrective SQL apply script; failed-script replay is prohibited'}
     $invocations=@($Current.preflight)
     foreach($step in $Current.steps) {
-        if($step.id -ieq $a.failed_step_id){throw 'No amended step may reuse the failed step ID'}
+        if($step.id -ieq $a.failed_step_id -or ($null -ne $ancestorStep -and $step.id -ieq $ancestorStep)){throw 'No amended step may reuse a failed ancestor step ID'}
         $invocations+=@($step.apply,$step.verify)
     }
     foreach($invocation in $invocations) {
         $member=@($Current.members|Where-Object {$_.name -ceq $invocation.file})
-        if($member.Count -ne 1 -or $member[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $member[0].sha256 -ieq $oldApply[0].sha256){throw 'No amendment invocation may execute the failed apply script; use different reviewed bytes'}
+        if($member.Count -ne 1 -or $member[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $member[0].sha256 -ieq $oldApply[0].sha256 -or ($null -ne $ancestorApplyHash -and $member[0].sha256 -ieq $ancestorApplyHash)){throw 'No amendment invocation may execute a failed ancestor apply script; use different reviewed bytes'}
     }
     $directory=Join-Path $BaseStage '.receipts';Assert-AdminPath $directory
     $entries=@(Get-ChildItem -LiteralPath $directory -Force)
@@ -184,8 +197,8 @@ $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if(-not ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Run the release script in an administrative PowerShell'}
 $raw=Read-Pinned $ManifestPath $ExpectedSHA256 65536
 $script:manifest=[Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
-if($manifest.version -notin @(1,2) -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
-if(($manifest.version -eq 2) -ne ($manifest.PSObject.Properties.Name -ccontains 'amendment')){throw 'Release version and amendment fields differ'}
+if($manifest.version -notin @(1,2,3) -or $manifest.host -cne $env:COMPUTERNAME -or $manifest.application_sid -cne $identity.User.Value){throw 'Release host or identity differs'}
+if(($manifest.version -in @(2,3)) -ne ($manifest.PSObject.Properties.Name -ccontains 'amendment')){throw 'Release version and amendment fields differ'}
 $releaseId=([guid]$manifest.release_id).ToString()
 if($releaseId -cne $manifest.release_id){throw 'Canonical release ID required'}
 Assert-AdminPath $manifest.policy.path
@@ -196,9 +209,13 @@ Assert-AdminPath $powershell
 $executionLock=Enter-ReleaseExecution (Join-Path $policy.state_directory ('deployment-'+$releaseId+'.lock'))
 try {
 $script:staged=Join-Path $policy.state_directory ('release-'+$releaseId)
-Assert-OriginalReleaseUnselected $manifest $staged
+if($manifest.version -eq 1){Assert-OriginalReleaseUnselected $manifest $staged}
 $amendmentSelection=$null
-if($manifest.version -eq 2) {
+if($manifest.version -eq 3) {
+    if(([guid]$manifest.amendment.parent_amendment_id).ToString() -cne $manifest.amendment.parent_amendment_id){throw 'Canonical parent amendment required'}
+    $script:staged=Join-Path $staged ('amendment-'+$manifest.amendment.parent_amendment_id)
+}
+if($manifest.version -in @(2,3)) {
     Assert-ReleaseAmendment $manifest $staged
     if(-not(Test-Path -LiteralPath (Join-Path $policy.state_directory ('deployment-drained-'+$releaseId+'.json')))){throw 'Existing protected drain required before amendment'}
     $amendmentSelection=Join-Path $staged '.amendment-selected.json'

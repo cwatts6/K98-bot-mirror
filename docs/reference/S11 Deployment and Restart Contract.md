@@ -232,3 +232,30 @@ retroactively changed. A packet amending such a runner must prove its original
 verifier remains fail-closed for the retained outcome. The October 10 correction
 requires the exact original Failed receipt throughout; it does not support
 amending an original Applied outcome. Use only the amended launcher after selection.
+
+### One successor after a selected amendment fails
+
+A version-three manifest may replace one selected version-two amendment. It pins
+the parent's amendment ID and manifest hash. Both the original release and its
+selected amendment must still have only their first SQL starting intent, with no
+completed step or start request. The release identity, predecessor policy and
+issuer remain unchanged. Further amendment depth is refused.
+
+The successor uses the same exclusive release lock and existing drain. Its stage
+and immutable selection live inside the parent amendment directory; neither
+ancestor's manifest, intent nor existing selection is replaced. No invocation may
+reuse either ancestor's failed apply bytes, and no step may reuse either failed
+step ID. Historical launchers must remain blocked by their unchanged failed SQL
+receipts. Only the selected successor launcher is used to continue.
+
+The successor preflight must reconcile both specific failed transactions and
+verify the actual installed SQL definitions, permissions and source before any
+new SQL intent. The encoding correction uses a new migration identity, preserves
+both failed ledger rows, and verifies installed procedure hashes before commit.
+Runtime contracts explicitly pin all three migration identities, checksums and
+expected statuses. An observed failed receipt cannot become a new expected hash.
+
+This bounded correction does not establish routine combined-update readiness.
+The normal updater must prepare Bot and SQL as one compatible release and rehearse
+the complete deployment path with the production SQL driver and installed
+predecessor representation before drain. Per-repository tests alone are insufficient.

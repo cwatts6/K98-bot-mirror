@@ -403,9 +403,9 @@ Assert-OriginalReleaseUnselected ([pscustomobject]@{version=$Version}) $Fixture
         text=True,
         timeout=20,
     )
-    assert (result.returncode == 0) is (version == 2 or not selected), result.stdout + result.stderr
-    if version == 1 and selected:
-        assert "Original release was superseded" in result.stderr
+    assert (result.returncode == 0) is (not selected), result.stdout + result.stderr
+    if selected:
+        assert "Release was superseded" in result.stderr
 
 
 def test_release_execution_lock_serializes_original_and_amendment(tmp_path):

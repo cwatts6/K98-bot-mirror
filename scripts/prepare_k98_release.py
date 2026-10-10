@@ -31,17 +31,20 @@ def validate_manifest(value):
         "preflight",
         "steps",
     }
-    if isinstance(value, dict) and value.get("version") == 2:
+    if isinstance(value, dict) and value.get("version") in (2, 3):
         fields.add("amendment")
     if not isinstance(value, dict) or set(value) != fields:
         raise ValueError("Exact release manifest fields required.")
-    if type(value["version"]) is not int or value["version"] not in (1, 2):
+    if type(value["version"]) is not int or value["version"] not in (1, 2, 3):
         raise ValueError("Unsupported release version.")
-    if value["version"] == 2:
+    if value["version"] in (2, 3):
         amendment = value["amendment"]
+        amendment_fields = {"id", "base_manifest_sha256", "failed_step_id"}
+        if value["version"] == 3:
+            amendment_fields.add("parent_amendment_id")
         if (
             not isinstance(amendment, dict)
-            or set(amendment) != {"id", "base_manifest_sha256", "failed_step_id"}
+            or set(amendment) != amendment_fields
             or not isinstance(amendment["id"], str)
             or str(UUID(amendment["id"])) != amendment["id"]
             or not isinstance(amendment["base_manifest_sha256"], str)
@@ -50,6 +53,12 @@ def validate_manifest(value):
             or not re.fullmatch(r"[a-z0-9-]{1,60}", amendment["failed_step_id"])
         ):
             raise ValueError("Exact first-SQL-step amendment reference required.")
+        if value["version"] == 3 and (
+            not isinstance(amendment["parent_amendment_id"], str)
+            or str(UUID(amendment["parent_amendment_id"])) != amendment["parent_amendment_id"]
+            or amendment["parent_amendment_id"] == amendment["id"]
+        ):
+            raise ValueError("Exact distinct selected-parent amendment required.")
     if str(UUID(value["release_id"])) != value["release_id"]:
         raise ValueError("Canonical release ID required.")
     for field in ("host", "application_sid", "repository"):
@@ -135,7 +144,7 @@ def validate_manifest(value):
         invocation(step["verify"])
     if any(counts.get(kind) != 1 for kind in ("seed", "start", "readiness")):
         raise ValueError("Exactly one seed, start and readiness step required.")
-    if value["version"] == 2 and (
+    if value["version"] in (2, 3) and (
         steps[0]["kind"] != "sql" or value["amendment"]["failed_step_id"] in ids
     ):
         raise ValueError("Amendment must begin with a distinct corrective SQL step.")

@@ -17,6 +17,8 @@ STATS_OUTCOME_COLLATION_MIGRATION = "20261010_001_stats_import_outcomes_collatio
 STATS_OUTCOME_COLLATION_CHECKSUM = (
     "e423e79fd13234b91b62336ab8e34ff2b018b2bffcdfb3cd53dec1a9342ef315"
 )
+STATS_OUTCOME_ENCODING_MIGRATION = "20261010_002_stats_import_outcomes_encoding"
+STATS_OUTCOME_ENCODING_CHECKSUM = "3792c37de9642cdb33579a4afec820f9d21a4eb14e8388281f3c40eed01c5aa9"
 # Canonical UTF-16LE definition hashes of the reviewed migration's exact
 # postimages. This is a behavior amendment, not a compatibility spelling.
 FILE_VISIBILITY_MODULE_HASHES = {
@@ -108,11 +110,23 @@ def validate_contract(approved):
         raise SourceConflict("Complete reviewed direct-permission SQL contract required.")
     if replacement:
         installation = approved["outcome_installation"]
+        encoding = (
+            isinstance(installation, dict)
+            and installation.get("migration_id") == STATS_OUTCOME_ENCODING_MIGRATION
+        )
+        installation_fields = {"migration_id", "predecessor_status"}
+        if encoding:
+            installation_fields.add("collation_predecessor_status")
         if (
             not isinstance(installation, dict)
-            or set(installation) != {"migration_id", "predecessor_status"}
-            or installation["migration_id"] != STATS_OUTCOME_COLLATION_MIGRATION
+            or set(installation) != installation_fields
+            or installation["migration_id"]
+            not in (STATS_OUTCOME_COLLATION_MIGRATION, STATS_OUTCOME_ENCODING_MIGRATION)
             or installation["predecessor_status"] not in (None, "Failed", "Applied")
+            or (
+                encoding
+                and installation["collation_predecessor_status"] not in (None, "Failed", "Applied")
+            )
         ):
             raise SourceConflict("Explicit reviewed outcome replacement lineage required.")
 
@@ -214,13 +228,14 @@ def queries(base, source):
     # receipts remain separate; no installed hash can select its own contract.
     result["migration"] = (
         base["migration"][0].replace(
-            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?,?) ORDER BY MigrationId"
+            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?,?,?) ORDER BY MigrationId"
         ),
         (
             DIRECT_MIGRATION,
             FILE_VISIBILITY_MIGRATION,
             STATS_OUTCOME_MIGRATION,
             STATS_OUTCOME_COLLATION_MIGRATION,
+            STATS_OUTCOME_ENCODING_MIGRATION,
         ),
     )
     return result
@@ -389,10 +404,21 @@ def verify(observed, approved, *, profile):
             )
         )
     if installation:
+        encoding = installation["migration_id"] == STATS_OUTCOME_ENCODING_MIGRATION
+        collation_status = installation["collation_predecessor_status"] if encoding else "Applied"
+        if collation_status is not None:
+            expected_migrations.append(
+                dict(
+                    MigrationId=STATS_OUTCOME_COLLATION_MIGRATION,
+                    ChecksumSha256=STATS_OUTCOME_COLLATION_CHECKSUM,
+                    Status=collation_status,
+                )
+            )
+    if installation and encoding:
         expected_migrations.append(
             dict(
-                MigrationId=STATS_OUTCOME_COLLATION_MIGRATION,
-                ChecksumSha256=STATS_OUTCOME_COLLATION_CHECKSUM,
+                MigrationId=STATS_OUTCOME_ENCODING_MIGRATION,
+                ChecksumSha256=STATS_OUTCOME_ENCODING_CHECKSUM,
                 Status="Applied",
             )
         )

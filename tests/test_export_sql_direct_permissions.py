@@ -297,6 +297,55 @@ def test_invalid_outcome_replacement_contract_is_rejected(contract, installation
         direct.validate_contract(approved)
 
 
+@pytest.mark.parametrize("original", [None, "Failed", "Applied"])
+@pytest.mark.parametrize("collation", [None, "Failed", "Applied"])
+def test_encoding_installation_pins_each_predecessor_and_success(contract, original, collation):
+    observed, approved = copy.deepcopy(contract)
+    observed["migration"] = [
+        row for row in observed["migration"] if row["MigrationId"] != direct.STATS_OUTCOME_MIGRATION
+    ]
+    for name, checksum, status in [
+        (direct.STATS_OUTCOME_MIGRATION, direct.STATS_OUTCOME_CHECKSUM, original),
+        (
+            direct.STATS_OUTCOME_COLLATION_MIGRATION,
+            direct.STATS_OUTCOME_COLLATION_CHECKSUM,
+            collation,
+        ),
+        (
+            direct.STATS_OUTCOME_ENCODING_MIGRATION,
+            direct.STATS_OUTCOME_ENCODING_CHECKSUM,
+            "Applied",
+        ),
+    ]:
+        if status is not None:
+            observed["migration"].append(
+                dict(MigrationId=name, ChecksumSha256=checksum, Status=status)
+            )
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict, match="migration receipt"):
+        direct.verify(observed, approved, profile="application")
+    approved["outcome_installation"] = dict(
+        migration_id=direct.STATS_OUTCOME_ENCODING_MIGRATION,
+        predecessor_status=original,
+        collation_predecessor_status=collation,
+    )
+    assert direct.verify(observed, approved, profile="application") == digest(observed).hex()
+    for index in range(1, len(observed["migration"])):
+        damaged = copy.deepcopy(observed)
+        damaged["migration"][index]["ChecksumSha256"] = "0" * 64
+        adjusted = copy.deepcopy(approved)
+        adjusted["metadata_hash"] = digest(damaged).hex()
+        with pytest.raises(SourceConflict, match="migration receipt"):
+            direct.verify(damaged, adjusted, profile="application")
+    for status in ("Failed", "Pending"):
+        damaged = copy.deepcopy(observed)
+        damaged["migration"][-1]["Status"] = status
+        adjusted = copy.deepcopy(approved)
+        adjusted["metadata_hash"] = digest(damaged).hex()
+        with pytest.raises(SourceConflict, match="migration receipt"):
+            direct.verify(damaged, adjusted, profile="application")
+
+
 @pytest.fixture
 def file_visibility_contract(contract, monkeypatch):
     """Synthetic bodies exercise the same finite, three-module amendment."""
@@ -352,12 +401,13 @@ def test_file_visibility_amendment_requires_exact_postimages_and_receipt(file_vi
         == digest(observed).hex()
     )
     query, params = legacy_permission_queries(approved["source"])["migration"]
-    assert "MigrationId IN (?,?,?,?)" in query
+    assert "MigrationId IN (?,?,?,?,?)" in query
     assert params == (
         direct.DIRECT_MIGRATION,
         direct.FILE_VISIBILITY_MIGRATION,
         direct.STATS_OUTCOME_MIGRATION,
         direct.STATS_OUTCOME_COLLATION_MIGRATION,
+        direct.STATS_OUTCOME_ENCODING_MIGRATION,
     )
 
 
