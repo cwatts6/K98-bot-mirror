@@ -35,7 +35,7 @@ def validate_manifest(value):
         fields.add("amendment")
     if not isinstance(value, dict) or set(value) != fields:
         raise ValueError("Exact release manifest fields required.")
-    if type(value["version"]) is not int or value["version"] not in (1, 2, 3):
+    if type(value["version"]) is not int or value["version"] not in (1, 2, 3, 4):
         raise ValueError("Unsupported release version.")
     if value["version"] in (2, 3):
         amendment = value["amendment"]
@@ -203,7 +203,9 @@ def main(argv=None):
     print(
         json.dumps(
             prepare(
-                args.specification, args.output, Path(__file__).with_name("Deploy-K98Release.ps1")
+                args.specification,
+                args.output,
+                Path(__file__).with_name("Deploy-K98Release.ps1"),
             )
         )
     )

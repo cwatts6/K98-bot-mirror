@@ -1,8 +1,12 @@
-# One-time upgrade of the observed, previously used cd112e19 updater.
+# Reusable exact-version upgrade; packaging supplies independently pinned hashes.
 # Exact installed package, current startup state and operator lock are revalidated.
 # Close all other updater PowerShell windows before running this reviewed helper.
 [CmdletBinding()]
-param()
+param(
+ [ValidatePattern('^[a-f0-9]{64}$')][string]$PreviousManifestSHA256='cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871',
+ [ValidatePattern('^[a-f0-9]{64}$')][string]$InstallerSHA256='ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30',
+ [ValidatePattern('^[a-f0-9]{64}$')][string]$TargetManifestSHA256='6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b'
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0'
@@ -25,6 +29,7 @@ function Assert-UpgradeTool([string]$Path,[string]$ManifestHash) {
  if((Upgrade-Hash $bytes) -cne $ManifestHash){throw 'Tool manifest identity differs'}
  $manifest=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
  $names=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
+ if($null -ne $manifest.files.PSObject.Properties['prepare_k98_release.py']){$names+=@('prepare_k98_release.py')}
  if($manifest.version -ne 1 -or @($manifest.files.PSObject.Properties).Count -ne $names.Count){throw 'Tool manifest shape differs'}
  foreach($name in $names){if($null -eq $manifest.files.PSObject.Properties[$name]){throw 'Tool member missing from manifest'}}
  $items=@(Get-ChildItem -LiteralPath $Path -Force)
@@ -72,7 +77,7 @@ function Write-UpgradeMember([string]$Directory,[string]$Work,[string]$Name,[byt
 # Authenticate before executing installer code; retain these exact bytes in memory.
 $installer=Join-Path $PSScriptRoot 'Install-K98UpdateTool.ps1'
 $installerBytes=[IO.File]::ReadAllBytes($installer)
-if((Upgrade-Hash $installerBytes) -cne 'ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30'){throw 'Reviewed installer checksum differs'}
+if((Upgrade-Hash $installerBytes) -cne $InstallerSHA256){throw 'Reviewed installer checksum differs'}
 $installerText=[Text.Encoding]::UTF8.GetString($installerBytes)
 if($installerText -cnotmatch "\`$encoded='([A-Za-z0-9+/=]+)'"){throw 'Installer payload missing'}
 $newPayload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Matches[1]))|ConvertFrom-Json
@@ -88,9 +93,9 @@ if($null -eq $newAcl){throw 'Installer ACL builder missing'}
 $sid=$identity.User.Value
 $root='C:\ProgramData\K98\S11'
 $tool=Join-Path $root 'updater'
-$archive=Join-Path $root 'updater-before-custody-cd112e19'
+$archive=Join-Path $root ('updater-before-'+$PreviousManifestSHA256)
 $updates=Join-Path $root 'updates'
-$work=Join-Path $root 'updater-upgrade-6562c4cf8970'
+$work=Join-Path $root ('updater-upgrade-'+$TargetManifestSHA256)
 $candidate=Join-Path $work 'tool'
 Assert-Custody $root
 Assert-Custody $updates
@@ -109,8 +114,8 @@ try {
  if(Test-Path -LiteralPath (Join-Path $updates 'active.json')){throw 'Active release exists; tool replacement refused'}
  if(Test-Path -LiteralPath (Join-Path $policy.state_directory 'deployment-request.json')){throw 'Deployment request exists; tool replacement refused'}
  # Only the fully inventoried old package or exact completed new package is eligible.
- $oldHash='cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871'
- $newHash='6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b'
+ $oldHash=$PreviousManifestSHA256
+ $newHash=$TargetManifestSHA256
  Assert-NoUpgradeProcess
  if(Test-Path -LiteralPath $archive) {
   Assert-UpgradeTool $archive $oldHash
@@ -135,7 +140,7 @@ try {
  if(-not(Test-Path -LiteralPath $archive)) {
   Assert-UpgradeTool $tool $oldHash
   # Directory moves are confined to literal direct children of the protected root.
-  if([IO.Path]::GetFullPath($tool) -cne 'C:\ProgramData\K98\S11\updater' -or [IO.Path]::GetFullPath($archive) -cne 'C:\ProgramData\K98\S11\updater-before-custody-cd112e19'){throw 'Upgrade paths differ'}
+  if([IO.Path]::GetFullPath($tool) -cne 'C:\ProgramData\K98\S11\updater' -or [IO.Path]::GetFullPath($archive) -cne (Join-Path $root ('updater-before-'+$oldHash)) -or [IO.Path]::GetFullPath($candidate) -cne (Join-Path (Join-Path $root ('updater-upgrade-'+$newHash)) 'tool')){throw 'Upgrade paths differ'}
   Move-Item -LiteralPath $tool -Destination $archive -ErrorAction Stop
  }
  # Interruption after the backup move resumes here with the verified candidate.

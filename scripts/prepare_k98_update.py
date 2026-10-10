@@ -4,12 +4,14 @@ This module never installs source, connects to SQL, or starts processes. The
 Windows updater owns acquisition, custody checks and the deployment protocol.
 """
 
+from collections.abc import Callable
 from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path, PureWindowsPath
 import re
 import sys
+from typing import Any
 from uuid import uuid4
 
 if __name__ == "__main__" and not __package__:
@@ -27,10 +29,140 @@ TOOL_SOURCE_PATHS = frozenset(
         "K98-SourceUpdate.ps1",
         "Deploy-K98Release.ps1",
         "prepare_k98_update.py",
+        "prepare_k98_release.py",
         "verify_k98_update_pair.py",
         "package_k98_update_tool.py",
     )
 )
+
+RELEASE_DESCRIPTION = "deploy/k98-release.json"
+SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
+
+
+def combined_description(raw, before):
+    """A reviewed target-tree descriptor, never a live/generated hash assertion."""
+    if len(raw) > 65536:
+        raise ValueError("Combined release description exceeds bound.")
+    value = json.loads(raw)
+    if not isinstance(value, dict) or set(value) != {
+        "version",
+        "profile",
+        "bot_predecessors",
+        "sql_commit",
+        "migrations",
+    }:
+        raise ValueError("Exact combined release fields required.")
+    if value["version"] != 1 or value["profile"] != "module_grants_v1":
+        raise ValueError("Unsupported combined SQL profile; no drain requested.")
+    predecessors = value["bot_predecessors"]
+    if (
+        not isinstance(predecessors, list)
+        or not 1 <= len(predecessors) <= 16
+        or any(not isinstance(x, str) or not re.fullmatch(r"[a-f0-9]{40}", x) for x in predecessors)
+        or before not in predecessors
+    ):
+        raise ValueError(f"Combined release does not support installed Bot predecessor {before}.")
+    if not isinstance(value["sql_commit"], str) or not re.fullmatch(
+        r"[a-f0-9]{40}", value["sql_commit"]
+    ):
+        raise ValueError("Exact reviewed SQL commit required.")
+    migrations = value["migrations"]
+    if not isinstance(migrations, list) or not 1 <= len(migrations) <= 16:
+        raise ValueError("Explicit bounded SQL migration order required.")
+    seen = set()
+    for migration in migrations:
+        if not isinstance(migration, dict) or set(migration) != {"id", "sha256"}:
+            raise ValueError("Exact migration ID and profile hash required.")
+        name = migration["id"]
+        if (
+            not isinstance(name, str)
+            or not re.fullmatch(r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+", name)
+            or name in seen
+            or not isinstance(migration["sha256"], str)
+            or not re.fullmatch(r"[a-f0-9]{64}", migration["sha256"])
+        ):
+            raise ValueError("Unique exact SQL migration selection required.")
+        seen.add(name)
+    return value
+
+
+def combined_payload(description, read_sql_blob, *, protected_objects=(), protected_principals=()):
+    """Flatten only the explicit pinned profile/modules; preserve all SQL bytes."""
+    files = {}
+    for name in SQL_TOOLS:
+        raw = read_sql_blob("deploy/" + name)
+        if not raw or len(raw) > 2 * 1024 * 1024:
+            raise ValueError(f"Pinned SQL runner missing or oversized: {name}")
+        files[name] = raw
+    modules, grants, profiles = set(), set(), []
+    protected_objects = {x.casefold() for x in protected_objects}
+    protected_principals = {x.casefold() for x in protected_principals}
+    for migration in description["migrations"]:
+        name = migration["id"] + ".release.json"
+        raw = read_sql_blob("migrations/" + name)
+        if not raw or len(raw) > 1024 * 1024 or sha256(raw) != migration["sha256"]:
+            raise ValueError(f"SQL profile differs from reviewed description: {name}")
+        p = json.loads(raw)
+        if (
+            not isinstance(p, dict)
+            or set(p)
+            != {
+                "version",
+                "profile",
+                "migration_id",
+                "database_collation",
+                "tempdb_collation",
+                "compatibility_level",
+                "modules",
+                "grants",
+                "requires",
+            }
+            or p["version"] != 1
+            or p["profile"] != "module_grants_v1"
+            or p["migration_id"] != migration["id"]
+        ):
+            raise ValueError(f"Unsupported SQL migration profile: {name}")
+        # Full profile validation also runs through the exact SqlClient runner
+        # before drain. Reject cross-step overlaps: prior postimages must remain
+        # verifiable after any later step, including on every resume.
+        for m in p["modules"]:
+            key = (m["schema"] + "." + m["name"]).casefold()
+            if key in protected_objects:
+                raise ValueError(f"SQL module changes protected startup contract: {key}")
+            if key in modules:
+                raise ValueError(f"Repeated SQL module across release steps: {key}")
+            modules.add(key)
+            member = m["file"]
+            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,120}\.sql", member):
+                raise ValueError("Ordinary flat SQL module filename required.")
+            content = read_sql_blob("migrations/" + member)
+            if not content or len(content) > 2 * 1024 * 1024 or sha256(content) != m["sha256"]:
+                raise ValueError(f"Exact SQL module bytes differ: {member}")
+            if member in files and files[member] != content:
+                raise ValueError(f"SQL payload collision: {member}")
+            files[member] = content
+        for g in p["grants"]:
+            if (g["schema"] + "." + g["name"]).casefold() in protected_objects or g[
+                "principal"
+            ].casefold() in protected_principals:
+                raise ValueError("SQL grant changes protected startup contract.")
+            key = tuple(str(g[k]).casefold() for k in ("schema", "name", "principal", "permission"))
+            if key in grants:
+                raise ValueError("Repeated SQL grant across release steps.")
+            grants.add(key)
+        if name in files:
+            raise ValueError("SQL profile filename collision.")
+        files[name] = raw
+        profiles.append(dict(id=migration["id"], file=name, sha256=sha256(raw)))
+    check_case_aliases(files)
+    return (
+        dict(
+            commit=description["sql_commit"],
+            profiles=profiles,
+            members=[dict(name=n, sha256=sha256(b)) for n, b in sorted(files.items())],
+        ),
+        files,
+    )
 
 
 def sha256(raw):
@@ -74,7 +206,12 @@ def check_source_only(paths, *, tool_copies=()):
         # the successor consumes the resulting seed. Keep both contract sides
         # unchanged; upgrading this boundary needs a coordinated release.
         if lower.startswith(
-            ("core/export_", "services/export_", "scripts/run_export_", "scripts/provision_export_")
+            (
+                "core/export_",
+                "services/export_",
+                "scripts/run_export_",
+                "scripts/provision_export_",
+            )
         ) or lower in {
             "run_bot.py",
             "bot_config.py",
@@ -234,6 +371,26 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
                     )
                 ),
                 target_sha256=sha256(new) if new is not None else None,
+                checkout_sha256=(
+                    sorted(
+                        {
+                            sha256(raw)
+                            for raw in (
+                                (read_blob(target, path),)
+                                if b"\0" in new
+                                else (
+                                    read_blob(target, path),
+                                    read_blob(target, path).replace(b"\r\n", b"\n"),
+                                    read_blob(target, path)
+                                    .replace(b"\r\n", b"\n")
+                                    .replace(b"\n", b"\r\n"),
+                                )
+                            )
+                        }
+                    )
+                    if new is not None
+                    else []
+                ),
                 runtime=runtime,
                 deleted=new is None,
                 added=old is None,
@@ -291,9 +448,16 @@ def release_seed(previous, pins, gate):
 
 
 def prepare_update(
-    observation, changes, read_blob, destination, tool_directory, *, secure_output=False
+    observation,
+    changes,
+    read_blob,
+    destination,
+    tool_directory,
+    *,
+    secure_output=False,
+    read_sql_blob=None,
 ):
-    """Prepare an executable source-only package; all inputs are machine-derived.
+    """Prepare a source or bounded combined package; inputs are machine-derived.
 
     The caller has authenticated installed metadata and acquired an exact private
     main revision. The generated binding is rechecked by preflight before drain.
@@ -307,9 +471,44 @@ def prepare_update(
         if path in TOOL_SOURCE_PATHS
     }
     plan, payload = source_plan(
-        previous, config["before"], config["target"], changes, read_blob, tool_sources=tool_sources
+        previous,
+        config["before"],
+        config["target"],
+        changes,
+        read_blob,
+        tool_sources=tool_sources,
     )
     config.update(plan)
+    description_raw = read_blob(config["target"], RELEASE_DESCRIPTION)
+    previous_description = read_blob(config["before"], RELEASE_DESCRIPTION)
+    sql_files = {}
+    if description_raw != previous_description:
+        if description_raw is None:
+            raise ValueError("Removing a combined release description requires review.")
+        description = combined_description(description_raw, config["before"])
+        if read_sql_blob is None:
+            raise ValueError("Exact SQL source acquisition required before drain.")
+        from services.export_execution_dal import INSTALLATION_OBJECTS
+        from services.export_runtime_composition import application_contract_scope
+
+        bot = previous["bot-template.json"]
+        scope = application_contract_scope(bot["application_sql_contract"])
+        if scope is None:
+            raise ValueError(
+                "Whole-database startup SQL contract needs a separately reviewed upgrade."
+            )
+        protected = set(INSTALLATION_OBJECTS) | set(scope)
+        protected.update(m["name"] for m in bot["legacy_sql_contract"]["source"]["modules"])
+        principals = {
+            bot[k]["principal"]
+            for k in ("sql_contract", "legacy_sql_contract", "application_sql_contract")
+        }
+        config["sql"], sql_files = combined_payload(
+            description,
+            read_sql_blob,
+            protected_objects=protected,
+            protected_principals=principals,
+        )
     seed = release_seed(previous, plan["new_pins"], observation["gate"])
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
@@ -324,6 +523,7 @@ def prepare_update(
     config["old_pins"] = previous["AutomaticStartupPolicy.json"]["source_hashes"]
     config["flags"] = previous["AutomaticStartupPolicy.json"]["flags"]
     files = dict(seed)
+    files.update(sql_files)
     files["Release-Step.ps1"] = (tools / "K98-SourceUpdate.ps1").read_bytes()
     files["Verify-NewPair.py"] = (tools / "verify_k98_update_pair.py").read_bytes()
     files["EmptyGitConfig.txt"] = b""
@@ -339,14 +539,14 @@ def prepare_update(
     files["ReleaseBindings.json"] = encode(config)
     binding_hash = sha256(files["ReleaseBindings.json"])
 
-    def invocation(action):
+    def invocation(action) -> dict[str, Any]:
         return dict(
             file="Release-Step.ps1",
             arguments=dict(Action=action, ExpectedBindingsSHA256=binding_hash),
         )
 
-    manifest = dict(
-        version=1,
+    manifest: dict[str, Any] = dict(
+        version=4,
         release_id=config["release_id"],
         host=config["host"],
         application_sid=config["sid"],
@@ -367,10 +567,34 @@ def prepare_update(
             )
         ],
     )
-    # Validate before writing anything, including the runner's 128-member bound.
-    from scripts.prepare_k98_release import validate_manifest
+    if sql_files:
 
-    validate_manifest(manifest)
+        def sql_invocation(action, migration_id):
+            call = invocation(action)
+            call["arguments"]["MigrationId"] = migration_id
+            return call
+
+        manifest["steps"][:0] = [
+            dict(
+                id=f"sql-{index:02d}",
+                kind="sql",
+                apply=sql_invocation("ApplySql", item["id"]),
+                verify=sql_invocation("VerifySql", item["id"]),
+            )
+            for index, item in enumerate(config["sql"]["profiles"])
+        ]
+    # Validate before writing anything, including the runner's 128-member bound.
+    # The installed companion is authenticated by Update-K98. Loading that copy
+    # also supports upgrading from a predecessor whose validator lacks v4.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "k98_release_validator", tools / "prepare_k98_release.py"
+    )
+    validator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validator)
+
+    validator.validate_manifest(manifest)
     destination = Path(destination)
     mkdir, write = output_writers(config["sid"], secure_output=secure_output)
     mkdir(destination)
@@ -501,7 +725,9 @@ def main():
     )
     check_source_only(changes, tool_copies=TOOL_SOURCE_PATHS)
     requested = sorted(
-        set(changes) | set(observation["seed"]["AutomaticStartupPolicy.json"]["source_hashes"])
+        set(changes)
+        | {RELEASE_DESCRIPTION}
+        | set(observation["seed"]["AutomaticStartupPolicy.json"]["source_hashes"])
     )
     objects = {}
     complete_inventory = set()
@@ -551,6 +777,63 @@ def main():
         offset += expected_size + 1
     if offset != len(batch):
         raise ValueError("Unexpected Git object stream suffix.")
+    read_sql_blob: Callable[[str], bytes] | None = None
+    description_raw = blobs.get((target, RELEASE_DESCRIPTION))
+    if description_raw != blobs.get((before, RELEASE_DESCRIPTION)):
+        if description_raw is None:
+            raise ValueError("Removing a combined release description requires review.")
+        description = combined_description(description_raw, before)
+        # Acquire SQL into a separate Git database, never merge its history into
+        # Bot or select SQL main as the release target. The exact pin must be on main.
+        sql_root = Path(args.output + "-sql")
+        mkdir, _ = output_writers(config["sid"], secure_output=True)
+        mkdir(sql_root)
+        helper = config["credential_manager"].replace("\\", "/").replace(" ", "\\ ")
+
+        def sql_git(*arguments):
+            return subprocess.run(
+                [
+                    config["git_path"],
+                    "-c",
+                    "core.hooksPath=NUL",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "-c",
+                    f"safe.directory={sql_root.as_posix()}",
+                    "-c",
+                    "credential.helper=",
+                    "-c",
+                    f"credential.helper={helper}",
+                    "-C",
+                    str(sql_root),
+                    *arguments,
+                ],
+                capture_output=True,
+                check=True,
+                timeout=120,
+                env=environment,
+            ).stdout
+
+        sql_git("init", "--bare")
+        sql_git(
+            "fetch",
+            "--no-tags",
+            "--no-recurse-submodules",
+            "https://github.com/cwatts6/K98-bot-SQL-Server.git",
+            "refs/heads/main:refs/heads/main",
+        )
+        sql_git("merge-base", "--is-ancestor", description["sql_commit"], "refs/heads/main")
+
+        def acquired_sql_blob(path):
+            ordinary_path(path)
+            ref = description["sql_commit"] + ":" + path
+            size = int(sql_git("cat-file", "-s", ref))
+            if size > 2 * 1024 * 1024:
+                raise ValueError(f"SQL source object exceeds bound: {path}")
+            return sql_git("cat-file", "blob", ref)
+
+        read_sql_blob = acquired_sql_blob
+
     result = prepare_update(
         observation,
         changes,
@@ -558,6 +841,7 @@ def main():
         args.output,
         Path(__file__).parent,
         secure_output=True,
+        read_sql_blob=read_sql_blob,
     )
     print(json.dumps(result))
 

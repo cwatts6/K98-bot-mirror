@@ -55,8 +55,9 @@ Write-UpgradeMember $candidate $work 'next.txt' ([Text.Encoding]::UTF8.GetBytes(
 Check (Test-Path -LiteralPath (Join-Path $work 'pending-fixture')) 'partial staging evidence lost'
 # Exercise the actual swap orchestration without accessing production paths.
 $body=$ast.EndBlock.Statements[-1].Extent.Text
-$root='C:\ProgramData\K98\S11';$tool=Join-Path $root 'updater';$archive=Join-Path $root 'updater-before-custody-cd112e19';$updates=Join-Path $root 'updates'
-$work=Join-Path $root 'test-work';$candidate=Join-Path $work 'tool'
+$PreviousManifestSHA256='a'*64;$TargetManifestSHA256='b'*64
+$root='C:\ProgramData\K98\S11';$tool=Join-Path $root 'updater';$archive=Join-Path $root ('updater-before-'+$PreviousManifestSHA256);$updates=Join-Path $root 'updates'
+$work=Join-Path $root ('updater-upgrade-'+$TargetManifestSHA256);$candidate=Join-Path $work 'tool'
 $policy=[pscustomobject]@{state_directory='C:\fixture-state'}
 $newPayload=$payloadObject
 $lock=[pscustomobject]@{};$lock|Add-Member ScriptMethod Dispose {$script:disposed=$true}

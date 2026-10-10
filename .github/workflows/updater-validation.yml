@@ -1,0 +1,38 @@
+name: Updater validation
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/*K98*.ps1'
+      - 'scripts/*k98*.py'
+      - 'scripts/verify_k98_update_pair.py'
+      - 'tests/test*release*.py'
+      - 'tests/test*update*.py'
+      - '.github/workflows/updater-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-updater:
+    runs-on: windows-latest
+    env:
+      PYTHON_DOTENV_DISABLED: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Verify packet and protocol compatibility
+        run: python scripts/analyse_pytest_log_noise.py --pytest-args -q tests/test_prepare_k98_update.py tests/test_prepare_k98_release.py tests/test_combined_k98_update.py tests/test_release_amendment.py tests/test_export_release_seed.py
+      - name: Verify Windows 5.1 orchestration and recovery
+        shell: powershell
+        run: |
+          foreach ($script in @('Test-K98ReleaseOrchestration.ps1','Test-K98Update.ps1','Test-K98CombinedUpdate.ps1','Test-K98UpdateCloseout.ps1','Test-K98UpdateRecovery.ps1','Test-K98InstalledUpdaterUpgrade.ps1','Test-K98UpdateSource.ps1')) {
+            & powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path scripts $script)
+            if ($LASTEXITCODE -ne 0) { throw "Updater check failed: $script" }
+          }
