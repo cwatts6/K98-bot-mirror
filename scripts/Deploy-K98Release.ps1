@@ -123,6 +123,10 @@ function Assert-AmendmentSelection([string]$Path,$Current,[string]$Hash) {
     if($selected.amendment_id -cne $Current.amendment.id -or $selected.manifest_sha256 -cne $Hash.ToLowerInvariant() -or $selected.release_id -cne $Current.release_id){throw 'Another amendment is selected; preserve its outcome'}
 }
 
+function Assert-OriginalReleaseUnselected($Current,[string]$Stage) {
+    if($Current.version -eq 1 -and (Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json'))){throw 'Original release was superseded by an amendment; use only the selected amendment launcher'}
+}
+
 function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
     # One explicit amendment of a drained version-one release before any step
     # completed. SQL reconciliation belongs to the reviewed new preflight.
@@ -149,6 +153,10 @@ function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
     if($oldApply.Count -ne 1 -or $newApply.Count -ne 1 -or
        $oldApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $newApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or
        $oldApply[0].sha256 -ceq $newApply[0].sha256){throw 'Amendment requires a different pinned corrective SQL apply script; failed-script replay is prohibited'}
+    foreach($step in $Current.steps) {
+        $apply=@($Current.members|Where-Object {$_.name -ceq $step.apply.file})
+        if($step.id -ceq $a.failed_step_id -or $apply.Count -ne 1 -or $apply[0].sha256 -ceq $oldApply[0].sha256){throw 'No amended step may reuse the failed step ID or failed apply script'}
+    }
     $directory=Join-Path $BaseStage '.receipts';Assert-AdminPath $directory
     $entries=@(Get-ChildItem -LiteralPath $directory -Force)
     $expected=$a.failed_step_id+'.intent.json'
@@ -172,6 +180,7 @@ $policy=[Text.Encoding]::UTF8.GetString($policyRaw)|ConvertFrom-Json
 Assert-AdminPath $policy.state_directory
 Assert-AdminPath $powershell
 $script:staged=Join-Path $policy.state_directory ('release-'+$releaseId)
+Assert-OriginalReleaseUnselected $manifest $staged
 $amendmentSelection=$null
 if($manifest.version -eq 2) {
     Assert-ReleaseAmendment $manifest $staged
@@ -225,6 +234,7 @@ foreach($member in $members) {
     $null=Read-Pinned $destination $member.sha256 16MB
 }
 if((Invoke-ReleaseScript $manifest.preflight) -ne 0){throw 'Release preflight failed; no restart requested'}
+Assert-OriginalReleaseUnselected $manifest $staged
 if($null -ne $amendmentSelection) {
     if(-not(Test-Path -LiteralPath $amendmentSelection)) {
         Write-NewRecord $amendmentSelection @{amendment_id=$manifest.amendment.id;manifest_sha256=$ExpectedSHA256.ToLowerInvariant();release_id=$releaseId}

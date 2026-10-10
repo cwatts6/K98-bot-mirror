@@ -1,5 +1,6 @@
 """Explicit first-SQL-step amendments preserve original release evidence."""
 
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -74,6 +75,9 @@ def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
         "reused_apply_script",
         "renamed_apply_script",
         "unlisted_apply_script",
+        "later_failed_id",
+        "later_failed_script",
+        "later_renamed_failed_script",
     ],
 )
 def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path, damage):
@@ -103,6 +107,14 @@ def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path,
             current["steps"][0]["apply"]["file"] = "renamed.ps1"
     elif damage == "unlisted_apply_script":
         current["steps"][0]["apply"]["file"] = "missing.ps1"
+    elif damage is not None and damage.startswith("later_") and damage != "later_intent":
+        later = deepcopy(current["steps"][0])
+        later["id"] = "sql" if damage == "later_failed_id" else "another-sql"
+        if damage != "later_failed_id":
+            name = "old.ps1" if damage == "later_failed_script" else "renamed-old.ps1"
+            current["members"].append(dict(name=name, sha256=base["members"][0]["sha256"]))
+            later["apply"]["file"] = name
+        current["steps"].insert(1, later)
     raw = json.dumps(base).encode()
     (tmp_path / ".release.json").write_bytes(raw)
     current["amendment"]["base_manifest_sha256"] = hashlib.sha256(raw).hexdigest()
@@ -309,3 +321,48 @@ try{. ([scriptblock]::Create($block.Extent.Text));$success=$true}catch{$success=
     assert observed["success"] is (selection in ("absent", "same"))
     if selection in ("other_id", "create_race"):
         assert observed["selected"]["amendment_id"] == "other"
+
+
+@pytest.mark.parametrize("version,selected", [(1, False), (1, True), (2, False), (2, True)])
+def test_current_original_runner_refuses_a_selected_amendment(tmp_path, version, selected):
+    powershell = shutil.which("powershell.exe")
+    if not powershell:
+        pytest.skip("Windows PowerShell required")
+    runner = Path(__file__).resolve().parents[1] / "scripts/Deploy-K98Release.ps1"
+    if selected:
+        (tmp_path / ".amendment-selected.json").write_text("{}")
+    script = tmp_path / "original.ps1"
+    script.write_text(
+        r"""
+param([string]$Runner,[string]$Fixture,[int]$Version)
+$ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+$ast=[Management.Automation.Language.Parser]::ParseFile($Runner,[ref]$null,[ref]$null)
+$fn=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Assert-OriginalReleaseUnselected'},$true)
+. ([scriptblock]::Create($fn.Extent.Text))
+$calls=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Assert-OriginalReleaseUnselected'},$true))
+if($calls.Count -ne 2){throw 'Guard required before and after preflight'}
+Assert-OriginalReleaseUnselected ([pscustomobject]@{version=$Version}) $Fixture
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-Runner",
+            str(runner),
+            "-Fixture",
+            str(tmp_path),
+            "-Version",
+            str(version),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert (result.returncode == 0) is (version == 2 or not selected), result.stdout + result.stderr
+    if version == 1 and selected:
+        assert "Original release was superseded" in result.stderr

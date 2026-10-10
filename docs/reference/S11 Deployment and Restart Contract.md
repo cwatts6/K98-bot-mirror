@@ -193,7 +193,8 @@ any original step completed. It retains the same release ID, host, account,
 repository, predecessor policy and issuer. Its `amendment` names a new canonical
 ID, the exact original manifest SHA256 and the original first SQL step ID.
 The amended steps must begin with SQL under a different step ID and a different
-pinned apply-script hash. Omitting SQL or renaming the failed script is refused.
+pinned apply-script hash. No later step may reuse the failed ID or apply-script
+bytes either. Omitting SQL or renaming the failed script is refused.
 The changed corrective script still requires review; distinct bytes alone do not
 establish a safe migration.
 
@@ -217,3 +218,10 @@ reconciliation. Once an amendment is selected, use its exact launcher for every
 resume. Installed runtime contracts must explicitly approve the replacement
 migration lineage and its expected predecessor status; observed receipts never
 select or update their own expected hashes.
+
+The current runner refuses version-one execution when an amendment selection is
+present, both before and after preflight. Historical pinned runners cannot be
+retroactively changed. A packet amending such a runner must prove its original
+verifier remains fail-closed for the retained outcome. The October 10 correction
+requires the exact original Failed receipt throughout; it does not support
+amending an original Applied outcome. Use only the amended launcher after selection.
