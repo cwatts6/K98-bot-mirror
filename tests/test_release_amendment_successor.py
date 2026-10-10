@@ -46,7 +46,9 @@ def test_successor_manifest_is_explicit_and_bounded(fault):
 
 @pytest.mark.parametrize("version", [1, 2, 3])
 @pytest.mark.parametrize("selected", [False, True])
-def test_superseded_own_stage_stops_before_member_copy_or_preflight(tmp_path_factory, version, selected):
+def test_superseded_own_stage_stops_before_member_copy_or_preflight(
+    tmp_path_factory, version, selected
+):
     ps = shutil.which("powershell.exe")
     if not ps:
         pytest.skip("Windows PowerShell required")
