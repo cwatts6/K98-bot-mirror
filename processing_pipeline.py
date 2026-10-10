@@ -3,11 +3,11 @@ import asyncio
 import inspect
 import logging
 import os
-import time
 import traceback
 from typing import Literal
 
 from services.legacy_export_snapshot_service import bound_runtime, collect_producer_captures
+from services.processing_notification_service import NotificationTransitionFailed
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -41,7 +41,6 @@ from embed_utils import (
 from file_utils import (
     emit_telemetry_event,
     find_offload_by_meta,
-    read_json_safe,
     run_blocking_in_thread,  # still available for other modules; we favor run_step here
     run_maintenance_with_isolation,
 )
@@ -49,7 +48,7 @@ from gsheet_module import run_all_exports
 
 # NEW: log headroom helpers (bounded wait + auto-trigger on LOG_BACKUP)
 from log_health import LogHeadroomError, preflight_from_env_sync
-from player_stats_cache import build_lastkvk_player_stats_cache, build_player_stats_cache
+from player_stats_cache import build_player_stats_cache
 from stats_module import run_stats_copy_archive
 from target_utils import warm_name_cache, warm_target_cache
 from utils import live_queue, live_queue_lock, load_cached_input, update_live_queue_embed, utcnow
@@ -74,6 +73,24 @@ BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
 
 # Default trimming used when sending logs into embeds (kept small to avoid embed size issues)
 _EMBED_LOG_TRIM = int(os.getenv("EMBED_LOG_TRIM", str(_DEFAULT_MAX_LOG_EMBED_CHARS)))
+
+
+async def _notification_intervention(user, notify_channel, run_id):
+    await send_embed_safe(
+        user,
+        "Processing notification needs attention",
+        {
+            "Processing run": run_id,
+            "Reason": "A required notification update could not be saved.",
+            "Admin action": (
+                "Preserve the journal and repair disk, locking or permissions. Inspect this exact "
+                "run with processing_notifications.py status and correlated logs; reconcile or "
+                "close its notifications after inspection. Do not repeat the import or export."
+            ),
+        },
+        color=0xF1C40F,
+        fallback_channel=notify_channel,
+    )
 
 
 async def _run_proc_config_step(step_meta):
@@ -183,7 +200,14 @@ async def run_step(
 @bound_runtime
 @collect_producer_captures
 async def execute_processing_pipeline(
-    rank: int, *, seed: int, user, filename: str, channel_id: int, save_path: str | None = None
+    rank: int,
+    *,
+    seed: int,
+    user,
+    filename: str,
+    channel_id: int,
+    save_path: str | None = None,
+    notification_run_id: str | None = None,
 ) -> tuple[bool, bool, bool, bool | Literal["pending"] | None, bool | None, str]:
     """
     Orchestrates the file -> SQL -> Sheets processing pipeline.
@@ -383,110 +407,46 @@ async def execute_processing_pipeline(
             success_excel, success_archive, success_sql, None, None, str(out_archive or "")
         )
 
-    # 1b) Rebuild player_stats_cache.json as soon as SQL is updated
-    #     (Cache is SQL-sourced; does NOT depend on Google Sheets)
-    if success_sql:
+    # SQL/cache readiness is independent of Google configuration and delivery.
+    cache_output = None
+    try:
+        build_task = run_step(
+            build_player_stats_cache,
+            offload_sync_to_thread=True,
+            name="build_player_stats_cache",
+            meta=step_meta,
+        )
+        cache_output = (
+            await asyncio.wait_for(build_task, timeout=BUILD_CACHE_TIMEOUT)
+            if BUILD_CACHE_TIMEOUT and BUILD_CACHE_TIMEOUT > 0
+            else await build_task
+        )
+    except asyncio.CancelledError:
+        raise
+    except TimeoutError:
+        logger.exception("[CACHE] Fresh stats cache build timed out")
+        emit_telemetry_event({"event": "cache_build_timeout", "filename": filename})
+    except Exception as exc:
+        logger.exception("[CACHE] Fresh stats readiness not confirmed")
+        emit_telemetry_event(
+            {"event": "cache_build_failed", "filename": filename, "error_type": type(exc).__name__}
+        )
+    try:
+        await warm_name_cache()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[CACHE] Name cache refresh failed")
+    if notification_run_id:
+        from stats_alerts.processing_notifications import bot_data_ready
+
         try:
-            t0 = time.perf_counter()
-
-            # Offload build_player_stats_cache to a thread and optionally bound it by BUILD_CACHE_TIMEOUT.
-            try:
-                # Use run_step with offload_sync_to_thread so sync/async variants are supported.
-                build_task = run_step(
-                    build_player_stats_cache,
-                    offload_sync_to_thread=True,
-                    name="build_player_stats_cache",
-                    meta=step_meta,
-                )
-                if BUILD_CACHE_TIMEOUT and BUILD_CACHE_TIMEOUT > 0:
-                    # Bound the wait so shutdown remains responsive and long hangs are documented.
-                    await asyncio.wait_for(build_task, timeout=BUILD_CACHE_TIMEOUT)
-                else:
-                    await build_task
-            except TimeoutError:
-                # The background thread/process may still be running; record telemetry and continue.
-                logger.exception("[CACHE] build_player_stats_cache timed out (continuing)")
-                emit_telemetry_event({"event": "cache_build_timeout", "filename": filename})
-            except asyncio.CancelledError:
-                # Propagate cancellation cleanly
-                raise
-            except Exception as exc:
-                logger.exception(
-                    "[CACHE] build_player_stats_cache raised an exception (continuing)"
-                )
-                emit_telemetry_event(
-                    {
-                        "event": "cache_build_failed",
-                        "filename": filename,
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    }
-                )
-
-                # Kick off last-KVK cache build in the same manner as the main cache rebuild.
-                # Offload to a thread (non-fatal). Bound by BUILD_CACHE_TIMEOUT in the caller if desired.
-                try:
-                    last_task = run_step(
-                        build_lastkvk_player_stats_cache,
-                        offload_sync_to_thread=True,
-                        name="build_lastkvk_player_stats_cache",
-                        meta=step_meta,
-                    )
-                    if BUILD_CACHE_TIMEOUT and BUILD_CACHE_TIMEOUT > 0:
-                        await asyncio.wait_for(last_task, timeout=BUILD_CACHE_TIMEOUT)
-                    else:
-                        await last_task
-                except TimeoutError:
-                    logger.warning(
-                        "[CACHE] build_lastkvk_player_stats_cache timed out (continuing)"
-                    )
-                    emit_telemetry_event(
-                        {"event": "lastkvk_cache_build_timeout", "filename": filename}
-                    )
-                except Exception:
-                    logger.exception("[CACHE] build_lastkvk_player_stats_cache failed (continuing)")
-                    emit_telemetry_event(
-                        {"event": "lastkvk_cache_build_failed", "filename": filename}
-                    )
-
-            # quick sanity log: read PLAYER_STATS_CACHE off the loop
-            from constants import PLAYER_STATS_CACHE
-
-            try:
-                data = await run_step(
-                    read_json_safe,
-                    PLAYER_STATS_CACHE,
-                    offload_sync_to_thread=True,
-                    name="read_json_safe",
-                    meta=step_meta,
-                )
-            except asyncio.CancelledError:
-                # Propagate cancellation cleanly
-                raise
-            except Exception as exc:
-                logger.exception("[CACHE] Failed to read PLAYER_STATS_CACHE using read_json_safe")
-                emit_telemetry_event(
-                    {
-                        "event": "cache_read_failed",
-                        "filename": filename,
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    }
-                )
-                data = {}
-
-            count = (data.get("_meta") or {}).get("count", "unknown")
-            logger.info(
-                "[CACHE] player_stats_cache rebuilt early: %s players in %.2fs",
-                count,
-                time.perf_counter() - t0,
-            )
-        except asyncio.CancelledError:
+            await bot_data_ready(bot, notification_run_id, cache_output)
+        except NotificationTransitionFailed:
+            await _notification_intervention(user, notify_channel, notification_run_id)
             raise
-        except Exception:
-            logger.exception("[CACHE] Early build_player_stats_cache failed")
-            emit_telemetry_event({"event": "cache_build_failed", "filename": filename})
 
+    if success_sql:
         # Keep a single stats refresh after the heavy UPDATE_ALL2 step
         try:
             ok, out = await run_maintenance_with_isolation(
@@ -763,6 +723,15 @@ async def execute_processing_pipeline(
             str(out_archive or ""),
         )
 
+    # ProcConfig publishes targets; refresh their cache after that prerequisite,
+    # before an unrelated export failure can prevent current command lookups.
+    try:
+        await warm_target_cache()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[CACHE] target refresh failed after ProcConfig; inspect target cache")
+
     # 3) Google Sheets exports — offload to thread, but bounded by EXPORT_TIMEOUT
     await send_status_embed(
         "📤 Export to Google Sheets",
@@ -781,7 +750,7 @@ async def execute_processing_pipeline(
 
     try:
         try:
-            success_export, out_export = await asyncio.wait_for(
+            export_result = await asyncio.wait_for(
                 run_step(
                     run_all_exports,
                     SERVER,
@@ -794,9 +763,25 @@ async def execute_processing_pipeline(
                     offload_sync_to_thread=True,
                     name="run_all_exports",
                     meta=step_meta,
+                    **({"notification_run_id": notification_run_id} if notification_run_id else {}),
                 ),
                 timeout=EXPORT_TIMEOUT,
             )
+            from services.export_submission import ExportSubmission
+
+            if isinstance(export_result, ExportSubmission):
+                success_export, out_export = "pending", export_result.log
+                if notification_run_id:
+                    from services.processing_notification_service import patch_run
+
+                    await patch_run(
+                        notification_run_id,
+                        preparation_id=export_result.preparation_id,
+                        job_id=export_result.job_id,
+                        sheets="pending",
+                    )
+            else:
+                success_export, out_export = export_result
         except TimeoutError:
             logger.exception("[EXPORT] run_all_exports timed out")
             emit_telemetry_event(
@@ -805,6 +790,10 @@ async def execute_processing_pipeline(
             success_export, out_export = False, "Export timed out (see logs)."
     except asyncio.CancelledError:
         # Propagate cancellation so shutdown is responsive
+        raise
+    except NotificationTransitionFailed:
+        # Enqueue may already have succeeded. A journal error is not an export failure.
+        await _notification_intervention(user, notify_channel, notification_run_id)
         raise
     except Exception as exc:
         logger.exception("[EXPORT] Unhandled error during run_all_exports")
@@ -819,24 +808,6 @@ async def execute_processing_pipeline(
             }
         )
         success_export, out_export = False, "Export crashed (see logs)."
-
-    if str(out_export).startswith("Queued export job "):
-        success_export = "pending"
-
-    # 4) Warm caches after an export so commands/autocomplete feel snappy
-    try:
-        await warm_name_cache()
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception("[CACHE] warm_name_cache failed")
-
-    try:
-        await warm_target_cache()
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception("[CACHE] warm_target_cache failed")
 
     await send_status_embed(
         "📊 Google Sheets Export",
@@ -882,9 +853,53 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     """
     start_time = utcnow()
     channel_id = message.channel.id
+    notification_run_id = None
+    import bot_config
+    from services.legacy_export_snapshot_service import drain_thread
+    from services.processing_notification_service import event, patch_run, register_run
+
+    managed_notifications = bot_config.EXPORT_COORDINATION_ENABLED
+    if managed_notifications:
+        try:
+            notification_run_id = await drain_thread(
+                register_run,
+                source_message_id=message.id,
+                source_channel_id=channel_id,
+                summary_channel_id=NOTIFY_CHANNEL_ID,
+                sheets_channel_id=bot_config.GSHEETS_EXPORT_CHANNEL_ID,
+            )
+        except Exception as exc:
+            event(
+                None,
+                "registration",
+                "held",
+                "repair_notification_journal_before_next_run",
+                error=exc,
+            )
 
     # Cache notify channel for consistent fallback behavior in this processing run
     notify_channel = get_channel_safe(bot, NOTIFY_CHANNEL_ID)
+    if managed_notifications and not notification_run_id:
+        logger.error(
+            "processing_registration outcome=blocked source_message_id=%s source_channel_id=%s next_action=repair_runtime_or_notification_journal_before_resubmission",
+            message.id,
+            channel_id,
+        )
+        await send_embed_safe(
+            user,
+            "File processing not started",
+            {
+                "Reason": "Durable completion tracking is unavailable. No import was started.",
+                "Admin action": (
+                    "Check protected runtime availability and data/processing_outcomes.json. "
+                    "Repair disk/permissions or resolve old journal entries, then submit this file again."
+                ),
+            },
+            0xE74C3C,
+            bot=bot,
+            fallback_channel=notify_channel,
+        )
+        raise RuntimeError("Processing notification registration unavailable; no import started.")
     if notify_channel is None:
         logger.warning(
             "[HANDLE_FILE] NOTIFY_CHANNEL_ID not resolvable; initial notify embed will rely on followup/DM fallback."
@@ -944,8 +959,17 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     # Update live queue (keep only last 5 entries) — guarded by live_queue_lock
     async with live_queue_lock:
         for job in live_queue["jobs"]:
-            if job["filename"] == filename and job["user"] == str(message.author):
+            if (
+                not job.get("processing_run_id")
+                and job["filename"] == filename
+                and job["user"] == str(message.author)
+                and (
+                    not job.get("source_message_id")
+                    or job["source_message_id"] == getattr(message, "id", None)
+                )
+            ):
                 job["status"] = "⚙️ Processing..."
+                job["processing_run_id"] = notification_run_id
                 break
     await update_live_queue_embed(bot, NOTIFY_CHANNEL_ID)
 
@@ -957,7 +981,13 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
         success_proc_import,
         combined_log,
     ) = await execute_processing_pipeline(
-        rank, user=user, seed=seed, filename=filename, channel_id=channel_id, save_path=save_path
+        rank,
+        user=user,
+        seed=seed,
+        filename=filename,
+        channel_id=channel_id,
+        save_path=save_path,
+        **({"notification_run_id": notification_run_id} if notification_run_id else {}),
     )
 
     logger.info(
@@ -969,6 +999,53 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
         success_proc_import,
     )
     logger.info("[SUMMARY LOG]\n%s", combined_log)
+
+    if notification_run_id:
+        from services.processing_notification_store import notification_store
+
+        try:
+            current = await drain_thread(notification_store().get, notification_run_id)
+            sheets_state = (
+                "pending"
+                if success_export == "pending"
+                else ("uncertain" if success_proc_import is True else "failed")
+            )
+            handoff = await patch_run(
+                notification_run_id,
+                handoff=True,
+                sheets=sheets_state,
+                stats=current["stats"] if success_sql else "unavailable",
+                steps=dict(
+                    excel=success_excel,
+                    archive=success_archive,
+                    sql=success_sql,
+                    proc_config=success_proc_import,
+                ),
+                **(
+                    {
+                        "duration_seconds": (utcnow() - start_time).total_seconds(),
+                        "completed_at": utcnow().timestamp(),
+                    }
+                    if sheets_state in {"failed", "uncertain"}
+                    else {}
+                ),
+            )
+            if (
+                handoff
+                and handoff["sheets"] == sheets_state
+                and sheets_state in {"failed", "uncertain"}
+            ):
+                event(
+                    notification_run_id,
+                    "export",
+                    sheets_state,
+                    "inspect_pipeline_and_exact_job_evidence",
+                    duration=handoff.get("duration_seconds"),
+                )
+        except Exception as exc:
+            event(notification_run_id, "handoff", "held", "inspect_notification_journal", error=exc)
+            await _notification_intervention(user, notify_channel, notification_run_id)
+            raise
 
     await log_processing_result(
         bot,
@@ -986,6 +1063,7 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
         combined_log,
         start_time,
         SUMMARY_LOG,
+        **({"managed_notifications": True} if managed_notifications else {}),
     )
 
     # Status icon based on archive/export results
@@ -1005,8 +1083,18 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
 
     async with live_queue_lock:
         for job in live_queue["jobs"]:
-            if job["filename"] == filename and job["user"] == str(message.author):
-                job["status"] = f"{status_icon} {timestamp}"
+            if (
+                job.get("processing_run_id") == notification_run_id
+                if notification_run_id
+                else job["filename"] == filename and job["user"] == str(message.author)
+            ):
+                if notification_run_id:
+                    # Read inside the queue lock so a completed observer cannot be
+                    # overwritten by this caller's earlier pending submission result.
+                    latest = await drain_thread(notification_store().get, notification_run_id)
+                    job["status"] = f"Stats: {latest['stats']}; Sheets: {latest['sheets']}"
+                else:
+                    job["status"] = f"{status_icon} {timestamp}"
                 break
         live_queue["jobs"] = live_queue["jobs"][-5:]
     await update_live_queue_embed(bot, NOTIFY_CHANNEL_ID)

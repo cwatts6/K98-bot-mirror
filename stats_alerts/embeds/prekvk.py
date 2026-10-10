@@ -577,7 +577,7 @@ async def send_prekvk_embed(
     if message:
         try:
             if _delivery:
-                _delivery.enter(
+                await _delivery.before_dispatch(
                     getattr(channel, "id", None), operation="edit", message_id=message.id
                 )
             if diagnostic:
@@ -589,7 +589,7 @@ async def send_prekvk_embed(
             else:
                 await message.edit(embed=embed, view=view)
             if _delivery:
-                _delivery.receipt(message, channel, operation="edit")
+                await _delivery.after_dispatch(message, channel, operation="edit")
             logger.info(
                 "[PREKVK] Edited existing message id=%s in channel=%s",
                 getattr(message, "id", "?"),
@@ -599,7 +599,7 @@ async def send_prekvk_embed(
         except Exception as exc:
             if _delivery:
                 _delivery.failure(exc)
-            if diagnostic:
+            if diagnostic or getattr(_delivery, "durable", False):
                 raise  # An ambiguous edit must never fall through to a fresh send.
             logger.exception("[PREKVK] Edit failed; will send a fresh message.")
             if state.pop("prekvk_msg_id", None) is not None:
@@ -615,7 +615,7 @@ async def send_prekvk_embed(
         if attempt is not None:
             await attempt.start()
         if _delivery:
-            _delivery.enter(getattr(channel, "id", None))
+            await _delivery.before_dispatch(getattr(channel, "id", None))
         sent = await channel.send(
             embed=embed,
             content="@everyone" if (first_send_ping and not is_test and not diagnostic) else None,
@@ -627,7 +627,7 @@ async def send_prekvk_embed(
             ),
         )
         if _delivery:
-            _delivery.receipt(sent)
+            await _delivery.after_dispatch(sent)
         logger.info(
             "[PREKVK] Sent new message id=%s in channel=%s",
             getattr(sent, "id", "?"),

@@ -4,11 +4,11 @@ This change is source work, not authorization to replay, settle or restart any
 historical job. The successful 9 October export remains complete. Only imports
 registered with the new exact execution receipt participate in automatic handling.
 
-SQL import and Google delivery are separate outcomes. The planned notification
-change reports fresh SQL/cache stats in the normal stats channel with existing
-mention/cap rules. A separate configurable Sheets channel receives analysis links
-and export outcomes without mentions. That notification change is a subsequent
-delivery; the outcome foundation described here does not yet implement it.
+SQL import and Google delivery are separate outcomes. Fresh SQL/cache stats use
+the normal stats channel and existing mention/cap rules. A separate configurable
+Sheets channel receives analysis links and export outcomes without mentions.
+See [notification operation and resolution](s11_notifications.md) for that separate
+delivery layer and its local administrator command.
 
 ## What recovers automatically
 
@@ -25,8 +25,11 @@ It never repeats an import. A still-live writer can also finish a known complete
 SQL checkpoint/capture while it holds the original snapshot guard. Unknown capture
 or spool acknowledgments are retained.
 
-The observer checks at most 16 eligible receipts every 30 seconds. Restart resumes
-discovery; elapsed time and absence of a process never prove a SQL outcome.
+The observer checks at most 16 eligible receipts every 30 seconds, rotating by
+immutable preparation ID so held entries cannot starve later safe failures. The
+in-memory cursor resets on restart or account/storage change; it controls discovery
+order only and never authorizes settlement. Restart resumes discovery; elapsed
+time and absence of a process never prove a SQL outcome.
 Failed SQL skips cache rebuilding, maintenance, configuration import and export.
 Failed configuration import skips its dependent export. A failed ancillary
 notification cannot release or reacquire export ownership.

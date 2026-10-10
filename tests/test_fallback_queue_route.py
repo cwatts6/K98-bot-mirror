@@ -147,6 +147,8 @@ async def test_fallback_route_accepts_existing_extensions(filename: str):
     assert live_queue["jobs"] == [
         {
             "filename": filename,
+            "source_message_id": message.id,
+            "source_channel_id": message.channel.id,
             "user": "uploader",
             "channel": "uploads",
             "uploaded": "2026-05-26T12:30:00+00:00",

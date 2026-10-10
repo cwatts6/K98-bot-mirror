@@ -4,16 +4,24 @@ import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+_failure_cursor = None
 
 
 def recover_failures():
+    global _failure_cursor
     from services.legacy_export_snapshot_service import caller_runtime
     from services.stats_import_outcome_service import outcome_dal, settle_known_failure
 
     with caller_runtime() as runtime:
         if runtime is None:
             return
-        for preparation_id in outcome_dal(runtime).pending_failures():
+        dal = outcome_dal(runtime)
+        scope = (dal.account, dal.storage_owner)
+        after = _failure_cursor[1] if _failure_cursor and _failure_cursor[0] == scope else None
+        for preparation_id in dal.pending_failures(after=after):
+            # Scheduling only: each settlement still revalidates exact SQL evidence.
+            # Advance before a held/error result so it cannot starve later receipts.
+            _failure_cursor = (scope, preparation_id)
             settle_known_failure(runtime, preparation_id)
 
 
@@ -21,6 +29,7 @@ async def observe_processing_outcomes():
     from services.legacy_export_snapshot_service import drain_thread
 
     unavailable = False
+    notifications_unavailable = False
     while True:
         try:
             await drain_thread(recover_failures)
@@ -38,6 +47,23 @@ async def observe_processing_outcomes():
                     type(exc).__name__,
                 )
             unavailable = True
+        try:
+            from bot_loader import bot
+            from stats_alerts.processing_notifications import observe_notifications
+
+            await observe_notifications(bot)
+            if notifications_unavailable:
+                logger.info("processing_notifications available=true action=resume_registered_runs")
+            notifications_unavailable = False
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if not notifications_unavailable:
+                logger.warning(
+                    "processing_notifications available=false error_type=%s action=inspect_journal_and_protected_runtime",
+                    type(exc).__name__,
+                )
+            notifications_unavailable = True
         await asyncio.sleep(30)
 
 

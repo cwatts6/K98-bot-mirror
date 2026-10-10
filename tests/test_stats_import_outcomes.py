@@ -300,3 +300,98 @@ def test_uncertain_registration_cannot_use_unregistered_cleanup(tmp_path):
             assert dal.transition.call_args_list == calls_before
         finally:
             runtime._close_writer(owner)
+
+
+def test_failure_discovery_rotation_is_parameterized_and_scope_bounded(monkeypatch):
+    from contextlib import contextmanager
+
+    from services import stats_import_outcome_dal as module
+
+    cursor = Mock()
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "rows", lambda _: [])
+    dal = DAL(Mock(), account="a", storage_owner="disk-a")
+    after = str(uuid4())
+    assert dal.pending_failures(after=after) == []
+    sql, *args = cursor.execute.call_args.args
+    assert args == [16, "a", "disk-a", after]
+    assert "CASE WHEN e.PreparationID>CAST(? AS uniqueidentifier)" in sql
+    assert "p.AccountKey=? AND p.StorageOwner=?" in sql
+    assert "e.State IN ('prepared','rolled_back')" in sql
+    assert "p.JobID IS NULL AND p.SpoolKey IS NULL" in sql
+    assert dal.pending_failures() == []
+    assert cursor.execute.call_args.args[-1] is None
+    with pytest.raises((ValueError, SourceConflict)):
+        dal.pending_failures(after="not-a-guid")
+
+
+def test_recovery_rotates_past_held_entries_and_resets_for_new_scope(monkeypatch):
+    from contextlib import contextmanager
+
+    from services import (
+        legacy_export_snapshot_service as snapshots,
+        processing_outcome_worker as worker,
+    )
+
+    ids = [str(uuid4()) for _ in range(40)]
+    visited, cursors = [], []
+    dal = SimpleNamespace(account="a", storage_owner="disk-a")
+
+    def pending(*, after=None):
+        cursors.append(after)
+        offset = (ids.index(after) + 1) if after else 0
+        return (ids[offset:] + ids[:offset])[:16]
+
+    dal.pending_failures = pending
+
+    @contextmanager
+    def runtime():
+        yield object()
+
+    monkeypatch.setattr(snapshots, "caller_runtime", runtime)
+    monkeypatch.setattr(service, "outcome_dal", lambda _: dal)
+
+    def settle(_, preparation):
+        visited.append(preparation)
+        return False  # Every receipt remains held; discovery must still progress.
+
+    monkeypatch.setattr(service, "settle_known_failure", settle)
+    monkeypatch.setattr(worker, "_failure_cursor", None)
+    for _ in range(3):
+        worker.recover_failures()
+    assert len(visited) == 48 and set(visited) == set(ids)
+    assert cursors == [None, ids[15], ids[31]]
+    dal.storage_owner = "disk-b"
+    worker.recover_failures()
+    assert cursors[-1] is None
+
+
+def test_recovery_cursor_advances_before_unexpected_settlement_error(monkeypatch):
+    from contextlib import contextmanager
+
+    from services import (
+        legacy_export_snapshot_service as snapshots,
+        processing_outcome_worker as worker,
+    )
+
+    ids = [str(uuid4()), str(uuid4())]
+    dal = SimpleNamespace(
+        account="a", storage_owner="disk", pending_failures=Mock(return_value=ids)
+    )
+
+    @contextmanager
+    def runtime():
+        yield object()
+
+    monkeypatch.setattr(snapshots, "caller_runtime", runtime)
+    monkeypatch.setattr(service, "outcome_dal", lambda _: dal)
+    monkeypatch.setattr(service, "settle_known_failure", Mock(side_effect=OSError("unavailable")))
+    monkeypatch.setattr(worker, "_failure_cursor", None)
+    with pytest.raises(OSError):
+        worker.recover_failures()
+    assert worker._failure_cursor == (("a", "disk"), ids[0])

@@ -360,6 +360,10 @@ Defined through `bot_config.py` and validated by `scripts/config_self_test.py` w
 - `KVK_NOTIFICATION_CHANNEL_ID`
 - `LEADERSHIP_CHANNEL_ID`
 - `NOTIFY_CHANNEL_ID`
+- `GSHEETS_EXPORT_CHANNEL_ID` — separate analysis channel for confirmed Sheets exports
+  and failure notices; default `0` holds delivery for admin correction, with no
+  fallback to a stats channel. All mentions are disabled. See
+  [S11 notification operations](s11_notifications.md).
 - `OFFSEASON_STATS_CHANNEL_ID`
 
 Use `bot_config.py` as the exact source for exported names and types.

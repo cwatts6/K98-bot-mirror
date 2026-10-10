@@ -71,7 +71,6 @@ async def test_run_step_with_sync_and_async(monkeypatch):
     monkeypatch.setattr(pp, "run_all_exports", fake_run_all_exports)
     monkeypatch.setattr(pp, "run_maintenance_with_isolation", fake_run_maintenance_with_isolation)
     monkeypatch.setattr(pp, "preflight_from_env_sync", lambda *a, **k: None)
-    monkeypatch.setattr(pp, "read_json_safe", lambda *a, **k: {"_meta": {"count": 0}})
 
     # monkeypatch send_embed_safe to a no-op to avoid discord usage
     async def fake_send_embed_safe(*args, **kwargs):

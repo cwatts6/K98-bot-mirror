@@ -361,8 +361,6 @@ async def run_sql_procedure(
 
             preparation_id = register_execution(completed_filename)
             execution_id = preparation_id
-            if preparation_id is not None and isinstance(import_metadata, dict):
-                import_metadata["_export_preparation_id"] = preparation_id
             original_counter = fetch_update_all2_last_counter(cur, TASK_NAME)
             expected_counter = original_counter + 1
             logger.info(f"[SQL_PROC] Executing procedure with expected counter: {expected_counter}")

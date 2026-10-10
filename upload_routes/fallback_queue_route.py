@@ -66,6 +66,8 @@ async def handle_fallback_queue_upload(message: Any, deps: FallbackQueueRouteDep
                     deps.live_queue["jobs"].append(
                         {
                             "filename": attachment.filename,
+                            "source_message_id": message.id,
+                            "source_channel_id": message.channel.id,
                             "user": str(message.author),
                             "channel": message.channel.name,
                             "uploaded": deps.utcnow().isoformat(),
