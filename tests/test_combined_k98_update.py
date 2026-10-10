@@ -1,6 +1,7 @@
 from copy import deepcopy
 import json
 from pathlib import Path, PureWindowsPath
+import subprocess
 from uuid import uuid4
 
 import pytest
@@ -71,6 +72,43 @@ def test_committed_descriptor_ci_validation_reads_actual_input(tmp_path):
     assert main(args) == 1
     path.write_text('{"version":')
     assert main(args) == 1
+
+
+def test_descriptor_ci_refuses_deletion_but_allows_source_only(tmp_path, monkeypatch):
+    from scripts.validate_k98_release_description import main
+
+    monkeypatch.chdir(tmp_path)
+
+    def git(*args):
+        return subprocess.run(
+            ["git", *args], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    git("init")
+    git(
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "source",
+    )
+    source_base = git("rev-parse", "HEAD")
+    assert main(["--base-revision", source_base]) == 0
+    path = Path("deploy/k98-release.json")
+    path.parent.mkdir()
+    path.write_text(json.dumps(fixture()[0]))
+    assert main(["--base-revision", source_base]) == 0
+    git("add", path.as_posix())
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "combined")
+    combined_base = git("rev-parse", "HEAD")
+    assert main(["--base-revision", combined_base]) == 0
+    path.unlink()
+    assert main(["--base-revision", combined_base]) == 1
+    assert main(["--base-revision", "f" * 40]) == 1
+    assert main(["--base-revision", "main"]) == 1
 
 
 @pytest.mark.parametrize("damage", ["profile", "before", "commit", "order", "extra", "hash"])

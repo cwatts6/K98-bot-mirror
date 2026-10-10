@@ -34,7 +34,8 @@ or migration is added by the updater implementation itself.
 
 Descriptor-only pull requests trigger updater CI. The metadata check validates
 the actual descriptor's shape, exact commit/hash fields and explicit migration
-order. Installed-predecessor compatibility, private SQL acquisition and live SQL
+order. CI compares the exact PR base to reject deletion of a previously committed
+descriptor. Installed-predecessor compatibility, private SQL acquisition and live SQL
 preconditions remain preparation checks before drain; CI does not claim those
 production observations.
 
