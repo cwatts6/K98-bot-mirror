@@ -62,6 +62,21 @@ def test_reviewed_member_change_stops_before_output_creation(tmp_path):
     assert not (tmp_path / "output").exists()
 
 
+def test_generic_packager_rejects_updater_continuation_protocol(tmp_path):
+    value = specification()
+    value["version"] = 4
+    contents = b"reviewed arbitrary adapter"
+    (tmp_path / "step.ps1").write_bytes(contents)
+    value["members"][0]["sha256"] = hashlib.sha256(contents).hexdigest()
+    spec = tmp_path / "spec.json"
+    spec.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="Unsupported release version"):
+        validate_manifest(value)
+    with pytest.raises(ValueError, match="Unsupported release version"):
+        prepare(spec, tmp_path / "output", tmp_path / "unused-runner")
+    assert not (tmp_path / "output").exists()
+
+
 @pytest.mark.parametrize(
     "name",
     ["../step.ps1", "CON.ps1", "step.ps1.", "release.json", "Deploy-K98Release.ps1", "C:/step.ps1"],

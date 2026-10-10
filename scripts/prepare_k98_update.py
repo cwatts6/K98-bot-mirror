@@ -594,7 +594,7 @@ def prepare_update(
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
 
-    validator.validate_manifest(manifest)
+    validator.validate_updater_manifest(manifest)
     destination = Path(destination)
     mkdir, write = output_writers(config["sid"], secure_output=secure_output)
     mkdir(destination)

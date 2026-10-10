@@ -227,3 +227,21 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
     )
     for member in manifest["members"]:
         assert sha256((package / member["name"]).read_bytes()) == member["sha256"]
+    from scripts.prepare_k98_release import validate_updater_manifest
+
+    validate_updater_manifest(manifest)
+    for damage in ("adapter", "action", "binding", "migration", "argument"):
+        invalid = deepcopy(manifest)
+        call = invalid["steps"][0]["verify"]
+        if damage == "adapter":
+            call["file"] = "Deploy-SqlMigration.ps1"
+        elif damage == "action":
+            call["arguments"]["Action"] = "VerifySource"
+        elif damage == "binding":
+            call["arguments"]["ExpectedBindingsSHA256"] = "f" * 64
+        elif damage == "migration":
+            call["arguments"]["MigrationId"] = "20261010_902_other"
+        else:
+            call["arguments"]["Force"] = "true"
+        with pytest.raises(ValueError, match="exact normal-updater"):
+            validate_updater_manifest(invalid)
