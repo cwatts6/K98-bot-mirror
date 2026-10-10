@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+import re
 
 INSTALLER = r"""[CmdletBinding()]
 param()
@@ -124,17 +125,26 @@ def package(output, source=None, *, previous_manifest=None):
         template = (source / "Upgrade-K98InstalledUpdater.ps1").read_text(encoding="utf-8")
         # Generated defaults bind one reviewed old/new pair. The operator still
         # runs one fixed filename without calculating or substituting hashes.
-        for old, new in (
-            ("cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871", old_hash),
+        replacements = dict(
             (
-                "ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30",
-                hashlib.sha256(script).hexdigest(),
-            ),
-            ("6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b", new_hash),
-        ):
+                ("cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871", old_hash),
+                (
+                    "ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30",
+                    hashlib.sha256(script).hexdigest(),
+                ),
+                ("6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b", new_hash),
+            )
+        )
+        for old in replacements:
             if template.count(old) != 1:
                 raise ValueError("Upgrade template pin is missing or ambiguous.")
-            template = template.replace(old, new)
+        # Match only original placeholders. An installed predecessor hash can
+        # equal an old target placeholder and must not be replaced a second time.
+        template = re.sub(
+            "|".join(re.escape(old) for old in replacements),
+            lambda match: replacements[match.group(0)],
+            template,
+        )
         upgrade = output / "Upgrade-K98InstalledUpdater.ps1"
         with upgrade.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(template)

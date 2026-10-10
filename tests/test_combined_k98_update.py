@@ -114,7 +114,8 @@ def test_protected_sql_module_and_principal_changes_are_refused():
         combined_payload(d, files.get, protected_principals=["bot"])
 
 
-def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path):
+@pytest.mark.parametrize("installed", [False, True])
+def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path, installed):
     import base64
     import re
 
@@ -125,10 +126,21 @@ def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path):
     payload = json.loads(base64.b64decode(re.search(r"\$encoded='([^']+)'", text)[1]))
     manifest = tmp_path / "installed.json"
     manifest.write_bytes(base64.b64decode(payload["update-tool.json"]))
+    if installed:
+        manifest.write_bytes(
+            (Path(__file__).parent / "fixtures" / "updater_installed_20261009.json").read_bytes()
+        )
+        assert sha256(manifest.read_bytes()) == (
+            "6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b"
+        )
     second = package(tmp_path / "second", previous_manifest=manifest)
     upgrade = Path(second["upgrade"]).read_text()
-    assert sha256(manifest.read_bytes()) in upgrade
-    assert second["sha256"] in upgrade
+    new_text = Path(second["installer"]).read_text()
+    new_payload = json.loads(base64.b64decode(re.search(r"\$encoded='([^']+)'", new_text)[1]))
+    new_hash = sha256(base64.b64decode(new_payload["update-tool.json"]))
+    assert f"$PreviousManifestSHA256='{sha256(manifest.read_bytes())}'" in upgrade
+    assert f"$InstallerSHA256='{second['sha256']}'" in upgrade
+    assert f"$TargetManifestSHA256='{new_hash}'" in upgrade
     assert "updater-before-'+$PreviousManifestSHA256" in upgrade
     assert "Active release exists; tool replacement refused" in upgrade
 

@@ -1,4 +1,4 @@
-"""Generate routine source-only release inputs from the protected installed seed.
+"""Generate source or bounded combined release inputs from the protected seed.
 
 This module never installs source, connects to SQL, or starts processes. The
 Windows updater owns acquisition, custody checks and the deployment protocol.
