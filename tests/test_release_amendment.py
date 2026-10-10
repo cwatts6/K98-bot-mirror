@@ -22,13 +22,15 @@ def amendment():
             failed_step_id="sql",
         ),
     )
+    value["steps"][0]["id"] = "sql-correction"
+    value["members"][0]["sha256"] = "d" * 64
     return value
 
 
 def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
     validate_manifest(specification())
     validate_manifest(amendment())
-    for change in ("missing", "version", "hash", "extra", "id", "step"):
+    for change in ("missing", "version", "hash", "extra", "id", "step", "no_sql", "same_step"):
         value = amendment()
         if change == "missing":
             value.pop("amendment")
@@ -40,6 +42,10 @@ def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
             value["amendment"]["accept_unknown"] = True
         elif change == "id":
             value["amendment"]["id"] = None
+        elif change == "no_sql":
+            value["steps"].pop(0)
+        elif change == "same_step":
+            value["steps"][0]["id"] = value["amendment"]["failed_step_id"]
         else:
             value["amendment"]["failed_step_id"] = "../sql"
         with pytest.raises(ValueError):
@@ -63,6 +69,11 @@ def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
         "complete",
         "start",
         "intent_identity",
+        "no_corrective_sql",
+        "reused_step_id",
+        "reused_apply_script",
+        "renamed_apply_script",
+        "unlisted_apply_script",
     ],
 )
 def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path, damage):
@@ -81,6 +92,17 @@ def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path,
         base["version"] = 2
     elif damage == "first_step":
         base["steps"][0]["kind"] = "source"
+    elif damage == "no_corrective_sql":
+        current["steps"].pop(0)
+    elif damage == "reused_step_id":
+        current["steps"][0]["id"] = "sql"
+    elif damage in ("reused_apply_script", "renamed_apply_script"):
+        current["members"][0]["sha256"] = base["members"][0]["sha256"]
+        if damage == "renamed_apply_script":
+            current["members"][0]["name"] = "renamed.ps1"
+            current["steps"][0]["apply"]["file"] = "renamed.ps1"
+    elif damage == "unlisted_apply_script":
+        current["steps"][0]["apply"]["file"] = "missing.ps1"
     raw = json.dumps(base).encode()
     (tmp_path / ".release.json").write_bytes(raw)
     current["amendment"]["base_manifest_sha256"] = hashlib.sha256(raw).hexdigest()

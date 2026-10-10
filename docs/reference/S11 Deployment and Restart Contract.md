@@ -192,6 +192,10 @@ A version-two manifest can explicitly amend a drained version-one release before
 any original step completed. It retains the same release ID, host, account,
 repository, predecessor policy and issuer. Its `amendment` names a new canonical
 ID, the exact original manifest SHA256 and the original first SQL step ID.
+The amended steps must begin with SQL under a different step ID and a different
+pinned apply-script hash. Omitting SQL or renaming the failed script is refused.
+The changed corrective script still requires review; distinct bytes alone do not
+establish a safe migration.
 
 The original stage must contain only that step's starting intent and no start
 request. The runner preserves all original files and receipts, stages the new

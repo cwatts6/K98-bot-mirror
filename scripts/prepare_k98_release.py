@@ -135,6 +135,10 @@ def validate_manifest(value):
         invocation(step["verify"])
     if any(counts.get(kind) != 1 for kind in ("seed", "start", "readiness")):
         raise ValueError("Exactly one seed, start and readiness step required.")
+    if value["version"] == 2 and (
+        steps[0]["kind"] != "sql" or steps[0]["id"] == value["amendment"]["failed_step_id"]
+    ):
+        raise ValueError("Amendment must begin with a distinct corrective SQL step.")
 
 
 def prepare(specification, output, runner):

@@ -136,6 +136,14 @@ function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
         if($base.$field.path -cne $Current.$field.path -or $base.$field.sha256 -cne $Current.$field.sha256){throw ('Amendment changes original '+$field)}
     }
     if($base.steps[0].kind -cne 'sql' -or $base.steps[0].id -cne $a.failed_step_id){throw 'Amendment requires the original first SQL step'}
+    if(@($Current.steps).Count -eq 0 -or $Current.steps[0].kind -cne 'sql' -or $Current.steps[0].id -ceq $a.failed_step_id){throw 'Amendment must begin with a distinct corrective SQL step'}
+    $oldApply=@($base.members|Where-Object {$_.name -ceq $base.steps[0].apply.file})
+    $newApply=@($Current.members|Where-Object {$_.name -ceq $Current.steps[0].apply.file})
+    # A new directory or renamed copy cannot turn the failed executable into
+    # a fresh operation. The different corrective script still needs review.
+    if($oldApply.Count -ne 1 -or $newApply.Count -ne 1 -or
+       $oldApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $newApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or
+       $oldApply[0].sha256 -ceq $newApply[0].sha256){throw 'Amendment requires a different pinned corrective SQL apply script; failed-script replay is prohibited'}
     $directory=Join-Path $BaseStage '.receipts';Assert-AdminPath $directory
     $entries=@(Get-ChildItem -LiteralPath $directory -Force)
     $expected=$a.failed_step_id+'.intent.json'
