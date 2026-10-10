@@ -194,7 +194,9 @@ repository, predecessor policy and issuer. Its `amendment` names a new canonical
 ID, the exact original manifest SHA256 and the original first SQL step ID.
 The amended steps must begin with SQL under a different step ID and a different
 pinned apply-script hash. No later step may reuse the failed ID or apply-script
-bytes either. Omitting SQL or renaming the failed script is refused.
+bytes either. Preflight and every verifier are checked against those failed bytes
+as well; case variants cannot bypass the ID or checksum comparison.
+Omitting SQL or renaming the failed script is refused.
 The changed corrective script still requires review; distinct bytes alone do not
 establish a safe migration.
 
@@ -220,7 +222,12 @@ migration lineage and its expected predecessor status; observed receipts never
 select or update their own expected hashes.
 
 The current runner refuses version-one execution when an amendment selection is
-present, both before and after preflight. Historical pinned runners cannot be
+present, both before and after preflight. Both versions hold the same exclusive
+release execution handle from before these checks through readiness, serializing
+selection, receipt validation and execution. A busy handle reports `RELEASE_BUSY`;
+wait for the owning launcher to finish and retain its transcript. Do not delete
+the lock file. Process exit releases the handle without deleting evidence.
+Historical pinned runners cannot be
 retroactively changed. A packet amending such a runner must prove its original
 verifier remains fail-closed for the retained outcome. The October 10 correction
 requires the exact original Failed receipt throughout; it does not support

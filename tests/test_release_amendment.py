@@ -31,7 +31,17 @@ def amendment():
 def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
     validate_manifest(specification())
     validate_manifest(amendment())
-    for change in ("missing", "version", "hash", "extra", "id", "step", "no_sql", "same_step"):
+    for change in (
+        "missing",
+        "version",
+        "hash",
+        "extra",
+        "id",
+        "step",
+        "no_sql",
+        "same_step",
+        "later_id",
+    ):
         value = amendment()
         if change == "missing":
             value.pop("amendment")
@@ -47,6 +57,8 @@ def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
             value["steps"].pop(0)
         elif change == "same_step":
             value["steps"][0]["id"] = value["amendment"]["failed_step_id"]
+        elif change == "later_id":
+            value["steps"][1]["id"] = value["amendment"]["failed_step_id"]
         else:
             value["amendment"]["failed_step_id"] = "../sql"
         with pytest.raises(ValueError):
@@ -78,6 +90,11 @@ def test_version_two_requires_explicit_base_and_keeps_version_one_supported():
         "later_failed_id",
         "later_failed_script",
         "later_renamed_failed_script",
+        "case_failed_id",
+        "case_failed_hash",
+        "preflight_failed_script",
+        "verify_failed_script",
+        "later_verify_failed_script",
     ],
 )
 def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path, damage):
@@ -107,6 +124,29 @@ def test_native_amendment_gate_preserves_evidence_and_rejects_progress(tmp_path,
             current["steps"][0]["apply"]["file"] = "renamed.ps1"
     elif damage == "unlisted_apply_script":
         current["steps"][0]["apply"]["file"] = "missing.ps1"
+    elif damage == "case_failed_id":
+        current["steps"][1]["id"] = "SQL"
+    elif damage in (
+        "case_failed_hash",
+        "preflight_failed_script",
+        "verify_failed_script",
+        "later_verify_failed_script",
+    ):
+        digest = base["members"][0]["sha256"]
+        current["members"].append(
+            dict(
+                name="renamed-old.ps1",
+                sha256=digest.upper() if damage == "case_failed_hash" else digest,
+            )
+        )
+        invocation = (
+            current["preflight"]
+            if damage == "preflight_failed_script"
+            else current["steps"][
+                1 if damage in ("case_failed_hash", "later_verify_failed_script") else 0
+            ]["apply" if damage == "case_failed_hash" else "verify"]
+        )
+        invocation["file"] = "renamed-old.ps1"
     elif damage is not None and damage.startswith("later_") and damage != "later_intent":
         later = deepcopy(current["steps"][0])
         later["id"] = "sql" if damage == "later_failed_id" else "another-sql"
@@ -366,3 +406,62 @@ Assert-OriginalReleaseUnselected ([pscustomobject]@{version=$Version}) $Fixture
     assert (result.returncode == 0) is (version == 2 or not selected), result.stdout + result.stderr
     if version == 1 and selected:
         assert "Original release was superseded" in result.stderr
+
+
+def test_release_execution_lock_serializes_original_and_amendment(tmp_path):
+    powershell = shutil.which("powershell.exe")
+    if not powershell:
+        pytest.skip("Windows PowerShell required")
+    runner = Path(__file__).resolve().parents[1] / "scripts/Deploy-K98Release.ps1"
+    script = tmp_path / "lock.ps1"
+    script.write_text(
+        r"""
+param([string]$Runner,[string]$Fixture)
+$ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+$env:PSModulePath='C:\Windows\System32\WindowsPowerShell\v1.0\Modules'
+$ast=[Management.Automation.Language.Parser]::ParseFile($Runner,[ref]$null,[ref]$null)
+$fn=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Enter-ReleaseExecution'},$true)
+. ([scriptblock]::Create($fn.Extent.Text))
+function Assert-AdminPath([string]$Path){if(-not(Test-Path -LiteralPath $Path)){throw 'Missing fixture'}}
+function New-ControlAcl([bool]$Directory){return (Get-Acl -LiteralPath $Fixture)}
+# Use a file ACL for the real FileStream ACL constructor in the isolated fixture.
+$path=Join-Path $Fixture 'deployment-release.lock'
+[IO.File]::WriteAllText($path,'retained')
+function New-ControlAcl([bool]$Directory){return (Get-Acl -LiteralPath $path)}
+$first=Enter-ReleaseExecution $path
+try {
+ $rejected=$false
+ try{$second=Enter-ReleaseExecution $path;$second.Dispose()}catch{if($_.Exception.Message -like 'RELEASE_BUSY:*'){$rejected=$true}else{throw}}
+ if(-not $rejected){throw 'Concurrent original/amendment execution allowed'}
+} finally {$first.Dispose()}
+$next=Enter-ReleaseExecution $path;$next.Dispose()
+if([IO.File]::ReadAllText($path) -cne 'retained'){throw 'Lock data was replaced'}
+# The lock must enclose preflight, selection, receipt checks and all effects.
+$try=$ast.Find({param($n) $n -is [Management.Automation.Language.TryStatementAst] -and $null -ne $n.Finally -and $n.Finally.Extent.Text.Contains('$executionLock.Dispose()')},$true)
+if($null -eq $try){throw 'Execution lock lifetime is missing'}
+foreach($name in @('Assert-ReleaseAmendment','Assert-OriginalReleaseUnselected','Invoke-ReleaseScript','Invoke-ReleaseSteps')) {
+ $calls=@($try.Body.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq $name},$true))
+ if($calls.Count -eq 0){throw ('Lock does not enclose '+$name)}
+}
+Write-Output 'SERIALIZED'
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-Runner",
+            str(runner),
+            "-Fixture",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "SERIALIZED" in result.stdout

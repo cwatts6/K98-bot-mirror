@@ -127,6 +127,15 @@ function Assert-OriginalReleaseUnselected($Current,[string]$Stage) {
     if($Current.version -eq 1 -and (Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json'))){throw 'Original release was superseded by an amendment; use only the selected amendment launcher'}
 }
 
+function Enter-ReleaseExecution([string]$Path) {
+    Assert-AdminPath (Split-Path -Parent $Path)
+    if(Test-Path -LiteralPath $Path){Assert-AdminPath $Path}
+    try {
+        $stream=[IO.FileStream]::new($Path,[IO.FileMode]::OpenOrCreate,[Security.AccessControl.FileSystemRights]::Read -bor [Security.AccessControl.FileSystemRights]::Write,[IO.FileShare]::None,4096,[IO.FileOptions]::WriteThrough,(New-ControlAcl $false))
+    } catch [IO.IOException] {throw 'RELEASE_BUSY: Another launcher owns this release. Retain its transcript and wait for it to finish; do not delete the execution lock.'}
+    try {Assert-AdminPath $Path;return $stream} catch {$stream.Dispose();throw}
+}
+
 function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
     # One explicit amendment of a drained version-one release before any step
     # completed. SQL reconciliation belongs to the reviewed new preflight.
@@ -153,9 +162,14 @@ function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
     if($oldApply.Count -ne 1 -or $newApply.Count -ne 1 -or
        $oldApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $newApply[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or
        $oldApply[0].sha256 -ceq $newApply[0].sha256){throw 'Amendment requires a different pinned corrective SQL apply script; failed-script replay is prohibited'}
+    $invocations=@($Current.preflight)
     foreach($step in $Current.steps) {
-        $apply=@($Current.members|Where-Object {$_.name -ceq $step.apply.file})
-        if($step.id -ceq $a.failed_step_id -or $apply.Count -ne 1 -or $apply[0].sha256 -ceq $oldApply[0].sha256){throw 'No amended step may reuse the failed step ID or failed apply script'}
+        if($step.id -ieq $a.failed_step_id){throw 'No amended step may reuse the failed step ID'}
+        $invocations+=@($step.apply,$step.verify)
+    }
+    foreach($invocation in $invocations) {
+        $member=@($Current.members|Where-Object {$_.name -ceq $invocation.file})
+        if($member.Count -ne 1 -or $member[0].sha256 -cnotmatch '^[a-f0-9]{64}$' -or $member[0].sha256 -ieq $oldApply[0].sha256){throw 'No amendment invocation may execute the failed apply script; use different reviewed bytes'}
     }
     $directory=Join-Path $BaseStage '.receipts';Assert-AdminPath $directory
     $entries=@(Get-ChildItem -LiteralPath $directory -Force)
@@ -179,6 +193,8 @@ $policyRaw=Read-Pinned $manifest.policy.path $manifest.policy.sha256 1MB
 $policy=[Text.Encoding]::UTF8.GetString($policyRaw)|ConvertFrom-Json
 Assert-AdminPath $policy.state_directory
 Assert-AdminPath $powershell
+$executionLock=Enter-ReleaseExecution (Join-Path $policy.state_directory ('deployment-'+$releaseId+'.lock'))
+try {
 $script:staged=Join-Path $policy.state_directory ('release-'+$releaseId)
 Assert-OriginalReleaseUnselected $manifest $staged
 $amendmentSelection=$null
@@ -308,3 +324,4 @@ if(-not(Test-Path -LiteralPath $receipts)){$null=[IO.Directory]::CreateDirectory
 Assert-AdminPath $receipts
 Invoke-ReleaseSteps $steps $receipts $releaseId
 Write-Host ('Release verified: '+$releaseId)
+} finally {$executionLock.Dispose()}
