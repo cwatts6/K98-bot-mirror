@@ -118,6 +118,11 @@ function Invoke-ReleaseSteps($Steps,[string]$Receipts,[string]$ReleaseId) {
     }
 }
 
+function Assert-AmendmentSelection([string]$Path,$Current,[string]$Hash) {
+    $selected=Read-Control $Path
+    if($selected.amendment_id -cne $Current.amendment.id -or $selected.manifest_sha256 -cne $Hash.ToLowerInvariant() -or $selected.release_id -cne $Current.release_id){throw 'Another amendment is selected; preserve its outcome'}
+}
+
 function Assert-ReleaseAmendment($Current,[string]$BaseStage) {
     # One explicit amendment of a drained version-one release before any step
     # completed. SQL reconciliation belongs to the reviewed new preflight.
@@ -173,8 +178,7 @@ if($manifest.version -eq 2) {
     if(-not(Test-Path -LiteralPath (Join-Path $policy.state_directory ('deployment-drained-'+$releaseId+'.json')))){throw 'Existing protected drain required before amendment'}
     $amendmentSelection=Join-Path $staged '.amendment-selected.json'
     if(Test-Path -LiteralPath $amendmentSelection) {
-        $selected=Read-Control $amendmentSelection
-        if($selected.amendment_id -cne $manifest.amendment.id -or $selected.manifest_sha256 -cne $ExpectedSHA256.ToLowerInvariant()){throw 'Another amendment is selected; preserve its outcome'}
+        Assert-AmendmentSelection $amendmentSelection $manifest $ExpectedSHA256
     }
     $script:staged=Join-Path $staged ('amendment-'+$manifest.amendment.id)
 }
@@ -221,8 +225,13 @@ foreach($member in $members) {
     $null=Read-Pinned $destination $member.sha256 16MB
 }
 if((Invoke-ReleaseScript $manifest.preflight) -ne 0){throw 'Release preflight failed; no restart requested'}
-if($null -ne $amendmentSelection -and -not(Test-Path -LiteralPath $amendmentSelection)) {
-    Write-NewRecord $amendmentSelection @{amendment_id=$manifest.amendment.id;manifest_sha256=$ExpectedSHA256.ToLowerInvariant();release_id=$releaseId}
+if($null -ne $amendmentSelection) {
+    if(-not(Test-Path -LiteralPath $amendmentSelection)) {
+        Write-NewRecord $amendmentSelection @{amendment_id=$manifest.amendment.id;manifest_sha256=$ExpectedSHA256.ToLowerInvariant();release_id=$releaseId}
+    }
+    # Another launcher may have selected a manifest while preflight ran.
+    # CreateNew is exclusive; any observed selection must still match ours.
+    Assert-AmendmentSelection $amendmentSelection $manifest $ExpectedSHA256
 }
 $journals=@(Get-ChildItem -LiteralPath $policy.state_directory -Filter 'incarnation-*.json' -File|Sort-Object Name)
 if($journals.Count -lt 1 -or $journals.Count -gt 1000){throw 'Existing reviewed incarnation required; bootstrap is separate'}

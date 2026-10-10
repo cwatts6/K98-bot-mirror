@@ -244,3 +244,68 @@ try {Invoke-ReleaseSteps $steps $Fixture 'release';$success=$true}catch{$success
     assert observed["later"] == (1 if success else 0)
     assert observed["intent"] is True
     assert observed["complete"] is success
+
+
+@pytest.mark.parametrize(
+    "selection", ["absent", "same", "other_id", "other_hash", "other_release", "create_race"]
+)
+def test_selection_observed_after_preflight_is_revalidated(tmp_path, selection):
+    powershell = shutil.which("powershell.exe")
+    if not powershell:
+        pytest.skip("Windows PowerShell required")
+    runner = Path(__file__).resolve().parents[1] / "scripts/Deploy-K98Release.ps1"
+    script = tmp_path / "selection.ps1"
+    script.write_text(
+        r"""
+param([string]$Runner,[string]$Fixture,[string]$Scenario)
+$ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+$ast=[Management.Automation.Language.Parser]::ParseFile($Runner,[ref]$null,[ref]$null)
+$fn=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Assert-AmendmentSelection'},$true)
+. ([scriptblock]::Create($fn.Extent.Text))
+# Execute the actual post-preflight selection block, with a competing record
+# already present (or arriving between its existence check and CreateNew).
+$block=$ast.Find({param($n) $n -is [Management.Automation.Language.IfStatementAst] -and $n.Extent.Text.StartsWith('if($null -ne $amendmentSelection)')},$true)
+if($null -eq $block){throw 'Selection block missing'}
+$amendmentSelection=Join-Path $Fixture 'selection.json';$releaseId='release';$ExpectedSHA256='a'*64
+$manifest=[pscustomobject]@{release_id=$releaseId;amendment=@{id='current'}}
+function Read-Control([string]$Path){Get-Content -LiteralPath $Path -Raw|ConvertFrom-Json}
+function Write-NewRecord([string]$Path,$Value){
+ if($Scenario -ceq 'create_race'){[IO.File]::WriteAllText($Path,'{"amendment_id":"other","manifest_sha256":"other","release_id":"release"}')}
+ $stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+ try{$raw=[Text.Encoding]::UTF8.GetBytes(($Value|ConvertTo-Json -Compress));$stream.Write($raw,0,$raw.Length)}finally{$stream.Dispose()}
+}
+if($Scenario -notin @('absent','create_race')) {
+ $record=@{amendment_id='current';manifest_sha256=$ExpectedSHA256;release_id=$releaseId}
+ if($Scenario -ceq 'other_id'){$record.amendment_id='other'}
+ if($Scenario -ceq 'other_hash'){$record.manifest_sha256='b'*64}
+ if($Scenario -ceq 'other_release'){$record.release_id='other'}
+ [IO.File]::WriteAllText($amendmentSelection,($record|ConvertTo-Json -Compress))
+}
+try{. ([scriptblock]::Create($block.Extent.Text));$success=$true}catch{$success=$false}
+@{success=$success;selected=(Read-Control $amendmentSelection)}|ConvertTo-Json -Compress
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-Runner",
+            str(runner),
+            "-Fixture",
+            str(tmp_path),
+            "-Scenario",
+            selection,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    observed = json.loads(result.stdout)
+    assert observed["success"] is (selection in ("absent", "same"))
+    if selection in ("other_id", "create_race"):
+        assert observed["selected"]["amendment_id"] == "other"
