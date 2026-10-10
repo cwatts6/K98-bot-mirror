@@ -19,7 +19,7 @@ def digest(raw):
 
 def validate_manifest(value):
     """Validate the runner's bounded, ordered release protocol before packaging."""
-    if not isinstance(value, dict) or set(value) != {
+    fields = {
         "version",
         "release_id",
         "host",
@@ -30,10 +30,26 @@ def validate_manifest(value):
         "members",
         "preflight",
         "steps",
-    }:
+    }
+    if isinstance(value, dict) and value.get("version") == 2:
+        fields.add("amendment")
+    if not isinstance(value, dict) or set(value) != fields:
         raise ValueError("Exact release manifest fields required.")
-    if type(value["version"]) is not int or value["version"] != 1:
+    if type(value["version"]) is not int or value["version"] not in (1, 2):
         raise ValueError("Unsupported release version.")
+    if value["version"] == 2:
+        amendment = value["amendment"]
+        if (
+            not isinstance(amendment, dict)
+            or set(amendment) != {"id", "base_manifest_sha256", "failed_step_id"}
+            or not isinstance(amendment["id"], str)
+            or str(UUID(amendment["id"])) != amendment["id"]
+            or not isinstance(amendment["base_manifest_sha256"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", amendment["base_manifest_sha256"])
+            or not isinstance(amendment["failed_step_id"], str)
+            or not re.fullmatch(r"[a-z0-9-]{1,60}", amendment["failed_step_id"])
+        ):
+            raise ValueError("Exact first-SQL-step amendment reference required.")
     if str(UUID(value["release_id"])) != value["release_id"]:
         raise ValueError("Canonical release ID required.")
     for field in ("host", "application_sid", "repository"):

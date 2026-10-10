@@ -13,6 +13,10 @@ FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
 FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
 STATS_OUTCOME_MIGRATION = "20261009_001_stats_import_outcomes"
 STATS_OUTCOME_CHECKSUM = "344f050165a7f64078615db9deac10a687babdc1c28c2536eaedcda07fae87f3"
+STATS_OUTCOME_COLLATION_MIGRATION = "20261010_001_stats_import_outcomes_collation"
+STATS_OUTCOME_COLLATION_CHECKSUM = (
+    "e423e79fd13234b91b62336ab8e34ff2b018b2bffcdfb3cd53dec1a9342ef315"
+)
 # Canonical UTF-16LE definition hashes of the reviewed migration's exact
 # postimages. This is a behavior amendment, not a compatibility spelling.
 FILE_VISIBILITY_MODULE_HASHES = {
@@ -70,6 +74,9 @@ def validate_contract(approved):
     amended = isinstance(approved, dict) and "module_amendment" in approved
     if amended:
         fields.add("module_amendment")
+    replacement = isinstance(approved, dict) and "outcome_installation" in approved
+    if replacement:
+        fields.add("outcome_installation")
     if (
         not isinstance(approved, dict)
         or set(approved) != fields
@@ -99,6 +106,15 @@ def validate_contract(approved):
         )
     ):
         raise SourceConflict("Complete reviewed direct-permission SQL contract required.")
+    if replacement:
+        installation = approved["outcome_installation"]
+        if (
+            not isinstance(installation, dict)
+            or set(installation) != {"migration_id", "predecessor_status"}
+            or installation["migration_id"] != STATS_OUTCOME_COLLATION_MIGRATION
+            or installation["predecessor_status"] not in (None, "Failed", "Applied")
+        ):
+            raise SourceConflict("Explicit reviewed outcome replacement lineage required.")
 
 
 def queries(base, source):
@@ -198,9 +214,14 @@ def queries(base, source):
     # receipts remain separate; no installed hash can select its own contract.
     result["migration"] = (
         base["migration"][0].replace(
-            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?) ORDER BY MigrationId"
+            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?,?) ORDER BY MigrationId"
         ),
-        (DIRECT_MIGRATION, FILE_VISIBILITY_MIGRATION, STATS_OUTCOME_MIGRATION),
+        (
+            DIRECT_MIGRATION,
+            FILE_VISIBILITY_MIGRATION,
+            STATS_OUTCOME_MIGRATION,
+            STATS_OUTCOME_COLLATION_MIGRATION,
+        ),
     )
     return result
 
@@ -354,12 +375,27 @@ def verify(observed, approved, *, profile):
             ChecksumSha256=approved["migration_hash"],
             Status="Applied",
         ),
-        dict(
-            MigrationId=STATS_OUTCOME_MIGRATION,
-            ChecksumSha256=STATS_OUTCOME_CHECKSUM,
-            Status="Applied",
-        ),
     ]
+    # Select lineage only from the independently approved protected contract.
+    # A failed predecessor never substitutes for a successful replacement.
+    installation = approved.get("outcome_installation")
+    predecessor_status = installation["predecessor_status"] if installation else "Applied"
+    if predecessor_status is not None:
+        expected_migrations.append(
+            dict(
+                MigrationId=STATS_OUTCOME_MIGRATION,
+                ChecksumSha256=STATS_OUTCOME_CHECKSUM,
+                Status=predecessor_status,
+            )
+        )
+    if installation:
+        expected_migrations.append(
+            dict(
+                MigrationId=STATS_OUTCOME_COLLATION_MIGRATION,
+                ChecksumSha256=STATS_OUTCOME_COLLATION_CHECKSUM,
+                Status="Applied",
+            )
+        )
     if amended:
         expected_migrations.append(
             dict(

@@ -185,3 +185,31 @@ Release verification scripts must independently establish their postconditions:
 The runner does not infer these postconditions from an apply exit code. It
 requires the verifier to confirm them. A packet with placeholder verification
 scripts is not deployable, even when packaging and generic runner tests pass.
+
+## Reviewed amendment after the first SQL step fails
+
+A version-two manifest can explicitly amend a drained version-one release before
+any original step completed. It retains the same release ID, host, account,
+repository, predecessor policy and issuer. Its `amendment` names a new canonical
+ID, the exact original manifest SHA256 and the original first SQL step ID.
+
+The original stage must contain only that step's starting intent and no start
+request. The runner preserves all original files and receipts, stages the new
+packet in `release-<release-id>/amendment-<amendment-id>`, and records one immutable
+amendment selection. A competing amendment is refused. The existing original
+request and drain receipt remain authoritative; no replacement drain is invented.
+
+The new packet must provide a reviewed preflight that reconciles the specific
+failed SQL outcome, verifies unchanged source/native/task/SQL predecessor state,
+and checks backup readiness before any new migration. An absent process or a
+failed ledger status is insufficient proof of rollback. The replacement migration
+has its own reviewed ID and checksum; the failed predecessor receipt is preserved.
+No original apply is replayed. New apply intents and completion receipts live in
+the amendment directory and retain the ordinary no-replay rules.
+
+This is an explicit coordinated recovery operation, not an automatic retry or a
+routine updater option. Original or amended unknown outcomes require evidence
+reconciliation. Once an amendment is selected, use its exact launcher for every
+resume. Installed runtime contracts must explicitly approve the replacement
+migration lineage and its expected predecessor status; observed receipts never
+select or update their own expected hashes.

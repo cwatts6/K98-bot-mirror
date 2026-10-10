@@ -223,6 +223,80 @@ def test_explicit_direct_contract_has_no_signing_inputs(contract):
     assert "certificate_pins" not in approved
 
 
+@pytest.mark.parametrize("predecessor", [None, "Failed", "Applied"])
+def test_outcome_replacement_requires_explicit_protected_lineage(contract, predecessor):
+    observed, approved = copy.deepcopy(contract)
+    observed["migration"] = [
+        row for row in observed["migration"] if row["MigrationId"] != direct.STATS_OUTCOME_MIGRATION
+    ]
+    if predecessor is not None:
+        observed["migration"].append(
+            dict(
+                MigrationId=direct.STATS_OUTCOME_MIGRATION,
+                ChecksumSha256=direct.STATS_OUTCOME_CHECKSUM,
+                Status=predecessor,
+            )
+        )
+    observed["migration"].append(
+        dict(
+            MigrationId=direct.STATS_OUTCOME_COLLATION_MIGRATION,
+            ChecksumSha256=direct.STATS_OUTCOME_COLLATION_CHECKSUM,
+            Status="Applied",
+        )
+    )
+    approved["metadata_hash"] = digest(observed).hex()
+    # Even matching observed metadata does not authorize a different lineage.
+    with pytest.raises(SourceConflict, match="migration receipt"):
+        direct.verify(observed, approved, profile="application")
+    approved["outcome_installation"] = dict(
+        migration_id=direct.STATS_OUTCOME_COLLATION_MIGRATION,
+        predecessor_status=predecessor,
+    )
+    assert direct.verify(observed, approved, profile="application") == digest(observed).hex()
+    for damage in ("missing", "failed", "checksum", "predecessor"):
+        changed = copy.deepcopy(observed)
+        replacement = changed["migration"][-1]
+        if damage == "missing":
+            changed["migration"].pop()
+        elif damage == "failed":
+            replacement["Status"] = "Failed"
+        elif damage == "checksum":
+            replacement["ChecksumSha256"] = "0" * 64
+        else:
+            changed["migration"].append(
+                dict(
+                    MigrationId=direct.STATS_OUTCOME_MIGRATION,
+                    ChecksumSha256=direct.STATS_OUTCOME_CHECKSUM,
+                    Status="Pending",
+                )
+            )
+        adjusted = copy.deepcopy(approved)
+        adjusted["metadata_hash"] = digest(changed).hex()
+        with pytest.raises(SourceConflict, match="migration receipt"):
+            direct.verify(changed, adjusted, profile="application")
+
+
+@pytest.mark.parametrize(
+    "installation",
+    [
+        None,
+        {},
+        {"migration_id": "unreviewed", "predecessor_status": "Failed"},
+        {"migration_id": direct.STATS_OUTCOME_COLLATION_MIGRATION, "predecessor_status": "Pending"},
+        {
+            "migration_id": direct.STATS_OUTCOME_COLLATION_MIGRATION,
+            "predecessor_status": "Failed",
+            "checksum": "0" * 64,
+        },
+    ],
+)
+def test_invalid_outcome_replacement_contract_is_rejected(contract, installation):
+    _, approved = copy.deepcopy(contract)
+    approved["outcome_installation"] = installation
+    with pytest.raises(SourceConflict, match="replacement lineage"):
+        direct.validate_contract(approved)
+
+
 @pytest.fixture
 def file_visibility_contract(contract, monkeypatch):
     """Synthetic bodies exercise the same finite, three-module amendment."""
@@ -278,11 +352,12 @@ def test_file_visibility_amendment_requires_exact_postimages_and_receipt(file_vi
         == digest(observed).hex()
     )
     query, params = legacy_permission_queries(approved["source"])["migration"]
-    assert "MigrationId IN (?,?,?)" in query
+    assert "MigrationId IN (?,?,?,?)" in query
     assert params == (
         direct.DIRECT_MIGRATION,
         direct.FILE_VISIBILITY_MIGRATION,
         direct.STATS_OUTCOME_MIGRATION,
+        direct.STATS_OUTCOME_COLLATION_MIGRATION,
     )
 
 
