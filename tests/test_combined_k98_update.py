@@ -192,9 +192,12 @@ def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path, ins
     new_text = Path(second["installer"]).read_text()
     new_payload = json.loads(base64.b64decode(re.search(r"\$encoded='([^']+)'", new_text)[1]))
     new_hash = sha256(base64.b64decode(new_payload["update-tool.json"]))
-    assert f"$PreviousManifestSHA256='{sha256(manifest.read_bytes())}'" in upgrade
-    assert f"$InstallerSHA256='{second['sha256']}'" in upgrade
-    assert f"$TargetManifestSHA256='{new_hash}'" in upgrade
+    assert (
+        f"-Name PreviousManifestSHA256 -Value '{sha256(manifest.read_bytes())}' -Option Constant"
+        in upgrade
+    )
+    assert f"-Name InstallerSHA256 -Value '{second['sha256']}' -Option Constant" in upgrade
+    assert f"-Name TargetManifestSHA256 -Value '{new_hash}' -Option Constant" in upgrade
     assert "updater-before-'+$PreviousManifestSHA256" in upgrade
     assert "Active release exists; tool replacement refused" in upgrade
 

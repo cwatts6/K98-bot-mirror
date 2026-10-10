@@ -123,7 +123,7 @@ def package(output, source=None, *, previous_manifest=None):
         old_hash = hashlib.sha256(previous_raw).hexdigest()
         new_hash = hashlib.sha256(files["update-tool.json"]).hexdigest()
         template = (source / "Upgrade-K98InstalledUpdater.ps1").read_text(encoding="utf-8")
-        # Generated defaults bind one reviewed old/new pair. The operator still
+        # Generated constants bind one reviewed old/new pair. The operator still
         # runs one fixed filename without calculating or substituting hashes.
         replacements = dict(
             (

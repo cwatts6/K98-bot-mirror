@@ -9,6 +9,10 @@ foreach($f in $ast.FindAll({param($n) $n -is [Management.Automation.Language.Fun
 $passed=0
 function Check($v,$m){if(-not $v){throw $m};$script:passed++}
 function Reject($call,$pattern){try{& $call;throw 'DID_NOT_REJECT'}catch{if($_.Exception.Message -notlike $pattern){throw};$script:passed++}}
+foreach($pin in @('PreviousManifestSHA256','InstallerSHA256','TargetManifestSHA256')) {
+ $override=@{};$override[$pin]='0'*64
+ Reject {& $path @override} ('*parameter*'+$pin+'*')
+}
 $fixture=Join-Path (Split-Path -Parent $PSScriptRoot) ('.codex_artifacts\upgrade-test-'+[guid]::NewGuid().ToString('N'))
 $null=[IO.Directory]::CreateDirectory($fixture)
 $script:denied=''

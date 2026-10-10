@@ -2,15 +2,15 @@
 # Exact installed package, current startup state and operator lock are revalidated.
 # Close all other updater PowerShell windows before running this reviewed helper.
 [CmdletBinding()]
-param(
- [ValidatePattern('^[a-f0-9]{64}$')][string]$PreviousManifestSHA256='cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871',
- [ValidatePattern('^[a-f0-9]{64}$')][string]$InstallerSHA256='ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30',
- [ValidatePattern('^[a-f0-9]{64}$')][string]$TargetManifestSHA256='6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b'
-)
+param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0'
 $env:PSModulePath='C:\Windows\System32\WindowsPowerShell\v1.0\Modules'
+# Packaging replaces these literals once. Invocation cannot select another package.
+Set-Variable -Name PreviousManifestSHA256 -Value 'cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871' -Option Constant
+Set-Variable -Name InstallerSHA256 -Value 'ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30' -Option Constant
+Set-Variable -Name TargetManifestSHA256 -Value '6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b' -Option Constant
 if($env:COMPUTERNAME -cne 'MINI_AMD' -or $PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){throw 'Use MINI_AMD Windows PowerShell 5.1'}
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if($identity.Owner.Value -cne 'S-1-5-32-544'){throw 'Administrative default object owner required'}
