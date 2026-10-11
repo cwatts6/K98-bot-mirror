@@ -1,0 +1,2422 @@
+{
+  "version": 1,
+  "sql_revision": "9103f2c2b54821e8145aedf63a17e4aca474c911",
+  "roots": [
+    "KVK.KVK_AllPlayers_Raw",
+    "KVK.KVK_AllPlayers_Stage",
+    "KVK.KVK_CampMap",
+    "KVK.KVK_Camp_Windowed",
+    "KVK.KVK_DKPWeights",
+    "KVK.KVK_Ingest_Diagnostics",
+    "KVK.KVK_Ingest_Negatives",
+    "KVK.KVK_Kingdom_Windowed",
+    "KVK.KVK_Player_Baseline",
+    "KVK.KVK_Player_Windowed",
+    "KVK.KVK_Scan",
+    "KVK.KVK_Windows",
+    "KVK.SeasonSource",
+    "KVK.SourceAction",
+    "KVK.SourceAdminReview",
+    "KVK.SourceAggregateReport",
+    "KVK.SourceAggregateRevision",
+    "KVK.SourceArtifact",
+    "KVK.SourceCampConfig",
+    "KVK.SourceCampReportRow",
+    "KVK.SourceCompleteSelection",
+    "KVK.SourceConfigRequest",
+    "KVK.SourceConfigVersion",
+    "KVK.SourceDelivery",
+    "KVK.SourceExportIntent",
+    "KVK.SourceExportIntentPublication",
+    "KVK.SourceImportAttempt",
+    "KVK.SourceKingdomReportRow",
+    "KVK.SourceLogicalScan",
+    "KVK.SourceObservation",
+    "KVK.SourceObservationRevision",
+    "KVK.SourceOutputDisposition",
+    "KVK.SourceOutputFile",
+    "KVK.SourceOutputOperation",
+    "KVK.SourceOutputOperationResource",
+    "KVK.SourceOutputPool",
+    "KVK.SourceOutputSlot",
+    "KVK.SourcePeriod",
+    "KVK.SourcePlayerResult",
+    "KVK.SourcePlayerSnapshot",
+    "KVK.SourcePublication",
+    "KVK.SourceRoster",
+    "KVK.SourceRosterMember",
+    "KVK.SourceRouting",
+    "KVK.SourceScanBinding",
+    "KVK.SourceSelection",
+    "KVK.SourceUpdate",
+    "KVK.SourceWeightConfig",
+    "KVK.SourceWindowConfig",
+    "KVK.sp_KVK_AllPlayers_Ingest",
+    "KVK.sp_KVK_Get_Exports",
+    "KVK.sp_KVK_Ingest_Cleanup",
+    "KVK.sp_KVK_Recompute_Windows",
+    "KVK.vw_FightingDataset",
+    "KVK.vw_Player_Overall_KVK_Rank",
+    "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+    "dbo.ALL_GOVS",
+    "dbo.ALL_GOVS_ALLIANCES",
+    "dbo.ALL_GOVS_NAMES",
+    "dbo.ALL_STATS_FOR_DASHBAORD",
+    "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+    "dbo.CLAIM_KS4_IMPORT_FILE",
+    "dbo.CREATE_DASH",
+    "dbo.CREATE_DASH2",
+    "dbo.CREATE_DELTA_TABLES",
+    "dbo.CREATE_THE_AVERAGES",
+    "dbo.CaptureLogHealth",
+    "dbo.DEADSSUMMARY_PROC",
+    "dbo.EXEMPT_FROM_STATS",
+    "dbo.ExportAttempt",
+    "dbo.ExportAttemptPart",
+    "dbo.ExportExecutionSession",
+    "dbo.ExportExecutionStream",
+    "dbo.ExportJob",
+    "dbo.ExportJobResource",
+    "dbo.ExportManagedFileOrigin",
+    "dbo.ExportManualFileOrigin",
+    "dbo.ExportPreparation",
+    "dbo.ExportPreparationResource",
+    "dbo.ExportProviderRequest",
+    "dbo.ExportProviderRequestEvent",
+    "dbo.ExportReconciliationProof",
+    "dbo.ExportRequestBudget",
+    "dbo.ExportResource",
+    "dbo.FIX_IMPORT_STAGING",
+    "dbo.FallbackImportBatchControl",
+    "dbo.GOVERNOR_NAMES_PROC",
+    "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+    "dbo.HEALEDSUMMARY_PROC",
+    "dbo.HEALEDSUMMARY_PROC_OPT",
+    "dbo.IMPORT_STAGING_PROC",
+    "dbo.IMPORT_STAGING_PROC_CORE",
+    "dbo.INACTIVE_GOVERNORS",
+    "dbo.IntList",
+    "dbo.KILLPOINTSSUMMARY_PROC",
+    "dbo.KILLSSUMMARY_PROC",
+    "dbo.KS",
+    "dbo.KS4_ImportFileClaim",
+    "dbo.KS4_ImportFileReceipt",
+    "dbo.KT4SUMMARY_PROC",
+    "dbo.KT5SUMMARY_PROC",
+    "dbo.KVKTargetBands",
+    "dbo.KVK_Details",
+    "dbo.KingdomScanData4",
+    "dbo.LogBackupTriggerQueue",
+    "dbo.NVarCharList",
+    "dbo.POWERSUMMARY_PROC",
+    "dbo.POWER_BY_MONTH",
+    "dbo.ProcConfig",
+    "dbo.ProcConfig_Staging",
+    "dbo.RALLY_EXPORT",
+    "dbo.RANGEDSUMMARY_PROC",
+    "dbo.Refresh_PlayerScanMeta",
+    "dbo.SCAN_LIST",
+    "dbo.SP_Stats_for_Upload",
+    "dbo.SP_TaskStatus",
+    "dbo.STATS_FOR_UPLOAD",
+    "dbo.SUMMARY_CHANGE_EXPORT",
+    "dbo.SUMMARY_PROC",
+    "dbo.SchemaMigrationHistory",
+    "dbo.TARGETS",
+    "dbo.TARGETS_NEW",
+    "dbo.TEST",
+    "dbo.UPDATE_ALL",
+    "dbo.UPDATE_ALL2",
+    "dbo.UPDATE_RALLY_DATA",
+    "dbo.fn_KVK_Camp_Aggregated",
+    "dbo.fn_KVK_Kingdom_Aggregated",
+    "dbo.fn_KVK_Player_Aggregated",
+    "dbo.fn_KvkCombatMetrics",
+    "dbo.fn_NormalizeGovernorNameKey",
+    "dbo.fn_PreKvkLatestOverall",
+    "dbo.fn_PreKvkPhaseDelta",
+    "dbo.fn_StatsWindowDeltas",
+    "dbo.fn_StatsWindowDeltas_GovCsv",
+    "dbo.sp_Backfill_PlayerKVKHistory",
+    "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+    "dbo.sp_Create_Excel_For_Kvk_Indexes",
+    "dbo.sp_ExcelOutput_ByKVK",
+    "dbo.sp_ImportPlayerLocationFromStaging",
+    "dbo.sp_Import_Rally_AllTime",
+    "dbo.sp_Import_Rally_Daily",
+    "dbo.sp_Loop_ExcelOutput_ByKVK",
+    "dbo.sp_Maintain_PlayerKVKHistory",
+    "dbo.sp_Prep_ExcelExportTable",
+    "dbo.sp_Prep_ExcelOutputTable",
+    "dbo.sp_Prep_TargetTable",
+    "dbo.sp_QS_PerfPack",
+    "dbo.sp_RallyDaily_TopN",
+    "dbo.sp_Rebuild_ExcelForDashboard",
+    "dbo.sp_Rebuild_RALLY_EXPORT",
+    "dbo.sp_Rebuild_v_PlayerKVK_Last3",
+    "dbo.sp_RefreshInactiveGovernors",
+    "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+    "dbo.sp_Registry_GetAllActive",
+    "dbo.sp_Registry_GetByDiscordID",
+    "dbo.sp_Registry_GetByGovernorID",
+    "dbo.sp_Registry_Insert",
+    "dbo.sp_Registry_SoftDelete",
+    "dbo.sp_Registry_UpsertFromImport",
+    "dbo.sp_ReplacePlayerLocationFromStaging",
+    "dbo.sp_Snapshot_PlayerForts",
+    "dbo.sp_TARGETS_MASTER",
+    "dbo.sp_Upsert_ProcConfig_From_Staging",
+    "dbo.usp_ArkRetentionCleanup",
+    "dbo.usp_ArkSchemaVerify",
+    "dbo.usp_BackfillKvkFinalReportCompletion",
+    "dbo.usp_BackfillRallyDailySnapshotCompletion",
+    "dbo.usp_CleanupLogBackupTriggerQueue",
+    "dbo.usp_ExportExecutionSessionTransition",
+    "dbo.usp_ExportExecutionStreamTransition",
+    "dbo.usp_ExportManualOutputEnrollmentTransition",
+    "dbo.usp_ExportOutputEnrollmentTransition",
+    "dbo.usp_ExportProviderRequestEventAppend",
+    "dbo.usp_ExportReconciliationProofIssue",
+    "dbo.usp_GetKvkHistorySummaryMetricRanks",
+    "dbo.usp_GetLeadershipPlayerIdentityHistory",
+    "dbo.usp_GetLeadershipPlayerKvkHistory",
+    "dbo.usp_GetLeadershipPlayerLastActive",
+    "dbo.usp_GetLeadershipPlayerLookupDirectory",
+    "dbo.usp_GetLeadershipPlayerReview",
+    "dbo.usp_GetPendingLogBackupTriggers",
+    "dbo.usp_GetPersonalStatsDaily",
+    "dbo.usp_GetPlayerStatsWindows",
+    "dbo.usp_ImportAudit_CompleteBatch",
+    "dbo.usp_ImportAudit_FailBatch",
+    "dbo.usp_ImportAudit_RecordPhase",
+    "dbo.usp_ImportAudit_StartBatch",
+    "dbo.usp_LeadershipPlayerGovernorExists",
+    "dbo.usp_MarkLogBackupTriggerProcessed",
+    "dbo.usp_PurgeLeadershipPlayerReviewAudit",
+    "dbo.usp_RecordKvkFinalReportCompletion",
+    "dbo.usp_RecordLeadershipPlayerReviewAudit",
+    "dbo.usp_SetAllianceActivitySnapshotCompletion",
+    "dbo.usp_UpsertGovernorNameHistoryForScan",
+    "dbo.usp_VoteSurveyAdminDelete",
+    "dbo.usp_update_stats",
+    "dbo.vAllianceActivitySnapshots",
+    "dbo.vAllianceActivityWeekFinals",
+    "dbo.vAllianceActivity_DailyDelta",
+    "dbo.vAllianceActivity_WeeklyDelta",
+    "dbo.vDailyWithWTD_Activity",
+    "dbo.vDaily_Activity",
+    "dbo.vDaily_AllianceActivity",
+    "dbo.vDaily_Helps",
+    "dbo.vDaily_PlayerExport",
+    "dbo.vDaily_RSSAssisted",
+    "dbo.vDaily_RSSGathered",
+    "dbo.vFortsCompleted_WeekToDate",
+    "dbo.vWTD_Activity",
+    "dbo.vWTD_Helps",
+    "dbo.vWTD_RSSAssisted",
+    "dbo.vWTD_RSSGathered",
+    "dbo.vWeekly_AllianceActivity",
+    "dbo.v_Active_Players",
+    "dbo.v_EXCEL_FOR_KVK_All",
+    "dbo.v_EXCEL_FOR_KVK_Started",
+    "dbo.v_GovernorNames",
+    "dbo.v_GovernorNames_Strict",
+    "dbo.v_KVK_Honor_Latest",
+    "dbo.v_KVK_Honor_TopLatest",
+    "dbo.v_KVK_TARGETS_FOR_BOT",
+    "dbo.v_KVK_Under50_Last3_WithLatest",
+    "dbo.v_MGE_SignupReview",
+    "dbo.v_PlayerAccounts_Migrate",
+    "dbo.v_PlayerFortsLatest",
+    "dbo.v_PlayerFortsLatestWithRank",
+    "dbo.v_PlayerKVK_Last3",
+    "dbo.v_PlayerLatestStats",
+    "dbo.v_PlayerProfile",
+    "dbo.v_PlayerScanMeta",
+    "dbo.v_PreKvk13_All",
+    "dbo.v_PreKvk13_Overall",
+    "dbo.v_PreKvk13_Phase1",
+    "dbo.v_PreKvk13_Phase2",
+    "dbo.v_PreKvk13_Phase3",
+    "dbo.v_RallyDaily_Latest",
+    "dbo.v_RallyTotals_Current",
+    "dbo.v_TARGETS_FOR_UPLOAD",
+    "dbo.vw_All_Governors_Clean",
+    "dbo.vw_ArkPlayerReport",
+    "dbo.vw_Governor_KVK_Summary_GlobalLatest",
+    "dbo.vw_Top3_Week",
+    "dbo.vw_Top3_Yesterday",
+    "dbo.usp_S11RunStatsImport",
+    "dbo.StatsImportExecution"
+  ],
+  "objects": [
+    "KVK.KVK_AllPlayers_Raw",
+    "KVK.KVK_AllPlayers_Stage",
+    "KVK.KVK_CampMap",
+    "KVK.KVK_Camp_Windowed",
+    "KVK.KVK_DKPWeights",
+    "KVK.KVK_Ingest_Diagnostics",
+    "KVK.KVK_Ingest_Negatives",
+    "KVK.KVK_Kingdom_Windowed",
+    "KVK.KVK_Player_Baseline",
+    "KVK.KVK_Player_Windowed",
+    "KVK.KVK_Scan",
+    "KVK.KVK_Windows",
+    "KVK.SeasonSource",
+    "KVK.SourceAction",
+    "KVK.SourceAdminReview",
+    "KVK.SourceAggregateReport",
+    "KVK.SourceAggregateRevision",
+    "KVK.SourceArtifact",
+    "KVK.SourceCampConfig",
+    "KVK.SourceCampReportRow",
+    "KVK.SourceCompleteSelection",
+    "KVK.SourceConfigRequest",
+    "KVK.SourceConfigVersion",
+    "KVK.SourceDelivery",
+    "KVK.SourceExportIntent",
+    "KVK.SourceExportIntentPublication",
+    "KVK.SourceImportAttempt",
+    "KVK.SourceKingdomReportRow",
+    "KVK.SourceLogicalScan",
+    "KVK.SourceObservation",
+    "KVK.SourceObservationRevision",
+    "KVK.SourceOutputDisposition",
+    "KVK.SourceOutputFile",
+    "KVK.SourceOutputOperation",
+    "KVK.SourceOutputOperationResource",
+    "KVK.SourceOutputPool",
+    "KVK.SourceOutputSlot",
+    "KVK.SourcePeriod",
+    "KVK.SourcePlayerResult",
+    "KVK.SourcePlayerSnapshot",
+    "KVK.SourcePublication",
+    "KVK.SourceRoster",
+    "KVK.SourceRosterMember",
+    "KVK.SourceRouting",
+    "KVK.SourceScanBinding",
+    "KVK.SourceSelection",
+    "KVK.SourceUpdate",
+    "KVK.SourceWeightConfig",
+    "KVK.SourceWindowConfig",
+    "KVK.sp_KVK_AllPlayers_Ingest",
+    "KVK.sp_KVK_Get_Exports",
+    "KVK.sp_KVK_Ingest_Cleanup",
+    "KVK.sp_KVK_Recompute_Windows",
+    "KVK.vw_FightingDataset",
+    "KVK.vw_Player_Overall_KVK_Rank",
+    "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+    "dbo.ALL_GOVS",
+    "dbo.ALL_GOVS_ALLIANCES",
+    "dbo.ALL_GOVS_ALLIANCES_SYNC_STATE",
+    "dbo.ALL_GOVS_NAMES",
+    "dbo.ALL_STATS_FOR_DASHBAORD",
+    "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+    "dbo.AllianceActivityDaily",
+    "dbo.AllianceActivityDelta",
+    "dbo.AllianceActivitySnapshotHeader",
+    "dbo.AllianceActivitySnapshotRow",
+    "dbo.ArkAlliances",
+    "dbo.ArkAuditLog",
+    "dbo.ArkBans",
+    "dbo.ArkConfig",
+    "dbo.ArkMatches",
+    "dbo.ArkReminderPrefs",
+    "dbo.ArkSignups",
+    "dbo.CLAIM_KS4_IMPORT_FILE",
+    "dbo.CREATE_DASH",
+    "dbo.CREATE_DASH2",
+    "dbo.CREATE_DELTA_TABLES",
+    "dbo.CREATE_THE_AVERAGES",
+    "dbo.CaptureLogHealth",
+    "dbo.D12",
+    "dbo.D12D",
+    "dbo.D3",
+    "dbo.D3D",
+    "dbo.D6",
+    "dbo.D6D",
+    "dbo.DALL",
+    "dbo.DASH",
+    "dbo.DEADSSUMMARY",
+    "dbo.DEADSSUMMARY_PROC",
+    "dbo.DeadsDelta",
+    "dbo.DeltaMetrics",
+    "dbo.DeltaProcessingLog",
+    "dbo.DiscordGovernorRegistry",
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_15",
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_JUN25",
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE",
+    "dbo.EXCEL_FOR_CURRENT_KVK",
+    "dbo.EXCEL_FOR_DASHBOARD",
+    "dbo.EXCEL_FOR_FEB24_KVK",
+    "dbo.EXCEL_FOR_JAN25_KVK",
+    "dbo.EXCEL_FOR_JUL23_KVK",
+    "dbo.EXCEL_FOR_KVK_10",
+    "dbo.EXCEL_FOR_KVK_11",
+    "dbo.EXCEL_FOR_KVK_12",
+    "dbo.EXCEL_FOR_KVK_13",
+    "dbo.EXCEL_FOR_KVK_14",
+    "dbo.EXCEL_FOR_KVK_15",
+    "dbo.EXCEL_FOR_KVK_3",
+    "dbo.EXCEL_FOR_KVK_4",
+    "dbo.EXCEL_FOR_KVK_5",
+    "dbo.EXCEL_FOR_KVK_6",
+    "dbo.EXCEL_FOR_KVK_7",
+    "dbo.EXCEL_FOR_KVK_8",
+    "dbo.EXCEL_FOR_KVK_9",
+    "dbo.EXCEL_FOR_MAR25_KVK",
+    "dbo.EXCEL_FOR_MAY24_KVK",
+    "dbo.EXCEL_FOR_OCT23_KVK",
+    "dbo.EXCEL_FOR_SEPT24_KVK",
+    "dbo.EXCEL_OUTPUT_KVK_TARGETS_JUN25",
+    "dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25",
+    "dbo.EXEMPT_FROM_STATS",
+    "dbo.ErrorAudit",
+    "dbo.ExportAttempt",
+    "dbo.ExportAttemptPart",
+    "dbo.ExportExecutionSession",
+    "dbo.ExportExecutionStream",
+    "dbo.ExportJob",
+    "dbo.ExportJobResource",
+    "dbo.ExportManagedFileOrigin",
+    "dbo.ExportManualFileOrigin",
+    "dbo.ExportPreparation",
+    "dbo.ExportPreparationResource",
+    "dbo.ExportProviderRequest",
+    "dbo.ExportProviderRequestEvent",
+    "dbo.ExportReconciliationProof",
+    "dbo.ExportRequestBudget",
+    "dbo.ExportResource",
+    "dbo.FIX_IMPORT_STAGING",
+    "dbo.FallbackImportBatchControl",
+    "dbo.GOVERNOR_NAMES_PROC",
+    "dbo.GOVS",
+    "dbo.GovernorNameHistory",
+    "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+    "dbo.HEALEDSUMMARY",
+    "dbo.HEALEDSUMMARY_PROC",
+    "dbo.HEALEDSUMMARY_PROC_OPT",
+    "dbo.HEALED_ALL",
+    "dbo.HEALED_D12",
+    "dbo.HEALED_D12D",
+    "dbo.HEALED_D3",
+    "dbo.HEALED_D3D",
+    "dbo.HEALED_D6",
+    "dbo.HEALED_D6D",
+    "dbo.HEALED_LATEST",
+    "dbo.HealedTroopsDelta",
+    "dbo.HelpsDelta",
+    "dbo.HoH_Deads",
+    "dbo.IMPORT_STAGING",
+    "dbo.IMPORT_STAGING_CSV",
+    "dbo.IMPORT_STAGING_CSV_RAW",
+    "dbo.IMPORT_STAGING_PROC",
+    "dbo.IMPORT_STAGING_PROC_CORE",
+    "dbo.INACTIVE_GOVERNORS",
+    "dbo.ImportAuditBatch",
+    "dbo.ImportAuditPhase",
+    "dbo.IntList",
+    "dbo.K12",
+    "dbo.K12D",
+    "dbo.K3",
+    "dbo.K3D",
+    "dbo.K412",
+    "dbo.K412D",
+    "dbo.K43",
+    "dbo.K43D",
+    "dbo.K46",
+    "dbo.K46D",
+    "dbo.K4ALL",
+    "dbo.K512",
+    "dbo.K512D",
+    "dbo.K53",
+    "dbo.K53D",
+    "dbo.K56",
+    "dbo.K56D",
+    "dbo.K5ALL",
+    "dbo.K6",
+    "dbo.K6D",
+    "dbo.KALL",
+    "dbo.KILL4SUMMARY",
+    "dbo.KILL5SUMMARY",
+    "dbo.KILLPOINTSSUMMARY",
+    "dbo.KILLPOINTSSUMMARY_PROC",
+    "dbo.KILLPOINTS_ALL",
+    "dbo.KILLPOINTS_D12",
+    "dbo.KILLPOINTS_D12D",
+    "dbo.KILLPOINTS_D3",
+    "dbo.KILLPOINTS_D3D",
+    "dbo.KILLPOINTS_D6",
+    "dbo.KILLPOINTS_D6D",
+    "dbo.KILLPOINTS_LATEST",
+    "dbo.KILLSSUMMARY_PROC",
+    "dbo.KILLSUMMARY",
+    "dbo.KS",
+    "dbo.KS4_ImportFileClaim",
+    "dbo.KS4_ImportFileReceipt",
+    "dbo.KT4SUMMARY_PROC",
+    "dbo.KT5SUMMARY_PROC",
+    "dbo.KVKFinalReportHeader",
+    "dbo.KVKTargetBands",
+    "dbo.KVK_Details",
+    "dbo.KVK_Honor_AllPlayers_Raw",
+    "dbo.KVK_Honor_Ranked",
+    "dbo.KVK_Honor_Scan",
+    "dbo.KVK_Target_Publication",
+    "dbo.KVK_Target_Publication_Row",
+    "dbo.KillPointsDelta",
+    "dbo.KingdomScanData4",
+    "dbo.KingdomScanData5",
+    "dbo.LATEST",
+    "dbo.LATEST_GOVERNORNAME",
+    "dbo.LATEST_POWER",
+    "dbo.LATEST_T4&T5_KILLS",
+    "dbo.LATEST_T4_KILLS",
+    "dbo.LATEST_T5_KILLS",
+    "dbo.LeadershipPlayerReviewAudit",
+    "dbo.LeadershipPlayerReviewAuditDaily",
+    "dbo.LogBackupTriggerQueue",
+    "dbo.LogHealthSamples",
+    "dbo.MGE_Awards",
+    "dbo.MGE_Commanders",
+    "dbo.MGE_Events",
+    "dbo.MGE_Signups",
+    "dbo.MGE_Variants",
+    "dbo.NVarCharList",
+    "dbo.P12",
+    "dbo.P12D",
+    "dbo.P3",
+    "dbo.P3D",
+    "dbo.P6",
+    "dbo.P6D",
+    "dbo.PALL",
+    "dbo.POWERDelta",
+    "dbo.POWERSUMMARY",
+    "dbo.POWERSUMMARY_PROC",
+    "dbo.POWER_BY_MONTH",
+    "dbo.PlayerAccountStatus",
+    "dbo.PlayerFortsHistory",
+    "dbo.PlayerKVKHistory",
+    "dbo.PlayerLocation",
+    "dbo.PlayerLocation_Staging",
+    "dbo.PlayerScanMeta",
+    "dbo.PreKvk_Scan",
+    "dbo.PreKvk_Scores",
+    "dbo.PreKvk_Scores_Ranked",
+    "dbo.ProcConfig",
+    "dbo.ProcConfig_AuditLog",
+    "dbo.ProcConfig_Staging",
+    "dbo.QS_PerfPack_Run",
+    "dbo.QS_PerfPack_TopQueries",
+    "dbo.QS_PerfPack_Waits",
+    "dbo.RALLY_EXPORT",
+    "dbo.RALLY_JOINED",
+    "dbo.RALLY_JOINERS",
+    "dbo.RALLY_STARTED",
+    "dbo.RALLY_STARTED_TABLE",
+    "dbo.RANGEDSUMMARY",
+    "dbo.RANGEDSUMMARY_PROC",
+    "dbo.RANGED_ALL",
+    "dbo.RANGED_D12",
+    "dbo.RANGED_D12D",
+    "dbo.RANGED_D3",
+    "dbo.RANGED_D3D",
+    "dbo.RANGED_D6",
+    "dbo.RANGED_D6D",
+    "dbo.RANGED_LATEST",
+    "dbo.RSSASSISTDelta",
+    "dbo.RSSGatheredDelta",
+    "dbo.RallyDailySnapshotHeader",
+    "dbo.RallyData",
+    "dbo.RallyData_Raw",
+    "dbo.RangedPointsDelta",
+    "dbo.Refresh_PlayerScanMeta",
+    "dbo.SCAN_LIST",
+    "dbo.SP_ExecutionLog",
+    "dbo.SP_Stats_for_Upload",
+    "dbo.SP_TaskStatus",
+    "dbo.STAGING_STATS",
+    "dbo.STATS",
+    "dbo.STATS_FOR_UPLOAD",
+    "dbo.SUMMARY_CHANGE_EXPORT",
+    "dbo.SUMMARY_PROC",
+    "dbo.SUMMARY_PROC_STATE",
+    "dbo.SchemaMigrationHistory",
+    "dbo.StatsImportExecution",
+    "dbo.T4KillDelta",
+    "dbo.T4T5KillDelta",
+    "dbo.T5KillDelta",
+    "dbo.TARGETS",
+    "dbo.TARGETS_JUN25",
+    "dbo.TARGETS_NEW",
+    "dbo.TEST",
+    "dbo.TEST2",
+    "dbo.THE_AVERAGES",
+    "dbo.UPDATE_ALL",
+    "dbo.UPDATE_ALL2",
+    "dbo.UPDATE_RALLY_DATA",
+    "dbo.Update_ALL_Complete",
+    "dbo.VoteSurveyDeletionAudit",
+    "dbo.ZEROED",
+    "dbo.cur_RallyDaily",
+    "dbo.cur_RallyTotals_Base",
+    "dbo.fn_KVK_Camp_Aggregated",
+    "dbo.fn_KVK_Kingdom_Aggregated",
+    "dbo.fn_KVK_Player_Aggregated",
+    "dbo.fn_KvkCombatMetrics",
+    "dbo.fn_NormalizeGovernorNameKey",
+    "dbo.fn_PreKvkLatestOverall",
+    "dbo.fn_PreKvkPhaseDelta",
+    "dbo.fn_StatsWindowDeltas",
+    "dbo.fn_StatsWindowDeltas_GovCsv",
+    "dbo.sp_Backfill_PlayerKVKHistory",
+    "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+    "dbo.sp_Create_Excel_For_Kvk_Indexes",
+    "dbo.sp_ExcelOutput_ByKVK",
+    "dbo.sp_ImportPlayerLocationFromStaging",
+    "dbo.sp_Import_Rally_AllTime",
+    "dbo.sp_Import_Rally_Daily",
+    "dbo.sp_Loop_ExcelOutput_ByKVK",
+    "dbo.sp_Maintain_PlayerKVKHistory",
+    "dbo.sp_Prep_ExcelExportTable",
+    "dbo.sp_Prep_ExcelOutputTable",
+    "dbo.sp_Prep_TargetTable",
+    "dbo.sp_QS_PerfPack",
+    "dbo.sp_RallyDaily_TopN",
+    "dbo.sp_Rebuild_ExcelForDashboard",
+    "dbo.sp_Rebuild_RALLY_EXPORT",
+    "dbo.sp_Rebuild_v_PlayerKVK_Last3",
+    "dbo.sp_RefreshInactiveGovernors",
+    "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+    "dbo.sp_Registry_GetAllActive",
+    "dbo.sp_Registry_GetByDiscordID",
+    "dbo.sp_Registry_GetByGovernorID",
+    "dbo.sp_Registry_Insert",
+    "dbo.sp_Registry_SoftDelete",
+    "dbo.sp_Registry_UpsertFromImport",
+    "dbo.sp_ReplacePlayerLocationFromStaging",
+    "dbo.sp_Snapshot_PlayerForts",
+    "dbo.sp_TARGETS_MASTER",
+    "dbo.sp_Upsert_ProcConfig_From_Staging",
+    "dbo.stg_RallyAllTime",
+    "dbo.stg_RallyDaily",
+    "dbo.usp_ArkRetentionCleanup",
+    "dbo.usp_ArkSchemaVerify",
+    "dbo.usp_BackfillKvkFinalReportCompletion",
+    "dbo.usp_BackfillRallyDailySnapshotCompletion",
+    "dbo.usp_CleanupLogBackupTriggerQueue",
+    "dbo.usp_ExportExecutionSessionTransition",
+    "dbo.usp_ExportExecutionStreamTransition",
+    "dbo.usp_ExportManualOutputEnrollmentTransition",
+    "dbo.usp_ExportOutputEnrollmentTransition",
+    "dbo.usp_ExportProviderRequestEventAppend",
+    "dbo.usp_ExportReconciliationProofIssue",
+    "dbo.usp_GetKvkHistorySummaryMetricRanks",
+    "dbo.usp_GetLeadershipPlayerIdentityHistory",
+    "dbo.usp_GetLeadershipPlayerKvkHistory",
+    "dbo.usp_GetLeadershipPlayerLastActive",
+    "dbo.usp_GetLeadershipPlayerLookupDirectory",
+    "dbo.usp_GetLeadershipPlayerReview",
+    "dbo.usp_GetPendingLogBackupTriggers",
+    "dbo.usp_GetPersonalStatsDaily",
+    "dbo.usp_GetPlayerStatsWindows",
+    "dbo.usp_ImportAudit_CompleteBatch",
+    "dbo.usp_ImportAudit_FailBatch",
+    "dbo.usp_ImportAudit_RecordPhase",
+    "dbo.usp_ImportAudit_StartBatch",
+    "dbo.usp_LeadershipPlayerGovernorExists",
+    "dbo.usp_MarkLogBackupTriggerProcessed",
+    "dbo.usp_PurgeLeadershipPlayerReviewAudit",
+    "dbo.usp_RecordKvkFinalReportCompletion",
+    "dbo.usp_RecordLeadershipPlayerReviewAudit",
+    "dbo.usp_S11RunStatsImport",
+    "dbo.usp_SetAllianceActivitySnapshotCompletion",
+    "dbo.usp_UpsertGovernorNameHistoryForScan",
+    "dbo.usp_VoteSurveyAdminDelete",
+    "dbo.usp_update_stats",
+    "dbo.vAllianceActivitySnapshots",
+    "dbo.vAllianceActivityWeekFinals",
+    "dbo.vAllianceActivity_DailyDelta",
+    "dbo.vAllianceActivity_WeeklyDelta",
+    "dbo.vDailyWithWTD_Activity",
+    "dbo.vDaily_Activity",
+    "dbo.vDaily_AllianceActivity",
+    "dbo.vDaily_Helps",
+    "dbo.vDaily_PlayerExport",
+    "dbo.vDaily_RSSAssisted",
+    "dbo.vDaily_RSSGathered",
+    "dbo.vFortsCompleted_WeekToDate",
+    "dbo.vWTD_Activity",
+    "dbo.vWTD_Helps",
+    "dbo.vWTD_RSSAssisted",
+    "dbo.vWTD_RSSGathered",
+    "dbo.vWeekly_AllianceActivity",
+    "dbo.v_Active_Players",
+    "dbo.v_EXCEL_FOR_KVK_All",
+    "dbo.v_EXCEL_FOR_KVK_Started",
+    "dbo.v_GovernorNames",
+    "dbo.v_GovernorNames_Strict",
+    "dbo.v_KVK_Honor_Latest",
+    "dbo.v_KVK_Honor_TopLatest",
+    "dbo.v_KVK_TARGETS_FOR_BOT",
+    "dbo.v_KVK_Under50_Last3_WithLatest",
+    "dbo.v_MGE_SignupReview",
+    "dbo.v_PlayerAccounts_Migrate",
+    "dbo.v_PlayerFortsLatest",
+    "dbo.v_PlayerFortsLatestWithRank",
+    "dbo.v_PlayerKVK_Last3",
+    "dbo.v_PlayerLatestStats",
+    "dbo.v_PlayerProfile",
+    "dbo.v_PlayerScanMeta",
+    "dbo.v_PreKvk13_All",
+    "dbo.v_PreKvk13_Overall",
+    "dbo.v_PreKvk13_Phase1",
+    "dbo.v_PreKvk13_Phase2",
+    "dbo.v_PreKvk13_Phase3",
+    "dbo.v_RallyDaily_Latest",
+    "dbo.v_RallyTotals_Current",
+    "dbo.v_TARGETS_FOR_UPLOAD",
+    "dbo.vw_All_Governors_Clean",
+    "dbo.vw_ArkPlayerReport",
+    "dbo.vw_Governor_KVK_Summary_GlobalLatest",
+    "dbo.vw_Top3_Week",
+    "dbo.vw_Top3_Yesterday"
+  ],
+  "references": {
+    "KVK.KVK_AllPlayers_Raw": [
+      "dbo.LATEST_POWER"
+    ],
+    "KVK.KVK_AllPlayers_Stage": [
+      "dbo.LATEST_POWER"
+    ],
+    "KVK.KVK_CampMap": [],
+    "KVK.KVK_Camp_Windowed": [],
+    "KVK.KVK_DKPWeights": [],
+    "KVK.KVK_Ingest_Diagnostics": [],
+    "KVK.KVK_Ingest_Negatives": [],
+    "KVK.KVK_Kingdom_Windowed": [],
+    "KVK.KVK_Player_Baseline": [],
+    "KVK.KVK_Player_Windowed": [],
+    "KVK.KVK_Scan": [],
+    "KVK.KVK_Windows": [],
+    "KVK.SeasonSource": [],
+    "KVK.SourceAction": [
+      "KVK.SourceConfigRequest",
+      "KVK.SourcePublication"
+    ],
+    "KVK.SourceAdminReview": [
+      "KVK.SeasonSource"
+    ],
+    "KVK.SourceAggregateReport": [
+      "KVK.SourceAggregateRevision",
+      "KVK.SourcePeriod"
+    ],
+    "KVK.SourceAggregateRevision": [
+      "KVK.SourceAggregateReport",
+      "KVK.SourceArtifact"
+    ],
+    "KVK.SourceArtifact": [],
+    "KVK.SourceCampConfig": [
+      "KVK.SourceConfigVersion"
+    ],
+    "KVK.SourceCampReportRow": [
+      "KVK.SourceAggregateRevision"
+    ],
+    "KVK.SourceCompleteSelection": [
+      "KVK.SourcePublication",
+      "KVK.SourceUpdate"
+    ],
+    "KVK.SourceConfigRequest": [
+      "KVK.SourcePeriod",
+      "KVK.SourcePublication",
+      "KVK.SourceWindowConfig"
+    ],
+    "KVK.SourceConfigVersion": [
+      "KVK.SourceRoster"
+    ],
+    "KVK.SourceDelivery": [
+      "KVK.SourcePublication"
+    ],
+    "KVK.SourceExportIntent": [
+      "KVK.SeasonSource"
+    ],
+    "KVK.SourceExportIntentPublication": [
+      "KVK.SourceExportIntent",
+      "KVK.SourcePublication",
+      "KVK.SourceUpdate"
+    ],
+    "KVK.SourceImportAttempt": [
+      "KVK.SourceAggregateRevision",
+      "KVK.SourceArtifact",
+      "KVK.SourceObservationRevision"
+    ],
+    "KVK.SourceKingdomReportRow": [
+      "KVK.SourceAggregateRevision"
+    ],
+    "KVK.SourceLogicalScan": [
+      "KVK.SourceObservation"
+    ],
+    "KVK.SourceObservation": [
+      "KVK.SourceObservationRevision"
+    ],
+    "KVK.SourceObservationRevision": [
+      "KVK.SourceArtifact",
+      "KVK.SourceObservation"
+    ],
+    "KVK.SourceOutputDisposition": [
+      "KVK.SeasonSource",
+      "KVK.SourceDelivery",
+      "KVK.SourceOutputFile",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "KVK.SourcePublication",
+      "dbo.ExportAttempt",
+      "dbo.ExportAttemptPart",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource"
+    ],
+    "KVK.SourceOutputFile": [
+      "dbo.ExportResource"
+    ],
+    "KVK.SourceOutputOperation": [
+      "KVK.SeasonSource",
+      "KVK.SourceOutputOperationResource",
+      "KVK.SourceOutputPool"
+    ],
+    "KVK.SourceOutputOperationResource": [
+      "KVK.SourceOutputFile",
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportResource"
+    ],
+    "KVK.SourceOutputPool": [
+      "KVK.SeasonSource",
+      "KVK.SourceOutputFile",
+      "dbo.ExportResource"
+    ],
+    "KVK.SourceOutputSlot": [
+      "KVK.SourceOutputDisposition",
+      "KVK.SourceOutputFile",
+      "KVK.SourceOutputPool",
+      "dbo.ExportAttemptPart"
+    ],
+    "KVK.SourcePeriod": [],
+    "KVK.SourcePlayerResult": [
+      "KVK.SourceCampConfig",
+      "KVK.SourcePublication",
+      "KVK.SourceRosterMember"
+    ],
+    "KVK.SourcePlayerSnapshot": [
+      "KVK.SourceObservationRevision"
+    ],
+    "KVK.SourcePublication": [
+      "KVK.SourceAggregateRevision",
+      "KVK.SourceConfigVersion",
+      "KVK.SourceObservationRevision",
+      "KVK.SourcePeriod",
+      "KVK.SourceScanBinding",
+      "KVK.SourceWindowConfig"
+    ],
+    "KVK.SourceRoster": [
+      "KVK.SourceObservationRevision"
+    ],
+    "KVK.SourceRosterMember": [
+      "KVK.SourceRoster"
+    ],
+    "KVK.SourceRouting": [
+      "KVK.SourceSelection"
+    ],
+    "KVK.SourceScanBinding": [
+      "KVK.SourceConfigVersion",
+      "KVK.SourceLogicalScan"
+    ],
+    "KVK.SourceSelection": [
+      "KVK.SourcePublication"
+    ],
+    "KVK.SourceUpdate": [
+      "KVK.SeasonSource",
+      "KVK.SourceAggregateReport",
+      "KVK.SourceAggregateRevision",
+      "KVK.SourceConfigRequest",
+      "KVK.SourceConfigVersion",
+      "KVK.SourceObservationRevision",
+      "KVK.SourcePeriod",
+      "KVK.SourceScanBinding",
+      "KVK.SourceWindowConfig"
+    ],
+    "KVK.SourceWeightConfig": [
+      "KVK.SourceConfigVersion"
+    ],
+    "KVK.SourceWindowConfig": [
+      "KVK.SourceConfigVersion",
+      "KVK.SourcePeriod"
+    ],
+    "KVK.sp_KVK_AllPlayers_Ingest": [
+      "KVK.KVK_AllPlayers_Raw",
+      "KVK.KVK_AllPlayers_Stage",
+      "KVK.KVK_Ingest_Negatives",
+      "KVK.KVK_Player_Baseline",
+      "KVK.KVK_Scan",
+      "dbo.KVK_Details",
+      "dbo.LATEST_POWER"
+    ],
+    "KVK.sp_KVK_Get_Exports": [
+      "KVK.KVK_Camp_Windowed",
+      "KVK.KVK_DKPWeights",
+      "KVK.KVK_Ingest_Negatives",
+      "KVK.KVK_Kingdom_Windowed",
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Scan",
+      "KVK.KVK_Windows"
+    ],
+    "KVK.sp_KVK_Ingest_Cleanup": [
+      "KVK.KVK_AllPlayers_Stage",
+      "KVK.KVK_Ingest_Diagnostics",
+      "KVK.KVK_Ingest_Negatives"
+    ],
+    "KVK.sp_KVK_Recompute_Windows": [
+      "KVK.KVK_AllPlayers_Raw",
+      "KVK.KVK_CampMap",
+      "KVK.KVK_Camp_Windowed",
+      "KVK.KVK_DKPWeights",
+      "KVK.KVK_Kingdom_Windowed",
+      "KVK.KVK_Player_Baseline",
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Scan",
+      "KVK.KVK_Windows",
+      "dbo.GOVS",
+      "dbo.LATEST"
+    ],
+    "KVK.vw_FightingDataset": [
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Windows"
+    ],
+    "KVK.vw_Player_Overall_KVK_Rank": [
+      "KVK.KVK_Player_Windowed"
+    ],
+    "dbo.ACQUIRE_KS4_IMPORT_LOCK": [
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.ALL_GOVS": [
+      "dbo.LATEST"
+    ],
+    "dbo.ALL_GOVS_ALLIANCES": [],
+    "dbo.ALL_GOVS_ALLIANCES_SYNC_STATE": [],
+    "dbo.ALL_GOVS_NAMES": [],
+    "dbo.ALL_STATS_FOR_DASHBAORD": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.ARCHIVE_IMPORT_STAGING_FILE": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+      "dbo.KS4_ImportFileClaim",
+      "dbo.KS4_ImportFileReceipt",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.AllianceActivityDaily": [],
+    "dbo.AllianceActivityDelta": [],
+    "dbo.AllianceActivitySnapshotHeader": [],
+    "dbo.AllianceActivitySnapshotRow": [
+      "dbo.AllianceActivitySnapshotHeader"
+    ],
+    "dbo.ArkAlliances": [],
+    "dbo.ArkAuditLog": [
+      "dbo.ArkMatches"
+    ],
+    "dbo.ArkBans": [],
+    "dbo.ArkConfig": [],
+    "dbo.ArkMatches": [
+      "dbo.ArkAlliances"
+    ],
+    "dbo.ArkReminderPrefs": [],
+    "dbo.ArkSignups": [
+      "dbo.ArkMatches"
+    ],
+    "dbo.CLAIM_KS4_IMPORT_FILE": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+      "dbo.IMPORT_STAGING_PROC",
+      "dbo.KS4_ImportFileClaim",
+      "dbo.KS4_ImportFileReceipt",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.CREATE_DASH": [
+      "dbo.DASH",
+      "dbo.EXCEL_FOR_DASHBOARD"
+    ],
+    "dbo.CREATE_DASH2": [
+      "dbo.DASH",
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.TARGETS",
+      "dbo.ZEROED"
+    ],
+    "dbo.CREATE_DELTA_TABLES": [
+      "dbo.DeadsDelta",
+      "dbo.DeltaMetrics",
+      "dbo.DeltaProcessingLog",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.T4KillDelta",
+      "dbo.T4T5KillDelta",
+      "dbo.T5KillDelta"
+    ],
+    "dbo.CREATE_THE_AVERAGES": [
+      "dbo.KingdomScanData4",
+      "dbo.STATS",
+      "dbo.THE_AVERAGES"
+    ],
+    "dbo.CaptureLogHealth": [
+      "dbo.LogHealthSamples"
+    ],
+    "dbo.D12": [],
+    "dbo.D12D": [],
+    "dbo.D3": [],
+    "dbo.D3D": [],
+    "dbo.D6": [],
+    "dbo.D6D": [],
+    "dbo.DALL": [],
+    "dbo.DASH": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.DEADSSUMMARY": [],
+    "dbo.DEADSSUMMARY_PROC": [
+      "dbo.D12",
+      "dbo.D12D",
+      "dbo.D3",
+      "dbo.D3D",
+      "dbo.D6",
+      "dbo.D6D",
+      "dbo.DALL",
+      "dbo.DEADSSUMMARY",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.DeadsDelta": [],
+    "dbo.DeltaMetrics": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta"
+    ],
+    "dbo.DeltaProcessingLog": [],
+    "dbo.DiscordGovernorRegistry": [],
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_15": [],
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_JUN25": [],
+    "dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE": [],
+    "dbo.EXCEL_FOR_CURRENT_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_DASHBOARD": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_FEB24_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_JAN25_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_JUL23_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_10": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_11": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_12": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_13": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_14": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_15": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_3": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_4": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_5": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_6": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_7": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_8": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_KVK_9": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_MAR25_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_MAY24_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_OCT23_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_FOR_SEPT24_KVK": [
+      "dbo.ZEROED"
+    ],
+    "dbo.EXCEL_OUTPUT_KVK_TARGETS_JUN25": [],
+    "dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25": [],
+    "dbo.EXEMPT_FROM_STATS": [],
+    "dbo.ErrorAudit": [],
+    "dbo.ExportAttempt": [
+      "KVK.SourceDelivery",
+      "KVK.SourcePublication",
+      "dbo.ExportJob"
+    ],
+    "dbo.ExportAttemptPart": [
+      "dbo.ExportAttempt"
+    ],
+    "dbo.ExportExecutionSession": [],
+    "dbo.ExportExecutionStream": [
+      "KVK.SourceOutputOperation",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportJob",
+      "dbo.ExportPreparation"
+    ],
+    "dbo.ExportJob": [
+      "KVK.SourceExportIntent"
+    ],
+    "dbo.ExportJobResource": [
+      "dbo.ExportJob",
+      "dbo.ExportResource"
+    ],
+    "dbo.ExportManagedFileOrigin": [
+      "dbo.ExportExecutionStream",
+      "dbo.ExportPreparation",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent"
+    ],
+    "dbo.ExportManualFileOrigin": [
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportPreparation"
+    ],
+    "dbo.ExportPreparation": [
+      "dbo.ExportJob"
+    ],
+    "dbo.ExportPreparationResource": [
+      "dbo.ExportPreparation",
+      "dbo.ExportResource"
+    ],
+    "dbo.ExportProviderRequest": [
+      "dbo.ExportExecutionStream"
+    ],
+    "dbo.ExportProviderRequestEvent": [
+      "dbo.ExportProviderRequest"
+    ],
+    "dbo.ExportReconciliationProof": [
+      "dbo.ExportExecutionSession"
+    ],
+    "dbo.ExportRequestBudget": [],
+    "dbo.ExportResource": [
+      "KVK.SourceOutputOperationResource",
+      "dbo.ExportJobResource",
+      "dbo.ExportPreparationResource"
+    ],
+    "dbo.FIX_IMPORT_STAGING": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.IMPORT_STAGING",
+      "dbo.KS",
+      "dbo.KS4_ImportFileReceipt",
+      "dbo.KingdomScanData4",
+      "dbo.KingdomScanData5",
+      "dbo.LATEST"
+    ],
+    "dbo.FallbackImportBatchControl": [],
+    "dbo.GOVERNOR_NAMES_PROC": [
+      "dbo.ALL_GOVS",
+      "dbo.ALL_GOVS_ALLIANCES",
+      "dbo.ALL_GOVS_ALLIANCES_SYNC_STATE",
+      "dbo.ALL_GOVS_NAMES",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.GOVS": [],
+    "dbo.GovernorNameHistory": [],
+    "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE": [],
+    "dbo.HEALEDSUMMARY": [],
+    "dbo.HEALEDSUMMARY_PROC": [
+      "dbo.D12",
+      "dbo.D12D",
+      "dbo.D3",
+      "dbo.D3D",
+      "dbo.D6",
+      "dbo.D6D",
+      "dbo.HEALEDSUMMARY",
+      "dbo.HEALED_ALL",
+      "dbo.HEALED_D12",
+      "dbo.HEALED_D12D",
+      "dbo.HEALED_D3",
+      "dbo.HEALED_D3D",
+      "dbo.HEALED_D6",
+      "dbo.HEALED_D6D",
+      "dbo.HEALED_LATEST",
+      "dbo.KingdomScanData4",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.HEALEDSUMMARY_PROC_OPT": [
+      "dbo.D12",
+      "dbo.D12D",
+      "dbo.D3",
+      "dbo.D3D",
+      "dbo.D6",
+      "dbo.D6D",
+      "dbo.HEALEDSUMMARY",
+      "dbo.HEALED_ALL",
+      "dbo.HEALED_D12",
+      "dbo.HEALED_D12D",
+      "dbo.HEALED_D3",
+      "dbo.HEALED_D3D",
+      "dbo.HEALED_D6",
+      "dbo.HEALED_D6D",
+      "dbo.HEALED_LATEST",
+      "dbo.KingdomScanData4",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.HEALED_ALL": [],
+    "dbo.HEALED_D12": [],
+    "dbo.HEALED_D12D": [],
+    "dbo.HEALED_D3": [],
+    "dbo.HEALED_D3D": [],
+    "dbo.HEALED_D6": [],
+    "dbo.HEALED_D6D": [],
+    "dbo.HEALED_LATEST": [],
+    "dbo.HealedTroopsDelta": [],
+    "dbo.HelpsDelta": [],
+    "dbo.HoH_Deads": [],
+    "dbo.IMPORT_STAGING": [],
+    "dbo.IMPORT_STAGING_CSV": [],
+    "dbo.IMPORT_STAGING_CSV_RAW": [],
+    "dbo.IMPORT_STAGING_PROC": [
+      "dbo.CLAIM_KS4_IMPORT_FILE",
+      "dbo.IMPORT_STAGING_PROC_CORE"
+    ],
+    "dbo.IMPORT_STAGING_PROC_CORE": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+      "dbo.IMPORT_STAGING",
+      "dbo.IMPORT_STAGING_CSV",
+      "dbo.IMPORT_STAGING_CSV_RAW",
+      "dbo.IMPORT_STAGING_PROC",
+      "dbo.KS4_ImportFileClaim",
+      "dbo.KS4_ImportFileReceipt",
+      "dbo.KingdomScanData4",
+      "dbo.KingdomScanData5",
+      "dbo.LATEST",
+      "dbo.UPDATE_ALL",
+      "dbo.UPDATE_ALL2"
+    ],
+    "dbo.INACTIVE_GOVERNORS": [],
+    "dbo.ImportAuditBatch": [],
+    "dbo.ImportAuditPhase": [
+      "dbo.ImportAuditBatch"
+    ],
+    "dbo.IntList": [],
+    "dbo.K12": [],
+    "dbo.K12D": [],
+    "dbo.K3": [],
+    "dbo.K3D": [],
+    "dbo.K412": [],
+    "dbo.K412D": [],
+    "dbo.K43": [],
+    "dbo.K43D": [],
+    "dbo.K46": [],
+    "dbo.K46D": [],
+    "dbo.K4ALL": [],
+    "dbo.K512": [],
+    "dbo.K512D": [],
+    "dbo.K53": [],
+    "dbo.K53D": [],
+    "dbo.K56": [],
+    "dbo.K56D": [],
+    "dbo.K5ALL": [],
+    "dbo.K6": [],
+    "dbo.K6D": [],
+    "dbo.KALL": [],
+    "dbo.KILL4SUMMARY": [],
+    "dbo.KILL5SUMMARY": [],
+    "dbo.KILLPOINTSSUMMARY": [],
+    "dbo.KILLPOINTSSUMMARY_PROC": [
+      "dbo.D12",
+      "dbo.D12D",
+      "dbo.D3",
+      "dbo.D3D",
+      "dbo.D6",
+      "dbo.D6D",
+      "dbo.KILLPOINTSSUMMARY",
+      "dbo.KILLPOINTS_ALL",
+      "dbo.KILLPOINTS_D12",
+      "dbo.KILLPOINTS_D12D",
+      "dbo.KILLPOINTS_D3",
+      "dbo.KILLPOINTS_D3D",
+      "dbo.KILLPOINTS_D6",
+      "dbo.KILLPOINTS_D6D",
+      "dbo.KILLPOINTS_LATEST",
+      "dbo.KingdomScanData4",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.KILLPOINTS_ALL": [],
+    "dbo.KILLPOINTS_D12": [],
+    "dbo.KILLPOINTS_D12D": [],
+    "dbo.KILLPOINTS_D3": [],
+    "dbo.KILLPOINTS_D3D": [],
+    "dbo.KILLPOINTS_D6": [],
+    "dbo.KILLPOINTS_D6D": [],
+    "dbo.KILLPOINTS_LATEST": [],
+    "dbo.KILLSSUMMARY_PROC": [
+      "dbo.K12",
+      "dbo.K12D",
+      "dbo.K3",
+      "dbo.K3D",
+      "dbo.K6",
+      "dbo.K6D",
+      "dbo.KALL",
+      "dbo.KILLSUMMARY",
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST_T4&T5_KILLS",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.KILLSUMMARY": [],
+    "dbo.KS": [],
+    "dbo.KS4_ImportFileClaim": [],
+    "dbo.KS4_ImportFileReceipt": [],
+    "dbo.KT4SUMMARY_PROC": [
+      "dbo.K412",
+      "dbo.K412D",
+      "dbo.K43",
+      "dbo.K43D",
+      "dbo.K46",
+      "dbo.K46D",
+      "dbo.K4ALL",
+      "dbo.KILL4SUMMARY",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST_T4_KILLS",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.KT5SUMMARY_PROC": [
+      "dbo.K512",
+      "dbo.K512D",
+      "dbo.K53",
+      "dbo.K53D",
+      "dbo.K56",
+      "dbo.K56D",
+      "dbo.K5ALL",
+      "dbo.KILL5SUMMARY",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST_T5_KILLS",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.KVKFinalReportHeader": [],
+    "dbo.KVKTargetBands": [],
+    "dbo.KVK_Details": [],
+    "dbo.KVK_Honor_AllPlayers_Raw": [
+      "dbo.KVK_Honor_Scan"
+    ],
+    "dbo.KVK_Honor_Ranked": [],
+    "dbo.KVK_Honor_Scan": [],
+    "dbo.KVK_Target_Publication": [],
+    "dbo.KVK_Target_Publication_Row": [
+      "dbo.KVK_Target_Publication"
+    ],
+    "dbo.KillPointsDelta": [],
+    "dbo.KingdomScanData4": [],
+    "dbo.KingdomScanData5": [],
+    "dbo.LATEST": [],
+    "dbo.LATEST_GOVERNORNAME": [],
+    "dbo.LATEST_POWER": [],
+    "dbo.LATEST_T4&T5_KILLS": [],
+    "dbo.LATEST_T4_KILLS": [],
+    "dbo.LATEST_T5_KILLS": [],
+    "dbo.LeadershipPlayerReviewAudit": [],
+    "dbo.LeadershipPlayerReviewAuditDaily": [],
+    "dbo.LogBackupTriggerQueue": [],
+    "dbo.LogHealthSamples": [],
+    "dbo.MGE_Awards": [
+      "dbo.MGE_Commanders",
+      "dbo.MGE_Events",
+      "dbo.MGE_Signups"
+    ],
+    "dbo.MGE_Commanders": [],
+    "dbo.MGE_Events": [
+      "dbo.MGE_Variants"
+    ],
+    "dbo.MGE_Signups": [
+      "dbo.MGE_Commanders",
+      "dbo.MGE_Events"
+    ],
+    "dbo.MGE_Variants": [],
+    "dbo.NVarCharList": [],
+    "dbo.P12": [],
+    "dbo.P12D": [],
+    "dbo.P3": [],
+    "dbo.P3D": [],
+    "dbo.P6": [],
+    "dbo.P6D": [],
+    "dbo.PALL": [],
+    "dbo.POWERDelta": [],
+    "dbo.POWERSUMMARY": [],
+    "dbo.POWERSUMMARY_PROC": [
+      "dbo.KingdomScanData4",
+      "dbo.LATEST_POWER",
+      "dbo.P12",
+      "dbo.P12D",
+      "dbo.P3",
+      "dbo.P3D",
+      "dbo.P6",
+      "dbo.P6D",
+      "dbo.PALL",
+      "dbo.POWERSUMMARY",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.POWER_BY_MONTH": [],
+    "dbo.PlayerAccountStatus": [],
+    "dbo.PlayerFortsHistory": [],
+    "dbo.PlayerKVKHistory": [],
+    "dbo.PlayerLocation": [],
+    "dbo.PlayerLocation_Staging": [],
+    "dbo.PlayerScanMeta": [],
+    "dbo.PreKvk_Scan": [],
+    "dbo.PreKvk_Scores": [
+      "dbo.PreKvk_Scan"
+    ],
+    "dbo.PreKvk_Scores_Ranked": [],
+    "dbo.ProcConfig": [],
+    "dbo.ProcConfig_AuditLog": [],
+    "dbo.ProcConfig_Staging": [],
+    "dbo.QS_PerfPack_Run": [],
+    "dbo.QS_PerfPack_TopQueries": [
+      "dbo.QS_PerfPack_Run"
+    ],
+    "dbo.QS_PerfPack_Waits": [
+      "dbo.QS_PerfPack_Run"
+    ],
+    "dbo.RALLY_EXPORT": [
+      "dbo.RALLY_JOINED"
+    ],
+    "dbo.RALLY_JOINED": [],
+    "dbo.RALLY_JOINERS": [],
+    "dbo.RALLY_STARTED": [],
+    "dbo.RALLY_STARTED_TABLE": [
+      "dbo.RALLY_STARTED"
+    ],
+    "dbo.RANGEDSUMMARY": [],
+    "dbo.RANGEDSUMMARY_PROC": [
+      "dbo.D12",
+      "dbo.D3",
+      "dbo.D6",
+      "dbo.KingdomScanData4",
+      "dbo.RANGEDSUMMARY",
+      "dbo.RANGED_ALL",
+      "dbo.RANGED_D12",
+      "dbo.RANGED_D12D",
+      "dbo.RANGED_D3",
+      "dbo.RANGED_D3D",
+      "dbo.RANGED_D6",
+      "dbo.RANGED_D6D",
+      "dbo.RANGED_LATEST",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.RANGED_ALL": [],
+    "dbo.RANGED_D12": [],
+    "dbo.RANGED_D12D": [],
+    "dbo.RANGED_D3": [],
+    "dbo.RANGED_D3D": [],
+    "dbo.RANGED_D6": [],
+    "dbo.RANGED_D6D": [],
+    "dbo.RANGED_LATEST": [],
+    "dbo.RSSASSISTDelta": [],
+    "dbo.RSSGatheredDelta": [],
+    "dbo.RallyDailySnapshotHeader": [],
+    "dbo.RallyData": [],
+    "dbo.RallyData_Raw": [],
+    "dbo.RangedPointsDelta": [],
+    "dbo.Refresh_PlayerScanMeta": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.PlayerScanMeta"
+    ],
+    "dbo.SCAN_LIST": [],
+    "dbo.SP_ExecutionLog": [],
+    "dbo.SP_Stats_for_Upload": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.EXEMPT_FROM_STATS",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KVKFinalReportHeader",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.ProcConfig",
+      "dbo.RangedPointsDelta",
+      "dbo.STATS_FOR_UPLOAD",
+      "dbo.ZEROED"
+    ],
+    "dbo.SP_TaskStatus": [],
+    "dbo.STAGING_STATS": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta"
+    ],
+    "dbo.STATS": [
+      "dbo.DeadsDelta",
+      "dbo.HelpsDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta"
+    ],
+    "dbo.STATS_FOR_UPLOAD": [
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.SUMMARY_CHANGE_EXPORT": [],
+    "dbo.SUMMARY_PROC": [
+      "dbo.DEADSSUMMARY",
+      "dbo.DEADSSUMMARY_PROC",
+      "dbo.HEALEDSUMMARY",
+      "dbo.HEALEDSUMMARY_PROC",
+      "dbo.KILL4SUMMARY",
+      "dbo.KILL5SUMMARY",
+      "dbo.KILLPOINTSSUMMARY",
+      "dbo.KILLPOINTSSUMMARY_PROC",
+      "dbo.KILLSSUMMARY_PROC",
+      "dbo.KILLSUMMARY",
+      "dbo.KT4SUMMARY_PROC",
+      "dbo.KT5SUMMARY_PROC",
+      "dbo.KingdomScanData4",
+      "dbo.POWERSUMMARY",
+      "dbo.POWERSUMMARY_PROC",
+      "dbo.RANGEDSUMMARY",
+      "dbo.RANGEDSUMMARY_PROC",
+      "dbo.SUMMARY_CHANGE_EXPORT",
+      "dbo.SUMMARY_PROC_STATE"
+    ],
+    "dbo.SUMMARY_PROC_STATE": [],
+    "dbo.SchemaMigrationHistory": [],
+    "dbo.T4KillDelta": [],
+    "dbo.T4T5KillDelta": [],
+    "dbo.T5KillDelta": [],
+    "dbo.TARGETS": [
+      "dbo.EXCEL_EXPORT_KVK_TARGETS_JUN25",
+      "dbo.EXCEL_FOR_JAN25_KVK",
+      "dbo.EXCEL_FOR_MAR25_KVK",
+      "dbo.EXCEL_OUTPUT_KVK_TARGETS_JUN25",
+      "dbo.KingdomScanData4",
+      "dbo.TARGETS_JUN25"
+    ],
+    "dbo.TARGETS_JUN25": [],
+    "dbo.TARGETS_NEW": [
+      "dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE",
+      "dbo.KVKTargetBands",
+      "dbo.KingdomScanData4",
+      "dbo.ProcConfig",
+      "dbo.TARGETS"
+    ],
+    "dbo.TEST": [
+      "dbo.D12",
+      "dbo.D3",
+      "dbo.D6",
+      "dbo.DALL",
+      "dbo.DEADSSUMMARY",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.TEST2": [],
+    "dbo.THE_AVERAGES": [],
+    "dbo.UPDATE_ALL": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.ALL_STATS_FOR_DASHBAORD",
+      "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "dbo.CLAIM_KS4_IMPORT_FILE",
+      "dbo.CREATE_DASH",
+      "dbo.CREATE_DELTA_TABLES",
+      "dbo.CREATE_THE_AVERAGES",
+      "dbo.DeadsDelta",
+      "dbo.EXCEL_FOR_CURRENT_KVK",
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.EXCEL_FOR_FEB24_KVK",
+      "dbo.EXCEL_FOR_JAN25_KVK",
+      "dbo.EXCEL_FOR_JUL23_KVK",
+      "dbo.EXCEL_FOR_MAY24_KVK",
+      "dbo.EXCEL_FOR_OCT23_KVK",
+      "dbo.EXCEL_FOR_SEPT24_KVK",
+      "dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25",
+      "dbo.GOVERNOR_NAMES_PROC",
+      "dbo.HelpsDelta",
+      "dbo.HoH_Deads",
+      "dbo.IMPORT_STAGING",
+      "dbo.IMPORT_STAGING_PROC",
+      "dbo.IMPORT_STAGING_PROC_CORE",
+      "dbo.KS",
+      "dbo.KS4_ImportFileClaim",
+      "dbo.KingdomScanData4",
+      "dbo.KingdomScanData5",
+      "dbo.LATEST",
+      "dbo.POWERDelta",
+      "dbo.POWER_BY_MONTH",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.SP_TaskStatus",
+      "dbo.STAGING_STATS",
+      "dbo.STATS",
+      "dbo.STATS_FOR_UPLOAD",
+      "dbo.SUMMARY_PROC",
+      "dbo.T4KillDelta",
+      "dbo.T4T5KillDelta",
+      "dbo.T5KillDelta",
+      "dbo.TARGETS",
+      "dbo.THE_AVERAGES",
+      "dbo.UPDATE_RALLY_DATA",
+      "dbo.Update_ALL_Complete",
+      "dbo.ZEROED",
+      "dbo.sp_RefreshInactiveGovernors"
+    ],
+    "dbo.UPDATE_ALL2": [
+      "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "dbo.ALL_STATS_FOR_DASHBAORD",
+      "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "dbo.CLAIM_KS4_IMPORT_FILE",
+      "dbo.CREATE_DASH2",
+      "dbo.CREATE_THE_AVERAGES",
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.ErrorAudit",
+      "dbo.GOVERNOR_NAMES_PROC",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.IMPORT_STAGING",
+      "dbo.IMPORT_STAGING_PROC",
+      "dbo.IMPORT_STAGING_PROC_CORE",
+      "dbo.KS",
+      "dbo.KS4_ImportFileClaim",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.KingdomScanData5",
+      "dbo.LATEST",
+      "dbo.LogBackupTriggerQueue",
+      "dbo.POWER_BY_MONTH",
+      "dbo.PlayerScanMeta",
+      "dbo.ProcConfig",
+      "dbo.RangedPointsDelta",
+      "dbo.Refresh_PlayerScanMeta",
+      "dbo.SCAN_LIST",
+      "dbo.SP_Stats_for_Upload",
+      "dbo.SP_TaskStatus",
+      "dbo.STATS",
+      "dbo.STATS_FOR_UPLOAD",
+      "dbo.SUMMARY_PROC",
+      "dbo.StatsImportExecution",
+      "dbo.THE_AVERAGES",
+      "dbo.Update_ALL_Complete",
+      "dbo.ZEROED",
+      "dbo.sp_ExcelOutput_ByKVK",
+      "dbo.sp_Rebuild_ExcelForDashboard",
+      "dbo.sp_RefreshInactiveGovernors",
+      "dbo.usp_UpsertGovernorNameHistoryForScan"
+    ],
+    "dbo.UPDATE_RALLY_DATA": [
+      "dbo.KingdomScanData4",
+      "dbo.LATEST_GOVERNORNAME",
+      "dbo.RALLY_EXPORT",
+      "dbo.RALLY_JOINED",
+      "dbo.RALLY_JOINERS",
+      "dbo.RALLY_STARTED",
+      "dbo.RALLY_STARTED_TABLE",
+      "dbo.RallyData",
+      "dbo.RallyData_Raw",
+      "dbo.STATS",
+      "dbo.TEST2"
+    ],
+    "dbo.Update_ALL_Complete": [],
+    "dbo.VoteSurveyDeletionAudit": [],
+    "dbo.ZEROED": [],
+    "dbo.cur_RallyDaily": [],
+    "dbo.cur_RallyTotals_Base": [],
+    "dbo.fn_KVK_Camp_Aggregated": [
+      "KVK.KVK_Camp_Windowed",
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Windows"
+    ],
+    "dbo.fn_KVK_Kingdom_Aggregated": [
+      "KVK.KVK_Kingdom_Windowed",
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Windows"
+    ],
+    "dbo.fn_KVK_Player_Aggregated": [
+      "KVK.KVK_Player_Windowed",
+      "KVK.KVK_Windows"
+    ],
+    "dbo.fn_KvkCombatMetrics": [],
+    "dbo.fn_NormalizeGovernorNameKey": [],
+    "dbo.fn_PreKvkLatestOverall": [
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.fn_PreKvkPhaseDelta": [
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.fn_StatsWindowDeltas": [
+      "dbo.DeadsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.vDaily_PlayerExport"
+    ],
+    "dbo.fn_StatsWindowDeltas_GovCsv": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.vDaily_PlayerExport"
+    ],
+    "dbo.sp_Backfill_PlayerKVKHistory": [
+      "dbo.sp_Maintain_PlayerKVKHistory"
+    ],
+    "dbo.sp_Build_Prekvk_And_Honor_Rankings": [
+      "dbo.KVK_Honor_AllPlayers_Raw",
+      "dbo.KVK_Honor_Ranked",
+      "dbo.KVK_Honor_Scan",
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores",
+      "dbo.PreKvk_Scores_Ranked"
+    ],
+    "dbo.sp_Create_Excel_For_Kvk_Indexes": [],
+    "dbo.sp_ExcelOutput_ByKVK": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.HoH_Deads",
+      "dbo.KVK_Honor_Ranked",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.POWERDelta",
+      "dbo.PreKvk_Scores_Ranked",
+      "dbo.ProcConfig",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.STAGING_STATS",
+      "dbo.STATS",
+      "dbo.T4KillDelta",
+      "dbo.T4T5KillDelta",
+      "dbo.T5KillDelta",
+      "dbo.ZEROED",
+      "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+      "dbo.sp_Create_Excel_For_Kvk_Indexes",
+      "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+      "dbo.usp_RecordKvkFinalReportCompletion"
+    ],
+    "dbo.sp_ImportPlayerLocationFromStaging": [
+      "dbo.LATEST",
+      "dbo.PlayerLocation",
+      "dbo.PlayerLocation_Staging"
+    ],
+    "dbo.sp_Import_Rally_AllTime": [
+      "dbo.cur_RallyTotals_Base",
+      "dbo.sp_Rebuild_RALLY_EXPORT",
+      "dbo.sp_Snapshot_PlayerForts",
+      "dbo.stg_RallyAllTime"
+    ],
+    "dbo.sp_Import_Rally_Daily": [
+      "dbo.RallyDailySnapshotHeader",
+      "dbo.cur_RallyDaily",
+      "dbo.sp_Rebuild_RALLY_EXPORT",
+      "dbo.sp_Snapshot_PlayerForts",
+      "dbo.stg_RallyDaily"
+    ],
+    "dbo.sp_Loop_ExcelOutput_ByKVK": [
+      "dbo.CREATE_DELTA_TABLES",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.ProcConfig",
+      "dbo.STAGING_STATS",
+      "dbo.sp_ExcelOutput_ByKVK"
+    ],
+    "dbo.sp_Maintain_PlayerKVKHistory": [
+      "dbo.PlayerKVKHistory"
+    ],
+    "dbo.sp_Prep_ExcelExportTable": [
+      "dbo.EXCEL_EXPORT_KVK_TARGETS_TEMPLATE",
+      "dbo.EXEMPT_FROM_STATS"
+    ],
+    "dbo.sp_Prep_ExcelOutputTable": [
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.sp_Prep_TargetTable": [
+      "dbo.EXEMPT_FROM_STATS",
+      "dbo.KVKTargetBands",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.sp_QS_PerfPack": [
+      "dbo.QS_PerfPack_Run",
+      "dbo.QS_PerfPack_TopQueries",
+      "dbo.QS_PerfPack_Waits"
+    ],
+    "dbo.sp_RallyDaily_TopN": [
+      "dbo.LATEST",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.sp_Rebuild_ExcelForDashboard": [
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.ProcConfig",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.sp_Rebuild_RALLY_EXPORT": [
+      "dbo.RALLY_EXPORT",
+      "dbo.RALLY_JOINED",
+      "dbo.cur_RallyDaily",
+      "dbo.cur_RallyTotals_Base"
+    ],
+    "dbo.sp_Rebuild_v_PlayerKVK_Last3": [
+      "dbo.K3",
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.PlayerKVKHistory",
+      "dbo.PlayerLocation",
+      "dbo.v_PlayerKVK_Last3"
+    ],
+    "dbo.sp_RefreshInactiveGovernors": [
+      "dbo.INACTIVE_GOVERNORS",
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.SP_ExecutionLog"
+    ],
+    "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KVK_Details",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED",
+      "dbo.v_EXCEL_FOR_KVK_All",
+      "dbo.v_EXCEL_FOR_KVK_Started"
+    ],
+    "dbo.sp_Registry_GetAllActive": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_Registry_GetByDiscordID": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_Registry_GetByGovernorID": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_Registry_Insert": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_Registry_SoftDelete": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_Registry_UpsertFromImport": [
+      "dbo.DiscordGovernorRegistry"
+    ],
+    "dbo.sp_ReplacePlayerLocationFromStaging": [
+      "dbo.LATEST",
+      "dbo.PlayerLocation",
+      "dbo.PlayerLocation_Staging"
+    ],
+    "dbo.sp_Snapshot_PlayerForts": [
+      "dbo.PlayerFortsHistory",
+      "dbo.v_RallyTotals_Current"
+    ],
+    "dbo.sp_TARGETS_MASTER": [
+      "dbo.CREATE_DELTA_TABLES",
+      "dbo.KVK_Target_Publication",
+      "dbo.KVK_Target_Publication_Row",
+      "dbo.KingdomScanData4",
+      "dbo.ProcConfig",
+      "dbo.TARGETS",
+      "dbo.sp_ExcelOutput_ByKVK",
+      "dbo.sp_Prep_ExcelExportTable",
+      "dbo.sp_Prep_ExcelOutputTable",
+      "dbo.sp_Prep_TargetTable",
+      "dbo.v_KVK_TARGETS_FOR_BOT",
+      "dbo.v_TARGETS_FOR_UPLOAD"
+    ],
+    "dbo.sp_Upsert_ProcConfig_From_Staging": [
+      "dbo.ProcConfig",
+      "dbo.ProcConfig_AuditLog",
+      "dbo.ProcConfig_Staging"
+    ],
+    "dbo.stg_RallyAllTime": [],
+    "dbo.stg_RallyDaily": [],
+    "dbo.usp_ArkRetentionCleanup": [
+      "dbo.ArkAuditLog",
+      "dbo.ArkBans",
+      "dbo.ArkMatches",
+      "dbo.ArkSignups"
+    ],
+    "dbo.usp_ArkSchemaVerify": [
+      "dbo.ArkAlliances",
+      "dbo.ArkAuditLog",
+      "dbo.ArkBans",
+      "dbo.ArkConfig",
+      "dbo.ArkMatches",
+      "dbo.ArkReminderPrefs",
+      "dbo.ArkSignups"
+    ],
+    "dbo.usp_BackfillKvkFinalReportCompletion": [
+      "dbo.KVKFinalReportHeader",
+      "dbo.KVK_Details",
+      "dbo.KingdomScanData4",
+      "dbo.usp_RecordKvkFinalReportCompletion",
+      "dbo.v_EXCEL_FOR_KVK_All"
+    ],
+    "dbo.usp_BackfillRallyDailySnapshotCompletion": [
+      "dbo.RallyDailySnapshotHeader",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.usp_CleanupLogBackupTriggerQueue": [
+      "dbo.LogBackupTriggerQueue"
+    ],
+    "dbo.usp_ExportExecutionSessionTransition": [
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportPreparation"
+    ],
+    "dbo.usp_ExportExecutionStreamTransition": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputOperationResource",
+      "KVK.SourceOutputPool",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportPreparation",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportResource"
+    ],
+    "dbo.usp_ExportManualOutputEnrollmentTransition": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportManualFileOrigin",
+      "dbo.ExportPreparation",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportResource"
+    ],
+    "dbo.usp_ExportOutputEnrollmentTransition": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportPreparation",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportResource"
+    ],
+    "dbo.usp_ExportProviderRequestEventAppend": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputOperationResource",
+      "KVK.SourceOutputPool",
+      "dbo.ExportAttempt",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportPreparation",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportResource"
+    ],
+    "dbo.usp_ExportReconciliationProofIssue": [
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportManualFileOrigin",
+      "dbo.ExportPreparation",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportReconciliationProof",
+      "dbo.TARGETS"
+    ],
+    "dbo.usp_GetKvkHistorySummaryMetricRanks": [
+      "dbo.HealedTroopsDelta",
+      "dbo.IntList",
+      "dbo.KVKFinalReportHeader",
+      "dbo.KillPointsDelta",
+      "dbo.fn_KvkCombatMetrics",
+      "dbo.v_EXCEL_FOR_KVK_All"
+    ],
+    "dbo.usp_GetLeadershipPlayerIdentityHistory": [
+      "dbo.GovernorNameHistory",
+      "dbo.IntList",
+      "dbo.KingdomScanData4",
+      "dbo.fn_NormalizeGovernorNameKey"
+    ],
+    "dbo.usp_GetLeadershipPlayerKvkHistory": [
+      "dbo.EXEMPT_FROM_STATS",
+      "dbo.HealedTroopsDelta",
+      "dbo.KVKFinalReportHeader",
+      "dbo.KVK_Details",
+      "dbo.KillPointsDelta",
+      "dbo.fn_KvkCombatMetrics",
+      "dbo.v_EXCEL_FOR_KVK_All"
+    ],
+    "dbo.usp_GetLeadershipPlayerLastActive": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow",
+      "dbo.KingdomScanData4",
+      "dbo.RallyDailySnapshotHeader",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.usp_GetLeadershipPlayerLookupDirectory": [
+      "dbo.GovernorNameHistory",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.fn_NormalizeGovernorNameKey"
+    ],
+    "dbo.usp_GetLeadershipPlayerReview": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow",
+      "dbo.GovernorNameHistory",
+      "dbo.HelpsDelta",
+      "dbo.KVKFinalReportHeader",
+      "dbo.KingdomScanData4",
+      "dbo.POWERDelta",
+      "dbo.PlayerLocation",
+      "dbo.RallyDailySnapshotHeader",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.usp_GetPendingLogBackupTriggers": [
+      "dbo.LogBackupTriggerQueue"
+    ],
+    "dbo.usp_GetPersonalStatsDaily": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow",
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.IntList",
+      "dbo.KS",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.STATS",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.usp_GetPlayerStatsWindows": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.IntList",
+      "dbo.KillPointsDelta",
+      "dbo.LATEST",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RSSGatheredDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.fn_StatsWindowDeltas_GovCsv",
+      "dbo.vDaily_PlayerExport"
+    ],
+    "dbo.usp_ImportAudit_CompleteBatch": [
+      "dbo.ImportAuditBatch"
+    ],
+    "dbo.usp_ImportAudit_FailBatch": [
+      "dbo.ImportAuditBatch"
+    ],
+    "dbo.usp_ImportAudit_RecordPhase": [
+      "dbo.ImportAuditBatch",
+      "dbo.ImportAuditPhase"
+    ],
+    "dbo.usp_ImportAudit_StartBatch": [
+      "dbo.ImportAuditBatch"
+    ],
+    "dbo.usp_LeadershipPlayerGovernorExists": [
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.usp_MarkLogBackupTriggerProcessed": [
+      "dbo.LogBackupTriggerQueue"
+    ],
+    "dbo.usp_PurgeLeadershipPlayerReviewAudit": [
+      "dbo.LeadershipPlayerReviewAudit",
+      "dbo.LeadershipPlayerReviewAuditDaily"
+    ],
+    "dbo.usp_RecordKvkFinalReportCompletion": [
+      "dbo.KVKFinalReportHeader",
+      "dbo.v_EXCEL_FOR_KVK_All"
+    ],
+    "dbo.usp_RecordLeadershipPlayerReviewAudit": [
+      "dbo.LeadershipPlayerReviewAudit",
+      "dbo.usp_PurgeLeadershipPlayerReviewAudit"
+    ],
+    "dbo.usp_SetAllianceActivitySnapshotCompletion": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow"
+    ],
+    "dbo.usp_UpsertGovernorNameHistoryForScan": [
+      "dbo.GovernorNameHistory",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.fn_NormalizeGovernorNameKey"
+    ],
+    "dbo.usp_VoteSurveyAdminDelete": [
+      "dbo.VoteSurveyDeletionAudit"
+    ],
+    "dbo.usp_update_stats": [
+      "dbo.STATS"
+    ],
+    "dbo.vAllianceActivitySnapshots": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow"
+    ],
+    "dbo.vAllianceActivityWeekFinals": [
+      "dbo.vAllianceActivitySnapshots"
+    ],
+    "dbo.vAllianceActivity_DailyDelta": [
+      "dbo.AllianceActivityDaily",
+      "dbo.v_GovernorNames"
+    ],
+    "dbo.vAllianceActivity_WeeklyDelta": [
+      "dbo.AllianceActivityDaily",
+      "dbo.v_GovernorNames"
+    ],
+    "dbo.vDailyWithWTD_Activity": [
+      "dbo.AllianceActivityDaily"
+    ],
+    "dbo.vDaily_Activity": [
+      "dbo.AllianceActivityDaily"
+    ],
+    "dbo.vDaily_AllianceActivity": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow"
+    ],
+    "dbo.vDaily_Helps": [
+      "dbo.HelpsDelta",
+      "dbo.KS",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.vDaily_PlayerExport": [
+      "dbo.DeadsDelta",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KS",
+      "dbo.KillPointsDelta",
+      "dbo.KingdomScanData4",
+      "dbo.POWERDelta",
+      "dbo.RSSASSISTDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.cur_RallyDaily",
+      "dbo.vDaily_AllianceActivity"
+    ],
+    "dbo.vDaily_RSSAssisted": [
+      "dbo.KS",
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.vDaily_RSSGathered": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.RSSGatheredDelta"
+    ],
+    "dbo.vFortsCompleted_WeekToDate": [
+      "dbo.LATEST",
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.vWTD_Activity": [
+      "dbo.AllianceActivityDaily"
+    ],
+    "dbo.vWTD_Helps": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.vWTD_RSSAssisted": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.vWTD_RSSGathered": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.vWeekly_AllianceActivity": [
+      "dbo.AllianceActivitySnapshotHeader",
+      "dbo.AllianceActivitySnapshotRow",
+      "dbo.LATEST"
+    ],
+    "dbo.v_Active_Players": [
+      "dbo.KingdomScanData4",
+      "dbo.PlayerLocation"
+    ],
+    "dbo.v_EXCEL_FOR_KVK_All": [
+      "dbo.EXCEL_FOR_KVK_10",
+      "dbo.EXCEL_FOR_KVK_11",
+      "dbo.EXCEL_FOR_KVK_12",
+      "dbo.EXCEL_FOR_KVK_13",
+      "dbo.EXCEL_FOR_KVK_14",
+      "dbo.EXCEL_FOR_KVK_15",
+      "dbo.EXCEL_FOR_KVK_3",
+      "dbo.EXCEL_FOR_KVK_4",
+      "dbo.EXCEL_FOR_KVK_5",
+      "dbo.EXCEL_FOR_KVK_6",
+      "dbo.EXCEL_FOR_KVK_7",
+      "dbo.EXCEL_FOR_KVK_8",
+      "dbo.EXCEL_FOR_KVK_9",
+      "dbo.HealedTroopsDelta",
+      "dbo.HelpsDelta",
+      "dbo.KillPointsDelta",
+      "dbo.RangedPointsDelta",
+      "dbo.ZEROED"
+    ],
+    "dbo.v_EXCEL_FOR_KVK_Started": [
+      "dbo.KVK_Details",
+      "dbo.v_EXCEL_FOR_KVK_All"
+    ],
+    "dbo.v_GovernorNames": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.v_GovernorNames_Strict": [
+      "dbo.v_GovernorNames"
+    ],
+    "dbo.v_KVK_Honor_Latest": [
+      "dbo.KVK_Honor_AllPlayers_Raw",
+      "dbo.KVK_Honor_Scan"
+    ],
+    "dbo.v_KVK_Honor_TopLatest": [
+      "dbo.KVK_Honor_AllPlayers_Raw",
+      "dbo.KVK_Honor_Scan"
+    ],
+    "dbo.v_KVK_TARGETS_FOR_BOT": [
+      "dbo.KVK_Target_Publication",
+      "dbo.KVK_Target_Publication_Row"
+    ],
+    "dbo.v_KVK_Under50_Last3_WithLatest": [
+      "dbo.KS",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST",
+      "dbo.PlayerKVKHistory",
+      "dbo.PlayerLocation"
+    ],
+    "dbo.v_MGE_SignupReview": [
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.KingdomScanData4",
+      "dbo.MGE_Awards",
+      "dbo.MGE_Events",
+      "dbo.MGE_Signups"
+    ],
+    "dbo.v_PlayerAccounts_Migrate": [
+      "dbo.LATEST",
+      "dbo.PlayerAccountStatus",
+      "dbo.PlayerLocation",
+      "dbo.v_PlayerLatestStats",
+      "dbo.v_PlayerProfile"
+    ],
+    "dbo.v_PlayerFortsLatest": [
+      "dbo.PlayerFortsHistory"
+    ],
+    "dbo.v_PlayerFortsLatestWithRank": [
+      "dbo.PlayerFortsHistory"
+    ],
+    "dbo.v_PlayerKVK_Last3": [
+      "dbo.PlayerKVKHistory"
+    ],
+    "dbo.v_PlayerLatestStats": [
+      "dbo.KingdomScanData4"
+    ],
+    "dbo.v_PlayerProfile": [
+      "dbo.PlayerAccountStatus",
+      "dbo.PlayerLocation",
+      "dbo.v_PlayerFortsLatestWithRank",
+      "dbo.v_PlayerLatestStats"
+    ],
+    "dbo.v_PlayerScanMeta": [
+      "dbo.PlayerScanMeta"
+    ],
+    "dbo.v_PreKvk13_All": [
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.v_PreKvk13_Overall": [
+      "dbo.LATEST",
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.v_PreKvk13_Phase1": [
+      "dbo.LATEST",
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.v_PreKvk13_Phase2": [
+      "dbo.LATEST",
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.v_PreKvk13_Phase3": [
+      "dbo.LATEST",
+      "dbo.PreKvk_Scan",
+      "dbo.PreKvk_Scores"
+    ],
+    "dbo.v_RallyDaily_Latest": [
+      "dbo.cur_RallyDaily"
+    ],
+    "dbo.v_RallyTotals_Current": [
+      "dbo.cur_RallyDaily",
+      "dbo.cur_RallyTotals_Base"
+    ],
+    "dbo.v_TARGETS_FOR_UPLOAD": [
+      "dbo.EXCEL_EXPORT_KVK_TARGETS_15"
+    ],
+    "dbo.vw_All_Governors_Clean": [
+      "dbo.ALL_GOVS"
+    ],
+    "dbo.vw_ArkPlayerReport": [
+      "dbo.ArkAuditLog",
+      "dbo.ArkMatches",
+      "dbo.ArkSignups"
+    ],
+    "dbo.vw_Governor_KVK_Summary_GlobalLatest": [
+      "dbo.EXCEL_FOR_DASHBOARD",
+      "dbo.KingdomScanData4",
+      "dbo.LATEST"
+    ],
+    "dbo.vw_Top3_Week": [
+      "dbo.AllianceActivityDelta",
+      "dbo.AllianceActivitySnapshotHeader"
+    ],
+    "dbo.vw_Top3_Yesterday": [
+      "dbo.AllianceActivityDelta",
+      "dbo.AllianceActivitySnapshotHeader"
+    ],
+    "dbo.usp_S11RunStatsImport": [
+      "dbo.ExportPreparation",
+      "dbo.ExportResource",
+      "dbo.StatsImportExecution",
+      "dbo.UPDATE_ALL2"
+    ],
+    "dbo.StatsImportExecution": [
+      "dbo.ExportPreparation"
+    ]
+  }
+}
