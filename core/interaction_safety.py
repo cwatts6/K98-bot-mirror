@@ -118,9 +118,9 @@ async def edit_or_followup(
 
 
 async def safe_defer(ctx, *, ephemeral: bool = True) -> bool:
-    """Best-effort defer that won't crash on unknown/expired interaction."""
+    """Defer a context or raw interaction; fail closed if acknowledgement fails."""
     try:
-        ir = getattr(ctx, "interaction", None)
+        ir = getattr(ctx, "interaction", None) or ctx
         if ir and hasattr(ir, "response") and not ir.response.is_done():
             await ir.response.defer(ephemeral=ephemeral)
             return True
