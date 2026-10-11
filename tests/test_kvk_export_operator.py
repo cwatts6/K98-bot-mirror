@@ -366,3 +366,94 @@ def test_operator_retirement_requires_explicit_recovery_composition(service, act
     with pytest.raises(SourceConflict, match="adapter is not composed"):
         service.reconcile(actor, str(uuid4()))
     service.coordinator.reconcile_operator.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action,method,row,saved",
+    [
+        ("export", "export", {"job_id": "job-1", "state": "queued", "no_op": False}, True),
+        ("export", "export", {"job_id": "job-1", "state": "confirmed", "no_op": True}, False),
+        ("export_status", "status", {"operation_id": "op-1", "job_id": "job-1"}, False),
+        ("export_reconcile", "reconcile", {"job_id": "job-1", "state": "confirmed"}, True),
+        ("export_reconcile", "reconcile", {"OperationID": "op-1", "State": "confirmed"}, True),
+        ("rollover_confirm", "confirm", {"OperationID": "op-1", "State": "closing"}, True),
+    ],
+)
+async def test_export_dispatch_failed_delivery_retains_saved_identity(
+    actor, action, method, row, saved, caplog
+):
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views.kvk_source_export_view import dispatch_export
+
+    svc = Mock()
+    svc.summary.return_value = "export receipt"
+    getattr(svc, method).return_value = row
+    inter = interaction()
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    inter.followup.send.side_effect = [RuntimeError("private provider detail"), None]
+    await dispatch_export(
+        inter,
+        svc,
+        actor,
+        action,
+        kvk_no=16,
+        index_file_id="index",
+        job_id="job-1",
+        new_kvk=17,
+        review="op-1",
+    )
+    getattr(svc, method).assert_called_once()
+    fallback = inter.followup.send.call_args.args[0]
+    assert ("Action saved" in fallback) is saved
+    assert "action:export_status" in fallback and "action:resume" not in fallback
+    for key in ("OperationID", "operation_id", "job_id"):
+        if row.get(key):
+            assert row[key] in fallback
+    assert "No action was automatically retried" in fallback
+    assert (
+        "private provider detail" not in fallback and "private provider detail" not in caplog.text
+    )
+    for call in inter.followup.send.call_args_list:
+        assert call.kwargs["ephemeral"] is True
+        assert call.kwargs["allowed_mentions"].to_dict()["parse"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["rollover_confirm", "export_rebuild"])
+async def test_export_confirmation_retires_controls_before_failed_delivery(service, actor, action):
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views.kvk_source_export_view import KvkSourceExportView
+
+    preview = service._preview(actor, action, {})
+    operation = {
+        k: "value"
+        for k in ("OperationID", "State", "Phase", "OldKVK", "NewKVK", "OldEpoch", "TargetEpoch")
+    }
+    operation["OperationID"] = preview.token
+    service.rollover.confirm.return_value = operation
+    service.coordinator.admit_repair.return_value = {
+        "job_id": "job-1",
+        "repair_id": preview.token,
+        "state": "queued",
+    }
+    inter = interaction(owner=actor.user_id, guild=actor.guild_id, channel=actor.channel_id)
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    control = KvkSourceExportView(service, preview)
+    messages = []
+
+    async def deliver(content, **kwargs):
+        assert control.confirm_button.disabled and control.is_finished()
+        messages.append(content)
+        if len(messages) == 1:
+            raise RuntimeError("delivery failed")
+
+    inter.followup.send.side_effect = deliver
+    await control.confirm_button.callback(inter)
+    assert len(messages) == 2
+    assert "Action saved" in messages[-1] and preview.token in messages[-1]
+    assert "action:export_status" in messages[-1] and "action:resume" not in messages[-1]
+    assert service.rollover.confirm.call_count == (action == "rollover_confirm")
+    assert service.coordinator.admit_repair.call_count == (action == "export_rebuild")
+    if action == "export_rebuild":
+        assert "job:job-1" in messages[-1] and f"repair:{preview.token}" in messages[-1]

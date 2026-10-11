@@ -22,9 +22,9 @@ class KvkSourceExportView(discord.ui.View):
             if not await safe_defer(interaction, ephemeral=True):
                 return
             row = await asyncio.to_thread(self.service.confirm, actor, self.preview.token)
-            await send_receipt(interaction, self.service, row)
             button.disabled = True
             self.stop()
+            await send_receipt(interaction, self.service, row, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -99,4 +99,6 @@ async def dispatch_export(
         row = await asyncio.to_thread(service.confirm, actor, review)
     else:
         raise ValueError("Unknown grouped export action.")
-    await send_receipt(interaction, service, row)
+    await send_receipt(
+        interaction, service, row, saved=action != "export_status" and not row.get("no_op", False)
+    )

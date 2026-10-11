@@ -674,6 +674,9 @@ Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_
   If receipt delivery fails after a saved action, resume its UUID and inspect the retained outcome;
   delivery failure never automatically replays the action. An uncertain commit requires status
   inspection before any retry.
+  Export delivery failures retain the operation/job/repair identities and direct the operator
+  to `export_status` for the original season/index before another action. Disposable preview
+  tokens are labeled process-local and do not imply a confirmed export.
 
 Controls remain default-off. New-source SQL migration must precede revised intake rollout.
 No public routing, export coordinator, deployment or activation is provided by this command.

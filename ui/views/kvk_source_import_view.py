@@ -53,6 +53,55 @@ async def report_failure(interaction, exc):
     )
 
 
+def _receipt_delivery_recovery(row):
+    """Keep each receipt family's identity and recovery route in delivery failures."""
+    data = row if isinstance(row, dict) else {}
+    for field, key in (("AttemptID", "receipt"), ("ReviewID", "review")):
+        if data.get(field):
+            identity = data[field]
+            return (
+                key,
+                identity,
+                (
+                    f"Resume with /kvk_admin source action:resume {key}:{identity}. "
+                    "Inspect the retained outcome before another action. "
+                ),
+            )
+    identities = [
+        (label, value)
+        for label, value in (
+            ("operation", data.get("OperationID") or data.get("operation_id")),
+            ("job", data.get("job_id")),
+            ("repair", data.get("repair_id")),
+            ("pool", data.get("pool_id")),
+        )
+        if value
+    ]
+    if identities:
+        key, identity = identities[0]
+        return (
+            key,
+            identity,
+            (
+                "Export identities: "
+                + "; ".join(f"{label}:{value}" for label, value in identities)
+                + ". Inspect /kvk_admin source action:export_status for the original season/index "
+                "before another action; retain these identities for reconciliation. "
+            ),
+        )
+    token = getattr(row, "token", None)
+    if token:
+        return (
+            "preview",
+            token,
+            (
+                f"Preview token:{token}. This preview is process-local; no export action was "
+                "confirmed. Reopen and review a fresh preview if its controls are unavailable. "
+            ),
+        )
+    return "receipt", None, "Inspect the retained outcome before another action. "
+
+
 async def send_receipt(interaction, service, row, view=None, *, saved=False):
     """Retain every complete review line across bounded private messages."""
     try:
@@ -75,8 +124,7 @@ async def send_receipt(interaction, service, row, view=None, *, saved=False):
         raise
     except Exception as exc:
         data = row if isinstance(row, dict) else {}
-        key = "receipt" if "AttemptID" in data else "review"
-        identity = data.get("AttemptID", data.get("ReviewID"))
+        key, identity, recovery = _receipt_delivery_recovery(row)
         version = data.get("payload", {}).get("version", data.get("Version"))
         logger.warning(
             "KVK receipt delivery failed %s=%s version=%s saved=%s state=%s type=%s",
@@ -84,7 +132,7 @@ async def send_receipt(interaction, service, row, view=None, *, saved=False):
             identity,
             version,
             saved,
-            data.get("Status", data.get("ReviewState")),
+            data.get("Status", data.get("ReviewState", data.get("State", data.get("state")))),
             type(exc).__name__,
         )
         if view is not None:
@@ -93,12 +141,8 @@ async def send_receipt(interaction, service, row, view=None, *, saved=False):
         await send_ephemeral(
             interaction,
             ("Action saved; receipt delivery failed. " if saved else "Receipt delivery failed. ")
-            + (
-                f"Resume with /kvk_admin source action:resume {key}:{identity}. "
-                if identity
-                else ""
-            )
-            + "Inspect the retained outcome before another action; no action was automatically retried.",
+            + recovery
+            + "No action was automatically retried.",
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return False

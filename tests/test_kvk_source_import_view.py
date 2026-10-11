@@ -378,7 +378,11 @@ async def test_export_preview_delivery_failure_has_no_fake_receipt_identity():
     inter.response.send_message.side_effect = [RuntimeError("send failed"), None]
     service = SimpleNamespace(summary=lambda row: "preview")
     assert not await send_receipt(inter, service, SimpleNamespace(token="preview"))
-    assert "review:None" not in inter.response.send_message.call_args.args[0]
+    message = inter.response.send_message.call_args.args[0]
+    assert "Preview token:preview" in message
+    assert "process-local" in message and "no export action was confirmed" in message
+    assert "review:None" not in message and "action:resume" not in message
+    assert "Action saved" not in message
 
 
 @pytest.mark.asyncio
