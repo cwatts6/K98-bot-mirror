@@ -387,25 +387,18 @@ async def test_export_preview_delivery_failure_has_no_fake_receipt_identity():
 
 
 @pytest.mark.asyncio
-async def test_receipt_uses_real_pycord_webhook_without_network():
-    from types import MethodType
-
+async def test_receipt_uses_real_pycord_webhook_without_network(monkeypatch):
     import discord
     from discord.webhook.async_ import async_context
 
     adapter = SimpleNamespace(execute_webhook=AsyncMock(return_value={}))
-    webhook = SimpleNamespace(
-        token="synthetic-test-token",
-        type=discord.WebhookType.application,
-        _state=SimpleNamespace(allowed_mentions=None),
-        id=1,
+    webhook = discord.Webhook(
+        {"id": "1", "type": discord.WebhookType.application.value, "token": "synthetic-test-token"},
         session=None,
-        proxy=None,
-        proxy_auth=None,
-        _create_message=lambda data: None,
-        parent=None,
+        state=SimpleNamespace(allowed_mentions=None),
     )
-    webhook.send = MethodType(discord.Webhook.send, webhook)
+    # Keep the library's complete webhook state; replace only the network response boundary.
+    monkeypatch.setattr(discord.Webhook, "_create_message", lambda self, data: None)
     token = async_context.set(adapter)
     try:
         inter = interaction()
