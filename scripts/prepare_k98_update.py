@@ -419,7 +419,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     return dict(before=before, target=target, source_members=members, new_pins=pins), payload
 
 
-def release_seed(previous, pins, gate):
+def release_seed(previous, pins, gate, *, policy_path=None):
     """Derive fresh metadata and update only exact predecessor gate bindings."""
     deployment, review, pipe = (str(uuid4()) for _ in range(3))
     payload = successor_seed(
@@ -428,6 +428,17 @@ def release_seed(previous, pins, gate):
     old = previous["AutomaticStartupPolicy.json"]
     new = json.loads(payload["AutomaticStartupPolicy.json"])
     old_directory = str(PureWindowsPath(old["seed_plan"]["path"]).parent)
+    if policy_path is not None:
+        # A reviewed activation may keep its seed in the predecessor directory.
+        # Rebind the gate and wrapper log from the active policy location.
+        active_path = PureWindowsPath(policy_path)
+        if (
+            not active_path.is_absolute()
+            or active_path.name != "AutomaticStartupPolicy.json"
+            or gate.count(f"$policy='{active_path}'") != 1
+        ):
+            raise ValueError("Installed launch gate active policy path differs.")
+        old_directory = str(active_path.parent)
     new_directory = str(PureWindowsPath(new["seed_plan"]["path"]).parent)
     # A launch gate remains reviewed code. No eval, regex template engine or
     # guessed substitution is used to alter executable behavior.
@@ -516,7 +527,9 @@ def prepare_update(
             protected_objects=protected,
             protected_principals=principals,
         )
-    seed = release_seed(previous, plan["new_pins"], observation["gate"])
+    seed = release_seed(
+        previous, plan["new_pins"], observation["gate"], policy_path=config["old_policy"]["Path"]
+    )
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
         dict(name=name, sha256=sha256(raw)) for name, raw in sorted(seed.items())

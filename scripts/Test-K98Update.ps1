@@ -171,4 +171,38 @@ Check ($statusRecord.release_id -ceq 'fixture-release') 'Status receipt not rele
 Check (Check-Readiness) 'Repeated verification did not retain matching status'
 [IO.File]::AppendAllText($logPath,"`nExport coordinator unavailable")
 Reject {Check-Readiness} '*Readiness classification changed*'
+# Load only the seed reader; never execute the updater's top-level workflow.
+$seedAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Update-K98.ps1'),[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Seed reader parse failure'}
+$seedReader=$seedAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Read-InstalledSeed'},$false)
+Check ($seedReader.Count -eq 1) 'Seed reader must be unique'
+. ([scriptblock]::Create($seedReader[0].Extent.Text))
+$seedRoot='C:\ProgramData\K98\S11\runtime\f490942c-9cfd-4a2e-b556-057e6fb04ea1'
+$planPath=Join-Path $seedRoot 'ManualProcessPairPlan-CANDIDATE.json'
+$script:seedCalls=[Collections.Generic.List[string]]::new()
+$script:missingSeed='';$script:badPlan=$false
+function Read-Json([string]$Path,[string]$Expected='') {
+ $script:seedCalls.Add($Path)
+ if($Path -ceq $script:missingSeed){throw 'fixture missing seed'}
+ if($Path -ceq $planPath){
+  if($Expected -cne ('a'*64) -or $script:badPlan){throw 'fixture plan hash differs'}
+ } elseif((Split-Path -Parent $Path) -cne $seedRoot){throw 'fixture wrong seed directory'}
+ return @{member=(Split-Path -Leaf $Path)}
+}
+$activePolicy=@{seed_plan=@{path=$planPath;sha256='a'*64};flags=@{KVK_SOURCE_INTAKE_ENABLED=$true}}
+$seed=Read-InstalledSeed $activePolicy
+Check ($seed.Count -eq 11) 'Seed inventory differs'
+Check ([object]::ReferenceEquals($seed['AutomaticStartupPolicy.json'],$activePolicy)) 'Active policy replaced by predecessor policy'
+Check ($seedCalls.Count -eq 10) 'Seed reader made unexpected reads'
+Check (-not($seedCalls | Where-Object {$_ -like '*AutomaticStartupPolicy.json'})) 'Stale policy was read'
+$script:badPlan=$true
+Reject {Read-InstalledSeed $activePolicy} '*plan hash differs*'
+$script:badPlan=$false;$script:missingSeed=Join-Path $seedRoot 'bot-template.json'
+Reject {Read-InstalledSeed $activePolicy} '*missing seed*'
+$script:missingSeed=''
+foreach($unsafe in @('C:\other\ManualProcessPairPlan-CANDIDATE.json',($planPath -replace '\.json$','xjson'),($planPath -replace 'runtime\\','runtime\..\runtime\'))) {
+ $activePolicy.seed_plan.path=$unsafe;$seedCalls.Clear()
+ Reject {Read-InstalledSeed $activePolicy} '*seed plan path differs*'
+ Check ($seedCalls.Count -eq 0) 'Unsafe path reached file reads'
+}
 [pscustomobject]@{Status='PASS';Cases=$passed;Evidence=$fixture;ProductionTouched=$false}|ConvertTo-Json -Compress

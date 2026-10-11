@@ -34,6 +34,17 @@ function Assert-UpdaterCustody([string]$Path) {
   $item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory};$depth++
  }
 }
+function Read-InstalledSeed($Policy) {
+ # Activation can install a new policy/gate while retaining the authenticated
+ # predecessor seed. Resolve seed members from the policy's pinned plan, never
+ # substitute the stale policy beside that plan for the active policy.
+ $planPath=[string]$Policy.seed_plan.path
+ if($planPath -cnotmatch '^C:\\ProgramData\\K98\\S11\\runtime\\[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\ManualProcessPairPlan-CANDIDATE\.json$'){throw 'Installed seed plan path differs'}
+ $seedDirectory=Split-Path -Parent $planPath
+ $seed=[ordered]@{'AutomaticStartupPolicy.json'=$Policy;'ManualProcessPairPlan-CANDIDATE.json'=(Read-Json $planPath $Policy.seed_plan.sha256)}
+ foreach($name in @('authority-template.json','bot-template.json','host_acl.json','bot_identity.json','identity_issuance.json','file_access.json','key_inventory.json','writer_drain.json','sql_installation.json')){$seed[$name]=Read-Json (Join-Path $seedDirectory $name)}
+ return $seed
+}
 Assert-UpdaterCustody $PSCommandPath
 $library=Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1'
 Assert-UpdaterCustody $library
@@ -141,8 +152,7 @@ try {
   $target=Git 'rev-parse refs/remotes/origin/main'
   if($before -ceq $target){Write-Host 'Already current. No restart required.';return}
   $null=Git ('merge-base --is-ancestor '+$before+' '+$target)
-  $seed=[ordered]@{}
-  foreach($name in @('authority-template.json','bot-template.json','ManualProcessPairPlan-CANDIDATE.json','AutomaticStartupPolicy.json','host_acl.json','bot_identity.json','identity_issuance.json','file_access.json','key_inventory.json','writer_drain.json','sql_installation.json')){$seed[$name]=Read-Json (Join-Path $seedDirectory $name)}
+  $seed=Read-InstalledSeed $policy
   $account=$seed['authority-template.json'].runtime_registration.account
   $c | Add-Member -NotePropertyName account -NotePropertyValue $account
   if($account -notmatch '^[A-Za-z0-9_.@:-]{1,128}$'){throw 'Invalid installed account'}
