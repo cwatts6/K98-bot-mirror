@@ -7,7 +7,7 @@ import time
 import discord
 
 from core.interaction_safety import safe_defer, send_ephemeral, send_or_followup
-from kvk.models.source_receipt_state import unexpired
+from kvk.models.source_receipt_state import accepted_details, unexpired
 from kvk.schemas.new_source_schema import SourceValidationError
 from kvk.services.new_source_admin_service import (
     CONFIRM_SECONDS,
@@ -464,7 +464,7 @@ class KvkSourceImportView(discord.ui.View):
             row = await asyncio.to_thread(self.service.cancel, actor, self.receipt_id, self.version)
             self.disable_all_items()
             self.stop()
-            await send_receipt(interaction, self.service, row, saved=True)
+            await send_receipt(interaction, self.service, row, saved=row.get("cancel_saved", False))
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -517,7 +517,7 @@ class SourceReviewView(discord.ui.View):
             )
             self.disable_all_items()
             self.stop()
-            await send_receipt(interaction, self.service, row, saved=True)
+            await send_receipt(interaction, self.service, row, saved=row.get("cancel_saved", False))
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -624,11 +624,10 @@ class SourcePairModal(discord.ui.Modal):
             label="Reason, including counterpart validity", max_length=512
         )
         if receipt:
-            proposal = receipt["payload"].get("proposal", {})
+            outcome, proposal = accepted_details(receipt)
             candidate = proposal.get("candidate", {})
-            outcome = receipt["payload"].get("outcome", {})
             self.scope.value = f"{season or ''} | {candidate.get('period_key') or ''} | {outcome.get('scan_id') or ''} | publish"
-            self.aggregate.value = receipt.get("AggregateRevisionID") or ""
+            self.aggregate.value = outcome.get("aggregate_revision_id") or ""
             if candidate.get("coverage_start_utc"):
                 self.coverage.value = " | ".join(
                     candidate[key]

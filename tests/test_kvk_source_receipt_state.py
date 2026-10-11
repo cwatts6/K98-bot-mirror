@@ -128,7 +128,9 @@ def test_real_dal_cancel_is_retained_and_idempotent(monkeypatch, status):
     cancelled = store.cancel()
     assert cancelled["payload"]["cancelled"]
     assert cancelled["payload"]["version"] == 3
-    assert store.cancel(2) == store.cancel(3) == cancelled
+    assert cancelled["cancel_saved"] is True
+    assert store.cancel(2) == store.cancel(3) == dict(cancelled, cancel_saved=False)
+    assert "cancel_saved" not in store.row
     assert len(store.writes) == 1
     with pytest.raises(SourceConflict):
         store.prepare("accept", 3)
@@ -142,7 +144,7 @@ def test_real_dal_cancel_is_retained_and_idempotent(monkeypatch, status):
 def test_real_dal_accepted_cancel_and_repeat_confirm_are_noops(monkeypatch):
     original = receipt("accepted")
     store = DurableReceipt(monkeypatch, original)
-    assert store.cancel() == original
+    assert store.cancel() == dict(original, cancel_saved=False)
     operation = Mock()
     assert store.dal.confirm("receipt", "10", "20", 2, operation) == original
     operation.assert_not_called()
@@ -189,7 +191,7 @@ def test_confirmation_wins_before_cancel_without_cancelling_accepted_data(monkey
     outcome = {"state": "accepted; not published", "observation_revision_id": "new-revision"}
     operation = Mock(return_value=outcome)
     result = store.dal.confirm("receipt", "10", "20", 2, operation)
-    assert store.cancel() == result
+    assert store.cancel() == dict(result, cancel_saved=False)
     assert len(store.writes) == 1
     operation.assert_called_once()
 

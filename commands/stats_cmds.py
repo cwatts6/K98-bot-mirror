@@ -284,7 +284,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                     review_service,
                     row,
                     SourceReviewView(review_service, row) if action != "status" else None,
-                    saved=action == "cancel",
+                    saved=action == "cancel" and row.get("cancel_saved", False),
                 )
                 return
             if update_id:
@@ -303,7 +303,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 row = await asyncio.to_thread(
                     service.cancel, actor, receipt, row["payload"]["version"]
                 )
-                await send_receipt(interaction, service, row, saved=True)
+                await send_receipt(interaction, service, row, saved=row.get("cancel_saved", False))
                 return
             if roster_correction:
                 row = await asyncio.to_thread(service.roster_preview, actor, receipt)

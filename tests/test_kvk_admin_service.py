@@ -616,3 +616,69 @@ async def test_grouped_export_all_distinguishes_confirmed_noop_from_queue(monkey
     assert ("already confirmed" in message) == confirmed
     assert ("provider completion is pending" in message) == (not confirmed)
     assert followup.send.call_args.kwargs["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ["receipt", "review"])
+@pytest.mark.parametrize("changed", [False, True])
+async def test_grouped_cancel_delivery_uses_transaction_write_result(monkeypatch, family, changed):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock
+
+    from commands import stats_cmds
+    from kvk.services import (
+        new_source_admin_service as source,
+        source_admin_review_service as reviews,
+    )
+    from tests.test_kvk_source_admin import ACCESS, NOW
+    from tests.test_kvk_source_import_view import interaction
+
+    groups = []
+    bot = SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kw: lambda fn: fn
+    )
+    monkeypatch.setattr(stats_cmds, "track_usage", lambda: lambda fn: fn)
+    stats_cmds.register_stats(bot)
+    command = next(
+        c for g in groups if g.name == "kvk_admin" for c in g.subcommands if c.name == "source"
+    )
+    key = "00000000-0000-4000-8000-000000000001"
+    row = dict(
+        AttemptID=key,
+        ReviewID=key,
+        ActorID="10",
+        Status="accepted",
+        ReviewState="completed",
+        Version=2,
+        payload={"version": 2},
+    )
+    service = SimpleNamespace(
+        access=ACCESS,
+        now=lambda: NOW,
+        receipt=Mock(return_value=row),
+        read=Mock(return_value=row),
+        summary=lambda r: "Private receipt",
+        cancel=Mock(return_value=dict(row, cancel_saved=changed)),
+    )
+    monkeypatch.setattr(source, "access_from_config", lambda: ACCESS)
+    monkeypatch.setattr(source, "configured_service", lambda: service)
+    monkeypatch.setattr(reviews, "configured_review_service", lambda: service)
+    monkeypatch.setattr(stats_cmds, "safe_defer", AsyncMock(return_value=True))
+    inter = interaction()
+    inter.data = {
+        "options": [
+            {"name": "action", "type": 3, "value": "cancel"},
+            {"name": family, "type": 3, "value": key},
+        ]
+    }
+    inter.response.send_message.side_effect = [RuntimeError("delivery failed"), None]
+    ctx = SimpleNamespace(
+        user=inter.user,
+        guild=inter.guild,
+        channel=inter.channel,
+        interaction=inter,
+        command=command,
+    )
+    await command._invoke(ctx)
+    service.cancel.assert_called_once()
+    assert ("Action saved" in inter.response.send_message.call_args.args[0]) is changed

@@ -264,6 +264,7 @@ async def test_cancel_commit_survives_failed_delivery_and_controls_retire(caplog
     view, service = make_view()
     cancelled = deepcopy(view.row)
     cancelled["payload"].update(version=3, cancelled=True)
+    cancelled["cancel_saved"] = True
     service.cancel = Mock(return_value=cancelled)
     inter = interaction()
     inter.response.is_done = lambda: inter.response.defer.await_count > 0
@@ -428,3 +429,83 @@ async def test_cancel_does_not_mutate_when_acknowledgement_fails():
     inter.response.defer.side_effect = RuntimeError("expired")
     await view.cancel_button.callback(inter)
     service.cancel.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ["receipt", "review"])
+@pytest.mark.parametrize("changed", [False, True])
+async def test_cancel_delivery_reports_actual_write_for_both_view_families(family, changed):
+    from datetime import timedelta
+
+    if family == "receipt":
+        view, service = make_view()
+        row = dict(view.row, cancel_saved=changed)
+        callback = view.cancel_button.callback
+    else:
+        row = dict(
+            ReviewID="review",
+            ActorID="10",
+            GuildID="20",
+            ChannelID="30",
+            ReviewState="pending",
+            Version=1,
+            ExpiresUTC=NOW + timedelta(minutes=5),
+        )
+        service = SimpleNamespace(access=ACCESS, now=lambda: NOW, summary=lambda row: "receipt")
+        view = SourceReviewView(service, row)
+        row = dict(row, ReviewState="cancelled", Version=2, cancel_saved=changed)
+        callback = view.cancel.callback
+    service.cancel = Mock(return_value=row)
+    inter = interaction()
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    inter.followup.send.side_effect = [RuntimeError("private failure"), None]
+    await callback(inter)
+    service.cancel.assert_called_once()
+    message = inter.followup.send.call_args.args[0]
+    assert ("Action saved" in message) is changed
+    assert "receipt delivery failed" in message.lower()
+    assert "private failure" not in message
+    assert all(item.disabled for item in view.children)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ["player", "aggregate"])
+@pytest.mark.parametrize("later", ["cancelled", "completed"])
+async def test_pair_modal_prefills_one_retained_acceptance_not_later_proposal(
+    monkeypatch, family, later
+):
+    from tests.test_kvk_source_receipt_state import DurableReceipt, receipt
+
+    original = receipt("accepted")
+    outcome = dict(state="accepted", scan_id=6)
+    outcome["observation_revision_id" if family == "player" else "aggregate_revision_id"] = (
+        "accepted-revision"
+    )
+    original["payload"]["outcome"] = outcome
+    original["payload"]["proposal"]["candidate"] = dict(
+        period_key="fight:accepted",
+        coverage_start_utc="2026-09-01T00:00:00Z",
+        coverage_end_utc="2026-09-02T00:00:00Z",
+        as_of_utc="2026-09-02T01:00:00Z",
+    )
+    if family == "aggregate":
+        original.update(ObservationRevisionID=None, AggregateRevisionID="accepted-revision")
+    store = DurableReceipt(monkeypatch, original)
+    store.prepare("correct")
+    store.row["payload"]["proposal"]["candidate"] = dict(
+        period_key="fight:unaccepted",
+        coverage_start_utc="bad",
+        coverage_end_utc="bad",
+        as_of_utc="bad",
+    )
+    if later == "cancelled":
+        row = store.cancel(3)
+    else:
+        row = store.row
+        row["payload"]["outcome"] = dict(state="configuration requested")
+    modal = SourcePairModal(SimpleNamespace(access=ACCESS), ADMIN, 16, receipt=row)
+    assert modal.scope.value == "16 | fight:accepted | 6 | publish"
+    assert modal.aggregate.value == ("accepted-revision" if family == "aggregate" else "")
+    assert (
+        modal.coverage.value == "2026-09-01T00:00:00Z | 2026-09-02T00:00:00Z | 2026-09-02T01:00:00Z"
+    )

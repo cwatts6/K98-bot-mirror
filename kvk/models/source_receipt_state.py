@@ -4,23 +4,36 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 
-def accepted_outcome(row):
-    """Keep accepted inputs visible while a later proposal is pending or cancelled."""
+def accepted_details(row):
+    """Return acceptance and its own proposal, never a later proposal's metadata."""
     payload = row["payload"]
-    outcomes = [payload.get("outcome")] + [
-        entry.get("outcome") for entry in reversed(payload.get("history", []))
-    ]
-    for outcome in outcomes:
+    entries = [payload, *reversed(payload.get("history", []))]
+    for entry in entries:
+        outcome = entry.get("outcome")
         if outcome and (
             outcome.get("observation_revision_id") or outcome.get("aggregate_revision_id")
         ):
-            return outcome
+            # Older cancellation history may repeat an outcome without its proposal.
+            proposal = next(
+                (
+                    item["proposal"]
+                    for item in entries
+                    if item.get("outcome") == outcome and item.get("proposal")
+                ),
+                {},
+            )
+            return outcome, proposal
     if row["Status"] in ("accepted", "duplicate"):
         return {
             "observation_revision_id": row.get("ObservationRevisionID"),
             "aggregate_revision_id": row.get("AggregateRevisionID"),
-        }
-    return {}
+        }, payload.get("proposal", {})
+    return {}, {}
+
+
+def accepted_outcome(row):
+    """Keep accepted inputs visible while a later proposal is pending or cancelled."""
+    return accepted_details(row)[0]
 
 
 def has_accepted_input(row):

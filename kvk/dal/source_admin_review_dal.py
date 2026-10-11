@@ -95,7 +95,7 @@ class SourceAdminReviewDAL:
             if row["ReviewState"] != "pending":
                 if expected_version not in (row["Version"], row["Version"] - 1):
                     raise SourceConflict("Review version is stale.")
-                return row
+                return dict(row, cancel_saved=False) if cancel else row
             if row["Version"] != expected_version:
                 raise SourceConflict("Review version is stale; resume it.")
             if not cancel and now >= row["ExpiresUTC"].replace(tzinfo=UTC):
@@ -116,7 +116,8 @@ class SourceAdminReviewDAL:
             )
             if one(cursor) is None:
                 raise SourceConflict("Review completion CAS lost.")
-            return self._read(cursor, review_id, actor)
+            result = self._read(cursor, review_id, actor)
+            return dict(result, cancel_saved=True) if cancel else result
 
     def seasons(self):
         with transaction(self.connect) as cursor:

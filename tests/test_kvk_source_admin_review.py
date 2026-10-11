@@ -301,7 +301,10 @@ def test_cancelled_review_never_executes_prepared_operation(monkeypatch):
     repository = dal.SourceAdminReviewDAL(Mock())
     repository._read = Mock(side_effect=[row, cancelled])
     operation = Mock()
-    assert repository.finish(key, ADMIN, 1, now=NOW, operation=operation, cancel=True) == cancelled
+    assert repository.finish(key, ADMIN, 1, now=NOW, operation=operation, cancel=True) == dict(
+        cancelled, cancel_saved=True
+    )
+    assert "cancel_saved" not in cancelled
     operation.assert_not_called()
 
 
@@ -482,3 +485,23 @@ def test_confirmation_reports_retained_target_for_semantic_duplicate(monkeypatch
     assert outcome["state"] == ("complete selected" if complete else "superseded")
     if complete:
         assert outcome["result"]["update_id"] == target
+
+
+@pytest.mark.parametrize("state", ["completed", "cancelled"])
+@pytest.mark.parametrize("version", [1, 2])
+def test_terminal_review_cancel_reports_no_write_even_for_stale_replay(monkeypatch, state, version):
+    from contextlib import nullcontext
+
+    from kvk.dal import source_admin_review_dal as dal
+
+    row = dict(ReviewID=str(uuid4()), Version=2, ReviewState=state)
+    cursor = Mock()
+    monkeypatch.setattr(dal, "transaction", lambda _: nullcontext(cursor))
+    monkeypatch.setattr(dal, "one", Mock(return_value={"KVK_NO": 16}))
+    monkeypatch.setattr(dal, "lock_scope", Mock())
+    repository = dal.SourceAdminReviewDAL(Mock())
+    repository._read = Mock(return_value=row)
+    result = repository.finish(row["ReviewID"], ADMIN, version, now=NOW, cancel=True)
+    assert result == dict(row, cancel_saved=False)
+    assert "cancel_saved" not in row
+    assert not any("UPDATE" in call.args[0] for call in cursor.execute.call_args_list)

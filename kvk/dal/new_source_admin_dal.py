@@ -116,10 +116,10 @@ class SourceAdminDAL:
                 payload["version"],
                 payload["version"] - 1,
             ):
-                return row
+                return dict(row, cancel_saved=False)
             self._version(row, expected_version)
             if not pending_work(row):
-                return row
+                return dict(row, cancel_saved=False)
             payload["cancelled"] = True
             payload["history"].append(
                 {"version": expected_version, "action": "cancel", "outcome": payload.get("outcome")}
@@ -133,7 +133,7 @@ class SourceAdminDAL:
                 row["ObservationRevisionID"],
                 row["AggregateRevisionID"],
             )
-            return self._receipt(cursor, receipt_id, actor, guild_id)
+            return dict(self._receipt(cursor, receipt_id, actor, guild_id), cancel_saved=True)
 
     def create_receipt(self, *, content, admission, filename, kvk_no, payload):
         with transaction(self.connect) as cursor:
