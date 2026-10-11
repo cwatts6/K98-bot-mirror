@@ -284,6 +284,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                     review_service,
                     row,
                     SourceReviewView(review_service, row) if action != "status" else None,
+                    saved=action == "cancel",
                 )
                 return
             if update_id:
@@ -302,17 +303,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 row = await asyncio.to_thread(
                     service.cancel, actor, receipt, row["payload"]["version"]
                 )
-                await send_receipt(interaction, service, row)
+                await send_receipt(interaction, service, row, saved=True)
                 return
             if roster_correction:
                 row = await asyncio.to_thread(service.roster_preview, actor, receipt)
             view = None
             if action != "status":
-                selected_action = (
-                    row["payload"].get("proposal", {}).get("action", "accept")
-                    if action == "resume"
-                    else action
-                )
+                selected_action = service.resume_action(row) if action == "resume" else action
                 access.authorize(actor, selected_action)
                 view = KvkSourceImportView(
                     service,

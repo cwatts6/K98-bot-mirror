@@ -9,9 +9,20 @@ from pathlib import Path
 import re
 from uuid import UUID
 
-from kvk.dal.new_source_import_dal import Admission, SourceConflict, canonical
+from kvk.dal.new_source_import_dal import (
+    Admission,
+    SourceConflict,
+    UncertainCommit as UncertainCommit,
+    canonical,
+)
 from kvk.models.new_source_observation import CampMapping, MetadataConfirmation, SourceScope
 from kvk.models.new_source_reporting import FrozenWeights, require_utc
+from kvk.models.source_receipt_state import (
+    accepted_outcome,
+    pending_work,
+    preparation_error,
+    receipt_actions,
+)
 from kvk.schemas.new_source_schema import (
     INT_MAX,
     ReportState,
@@ -213,6 +224,42 @@ class SourceAdminService:
             # A failed setup check must not hide the retained receipt or prevent cancellation.
             row["configuration_diagnostic"] = str(exc)
 
+    def actions(self, row, action="accept", *, roster_correction=False):
+        return receipt_actions(row, action, self.now(), roster_correction=roster_correction)
+
+    @staticmethod
+    def resume_action(row):
+        proposal = row["payload"].get("proposal", {})
+        if pending_work(row):
+            return proposal.get("action", "accept")
+        if (
+            not row["payload"].get("cancelled")
+            and proposal.get("baseline_configuration")
+            and row.get("ObservationRevisionID")
+        ):
+            return "configure"
+        return "accept"
+
+    def check_receipt_action(self, actor, receipt_id, version, action, control):
+        """Re-read before opening or submitting a receipt-origin modal."""
+        row = self.receipt(actor, receipt_id, action)
+        if row["payload"]["version"] != version:
+            raise SourceConflict("Receipt changed; resume its current version.")
+        allowed = self.actions(row, action)
+        if control not in ("prepare", "pair") or not getattr(allowed, control):
+            raise SourceConflict("This action is unavailable for the current receipt; resume it.")
+        if control == "pair":
+            self.access.authorize(actor, "match_update")
+        return row
+
+    @staticmethod
+    def _require_preparation(row, version, action):
+        if row["payload"]["version"] != version:
+            raise SourceConflict("Receipt changed; resume its current version.")
+        error = preparation_error(row, action)
+        if error:
+            raise SourceConflict(error)
+
     def stage_upload(self, actor, *, filename, content, message_id, attachment_id, season=None):
         self.access.authorize(actor, upload=True)
         self._admit_write()
@@ -309,6 +356,7 @@ class SourceAdminService:
     ):
         admin = self.access.authorize(actor, action)
         row = self.receipt(actor, receipt_id, action)
+        self._require_preparation(row, version, action)
         self._admit_write()
         if action not in ("accept", "finalize", "correct"):
             raise ValueError("Choose accept, finalize or correct for workbook metadata.")
@@ -389,10 +437,9 @@ class SourceAdminService:
     ):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
+        self._require_preparation(row, version, "configure")
         self._admit_write()
-        b0_revision = row["ObservationRevisionID"] or (
-            row["payload"].get("proposal", {}).get("b0_revision")
-        )
+        b0_revision = accepted_outcome(row).get("observation_revision_id")
         if not b0_revision:
             raise ValueError("Configuration requires this owner's accepted B0 player receipt.")
         if not reason.strip() or len(reason) > 512:
@@ -482,10 +529,9 @@ class SourceAdminService:
     def prepare_roster_correction(self, actor, receipt_id, version, *, reason, publication_plan):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
+        self._require_preparation(row, version, "configure")
         self._admit_write()
-        revision = row["ObservationRevisionID"] or row["payload"].get("proposal", {}).get(
-            "b0_revision"
-        )
+        revision = accepted_outcome(row).get("observation_revision_id")
         if not revision or not reason.strip() or len(reason) > 512:
             raise ValueError(
                 "An accepted B0 correction receipt and bounded audit reason are required."
@@ -527,9 +573,7 @@ class SourceAdminService:
     def roster_preview(self, actor, receipt_id):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
-        revision = row["ObservationRevisionID"] or row["payload"].get("proposal", {}).get(
-            "b0_revision"
-        )
+        revision = accepted_outcome(row).get("observation_revision_id")
         if not revision:
             raise ValueError("Use your accepted correction of the original B0 observation.")
         row["roster_preview"] = self.repository.context(
@@ -643,9 +687,18 @@ class SourceAdminService:
 
     def cancel(self, actor, receipt_id, version):
         row = self.receipt(actor, receipt_id, "cancel")
-        return self.repository.cancel(
+        result = self.repository.cancel(
             row["AttemptID"], str(actor.user_id), str(actor.guild_id), version
         )
+        logger.info(
+            "KVK source cancel actor=%s receipt=%s version=%s cancelled=%s utc=%s",
+            actor.user_id,
+            receipt_id,
+            result["payload"]["version"],
+            bool(result["payload"].get("cancelled")),
+            self.now().isoformat(),
+        )
+        return result
 
     @staticmethod
     def summary(row):
@@ -655,12 +708,20 @@ class SourceAdminService:
         lines = [
             f"Receipt: {row['AttemptID']}",
             f"KVK {row['KVK_NO']} | version {payload['version']}",
-            f"State: {outcome['state'] if outcome else row['Status']}",
+            f"State: {'pending work cancelled' if payload.get('cancelled') else outcome['state'] if outcome else row['Status']}",
         ]
         if payload.get("cancelled"):
             lines.append(
                 "Pending work cancelled; any accepted revisions and original files remain retained."
             )
+        elif not pending_work(row):
+            lines.append("No pending work to cancel. Accepted inputs remain retained.")
+        retained = accepted_outcome(row)
+        if retained and retained != outcome:
+            lines.append("Previously accepted input remains retained:")
+            for key in ("observation_revision_id", "aggregate_revision_id", "scan_id"):
+                if retained.get(key) is not None:
+                    lines.append(f"{key}: {retained[key]}")
         if row.get("configuration_diagnostic"):
             lines.append(row["configuration_diagnostic"])
         candidate = proposal.get("candidate", payload.get("candidate", {}))

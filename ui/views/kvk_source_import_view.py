@@ -6,9 +6,15 @@ import time
 
 import discord
 
-from core.interaction_safety import safe_defer, send_ephemeral
+from core.interaction_safety import safe_defer, send_ephemeral, send_or_followup
+from kvk.models.source_receipt_state import unexpired
 from kvk.schemas.new_source_schema import SourceValidationError
-from kvk.services.new_source_admin_service import CONFIRM_SECONDS, SourceActor, SourceConflict
+from kvk.services.new_source_admin_service import (
+    CONFIRM_SECONDS,
+    SourceActor,
+    SourceConflict,
+    UncertainCommit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,14 @@ async def report_failure(interaction, exc):
     # Parser/SQL messages can contain private fields: return only controlled guidance.
     logger.info("KVK source interaction failed type=%s", type(exc).__name__)
     guidance = "Check permissions, metadata and current receipt version, then resume."
+    if isinstance(exc, UncertainCommit):
+        await send_ephemeral(
+            interaction,
+            "The action's commit outcome is uncertain. Read the durable receipt/review with "
+            "/kvk_admin source action:status before any retry. Do not repeat the mutation.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return
     if isinstance(exc, SourceValidationError):
         guidance = f"Workbook validation rejected the input ({exc.code}). Review its structure and metadata."
     elif type(exc) in (ValueError, PermissionError, SourceConflict):
@@ -39,24 +53,55 @@ async def report_failure(interaction, exc):
     )
 
 
-async def send_receipt(interaction, service, row, view=None):
+async def send_receipt(interaction, service, row, view=None, *, saved=False):
     """Retain every complete review line across bounded private messages."""
-    pages, page = [], ""
-    for line in service.summary(row).splitlines():
-        if len(line) > 1800:
-            raise ValueError("Receipt review line exceeds its display contract.")
-        if len(page) + len(line) + 1 > 1800:
-            pages.append(page)
-            page = ""
-        page += ("\n" if page else "") + line
-    pages.append(page)
-    for index, content in enumerate(pages):
+    try:
+        pages, page = [], ""
+        for line in service.summary(row).splitlines():
+            if len(line) > 1800:
+                raise ValueError("Receipt review line exceeds its display contract.")
+            if len(page) + len(line) + 1 > 1800:
+                pages.append(page)
+                page = ""
+            page += ("\n" if page else "") + line
+        pages.append(page)
+        for index, content in enumerate(pages):
+            kwargs = {"allowed_mentions": discord.AllowedMentions.none()}
+            if view is not None and index == len(pages) - 1:
+                kwargs["view"] = view
+            await send_or_followup(interaction, content, ephemeral=True, **kwargs)
+        return True
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        data = row if isinstance(row, dict) else {}
+        key = "receipt" if "AttemptID" in data else "review"
+        identity = data.get("AttemptID", data.get("ReviewID"))
+        version = data.get("payload", {}).get("version", data.get("Version"))
+        logger.warning(
+            "KVK receipt delivery failed %s=%s version=%s saved=%s state=%s type=%s",
+            key,
+            identity,
+            version,
+            saved,
+            data.get("Status", data.get("ReviewState")),
+            type(exc).__name__,
+        )
+        if view is not None:
+            view.disable_all_items()
+            view.stop()
         await send_ephemeral(
             interaction,
-            content,
-            view=view if index == len(pages) - 1 else None,
+            ("Action saved; receipt delivery failed. " if saved else "Receipt delivery failed. ")
+            + (
+                f"Resume with /kvk_admin source action:resume {key}:{identity}. "
+                if identity
+                else ""
+            )
+            + "Inspect the retained outcome before another action; no action was automatically retried.",
             allowed_mentions=discord.AllowedMentions.none(),
         )
+        return False
 
 
 class SourceMetadataModal(discord.ui.Modal):
@@ -135,7 +180,9 @@ class SourceMetadataModal(discord.ui.Modal):
             view = KvkSourceImportView(
                 self.source_view.service, row, action=self.source_view.action
             )
-            await send_receipt(interaction, self.source_view.service, row, view)
+            self.source_view.disable_all_items()
+            self.source_view.stop()
+            await send_receipt(interaction, self.source_view.service, row, view, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -174,7 +221,9 @@ class SourceConfigurationModal(discord.ui.Modal):
                 reason=self.reason.value,
             )
             view = KvkSourceImportView(self.source_view.service, row, action="configure")
-            await send_receipt(interaction, self.source_view.service, row, view)
+            self.source_view.disable_all_items()
+            self.source_view.stop()
+            await send_receipt(interaction, self.source_view.service, row, view, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -206,6 +255,8 @@ class SourceRosterModal(discord.ui.Modal):
                 reason=self.reason.value,
                 publication_plan=self.plan.value or "",
             )
+            self.source_view.disable_all_items()
+            self.source_view.stop()
             await send_receipt(
                 interaction,
                 self.source_view.service,
@@ -213,6 +264,7 @@ class SourceRosterModal(discord.ui.Modal):
                 KvkSourceImportView(
                     self.source_view.service, row, action="configure", roster_correction=True
                 ),
+                saved=True,
             )
         except Exception as exc:
             await report_failure(interaction, exc)
@@ -248,11 +300,18 @@ class KvkSourceImportView(discord.ui.View):
                 else proposal.get("expected_revision_version")
             ),
         )
-        self.confirm_button.disabled = (
-            row["Status"] != "validated"
-            or row["payload"].get("proposal", {}).get("action") != action
-            or (self.roster_correction and proposal.get("mode") != "roster")
-        )
+        allowed = service.actions(row, action, roster_correction=self.roster_correction)
+        self.prepare_button.disabled = not allowed.prepare
+        self.confirm_button.disabled = not allowed.confirm
+        self.cancel_button.disabled = not allowed.cancel
+        self.pair_button.disabled = not allowed.pair or self.owner_id != service.access.admin_id
+        self.prepare_button.label = {
+            "configure": (
+                "Review roster correction" if self.roster_correction else "Review configuration"
+            ),
+            "correct": "Review explicit correction",
+            "finalize": "Review aggregate finalization",
+        }.get(action, "Prepare / review metadata")
 
     async def authorized(self, interaction):
         if time.monotonic() >= self.expires_at or interaction.user.id != self.owner_id:
@@ -272,7 +331,15 @@ class KvkSourceImportView(discord.ui.View):
     @discord.ui.button(label="Prepare / review metadata", style=discord.ButtonStyle.secondary)
     async def prepare_button(self, button, interaction):
         try:
-            await self.authorized(interaction)
+            actor = await self.authorized(interaction)
+            await asyncio.to_thread(
+                self.service.check_receipt_action,
+                actor,
+                self.receipt_id,
+                self.version,
+                self.action,
+                "prepare",
+            )
             modal = (
                 (
                     SourceRosterModal(self)
@@ -295,6 +362,8 @@ class KvkSourceImportView(discord.ui.View):
             row = await asyncio.to_thread(
                 self.service.confirm, actor, self.receipt_id, self.version
             )
+            self.disable_all_items()
+            self.stop()
             next_action = (
                 "configure"
                 if row["payload"].get("proposal", {}).get("baseline_configuration")
@@ -306,9 +375,8 @@ class KvkSourceImportView(discord.ui.View):
                 self.service,
                 row,
                 KvkSourceImportView(self.service, row, action=next_action),
+                saved=True,
             )
-            self.disable_all_items()
-            self.stop()
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -321,11 +389,23 @@ class KvkSourceImportView(discord.ui.View):
         try:
             actor = await self.authorized(interaction)
             self.service.access.authorize(actor, "match_update")
+            row = await asyncio.to_thread(
+                self.service.check_receipt_action,
+                actor,
+                self.receipt_id,
+                self.version,
+                self.action,
+                "pair",
+            )
             from kvk.services.source_admin_review_service import configured_review_service
 
             await interaction.response.send_modal(
                 SourcePairModal(
-                    configured_review_service(), actor, self.row.get("KVK_NO"), receipt=self.row
+                    configured_review_service(),
+                    actor,
+                    row.get("KVK_NO"),
+                    receipt=row,
+                    receipt_origin=self,
                 )
             )
         except Exception as exc:
@@ -338,9 +418,9 @@ class KvkSourceImportView(discord.ui.View):
             if not await safe_defer(interaction, ephemeral=True):
                 return
             row = await asyncio.to_thread(self.service.cancel, actor, self.receipt_id, self.version)
-            await send_receipt(interaction, self.service, row)
             self.disable_all_items()
             self.stop()
+            await send_receipt(interaction, self.service, row, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -351,6 +431,10 @@ class SourceReviewView(discord.ui.View):
     def __init__(self, service, row):
         super().__init__(timeout=CONFIRM_SECONDS)
         self.service, self.row = service, row
+        self.cancel.disabled = row["ReviewState"] != "pending"
+        self.confirm.disabled = self.cancel.disabled or not unexpired(
+            row["ExpiresUTC"], service.now()
+        )
 
     async def actor(self, interaction):
         actor = await current_actor(interaction, self.service.access)
@@ -372,9 +456,9 @@ class SourceReviewView(discord.ui.View):
             row = await asyncio.to_thread(
                 self.service.confirm, actor, str(self.row["ReviewID"]), self.row["Version"]
             )
-            await send_receipt(interaction, self.service, row)
             self.disable_all_items()
             self.stop()
+            await send_receipt(interaction, self.service, row, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -387,9 +471,9 @@ class SourceReviewView(discord.ui.View):
             row = await asyncio.to_thread(
                 self.service.cancel, actor, str(self.row["ReviewID"]), self.row["Version"]
             )
-            await send_receipt(interaction, self.service, row)
             self.disable_all_items()
             self.stop()
+            await send_receipt(interaction, self.service, row, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -420,7 +504,9 @@ class SourceChoiceModal(discord.ui.Modal):
                 self.source.value,
                 self.reason.value,
             )
-            await send_receipt(interaction, self.service, row, SourceReviewView(self.service, row))
+            await send_receipt(
+                interaction, self.service, row, SourceReviewView(self.service, row), saved=True
+            )
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -461,16 +547,21 @@ class SourceConfigurationReviewModal(discord.ui.Modal):
                 self.reason.value,
                 attest_counterparts=self.attest.value.strip() == "VALID",
             )
-            await send_receipt(interaction, self.service, row, SourceReviewView(self.service, row))
+            await send_receipt(
+                interaction, self.service, row, SourceReviewView(self.service, row), saved=True
+            )
         except Exception as exc:
             await report_failure(interaction, exc)
 
 
 class SourcePairModal(discord.ui.Modal):
-    def __init__(self, service, owner, season=None, receipt=None, update_id=None):
+    def __init__(
+        self, service, owner, season=None, receipt=None, update_id=None, receipt_origin=None
+    ):
         super().__init__(title="Review matched source update", timeout=CONFIRM_SECONDS)
         self.service, self.owner = service, owner
         self.update_id = update_id
+        self.receipt_origin = receipt_origin
         self.scope = discord.ui.InputText(
             label="Season | period key | end scan | action",
             value=f"{season or ''} | fight:pass4 | | publish",
@@ -511,6 +602,17 @@ class SourcePairModal(discord.ui.Modal):
             start_utc, end_utc, as_of = (v.strip() for v in self.coverage.value.split("|"))
             if not await safe_defer(interaction, ephemeral=True):
                 return
+            if self.receipt_origin is not None:
+                origin = self.receipt_origin
+                await origin.authorized(interaction)
+                await asyncio.to_thread(
+                    origin.service.check_receipt_action,
+                    actor,
+                    origin.receipt_id,
+                    origin.version,
+                    origin.action,
+                    "pair",
+                )
             row = await asyncio.to_thread(
                 self.service.prepare_match,
                 actor,
@@ -526,7 +628,9 @@ class SourcePairModal(discord.ui.Modal):
                 counterpart_revision_id=self.counterpart.value.strip() or None,
                 reason=self.reason.value,
             )
-            await send_receipt(interaction, self.service, row, SourceReviewView(self.service, row))
+            await send_receipt(
+                interaction, self.service, row, SourceReviewView(self.service, row), saved=True
+            )
         except Exception as exc:
             await report_failure(interaction, exc)
 
@@ -567,7 +671,9 @@ class SourceUploadSeasonModal(discord.ui.Modal):
                     attachment_id=attachment.id,
                     season=self.season.value,
                 )
-                await send_receipt(interaction, service, row, KvkSourceImportView(service, row))
+                await send_receipt(
+                    interaction, service, row, KvkSourceImportView(service, row), saved=True
+                )
             await send_ephemeral(
                 interaction,
                 "Files retained for metadata review. If one side is missing, upload its counterpart here. After acceptance, use /kvk_admin source match_update to review the exact pair, or retain scans without assigning a fight.",

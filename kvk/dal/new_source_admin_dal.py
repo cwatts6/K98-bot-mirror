@@ -21,6 +21,7 @@ from kvk.dal.new_source_import_dal import (
     rows,
     transaction,
 )
+from kvk.models.source_receipt_state import pending_work, preparation_error
 from kvk.schemas.new_source_schema import SOURCE_KEY
 
 DRAFT_KEY = "s5a_draft"
@@ -117,6 +118,8 @@ class SourceAdminDAL:
             ):
                 return row
             self._version(row, expected_version)
+            if not pending_work(row):
+                return row
             payload["cancelled"] = True
             payload["history"].append(
                 {"version": expected_version, "action": "cancel", "outcome": payload.get("outcome")}
@@ -211,11 +214,14 @@ class SourceAdminDAL:
             row = self._receipt(cursor, receipt_id, actor, guild_id)
             self._version(row, expected_version)
             payload = row["payload"]
-            if payload.get("cancelled"):
-                raise SourceConflict(
-                    "This pending receipt was cancelled; accepted inputs remain retained."
-                )
-            if payload.get("proposal") == proposal and row["Status"] == "validated":
+            error = preparation_error(row, proposal.get("action"))
+            if error:
+                raise SourceConflict(error)
+            if (
+                not payload.get("cancelled")
+                and payload.get("proposal") == proposal
+                and row["Status"] == "validated"
+            ):
                 return row
             payload.setdefault("history", []).append(
                 {
@@ -223,10 +229,12 @@ class SourceAdminDAL:
                     "status": row["Status"],
                     "proposal": payload.get("proposal"),
                     "outcome": payload.get("outcome"),
+                    "cancelled": payload.get("cancelled", False),
                 }
             )
             payload.update(version=expected_version + 1, proposal=proposal)
             payload.pop("outcome", None)
+            payload.pop("cancelled", None)
             self._save(cursor, row, payload, "validated")
             return self._receipt(cursor, receipt_id, actor, guild_id)
 

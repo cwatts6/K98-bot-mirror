@@ -88,7 +88,7 @@ async def test_source_group_registers_real_options_and_private_service_handoff(m
 
     from commands import stats_cmds
     from kvk.services import new_source_admin_service as source
-    from tests.test_kvk_source_admin import ACCESS
+    from tests.test_kvk_source_admin import ACCESS, NOW
     from tests.test_kvk_source_import_view import interaction
 
     groups = []
@@ -120,6 +120,11 @@ async def test_source_group_registers_real_options_and_private_service_handoff(m
         receipt=Mock(return_value=row),
         roster_preview=Mock(return_value=row),
         summary=lambda r: "Private receipt",
+        now=lambda: NOW,
+        resume_action=source.SourceAdminService.resume_action,
+    )
+    service.actions = lambda *args, **kwargs: source.SourceAdminService.actions(
+        service, *args, **kwargs
     )
     monkeypatch.setattr(source, "access_from_config", lambda: ACCESS)
     monkeypatch.setattr(source, "configured_service", lambda: service)
@@ -144,8 +149,10 @@ async def test_source_group_registers_real_options_and_private_service_handoff(m
     service.receipt.assert_called_once()
     assert service.receipt.call_args.args[1:] == (row["AttemptID"], action)
     reply = inter.response.send_message.call_args
+    assert reply.args[0] == "Private receipt"
     assert reply.kwargs["ephemeral"] is True
     assert reply.kwargs["allowed_mentions"].to_dict() == {"parse": []}
+    assert ("view" in reply.kwargs) is (action != "status")
     if roster_mode:
         service.roster_preview.assert_called_once()
         assert reply.kwargs["view"].roster_correction

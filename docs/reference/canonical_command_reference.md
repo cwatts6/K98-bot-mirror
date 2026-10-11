@@ -666,6 +666,14 @@ Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_
 - `resume review:<UUID>` reloads durable review state. `status update_id:<UUID>` shows a matched
   update. `cancel` with a receipt/review stops pending work, retaining accepted inputs and files.
   Receipt/review ownership and original channel are checked again at every action.
+  Completed receipts have no pending intake to cancel; repeated cancellation does not create
+  another version. Cancelled intake requires a new upload. Accepted inputs remain available for
+  explicit administrator configuration/correction/finalization and separate matched-update review.
+  Cancelling a follow-up proposal does not cancel its previously accepted input; an eligible
+  explicit follow-up creates a fresh review version. Completed/cancelled reviews cannot be confirmed.
+  If receipt delivery fails after a saved action, resume its UUID and inspect the retained outcome;
+  delivery failure never automatically replays the action. An uncertain commit requires status
+  inspection before any retry.
 
 Controls remain default-off. New-source SQL migration must precede revised intake rollout.
 No public routing, export coordinator, deployment or activation is provided by this command.

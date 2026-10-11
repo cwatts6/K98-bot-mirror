@@ -8,8 +8,9 @@ import re
 
 import pytest
 
-from services.export_execution_dal import legacy_definition_hash
+from services.export_execution_dal import legacy_definition_hash, validate_legacy_permission_source
 from services.export_runtime_composition import verify_legacy_installation_contract
+from services.export_sql_direct_permissions import FILE_VISIBILITY_MODULE_HASHES
 from tests.test_export_runtime_composition import legacy_permission_fixture
 
 SQL_ROOT = Path(os.environ.get("K98_SQL_SOURCE_ROOT", "C:/K98-bot-SQL-Server"))
@@ -21,6 +22,79 @@ CALLER_FORMS = {
 }
 TYPE_FORMS = CALLER_FORMS | {"dbo.sp_Create_Excel_For_Kvk_Indexes"}
 END_FORMS = {"dbo.fn_NormalizeGovernorNameKey", "dbo.usp_RecordKvkFinalReportCompletion"}
+
+
+def source_definition(raw):
+    text = raw.decode("utf-8-sig").replace("\r\n", "\n")
+    starts = list(re.finditer(r"^(?:ALTER|CREATE OR ALTER)\s+(?:PROCEDURE|FUNCTION)\b", text, re.M))
+    assert len(starts) == 1
+    source = re.sub(r"(?im)^GO\s*\Z", "", text[starts[0].start() :]).strip(" \t\r\n")
+    return re.sub(r"^(?:ALTER|CREATE OR ALTER)\b", "CREATE", source)
+
+
+def historical_source_bytes(module, raw, outcome_source):
+    """Check the exact forward image before undoing only reviewed amendments.
+
+    Python counterpart of the SQL repo's Test-ExportLegacyModulePermissionContracts.ps1
+    and StatsImportOutcome.Source.ps1, keeping pytest independent of PowerShell/Git.
+    Neither historical manifests nor runtime allowlists are rewritten.
+    """
+    name = module["name"]
+    if name == "dbo.UPDATE_ALL2":
+        validate_legacy_permission_source(outcome_source)
+        current = next(m for m in outcome_source["modules"] if m["name"] == name)
+        assert hashlib.sha256(raw).hexdigest() == current["source_sha256"], "Outcome source drift"
+        assert (
+            legacy_definition_hash(source_definition(raw)) == current["definition_sha256"]
+        ), "Outcome definition drift"
+        text = raw.decode("utf-8").replace("\r\n", "\n")
+        text = text.replace(
+            "@CompletedFileName [nvarchar](260),\n    @ExportPreparationID uniqueidentifier = NULL",
+            "@CompletedFileName [nvarchar](260)",
+        )
+        for indent, suffix in (("    ", "\n"), ("        ", "")):
+            text = re.sub(
+                rf"(?ms)^{indent}IF @ExportPreparationID IS NOT NULL\n{indent}BEGIN\n"
+                rf".*?^{indent}END;\n{suffix}",
+                "",
+                text,
+            )
+        text = text.replace(
+            "        DECLARE @S11CompletionCounters TABLE (LastRunCounter int NOT NULL);\n", ""
+        ).replace(
+            "        OUTPUT inserted.LastRunCounter INTO @S11CompletionCounters (LastRunCounter)\n",
+            "",
+        )
+        text = text.replace(
+            "FROM dbo.SP_TaskStatus WITH (UPDLOCK,HOLDLOCK)", "FROM dbo.SP_TaskStatus"
+        )
+        assert "@ExportPreparationID" not in text and "StatsImportExecution" not in text
+        raw = text.replace("\n", "\r\n").encode("utf-8")
+    elif name in FILE_VISIBILITY_MODULE_HASHES:
+        assert (
+            legacy_definition_hash(source_definition(raw)) == FILE_VISIBILITY_MODULE_HASHES[name]
+        ), "File visibility definition drift"
+        text = re.sub(
+            r"SET (@\w+) = COALESCE\(\(SELECT file_exists FROM sys\.dm_os_file_exists\((@\w+)\)\), 0\);",
+            r"EXEC master.dbo.xp_fileexist \2, \1 OUTPUT;",
+            raw.decode("utf-8").replace("\r\n", "\n"),
+        )
+        raw = text.replace("\n", "\r\n").encode("utf-8")
+    assert hashlib.sha256(raw).hexdigest() == module["source_sha256"], "Historical source drift"
+    return raw
+
+
+@pytest.fixture
+def permission_sources():
+    if not SQL_ROOT.is_dir():
+        pytest.skip("Separate authoritative SQL checkout required")
+    historical = json.loads(
+        (SQL_ROOT / "deploy/export_legacy_module_permission_manifest.json").read_bytes()
+    )
+    outcome = json.loads((SQL_ROOT / "deploy/export_stats_import_outcome_source.json").read_bytes())
+    validate_legacy_permission_source(historical)
+    validate_legacy_permission_source(outcome)
+    return historical, outcome
 
 
 def tokens(text):
@@ -92,31 +166,26 @@ def equivalent_tokens(name, text):
     return header_tokens, body_tokens
 
 
-@pytest.mark.skipif(not SQL_ROOT.is_dir(), reason="Separate authoritative SQL checkout required")
-def test_all_finite_forms_are_reconstructed_from_authoritative_source():
-    from services.export_execution_dal import validate_legacy_permission_source
-
-    manifest = json.loads(
-        (SQL_ROOT / "deploy/export_legacy_module_permission_manifest.json").read_bytes()
-    )
-    validate_legacy_permission_source(manifest)
+def test_all_finite_forms_are_reconstructed_from_authoritative_source(permission_sources):
+    manifest, outcome = permission_sources
     forms_bytes = (SQL_ROOT / manifest["compatibility_forms"]).read_bytes()
     assert hashlib.sha256(forms_bytes).hexdigest() == manifest["compatibility_forms_sha256"]
     forms = json.loads(forms_bytes)["forms"]
     assert len(forms) == len({f["module"] for f in forms}) == 27
     modules = {m["name"]: m for m in manifest["modules"]}
     assert len(modules) == 38
+    # Check all 38 historical byte pins, including amended modules without a recipe.
+    sources = {
+        name: source_definition(
+            historical_source_bytes(module, (SQL_ROOT / module["path"]).read_bytes(), outcome)
+        )
+        for name, module in modules.items()
+    }
+    for name, module in modules.items():
+        assert legacy_definition_hash(sources[name]) == module["definition_sha256"]
     for form in forms:
         module = modules[form["module"]]
-        raw = (SQL_ROOT / module["path"]).read_bytes()
-        assert hashlib.sha256(raw).hexdigest() == module["source_sha256"]
-        text = raw.decode("utf-8-sig").replace("\r\n", "\n")
-        starts = list(
-            re.finditer(r"^(?:ALTER|CREATE OR ALTER)\s+(?:PROCEDURE|FUNCTION)\b", text, re.M)
-        )
-        assert len(starts) == 1
-        source = re.sub(r"(?im)^GO\s*\Z", "", text[starts[0].start() :]).strip(" \t\r\n")
-        source = re.sub(r"^(?:ALTER|CREATE OR ALTER)\b", "CREATE", source)
+        source = sources[module["name"]]
         assert (
             legacy_definition_hash(source)
             == module["definition_sha256"]
@@ -142,6 +211,51 @@ def test_all_finite_forms_are_reconstructed_from_authoritative_source():
             assert f"(N'{module['name']}',0x{legacy_definition_hash(variant)})" in (
                 SQL_ROOT / path
             ).read_text(encoding="utf-8-sig")
+
+
+@pytest.mark.parametrize("name", ["dbo.UPDATE_ALL2", *FILE_VISIBILITY_MODULE_HASHES])
+def test_amendment_reconstruction_rejects_changed_forward_image(permission_sources, name):
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == name)
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    # Damage the added code itself, which inversion would otherwise remove.
+    before, after = (
+        (b"State='completed',", b"State='partial',")
+        if name == "dbo.UPDATE_ALL2"
+        else (b"SELECT file_exists FROM", b"SELECT file_is_a_directory FROM")
+    )
+    assert before in raw
+    with pytest.raises(
+        AssertionError, match=r"Outcome source drift|File visibility definition drift"
+    ):
+        historical_source_bytes(module, raw.replace(before, after, 1), outcome)
+
+
+def test_amendment_reconstruction_rejects_resealed_outcome_manifest(permission_sources):
+    from copy import deepcopy
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == "dbo.UPDATE_ALL2")
+    raw = (
+        (SQL_ROOT / module["path"]).read_bytes().replace(b"State='completed',", b"State='partial',")
+    )
+    changed = deepcopy(outcome)
+    current = next(m for m in changed["modules"] if m["name"] == module["name"])
+    current["source_sha256"] = hashlib.sha256(raw).hexdigest()
+    current["definition_sha256"] = legacy_definition_hash(source_definition(raw))
+    with pytest.raises(SourceConflict, match="Exact reviewed legacy SQL source manifest required"):
+        historical_source_bytes(module, raw, changed)
+
+
+@pytest.mark.parametrize("name", ["dbo.UPDATE_ALL2", *FILE_VISIBILITY_MODULE_HASHES])
+def test_amendment_reconstruction_preserves_exact_historical_byte_pin(permission_sources, name):
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == name)
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    with pytest.raises(AssertionError, match="Historical source drift"):
+        historical_source_bytes(module | {"source_sha256": "0" * 64}, raw, outcome)
 
 
 def compatibility_fixture(monkeypatch):

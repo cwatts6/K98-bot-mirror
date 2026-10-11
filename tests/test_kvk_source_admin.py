@@ -115,7 +115,12 @@ class MemoryRepository:
         row = self.read_receipt(rid, actor, guild)
         if row["payload"]["version"] != version:
             raise SourceConflict("stale")
-        row["payload"]["history"].append({"proposal": row["payload"].get("proposal")})
+        row["payload"]["history"].append(
+            {
+                "proposal": row["payload"].get("proposal"),
+                "outcome": row["payload"].get("outcome"),
+            }
+        )
         row["payload"].update(version=version + 1, proposal=deepcopy(proposal))
         row["payload"].pop("outcome", None)
         row.update(Status="validated", ObservationRevisionID=None, AggregateRevisionID=None)
@@ -1097,6 +1102,7 @@ def test_read_only_roster_preview_does_not_require_headroom(rig):
     service, repo = rig
     row = upload(service)
     repo.receipts[row["AttemptID"]]["ObservationRevisionID"] = "synthetic-retained-b0"
+    repo.receipts[row["AttemptID"]]["Status"] = "accepted"
     service.write_preflight = Mock(side_effect=SourceConflict("Insufficient headroom"))
     preview = service.roster_preview(ADMIN, row["AttemptID"])
     assert "roster_preview" in preview
