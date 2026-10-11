@@ -510,3 +510,27 @@ async def test_pair_modal_prefills_one_retained_acceptance_not_later_proposal(
     assert (
         modal.coverage.value == "2026-09-01T00:00:00Z | 2026-09-02T00:00:00Z | 2026-09-02T01:00:00Z"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["receipt", "review"])
+@pytest.mark.parametrize("valid", [False, True])
+async def test_creation_uncertainty_privately_retains_only_uuid_lookup(kind, valid):
+    from uuid import uuid4
+
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from ui.views.kvk_source_import_view import report_failure
+
+    key = str(uuid4()) if valid else "private @everyone"
+    exc = UncertainCommit("private SQL details", **{f"{kind}_id": key})
+    inter = interaction()
+    await report_failure(inter, exc)
+    call = inter.response.send_message.call_args
+    message = call.args[0]
+    assert f"action:status {kind}:{key}" in message if valid else "private" not in message
+    assert "commit outcome is uncertain" in message
+    assert "Do not repeat the mutation" in message
+    assert "Action retained" not in message and "private" not in message
+    assert call.kwargs["ephemeral"] is True
+    assert call.kwargs["allowed_mentions"].everyone is False
+    inter.response.send_message.assert_awaited_once()

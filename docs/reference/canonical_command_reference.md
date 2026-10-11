@@ -673,7 +673,9 @@ Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_
   explicit follow-up creates a fresh review version. Completed/cancelled reviews cannot be confirmed.
   If receipt delivery fails after a saved action, resume its UUID and inspect the retained outcome;
   "Action retained" describes durable state, including a replayed confirmation, not a new write.
-  delivery failure never automatically replays the action. An uncertain commit requires status
+  Initial receipt/review creation uncertainty preserves its generated UUID in the private
+  `status` lookup guidance; this does not assert that creation committed.
+  Delivery failure never automatically replays the action. An uncertain commit requires status
   inspection before any retry.
   Export delivery failures retain the operation/job/repair identities and direct the operator
   to `export_status` for the original season/index before another action. Disposable preview

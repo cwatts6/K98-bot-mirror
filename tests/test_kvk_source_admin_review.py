@@ -505,3 +505,41 @@ def test_terminal_review_cancel_reports_no_write_even_for_stale_replay(monkeypat
     assert result == dict(row, cancel_saved=False)
     assert "cancel_saved" not in row
     assert not any("UPDATE" in call.args[0] for call in cursor.execute.call_args_list)
+
+
+@pytest.mark.parametrize("replay", [False, True])
+def test_review_creation_uncertainty_retains_exact_identity(monkeypatch, replay):
+    from kvk.dal import source_admin_review_dal as module
+    from kvk.dal.new_source_import_dal import UncertainCommit
+
+    key = str(uuid4())
+    cursor = Mock()
+    connection = Mock(autocommit=False)
+    connection.cursor.return_value = cursor
+    connection.commit.side_effect = RuntimeError("private SQL failure")
+    monkeypatch.setattr(module, "lock_scope", Mock())
+    monkeypatch.setattr(module, "one", Mock(return_value={"ReviewID": key} if replay else None))
+    monkeypatch.setattr(module, "uuid4", lambda: key)
+    dal = module.SourceAdminReviewDAL(lambda: connection)
+    dal._read = Mock(
+        return_value=dict(ReviewID=key, KVK_NO=16, ReviewKind="choose_source", PayloadJson="{}")
+    )
+    with pytest.raises(UncertainCommit) as raised:
+        dal.create(
+            actor=ADMIN,
+            kvk_no=16,
+            kind="choose_source",
+            payload={},
+            now=NOW,
+            expires=NOW + timedelta(minutes=5),
+            review_id=key if replay else None,
+        )
+    assert raised.value.review_id == key
+    assert raised.value.receipt_id is None
+    assert "private" not in str(raised.value)
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
+    connection.close.assert_called_once()
+    assert sum(
+        "INSERT KVK.SourceAdminReview" in call.args[0] for call in cursor.execute.call_args_list
+    ) == (0 if replay else 1)

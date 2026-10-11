@@ -24,6 +24,11 @@ class SourceConflict(ValueError):
 class UncertainCommit(RuntimeError):
     """Read the durable operation identity before deciding whether to retry."""
 
+    def __init__(self, *args, receipt_id=None, review_id=None):
+        super().__init__(*args)
+        self.receipt_id = receipt_id
+        self.review_id = review_id
+
 
 def canonical(value) -> str:
     def convert(item):

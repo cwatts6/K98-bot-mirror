@@ -14,6 +14,7 @@ from kvk.dal.new_source_config_dal import snapshot_endpoint_request
 from kvk.dal.new_source_import_dal import (
     SourceConflict,
     SourceImportDAL,
+    UncertainCommit,
     canonical,
     digest,
     lock_scope,
@@ -136,58 +137,63 @@ class SourceAdminDAL:
             return dict(self._receipt(cursor, receipt_id, actor, guild_id), cancel_saved=True)
 
     def create_receipt(self, *, content, admission, filename, kvk_no, payload):
-        with transaction(self.connect) as cursor:
-            lock_scope(cursor, kvk_no)
-            from kvk.dal.season_source_dal import require_source
+        receipt_id = None
+        try:
+            with transaction(self.connect) as cursor:
+                lock_scope(cursor, kvk_no)
+                from kvk.dal.season_source_dal import require_source
 
-            require_source(cursor, kvk_no, SOURCE_KEY, onboarding=True)
-            # Keep admission locked through persistence: rejected setup/lifecycle checks
-            # must not leave an original without a receipt. Never delete shared originals.
-            artifact = self.artifacts.persist_artifact(content)
-            SourceImportDAL(self.connect, self.artifacts)._artifact(
-                cursor, artifact, admission.received_utc.replace(tzinfo=None)
-            )
-            cursor.execute(
-                "SELECT AttemptID,ActorID,ArtifactHash,KVK_NO,ChannelID FROM KVK.SourceImportAttempt "
-                "WITH (UPDLOCK,HOLDLOCK) WHERE GuildID=? AND MessageID=? AND AttachmentID=? AND ActionKey=?",
-                admission.guild_id,
-                admission.message_id,
-                admission.attachment_id,
-                DRAFT_KEY,
-            )
-            existing = one(cursor)
-            if existing:
-                if (
-                    existing["ActorID"] != admission.actor
-                    or bytes(existing["ArtifactHash"]).hex() != artifact.sha256
-                    or existing["KVK_NO"] != kvk_no
-                    or existing["ChannelID"] != admission.channel_id
-                ):
-                    raise SourceConflict("Upload replay conflicts with its original receipt.")
-                return self._receipt(
-                    cursor, existing["AttemptID"], admission.actor, admission.guild_id
+                require_source(cursor, kvk_no, SOURCE_KEY, onboarding=True)
+                # Keep admission locked through persistence: rejected setup/lifecycle checks
+                # must not leave an original without a receipt. Never delete shared originals.
+                artifact = self.artifacts.persist_artifact(content)
+                SourceImportDAL(self.connect, self.artifacts)._artifact(
+                    cursor, artifact, admission.received_utc.replace(tzinfo=None)
                 )
-            receipt_id = str(uuid4())
-            cursor.execute(
-                "INSERT KVK.SourceImportAttempt "
-                "(AttemptID,SourceKey,KVK_NO,GuildID,MessageID,AttachmentID,ActionKey,ArtifactHash,"
-                "ActorID,ChannelID,OriginalFilename,ReceivedUTC,Status,DiagnosticSummary,ProvenanceJson) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'received','Awaiting metadata confirmation',?)",
-                receipt_id,
-                SOURCE_KEY,
-                kvk_no,
-                admission.guild_id,
-                admission.message_id,
-                admission.attachment_id,
-                DRAFT_KEY,
-                bytes.fromhex(artifact.sha256),
-                admission.actor,
-                admission.channel_id,
-                filename,
-                admission.received_utc.replace(tzinfo=None),
-                _json(payload),
-            )
-            return self._receipt(cursor, receipt_id, admission.actor, admission.guild_id)
+                cursor.execute(
+                    "SELECT AttemptID,ActorID,ArtifactHash,KVK_NO,ChannelID FROM KVK.SourceImportAttempt "
+                    "WITH (UPDLOCK,HOLDLOCK) WHERE GuildID=? AND MessageID=? AND AttachmentID=? AND ActionKey=?",
+                    admission.guild_id,
+                    admission.message_id,
+                    admission.attachment_id,
+                    DRAFT_KEY,
+                )
+                existing = one(cursor)
+                if existing:
+                    if (
+                        existing["ActorID"] != admission.actor
+                        or bytes(existing["ArtifactHash"]).hex() != artifact.sha256
+                        or existing["KVK_NO"] != kvk_no
+                        or existing["ChannelID"] != admission.channel_id
+                    ):
+                        raise SourceConflict("Upload replay conflicts with its original receipt.")
+                    receipt_id = existing["AttemptID"]
+                    return self._receipt(cursor, receipt_id, admission.actor, admission.guild_id)
+                receipt_id = str(uuid4())
+                cursor.execute(
+                    "INSERT KVK.SourceImportAttempt "
+                    "(AttemptID,SourceKey,KVK_NO,GuildID,MessageID,AttachmentID,ActionKey,ArtifactHash,"
+                    "ActorID,ChannelID,OriginalFilename,ReceivedUTC,Status,DiagnosticSummary,ProvenanceJson) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'received','Awaiting metadata confirmation',?)",
+                    receipt_id,
+                    SOURCE_KEY,
+                    kvk_no,
+                    admission.guild_id,
+                    admission.message_id,
+                    admission.attachment_id,
+                    DRAFT_KEY,
+                    bytes.fromhex(artifact.sha256),
+                    admission.actor,
+                    admission.channel_id,
+                    filename,
+                    admission.received_utc.replace(tzinfo=None),
+                    _json(payload),
+                )
+                return self._receipt(cursor, receipt_id, admission.actor, admission.guild_id)
+        except UncertainCommit as exc:
+            raise UncertainCommit(
+                "Receipt creation commit outcome is uncertain.", receipt_id=receipt_id
+            ) from exc
 
     @staticmethod
     def _version(row, expected_version):

@@ -1107,3 +1107,58 @@ def test_read_only_roster_preview_does_not_require_headroom(rig):
     preview = service.roster_preview(ADMIN, row["AttemptID"])
     assert "roster_preview" in preview
     service.write_preflight.assert_not_called()
+
+
+@pytest.mark.parametrize("replay", [False, True])
+def test_receipt_creation_uncertainty_retains_exact_identity(monkeypatch, replay):
+    from types import SimpleNamespace
+
+    from kvk.dal import new_source_admin_dal as module, season_source_dal
+
+    key = str(uuid4())
+    cursor = Mock()
+    connection = Mock(autocommit=False)
+    connection.cursor.return_value = cursor
+    connection.commit.side_effect = RuntimeError("private SQL failure")
+    admission = SimpleNamespace(
+        actor="10",
+        guild_id="20",
+        channel_id="30",
+        message_id="40",
+        attachment_id="50",
+        received_utc=NOW,
+    )
+    artifact = SimpleNamespace(sha256="ab" * 32)
+    existing = (
+        dict(
+            AttemptID=key,
+            ActorID="10",
+            ChannelID="30",
+            KVK_NO=16,
+            ArtifactHash=bytes.fromhex(artifact.sha256),
+        )
+        if replay
+        else None
+    )
+    monkeypatch.setattr(module, "one", Mock(return_value=existing))
+    monkeypatch.setattr(module, "lock_scope", Mock())
+    monkeypatch.setattr(season_source_dal, "require_source", Mock())
+    monkeypatch.setattr(module, "uuid4", lambda: key)
+    monkeypatch.setattr(module.SourceImportDAL, "_artifact", Mock())
+    store = Mock()
+    store.persist_artifact.return_value = artifact
+    dal = module.SourceAdminDAL(lambda: connection, store)
+    dal._receipt = Mock(return_value=dict(AttemptID=key))
+    with pytest.raises(UncertainCommit) as raised:
+        dal.create_receipt(
+            content=b"synthetic", admission=admission, filename="test.xlsx", kvk_no=16, payload={}
+        )
+    assert raised.value.receipt_id == key
+    assert raised.value.review_id is None
+    assert "private" not in str(raised.value)
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
+    connection.close.assert_called_once()
+    assert sum(
+        "INSERT KVK.SourceImportAttempt" in call.args[0] for call in cursor.execute.call_args_list
+    ) == (0 if replay else 1)

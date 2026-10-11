@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from uuid import UUID
 
 import discord
 
@@ -35,6 +36,16 @@ async def report_failure(interaction, exc, *, export=False):
     logger.info("KVK source interaction failed type=%s", type(exc).__name__)
     guidance = "Check permissions, metadata and current receipt version, then resume."
     if isinstance(exc, UncertainCommit):
+        identity_option = ""
+        if not export:
+            for key in ("receipt", "review"):
+                value = getattr(exc, f"{key}_id", None)
+                if value is not None:
+                    try:
+                        identity_option = f" {key}:{UUID(str(value))}"
+                    except (ValueError, TypeError, AttributeError):
+                        continue
+                    break
         await send_ephemeral(
             interaction,
             (
@@ -43,7 +54,8 @@ async def report_failure(interaction, exc, *, export=False):
                 "Retain the known job/operation ID for reconciliation. Do not repeat the mutation."
                 if export
                 else "The action's commit outcome is uncertain. Read the durable receipt/review with "
-                "/kvk_admin source action:status before any retry. Do not repeat the mutation."
+                f"/kvk_admin source action:status{identity_option} before any retry. "
+                "Do not repeat the mutation."
             ),
             allowed_mentions=discord.AllowedMentions.none(),
         )

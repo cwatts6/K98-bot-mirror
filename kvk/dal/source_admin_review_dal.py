@@ -6,7 +6,14 @@ import json
 from uuid import uuid4
 
 from kvk.dal.new_source_admin_dal import _BorrowedConnection
-from kvk.dal.new_source_import_dal import SourceConflict, lock_scope, one, rows, transaction
+from kvk.dal.new_source_import_dal import (
+    SourceConflict,
+    UncertainCommit,
+    lock_scope,
+    one,
+    rows,
+    transaction,
+)
 from kvk.models.source_integration import REVIEW_KINDS, identity, review_payload
 
 
@@ -48,34 +55,39 @@ class SourceAdminReviewDAL:
             raise ValueError("Invalid review kind or season.")
         text = review_payload(payload)
         key = identity(review_id) if review_id else str(uuid4())
-        with transaction(self.connect) as cursor:
-            lock_scope(cursor, kvk_no)
-            cursor.execute("SELECT ReviewID FROM KVK.SourceAdminReview WHERE ReviewID=?", key)
-            if one(cursor):
-                prior = self._read(cursor, key, actor)
-                if (prior["KVK_NO"], prior["ReviewKind"], prior["PayloadJson"]) != (
+        try:
+            with transaction(self.connect) as cursor:
+                lock_scope(cursor, kvk_no)
+                cursor.execute("SELECT ReviewID FROM KVK.SourceAdminReview WHERE ReviewID=?", key)
+                if one(cursor):
+                    prior = self._read(cursor, key, actor)
+                    if (prior["KVK_NO"], prior["ReviewKind"], prior["PayloadJson"]) != (
+                        kvk_no,
+                        kind,
+                        text,
+                    ):
+                        raise SourceConflict("Review replay conflicts with retained evidence.")
+                    return prior
+                cursor.execute(
+                    "INSERT KVK.SourceAdminReview "
+                    "(ReviewID,KVK_NO,ReviewKind,ActorID,GuildID,ChannelID,Version,ReviewState,"
+                    "PayloadJson,PayloadHash,CreatedUTC,ExpiresUTC) VALUES (?,?,?,?,?,?,1,'pending',?,?,?,?)",
+                    key,
                     kvk_no,
                     kind,
+                    str(actor.user_id),
+                    str(actor.guild_id),
+                    str(actor.channel_id),
                     text,
-                ):
-                    raise SourceConflict("Review replay conflicts with retained evidence.")
-                return prior
-            cursor.execute(
-                "INSERT KVK.SourceAdminReview "
-                "(ReviewID,KVK_NO,ReviewKind,ActorID,GuildID,ChannelID,Version,ReviewState,"
-                "PayloadJson,PayloadHash,CreatedUTC,ExpiresUTC) VALUES (?,?,?,?,?,?,1,'pending',?,?,?,?)",
-                key,
-                kvk_no,
-                kind,
-                str(actor.user_id),
-                str(actor.guild_id),
-                str(actor.channel_id),
-                text,
-                hashlib.sha256(text.encode()).digest(),
-                now.replace(tzinfo=None),
-                expires.replace(tzinfo=None),
-            )
-            return self._read(cursor, key, actor)
+                    hashlib.sha256(text.encode()).digest(),
+                    now.replace(tzinfo=None),
+                    expires.replace(tzinfo=None),
+                )
+                return self._read(cursor, key, actor)
+        except UncertainCommit as exc:
+            raise UncertainCommit(
+                "Review creation commit outcome is uncertain.", review_id=key
+            ) from exc
 
     def finish(self, review_id, actor, expected_version, *, now, operation=None, cancel=False):
         # Read the immutable season key before acquiring locks in the common order.
