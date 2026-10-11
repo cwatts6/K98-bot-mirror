@@ -2,6 +2,11 @@
 
 import asyncio
 import logging
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import discord
+import pytest
 
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 
@@ -46,6 +51,49 @@ def test_safe_defer_idempotence_when_already_done_and_no_ctx_defer():
     ok = asyncio.run(safe_defer(ctx, ephemeral=True))
     assert ok is False
     assert ctx.interaction.response.defer_calls == []
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("ephemeral", [False, True])
+def test_safe_defer_acknowledges_raw_and_wrapped_interactions_once(wrapped, ephemeral):
+    response = _Response()
+    interaction = SimpleNamespace(response=response)
+    subject = SimpleNamespace(interaction=interaction) if wrapped else interaction
+    assert asyncio.run(safe_defer(subject, ephemeral=ephemeral)) is True
+    assert asyncio.run(safe_defer(subject, ephemeral=ephemeral)) is False
+    assert response.defer_calls == [ephemeral]
+
+
+def test_safe_defer_preserves_context_only_fallback():
+    ctx = SimpleNamespace(defer=AsyncMock())
+    assert asyncio.run(safe_defer(ctx, ephemeral=False)) is True
+    ctx.defer.assert_awaited_once_with(ephemeral=False)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("error_type", [discord.NotFound, discord.HTTPException, RuntimeError])
+def test_safe_defer_failed_acknowledgement_stops_without_fallback(wrapped, error_type):
+    if error_type is RuntimeError:
+        error = RuntimeError("unavailable")
+    else:
+        error = error_type(SimpleNamespace(status=404, reason="Not Found"), "expired")
+    response = SimpleNamespace(is_done=lambda: False, defer=AsyncMock(side_effect=error))
+    interaction = SimpleNamespace(response=response)
+    subject = (
+        SimpleNamespace(interaction=interaction, defer=AsyncMock()) if wrapped else interaction
+    )
+    assert asyncio.run(safe_defer(subject)) is False
+    response.defer.assert_awaited_once_with(ephemeral=True)
+    if wrapped:
+        subject.defer.assert_not_awaited()
+
+
+def test_safe_defer_preserves_cancellation():
+    response = SimpleNamespace(
+        is_done=lambda: False, defer=AsyncMock(side_effect=asyncio.CancelledError)
+    )
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(safe_defer(SimpleNamespace(response=response)))
 
 
 def test_safe_command_catches_and_logs_exceptions(caplog):

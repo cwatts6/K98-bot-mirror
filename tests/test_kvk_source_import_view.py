@@ -3,12 +3,14 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from tests.test_kvk_source_admin import ACCESS
+from tests.test_kvk_source_admin import ACCESS, ADMIN
 from ui.views.kvk_source_import_view import (
     KvkSourceImportView,
     SourceConfigurationModal,
     SourceMetadataModal,
     SourceRosterModal,
+    SourceUploadSeasonModal,
+    SourceUploadStartView,
 )
 
 
@@ -78,16 +80,77 @@ async def test_callbacks_enforce_owner_guild_channel_expiry(case):
 
 
 @pytest.mark.asyncio
-async def test_callback_defers_and_confirms_exact_receipt_version(monkeypatch):
-    import ui.views.kvk_source_import_view as module
-
+async def test_callback_defers_and_confirms_exact_receipt_version():
     view, service = make_view()
     inter = interaction()
-    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
     await view.confirm_button.callback(inter)
+    inter.response.defer.assert_awaited_once_with(ephemeral=True)
     assert service.confirm.call_args.args[1:] == ("receipt", 2)
     assert inter.guild.fetch_member.await_count == 1
     assert all(item.disabled for item in view.children)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["success", "expired", "other_owner", "wrong_channel"])
+async def test_upload_season_modal_uses_real_acknowledgement_before_staging(case):
+    import discord
+
+    row = {"AttemptID": "receipt", "ActorID": "10", "Status": "received", "payload": {"version": 1}}
+    service = SimpleNamespace(
+        access=ACCESS,
+        stage_upload=Mock(return_value=row),
+        summary=Mock(return_value="retained for review"),
+        confirm=Mock(),
+    )
+    factory = Mock(return_value=service)
+    attachment = SimpleNamespace(filename="baseline.xlsx", id=42, read=AsyncMock())
+    view = SourceUploadStartView(ACCESS, ADMIN, [attachment], 99, factory, season=16)
+    modal = SourceUploadSeasonModal(view)
+    inter = interaction(
+        owner=11 if case == "other_owner" else 10, channel=99 if case == "wrong_channel" else 30
+    )
+    acknowledged = False
+
+    async def defer(*, ephemeral):
+        nonlocal acknowledged
+        assert ephemeral is True
+        factory.assert_not_called()
+        attachment.read.assert_not_awaited()
+        if case == "expired":
+            raise discord.NotFound(SimpleNamespace(status=404, reason="Not Found"), "expired")
+        acknowledged = True
+
+    async def read():
+        assert acknowledged
+        return b"synthetic workbook"
+
+    inter.response.defer.side_effect = defer
+    inter.response.is_done = lambda: acknowledged
+    attachment.read.side_effect = read
+    await modal.callback(inter)
+
+    service.confirm.assert_not_called()  # Staging is never acceptance.
+    if case == "success":
+        inter.response.defer.assert_awaited_once_with(ephemeral=True)
+        factory.assert_called_once_with()
+        attachment.read.assert_awaited_once_with()
+        service.stage_upload.assert_called_once_with(
+            ADMIN,
+            filename="baseline.xlsx",
+            content=b"synthetic workbook",
+            message_id=99,
+            attachment_id=42,
+            season="16",
+        )
+        assert inter.followup.send.await_count == 2
+        assert all(call.kwargs["ephemeral"] for call in inter.followup.send.call_args_list)
+        assert all(item.disabled for item in view.children)
+    else:
+        factory.assert_not_called()
+        attachment.read.assert_not_awaited()
+        service.stage_upload.assert_not_called()
+        if case != "expired":
+            inter.response.defer.assert_not_awaited()
 
 
 @pytest.mark.asyncio
