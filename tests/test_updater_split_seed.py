@@ -12,20 +12,31 @@ from tests.test_export_release_seed import predecessor
 
 
 @pytest.mark.parametrize("split", [False, True])
-def test_active_policy_and_log_rebind_without_losing_activation(tmp_path, monkeypatch, split):
+@pytest.mark.parametrize("pretty_policy", [False, True])
+def test_active_policy_and_log_rebind_without_losing_activation(
+    tmp_path, monkeypatch, split, pretty_policy
+):
     previous = predecessor(tmp_path, monkeypatch)
     policy = previous["AutomaticStartupPolicy.json"]
     policy["flags"].update(KVK_SOURCE_INTAKE_ENABLED=True, KVK_SOURCE_RECOVERY_ENABLED=True)
     seed_directory = PureWindowsPath(policy["seed_plan"]["path"]).parent
     active_directory = seed_directory.parent / "activation" if split else seed_directory
     policy_path = str(active_directory / "AutomaticStartupPolicy.json")
-    gate = f"$policy='{policy_path}'\n$policyHash='{sha256(encode(policy))}'\n$log='{active_directory}\\wrapper-startup.log'\n"
+    policy_bytes = (
+        (json.dumps(policy, indent=2) + "\n").encode() if pretty_policy else encode(policy)
+    )
+    policy_hash = sha256(policy_bytes)
+    gate = f"$policy='{policy_path}'\n$policyHash='{policy_hash}'\n$log='{active_directory}\\wrapper-startup.log'\n"
     original = deepcopy(previous)
     for index in range(2):
         before = deepcopy(previous)
         before_policy = deepcopy(previous["AutomaticStartupPolicy.json"])
         payload = release_seed(
-            previous, {"DL_bot.py": str(index + 1) * 64}, gate, policy_path=policy_path
+            previous,
+            {"DL_bot.py": str(index + 1) * 64},
+            gate,
+            policy_path=policy_path,
+            policy_sha256=policy_hash,
         )
         assert previous == before
         gate = payload.pop("Start-ReviewedAutomaticStartup.ps1").decode()
@@ -39,7 +50,7 @@ def test_active_policy_and_log_rebind_without_losing_activation(tmp_path, monkey
         assert policy["flags"] == original["AutomaticStartupPolicy.json"]["flags"]
         assert policy["predecessor"] == {
             "state_directory": before_policy["state_directory"],
-            "policy_sha256": sha256(encode(before_policy)),
+            "policy_sha256": policy_hash,
         }
         assert policy["seed_plan"]["sha256"] == sha256(
             payload["ManualProcessPairPlan-CANDIDATE.json"]
@@ -48,6 +59,7 @@ def test_active_policy_and_log_rebind_without_losing_activation(tmp_path, monkey
             previous["bot-template.json"]["sql_contract"]
             == original["bot-template.json"]["sql_contract"]
         )
+        policy_hash = sha256(payload["AutomaticStartupPolicy.json"])
 
 
 @pytest.mark.parametrize(
@@ -72,3 +84,15 @@ def test_split_policy_preparation_rejects_unbound_or_changed_inputs(tmp_path, mo
         previous["bot-template.json"]["unexpected"] = True
     with pytest.raises(ValueError):
         release_seed(previous, {"DL_bot.py": "a" * 64}, gate, policy_path=path)
+
+
+@pytest.mark.parametrize("digest", ["", "A" * 64, "a" * 63, "z" * 64, 42, "0" * 64])
+def test_installed_policy_hash_must_be_valid_and_bound_by_gate(tmp_path, monkeypatch, digest):
+    previous = predecessor(tmp_path, monkeypatch)
+    policy = previous["AutomaticStartupPolicy.json"]
+    path = r"C:\K98\activation\AutomaticStartupPolicy.json"
+    gate = f"$policy='{path}'\n$policyHash='{sha256(encode(policy))}'\n"
+    with pytest.raises(ValueError):
+        release_seed(
+            previous, {"DL_bot.py": "a" * 64}, gate, policy_path=path, policy_sha256=digest
+        )

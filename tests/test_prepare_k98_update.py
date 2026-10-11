@@ -552,7 +552,15 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
         policy_path = str(
             PureWindowsPath(policy["seed_plan"]["path"]).with_name("AutomaticStartupPolicy.json")
         )
-        gate = f"$policy='{policy_path}'\n$policyHash='{sha256(encode(policy))}'\n"
+        # First update follows activation: policy lives apart from the seed and
+        # its authenticated bytes are not the protocol's canonical serialization.
+        if index == 0:
+            policy_path = r"C:\ProgramData\K98\S11\runtime\activation\AutomaticStartupPolicy.json"
+            policy_raw = (json.dumps(policy, indent=2) + "\n").encode()
+        else:
+            policy_raw = encode(policy)
+        policy_hash = sha256(policy_raw)
+        gate = f"$policy='{policy_path}'\n$policyHash='{policy_hash}'\n"
         observation = dict(
             seed=previous,
             gate=gate,
@@ -562,7 +570,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
                 root="C:\\fixture",
                 host="FIXTURE",
                 sid="S-1-5-21-1-2-3-1001",
-                old_policy=dict(Path=policy_path, SHA256=sha256(encode(policy))),
+                old_policy=dict(Path=policy_path, SHA256=policy_hash),
                 old_plan=dict(Python="C:\\fixture\\python.exe", PythonSHA256="a" * 64),
             ),
         )
@@ -603,6 +611,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
         bindings = json.loads((package / "ReleaseBindings.json").read_bytes())
         assert (package / bindings["source_members"][0]["payload"]).read_bytes() == content
         assert bindings["new_policy"]["flags"] == policy["flags"]
+        assert bindings["new_policy"]["predecessor"]["policy_sha256"] == policy_hash
         previous = {name: json.loads((package / name).read_bytes()) for name in previous}
         raw = content
     assert len(identities) == 2

@@ -419,7 +419,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     return dict(before=before, target=target, source_members=members, new_pins=pins), payload
 
 
-def release_seed(previous, pins, gate, *, policy_path=None):
+def release_seed(previous, pins, gate, *, policy_path=None, policy_sha256=None):
     """Derive fresh metadata and update only exact predecessor gate bindings."""
     deployment, review, pipe = (str(uuid4()) for _ in range(3))
     payload = successor_seed(
@@ -442,7 +442,14 @@ def release_seed(previous, pins, gate, *, policy_path=None):
     new_directory = str(PureWindowsPath(new["seed_plan"]["path"]).parent)
     # A launch gate remains reviewed code. No eval, regex template engine or
     # guessed substitution is used to alter executable behavior.
-    old_hash = sha256(encode(old))
+    # The active policy was authenticated as bytes. Activation packets may use
+    # different JSON whitespace than encode(); predecessor identity must retain
+    # that exact installed hash, not a hash of re-serialized semantic content.
+    old_hash = policy_sha256 if policy_sha256 is not None else sha256(encode(old))
+    if not isinstance(old_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", old_hash):
+        raise ValueError("Installed policy checksum format differs.")
+    new["predecessor"]["policy_sha256"] = old_hash
+    payload["AutomaticStartupPolicy.json"] = encode(new)
     if old_directory not in gate or old_hash not in gate:
         raise ValueError("Installed launch gate does not bind predecessor policy.")
     gate = gate.replace(old_directory, new_directory).replace(
@@ -528,7 +535,11 @@ def prepare_update(
             protected_principals=principals,
         )
     seed = release_seed(
-        previous, plan["new_pins"], observation["gate"], policy_path=config["old_policy"]["Path"]
+        previous,
+        plan["new_pins"],
+        observation["gate"],
+        policy_path=config["old_policy"]["Path"],
+        policy_sha256=config["old_policy"]["SHA256"],
     )
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
