@@ -26,7 +26,7 @@ class KvkSourceExportView(discord.ui.View):
             self.stop()
             await send_receipt(interaction, self.service, row, saved=True)
         except Exception as exc:
-            await report_failure(interaction, exc)
+            await report_failure(interaction, exc, export=True)
 
 
 class SourceExportReasonModal(discord.ui.Modal):
@@ -67,7 +67,7 @@ class SourceExportReasonModal(discord.ui.Modal):
                 interaction, self.service, row, KvkSourceExportView(self.service, row)
             )
         except Exception as exc:
-            await report_failure(interaction, exc)
+            await report_failure(interaction, exc, export=True)
 
 
 async def dispatch_export(

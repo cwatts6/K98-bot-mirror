@@ -184,6 +184,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             send_receipt,
         )
 
+        export_action = False
         try:
             access = access_from_config()
             actor = await current_actor(ctx, access)
@@ -194,6 +195,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             )
 
             if action in EXPORT_ACTIONS:
+                export_action = True
                 if any(
                     (
                         file_1,
@@ -321,7 +323,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 )
             await send_receipt(getattr(ctx, "interaction", ctx), service, row, view)
         except Exception as exc:
-            await report_failure(getattr(ctx, "interaction", ctx), exc)
+            await report_failure(getattr(ctx, "interaction", ctx), exc, export=export_action)
 
     @kvk_admin_group.command(
         name="test_export",

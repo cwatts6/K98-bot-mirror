@@ -30,15 +30,21 @@ async def current_actor(subject, access):
     return SourceActor(member.id, guild.id, channel.id, frozenset(r.id for r in member.roles))
 
 
-async def report_failure(interaction, exc):
+async def report_failure(interaction, exc, *, export=False):
     # Parser/SQL messages can contain private fields: return only controlled guidance.
     logger.info("KVK source interaction failed type=%s", type(exc).__name__)
     guidance = "Check permissions, metadata and current receipt version, then resume."
     if isinstance(exc, UncertainCommit):
         await send_ephemeral(
             interaction,
-            "The action's commit outcome is uncertain. Read the durable receipt/review with "
-            "/kvk_admin source action:status before any retry. Do not repeat the mutation.",
+            (
+                "The export commit outcome is uncertain. Inspect /kvk_admin source "
+                "action:export_status for the original season/index before any retry. "
+                "Retain the known job/operation ID for reconciliation. Do not repeat the mutation."
+                if export
+                else "The action's commit outcome is uncertain. Read the durable receipt/review with "
+                "/kvk_admin source action:status before any retry. Do not repeat the mutation."
+            ),
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return

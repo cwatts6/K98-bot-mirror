@@ -677,7 +677,9 @@ Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_
   inspection before any retry.
   Export delivery failures retain the operation/job/repair identities and direct the operator
   to `export_status` for the original season/index before another action. Disposable preview
-  tokens are labeled process-local and do not imply a confirmed export.
+  tokens are labeled process-local and do not imply a confirmed export. An uncertain export
+  commit requires `export_status` for the original season/index, not intake `status`; retain
+  known job/operation IDs for reconciliation and do not repeat the mutation.
 
 Controls remain default-off. New-source SQL migration must precede revised intake rollout.
 No public routing, export coordinator, deployment or activation is provided by this command.

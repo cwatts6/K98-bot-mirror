@@ -457,3 +457,54 @@ async def test_export_confirmation_retires_controls_before_failed_delivery(servi
     assert service.coordinator.admit_repair.call_count == (action == "export_rebuild")
     if action == "export_rebuild":
         assert "job:job-1" in messages[-1] and f"repair:{preview.token}" in messages[-1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["rollover_confirm", "export_rebuild"])
+async def test_uncertain_export_confirmation_uses_export_recovery(service, actor, action):
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views.kvk_source_export_view import KvkSourceExportView
+
+    preview = service._preview(actor, action, {})
+    operation = (
+        service.rollover.confirm
+        if action == "rollover_confirm"
+        else service.coordinator.admit_repair
+    )
+    operation.side_effect = UncertainCommit("private provider/SQL detail")
+    inter = interaction(owner=actor.user_id, guild=actor.guild_id, channel=actor.channel_id)
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    control = KvkSourceExportView(service, preview)
+    await control.confirm_button.callback(inter)
+    operation.assert_called_once()
+    message = inter.followup.send.call_args.args[0]
+    assert "commit outcome is uncertain" in message and "action:export_status" in message
+    assert "original season/index" in message and "Do not repeat the mutation" in message
+    assert "action:status" not in message and "Action retained" not in message
+    assert "private provider/SQL detail" not in message
+    assert inter.followup.send.call_args.kwargs["ephemeral"] is True
+    assert inter.followup.send.call_args.kwargs["allowed_mentions"].to_dict()["parse"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["rollover_preview", "export_rebuild"])
+async def test_export_reason_modal_uses_export_recovery(service, actor, action):
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from tests.test_kvk_source_import_view import interaction
+    from ui.views.kvk_source_export_view import SourceExportReasonModal
+
+    method = "preview_rollover" if action == "rollover_preview" else "preview_rebuild"
+    operation = Mock(side_effect=UncertainCommit("private"))
+    setattr(service, method, operation)
+    control = SourceExportReasonModal(
+        service, action, kvk_no=16, index_file_id="index", job_id="job", new_kvk=17
+    )
+    control.reason.value = "review"
+    inter = interaction(owner=actor.user_id, guild=actor.guild_id, channel=actor.channel_id)
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    await control.callback(inter)
+    operation.assert_called_once()
+    message = inter.followup.send.call_args.args[0]
+    assert "action:export_status" in message and "action:status" not in message
+    assert "private" not in message and "Do not repeat the mutation" in message

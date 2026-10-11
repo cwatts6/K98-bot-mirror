@@ -682,3 +682,54 @@ async def test_grouped_cancel_delivery_uses_transaction_write_result(monkeypatch
     await command._invoke(ctx)
     service.cancel.assert_called_once()
     assert ("Action retained" in inter.response.send_message.call_args.args[0]) is changed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action,method",
+    [("export", "export"), ("export_reconcile", "reconcile"), ("rollover_confirm", "confirm")],
+)
+async def test_grouped_uncertain_export_commit_uses_export_status(monkeypatch, action, method):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from commands import stats_cmds
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from kvk.services import (
+        new_source_admin_service as source,
+        source_export_operator_service as exports,
+    )
+    from tests.test_kvk_source_admin import ACCESS
+    from tests.test_kvk_source_import_view import interaction
+
+    groups = []
+    bot = SimpleNamespace(
+        add_application_command=groups.append, slash_command=lambda **kw: lambda fn: fn
+    )
+    monkeypatch.setattr(stats_cmds, "track_usage", lambda: lambda fn: fn)
+    stats_cmds.register_stats(bot)
+    command = next(
+        c for g in groups if g.name == "kvk_admin" for c in g.subcommands if c.name == "source"
+    )
+    service = Mock()
+    getattr(service, method).side_effect = UncertainCommit("private SQL/password")
+    monkeypatch.setattr(source, "access_from_config", lambda: ACCESS)
+    monkeypatch.setattr(exports, "configured_operator_service", lambda: service)
+    inter = interaction()
+    inter.response.is_done = lambda: inter.response.defer.await_count > 0
+    inter.data = {"options": [{"name": "action", "type": 3, "value": action}]}
+    ctx = SimpleNamespace(
+        user=inter.user,
+        guild=inter.guild,
+        channel=inter.channel,
+        interaction=inter,
+        command=command,
+    )
+    await command._invoke(ctx)
+    getattr(service, method).assert_called_once()
+    message = inter.followup.send.call_args.args[0]
+    assert "action:export_status" in message and "original season/index" in message
+    assert "action:status" not in message and "private SQL/password" not in message
+    assert "Do not repeat the mutation" in message and "Action retained" not in message
+    assert inter.followup.send.call_args.kwargs["ephemeral"] is True
+    assert inter.followup.send.call_args.kwargs["allowed_mentions"].to_dict()["parse"] == []
