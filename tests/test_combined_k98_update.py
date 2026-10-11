@@ -239,14 +239,21 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
     d, _, files = fixture()
     observation = dict(
         seed=previous,
-        gate=f"$policy='{PureWindowsPath(policy['seed_plan']['path'])}'\n$policyHash='{sha256(encode(policy))}'\n",
+        gate=f"$policy='{PureWindowsPath(policy['seed_plan']['path']).with_name('AutomaticStartupPolicy.json')}'\n$policyHash='{sha256(encode(policy))}'\n",
         bindings=dict(
             before="a" * 40,
             target="c" * 40,
             root="C:\\fixture",
             host="FIXTURE",
             sid="S-1-5-21-1-2-3-1001",
-            old_policy=dict(Path="C:\\fixture\\policy.json", SHA256=sha256(encode(policy))),
+            old_policy=dict(
+                Path=str(
+                    PureWindowsPath(policy["seed_plan"]["path"]).with_name(
+                        "AutomaticStartupPolicy.json"
+                    )
+                ),
+                SHA256=sha256(encode(policy)),
+            ),
             old_plan=dict(Python="C:\\fixture\\python.exe", PythonSHA256="a" * 64),
         ),
     )

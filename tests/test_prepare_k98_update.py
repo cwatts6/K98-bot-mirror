@@ -549,7 +549,10 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
     identities = set()
     for index, content in enumerate((b"print('first')\n", b"print('second')\n")):
         policy = previous["AutomaticStartupPolicy.json"]
-        gate = f"$policy='{PureWindowsPath(policy['seed_plan']['path'])}'\n$policyHash='{sha256(encode(policy))}'\n"
+        policy_path = str(
+            PureWindowsPath(policy["seed_plan"]["path"]).with_name("AutomaticStartupPolicy.json")
+        )
+        gate = f"$policy='{policy_path}'\n$policyHash='{sha256(encode(policy))}'\n"
         observation = dict(
             seed=previous,
             gate=gate,
@@ -559,7 +562,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
                 root="C:\\fixture",
                 host="FIXTURE",
                 sid="S-1-5-21-1-2-3-1001",
-                old_policy=dict(Path="C:\\fixture\\policy.json", SHA256=sha256(encode(policy))),
+                old_policy=dict(Path=policy_path, SHA256=sha256(encode(policy))),
                 old_plan=dict(Python="C:\\fixture\\python.exe", PythonSHA256="a" * 64),
             ),
         )
