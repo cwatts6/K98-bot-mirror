@@ -1162,3 +1162,49 @@ def test_receipt_creation_uncertainty_retains_exact_identity(monkeypatch, replay
     assert sum(
         "INSERT KVK.SourceImportAttempt" in call.args[0] for call in cursor.execute.call_args_list
     ) == (0 if replay else 1)
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+@pytest.mark.parametrize("mapping_matches_acceptance", [False, True])
+def test_configuration_uses_scope_from_same_retained_acceptance(
+    rig, cancelled, mapping_matches_acceptance
+):
+    service, repo = rig
+    accepted = accepted_b0(service)
+    original = deepcopy(accepted["payload"]["proposal"])
+    correction = deepcopy(original)
+    correction["action"] = "correct"
+    correction["fields"]["kingdoms"] = "101,103"
+    draft = repo.prepare(
+        accepted["AttemptID"],
+        str(ADMIN.user_id),
+        str(ADMIN.guild_id),
+        accepted["payload"]["version"],
+        correction,
+    )
+    repo.receipts[draft["AttemptID"]]["payload"]["cancelled"] = cancelled
+    arguments = dict(
+        window="fight:pass4 | Pass 4 | 10 | 13",
+        coverage="2026-09-05T15:26Z | 2026-09-07T07:21Z",
+        mapping="101 | 1 | North Camp\n"
+        + ("102" if mapping_matches_acceptance else "103")
+        + " | 2 | South Camp",
+        weights="10 | 20 | 40 | 2026-09-01T00:00Z",
+        reason="Review original accepted B0",
+    )
+    if not mapping_matches_acceptance:
+        with pytest.raises(ValueError, match="exactly the accepted B0 scope"):
+            service.prepare_configuration(
+                ADMIN, draft["AttemptID"], draft["payload"]["version"], **arguments
+            )
+        assert repo.receipts[draft["AttemptID"]]["payload"]["proposal"] == correction
+        return
+    reviewed = service.prepare_configuration(
+        ADMIN, draft["AttemptID"], draft["payload"]["version"], **arguments
+    )
+    proposal = reviewed["payload"]["proposal"]
+    assert proposal["b0_revision"] == accepted["ObservationRevisionID"]
+    assert [entry[0] for entry in proposal["configuration"]["mapping"]] == [101, 102]
+    result = service.confirm(ADMIN, reviewed["AttemptID"], reviewed["payload"]["version"])
+    assert repo.calls[-1]["b0_revision_id"] == accepted["ObservationRevisionID"]
+    assert result["ObservationRevisionID"] == accepted["ObservationRevisionID"]

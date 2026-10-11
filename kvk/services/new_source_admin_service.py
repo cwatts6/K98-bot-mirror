@@ -18,6 +18,7 @@ from kvk.dal.new_source_import_dal import (
 from kvk.models.new_source_observation import CampMapping, MetadataConfirmation, SourceScope
 from kvk.models.new_source_reporting import FrozenWeights, require_utc
 from kvk.models.source_receipt_state import (
+    accepted_details,
     accepted_outcome,
     pending_work,
     preparation_error,
@@ -439,7 +440,8 @@ class SourceAdminService:
         row = self.receipt(actor, receipt_id, "configure")
         self._require_preparation(row, version, "configure")
         self._admit_write()
-        b0_revision = accepted_outcome(row).get("observation_revision_id")
+        outcome, accepted = accepted_details(row)
+        b0_revision = outcome.get("observation_revision_id")
         if not b0_revision:
             raise ValueError("Configuration requires this owner's accepted B0 player receipt.")
         if not reason.strip() or len(reason) > 512:
@@ -496,10 +498,10 @@ class SourceAdminService:
                 raise ValueError("Camp labels must identify one camp each.")
             x, y, z, effective = (s.strip() for s in weights.split("|"))
             weight = FrozenWeights("pending approval", x, y, z, utc_text(effective))
-            proposals = [row["payload"].get("proposal", {})] + [
-                h.get("proposal") or {} for h in reversed(row["payload"].get("history", []))
-            ]
-            accepted = next((p for p in proposals if "fields" in p), {})
+            if not accepted.get("fields", {}).get("kingdoms"):
+                raise SourceConflict(
+                    "Accepted B0 scope is unavailable; retain the receipt for review."
+                )
             scope = tuple(
                 sorted(positive(x.strip()) for x in accepted["fields"]["kingdoms"].split(","))
             )
