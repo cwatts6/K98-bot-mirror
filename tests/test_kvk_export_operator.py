@@ -405,7 +405,7 @@ async def test_export_dispatch_failed_delivery_retains_saved_identity(
     )
     getattr(svc, method).assert_called_once()
     fallback = inter.followup.send.call_args.args[0]
-    assert ("Action saved" in fallback) is saved
+    assert ("Action retained" in fallback) is saved
     assert "action:export_status" in fallback and "action:resume" not in fallback
     for key in ("OperationID", "operation_id", "job_id"):
         if row.get(key):
@@ -451,7 +451,7 @@ async def test_export_confirmation_retires_controls_before_failed_delivery(servi
     inter.followup.send.side_effect = deliver
     await control.confirm_button.callback(inter)
     assert len(messages) == 2
-    assert "Action saved" in messages[-1] and preview.token in messages[-1]
+    assert "Action retained" in messages[-1] and preview.token in messages[-1]
     assert "action:export_status" in messages[-1] and "action:resume" not in messages[-1]
     assert service.rollover.confirm.call_count == (action == "rollover_confirm")
     assert service.coordinator.admit_repair.call_count == (action == "export_rebuild")

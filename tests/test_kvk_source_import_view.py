@@ -273,7 +273,7 @@ async def test_cancel_commit_survives_failed_delivery_and_controls_retire(caplog
     service.cancel.assert_called_once_with(ADMIN, "receipt", 2)
     assert all(item.disabled for item in view.children)
     fallback = inter.followup.send.call_args.args[0]
-    assert "Action saved; receipt delivery failed" in fallback
+    assert "Action retained; receipt delivery failed" in fallback
     assert "action:resume receipt:receipt" in fallback
     assert "could not complete" not in fallback
     assert "private SQL/password text" not in caplog.text
@@ -285,7 +285,7 @@ async def test_summary_failure_after_save_is_a_delivery_failure():
     inter = interaction()
     service = SimpleNamespace(summary=Mock(side_effect=RuntimeError("private")))
     assert not await send_receipt(inter, service, {"AttemptID": "id"}, saved=True)
-    assert "Action saved" in inter.response.send_message.call_args.args[0]
+    assert "Action retained" in inter.response.send_message.call_args.args[0]
 
 
 @pytest.mark.asyncio
@@ -301,7 +301,7 @@ async def test_uncertain_commit_reports_inspection_not_failure_or_retry():
     message = inter.followup.send.call_args.args[0]
     assert "commit outcome is uncertain" in message
     assert "Do not repeat the mutation" in message
-    assert "Action saved" not in message and "private" not in message
+    assert "Action retained" not in message and "private" not in message
 
 
 @pytest.mark.asyncio
@@ -383,7 +383,7 @@ async def test_export_preview_delivery_failure_has_no_fake_receipt_identity():
     assert "Preview token:preview" in message
     assert "process-local" in message and "no export action was confirmed" in message
     assert "review:None" not in message and "action:resume" not in message
-    assert "Action saved" not in message
+    assert "Action retained" not in message
 
 
 @pytest.mark.asyncio
@@ -462,7 +462,7 @@ async def test_cancel_delivery_reports_actual_write_for_both_view_families(famil
     await callback(inter)
     service.cancel.assert_called_once()
     message = inter.followup.send.call_args.args[0]
-    assert ("Action saved" in message) is changed
+    assert ("Action retained" in message) is changed
     assert "receipt delivery failed" in message.lower()
     assert "private failure" not in message
     assert all(item.disabled for item in view.children)

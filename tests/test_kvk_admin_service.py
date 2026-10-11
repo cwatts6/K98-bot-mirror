@@ -681,4 +681,4 @@ async def test_grouped_cancel_delivery_uses_transaction_write_result(monkeypatch
     )
     await command._invoke(ctx)
     service.cancel.assert_called_once()
-    assert ("Action saved" in inter.response.send_message.call_args.args[0]) is changed
+    assert ("Action retained" in inter.response.send_message.call_args.args[0]) is changed

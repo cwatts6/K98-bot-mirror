@@ -103,7 +103,11 @@ def _receipt_delivery_recovery(row):
 
 
 async def send_receipt(interaction, service, row, view=None, *, saved=False):
-    """Retain every complete review line across bounded private messages."""
+    """Retain every complete review line across bounded private messages.
+
+    saved means a durable action exists, including an idempotent confirmation replay;
+    it does not claim that this invocation performed a new write.
+    """
     try:
         pages, page = [], ""
         for line in service.summary(row).splitlines():
@@ -140,7 +144,7 @@ async def send_receipt(interaction, service, row, view=None, *, saved=False):
             view.stop()
         await send_ephemeral(
             interaction,
-            ("Action saved; receipt delivery failed. " if saved else "Receipt delivery failed. ")
+            ("Action retained; receipt delivery failed. " if saved else "Receipt delivery failed. ")
             + recovery
             + "No action was automatically retried.",
             allowed_mentions=discord.AllowedMentions.none(),
