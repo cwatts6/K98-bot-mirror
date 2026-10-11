@@ -289,3 +289,24 @@ def test_recreated_service_prepares_cancelled_config_using_retained_b0(rig, monk
         reason="Explicit new configuration review",
     )
     assert reviewed["payload"]["proposal"]["b0_revision"] == row["ObservationRevisionID"]
+
+
+@pytest.mark.parametrize("initial_proposal", ["absent", None])
+def test_first_prepare_then_cancel_handles_null_historical_proposal(monkeypatch, initial_proposal):
+    row = receipt("received")
+    if initial_proposal == "absent":
+        row["payload"].pop("proposal")
+    else:
+        row["payload"]["proposal"] = None
+    store = DurableReceipt(monkeypatch, row)
+    reviewed = store.prepare("accept")
+    assert reviewed["payload"]["history"][0]["proposal"] is None
+    assert accepted_outcome(reviewed) == {}
+    assert receipt_actions(reviewed, "accept", NOW).cancel
+    assert "State: validated" in SourceAdminService.summary(reviewed)
+    cancelled = store.cancel(3)
+    assert accepted_outcome(cancelled) == {}
+    allowed = receipt_actions(cancelled, "accept", NOW)
+    assert not any((allowed.prepare, allowed.confirm, allowed.cancel, allowed.pair))
+    assert "pending work cancelled" in SourceAdminService.summary(cancelled)
+    assert store.cancel(3)["cancel_saved"] is False

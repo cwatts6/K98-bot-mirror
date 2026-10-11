@@ -13,7 +13,7 @@ def accepted_details(row):
         # Configuration outcomes also repeat a B0 revision without accepting input.
         if (
             entry.get("action") == "cancel"
-            or entry.get("proposal", {}).get("action") == "configure"
+            or (entry.get("proposal") or {}).get("action") == "configure"
         ):
             continue
         outcome = entry.get("outcome")
@@ -38,8 +38,8 @@ def accepted_details(row):
             "aggregate_revision_id": row.get("AggregateRevisionID"),
         }, (
             {}
-            if payload.get("proposal", {}).get("action") == "configure"
-            else payload.get("proposal", {})
+            if (payload.get("proposal") or {}).get("action") == "configure"
+            else (payload.get("proposal") or {})
         )
     return {}, {}
 
