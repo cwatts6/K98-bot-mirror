@@ -9,8 +9,12 @@ def accepted_details(row):
     payload = row["payload"]
     entries = [payload, *reversed(payload.get("history", []))]
     for entry in entries:
-        # Configuration outcomes can repeat a B0 revision without accepting input.
-        if entry.get("proposal", {}).get("action") == "configure":
+        # Legacy cancellation entries copy outcomes without accepting any input.
+        # Configuration outcomes also repeat a B0 revision without accepting input.
+        if (
+            entry.get("action") == "cancel"
+            or entry.get("proposal", {}).get("action") == "configure"
+        ):
             continue
         outcome = entry.get("outcome")
         if outcome and (

@@ -470,7 +470,7 @@ async def test_cancel_delivery_reports_actual_write_for_both_view_families(famil
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("family", ["player", "aggregate"])
-@pytest.mark.parametrize("later", ["cancelled", "completed"])
+@pytest.mark.parametrize("later", ["cancelled", "completed", "legacy_cancelled"])
 async def test_pair_modal_prefills_one_retained_acceptance_not_later_proposal(
     monkeypatch, family, later
 ):
@@ -506,6 +506,11 @@ async def test_pair_modal_prefills_one_retained_acceptance_not_later_proposal(
         row["payload"]["outcome"] = dict(
             state="configuration requested", observation_revision_id="accepted-revision"
         )
+        if later == "legacy_cancelled":
+            row["payload"]["cancelled"] = True
+            row["payload"]["history"].append(
+                dict(action="cancel", version=3, outcome=dict(row["payload"]["outcome"]))
+            )
     modal = SourcePairModal(SimpleNamespace(access=ACCESS), ADMIN, 16, receipt=row)
     assert modal.scope.value == "16 | fight:accepted | 6 | publish"
     assert modal.aggregate.value == ("accepted-revision" if family == "aggregate" else "")
