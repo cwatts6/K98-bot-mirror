@@ -502,7 +502,10 @@ async def test_pair_modal_prefills_one_retained_acceptance_not_later_proposal(
         row = store.cancel(3)
     else:
         row = store.row
-        row["payload"]["outcome"] = dict(state="configuration requested")
+        row["payload"]["proposal"]["action"] = "configure"
+        row["payload"]["outcome"] = dict(
+            state="configuration requested", observation_revision_id="accepted-revision"
+        )
     modal = SourcePairModal(SimpleNamespace(access=ACCESS), ADMIN, 16, receipt=row)
     assert modal.scope.value == "16 | fight:accepted | 6 | publish"
     assert modal.aggregate.value == ("accepted-revision" if family == "aggregate" else "")

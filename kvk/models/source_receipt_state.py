@@ -9,6 +9,9 @@ def accepted_details(row):
     payload = row["payload"]
     entries = [payload, *reversed(payload.get("history", []))]
     for entry in entries:
+        # Configuration outcomes can repeat a B0 revision without accepting input.
+        if entry.get("proposal", {}).get("action") == "configure":
+            continue
         outcome = entry.get("outcome")
         if outcome and (
             outcome.get("observation_revision_id") or outcome.get("aggregate_revision_id")
@@ -18,7 +21,9 @@ def accepted_details(row):
                 (
                     item["proposal"]
                     for item in entries
-                    if item.get("outcome") == outcome and item.get("proposal")
+                    if item.get("outcome") == outcome
+                    and item.get("proposal")
+                    and item["proposal"].get("action") != "configure"
                 ),
                 {},
             )
@@ -27,7 +32,11 @@ def accepted_details(row):
         return {
             "observation_revision_id": row.get("ObservationRevisionID"),
             "aggregate_revision_id": row.get("AggregateRevisionID"),
-        }, payload.get("proposal", {})
+        }, (
+            {}
+            if payload.get("proposal", {}).get("action") == "configure"
+            else payload.get("proposal", {})
+        )
     return {}, {}
 
 
