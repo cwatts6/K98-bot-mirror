@@ -395,7 +395,7 @@ async def test_receipt_uses_real_pycord_webhook_without_network(monkeypatch):
     webhook = discord.Webhook(
         {"id": "1", "type": discord.WebhookType.application.value, "token": "synthetic-test-token"},
         session=None,
-        state=SimpleNamespace(allowed_mentions=None),
+        state=SimpleNamespace(allowed_mentions=None, store_view=Mock()),
     )
     # Keep the library's complete webhook state; replace only the network response boundary.
     monkeypatch.setattr(discord.Webhook, "_create_message", lambda self, data: None)
