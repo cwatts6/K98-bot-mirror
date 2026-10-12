@@ -206,6 +206,8 @@ def test_cli_checks_all_changed_object_modes_and_distinct_blocker_exit(monkeypat
         if args[0] == "diff":
             return b"ordinary.py\0"
         if args[0] == "ls-tree":
+            if "--name-only" in args:
+                return b"ordinary.py\0"
             file_mode = "100644" if args[2] == BEFORE else mode
             kind = "commit" if file_mode == "160000" else "blob"
             return f"{file_mode} {kind} {'c' * 40}\tordinary.py\0".encode()
@@ -234,3 +236,23 @@ def test_cli_unexpected_git_failure_does_not_report_a_classification(monkeypatch
     with pytest.raises(compatibility.subprocess.CalledProcessError):
         compatibility.main()
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    "paths,inventory",
+    [
+        (["pkg/a.py", "PKG/A.py"], []),
+        (["pkg/new.py"], ["PKG/unchanged.py"]),
+        (["pkg/a.py", "pkg/A.py"], []),
+    ],
+)
+def test_case_aliases_across_changed_and_retained_inventory_require_coordination(paths, inventory):
+    result = classify(
+        BEFORE,
+        AFTER,
+        paths,
+        lambda c, p: b"old" if c == BEFORE else b"new",
+        inventory_paths=inventory,
+    )
+    assert result["classification"] == "COORDINATED_RELEASE_REQUIRED"
+    assert any("Case-colliding" in blocker for blocker in result["blockers"])

@@ -11,13 +11,33 @@ from pathlib import Path
 import re
 import subprocess
 
-from scripts.prepare_k98_update import TOOL_SOURCE_PATHS, check_source_only, sha256
+from scripts.prepare_k98_update import (
+    TOOL_SOURCE_PATHS,
+    check_case_aliases,
+    check_source_only,
+    sha256,
+)
 
 COORDINATED_RELEASE_EXIT = 3
 
 
-def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sha256=None):
+def classify(
+    before,
+    target,
+    paths,
+    read_blob,
+    installed_tool=None,
+    *,
+    policy_sha256=None,
+    inventory_paths=None,
+):
     blockers, tool_changes = [], []
+    try:
+        if len(paths) > 4096 or len(set(paths)) != len(paths):
+            raise ValueError("Bounded unique changed paths required.")
+        check_case_aliases(set(paths) | set(inventory_paths or ()))
+    except ValueError as exc:
+        blockers.append(str(exc))
     if installed_tool is not None:
         expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
         legacy = expected - {"prepare_k98_release.py"}
@@ -93,6 +113,12 @@ def main():
     )
     paths = git("diff", "--no-renames", "--name-only", "-z", before, target).decode().split("\0")
     paths = [path for path in paths if path]
+    inventory = set()
+    for commit in (before, target):
+        tree = git("ls-tree", "-r", "--name-only", "-z", commit)
+        if len(tree) > 4 * 1024 * 1024:
+            raise ValueError("Git tree inventory exceeds bound.")
+        inventory.update(path for path in tree.decode().split("\0") if path)
 
     def read_blob(commit, path):
         entry = git("ls-tree", "-z", commit, "--", path)
@@ -120,6 +146,7 @@ def main():
         policy_sha256=sha256(
             Path(__file__).with_name("prepare_k98_update.py").read_bytes().replace(b"\r\n", b"\n")
         ),
+        inventory_paths=inventory,
     )
     print(json.dumps(result, indent=2))
     return COORDINATED_RELEASE_EXIT if result["blockers"] else 0
