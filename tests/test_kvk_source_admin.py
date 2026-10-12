@@ -439,6 +439,39 @@ def test_imported_window_uses_accepted_times_and_revalidates_meaning(rig, change
         assert service.confirm(ADMIN, row["AttemptID"], 3)["payload"]["outcome"]
 
 
+@pytest.mark.parametrize("bound_period", [None, "fight:pass4"])
+def test_imported_window_cannot_replace_an_existing_period_binding(rig, bound_period):
+    service, repo = rig
+    row = accepted_b0(service)
+    aggregate_guard(repo)
+    repo.configuration_windows = lambda *a, **kw: [
+        dict(
+            WindowName="Selected window",
+            StartScanID=10,
+            EndScanID=14,
+            period_key=bound_period,
+            start_utc="2026-09-05T15:26:00+00:00",
+            end_utc="2026-09-08T07:21:00+00:00",
+        )
+    ]
+    arguments = dict(
+        window="fight:pass4",
+        imported_window_name="Selected window",
+        coverage="",
+        mapping="",
+        weights="",
+        reason="Review endpoints without rebinding the period",
+    )
+    if bound_period is None:
+        retained = deepcopy(repo.receipts[row["AttemptID"]])
+        with pytest.raises(SourceConflict, match="different imported window"):
+            service.prepare_configuration(ADMIN, row["AttemptID"], 2, **arguments)
+        assert repo.receipts[row["AttemptID"]] == retained
+    else:
+        draft = service.prepare_configuration(ADMIN, row["AttemptID"], 2, **arguments)
+        assert draft["payload"]["proposal"]["configuration"]["end"] == 14
+
+
 def test_initial_configuration_is_reviewed_and_retains_b0(rig):
     service, repo = rig
     row = accepted_b0(service)

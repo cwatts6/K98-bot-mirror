@@ -499,6 +499,10 @@ class SourceAdminService:
         spec = {"period_key": period, "label": label, "start": start, "end": end}
         imported_configuration = None
         if guard["config"]:
+            if imported_window is not None and imported_window["period_key"] != period:
+                raise SourceConflict(
+                    "This period already has a different imported window; select its bound window or a new period key."
+                )
             if mapping.strip() or weights.strip() or coverage.strip():
                 raise ValueError(
                     "Endpoint updates retain the approved map, weights and coverage; leave those fields empty."
