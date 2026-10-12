@@ -22,6 +22,7 @@ from kvk.dal.new_source_import_dal import (
     rows,
     transaction,
 )
+from kvk.dal.source_sql_diagnostics import diagnosed_source_operation
 from kvk.models.source_receipt_state import pending_work, preparation_error
 from kvk.schemas.new_source_schema import SOURCE_KEY
 
@@ -368,6 +369,7 @@ class SourceAdminDAL:
             lock_scope(cursor, kvk_no)
             return self._context(cursor, kvk_no, candidate)
 
+    @diagnosed_source_operation
     def confirm(self, receipt_id, actor, guild_id, expected_version, operation):
         """Receipt and S3B acceptance share one transaction, including uncertain commit."""
         # Obtain season first without holding a draft lock ahead of the season mutex.

@@ -15,6 +15,7 @@ from kvk.services.new_source_admin_service import (
     SourceActor,
     SourceConflict,
     UncertainCommit,
+    failure_reference,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,12 @@ async def report_failure(interaction, exc, *, export=False):
     # Parser/SQL messages can contain private fields: return only controlled guidance.
     logger.info("KVK source interaction failed type=%s", type(exc).__name__)
     guidance = "Check permissions, metadata and current receipt version, then resume."
+    reference = failure_reference(exc)
+    if reference:
+        guidance = (
+            f"Database diagnostic reference: {reference}. Retain this receipt and inspect "
+            "its status before a fresh review. Do not repeat the confirmation blindly."
+        )
     if isinstance(exc, UncertainCommit):
         identity_option = ""
         if not export:

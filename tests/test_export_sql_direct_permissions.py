@@ -731,6 +731,44 @@ def test_direct_contract_includes_only_approved_dependency_catalog_read():
     ]
 
 
+def test_aggregate_row_grants_cover_dynamic_inserts_and_pinned_reads():
+    """The importer/report reader choose these fixed table names inside loops."""
+    names = {"KVK.SourceKingdomReportRow", "KVK.SourceCampReportRow"}
+    rows = [row for row in direct.application_grant_rows() if row["TargetName"] in names]
+    assert {(r["TargetName"], r["PermissionName"], r["ColumnName"]) for r in rows} == {
+        (name, permission, None) for name in names for permission in ("INSERT", "SELECT")
+    }
+    assert len(rows) == 4 and all(r["GrantState"] == "G" for r in rows)
+    plan = json.loads(Path("deploy/s11_application_grants.json").read_bytes())
+    sql = render(
+        plan,
+        server="mini_AMD",
+        database="ROK_TRACKER",
+        principal="S11_ExportApplication",
+        login_sid="0x" + "12" * 16,
+    )
+    for name in names:
+        table = name.split(".")[1]
+        for permission in ("INSERT", "SELECT"):
+            assert (
+                f"GRANT {permission} ON OBJECT::[KVK].[{table}] TO [S11_ExportApplication]" in sql
+            )
+
+
+@pytest.mark.parametrize("table", ["SourceKingdomReportRow", "SourceCampReportRow"])
+@pytest.mark.parametrize("permission", ["INSERT", "SELECT"])
+def test_incomplete_aggregate_row_permissions_fail_contract(contract, table, permission):
+    observed, approved = contract
+    observed["application_grants"] = [
+        row
+        for row in observed["application_grants"]
+        if (row["TargetName"], row["PermissionName"]) != (f"KVK.{table}", permission)
+    ]
+    approved["metadata_hash"] = digest(observed).hex()
+    with pytest.raises(SourceConflict):
+        verify_legacy_installation_contract(observed, approved, profile="application")
+
+
 @pytest.mark.parametrize("permissions", [[], ["CONTROL"], ["CONNECT", "CONTROL"]])
 def test_renderer_rejects_master_database_permission_widening(permissions):
     plan = json.loads(Path("deploy/s11_application_grants.json").read_bytes())

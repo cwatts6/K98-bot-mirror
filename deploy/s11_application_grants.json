@@ -215,6 +215,18 @@
       "source_sha256": "3e69e6e17ff4fda20f98556cc5867636cdadef045f798a4f5dff2aabb04eec7e"
     },
     {
+      "object": "KVK.SourceCampReportRow",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCampReportRow.Table.sql",
+      "source_sha256": "d61535898aebf2733687b0caa58c68abab3bce4cf2d3409bcd7bc22a27e01cfe"
+    },
+    {
+      "object": "KVK.SourceCampReportRow",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCampReportRow.Table.sql",
+      "source_sha256": "d61535898aebf2733687b0caa58c68abab3bce4cf2d3409bcd7bc22a27e01cfe"
+    },
+    {
       "object": "KVK.SourceCompleteSelection",
       "permission": "INSERT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceCompleteSelection.Table.sql",
@@ -327,6 +339,18 @@
       "permission": "UPDATE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceImportAttempt.Table.sql",
       "source_sha256": "e0c24592315a08af0c61070371a25e527b285e6382e305a17254477cc37d8b45"
+    },
+    {
+      "object": "KVK.SourceKingdomReportRow",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceKingdomReportRow.Table.sql",
+      "source_sha256": "118d376b466526b4d23aa47f46a4da045a2113380e331d3af96d27f4c41e03b0"
+    },
+    {
+      "object": "KVK.SourceKingdomReportRow",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceKingdomReportRow.Table.sql",
+      "source_sha256": "118d376b466526b4d23aa47f46a4da045a2113380e331d3af96d27f4c41e03b0"
     },
     {
       "object": "KVK.SourceLogicalScan",

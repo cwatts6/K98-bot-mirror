@@ -9,6 +9,11 @@ import json
 import logging
 from uuid import uuid4
 
+from kvk.dal.source_sql_diagnostics import (
+    diagnosed_source_operation,
+    diagnostic_call,
+    diagnostic_cursor,
+)
 from kvk.models.new_source_reporting import require_utc
 from kvk.schemas.new_source_schema import INT_MAX, PLAYER_HEADERS, SOURCE_KEY
 from kvk.services.new_source_artifact_store import ArtifactStore, StoredArtifact
@@ -100,24 +105,24 @@ def rows(cursor):
 
 @contextmanager
 def transaction(connect):
-    connection = connect()
+    connection = diagnostic_call("connect", connect)
     try:
         if connection.autocommit:
             raise ValueError("Source operations require a dedicated transactional connection.")
-        cursor = connection.cursor()
+        cursor = diagnostic_cursor(diagnostic_call("cursor", connection.cursor))
         cursor.execute("SET XACT_ABORT ON; SET NOCOUNT ON;")
         try:
             yield cursor
         except BaseException:
-            connection.rollback()
+            diagnostic_call("rollback", connection.rollback)
             raise
         try:
-            connection.commit()
+            diagnostic_call("commit", connection.commit)
         except Exception as exc:
             # Do not replay, or claim rollback when COMMIT may have succeeded.
             raise UncertainCommit("Read the durable operation before retrying.") from exc
     finally:
-        connection.close()
+        diagnostic_call("close", connection.close)
 
 
 def lock_scope(cursor, kvk_no: int):
@@ -480,6 +485,7 @@ class SourceImportDAL:
         )
         return result
 
+    @diagnosed_source_operation
     def accept_aggregate(self, prepared, artifact: StoredArtifact, admission: Admission):
         verified = parse_aggregate_workbook(
             self.artifacts.read(artifact), prepared.metadata, prepared.mapping

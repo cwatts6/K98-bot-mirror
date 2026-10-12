@@ -15,6 +15,7 @@ from kvk.dal.new_source_import_dal import (
     UncertainCommit as UncertainCommit,
     canonical,
 )
+from kvk.dal.source_sql_diagnostics import failure_reference as failure_reference
 from kvk.models.new_source_observation import CampMapping, MetadataConfirmation, SourceScope
 from kvk.models.new_source_reporting import FrozenWeights, require_utc
 from kvk.models.source_receipt_state import (
