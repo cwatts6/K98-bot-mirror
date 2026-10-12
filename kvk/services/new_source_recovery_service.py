@@ -24,13 +24,15 @@ def snapshot_config_import(cursor, windows, *, actor=None, provenance=None, sour
 
     from kvk.dal.new_source_recovery_dal import snapshot_import
 
+    captured = ()
     if bot_config.KVK_SOURCE_INTAKE_ENABLED and source_weights is not None:
         from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
 
-        SourceAdminReviewDAL.snapshot_import(
+        captured = SourceAdminReviewDAL.snapshot_import(
             cursor, source_weights, now=datetime.now(UTC).replace(microsecond=0)
         )
     if not bot_config.KVK_SOURCE_RECOVERY_ENABLED:
+        _snapshot_current_weights(cursor, captured)
         return ()
 
     records = []
@@ -57,7 +59,7 @@ def snapshot_config_import(cursor, windows, *, actor=None, provenance=None, sour
         importer="proc_config_import.run_proc_config_import",
         windows_digest=hashlib.sha256(canonical(records).encode()).hexdigest(),
     )
-    return snapshot_import(
+    result = snapshot_import(
         cursor,
         records,
         actor=actor or "system:proc_config_import",
@@ -65,6 +67,21 @@ def snapshot_config_import(cursor, windows, *, actor=None, provenance=None, sour
         provenance=evidence,
         requested_utc=datetime.now(UTC).replace(microsecond=0),
     )
+    _snapshot_current_weights(cursor, captured)
+    return result
+
+
+def _snapshot_current_weights(cursor, seasons):
+    from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+    from kvk.dal.source_weight_dal import refresh_requests
+
+    for season in seasons or ():
+        refresh_requests(
+            cursor,
+            season,
+            SourceAdminReviewDAL.imported_configuration(cursor, season),
+            datetime.now(UTC).replace(microsecond=0),
+        )
 
 
 def wake_recovery():
@@ -112,6 +129,9 @@ class RecoveryService:
 
     def recover_period(self, season, period):
         from kvk.services.source_update_service import SourceUpdateService
+        from kvk.services.source_weight_service import refresh_season_weights
+
+        refresh_season_weights(self.dal.connect, season)
 
         updates = self.dal.ready_updates(season, period)
         service = SourceUpdateService(self.dal.connect)

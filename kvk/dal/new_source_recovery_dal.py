@@ -394,6 +394,14 @@ class RecoveryDAL:
             ):
                 raise SourceConflict("Sealed update no longer matches desired scope/configuration.")
             config = self._config(cursor, identity, season, period)
+            from kvk.dal.source_update_dal import has_period_assignment
+
+            if update and has_period_assignment(update):
+                from dataclasses import replace
+
+                # Accepted scan IDs define the player window. Aggregate coverage is
+                # independently sealed on SourceUpdate, not the original period envelope.
+                config = replace(config, closes_at_utc=None)
             old = None
             if selected:
                 cursor.execute(
@@ -461,6 +469,10 @@ class RecoveryDAL:
                     if old_update and has_period_assignment(old_update)
                     else None
                 )
+                if assigned_period or old_assignment:
+                    from dataclasses import replace
+
+                    old_config = replace(old_config, closes_at_utc=None)
                 start = (
                     self._observation(cursor, old["StartRevisionID"], old_assignment)
                     if old["StartRevisionID"]

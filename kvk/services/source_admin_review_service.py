@@ -158,6 +158,8 @@ class SourceAdminReviewService:
             raise SourceConflict("No-fight has no aggregate counterpart.")
         times = [utc_text(value) for value in (coverage_start, coverage_end, as_of)]
         proof = {"action": action, "reason": reason}
+        if context.get("current_weights"):
+            proof.update(action="correct", current_weights=True)
         if context.get("configuration_review"):
             if action != "correct":
                 raise SourceConflict(
@@ -238,7 +240,13 @@ class SourceAdminReviewService:
             original_proof = json.loads(retained["ConfirmationJson"])
             if any(
                 original_proof.get(key) != proof.get(key)
-                for key in ("action", "period_assignment", "counterpart", "configuration_review")
+                for key in (
+                    "action",
+                    "period_assignment",
+                    "counterpart",
+                    "configuration_review",
+                    "current_weights",
+                )
             ):
                 raise SourceConflict("A waiting UpdateID cannot change its confirmed authority.")
             expected_end = retained.get("EndScanID") or original_proof.get(
@@ -352,7 +360,11 @@ class SourceAdminReviewService:
 
         payload = locked["payload"]
         current = SourceAdminReviewDAL(connect).configuration_context(locked["KVK_NO"])
-        if current != {key: payload[key] for key in ("snapshot", "periods", "season_version")}:
+        from kvk.models.source_configuration import configuration_meaning
+
+        if configuration_meaning(current["snapshot"]) != configuration_meaning(
+            payload["snapshot"]
+        ) or any(current[key] != payload[key] for key in ("periods", "season_version")):
             raise SourceConflict(
                 "Imported configuration or affected results changed; review again."
             )

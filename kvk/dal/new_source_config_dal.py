@@ -69,6 +69,7 @@ def snapshot_endpoint_request(
     new_start_scan_id=UNCHANGED_START,
     reviewed_configuration=None,
     review_id=None,
+    current_weights=None,
 ):
     require_utc(requested_utc)
     if (
@@ -90,6 +91,18 @@ def snapshot_endpoint_request(
     from kvk.dal.season_source_dal import require_source
 
     require_source(cursor, kvk_no, SOURCE_KEY)
+    if current_weights is not None:
+        from kvk.dal.source_admin_review_dal import SourceAdminReviewDAL
+        from kvk.models.source_configuration import weight_values
+
+        imported = SourceAdminReviewDAL.imported_configuration(cursor, kvk_no)
+        if reviewed_configuration is not None or weight_values(
+            current_weights["weights"]
+        ) != weight_values(imported["weights"]):
+            raise SourceConflict(
+                "Weight refresh must use the current imported season coefficients."
+            )
+        provenance = dict(provenance, current_weights=True)
     if reviewed_configuration is not None:
         cursor.execute(
             "SELECT PayloadJson,ActorID,ReviewKind,ReviewState FROM KVK.SourceAdminReview WHERE ReviewID=? AND KVK_NO=?",
@@ -119,6 +132,8 @@ def snapshot_endpoint_request(
         raise SourceConflict("Missing approved base configuration.")
     old_start = base["StartScanID"]
     start = old_start if new_start_scan_id is UNCHANGED_START else new_start_scan_id
+    if current_weights is not None and (start != old_start or new_end_scan_id != base["EndScanID"]):
+        raise SourceConflict("Current weights cannot change scan endpoints.")
     if start is not None and (type(start) is not int or not 1 <= start <= INT_MAX):
         raise ValueError("Invalid desired start endpoint.")
     if new_end_scan_id is not None and start is not None:
@@ -130,6 +145,10 @@ def snapshot_endpoint_request(
     content = {"base": base_config_id, "period": period_id, "start": start, "end": new_end_scan_id}
     if reviewed_configuration is not None:
         content["configuration"] = reviewed_configuration
+    if current_weights is not None:
+        from kvk.models.source_configuration import weight_digest_tokens
+
+        content["weights"] = weight_digest_tokens(current_weights["weights"])
     content_hash = digest(content)
     cursor.execute(
         "SELECT * FROM KVK.SourceConfigRequest WHERE SourceKey=? AND KVK_NO=? AND PeriodID=? AND BaseConfigVersionID=? AND ConfigContentHash=?",
@@ -149,6 +168,7 @@ def snapshot_endpoint_request(
         base["EndScanID"] == new_end_scan_id
         and old_start == start
         and reviewed_configuration is None
+        and current_weights is None
     ):
         return None
     if start is not None and new_end_scan_id is not None:
@@ -204,7 +224,9 @@ def snapshot_endpoint_request(
         (
             digest([*reviewed_configuration["weights"], reviewed_configuration["effective"]])
             if reviewed_configuration is not None
-            else base["WeightDigest"]
+            else (
+                digest(content["weights"]) if current_weights is not None else base["WeightDigest"]
+            )
         ),
         utc,
         actor,
@@ -264,6 +286,20 @@ def snapshot_endpoint_request(
             y,
             z,
             datetime.fromisoformat(reviewed_configuration["effective"]).replace(tzinfo=None),
+        )
+    if current_weights is not None:
+        # Only the newly allocated version is changed; every retained snapshot survives.
+        x, y, z = current_weights["weights"]
+        cursor.execute(
+            "UPDATE KVK.SourceWeightConfig SET WeightT4X=?,WeightT5Y=?,WeightDeadsZ=?,WeightT4XSource=?,WeightT5YSource=?,WeightDeadsZSource=?,EffectiveFromUTC=? WHERE ConfigVersionID=?",
+            Decimal(x),
+            Decimal(y),
+            Decimal(z),
+            x,
+            y,
+            z,
+            datetime.fromisoformat(current_weights["effective"]).replace(tzinfo=None),
+            config_id,
         )
     cursor.execute(
         "INSERT KVK.SourceConfigRequest (RequestID,SourceKey,KVK_NO,PeriodID,PeriodKey,BaseConfigVersionID,DesiredConfigVersionID,ConfigContentHash,OldStartScanID,OldEndScanID,NewStartScanID,NewEndScanID,Origin,Actor,RequestedUTC,RequestState,Reason,ProvenanceJson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)",

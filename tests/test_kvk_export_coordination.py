@@ -432,9 +432,11 @@ def test_cas_zero_rows_is_not_success(monkeypatch):
 
 
 def test_running_a_is_untouched_while_b_coalesces_to_c_with_original_ticket(monkeypatch):
-    from kvk.dal import season_source_dal, source_update_dal
+    from kvk.dal import season_source_dal, source_update_dal, source_weight_dal
 
     monkeypatch.setattr(season_source_dal, "require_source", lambda *_: None)
+    weight_check = Mock()
+    monkeypatch.setattr(source_weight_dal, "require_current_export_weights", weight_check)
 
     request = spec()
     pending_id, running_id, final_id = str(uuid4()), str(uuid4()), str(uuid4())
@@ -468,6 +470,7 @@ def test_running_a_is_untouched_while_b_coalesces_to_c_with_original_ticket(monk
         ),
     )
     dal.enqueue(request)
+    weight_check.assert_called_once()
     assert [call.args[1] for call in sync.call_args_list] == [
         pending["IntentID"],
         request.intent_id,

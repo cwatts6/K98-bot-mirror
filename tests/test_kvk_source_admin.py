@@ -386,6 +386,59 @@ def accepted_b0(service):
     return service.confirm(ADMIN, row["AttemptID"], 2)
 
 
+@pytest.mark.parametrize("changed", [None, "timestamp", "weights", "window"])
+def test_imported_window_uses_accepted_times_and_revalidates_meaning(rig, changed):
+    service, repo = rig
+    row = accepted_b0(service)
+    repo.baseline_setup = dict(
+        mapping=[[101, 1, "North"], [102, 2, "South"]],
+        weights=["10", "20", "40"],
+        effective="2026-10-11T14:02:35+00:00",
+        windows=[],
+    )
+    window = dict(
+        WindowName="Pass 4",
+        WindowSeq=1,
+        StartScanID=12,
+        EndScanID=18,
+        period_key=None,
+        start_utc="2026-09-05T15:26:00+00:00",
+        end_utc="2026-09-07T07:21:00+00:00",
+    )
+    repo.configuration_windows = lambda *a, **kw: [deepcopy(window)]
+    draft = service.prepare_configuration(
+        ADMIN,
+        row["AttemptID"],
+        2,
+        window="fight:pass4",
+        imported_window_name="Pass 4",
+        coverage="",
+        mapping="",
+        weights="",
+        reason="Reviewed imported window",
+    )
+    spec = draft["payload"]["proposal"]["configuration"]
+    assert (spec["start"], spec["end"]) == (12, 18)
+    assert (spec["coverage_start"], spec["coverage_end"]) == (
+        window["start_utc"],
+        window["end_utc"],
+    )
+    assert "2026-09-05" in service.summary(draft)
+    if changed == "timestamp":
+        repo.baseline_setup.update(
+            effective="2026-10-12T10:19:48+00:00", weights=["10.0", "20", "40"]
+        )
+    elif changed == "weights":
+        repo.baseline_setup["weights"][0] = "99"
+    elif changed == "window":
+        window["EndScanID"] = 19
+    if changed in ("weights", "window"):
+        with pytest.raises(SourceConflict, match="changed"):
+            service.confirm(ADMIN, row["AttemptID"], 3)
+    else:
+        assert service.confirm(ADMIN, row["AttemptID"], 3)["payload"]["outcome"]
+
+
 def test_initial_configuration_is_reviewed_and_retains_b0(rig):
     service, repo = rig
     row = accepted_b0(service)
@@ -689,7 +742,7 @@ def test_real_dal_endpoint_configuration_calls_accepted_request_api(monkeypatch)
     assert request.call_args.kwargs["origin"] == "admin"
 
 
-@pytest.mark.parametrize("change", ["mapping", "weight", "effective", "coverage"])
+@pytest.mark.parametrize("change", ["mapping", "coverage"])
 def test_new_period_cannot_replace_frozen_season_components(monkeypatch, change):
     from decimal import Decimal
 

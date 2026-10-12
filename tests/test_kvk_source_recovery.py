@@ -212,7 +212,10 @@ def test_acceptance_wake_only_after_confirm(monkeypatch):
 
 
 def test_recovery_discovers_explicit_updates_only(monkeypatch):
-    from kvk.services import source_update_service
+    from kvk.services import source_update_service, source_weight_service
+
+    refresh = Mock()
+    monkeypatch.setattr(source_weight_service, "refresh_season_weights", refresh)
 
     paired = Mock()
     monkeypatch.setattr(source_update_service, "SourceUpdateService", lambda connect: paired)
@@ -220,6 +223,7 @@ def test_recovery_discovers_explicit_updates_only(monkeypatch):
     dal.ready_updates.return_value = [{"UpdateID": "first"}, {"UpdateID": "second"}]
     worker = recovery.RecoveryService(dal, Mock())
     assert worker.recover_period(16, "period") is paired.publish.return_value
+    refresh.assert_called_once_with(dal.connect, 16)
     assert [call.args[0] for call in paired.publish.call_args_list] == ["first", "second"]
     dal.load_inputs.assert_not_called()
     dal.ready_updates.return_value = []

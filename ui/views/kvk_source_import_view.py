@@ -254,9 +254,10 @@ class SourceMetadataModal(discord.ui.Modal):
 
 
 class SourceConfigurationModal(discord.ui.Modal):
-    def __init__(self, view):
+    def __init__(self, view, imported_window=None):
         super().__init__(title="Approve source configuration", timeout=CONFIRM_SECONDS)
         self.source_view = view
+        self.imported_window = imported_window
         self.window = discord.ui.InputText(
             label="Period | label | StartScanID | EndScanID",
             placeholder="fight:pass4 | Pass 4 | 10 | 13",
@@ -266,6 +267,11 @@ class SourceConfigurationModal(discord.ui.Modal):
             label="Initial only: coverage start UTC | end UTC", required=False, max_length=100
         )
         self.reason = discord.ui.InputText(label="Configuration approval reason", max_length=512)
+        if imported_window is not None:
+            self.window.label = "Period key (e.g. fight:pass4)"
+            self.window.placeholder = "fight:pass4"
+            self.window.value = imported_window.get("period_key") or ""
+            self.coverage.label = "Optional differing report coverage: UTC | UTC"
         # Kingdoms/camps/weights are read from kvk_list by the service, not retyped here.
         for item in (self.window, self.coverage, self.reason):
             self.add_item(item)
@@ -285,6 +291,11 @@ class SourceConfigurationModal(discord.ui.Modal):
                 mapping="",
                 weights="",
                 reason=self.reason.value,
+                **(
+                    {"imported_window_name": self.imported_window["WindowName"]}
+                    if self.imported_window
+                    else {}
+                ),
             )
             view = KvkSourceImportView(self.source_view.service, row, action="configure")
             self.source_view.disable_all_items()
@@ -292,6 +303,57 @@ class SourceConfigurationModal(discord.ui.Modal):
             await send_receipt(interaction, self.source_view.service, row, view, saved=True)
         except Exception as exc:
             await report_failure(interaction, exc)
+
+
+class SourceWindowPicker(discord.ui.View):
+    """Window selection only; fresh service reads own configuration and timestamps."""
+
+    def __init__(self, source_view, windows, page=0):
+        super().__init__(timeout=CONFIRM_SECONDS)
+        self.source_view, self.windows, self.page = source_view, windows, page
+        self.window_select.options = [
+            discord.SelectOption(
+                label=w["WindowName"],
+                value=str(i),
+                description=f"Scans {w['StartScanID']} → {w['EndScanID']}"[:100],
+            )
+            for i, w in enumerate(windows)
+            if page * 25 <= i < (page + 1) * 25
+        ]
+        self.previous.disabled = page == 0
+        self.next_page.disabled = (page + 1) * 25 >= len(windows)
+
+    async def interaction_check(self, interaction):
+        return await self.source_view.interaction_check(interaction)
+
+    @discord.ui.select(
+        placeholder="Select an imported reporting window", min_values=1, max_values=1
+    )
+    async def window_select(self, select, interaction):
+        try:
+            await self.source_view.authorized(interaction)
+            index = int(select.values[0])
+            if not self.page * 25 <= index < min(len(self.windows), (self.page + 1) * 25):
+                raise ValueError("Select a window from this page.")
+            await interaction.response.send_modal(
+                SourceConfigurationModal(self.source_view, self.windows[index])
+            )
+        except Exception as exc:
+            await report_failure(interaction, exc)
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+    async def previous(self, button, interaction):
+        await interaction.response.edit_message(
+            view=SourceWindowPicker(self.source_view, self.windows, max(0, self.page - 1))
+        )
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+    async def next_page(self, button, interaction):
+        await interaction.response.edit_message(
+            view=SourceWindowPicker(
+                self.source_view, self.windows, min((len(self.windows) - 1) // 25, self.page + 1)
+            )
+        )
 
 
 class SourceRosterModal(discord.ui.Modal):
@@ -406,6 +468,21 @@ class KvkSourceImportView(discord.ui.View):
                 self.action,
                 "prepare",
             )
+            if self.action == "configure" and not self.roster_correction:
+                if not await safe_defer(interaction, ephemeral=True):
+                    return
+                windows = await asyncio.to_thread(
+                    self.service.configuration_windows, actor, self.receipt_id, self.version
+                )
+                if not windows:
+                    raise ValueError("Import the season's reporting windows before configuration.")
+                await send_or_followup(
+                    interaction,
+                    "Select the imported window. Accepted scan timestamps will be shown for review; endpoint edits belong in the source sheet.",
+                    ephemeral=True,
+                    view=SourceWindowPicker(self, windows),
+                )
+                return
             modal = (
                 (
                     SourceRosterModal(self)

@@ -22,7 +22,7 @@ class SourceUpdateService:
     def associate(self, update_id, **association):
         return self.dal.associate(update_id, **association)
 
-    def publish(self, update_id):
+    def publish(self, update_id, *, emit_export_intent=True):
         update = self.dal.resume_endpoint(update_id)
         if update["UpdateState"] == "superseded":
             update = self.dal.replay_target(update_id)
@@ -107,5 +107,6 @@ class SourceUpdateService:
             action_type="endpoint_update" if request else confirmed_action,
             request_id=update["RequestID"],
             admin_authorized=confirmed_action != "publish",
+            **({"emit_export_intent": False} if not emit_export_intent else {}),
         )
-        return result["complete"]
+        return result.get("complete") if emit_export_intent else result

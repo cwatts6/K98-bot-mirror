@@ -288,6 +288,8 @@ class ExportRuntime(RuntimeLifetime):
             budget_factory=budget,
             stream_factory=self.jobs.retirement,
         )
+        from kvk.services.source_weight_service import refresh_season_weights
+
         self.operator = SourceExportOperatorService(
             access_factory=access_from_config,
             pools=self.pools,
@@ -296,6 +298,9 @@ class ExportRuntime(RuntimeLifetime):
             generation_loader=generation_loader,
             reconciler=self.reconciler,
             retirement_recovery=recovery,
+            weight_refresher=lambda season: refresh_season_weights(
+                connect, season, require_current=True
+            ),
         )
         legacy_adapter = LegacyProviderJob(
             lambda _: recorded_clients(),

@@ -476,7 +476,10 @@ class ExportCoordinationDAL:
                 from kvk.dal.source_update_dal import read_export_intent
 
                 require_source(cursor, spec.kvk_no, "snapshot_report_v1")
-                intent, _ = read_export_intent(cursor, spec.intent_id)
+                intent, vector = read_export_intent(cursor, spec.intent_id)
+                from kvk.dal.source_weight_dal import require_current_export_weights
+
+                require_current_export_weights(cursor, intent, vector)
                 if (
                     intent["KVK_NO"] != spec.kvk_no
                     or bytes(intent["VectorHash"]) != spec.input_hash

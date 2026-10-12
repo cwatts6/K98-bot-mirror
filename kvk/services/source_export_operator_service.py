@@ -46,6 +46,7 @@ class SourceExportOperatorService:
         generation_loader,
         reconciler,
         retirement_recovery=None,
+        weight_refresher=None,
         now=time.monotonic,
     ):
         if not coordinator.output_operations:
@@ -57,6 +58,7 @@ class SourceExportOperatorService:
             reconciler,
         )
         self.retirement_recovery = retirement_recovery
+        self.weight_refresher = weight_refresher
         self.now = now
         self._previews = {}
         self._lock = threading.RLock()
@@ -115,6 +117,8 @@ class SourceExportOperatorService:
     @bound_runtime
     def export(self, actor, kvk_no, index_file_id=None):
         self.authorize(actor, "export")
+        if self.weight_refresher is not None:
+            self.weight_refresher(kvk_no)
         context = self.pools.export_context(self.pools.resolve(kvk_no, index_file_id))
         pool, intent = context["pool"], context.get("intent")
         if not intent:

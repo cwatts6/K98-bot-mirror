@@ -84,11 +84,45 @@ def configuration_review_authorized(cursor, update):
     return True
 
 
+def window_assignment_authorized(update, config):
+    """Check the confirmed window even before player revisions are attached."""
+    evidence = json.loads(update["ConfirmationJson"])
+    assignment = evidence.get("period_assignment")
+    if assignment is None:
+        return False
+    if not isinstance(assignment, dict):
+        raise SourceConflict("Invalid confirmed period assignment.")
+    end = assignment.get("end_scan_id")
+    expected = dict(
+        period_id=update["PeriodID"],
+        config_version_id=update["ConfigVersionID"],
+        start_scan_id=config["StartScanID"],
+        end_scan_id=end,
+        actor=update["ConfirmedBy"],
+    )
+    if (
+        not evidence.get("reason")
+        or assignment != expected
+        or type(end) is not int
+        or end < config["StartScanID"]
+        or (config["EndScanID"] is not None and end > config["EndScanID"])
+        or any(
+            update[column] is not None and update[column] != expected[key]
+            for column, key in (("StartScanID", "start_scan_id"), ("EndScanID", "end_scan_id"))
+        )
+    ):
+        raise SourceConflict("Period assignment differs from the confirmed window.")
+    return True
+
+
 def validate_update(cursor, update, *, complete=False, sealed=False):
     """Validate relationships not established by the static scoped foreign keys."""
     if update["SourceKey"] != SOURCE_KEY:
         raise SourceConflict("Unknown update source.")
     configuration_authority = configuration_review_authorized(cursor, update)
+    from kvk.dal.source_weight_dal import validate_weight_authority
+
+    weight_authority = validate_weight_authority(cursor, update)
     cursor.execute(
         "SELECT c.RosterID,c.MappingDigest,r.B0RevisionID,w.StartScanID,w.EndScanID,p.PeriodKind,p.CoverageStartUTC,p.CoverageEndUTC "
         "FROM KVK.SourceConfigVersion c JOIN KVK.SourceRoster r ON r.RosterID=c.RosterID "
@@ -126,8 +160,12 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
         )
     ):
         raise SourceConflict("No-fight requires configured equal endpoints and no aggregate.")
-    if update["CoverageStartUTC"] != config["CoverageStartUTC"] or (
-        config["CoverageEndUTC"] is not None and update["CoverageEndUTC"] > config["CoverageEndUTC"]
+    if not window_assignment_authorized(update, config) and (
+        update["CoverageStartUTC"] != config["CoverageStartUTC"]
+        or (
+            config["CoverageEndUTC"] is not None
+            and update["CoverageEndUTC"] > config["CoverageEndUTC"]
+        )
     ):
         raise SourceConflict("Update coverage exceeds the configured period.")
     if complete and (
@@ -280,6 +318,10 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
             raise SourceConflict("Observation is not associated with this period.")
         if (
             not sealed
+            and not (
+                weight_authority
+                and json.loads(update["ConfirmationJson"]).get("automatic_weight_refresh")
+            )
             and event["SelectedRevisionID"] != revision
             and revision != config["B0RevisionID"]
         ):
@@ -324,7 +366,12 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
         ):
             raise SourceConflict("Aggregate report family differs.")
         if (
-            not sealed and aggregate["SelectedRevisionID"] != update["AggregateRevisionID"]
+            not sealed
+            and not (
+                weight_authority
+                and json.loads(update["ConfirmationJson"]).get("automatic_weight_refresh")
+            )
+            and aggregate["SelectedRevisionID"] != update["AggregateRevisionID"]
         ) or bytes(aggregate["MappingDigest"]) != bytes(config["MappingDigest"]):
             raise SourceConflict("Aggregate revision or frozen mapping is stale.")
         if not counterpart or counterpart != update["AggregateRevisionID"]:
@@ -679,7 +726,13 @@ class SourceUpdateDAL:
 
 
 def commit_complete(
-    cursor, *, update, publication_id, expected_public_version, expected_update_version
+    cursor,
+    *,
+    update,
+    publication_id,
+    expected_public_version,
+    expected_update_version,
+    emit_export_intent=True,
 ):
     """Caller holds all season/selection/config locks and owns the only commit."""
     cursor.execute(
@@ -738,6 +791,8 @@ def commit_complete(
     )
     if one(cursor) is None:
         raise SourceConflict("Sealed update CAS lost.")
+    if not emit_export_intent:
+        return None  # Only a caller-owned season transaction may defer the final vector.
     cursor.execute(
         "SELECT s.PeriodID,s.UpdateID,s.PublicationID,s.PublicSelectionVersion,u.ConfigVersionID,p.ManifestHash "
         "FROM KVK.SourceCompleteSelection s JOIN KVK.SourceUpdate u ON u.UpdateID=s.UpdateID "

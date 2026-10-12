@@ -459,7 +459,7 @@ def test_s8c_configuration_capture_does_not_invent_attestation(monkeypatch):
 
     monkeypatch.setattr(bot_config, "KVK_SOURCE_INTAKE_ENABLED", True)
     monkeypatch.setattr(bot_config, "KVK_SOURCE_RECOVERY_ENABLED", False)
-    capture = Mock()
+    capture = Mock(return_value=())
     monkeypatch.setattr(SourceAdminReviewDAL, "snapshot_import", capture)
     cursor = Mock()
     assert (

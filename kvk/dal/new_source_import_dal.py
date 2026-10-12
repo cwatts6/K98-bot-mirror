@@ -504,22 +504,12 @@ class SourceImportDAL:
             period = one(cursor)
             if not period or period["PeriodKind"] == "no_fight":
                 raise SourceConflict("Aggregate needs an explicitly configured combat period.")
-            if c.coverage_start_utc.replace(tzinfo=None) != period["CoverageStartUTC"]:
-                raise SourceConflict("Aggregate coverage start differs from period.")
-            if (
-                period["CoverageEndUTC"]
-                and c.coverage_end_utc.replace(tzinfo=None) > period["CoverageEndUTC"]
-            ):
-                raise SourceConflict("Aggregate exceeds period coverage.")
+            # The report's explicitly confirmed coverage is a source fact. Player
+            # endpoints can be corrected independently of the original period envelope.
             state = c.report_state.value
             if state != "live":
                 if not admission.admin_authorized:
                     raise SourceConflict("Final aggregate requires authorized finalization.")
-                if (
-                    period["CoverageEndUTC"] is None
-                    or c.coverage_end_utc.replace(tzinfo=None) != period["CoverageEndUTC"]
-                ):
-                    raise SourceConflict("Final aggregate requires exact closed-period coverage.")
             cursor.execute(
                 "SELECT * FROM KVK.SourceAggregateReport WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? AND PeriodKey=?",
                 SOURCE_KEY,

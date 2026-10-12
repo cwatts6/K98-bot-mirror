@@ -211,6 +211,7 @@ class SourceAdminReviewDAL:
         cursor.execute("SELECT @@TRANCOUNT")
         if cursor.fetchone()[0] < 1:
             raise ValueError("Configuration snapshots require the importer transaction.")
+        captured = []
         for season, coefficients in sorted(source_weights.items()):
             lock_scope(cursor, season)
             cursor.execute("SELECT SourceKey FROM KVK.SeasonSource WHERE KVK_NO=?", season)
@@ -244,6 +245,8 @@ class SourceAdminReviewDAL:
                 now.replace(tzinfo=None),
                 (now + timedelta(days=365)).replace(tzinfo=None),
             )
+            captured.append(season)
+        return tuple(captured)
 
     def configuration(self, kvk_no):
         with transaction(self.connect) as cursor:
@@ -404,5 +407,8 @@ class SourceAdminReviewDAL:
                     json.loads(request["ProvenanceJson"]).get("configuration_review")
                     if request
                     else None
+                ),
+                current_weights=bool(
+                    request and json.loads(request["ProvenanceJson"]).get("current_weights")
                 ),
             )

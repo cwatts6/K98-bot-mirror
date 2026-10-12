@@ -621,10 +621,12 @@ An expired view can be resumed with `/kvk_admin source action:resume receipt:<UU
 again when its durable confirmation expires. Status reports the accepted source revision and
 version needed by finalization/correction. Repeated accepted confirmations return their receipt.
 
-Use configure with your accepted B0 player receipt. Initial onboarding collects one period,
-its exact endpoints/coverage, the complete camp map, coefficient strings and effective UTC.
-For an existing period, configure changes only StartScanID/EndScanID; leave coverage/map/weights
-empty. Either endpoint may change, supplied end must be >= start, and the approval records a
+Use configure with your accepted B0 player receipt. Select an imported window, enter its period
+key and review the accepted endpoint scan times. Initial coverage defaults to those scan times;
+enter explicit differing report coverage only when needed. The camp map and current player DKP
+coefficients come from the imported season configuration. Import time is provenance, not a
+weight-equality gate. For an existing period, leave initial coverage empty. Either endpoint may
+change in the source sheet; supplied end must be >= start, and the approval records a
 pending endpoint request without a second correction command. Ordinary configuration cannot replace B0.
 For an explicit roster correction, first accept an authorized correction of the original B0
 observation, then use configure with `roster_correction:true` and that receipt. Review the
@@ -651,8 +653,16 @@ Additional optional arguments: `kvk_no`, `source`, `review`, `update_id`, `file_
   Confirm/change season, then review each file's kind and actual UTC metadata. Unlabelled files
   need explicit metadata; upload time is never used. Missing baseline configuration blocks
   acceptance and permits Check again or cancellation. Original files remain retained.
-- `configure receipt:<B0 receipt>`: initialise a window from accepted B0. Kingdoms/camps/weights
-  are imported; provide the period/label and UTC coverage. Start/end scan IDs may be pending.
+- `configure receipt:<B0 receipt>`: select an imported window from a paginated picker and enter
+  its period key. Endpoints and label come from the imported row; accepted scan UTC timestamps
+  appear in the review. The start must be accepted; the end may be pending. Initial coverage
+  defaults to accepted scan times, with an explicit override for differing report coverage.
+  Kingdoms/camps/current player weights are imported and rechecked at confirmation.
+- Changed player weights create new configuration and calculation snapshots. Recovery refreshes
+  compatible completed periods together; an export request also checks current weights before
+  reuse or admission. Pending incompatible window/map/roster work retains the previous complete
+  results and blocks a current-weight export. Supplied kingdom/camp statistics, including DKP,
+  remain unchanged. See [current weights and windows](kvk_source_migration/current_weights_windows_20261012.md).
 - `configure kvk_no:<season>`: review imported changes across existing source windows. The
   before/after review identifies affected base updates and retained counterpart revisions.
   Typing `VALID` requests explicit counterpart validity attestation, confirmed on the full review.

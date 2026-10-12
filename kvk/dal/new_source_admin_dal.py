@@ -109,6 +109,43 @@ class SourceAdminDAL:
             return SourceAdminReviewDAL.imported_configuration(cursor, kvk_no)
         return SourceAdminReviewDAL(self.connect).configuration(kvk_no)
 
+    def configuration_windows(self, kvk_no, *, cursor=None):
+        def read(current):
+            imported = self.imported_configuration(kvk_no, cursor=current)
+            current.execute(
+                "SELECT DISTINCT w.WindowName,p.PeriodKey FROM KVK.SourceWindowConfig w JOIN KVK.SourcePeriod p ON p.SourceKey=w.SourceKey AND p.KVK_NO=w.KVK_NO AND p.PeriodKey=w.PeriodKey WHERE w.SourceKey=? AND w.KVK_NO=?",
+                SOURCE_KEY,
+                kvk_no,
+            )
+            periods = {}
+            for row in rows(current):
+                if row["WindowName"] in periods and periods[row["WindowName"]] != row["PeriodKey"]:
+                    raise SourceConflict("Imported window has ambiguous period mapping.")
+                periods[row["WindowName"]] = row["PeriodKey"]
+            current.execute(
+                "SELECT s.LogicalScanID,o.ScanStartUTC FROM KVK.SourceLogicalScan s JOIN KVK.SourceObservation o ON o.ObservationID=s.ObservationID WHERE s.SourceKey=? AND s.KVK_NO=?",
+                SOURCE_KEY,
+                kvk_no,
+            )
+            scans = {
+                r["LogicalScanID"]: r["ScanStartUTC"].isoformat() + "+00:00" for r in rows(current)
+            }
+            return [
+                dict(
+                    w,
+                    period_key=periods.get(w["WindowName"]),
+                    start_utc=scans.get(w["StartScanID"]),
+                    end_utc=scans.get(w["EndScanID"]),
+                )
+                for w in imported["windows"]
+            ]
+
+        if cursor is not None:
+            return read(cursor)
+        with transaction(self.connect) as current:
+            lock_scope(current, kvk_no)
+            return read(current)
+
     def cancel(self, receipt_id, actor, guild_id, expected_version):
         with transaction(self.connect) as cursor:
             row = self._receipt(cursor, receipt_id, actor, guild_id)
@@ -418,15 +455,9 @@ class SourceAdminDAL:
                     frozen["ConfigVersionID"],
                 )
                 frozen_map = [(m["Kingdom"], m["CampID"], m["CampName"]) for m in rows(cursor)]
-                frozen_weights = [frozen[k] for k in ("WeightT4X", "WeightT5Y", "WeightDeadsZ")]
-                if (
-                    frozen_map != [tuple(entry) for entry in spec["mapping"]]
-                    or frozen_weights != [Decimal(value) for value in spec["weights"][:3]]
-                    or frozen["EffectiveFromUTC"]
-                    != datetime.fromisoformat(spec["weights"][3]).replace(tzinfo=None)
-                ):
+                if frozen_map != [tuple(entry) for entry in spec["mapping"]]:
                     raise SourceConflict(
-                        "A new period must retain the season's approved map and weights."
+                        "The imported kingdom/camp map differs from the approved season map; review that change separately."
                     )
         prior_period = proposal["guard"].get("period")
         if prior_period:

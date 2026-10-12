@@ -162,7 +162,12 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True, ass
         snapshot.calculation.eligible_count,
     ):
         raise SourceConflict("Candidate differs from approved configuration/roster.")
-    if stored["CoverageEndUTC"] != (
+    from kvk.dal.source_update_dal import has_period_assignment
+
+    assigned_window = bool(assigned_update and has_period_assignment(assigned_update))
+    if assigned_window and config.closes_at_utc is not None:
+        raise SourceConflict("Assigned player windows must use their confirmed scan endpoints.")
+    if not assigned_window and stored["CoverageEndUTC"] != (
         config.closes_at_utc.replace(tzinfo=None) if config.closes_at_utc else None
     ):
         raise SourceConflict("Candidate period close differs from approved coverage.")
@@ -182,8 +187,8 @@ def validate_snapshot_inputs(cursor, snapshot, b0, *, require_selected=True, ass
             config.start_scan_id,
             config.end_scan_id,
             config.end_scan_id,
-            stored["CoverageEndUTC"],
-            stored["CoverageEndUTC"],
+            None if assigned_window else stored["CoverageEndUTC"],
+            None if assigned_window else stored["CoverageEndUTC"],
         )
         latest = one(cursor)["Latest"]
         if latest != (selection.end.logical_scan_id if selection.end else None):
@@ -484,6 +489,7 @@ class PublicationDAL:
         expected_update_version=None,
         expected_public_version=None,
         expected_season_version=None,
+        emit_export_intent=True,
         validate_inputs,
     ):
         if action_type not in (
@@ -724,6 +730,7 @@ class PublicationDAL:
                     publication_id=publication_id,
                     expected_public_version=expected_public_version,
                     expected_update_version=expected_update_version,
+                    emit_export_intent=emit_export_intent,
                 )
             cursor.execute("SELECT * FROM KVK.SourceAction WHERE ActionID=?", action_id)
             result = one(cursor)

@@ -14,6 +14,7 @@ from ui.views.kvk_source_import_view import (
     SourceRosterModal,
     SourceUploadSeasonModal,
     SourceUploadStartView,
+    SourceWindowPicker,
     send_receipt,
 )
 
@@ -57,6 +58,44 @@ def make_view(action="accept"):
         check_receipt_action=Mock(return_value=row),
     )
     return KvkSourceImportView(service, row, action=action), service
+
+
+@pytest.mark.asyncio
+async def test_configuration_picker_pages_and_enforces_owner():
+    view, service = make_view("configure")
+    windows = [
+        dict(WindowName=f"Window {i}", StartScanID=i + 1, EndScanID=i + 2, period_key=None)
+        for i in range(30)
+    ]
+    picker = SourceWindowPicker(view, windows)
+    assert len(picker.window_select.options) == 25
+    assert picker.previous.disabled and not picker.next_page.disabled
+    second = SourceWindowPicker(view, windows, 1)
+    assert len(second.window_select.options) == 5 and second.next_page.disabled
+    assert not await picker.interaction_check(interaction(owner=11))
+    picker.window_select._selected_values = ["0"]
+    inter = interaction()
+    inter.data = {"values": ["0"]}
+    picker.window_select._interaction = inter
+    await picker.window_select.callback(inter)
+    modal = inter.response.send_modal.call_args.args[0]
+    assert modal.imported_window == windows[0]
+    assert "Period key" in modal.window.label
+    assert not modal.coverage.required
+
+
+@pytest.mark.asyncio
+async def test_configuration_prepare_reads_imported_windows_after_acknowledging():
+    view, service = make_view("configure")
+    service.configuration_windows = Mock(
+        return_value=[dict(WindowName="Pass 4", StartScanID=12, EndScanID=18)]
+    )
+    inter = interaction()
+    inter.response.defer.side_effect = lambda **kw: setattr(inter.response, "is_done", lambda: True)
+    await view.prepare_button.callback(inter)
+    inter.response.defer.assert_awaited_once_with(ephemeral=True)
+    service.configuration_windows.assert_called_once_with(ADMIN, "receipt", 2)
+    assert isinstance(inter.followup.send.call_args.kwargs["view"], SourceWindowPicker)
 
 
 @pytest.mark.asyncio

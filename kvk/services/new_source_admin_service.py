@@ -433,8 +433,22 @@ class SourceAdminService:
             receipt_id, str(actor.user_id), str(actor.guild_id), version, proposal
         )
 
+    def configuration_windows(self, actor, receipt_id, version):
+        row = self.check_receipt_action(actor, receipt_id, version, "configure", "prepare")
+        return self.repository.configuration_windows(row["KVK_NO"])
+
     def prepare_configuration(
-        self, actor, receipt_id, version, *, window, coverage, mapping, weights, reason
+        self,
+        actor,
+        receipt_id,
+        version,
+        *,
+        window,
+        coverage,
+        mapping,
+        weights,
+        reason,
+        imported_window_name=None,
     ):
         self.access.authorize(actor, "configure")
         row = self.receipt(actor, receipt_id, "configure")
@@ -446,6 +460,29 @@ class SourceAdminService:
             raise ValueError("Configuration requires this owner's accepted B0 player receipt.")
         if not reason.strip() or len(reason) > 512:
             raise ValueError("Configuration approval requires a bounded audit reason.")
+        imported_window = None
+        if imported_window_name is not None:
+            choices = self.repository.configuration_windows(row["KVK_NO"])
+            matching = [w for w in choices if w["WindowName"] == imported_window_name]
+            if len(matching) != 1:
+                raise SourceConflict("The imported window changed; select it again.")
+            imported_window = matching[0]
+            period_key = window.strip()
+            if imported_window["period_key"] and imported_window["period_key"] != period_key:
+                raise SourceConflict("The imported window already belongs to another period.")
+            if not imported_window["start_utc"]:
+                raise SourceConflict(
+                    "Accept the imported window's start scan before configuring it."
+                )
+            window = "|".join(
+                str(v) if v is not None else ""
+                for v in (
+                    period_key,
+                    imported_window["WindowName"],
+                    imported_window["StartScanID"],
+                    imported_window["EndScanID"],
+                )
+            )
         period, label, start, end = (x.strip() for x in window.split("|"))
         if (
             not re.fullmatch(r"overall|(?:fight|no_fight):[a-z][a-z0-9_-]{0,63}", period)
@@ -476,6 +513,8 @@ class SourceAdminService:
                 weights = "|".join(
                     [*imported_configuration["weights"], imported_configuration["effective"]]
                 )
+            if imported_window is not None and not coverage.strip():
+                coverage = imported_window["start_utc"] + "|" + (imported_window["end_utc"] or "")
             begin, finish = (x.strip() for x in coverage.split("|"))
             begin, finish = utc_text(begin), utc_text(finish) if finish else None
             if finish and finish < begin:
@@ -522,6 +561,7 @@ class SourceAdminService:
             "receipt_id": receipt_id,
             "b0_revision": b0_revision,
             "imported_configuration": imported_configuration,
+            "imported_window": imported_window,
             "expires": (self.now() + timedelta(seconds=CONFIRM_SECONDS)).isoformat(),
         }
         return self.repository.prepare(
@@ -584,6 +624,8 @@ class SourceAdminService:
         return row
 
     def confirm(self, actor, receipt_id, version):
+        from kvk.models.source_configuration import configuration_meaning
+
         row = self.receipt(actor, receipt_id)
         proposal = row["payload"].get("proposal")
         if not proposal:
@@ -596,11 +638,17 @@ class SourceAdminService:
             if self.now() >= utc_text(saved["expires"]):
                 raise SourceConflict("Confirmation expired; resume and prepare it again.")
             if saved["action"] == "configure":
-                if (
-                    saved.get("imported_configuration") is not None
-                    and self.repository.imported_configuration(locked["KVK_NO"], cursor=cursor)
-                    != saved["imported_configuration"]
-                ):
+                if saved.get("imported_window") is not None:
+                    current_windows = self.repository.configuration_windows(
+                        locked["KVK_NO"], cursor=cursor
+                    )
+                    if saved["imported_window"] not in current_windows:
+                        raise SourceConflict(
+                            "Imported endpoints or accepted scan timestamps changed; review the window again."
+                        )
+                if saved.get("imported_configuration") is not None and configuration_meaning(
+                    self.repository.imported_configuration(locked["KVK_NO"], cursor=cursor)
+                ) != configuration_meaning(saved["imported_configuration"]):
                     raise SourceConflict("Imported configuration changed; review it again.")
                 if saved.get("mode") == "roster":
                     return self.repository.correct_roster(
@@ -630,7 +678,9 @@ class SourceAdminService:
                 current_setup = self.repository.baseline_configuration(
                     locked["KVK_NO"], cursor=cursor
                 )
-                if current_setup != saved.get("baseline_configuration"):
+                if configuration_meaning(current_setup) != configuration_meaning(
+                    saved.get("baseline_configuration")
+                ):
                     raise SourceConflict(
                         "Baseline configuration changed; Check again and review it."
                     )
@@ -741,6 +791,14 @@ class SourceAdminService:
                 lines.append(f"{key}: {candidate[key]}")
         if proposal.get("configuration"):
             spec = proposal["configuration"]
+            if proposal.get("imported_window"):
+                imported = proposal["imported_window"]
+                lines.append(
+                    f"Imported window: {imported['WindowName']} | accepted scans {imported['StartScanID']} → {imported['EndScanID']}"
+                )
+                lines.append(
+                    f"Player scan UTC: {imported['start_utc']} → {imported['end_utc'] or 'pending scan'}"
+                )
             lines.append(
                 f"Window: {spec['period_key']} | {spec['start']} to {spec['end'] if spec['end'] is not None else 'pending'}"
             )
