@@ -1,5 +1,6 @@
 from copy import deepcopy
 import json
+from pathlib import Path
 import sys
 
 import pytest
@@ -168,8 +169,30 @@ def test_invalid_installed_manifest_cannot_report_routine_compatibility(damage):
         installed["files"]["Deploy-K98Release.ps1"] = "invalid"
     else:
         installed["unknown"] = True
-    with pytest.raises(ValueError, match="eight-member installed-tool manifest"):
+    with pytest.raises(ValueError, match="supported installed-tool manifest"):
         classify(BEFORE, AFTER, [], lambda *_: None, installed, policy_sha256="a" * 64)
+
+
+def test_supported_legacy_installed_manifest_reports_upgrade():
+    installed = json.loads(Path("tests/fixtures/updater_installed_20261009.json").read_bytes())
+    result = classify(
+        BEFORE,
+        AFTER,
+        ["scripts/prepare_k98_release.py"],
+        lambda commit, path: None if commit == BEFORE else b"new",
+        installed,
+        policy_sha256="b" * 64,
+    )
+    assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
+    assert result["blockers"] == []
+    assert "scripts/prepare_k98_release.py" in result["updater_members"]
+
+
+def test_legacy_inventory_requires_upgrade_even_with_matching_policy():
+    installed = installed_manifest()
+    del installed["files"]["prepare_k98_release.py"]
+    result = classify(BEFORE, AFTER, [], lambda *_: None, installed, policy_sha256="a" * 64)
+    assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
 
 
 @pytest.mark.parametrize("mode", ["120000", "160000", "100755", "100644"])

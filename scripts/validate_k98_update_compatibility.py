@@ -20,19 +20,22 @@ def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sh
     blockers, tool_changes = [], []
     if installed_tool is not None:
         expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
+        legacy = expected - {"prepare_k98_release.py"}
         if (
             not isinstance(installed_tool, dict)
             or set(installed_tool) != {"version", "files"}
             or type(installed_tool["version"]) is not int
             or installed_tool["version"] != 1
             or not isinstance(installed_tool["files"], dict)
-            or set(installed_tool["files"]) != expected
+            or set(installed_tool["files"]) not in (expected, legacy)
             or any(
                 not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in installed_tool["files"].values()
             )
         ):
-            raise ValueError("Exact version-1, eight-member installed-tool manifest required.")
+            raise ValueError("Exact version-1 supported installed-tool manifest required.")
+        if set(installed_tool["files"]) == legacy:
+            tool_changes.append("scripts/prepare_k98_release.py")
     if installed_tool is not None and policy_sha256 is not None:
         if installed_tool.get("files", {}).get("prepare_k98_update.py") != policy_sha256:
             tool_changes.append("scripts/prepare_k98_update.py")
@@ -44,7 +47,7 @@ def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sh
             if path in TOOL_SOURCE_PATHS:
                 if new is None:
                     raise ValueError(f"Updater member removal is unsupported: {path}")
-                if installed_tool is None or installed_tool["files"][Path(path).name] != sha256(
+                if installed_tool is None or installed_tool["files"].get(Path(path).name) != sha256(
                     new
                 ):
                     if path not in tool_changes:
