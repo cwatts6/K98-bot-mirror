@@ -358,6 +358,23 @@ class ExportCoordinationDAL:
             )
             return rows(cursor)
 
+    def check_intent_weights(self, intent):
+        """Cheap discovery gate before loading generations or planning provider capacity."""
+        from kvk.dal.season_source_dal import require_source
+        from kvk.dal.source_weight_dal import require_current_export_weights
+
+        with transaction(self.connect) as cursor:
+            require_source(cursor, intent["KVK_NO"], "snapshot_report_v1")
+            cursor.execute(
+                "SELECT ConfigVersionID FROM KVK.SourceExportIntentPublication WHERE IntentID=? AND KVK_NO=?",
+                intent["IntentID"],
+                intent["KVK_NO"],
+            )
+            vector = rows(cursor)
+            if not vector:
+                raise SourceConflict("Export intent has no retained configuration members.")
+            require_current_export_weights(cursor, intent, vector)
+
     def enqueue(self, spec, *, preparation_id=None, _cursor=None, _repair_plan=None):
         if not isinstance(spec, JobSpec):
             raise ValueError("Validated immutable job specification required.")

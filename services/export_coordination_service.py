@@ -51,6 +51,7 @@ class ExportCoordinator:
                 if registration.kvk_no != intent["KVK_NO"]:
                     continue
                 try:
+                    self.dal.check_intent_weights(intent)
                     provenance = "{}"
                     if self.output_planner is not None:
                         provenance = bounded_json(

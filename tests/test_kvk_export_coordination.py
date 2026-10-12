@@ -324,6 +324,56 @@ def test_coordinator_discovery_paginates_without_losing_retained_intents():
     assert coordinator.after == (0, 0)
 
 
+def test_stale_intents_skip_planning_on_every_discovery_pass():
+    from services.export_coordination_service import ExportRegistration
+
+    stale, current = [
+        dict(IntentID=str(uuid4()), KVK_NO=16, CommitSequence=n, VectorHash=b"a" * 32)
+        for n in (1, 2)
+    ]
+    dal, planner = Mock(), Mock(return_value={})
+    dal.pending_intents.side_effect = [[stale, current], [], [stale, current]]
+    dal.check_intent_weights.side_effect = [SourceConflict("stale"), None] * 2
+    coordinator = ExportCoordinator(
+        dal,
+        adapters={},
+        registrations=(ExportRegistration(16, "acct", 1, ("file",)),),
+        output_planner=planner,
+    )
+    coordinator.discover()
+    assert coordinator.after == (16, 2)
+    coordinator.discover()
+    assert coordinator.after == (0, 0)
+    coordinator.discover()
+    assert coordinator.after == (16, 2)
+    assert planner.call_count == dal.enqueue.call_count == 2
+    assert all(call.args[0] == current["IntentID"] for call in planner.call_args_list)
+    assert all(call.args[0].intent_id == current["IntentID"] for call in dal.enqueue.call_args_list)
+
+
+@pytest.mark.parametrize("members", [[], [{"ConfigVersionID": "config"}]])
+def test_discovery_checks_retained_weight_members_without_loading_generations(monkeypatch, members):
+    import kvk.dal.season_source_dal as source
+    import kvk.dal.source_weight_dal as weights
+
+    cursor = Cursor(batches=[members])
+    dal = scripted(monkeypatch, cursor)
+    source_guard, weight_guard = Mock(), Mock()
+    monkeypatch.setattr(source, "require_source", source_guard)
+    monkeypatch.setattr(weights, "require_current_export_weights", weight_guard)
+    intent = dict(IntentID=str(uuid4()), KVK_NO=16)
+    if members:
+        dal.check_intent_weights(intent)
+        weight_guard.assert_called_once_with(cursor, intent, members)
+    else:
+        with pytest.raises(SourceConflict, match="no retained configuration"):
+            dal.check_intent_weights(intent)
+        weight_guard.assert_not_called()
+    source_guard.assert_called_once_with(cursor, 16, "snapshot_report_v1")
+    assert cursor.calls[0][1] == (intent["IntentID"], 16)
+    assert not any("UPDATE" in query or "ManifestJson" in query for query, _ in cursor.calls)
+
+
 def test_blocked_pool_preflight_does_not_skip_other_eligible_account_work():
     dal = Mock(output_operations=True)
     dal.pending_intents.return_value = []
