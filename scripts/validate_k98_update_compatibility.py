@@ -13,6 +13,8 @@ import subprocess
 
 from scripts.prepare_k98_update import TOOL_SOURCE_PATHS, check_source_only, sha256
 
+COORDINATED_RELEASE_EXIT = 3
+
 
 def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sha256=None):
     blockers, tool_changes = [], []
@@ -35,16 +37,18 @@ def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sh
         if installed_tool.get("files", {}).get("prepare_k98_update.py") != policy_sha256:
             tool_changes.append("scripts/prepare_k98_update.py")
     for path in paths:
-        if path in TOOL_SOURCE_PATHS:
-            raw = read_blob(target, path)
-            if raw is None:
-                blockers.append(f"Updater member removal is unsupported: {path}")
-            elif installed_tool is None or installed_tool.get("files", {}).get(
-                Path(path).name
-            ) != sha256(raw):
-                if path not in tool_changes:
-                    tool_changes.append(path)
         try:
+            old, new = read_blob(before, path), read_blob(target, path)
+            if old == new:
+                raise ValueError(f"Changed-path inventory differs: {path}")
+            if path in TOOL_SOURCE_PATHS:
+                if new is None:
+                    raise ValueError(f"Updater member removal is unsupported: {path}")
+                if installed_tool is None or installed_tool["files"][Path(path).name] != sha256(
+                    new
+                ):
+                    if path not in tool_changes:
+                        tool_changes.append(path)
             check_source_only(
                 [path],
                 tool_copies=TOOL_SOURCE_PATHS,
@@ -115,7 +119,7 @@ def main():
         ),
     )
     print(json.dumps(result, indent=2))
-    return 1 if result["blockers"] else 0
+    return COORDINATED_RELEASE_EXIT if result["blockers"] else 0
 
 
 if __name__ == "__main__":

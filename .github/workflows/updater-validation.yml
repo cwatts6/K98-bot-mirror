@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'deploy/k98-release.json'
+      - 'services/export_coordination_dal.py'
+      - 'services/export_coordination_service.py'
+      - 'services/export_runtime_composition.py'
       - 'scripts/*K98*.ps1'
       - 'scripts/*k98*.py'
       - 'scripts/verify_k98_update_pair.py'
@@ -50,7 +53,7 @@ jobs:
         run: |
           python -m scripts.validate_k98_update_compatibility --base $env:RELEASE_BASE_SHA --head $env:GITHUB_SHA
           $compatibilityExit = $LASTEXITCODE
-          if ($compatibilityExit -eq 1) {
+          if ($compatibilityExit -eq 3) {
             Write-Warning 'Coordinated release required. This source report does not authorize deployment.'
           } elseif ($compatibilityExit -ne 0) {
             exit $compatibilityExit

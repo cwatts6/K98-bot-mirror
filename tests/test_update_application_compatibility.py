@@ -1,8 +1,10 @@
 from copy import deepcopy
 import json
+import sys
 
 import pytest
 
+from scripts import validate_k98_update_compatibility as compatibility
 from scripts.prepare_k98_update import (
     APPLICATION_METHODS,
     TOOL_SOURCE_PATHS,
@@ -116,12 +118,16 @@ def test_classification_reports_every_blocker_and_tool_upgrade():
     )
     tool = "scripts/prepare_k98_update.py"
     assert (
-        classify(BEFORE, AFTER, [tool], lambda *_: b"new")["classification"]
+        classify(BEFORE, AFTER, [tool], lambda c, p: b"old" if c == BEFORE else b"new")[
+            "classification"
+        ]
         == "UPDATER_UPGRADE_REQUIRED"
     )
     installed = installed_manifest(sha256(b"new"))
     assert (
-        classify(BEFORE, AFTER, [tool], lambda *_: b"new", installed)["classification"]
+        classify(BEFORE, AFTER, [tool], lambda c, p: b"old" if c == BEFORE else b"new", installed)[
+            "classification"
+        ]
         == "ROUTINE_COMPATIBLE"
     )
     assert classify(BEFORE, AFTER, [tool], lambda *_: None, installed)["blockers"]
@@ -164,3 +170,44 @@ def test_invalid_installed_manifest_cannot_report_routine_compatibility(damage):
         installed["unknown"] = True
     with pytest.raises(ValueError, match="eight-member installed-tool manifest"):
         classify(BEFORE, AFTER, [], lambda *_: None, installed, policy_sha256="a" * 64)
+
+
+@pytest.mark.parametrize("mode", ["120000", "160000", "100755", "100644"])
+def test_cli_checks_all_changed_object_modes_and_distinct_blocker_exit(monkeypatch, capsys, mode):
+    monkeypatch.setattr(sys, "argv", ["compatibility", "--base", BEFORE, "--head", AFTER])
+
+    def git_output(command, **kwargs):
+        args = command[2:]
+        if args[0] == "rev-parse":
+            return (args[-1].split("^")[0] + "\n").encode()
+        if args[0] == "diff":
+            return b"ordinary.py\0"
+        if args[0] == "ls-tree":
+            file_mode = "100644" if args[2] == BEFORE else mode
+            kind = "commit" if file_mode == "160000" else "blob"
+            return f"{file_mode} {kind} {'c' * 40}\tordinary.py\0".encode()
+        if args[0] == "cat-file":
+            return b"4\n" if args[1] == "-s" else b"same"
+        raise AssertionError(command)
+
+    monkeypatch.setattr(compatibility.subprocess, "check_output", git_output)
+    assert compatibility.main() == compatibility.COORDINATED_RELEASE_EXIT == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["classification"] == "COORDINATED_RELEASE_REQUIRED"
+    assert (
+        "Ordinary Git blob" in result["blockers"][0]
+        if mode in ("120000", "160000")
+        else "Changed-path inventory" in result["blockers"][0]
+    )
+
+
+def test_cli_unexpected_git_failure_does_not_report_a_classification(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["compatibility", "--base", BEFORE])
+
+    def fail(*args, **kwargs):
+        raise compatibility.subprocess.CalledProcessError(1, "git")
+
+    monkeypatch.setattr(compatibility.subprocess, "check_output", fail)
+    with pytest.raises(compatibility.subprocess.CalledProcessError):
+        compatibility.main()
+    assert capsys.readouterr().out == ""
