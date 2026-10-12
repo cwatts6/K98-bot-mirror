@@ -42,7 +42,21 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify packet and protocol compatibility
-        run: python scripts/analyse_pytest_log_noise.py --pytest-args -q tests/test_prepare_k98_update.py tests/test_prepare_k98_release.py tests/test_combined_k98_update.py tests/test_release_amendment.py tests/test_export_release_seed.py
+        run: python scripts/analyse_pytest_log_noise.py --pytest-args -q tests/test_prepare_k98_update.py tests/test_prepare_k98_release.py tests/test_combined_k98_update.py tests/test_release_amendment.py tests/test_export_release_seed.py tests/test_update_application_compatibility.py
+      - name: Report candidate update compatibility
+        if: github.event_name == 'pull_request'
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python -m scripts.validate_k98_update_compatibility --base $env:RELEASE_BASE_SHA --head $env:GITHUB_SHA
+          $compatibilityExit = $LASTEXITCODE
+          if ($compatibilityExit -eq 1) {
+            Write-Warning 'Coordinated release required. This source report does not authorize deployment.'
+          } elseif ($compatibilityExit -ne 0) {
+            exit $compatibilityExit
+          }
+          # PR base is not installed-host evidence. Report routing here; live admission stays fail-closed.
+          exit 0
       - name: Verify Windows 5.1 orchestration and recovery
         shell: powershell
         run: |
