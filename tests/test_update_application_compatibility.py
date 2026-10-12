@@ -5,6 +5,7 @@ import pytest
 
 from scripts.prepare_k98_update import (
     APPLICATION_METHODS,
+    TOOL_SOURCE_PATHS,
     check_application_change,
     check_source_only,
     sha256,
@@ -26,6 +27,12 @@ NEW = OLD.replace(b"return spec", b"self.check_intent_weights(spec)\n        ret
     def check_intent_weights(self, intent):
         return intent
 """
+
+
+def installed_manifest(policy="a" * 64):
+    files = {path.rsplit("/", 1)[1]: "a" * 64 for path in TOOL_SOURCE_PATHS}
+    files.update({"EmptyGitConfig.txt": sha256(b""), "prepare_k98_update.py": policy})
+    return {"version": 1, "files": files}
 
 
 def test_application_change_retains_exact_source_and_policy_hashes():
@@ -112,7 +119,7 @@ def test_classification_reports_every_blocker_and_tool_upgrade():
         classify(BEFORE, AFTER, [tool], lambda *_: b"new")["classification"]
         == "UPDATER_UPGRADE_REQUIRED"
     )
-    installed = {"version": 1, "files": {"prepare_k98_update.py": sha256(b"new")}}
+    installed = installed_manifest(sha256(b"new"))
     assert (
         classify(BEFORE, AFTER, [tool], lambda *_: b"new", installed)["classification"]
         == "ROUTINE_COMPATIBLE"
@@ -133,8 +140,27 @@ def test_candidate_policy_is_not_mistaken_for_installed_capability():
         AFTER,
         [PATH],
         lambda c, p: OLD if c == BEFORE else NEW,
-        {"files": {"prepare_k98_update.py": "old"}},
-        policy_sha256="candidate",
+        installed_manifest(),
+        policy_sha256="b" * 64,
     )
     assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
     assert result["updater_members"] == ["scripts/prepare_k98_update.py"]
+
+
+@pytest.mark.parametrize("damage", ["version", "boolean", "missing", "extra", "hash", "fields"])
+def test_invalid_installed_manifest_cannot_report_routine_compatibility(damage):
+    installed = installed_manifest()
+    if damage == "version":
+        installed["version"] = 2
+    elif damage == "boolean":
+        installed["version"] = True
+    elif damage == "missing":
+        del installed["files"]["Deploy-K98Release.ps1"]
+    elif damage == "extra":
+        installed["files"]["unknown.py"] = "a" * 64
+    elif damage == "hash":
+        installed["files"]["Deploy-K98Release.ps1"] = "invalid"
+    else:
+        installed["unknown"] = True
+    with pytest.raises(ValueError, match="eight-member installed-tool manifest"):
+        classify(BEFORE, AFTER, [], lambda *_: None, installed, policy_sha256="a" * 64)

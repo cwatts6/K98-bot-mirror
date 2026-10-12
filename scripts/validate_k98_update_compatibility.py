@@ -8,6 +8,7 @@ live process state, or that this candidate updater is installed on the bot host.
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 
 from scripts.prepare_k98_update import TOOL_SOURCE_PATHS, check_source_only, sha256
@@ -15,6 +16,21 @@ from scripts.prepare_k98_update import TOOL_SOURCE_PATHS, check_source_only, sha
 
 def classify(before, target, paths, read_blob, installed_tool=None, *, policy_sha256=None):
     blockers, tool_changes = [], []
+    if installed_tool is not None:
+        expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
+        if (
+            not isinstance(installed_tool, dict)
+            or set(installed_tool) != {"version", "files"}
+            or type(installed_tool["version"]) is not int
+            or installed_tool["version"] != 1
+            or not isinstance(installed_tool["files"], dict)
+            or set(installed_tool["files"]) != expected
+            or any(
+                not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                for value in installed_tool["files"].values()
+            )
+        ):
+            raise ValueError("Exact version-1, eight-member installed-tool manifest required.")
     if installed_tool is not None and policy_sha256 is not None:
         if installed_tool.get("files", {}).get("prepare_k98_update.py") != policy_sha256:
             tool_changes.append("scripts/prepare_k98_update.py")
