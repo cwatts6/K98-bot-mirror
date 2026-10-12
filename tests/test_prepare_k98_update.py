@@ -209,7 +209,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         "core/export_process_identity.py",
         "core/export_startup_windows.py",
         "services/export_execution_protocol.py",
-        "services/export_runtime_composition.py",
         "services/export_startup_reconciliation.py",
         "scripts/run_export_startup_issuer.py",
         "scripts/run_export_process_gate.py",

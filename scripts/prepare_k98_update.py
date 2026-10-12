@@ -4,6 +4,7 @@ This module never installs source, connects to SQL, or starts processes. The
 Windows updater owns acquisition, custody checks and the deployment protocol.
 """
 
+import ast
 from collections.abc import Callable
 from copy import deepcopy
 import hashlib
@@ -37,6 +38,67 @@ TOOL_SOURCE_PATHS = frozenset(
 
 RELEASE_DESCRIPTION = "deploy/k98-release.json"
 SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
+
+# Installed policy, never supplied by the target tree. Only these application
+# bodies may differ in otherwise protected mixed modules. Headers, imports,
+# initialization and every other declaration remain structurally identical.
+APPLICATION_METHODS = {
+    "services/export_coordination_dal.py": ("ExportCoordinationDAL", {"enqueue"}),
+    "services/export_coordination_service.py": ("ExportCoordinator", {"discover"}),
+    "services/export_runtime_composition.py": ("ExportRuntime", {"__init__"}),
+}
+APPLICATION_ADDITIONS = {
+    "services/export_coordination_dal.py": "def check_intent_weights(self, intent): pass",
+}
+
+
+def application_contract(path, raw):
+    """Project protected syntax without importing or executing release source.
+
+    This is a compatibility boundary for reviewed code, not a Python sandbox or
+    proof of arbitrary application behavior. Unknown edits still need review of
+    the installed updater policy, rather than a release-controlled exemption.
+    """
+    if not isinstance(raw, bytes) or not raw or len(raw) > 2 * 1024 * 1024:
+        raise ValueError(f"Existing bounded application source required: {path}")
+    try:
+        tree = ast.parse(raw, filename=path)
+        compile(tree, path, "exec")  # Syntax validation only; never execute target code.
+    except (SyntaxError, ValueError, RecursionError) as exc:
+        raise ValueError(f"Cannot establish application compatibility: {path}") from exc
+    class_name, methods = APPLICATION_METHODS[path]
+    classes = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == class_name]
+    if len(classes) != 1:
+        raise ValueError(f"Exact application class required: {path}")
+    optional = (
+        ast.parse(APPLICATION_ADDITIONS[path]).body[0] if path in APPLICATION_ADDITIONS else None
+    )
+    if optional is not None and not isinstance(optional, ast.FunctionDef):
+        raise ValueError("Installed application policy is malformed.")
+    seen, retained = set(), []
+    for node in classes[0].body:
+        name = getattr(node, "name", None)
+        if name in methods or (optional is not None and name == optional.name):
+            if name in seen or not isinstance(node, ast.FunctionDef):
+                raise ValueError(f"Ambiguous application method: {path}:{name}")
+            seen.add(name)
+            node.body = [ast.Pass()]
+            if optional is not None and name == optional.name:
+                if ast.dump(node) != ast.dump(optional):
+                    raise ValueError(f"Application helper signature differs: {path}:{name}")
+                continue
+        retained.append(node)
+    if not methods <= seen:
+        raise ValueError(f"Required application methods missing: {path}")
+    classes[0].body = retained
+    return ast.dump(tree), seen
+
+
+def check_application_change(path, before, target):
+    old, old_methods = application_contract(path, before)
+    new, new_methods = application_contract(path, target)
+    if old != new or not old_methods <= new_methods:
+        raise ValueError(f"Protected application contract changed; non-routine release: {path}")
 
 
 def combined_description(raw, before):
@@ -202,12 +264,15 @@ def ordinary_path(path):
     return path
 
 
-def check_source_only(paths, *, tool_copies=()):
+def check_source_only(paths, *, tool_copies=(), read_blob=None, before=None, target=None):
     """Routine mode cannot silently install dependencies, SQL or environment."""
     for path in paths:
         ordinary_path(path)
         if path in TOOL_SOURCE_PATHS and path in tool_copies:
             continue  # source_plan must compare the target with installed bytes.
+        if path in APPLICATION_METHODS and read_blob is not None:
+            check_application_change(path, read_blob(before, path), read_blob(target, path))
+            continue
         lower = path.casefold()
         # Preparation runs installed tooling with predecessor helpers, while
         # the successor consumes the resulting seed. Keep both contract sides
@@ -304,7 +369,9 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     if not changes or len(changes) > 4096 or len(set(changes)) != len(changes):
         raise ValueError("Bounded unique changed paths required.")
     tool_sources = tool_sources or {}
-    check_source_only(changes, tool_copies=tool_sources)
+    check_source_only(
+        changes, tool_copies=tool_sources, read_blob=read_blob, before=before, target=target
+    )
     folded = [path.casefold() for path in changes]
     if len(set(folded)) != len(folded):
         raise ValueError("Case-colliding source paths refused.")
@@ -754,7 +821,12 @@ def main():
         .rstrip("\0")
         .split("\0")
     )
-    check_source_only(changes, tool_copies=TOOL_SOURCE_PATHS)
+    # Known mixed modules require authenticated before/target blobs below. All
+    # other forbidden paths still fail before acquisition. source_plan performs
+    # the mandatory structural comparison before creating a release package.
+    check_source_only(
+        [path for path in changes if path not in APPLICATION_METHODS], tool_copies=TOOL_SOURCE_PATHS
+    )
     requested = sorted(
         set(changes)
         | {RELEASE_DESCRIPTION}

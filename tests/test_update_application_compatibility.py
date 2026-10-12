@@ -1,0 +1,140 @@
+from copy import deepcopy
+import json
+
+import pytest
+
+from scripts.prepare_k98_update import (
+    APPLICATION_METHODS,
+    check_application_change,
+    check_source_only,
+    sha256,
+    source_plan,
+)
+from scripts.validate_k98_update_compatibility import classify
+
+BEFORE, AFTER = "a" * 40, "b" * 40
+PATH = "services/export_coordination_dal.py"
+OLD = b"""import json
+CONTRACT = 1
+class ExportCoordinationDAL:
+    def enqueue(self, spec, *, preparation_id=None):
+        return spec
+    def verify_contract(self, value):
+        return value == CONTRACT
+"""
+NEW = OLD.replace(b"return spec", b"self.check_intent_weights(spec)\n        return spec") + b"""
+    def check_intent_weights(self, intent):
+        return intent
+"""
+
+
+def test_application_change_retains_exact_source_and_policy_hashes():
+    previous = {"AutomaticStartupPolicy.json": {"source_hashes": {PATH: sha256(OLD)}}}
+    preserved = deepcopy(previous)
+    plan, payload = source_plan(
+        previous, BEFORE, AFTER, [PATH], lambda commit, path: OLD if commit == BEFORE else NEW
+    )
+    assert previous == preserved
+    assert plan["new_pins"][PATH] == sha256(NEW)
+    assert plan["source_members"][0]["before_sha256"] == [sha256(OLD)]
+    assert payload[PATH] == NEW
+
+
+@pytest.mark.parametrize("path", APPLICATION_METHODS)
+def test_supported_application_bodies_allow_successive_changes(path):
+    cls, methods = APPLICATION_METHODS[path]
+    method = next(iter(methods))
+    old = f"class {cls}:\n    def {method}(self):\n        pass\n".encode()
+    new = old.replace(b"pass", b"print('not executed')")
+    check_application_change(path, old, new)
+    check_application_change(path, new, new.replace(b"not executed", b"next release"))
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        NEW.replace(b"CONTRACT = 1", b"CONTRACT = 2"),
+        NEW.replace(b"import json", b"import os"),
+        NEW.replace(b"value == CONTRACT", b"True"),
+        NEW.replace(b"preparation_id=None", b"preparation_id=True"),
+        NEW.replace(b"class ExportCoordinationDAL:", b"class ExportCoordinationDAL(object):"),
+        NEW.replace(b"    def enqueue", b"    @staticmethod\n    def enqueue"),
+        NEW.replace(b"    def enqueue", b"    async def enqueue"),
+        NEW.replace(b"def enqueue", b"def renamed"),
+        NEW.replace(b"self, intent", b"self, intent=None"),
+        NEW.replace(
+            b"    def check_intent_weights", b"    @property\n    def check_intent_weights"
+        ),
+        NEW + b"    def enqueue(self, spec, *, preparation_id=None): pass\n",
+        NEW + b"class ExportCoordinationDAL: pass\n",
+        NEW + b"ExportCoordinationDAL.enqueue = lambda *a: None\n",
+        NEW + b"    def unknown_method(self): pass\n",
+        NEW.replace(b"return intent", b"break"),
+        b"invalid source !",
+        None,
+        b"",
+    ],
+)
+def test_unknown_or_protected_changes_are_refused(bad):
+    with pytest.raises(ValueError):
+        check_application_change(PATH, OLD, bad)
+
+
+def test_added_helper_cannot_be_removed_in_later_update():
+    with pytest.raises(ValueError, match="Protected application contract changed"):
+        check_application_change(PATH, NEW, OLD)
+
+
+def test_source_names_alone_never_authorize_mixed_modules():
+    with pytest.raises(ValueError, match="non-routine"):
+        check_source_only([PATH])
+
+
+def test_application_compatibility_does_not_bypass_predecessor_authentication():
+    previous = {"AutomaticStartupPolicy.json": {"source_hashes": {PATH: "f" * 64}}}
+    with pytest.raises(ValueError, match="Installed policy does not match"):
+        source_plan(
+            previous, BEFORE, AFTER, [PATH], lambda commit, path: OLD if commit == BEFORE else NEW
+        )
+
+
+def test_classification_reports_every_blocker_and_tool_upgrade():
+    paths = [PATH, "core/export_release_seed.py", "requirements.txt"]
+    result = classify(BEFORE, AFTER, paths, lambda c, p: OLD if c == BEFORE else NEW)
+    assert result["classification"] == "COORDINATED_RELEASE_REQUIRED"
+    assert len(result["blockers"]) == 2
+    assert (
+        classify(BEFORE, AFTER, [PATH], lambda c, p: OLD if c == BEFORE else NEW)["classification"]
+        == "ROUTINE_COMPATIBLE"
+    )
+    tool = "scripts/prepare_k98_update.py"
+    assert (
+        classify(BEFORE, AFTER, [tool], lambda *_: b"new")["classification"]
+        == "UPDATER_UPGRADE_REQUIRED"
+    )
+    installed = {"version": 1, "files": {"prepare_k98_update.py": sha256(b"new")}}
+    assert (
+        classify(BEFORE, AFTER, [tool], lambda *_: b"new", installed)["classification"]
+        == "ROUTINE_COMPATIBLE"
+    )
+    assert classify(BEFORE, AFTER, [tool], lambda *_: None, installed)["blockers"]
+
+
+def test_target_cannot_supply_a_compatibility_exemption():
+    result = classify(
+        BEFORE, AFTER, ["services/export_unknown.py"], lambda *_: json.dumps({"compatible": True})
+    )
+    assert result["classification"] == "COORDINATED_RELEASE_REQUIRED"
+
+
+def test_candidate_policy_is_not_mistaken_for_installed_capability():
+    result = classify(
+        BEFORE,
+        AFTER,
+        [PATH],
+        lambda c, p: OLD if c == BEFORE else NEW,
+        {"files": {"prepare_k98_update.py": "old"}},
+        policy_sha256="candidate",
+    )
+    assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
+    assert result["updater_members"] == ["scripts/prepare_k98_update.py"]

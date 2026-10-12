@@ -41,6 +41,17 @@ The release author uses `python -m scripts.prepare_k98_release --specification
 files and canonical `release.json`. The command returns the manifest and runner
 checksums. Supplied member checksums are checked, never silently replaced. No
 script, SQL operation or production launch runs during packaging.
+
+The installed compatible-application policy can admit specified application
+method bodies inside otherwise protected export modules. Its exact scope is in
+the Promotion Guide. It compares predecessor/target syntax without running target
+code and preserves every other declaration, signature and module initializer.
+Only installed tool code selects the exceptions; a target release cannot expand
+them. An authenticated tool upgrade is required before using a newer policy.
+Code review and behavioral tests remain necessary: matching protected syntax is
+not proof of arbitrary application semantics. Source/seed hash, custody, drain,
+unchanged flags, retained uncertainty, one-start and independent verification
+requirements are unchanged.
 Source acquisition must target the exact reviewed commit on private production
 `main`. SQL acquisition must target the exact reviewed SQL-repository commit and
 explicit migration IDs; discovering and executing all pending filenames is not

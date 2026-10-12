@@ -126,6 +126,23 @@ Codex uses `scripts/promote-to-production.ps1` to create the initial private PR 
 
 **Continue when:** both final heads have completed review and required checks, zero unresolved threads and a recorded promotion-readiness verdict.
 
+Before declaring deployment readiness, run the source compatibility check with the
+reviewed updater checkout against the **actual installed Bot commit**, not just the
+PR base:
+
+```powershell
+python -m scripts.validate_k98_update_compatibility --base <installed-commit> --head <production-target> --installed-tool-manifest <installed-update-tool.json>
+```
+
+`ROUTINE_COMPATIBLE` describes source compatibility under the checked policy;
+machine custody, source pins and live preflight must still pass. A differing
+installed preparation policy or target tool member reports `UPDATER_UPGRADE_REQUIRED`.
+Build the exact-version upgrade with `scripts.package_k98_update_tool --previous-manifest`
+and supply the independently checked installer/upgrade hashes. A blocked contract
+reports `COORDINATED_RELEASE_REQUIRED` and exits unsuccessfully. The checker neither
+executes target source nor prepares a release. Missing installed-tool evidence must
+not be represented as an installed capability check.
+
 ## Step 2 — Merge and update the development PC
 
 **Where:** GitHub, then normal PowerShell on the **development PC only**.
@@ -268,7 +285,31 @@ release: installed preparation helpers must agree with successor consumers.
 Routine preparation rejects changes to `core/export_*`, `services/export_*`,
 export launch/provision scripts, the watchdog, root configuration/constants,
 contract-package initializers and the updater/packaging scripts before requesting
-a drain. Ordinary bot/command changes and the legacy queue fix remain eligible.
+a drain, except for the installed, bounded application policy below. Ordinary
+bot/command changes and the legacy queue fix remain eligible.
+
+The compatible-application updater permits only method-body changes to
+`ExportCoordinationDAL.enqueue`, `ExportCoordinator.discover`, and
+`ExportRuntime.__init__` in their three existing modules. It also permits the
+specific `ExportCoordinationDAL.check_intent_weights(self, intent)` helper to be
+added or its body changed; a later release cannot remove it. Python syntax is
+parsed and compiled without execution. The entire remaining syntax tree must
+match the authenticated predecessor: imports, globals, class structure, method
+signatures/decorators and all startup/SQL/protocol validators remain protected.
+Unknown files, declarations, deletions and contract edits remain refused. These
+rules are part of the installed tool; target metadata cannot grant an exemption.
+This is a compatibility check for reviewed application code, not a Python sandbox
+or a replacement for functional/security review. All source hashes, custody,
+drain, policy/flag preservation, resume and readiness checks still apply.
+
+For the October 12 weight/window release, the observed installed commit is
+`aa6059f18bddb1b3e60748ea2ca67160d0b8e7b0`; its initial target was
+`5257167dcd4514316ca4c32f297a3be2512dfba9`. The previous routine updater correctly
+refused this delta before requesting a restart. Install the reviewed compatible-
+application updater through the existing exact-version upgrade mechanism first;
+never edit the installed preparer or remove the guard manually. After installation,
+run the normal updater with `-PrepareOnly` once, then without it after preparation
+succeeds. It acquires a fresh observation; the failed attempt is historical evidence.
 A release requiring SQL uses explicit reviewed migration IDs and the correct
 SQL-before-bot order where needed, with outcome receipts and no blind replay.
 
