@@ -63,7 +63,8 @@ async def report_failure(interaction, exc, *, export=False):
                 else "The action's commit outcome is uncertain. Read the durable receipt/review with "
                 f"/kvk_admin source action:status{identity_option} before any retry. "
                 "Do not repeat the mutation."
-            ),
+            )
+            + (f" Database diagnostic reference: {reference}." if reference else ""),
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return

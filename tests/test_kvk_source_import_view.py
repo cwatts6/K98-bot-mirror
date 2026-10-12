@@ -573,3 +573,29 @@ async def test_creation_uncertainty_privately_retains_only_uuid_lookup(kind, val
     assert call.kwargs["ephemeral"] is True
     assert call.kwargs["allowed_mentions"].everyone is False
     inter.response.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("export", [False, True])
+@pytest.mark.parametrize("reference", ["a" * 32, "private @everyone", None])
+async def test_uncertain_commit_preserves_only_valid_diagnostic_reference(export, reference):
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from ui.views.kvk_source_import_view import report_failure
+
+    exc = UncertainCommit("private SQL details")
+    exc.source_sql_correlation = reference
+    inter = interaction()
+    await report_failure(inter, exc, export=export)
+    call = inter.response.send_message.call_args
+    message = call.args[0]
+    assert "commit outcome is uncertain" in message
+    assert "Do not repeat the mutation" in message
+    assert ("action:export_status" if export else "action:status") in message
+    assert (
+        ("Database diagnostic reference: " + "a" * 32) in message
+        if reference == "a" * 32
+        else "Database diagnostic reference:" not in message
+    )
+    assert "private" not in message and "@everyone" not in message
+    assert call.kwargs["ephemeral"] is True
+    assert call.kwargs["allowed_mentions"].everyone is False
