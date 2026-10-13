@@ -30,6 +30,10 @@ function Assert-UpgradeTool([string]$Path,[string]$ManifestHash) {
  $manifest=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
  $names=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
  if($null -ne $manifest.files.PSObject.Properties['prepare_k98_release.py']){$names+=@('prepare_k98_release.py')}
+ if($null -ne $manifest.files.PSObject.Properties['k98_update_transitions.json']){
+  if($null -eq $manifest.files.PSObject.Properties['prepare_k98_release.py']){throw 'Unsupported intermediate updater inventory'}
+  $names+=@('k98_update_transitions.json')
+ }
  if($manifest.version -ne 1 -or @($manifest.files.PSObject.Properties).Count -ne $names.Count){throw 'Tool manifest shape differs'}
  foreach($name in $names){if($null -eq $manifest.files.PSObject.Properties[$name]){throw 'Tool member missing from manifest'}}
  $items=@(Get-ChildItem -LiteralPath $Path -Force)

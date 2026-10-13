@@ -30,6 +30,7 @@ def classify(
     *,
     policy_sha256=None,
     inventory_paths=None,
+    registry_sha256=None,
 ):
     blockers, tool_changes = [], []
     try:
@@ -40,25 +41,31 @@ def classify(
         blockers.append(str(exc))
     if installed_tool is not None:
         expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
-        legacy = expected - {"prepare_k98_release.py"}
+        prior = expected - {"k98_update_transitions.json"}
+        legacy = prior - {"prepare_k98_release.py"}
         if (
             not isinstance(installed_tool, dict)
             or set(installed_tool) != {"version", "files"}
             or type(installed_tool["version"]) is not int
             or installed_tool["version"] != 1
             or not isinstance(installed_tool["files"], dict)
-            or set(installed_tool["files"]) not in (expected, legacy)
+            or set(installed_tool["files"]) not in (expected, prior, legacy)
             or any(
                 not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in installed_tool["files"].values()
             )
         ):
             raise ValueError("Exact version-1 supported installed-tool manifest required.")
-        if set(installed_tool["files"]) == legacy:
-            tool_changes.append("scripts/prepare_k98_release.py")
+        for missing in expected - set(installed_tool["files"]):
+            tool_changes.append("scripts/" + missing)
     if installed_tool is not None and policy_sha256 is not None:
         if installed_tool.get("files", {}).get("prepare_k98_update.py") != policy_sha256:
             tool_changes.append("scripts/prepare_k98_update.py")
+    if installed_tool is not None and registry_sha256 is not None:
+        if installed_tool["files"].get("k98_update_transitions.json") != registry_sha256:
+            path = "scripts/k98_update_transitions.json"
+            if path not in tool_changes:
+                tool_changes.append(path)
     for path in paths:
         try:
             old, new = read_blob(before, path), read_blob(target, path)
@@ -147,6 +154,12 @@ def main():
             Path(__file__).with_name("prepare_k98_update.py").read_bytes().replace(b"\r\n", b"\n")
         ),
         inventory_paths=inventory,
+        registry_sha256=sha256(
+            Path(__file__)
+            .with_name("k98_update_transitions.json")
+            .read_bytes()
+            .replace(b"\r\n", b"\n")
+        ),
     )
     print(json.dumps(result, indent=2))
     return COORDINATED_RELEASE_EXIT if result["blockers"] else 0

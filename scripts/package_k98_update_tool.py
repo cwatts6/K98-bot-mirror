@@ -91,6 +91,7 @@ def package(output, source=None, *, previous_manifest=None):
         "prepare_k98_release.py",
         "verify_k98_update_pair.py",
         "package_k98_update_tool.py",
+        "k98_update_transitions.json",
     )
     # Ship Git's LF form even from a Windows CRLF checkout, so exact target
     # blob comparison during the first routine release is reproducible.
@@ -116,9 +117,10 @@ def package(output, source=None, *, previous_manifest=None):
     if previous_manifest is not None:
         previous_raw = Path(previous_manifest).read_bytes()
         previous = json.loads(previous_raw)
-        required = set(names) - {"prepare_k98_release.py"}
+        prior = set(names) - {"k98_update_transitions.json"}
+        required = prior - {"prepare_k98_release.py"}
         inventory = set(previous.get("files", {})) - {"EmptyGitConfig.txt"}
-        if previous.get("version") != 1 or inventory not in (required, set(names)):
+        if previous.get("version") != 1 or inventory not in (required, prior, set(names)):
             raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
         old_hash = hashlib.sha256(previous_raw).hexdigest()
         new_hash = hashlib.sha256(files["update-tool.json"]).hexdigest()

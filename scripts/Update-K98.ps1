@@ -189,11 +189,11 @@ try {
    # the live checkout. They can prepare the first release containing the tool.
    $toolManifest=Read-Json $toolManifestPath
    if($toolManifest.version -ne 1){throw 'Unsupported installed update tool'}
-   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','EmptyGitConfig.txt')
+   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','k98_update_transitions.json','EmptyGitConfig.txt')
    if(@($toolManifest.files.PSObject.Properties).Count -ne $required.Count){throw 'Exact update tool inventory required'}
    foreach($name in $required){$null=Read-Bytes (Join-Path $PSScriptRoot $name) $toolManifest.files.$name 2MB}
   } else {
-   $null=Read-Bytes $preparer $policy.source_hashes.'scripts/prepare_k98_update.py' 2MB
+   throw 'Install the reviewed updater package with its exact tool manifest before using the transition registry.'
   }
   & $venvPath -I -B $preparer --observation $observation --output $work | Out-Host
   if($LASTEXITCODE -ne 0){throw 'Preparation failed. Bot remains running; no restart requested.'}

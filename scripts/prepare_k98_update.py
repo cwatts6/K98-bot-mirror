@@ -33,11 +33,70 @@ TOOL_SOURCE_PATHS = frozenset(
         "prepare_k98_release.py",
         "verify_k98_update_pair.py",
         "package_k98_update_tool.py",
+        "k98_update_transitions.json",
     )
 )
 
 RELEASE_DESCRIPTION = "deploy/k98-release.json"
 SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
+
+
+def reviewed_transitions():
+    """Only the installed tool selects exact reviewed protocol transitions.
+
+    Target metadata cannot supply this policy. LF hashes permit authenticated
+    Git/Windows newline representations; source_plan retains exact installed pins.
+    """
+    raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
+    if len(raw) > 65536:
+        raise ValueError("Installed transition registry exceeds bound.")
+    value = json.loads(raw)
+    if set(value) != {"version", "transitions"} or value["version"] != 1:
+        raise ValueError("Unsupported installed transition registry.")
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 32:
+        raise ValueError("Bounded installed transitions required.")
+    identities = set()
+    for item in value["transitions"]:
+        if set(item) != {"id", "members"} or not re.fullmatch(r"[a-z0-9_]{1,80}", item["id"]):
+            raise ValueError("Exact installed transition required.")
+        if item["id"] in identities or not 1 <= len(item["members"]) <= 16:
+            raise ValueError("Unique bounded transition required.")
+        identities.add(item["id"])
+        paths = set()
+        for member in item["members"]:
+            if set(member) != {"path", "before_sha256", "after_sha256"}:
+                raise ValueError("Exact transition member required.")
+            path = ordinary_path(member["path"])
+            if not path.startswith("services/export_") or not path.endswith(".py") or path in paths:
+                raise ValueError("Unique export protocol source member required.")
+            paths.add(path)
+            for field in ("before_sha256", "after_sha256"):
+                digest = member[field]
+                if digest is None and field == "before_sha256":
+                    continue
+                if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+                    raise ValueError("Exact reviewed protocol hashes required.")
+    return value["transitions"]
+
+
+def transition_paths():
+    return {m["path"] for t in reviewed_transitions() for m in t["members"]}
+
+
+def check_protocol_transition(path, read_blob, before, target):
+    for transition in reviewed_transitions():
+        if path not in {member["path"] for member in transition["members"]}:
+            continue
+        matched = True
+        for member in transition["members"]:
+            for commit, field in ((before, "before_sha256"), (target, "after_sha256")):
+                raw = read_blob(commit, member["path"])
+                digest = sha256(raw.replace(b"\r\n", b"\n")) if raw is not None else None
+                matched = matched and digest == member[field]
+        if matched:
+            return {member["path"] for member in transition["members"]}
+    raise ValueError(f"Protected protocol transition is not installed/reviewed: {path}")
+
 
 # Installed policy, never supplied by the target tree. Only these application
 # bodies may differ in otherwise protected mixed modules. Headers, imports,
@@ -122,7 +181,7 @@ def validate_combined_description(raw):
         "migrations",
     }:
         raise ValueError("Exact combined release fields required.")
-    if value["version"] != 1 or value["profile"] != "module_grants_v1":
+    if value["version"] != 1 or value["profile"] not in {"module_grants_v1", "additive_tables_v1"}:
         raise ValueError("Unsupported combined SQL profile; no drain requested.")
     predecessors = value["bot_predecessors"]
     if (
@@ -158,7 +217,10 @@ def validate_combined_description(raw):
 def combined_payload(description, read_sql_blob, *, protected_objects=(), protected_principals=()):
     """Flatten only the explicit pinned profile/modules; preserve all SQL bytes."""
     files = {}
-    for name in SQL_TOOLS:
+    sql_tools = SQL_TOOLS + (
+        ("SqlDeploy.TableRelease.ps1",) if description["profile"] == "additive_tables_v1" else ()
+    )
+    for name in sql_tools:
         raw = read_sql_blob("deploy/" + name)
         if not raw or len(raw) > 2 * 1024 * 1024:
             raise ValueError(f"Pinned SQL runner missing or oversized: {name}")
@@ -172,6 +234,59 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
         if not raw or len(raw) > 1024 * 1024 or sha256(raw) != migration["sha256"]:
             raise ValueError(f"SQL profile differs from reviewed description: {name}")
         p = json.loads(raw)
+        if description["profile"] == "additive_tables_v1":
+            expected = {
+                "version",
+                "profile",
+                "migration_id",
+                "database_collation",
+                "tempdb_collation",
+                "compatibility_level",
+                "tables",
+                "requires",
+            }
+            if (
+                not isinstance(p, dict)
+                or set(p) != expected
+                or p["version"] != 1
+                or p["profile"] != "additive_tables_v1"
+                or p["migration_id"] != migration["id"]
+            ):
+                raise ValueError("Exact additive table profile required.")
+            if not isinstance(p["tables"], list) or not 1 <= len(p["tables"]) <= 8:
+                raise ValueError("Bounded additive tables required.")
+            for table in p["tables"]:
+                if not isinstance(table, dict) or set(table) != {
+                    "schema",
+                    "name",
+                    "columns",
+                    "primary_key",
+                    "unique_keys",
+                    "checks",
+                    "foreign_keys",
+                }:
+                    raise ValueError("Exact declarative table fields required.")
+                if any(
+                    not isinstance(table[k], str)
+                    or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", table[k])
+                    for k in ("schema", "name")
+                ):
+                    raise ValueError("Ordinary table identifiers required.")
+                key = (table["schema"] + "." + table["name"]).casefold()
+                if (
+                    key in modules
+                    or key in protected_objects
+                    or key in {"dbo.schemamigrationhistory", "dbo.deploymentrunhistory"}
+                ):
+                    raise ValueError("Repeated or protected additive table.")
+                modules.add(key)
+            # The exact SQL runner validates the full type/check/key DSL before
+            # drain and on every status/apply. No SQL text is acquired here.
+            if name in files:
+                raise ValueError("SQL profile filename collision.")
+            files[name] = raw
+            profiles.append(dict(id=migration["id"], file=name, sha256=sha256(raw)))
+            continue
         if (
             not isinstance(p, dict)
             or set(p)
@@ -187,7 +302,7 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
                 "requires",
             }
             or p["version"] != 1
-            or p["profile"] != "module_grants_v1"
+            or p["profile"] != description["profile"]
             or p["migration_id"] != migration["id"]
         ):
             raise ValueError(f"Unsupported SQL migration profile: {name}")
@@ -266,12 +381,16 @@ def ordinary_path(path):
 
 def check_source_only(paths, *, tool_copies=(), read_blob=None, before=None, target=None):
     """Routine mode cannot silently install dependencies, SQL or environment."""
+    protocols = transition_paths()
     for path in paths:
         ordinary_path(path)
         if path in TOOL_SOURCE_PATHS and path in tool_copies:
             continue  # source_plan must compare the target with installed bytes.
         if path in APPLICATION_METHODS and read_blob is not None:
             check_application_change(path, read_blob(before, path), read_blob(target, path))
+            continue
+        if path in protocols and read_blob is not None:
+            check_protocol_transition(path, read_blob, before, target)
             continue
         lower = path.casefold()
         # Preparation runs installed tooling with predecessor helpers, while
@@ -298,6 +417,7 @@ def check_source_only(paths, *, tool_copies=(), read_blob=None, before=None, tar
             "scripts/update-k98.ps1",
             "scripts/k98-sourceupdate.ps1",
             "scripts/deploy-k98release.ps1",
+            "scripts/k98_update_transitions.json",
         }:
             raise ValueError(
                 f"Startup/update contract change requires a non-routine release: {path}"
@@ -369,6 +489,10 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     if not changes or len(changes) > 4096 or len(set(changes)) != len(changes):
         raise ValueError("Bounded unique changed paths required.")
     tool_sources = tool_sources or {}
+    for path in set(changes) & transition_paths():
+        bundle = check_protocol_transition(path, read_blob, before, target)
+        if not bundle <= set(changes):
+            raise ValueError("Incomplete reviewed protocol transition inventory.")
     check_source_only(
         changes, tool_copies=tool_sources, read_blob=read_blob, before=before, target=target
     )
@@ -825,10 +949,16 @@ def main():
     # other forbidden paths still fail before acquisition. source_plan performs
     # the mandatory structural comparison before creating a release package.
     check_source_only(
-        [path for path in changes if path not in APPLICATION_METHODS], tool_copies=TOOL_SOURCE_PATHS
+        [
+            path
+            for path in changes
+            if path not in APPLICATION_METHODS and path not in transition_paths()
+        ],
+        tool_copies=TOOL_SOURCE_PATHS,
     )
     requested = sorted(
         set(changes)
+        | transition_paths()
         | {RELEASE_DESCRIPTION}
         | set(observation["seed"]["AutomaticStartupPolicy.json"]["source_hashes"])
     )

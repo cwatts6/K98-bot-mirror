@@ -191,6 +191,7 @@ def test_supported_legacy_installed_manifest_reports_upgrade():
 def test_legacy_inventory_requires_upgrade_even_with_matching_policy():
     installed = installed_manifest()
     del installed["files"]["prepare_k98_release.py"]
+    del installed["files"]["k98_update_transitions.json"]
     result = classify(BEFORE, AFTER, [], lambda *_: None, installed, policy_sha256="a" * 64)
     assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
 

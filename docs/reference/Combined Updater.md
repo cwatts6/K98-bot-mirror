@@ -1,5 +1,52 @@
 # Normal combined Bot and SQL updater
 
+## Reusable reader-report extension — implementation for review
+
+The candidate updater additionally supports `additive_tables_v1` and installed,
+exact-byte export protocol transitions. This is local implementation evidence,
+not a claim that MINI_AMD has this updater installed or that any report is active.
+Install a reviewed exact-version updater upgrade before selecting these releases.
+The operator still uses `Update-K98.ps1 -PrepareOnly`, then `Update-K98.ps1`, and
+requests one `/ops graceful_restart` only when prompted. `-Status` and existing
+same-release recovery remain available. No custom release launcher is required.
+
+An additive release uses the same version-1 Bot descriptor below with
+`profile: "additive_tables_v1"`. Every selected SQL profile must use that profile;
+mixing module and table profiles in one descriptor is not supported. SQL main is
+pinned explicitly. The SQL repository's `docs/additive-table-release.md` defines
+the bounded column/key/check/foreign-key declarations and recovery semantics.
+It creates new ordinary tables only: no arbitrary migration text, existing-table
+alterations, data backfill, grants, drops, schema creation or activation changes.
+The two report-history tables are the first supported case. Existing tables are
+accepted only with this exact profile's original committed receipt and release
+binding; matching tables without that receipt are refused, never adopted.
+
+`scripts/k98_update_transitions.json` is part of the protected installed updater
+package and its exact manifest. A transition names every required protocol file
+and its reviewed before/after LF hash (absence is explicit for new modules).
+All members must match together and be included in the source-change inventory.
+The reader transition covers `services/export_execution_protocol.py` and
+`services/export_reader_protocol.py`. The target repository cannot supply its own
+exemption: the installed registry selects transitions. Unknown versions still
+stop before drain. Adding another protected transition requires review and a new
+exact-version updater package. This admits a reviewed transition, not arbitrary
+future edits to export modules. The existing source/seed hashes, protected custody,
+retained uncertainty, flags and single-successor checks are unchanged.
+
+The updated compatibility checker compares both the candidate preparation policy
+and registry with the actual installed manifest. Without installed observations,
+its result is source capability only. There is deliberately no production release
+descriptor in this implementation: produce the reviewed SQL profile using actual
+database/tempdb collations and compatibility, merge/pin its SQL commit, then bind
+the actual permitted private Bot predecessors in the Bot descriptor. Preparing an
+upgrade requires the real installed `update-tool.json`, not a fixture manifest.
+
+Validation includes the normal updater regressions and the new protocol/profile
+tests. The SQL rehearsal uses explicitly approved disposable targets, tests real
+SqlClient transaction/process death and retains evidence; it does not touch MINI_AMD.
+Production report activation, guild/slot binding and runtime history permissions
+remain separate from deploying this source and schema.
+
 The installed `Update-K98.ps1` can prepare source-only releases or a bounded
 combined release from private `K98-bot/main`. It preserves the installed startup
 contracts, activation flags and held work. This change does not deploy or restart
@@ -39,7 +86,7 @@ descriptor. Installed-predecessor compatibility, private SQL acquisition and liv
 preconditions remain preparation checks before drain; CI does not claim those
 production observations.
 
-The first profile supports existing unsigned ordinary stored procedures/views and
+The `module_grants_v1` profile supports existing unsigned ordinary stored procedures/views and
 explicit new object EXECUTE/SELECT grants. It refuses sealed startup objects or
 principals, whole-database startup contracts, schema/data migrations, identities,
 dependencies/configuration changes, SQL Agent jobs, file/external effects, CLR,
@@ -47,6 +94,8 @@ encrypted modules, DDL triggers and ledger triggers. Profiles cannot modify the
 same module or grant twice in a release. Required migration history must already
 exist before drain; intra-release predecessor dependencies are not supported.
 Unsupported changes need a separately reviewed release design before deployment.
+The additive profile described above is a separate reviewed extension; it does not
+broaden the module profile or enable the historical arbitrary-SQL runner.
 
 ## Operator sequence
 

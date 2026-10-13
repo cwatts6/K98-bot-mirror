@@ -277,12 +277,20 @@ remain refused. The installer carries all six reviewed script copies for this ch
 
 ## Release boundaries and exceptional changes
 
+The reviewed reusable-updater extension adds an explicit `additive_tables_v1`
+profile and an installed exact-hash protocol transition registry; see
+[Combined Updater](Combined%20Updater.md). These capabilities require the matching
+reviewed updater to be installed first. They are not evidence of current MINI_AMD
+capability. The reader-report transition is the initial registered bundle; unknown
+protected edits remain refused. The existing module profile remains unchanged.
+No production descriptor or updater installation is implied by this implementation.
+
 Normal bot and SQL changes go through their Git repositories and review first.
 The source-only updater selects private `K98-bot/main`; it does not deploy mirror
 history, uncommitted live edits, dependencies, configuration or SQL migrations.
 Changes to startup/seed/update contracts also require a coordinated non-routine
 release: installed preparation helpers must agree with successor consumers.
-Routine preparation rejects changes to `core/export_*`, `services/export_*`,
+Routine preparation rejects unregistered changes to `core/export_*`, `services/export_*`,
 export launch/provision scripts, the watchdog, root configuration/constants,
 contract-package initializers and the updater/packaging scripts before requesting
 a drain, except for the installed, bounded application policy below. Ordinary

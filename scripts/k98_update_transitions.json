@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "transitions": [
+    {
+      "id": "reader_workbook_v1",
+      "members": [
+        {
+          "path": "services/export_execution_protocol.py",
+          "before_sha256": "fca1f960b6539928761d79096119f025d821a1e2a257b07b8cc3854d4dffa393",
+          "after_sha256": "3ee66e910a0921767fff54af6a1e33d57cc23f888f4bdac1daf381fcc2eaf6b3"
+        },
+        {
+          "path": "services/export_reader_protocol.py",
+          "before_sha256": null,
+          "after_sha256": "58a0106050d8ae2c323cc8a243d9b56be4f7ee6591f74157476ba1b99e3cfce5"
+        }
+      ]
+    }
+  ]
+}
