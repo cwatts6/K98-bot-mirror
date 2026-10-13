@@ -22,7 +22,7 @@ def _require_compatible_camps(inputs):
     for _, snapshot in inputs:
         metadata = snapshot["reader_context"]["metadata"]
         config = metadata["configs"]["selected"]
-        if config["PeriodKind"] == "fight" and no_fight(config):
+        if no_fight(config):
             continue
         # Names and configuration versions may change without changing the group.
         memberships.add(tuple(sorted((r["Kingdom"], r["CampID"]) for r in metadata["camps"])))

@@ -162,18 +162,22 @@ def test_equivalent_camp_membership_allows_config_and_label_changes():
     assert records(result, "Camps T4+T5 KP")[0]["Overall"] is not None
 
 
-def test_no_fight_mapping_does_not_participate_in_camp_compatibility():
+@pytest.mark.parametrize("period_kind", ["fight", "no_fight"])
+def test_no_fight_mapping_does_not_participate_in_camp_compatibility(period_kind):
     inputs = fixture(names=NAMES[:2])
     snap = inputs[-1][1]
     start = snap["envelope"]["publication"]["StartScanID"]
     snap["envelope"]["publication"].update(
-        EndScanID=start, AggregateState="not_applicable", AggregateRevisionID=None
+        EndScanID=start,
+        AggregateState="not_applicable",
+        AggregateRevisionID=None,
+        PeriodKey=period_kind + ":1",
     )
     snap["reader_context"]["revisions"]["aggregate"] = None
     for rows in snap["envelope"]["aggregates"].values():
         rows.clear()
     for config in snap["metadata"]["configs"].values():
-        config["EndScanID"] = start
+        config.update(EndScanID=start, PeriodKind=period_kind, PeriodKey=period_kind + ":1")
     snap["metadata"]["camps"].append(dict(snap["metadata"]["camps"][0], Kingdom=9999))
     sync(snap)
     result = build(inputs)
