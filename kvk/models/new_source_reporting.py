@@ -12,7 +12,7 @@ from kvk.models.new_source_observation import (
 )
 from kvk.schemas.new_source_schema import INT_MAX, SOURCE_KEY, MetricState
 
-CALCULATION_VERSION = "snapshot_report_calculation_v1"
+CALCULATION_VERSION = "snapshot_report_calculation_v3"
 
 
 class PeriodKind(StrEnum):
@@ -452,7 +452,11 @@ class ReportSnapshotV2:
                 "healed": "source Healed endpoint delta, troops; no intervening maximum",
                 "healed_points": "source healed delta * 20, calculated points",
                 "dkp": "frozen X*T4 delta + Y*T5 delta + Z*total-deaths delta, points",
-                "dkp_power_ratio": "DKP / positive B0 power, exact decimal(38,12) fraction",
+                "dkp_power_ratio": (
+                    "DKP / positive B0 power, half-even rounded decimal(38,12) fraction"
+                    if self.calculation.calculation_version == CALCULATION_VERSION
+                    else "DKP / positive B0 power, exact decimal(38,12) fraction"
+                ),
                 "rank": "descending available value then numeric GovernorID, usable B0 cohort",
                 "top_position_percent": "ordinal rank/population*100; 50-digit presentation ratio",
                 "aggregate": "supplied report values, raw tokens and units; no recalculation",

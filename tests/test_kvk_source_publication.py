@@ -1,5 +1,7 @@
 from dataclasses import replace
 from decimal import Decimal
+import json
+from unittest.mock import Mock
 
 import pytest
 
@@ -8,7 +10,12 @@ from kvk.models.new_source_reporting import CalculatedMetric
 from kvk.schemas.new_source_schema import MetricState
 from kvk.services.new_source_calculation import calculate_period
 from kvk.services.new_source_window_resolver import resolve_window
-from tests.kvk_source_fixtures import calculation_config, worked_calculation_inputs
+from tests.kvk_source_fixtures import (
+    calculation_config,
+    calculation_event,
+    player_row,
+    worked_calculation_inputs,
+)
 
 
 def test_direct_component_delivery_is_blocked_before_sql():
@@ -119,3 +126,73 @@ def test_s8c_player_weight_correction_does_not_recalculate_supplied_aggregates()
     assert corrected.calculation.players[0].metric("dkp") != original.calculation.players[0].metric(
         "dkp"
     )
+
+
+def test_rounded_ratio_survives_dal_result_roundtrip():
+    from kvk.dal.new_source_publication_dal import publication_results
+
+    b0 = calculation_event(1, day=1, rows=[player_row(Power=3)])
+    start = calculation_event(10, rows=[player_row()])
+    end = calculation_event(13, day=7, rows=[player_row(**{"T4 Kills": 2})])
+    player = calculate_period(resolve_window(calculation_config(), (start, end)), b0).players[0]
+    row = result_values(player)
+    assert row["dkp_power_ratio"] == Decimal("3.333333333333")
+    assert json.loads(row["FieldStatusJson"])["dkp_power_ratio"] == "available"
+    assert row["dkp_power_ratio_rank"] == row["dkp_power_ratio_cohort"] == 1
+    # Model SQL decimal scales and exercise the real DAL row mapper without a live DB.
+    stored = dict(row, dkp=Decimal("10.000000"), dkp_power_ratio=Decimal("3.333333333333"))
+    cursor = Mock()
+    cursor.description = [(key,) for key in stored]
+    cursor.fetchall.return_value = [tuple(stored.values())]
+    readback = publication_results(cursor, "publication")
+    assert result_digest(readback) == result_digest([row])
+    assert readback[0]["dkp_power_ratio"] == player.metric("dkp_power_ratio").value
+
+
+@pytest.mark.parametrize(
+    "legacy_version", ["snapshot_report_calculation_v1", "snapshot_report_calculation_v2"]
+)
+def test_new_ratio_version_gets_new_identity_and_preserves_old_publication(
+    monkeypatch, legacy_version
+):
+    from kvk.services import new_source_publication_service as service
+
+    b0, start, _, end = worked_calculation_inputs()
+    config = calculation_config()
+    engine = service.PublicationService(Mock(side_effect=AssertionError("SQL forbidden")))
+    stored = {}
+
+    def store(snapshot, **_):
+        payload = snapshot.to_dict()
+        if snapshot.publication_id in stored:
+            assert stored[snapshot.publication_id] == payload
+        else:
+            stored[snapshot.publication_id] = payload
+        return {"Generation": 1}
+
+    engine.dal.build_candidate = store
+    monkeypatch.setattr(
+        service,
+        "calculate_period",
+        lambda *args: replace(calculate_period(*args), calculation_version=legacy_version),
+    )
+    old = engine.build_candidate(config=config, observations=(start, end), b0=b0).snapshot
+    old_payload = old.to_dict()
+    monkeypatch.setattr(service, "calculate_period", calculate_period)
+    new = engine.build_candidate(config=config, observations=(start, end), b0=b0).snapshot
+    retry = engine.build_candidate(config=config, observations=(start, end), b0=b0).snapshot
+    assert new.publication_id != old.publication_id
+    assert new.publication_id == retry.publication_id
+    assert new.calculation.calculation_version == "snapshot_report_calculation_v3"
+    assert old.to_dict() == stored[old.publication_id] == old_payload
+    assert "exact decimal" in old_payload["metric_definitions"]["dkp_power_ratio"]
+    assert "half-even rounded" in new.to_dict()["metric_definitions"]["dkp_power_ratio"]
+
+
+def test_dal_still_rejects_unrounded_ratio_instead_of_silently_rounding_it():
+    b0, start, _, end = worked_calculation_inputs()
+    player = calculate_period(resolve_window(calculation_config(), (start, end)), b0).players[0]
+    metrics = dict(player.metrics)
+    metrics["dkp_power_ratio"] = CalculatedMetric(Decimal("0.1234567890123"), MetricState.AVAILABLE)
+    with pytest.raises(ValueError, match="precision"):
+        result_values(replace(player, metrics=tuple(metrics.items())))

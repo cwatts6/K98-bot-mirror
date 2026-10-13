@@ -1276,7 +1276,7 @@ class GoogleSheetsTransport:
             sheet_id=grids[0]["properties"]["sheetId"],
         )
 
-    def ensure_private(self, destination, key, manifest):
+    def _prepare_files(self, destination, key, manifest):
         from kvk.services.new_source_delivery_service import DestinationSetupRequired
 
         self._identity(destination, key)
@@ -1289,8 +1289,7 @@ class GoogleSheetsTransport:
             and getattr(self, "_registered_quarantine", False) is not True
         ):
             raise SourceConflict("Remove quarantined slots from destination registration.")
-        if set(manifest) != {*KVK_EXPORT_SECTION_NAMES, "ALL_WINDOWS", "COMPARISONS"}:
-            raise ValueError("Exactly twelve generation sections are required.")
+        self._validate_manifest(manifest)
         layout = self.partition_manifest(manifest)
         if len(layout) > len(self.registration.slot_file_ids):
             raise DestinationSetupRequired(
@@ -1368,6 +1367,15 @@ class GoogleSheetsTransport:
                 index, [bound_parts[str(i)] for i in range(len(layout))], layout, manifest
             )
         chosen = [bound_parts[str(i)] for i in range(len(layout))]
+        return index, chosen, layout, replacing
+
+    @staticmethod
+    def _validate_manifest(manifest):
+        if set(manifest) != {*KVK_EXPORT_SECTION_NAMES, "ALL_WINDOWS", "COMPARISONS"}:
+            raise ValueError("Exactly twelve generation sections are required.")
+
+    def ensure_private(self, destination, key, manifest):
+        index, chosen, layout, replacing = self._prepare_files(destination, key, manifest)
         for part, (file, pieces) in enumerate(zip(chosen, layout, strict=True)):
             self._staging_file(self._get(file["id"]))
             props = self._execute(

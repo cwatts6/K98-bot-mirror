@@ -166,6 +166,38 @@ def _iter_intent_export_snapshots(connect, reads):
         del envelope, metadata, weights
 
 
+def load_reader_export_inputs(*, connect, intent_id, kvk_no, guild_id, expected_hash):
+    """Stage 2 reader inputs; existing transport/schema remains unchanged.
+
+    The caller must authorize the season/guild before entering. Consume all history
+    and period inputs before performing provider writes; Stage 3 owns projection.
+    """
+    from kvk.dal.new_source_history_dal import capture_history
+    from kvk.dal.new_source_report_context_dal import load_report_context
+
+    intent, snapshots = load_intent_export_snapshots(connect=connect, intent_id=intent_id)
+    if (intent["SourceKey"], intent["KVK_NO"], bytes(intent["VectorHash"])) != (
+        SOURCE_KEY,
+        kvk_no,
+        expected_hash,
+    ):
+        raise SourceConflict("Reader intent differs from the authorised selection.")
+    history = capture_history(
+        connect=connect, intent_id=intent_id, kvk_no=kvk_no, guild_id=guild_id
+    )
+
+    def periods():
+        for selection, snapshot in snapshots:
+            context = load_report_context(
+                connect=connect, publication_id=selection.publication_id, kvk_no=kvk_no
+            )
+            if context["publication"] != snapshot["envelope"]["publication"]:
+                raise SourceConflict("Reader context differs from pinned publication.")
+            yield selection, dict(snapshot, reader_context=context)
+
+    return intent, history, periods()
+
+
 def _selected(cursor, selection):
     _, selected, requests = locked_period(cursor, selection.kvk_no, selection.period_id)
     if (

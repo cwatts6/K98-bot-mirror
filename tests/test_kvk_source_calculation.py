@@ -1,13 +1,13 @@
 """S3A T21-T30/T34/T36 plus precision and source isolation regressions."""
 
 from dataclasses import replace
-from decimal import Decimal, localcontext
+from decimal import ROUND_UP, Decimal, localcontext
 
 import pytest
 
-from kvk.models.new_source_reporting import PeriodKind
+from kvk.models.new_source_reporting import CalculatedMetric, PeriodKind
 from kvk.schemas.new_source_schema import BIGINT_MAX, MetricState
-from kvk.services.new_source_calculation import calculate_period
+from kvk.services.new_source_calculation import _ratio, calculate_period
 from kvk.services.new_source_window_resolver import resolve_window
 from tests.kvk_source_fixtures import (
     calculation_config,
@@ -25,7 +25,7 @@ def test_reviewed_roster_subset_uses_original_b0_without_mutating_it():
     assert [p.governor_id for p in result.players] == [1001]
     assert result.players[0].metric("dkp").value == 1800
     assert result.eligible_count == 1
-    assert result.calculation_version == "snapshot_report_calculation_v2"
+    assert result.calculation_version == "snapshot_report_calculation_v3"
     assert b0.observation is original and len(original.rows) == 4
 
 
@@ -210,3 +210,95 @@ def test_unavailable_total_kp_does_not_remove_tier_rank_and_highest_not_substitu
     assert result.metric("acclaim").value is None
     assert result.metric("highest_acclaim").value == 99
     assert result.metric("t4_t5_dead").state == MetricState.UNSUPPORTED
+
+
+@pytest.mark.parametrize(
+    "numerator,denominator,expected",
+    [
+        ("1", "3", "0.333333333333"),
+        ("2", "3", "0.666666666667"),
+        ("1", "8", "0.125000000000"),
+        ("0", "3", "0.000000000000"),
+        ("1", "2000000000000", "0.000000000000"),
+        ("3", "2000000000000", "0.000000000002"),
+        ("5", "2000000000000", "0.000000000002"),
+        ("-1", "3", "-0.333333333333"),
+        # Rounded value fits at the upper storage edge; a carry over it must not.
+        (
+            "99999999999999999999999999.9999999999994",
+            "1",
+            "99999999999999999999999999.999999999999",
+        ),
+    ],
+)
+def test_ratio_rounds_half_even_independently_of_ambient_context(numerator, denominator, expected):
+    with localcontext() as context:
+        context.prec = 3
+        context.rounding = ROUND_UP
+        result = _ratio(
+            CalculatedMetric(Decimal(numerator), MetricState.AVAILABLE),
+            CalculatedMetric(Decimal(denominator), MetricState.AVAILABLE),
+        )
+    assert result == CalculatedMetric(Decimal(expected), MetricState.AVAILABLE)
+
+
+@pytest.mark.parametrize("numerator", ["1e26", "1e100", "99999999999999999999999999.9999999999995"])
+def test_ratio_rejects_storage_overflow_after_rounding(numerator):
+    result = _ratio(
+        CalculatedMetric(Decimal(numerator), MetricState.AVAILABLE),
+        CalculatedMetric(Decimal(1), MetricState.AVAILABLE),
+    )
+    assert result.value is None
+    assert result.state == MetricState.INVALID_SOURCE_VALUE
+    assert result.reason == "ratio_decimal_overflow"
+
+
+@pytest.mark.parametrize("denominator", ["0", "-1"])
+def test_ratio_rejects_nonpositive_baseline(denominator):
+    result = _ratio(
+        CalculatedMetric(Decimal(1), MetricState.AVAILABLE),
+        CalculatedMetric(Decimal(denominator), MetricState.AVAILABLE),
+    )
+    assert result.reason == "nonpositive_denominator" and result.value is None
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        MetricState.MISSING_START,
+        MetricState.INVALID_SOURCE_VALUE,
+        MetricState.MISSING_CONFIGURATION,
+        MetricState.COUNTER_REGRESSION,
+    ],
+)
+def test_ratio_preserves_unavailable_inputs(state):
+    unavailable = CalculatedMetric(None, state, "original_reason")
+    available = CalculatedMetric(Decimal(1), MetricState.AVAILABLE)
+    assert _ratio(unavailable, available) == unavailable
+    assert _ratio(available, unavailable) == unavailable
+
+
+def test_repeating_ratios_are_ranked_at_stored_precision_before_display_rounding():
+    b0 = calculation_event(
+        1, day=1, rows=[player_row(1001, Power=3001), player_row(1002, Power=3000)]
+    )
+    start = calculation_event(10, rows=[player_row(1001), player_row(1002)])
+    end = calculation_event(
+        13,
+        day=7,
+        rows=[
+            player_row(1001, Power=0, **{"T4 Kills": 2}),
+            player_row(1002, Power=0, **{"T4 Kills": 2}),
+        ],
+    )
+    result = calculate_period(resolve_window(calculation_config(), (start, end)), b0)
+    low, high = result.players
+    assert result.calculation_version == "snapshot_report_calculation_v3"
+    assert low.metric("dkp_power_ratio").value == Decimal("0.003332222592")
+    assert high.metric("dkp_power_ratio").value == Decimal("0.003333333333")
+    assert format(low.metric("dkp_power_ratio").value, ".2f") == format(
+        high.metric("dkp_power_ratio").value, ".2f"
+    )
+    assert low.metric("power").value == -1  # Power loss does not gate the ratio.
+    assert dict(high.ranks)["dkp_power_ratio"].rank == 1
+    assert dict(low.ranks)["dkp_power_ratio"].population == 2

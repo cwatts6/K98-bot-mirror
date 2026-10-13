@@ -273,6 +273,7 @@ def deliver_coordinated_export(
     authority_stream=None,
     retirement_stream_factory=None,
     retirement_transport_factory=None,
+    reader_guild_id=None,
 ):
     """S10B Sheets path: pinned vector, durable attempts, no SQL around requests.
 
@@ -312,11 +313,34 @@ def deliver_coordinated_export(
     if digest(destinations) != bytes(job["DestinationSetHash"]):
         raise SourceConflict("Transport registration differs from admitted destinations.")
     dal.authorize(claim)
-    generation = transport.prepare_generation(
-        load_intent_generation(
+    from kvk.services.new_source_workbook_transport import ReaderSheetsTransport
+
+    if isinstance(transport, ReaderSheetsTransport):
+        from kvk.rendering.new_source_workbook import build_workbook_generation
+        from kvk.services.new_source_reader_service import load_reader_projection
+
+        if (
+            not isinstance(reader_guild_id, str)
+            or not reader_guild_id.isascii()
+            or not reader_guild_id.isdigit()
+            or not 1 <= len(reader_guild_id) <= 32
+        ):
+            raise ValueError("Reader delivery requires its explicit authorised guild.")
+        generation = build_workbook_generation(
+            load_reader_projection(
+                connect=connect,
+                intent_id=job["IntentID"],
+                expected_hash=bytes(job["InputHash"]),
+                kvk_no=job["KVK_NO"],
+                guild_id=reader_guild_id,
+                with_checkpoints=True,
+            )
+        )
+    else:
+        generation = load_intent_generation(
             connect=connect, intent_id=job["IntentID"], expected_hash=bytes(job["InputHash"])
         )
-    )
+    generation = transport.prepare_generation(generation)
     from kvk.dal.new_source_delivery_dal import Destination
 
     destination = Destination("sheets", registration.index_file_id)
@@ -375,7 +399,8 @@ def deliver_coordinated_export(
             )
         ]
         for number, (file, pieces) in enumerate(zip(files, layout, strict=True)):
-            directory_rows = sum(map(len, layout)) + 1 if number == 0 else 0
+            header_rows = 6 if isinstance(transport, ReaderSheetsTransport) else 1
+            directory_rows = sum(map(len, layout)) + header_rows if number == 0 else 0
             parts.append(
                 dict(
                     file_id=file["id"],
@@ -383,7 +408,9 @@ def deliver_coordinated_export(
                     manifest_hash=digest({"pieces": pieces, "manifest": manifest}).hex(),
                     grids=len(pieces) + int(number == 0),
                     rows=sum(p["rows"] for p in pieces) + directory_rows,
-                    cells=sum(max(2, p["rows"] + 1) * p["columns"] for p in pieces)
+                    cells=sum(
+                        max(header_rows + 1, p["rows"] + header_rows) * p["columns"] for p in pieces
+                    )
                     + directory_rows * 5,
                 )
             )
@@ -395,6 +422,14 @@ def deliver_coordinated_export(
                 "repair_id": job.get("RepairID"),
                 "retain": transport._retained.get(generation.key, True),
                 "tables": manifest,
+                **(
+                    {
+                        "reader_bindings": transport.reader_bindings,
+                        "reader_index_id": transport.reader_index_id,
+                    }
+                    if isinstance(transport, ReaderSheetsTransport)
+                    else {}
+                ),
                 "staging_audience": (
                     "public_viewer" if transport.preserve_public_staging else "private"
                 ),

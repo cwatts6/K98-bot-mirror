@@ -1,11 +1,12 @@
 """Exact player endpoint arithmetic and B0-cohort ranking, with no side effects."""
 
 from dataclasses import replace
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation, localcontext
 
 from kvk.combat_metrics import calculate_combat_metrics
 from kvk.models.new_source_observation import SourceRow
 from kvk.models.new_source_reporting import (
+    CALCULATION_VERSION,
     CalculatedMetric,
     MetricRank,
     ObservationInput,
@@ -93,9 +94,17 @@ def _ratio(numerator: CalculatedMetric, denominator: CalculatedMetric) -> Calcul
         return _unavailable(denominator.state, denominator.reason)
     if denominator.value <= 0:
         return _unavailable(MetricState.INVALID_SOURCE_VALUE, "nonpositive_denominator")
-    value = numerator.value / denominator.value
+    # Only the derived ratio is rounded; source counters/weights retain exact validation.
+    # 100 digits cover decimal(38,6) DKP / positive bigint power with ample guard digits.
+    with localcontext() as context:
+        context.prec = 100
+        context.rounding = ROUND_HALF_EVEN
+        try:
+            value = (numerator.value / denominator.value).quantize(Decimal("1e-12"))
+        except InvalidOperation:
+            return _unavailable(MetricState.INVALID_SOURCE_VALUE, "ratio_decimal_overflow")
     if not fits_decimal(value, 12):
-        return _unavailable(MetricState.INVALID_SOURCE_VALUE, "ratio_not_exact_decimal_38_12")
+        return _unavailable(MetricState.INVALID_SOURCE_VALUE, "ratio_decimal_overflow")
     return CalculatedMetric(value, MetricState.AVAILABLE)
 
 
@@ -139,7 +148,8 @@ def _name(*rows: SourceRow | None) -> str | None:
 def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> PeriodCalculation:
     """Calculate all eligible members; final coverage requires only the two exact endpoints.
 
-    Derived fixed-point values reject loss rather than rounding. Rank percentages are labelled
+    Derived points reject loss; DKP/power ratios round half-even to 12 decimal places.
+    Ranks use stored numeric values, before display rounding. Rank percentages are labelled
     presentation ratios computed at a fixed 50-digit precision, never stored as exact counters.
     """
     config = selection.config
@@ -264,9 +274,5 @@ def calculate_period(selection: WindowInputSelection, b0: ObservationInput) -> P
         len(eligible - ends.keys()),
         len((starts.keys() | ends.keys()) - eligible),
         tuple(coverage),
-        calculation_version=(
-            "snapshot_report_calculation_v2"
-            if config.roster_members is not None
-            else "snapshot_report_calculation_v1"
-        ),
+        calculation_version=CALCULATION_VERSION,
     )

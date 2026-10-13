@@ -294,7 +294,7 @@ class ProviderRequest:
         if not isinstance(arguments, dict):
             raise ProtocolError("Provider arguments must be an object.")
         allowed = {
-            "sheets.get": {"fields", "includeGridData"},
+            "sheets.get": {"fields", "includeGridData", "ranges"},
             "sheets.values.get": {"range", "valueRenderOption", "dateTimeRenderOption"},
             "sheets.values.batchGet": {"ranges", "valueRenderOption", "dateTimeRenderOption"},
             "sheets.values.update": {"range", "valueInputOption", "body"},
@@ -328,7 +328,9 @@ class ProviderRequest:
                 or not 0 < len(arguments["range"]) <= 4096
             ):
                 raise ProtocolError("Bounded explicit range required.")
-        if operation == "sheets.values.batchGet":
+        if operation == "sheets.values.batchGet" or (
+            operation == "sheets.get" and "ranges" in arguments
+        ):
             ranges = arguments.get("ranges")
             if not isinstance(ranges, list) or not 1 <= len(ranges) <= 16:
                 raise ProtocolError("Readback requires one through sixteen ranges.")
@@ -430,6 +432,9 @@ class ProviderRequest:
                 "sortRange",
                 "deleteNamedRange",
                 "deleteDeveloperMetadata",
+                "updateCells",
+                "setBasicFilter",
+                "updateDimensionProperties",
             }
             if any(
                 not isinstance(item, dict) or len(item) != 1 or not set(item) <= allowed_batches
@@ -440,6 +445,10 @@ class ProviderRequest:
                 operation_name, instruction = next(iter(item.items()))
                 if not isinstance(instruction, dict):
                     raise ProtocolError("Batch instruction must be an object.")
+                if operation_name in {"updateCells", "setBasicFilter", "updateDimensionProperties"}:
+                    from services.export_reader_protocol import validate_reader_batch
+
+                    validate_reader_batch(operation_name, instruction)
                 if operation_name == "deleteNamedRange" and (
                     set(instruction) != {"namedRangeId"}
                     or not isinstance(instruction["namedRangeId"], str)
@@ -659,9 +668,11 @@ def from_http(*, method, uri, body, stream_id, request_id, params=None):
     operation, match = selected
     pairs = parse_qsl(parts.query, keep_blank_values=True)
     arguments = _object(
-        (k, v) for k, v in pairs if operation != "sheets.values.batchGet" or k != "ranges"
+        (k, v)
+        for k, v in pairs
+        if operation not in {"sheets.values.batchGet", "sheets.get"} or k != "ranges"
     )
-    if operation == "sheets.values.batchGet":
+    if operation in {"sheets.values.batchGet", "sheets.get"}:
         ranges = [v for k, v in pairs if k == "ranges"]
         if ranges:
             arguments["ranges"] = ranges
