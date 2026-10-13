@@ -174,6 +174,8 @@ def test_no_fight_mapping_does_not_participate_in_camp_compatibility(period_kind
         PeriodKey=period_kind + ":1",
     )
     snap["reader_context"]["revisions"]["aggregate"] = None
+    # A real no-fight publication has available zero metrics and deliberately no ranks.
+    snap["envelope"]["players"] = reader_input(end_scan=10)[1]["envelope"]["players"]
     for rows in snap["envelope"]["aggregates"].values():
         rows.clear()
     for config in snap["metadata"]["configs"].values():
@@ -183,6 +185,16 @@ def test_no_fight_mapping_does_not_participate_in_camp_compatibility(period_kind
     result = build(inputs)
     assert len(result.checkpoints) == 1
     assert "1st Altar" not in [c.label for c in sheet(result, "Camps DKP").columns]
+    assert (
+        next(r for r in records(result, "Scans") if r["Period"] == "1st Altar")["Status"]
+        == "No fight"
+    )
+    assert (
+        next(r for r in records(result, "Report Guide") if r["Period"] == "1st Altar")[
+            "Availability"
+        ]
+        == "No fight"
+    )
 
 
 def test_cumulative_camp_missing_dkp_keeps_the_correct_camp_mapping():

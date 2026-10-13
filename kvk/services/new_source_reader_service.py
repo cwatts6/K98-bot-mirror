@@ -6,7 +6,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from kvk.models.new_source_history import HISTORY_VERSION, HistorySnapshot, encode_fact, hash_row
-from kvk.models.new_source_reader import ReaderProjection
+from kvk.models.new_source_reader import ReaderProjection, no_fight
 from kvk.models.new_source_reporting import CalculatedMetric
 from kvk.rendering.new_source_reader import columns_for, project_sheet
 from kvk.schemas.new_source_schema import SOURCE_KEY, MetricState
@@ -324,11 +324,7 @@ def build_reader_projection(inputs, *, history_snapshot, history_rows):
             raise SourceConflict("Reader source revision differs from the publication.")
         config = context["metadata"]["configs"]["selected"]
         periods.append((selection, snapshot))
-        if (
-            config["PeriodKind"] == "fight"
-            and config["StartScanID"] is not None
-            and config["StartScanID"] == config["EndScanID"]
-        ):
+        if config["PeriodKind"] != "overall" and no_fight(config):
             continue
         sheets.extend(
             _entity_sheet(selection, snapshot, kind, issues)

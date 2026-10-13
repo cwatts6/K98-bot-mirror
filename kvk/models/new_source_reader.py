@@ -11,6 +11,13 @@ from kvk.rendering.new_source_export import text_value
 READER_VERSION = "snapshot_report_reader_v1"
 
 
+def no_fight(window):
+    """Match the pinned WindowConfig no-fight classification without live lookups."""
+    return window["PeriodKind"] == "no_fight" or (
+        window["StartScanID"] is not None and window["StartScanID"] == window["EndScanID"]
+    )
+
+
 @dataclass(frozen=True)
 class ReaderColumn:
     label: str

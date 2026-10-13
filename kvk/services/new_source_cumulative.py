@@ -5,6 +5,7 @@ from decimal import Decimal, localcontext
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from kvk.models.new_source_checkpoints import FightMember
+from kvk.models.new_source_reader import no_fight
 from kvk.models.new_source_reporting import CalculatedMetric, fits_decimal
 from kvk.rendering.new_source_reader import columns_for, utc_time
 from kvk.schemas.new_source_schema import MetricState
@@ -38,10 +39,6 @@ def entity_records(snapshot, sheet, kind):
     )
     rows.sort(key=lambda r: (r["dkp"] is not None, r["dkp"] or Decimal(0)), reverse=True)
     return {r["CampID"]: record for r, record in zip(rows, records, strict=True)}
-
-
-def no_fight(window):
-    return window["StartScanID"] is not None and window["StartScanID"] == window["EndScanID"]
 
 
 def members_for(selection, snapshot, by_period):

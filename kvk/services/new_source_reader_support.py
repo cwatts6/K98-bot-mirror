@@ -4,7 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from kvk.models.new_source_history import safe_basename
-from kvk.models.new_source_reader import ReaderLink
+from kvk.models.new_source_reader import ReaderLink, no_fight as is_no_fight
 from kvk.rendering.new_source_reader import columns_for, utc_time
 from kvk.services.new_source_reader_service import REASONS, _issue, _sheet
 
@@ -62,11 +62,7 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
     ):
         period = "Overall" if window["PeriodKind"] == "overall" else window["WindowName"]
         selected = by_period.get(window["PeriodID"])
-        no_fight = (
-            window["PeriodKind"] == "fight"
-            and window["StartScanID"] is not None
-            and window["StartScanID"] == window["EndScanID"]
-        )
+        no_fight = window["PeriodKind"] != "overall" and is_no_fight(window)
         row = {
             "Period": period,
             "Start Scan": window["StartScanID"],
@@ -76,7 +72,11 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
             or "Configured endpoints; no published selection yet.",
         }
         if no_fight:
-            row["Selection Notes"] = "Start and end scans are the same; no fighting export."
+            row["Selection Notes"] = (
+                "Configured as no fight; no fighting export."
+                if window["PeriodKind"] == "no_fight"
+                else "Start and end scans are the same; no fighting export."
+            )
         if selected:
             selection, snapshot = selected
             pub, meta = snapshot["envelope"]["publication"], snapshot["metadata"]
@@ -259,9 +259,7 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
                 "Availability": "No fight",
             }
             for w in windows.values()
-            if w["PeriodKind"] == "fight"
-            and w["StartScanID"] is not None
-            and w["StartScanID"] == w["EndScanID"]
+            if w["PeriodKind"] != "overall" and is_no_fight(w)
         )
     guide = _sheet(
         [],
@@ -280,7 +278,7 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
             "Kingdom and camp DKP and tier KP use supplied report values, not player totals. Their displayed precision does not imply more precise measurements.",
             "Overall uses its independently selected publication. An unpublished Overall remains empty.",
             "Exact values and source metadata remain in the authorised audit; reader blanks are distinct from valid zero.",
-            "No fight is shown in Scans when configured start and end scans are equal; it has no fighting report.",
+            "No fight is shown in Scans for explicit no-fight periods or equal start and end scans; it has no fighting report.",
         ),
     )
     return [guide, *support]
