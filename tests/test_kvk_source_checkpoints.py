@@ -128,6 +128,59 @@ def build(inputs):
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
 
 
+@pytest.mark.parametrize("overall", [False, True])
+@pytest.mark.parametrize("change", ["move", "add", "remove"])
+def test_incompatible_camp_membership_fails_before_cumulative_or_comparison(overall, change):
+    inputs = fixture(names=NAMES[:1] if overall else NAMES[:2], overall=overall)
+    snap = inputs[-1][1]
+    mapping = snap["metadata"]["camps"]
+    if change == "move":
+        mapping[0]["CampID"] = 8 if mapping[0]["CampID"] != 8 else 1
+    elif change == "add":
+        mapping.append(dict(mapping[0], Kingdom=9999))
+    else:
+        mapping.pop()
+    sync(snap)
+    with pytest.raises(SourceConflict, match="compatible pinned camp membership"):
+        build(inputs)
+
+
+def test_equivalent_camp_membership_allows_config_and_label_changes():
+    inputs = fixture(names=NAMES[:2], overall=True)
+    for index, (_, snap) in enumerate(inputs):
+        config_id = str(UUID(int=700 + index))
+        snap["envelope"]["publication"]["ConfigVersionID"] = config_id
+        for config in snap["metadata"]["configs"].values():
+            config["ConfigVersionID"] = config_id
+        snap["metadata"]["camps"].reverse()
+        for entry in snap["metadata"]["camps"]:
+            entry["CampName"] = "Renamed camp " + str(index)
+        sync(snap)
+    result = build(inputs)
+    assert records(result, "Fights to 1st Altar Camps")[0]["T4+T5 KP"] == 120_000_000
+    assert records(result, "Camps T4+T5 KP")[0]["Pass 4"] == 100_000_000
+    assert records(result, "Camps T4+T5 KP")[0]["Overall"] is not None
+
+
+def test_no_fight_mapping_does_not_participate_in_camp_compatibility():
+    inputs = fixture(names=NAMES[:2])
+    snap = inputs[-1][1]
+    start = snap["envelope"]["publication"]["StartScanID"]
+    snap["envelope"]["publication"].update(
+        EndScanID=start, AggregateState="not_applicable", AggregateRevisionID=None
+    )
+    snap["reader_context"]["revisions"]["aggregate"] = None
+    for rows in snap["envelope"]["aggregates"].values():
+        rows.clear()
+    for config in snap["metadata"]["configs"].values():
+        config["EndScanID"] = start
+    snap["metadata"]["camps"].append(dict(snap["metadata"]["camps"][0], Kingdom=9999))
+    sync(snap)
+    result = build(inputs)
+    assert len(result.checkpoints) == 1
+    assert "1st Altar" not in [c.label for c in sheet(result, "Camps DKP").columns]
+
+
 def test_cumulative_camp_missing_dkp_keeps_the_correct_camp_mapping():
     from kvk.services.new_source_cumulative import entity_records
     from kvk.services.new_source_reader_service import _entity_sheet

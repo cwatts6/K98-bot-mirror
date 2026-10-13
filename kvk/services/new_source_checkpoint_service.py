@@ -16,11 +16,28 @@ from kvk.services.new_source_reader_service import build_reader_projection
 from kvk.services.new_source_reader_support import build_support
 
 
+def _require_compatible_camps(inputs):
+    """Camp IDs are local to a pinned configuration, not permanent group identities."""
+    memberships = set()
+    for _, snapshot in inputs:
+        metadata = snapshot["reader_context"]["metadata"]
+        config = metadata["configs"]["selected"]
+        if config["PeriodKind"] == "fight" and no_fight(config):
+            continue
+        # Names and configuration versions may change without changing the group.
+        memberships.add(tuple(sorted((r["Kingdom"], r["CampID"]) for r in metadata["camps"])))
+    if len(memberships) > 1:
+        raise SourceConflict(
+            "Cumulative and comparison reports require compatible pinned camp membership."
+        )
+
+
 def build_checkpoint_projection(inputs, *, history_snapshot, history_rows):
     inputs, history_rows = tuple(inputs), tuple(history_rows)
     base = build_reader_projection(
         inputs, history_snapshot=history_snapshot, history_rows=history_rows
     )
+    _require_compatible_camps(inputs)
     by_period = {s.period_id: (s, snap) for s, snap in inputs}
     ordered = sorted(
         inputs, key=lambda p: (p[1]["metadata"]["configs"]["selected"]["WindowSeq"], p[0].period_id)

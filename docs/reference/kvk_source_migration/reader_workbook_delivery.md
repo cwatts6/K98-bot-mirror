@@ -5,6 +5,13 @@ Legacy `GoogleSheetsTransport` remains the default. No production factory is swi
 by this implementation. Integrated acceptance has passed on disposable targets;
 rollout and production activation remain separate operator decisions.
 
+Cumulative and comparison reports require identical pinned kingdom-to-camp
+membership across the included fights and independently published Overall report.
+Camp IDs alone are not permanent group identities. Configuration version, row order
+and camp-label changes are allowed when membership is unchanged. No-fight windows
+do not contribute to this compatibility check; conflicting membership stops the
+export before any provider write.
+
 ## Naming and delayed-write safety
 
 Readable aliases are presentation only. Data, formatting, filters and index writes
