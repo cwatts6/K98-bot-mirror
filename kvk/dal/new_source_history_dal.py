@@ -19,6 +19,7 @@ from kvk.models.new_source_history import (
     page_size,
 )
 from kvk.models.source_integration import identity
+from kvk.models.source_receipt_state import accepted_outcome
 from kvk.schemas.new_source_schema import INT_MAX, SOURCE_KEY
 
 
@@ -90,13 +91,15 @@ def capture_history(*, connect, intent_id, kvk_no, guild_id, batch_size=250):
             "CREATE TABLE #ReportHistoryAttempts (AttemptID uniqueidentifier NOT NULL,"
             "ReceivedUTC datetime2(0) NOT NULL,OriginalFilename nvarchar(512) NULL,"
             "Status varchar(32) NOT NULL,ObservationRevisionID uniqueidentifier NULL,"
-            "AggregateRevisionID uniqueidentifier NULL); "
+            "AggregateRevisionID uniqueidentifier NULL,ActionKey varchar(32) NOT NULL,"
+            "ProvenanceJson nvarchar(max) NOT NULL); "
             "CREATE UNIQUE CLUSTERED INDEX IX_ReportHistoryAttempts "
             "ON #ReportHistoryAttempts (ReceivedUTC,AttemptID);"
         )
         cursor.execute(
             "INSERT #ReportHistoryAttempts SELECT AttemptID,ReceivedUTC,OriginalFilename,"
-            "Status,ObservationRevisionID,AggregateRevisionID FROM KVK.SourceImportAttempt "
+            "Status,ObservationRevisionID,AggregateRevisionID,ActionKey,ProvenanceJson "
+            "FROM KVK.SourceImportAttempt "
             "WITH (HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? AND GuildID=?",
             SOURCE_KEY,
             kvk_no,
@@ -186,8 +189,61 @@ def _attempt_pages(cursor, kvk_no, batch_size):
         batch = rows(cursor)
         if not batch:
             return
+        for row in batch:
+            _restore_accepted(cursor, row, kvk_no)
         yield batch
         last_time, last_id = batch[-1]["ReceivedUTC"], batch[-1]["AttemptID"]
+
+
+def _restore_accepted(cursor, row, kvk_no):
+    """Resolve only the retained acceptance of a frozen private admin receipt."""
+    if row.get("ActionKey") != "s5a_draft" or row["Status"] != "validated":
+        return
+    outcome = accepted_outcome(dict(row, payload=json.loads(row["ProvenanceJson"])))
+    player = outcome.get("observation_revision_id")
+    aggregate = outcome.get("aggregate_revision_id")
+    if not player and not aggregate:
+        return
+    if bool(player) == bool(aggregate):
+        raise SourceConflict("Retained import acceptance has ambiguous revision identity.")
+    revision = identity(player or aggregate)
+    if player:
+        cursor.execute(
+            "SELECT s.LogicalScanID,o.ScanStartUTC AS DataTimeUTC,r.RevisionNo,"
+            "(SELECT COUNT_BIG(*) FROM KVK.SourcePlayerSnapshot x "
+            "WHERE x.RevisionID=r.RevisionID) AS PlayerRecords "
+            "FROM KVK.SourceObservationRevision r "
+            "JOIN KVK.SourceObservation o ON o.ObservationID=r.ObservationID "
+            "AND o.SourceKey=r.SourceKey AND o.KVK_NO=r.KVK_NO "
+            "LEFT JOIN KVK.SourceLogicalScan s ON s.ObservationID=o.ObservationID "
+            "AND s.SourceKey=o.SourceKey AND s.KVK_NO=o.KVK_NO "
+            "WHERE r.RevisionID=? AND r.SourceKey=? AND r.KVK_NO=?",
+            revision,
+            SOURCE_KEY,
+            kvk_no,
+        )
+    else:
+        cursor.execute(
+            "SELECT g.AsOfUTC AS DataTimeUTC,g.RevisionNo,"
+            "(SELECT COUNT_BIG(*) FROM KVK.SourceKingdomReportRow x "
+            "WHERE x.RevisionID=g.RevisionID) AS KingdomRecords,"
+            "(SELECT COUNT_BIG(*) FROM KVK.SourceCampReportRow x "
+            "WHERE x.RevisionID=g.RevisionID) AS CampRecords "
+            "FROM KVK.SourceAggregateRevision g "
+            "WHERE g.RevisionID=? AND g.SourceKey=? AND g.KVK_NO=?",
+            revision,
+            SOURCE_KEY,
+            kvk_no,
+        )
+    details = one(cursor)
+    if details is None:
+        raise SourceConflict("Retained import acceptance is outside its source/season scope.")
+    row.update(details)
+    row.update(
+        ObservationRevisionID=revision if player else None,
+        AggregateRevisionID=revision if aggregate else None,
+        RetainedAcceptance=True,
+    )
 
 
 def _stored_pages(cursor, snapshot, batch_size):

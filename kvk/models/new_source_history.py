@@ -45,7 +45,13 @@ def history_fact(row):
     player = row.get("ObservationRevisionID")
     aggregate = row.get("AggregateRevisionID")
     if (status in ("accepted", "duplicate") and not (bool(player) ^ bool(aggregate))) or (
-        status not in ("accepted", "duplicate") and (player or aggregate)
+        status not in ("accepted", "duplicate")
+        and (player or aggregate)
+        and not (
+            status == "validated"
+            and row.get("RetainedAcceptance") is True
+            and bool(player) ^ bool(aggregate)
+        )
     ):
         raise ValueError("Import outcome and revision identity differ.")
     filename = safe_basename(row.get("OriginalFilename"))
@@ -56,6 +62,8 @@ def history_fact(row):
         notes.append("No accepted revision; data time and record count unavailable.")
     if status == "duplicate":
         notes.append("Same accepted revision; does not add another contribution.")
+    if row.get("RetainedAcceptance"):
+        notes.append("Earlier accepted input retained during a pending or cancelled follow-up.")
     if (player and row.get("PlayerRecords") is None) or (
         aggregate and (row.get("KingdomRecords") is None or row.get("CampRecords") is None)
     ):

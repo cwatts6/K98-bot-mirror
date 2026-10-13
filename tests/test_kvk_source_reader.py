@@ -219,6 +219,31 @@ def test_golden_stage3_headers_and_audit_contract():
     )
 
 
+@pytest.mark.parametrize(
+    "kind,title,id_key",
+    [
+        ("SourceKingdomReportRow", "Pass 4 Kingdoms", "Kingdom"),
+        ("SourceCampReportRow", "Pass 4 Camps", "CampID"),
+    ],
+)
+def test_aggregate_missing_dkp_sorts_last_without_losing_identity(kind, title, id_key):
+    selection, snapshot = reader_input()
+    rows = snapshot["envelope"]["aggregates"][kind]
+    missing = deepcopy(rows[0])
+    missing.update({id_key: 2 if id_key == "CampID" else 102, "dkp": None})
+    rows.insert(0, missing)
+    from kvk.services.new_source_reader_service import _entity_sheet
+
+    issues = []
+    result = _entity_sheet(selection, snapshot, "camp" if id_key == "CampID" else "kingdom", issues)
+    values = [dict(zip((c.label for c in result.columns), row, strict=True)) for row in result.rows]
+    assert values[0]["DKP"] is not None and values[-1]["DKP"] is None
+    assert issues
+    # The SQL schema and audit boundary still reject a NULL aggregate DKP.
+    with pytest.raises(SourceConflict, match="availability mismatch"):
+        build((selection, snapshot))
+
+
 def test_tier_metrics_power_and_aggregate_authority():
     projection = build()
     player = records(projection, "Pass 4 Players")[0]

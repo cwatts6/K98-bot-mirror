@@ -6,13 +6,14 @@ Install the reviewed Stage 2 migration separately before authorising this suite.
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+import json
 import os
 from threading import Event
 
 import pytest
 
 from kvk.dal.new_source_history_dal import capture_history, iter_history
-from kvk.dal.new_source_import_dal import transaction
+from kvk.dal.new_source_import_dal import one, transaction
 from kvk.dal.new_source_report_context_dal import iter_player_powers, load_report_context
 from tests import test_kvk_source_sql_integration as source_sql
 from tests.test_kvk_source_sql_integration import (
@@ -81,6 +82,69 @@ def test_engine_capture_restart_counts_context_and_duplicate_workers(database):
     )
     powers = list(iter_player_powers(connect=connect, context=context, batch_size=1))
     assert len(powers) == 2 and all(r["BaselinePower"] is not None for r in powers)
+
+
+@pytest.mark.parametrize("aggregate", [False, True])
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_engine_retains_accepted_receipt_during_followup(database, aggregate, cancelled):
+    connect, season, _ = database
+    result = selected(database)
+    column = "AggregateRevisionID" if aggregate else "ObservationRevisionID"
+    with transaction(connect) as cursor:
+        cursor.execute(
+            "SELECT TOP (1) AttemptID,ObservationRevisionID,AggregateRevisionID "
+            "FROM KVK.SourceImportAttempt WHERE SourceKey=? AND KVK_NO=? AND GuildID=? "
+            "AND " + column + " IS NOT NULL ORDER BY ReceivedUTC,AttemptID",
+            source_sql.SOURCE_KEY,
+            season,
+            GUILD,
+        )
+        selected_attempt = one(cursor)
+        attempt_id = selected_attempt["AttemptID"]
+        player_id = selected_attempt["ObservationRevisionID"]
+        aggregate_id = selected_attempt["AggregateRevisionID"]
+        payload = dict(
+            version=2,
+            cancelled=cancelled,
+            proposal={"action": "correct"},
+            history=[
+                dict(
+                    status="accepted",
+                    proposal={"action": "accept"},
+                    outcome=dict(
+                        observation_revision_id=player_id,
+                        aggregate_revision_id=aggregate_id,
+                        private_diagnostic="DO_NOT_EXPORT",
+                    ),
+                )
+            ],
+        )
+        # This is the durable transition made by SourceAdminDAL.prepare/cancel.
+        cursor.execute(
+            "UPDATE KVK.SourceImportAttempt SET Status='validated',ActionKey='s5a_draft',"
+            "ObservationRevisionID=NULL,AggregateRevisionID=NULL,ProvenanceJson=? "
+            "WHERE AttemptID=?",
+            json.dumps(payload),
+            attempt_id,
+        )
+    frozen = capture(database, result)
+    facts = list(iter_history(connect=connect, snapshot=frozen))
+    fact = next(r for r in facts if r["attempt_id"] == attempt_id)
+    assert fact["observation_revision_id"] == player_id
+    assert fact["aggregate_revision_id"] == aggregate_id
+    assert fact["import_status"] == "Validated"
+    assert fact["data_time_utc"] and fact["revision_number"] == 1
+    assert fact["kingdom_records"] == 2 if aggregate else fact["player_records"] == 2
+    if not aggregate:
+        assert fact["scan"] is not None
+    assert "DO_NOT_EXPORT" not in json.dumps(facts)
+    assert "Earlier accepted input" in " ".join(fact["notes"])
+    with transaction(connect) as cursor:
+        cursor.execute(
+            "UPDATE KVK.SourceImportAttempt SET ProvenanceJson='{}' WHERE AttemptID=?", attempt_id
+        )
+    assert capture(database, result) == frozen
+    assert list(iter_history(connect=connect, snapshot=frozen)) == facts
 
 
 def test_engine_capture_blocks_status_mutation_until_commit(database):

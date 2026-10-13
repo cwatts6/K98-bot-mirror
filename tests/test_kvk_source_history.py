@@ -384,7 +384,10 @@ def test_sql_contract_uses_frozen_attempts_parameter_scope_and_no_multiplying_jo
     copy = next(sql for sql, _ in database.executed if "INSERT #ReportHistoryAttempts" in sql)
     query = next(sql for sql, _ in database.executed if "FROM #ReportHistoryAttempts a" in sql)
     assert "WITH (HOLDLOCK)" in copy and "SourceKey=? AND KVK_NO=? AND GuildID=?" in copy
-    assert "DiagnosticSummary" not in copy and "ProvenanceJson" not in copy
+    assert "DiagnosticSummary" not in copy
+    # Private receipt history is frozen only to resolve retained acceptance;
+    # history_fact still strictly allowlists the durable/public projection.
+    assert "ProvenanceJson" in copy and "ActionKey" in copy
     assert query.count("SELECT COUNT_BIG(*)") == 3
     assert "ORDER BY a.ReceivedUTC,a.AttemptID" in query
     assert "SelectedRevisionID" not in query

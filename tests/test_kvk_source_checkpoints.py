@@ -128,6 +128,24 @@ def build(inputs):
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
 
 
+def test_cumulative_camp_missing_dkp_keeps_the_correct_camp_mapping():
+    from kvk.services.new_source_cumulative import entity_records
+    from kvk.services.new_source_reader_service import _entity_sheet
+
+    inputs = fixture(names=NAMES[:2])
+    for _, snapshot in inputs:
+        rows = snapshot["envelope"]["aggregates"]["SourceCampReportRow"]
+        missing = deepcopy(rows[0])
+        missing.update(CampID=2, CampLabel="South Camp", dkp=None)
+        rows.insert(0, missing)
+    selection, snapshot = inputs[0]
+    result = _entity_sheet(selection, snapshot, "camp", [])
+    values = entity_records(snapshot, result, "camp")
+    assert values[1]["DKP"] is not None
+    assert values[2]["DKP"] is None
+    assert values[1]["Camp"] != values[2]["Camp"]
+
+
 def first(projection, title):
     return next(r for r in records(projection, title) if r.get("Governor ID") == "1001")
 
