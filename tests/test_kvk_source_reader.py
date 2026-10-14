@@ -340,6 +340,28 @@ def test_empty_overall_is_useful_and_independent_overall_not_summed():
     assert not any(s.title == "Pass 4 Players" for s in actual.sheets)
 
 
+def test_equal_endpoint_overall_keeps_empty_sheets_and_exact_unranked_audit():
+    inp = reader_input(overall=True, end_scan=10)
+    assert all(r["dkp_rank"] is None for r in inp[1]["envelope"]["players"])
+    projection = build(inp)
+    for title in ("Overall Players", "Overall Kingdoms", "Overall Camps"):
+        result = sheet(projection, title)
+        assert result.rows == ()
+        assert result.availability == "Not applicable"
+    audit = next(t for t in projection.audit.tables if t.name == "KVK_Player_Full")
+    dkp = [dict(zip(audit.columns, row, strict=True)) for row in audit.rows]
+    dkp = [r for r in dkp if r["metric"] == "dkp"]
+    assert len(dkp) == 4
+    assert all(r["value"] == "0" and r["rank"] == "" for r in dkp)
+
+
+def test_equal_endpoint_overall_still_rejects_incomplete_roster():
+    inp = reader_input(overall=True, end_scan=10)
+    inp[1]["envelope"]["players"].pop()
+    with pytest.raises(SourceConflict, match="complete published player cohort"):
+        build(inp)
+
+
 @pytest.mark.parametrize("prefix", ["=", "+", "-", "@", " \t=", "\r+", "\n@"])
 def test_formula_like_and_unicode_labels_are_literal(prefix):
     inp = reader_input()

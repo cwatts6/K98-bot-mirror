@@ -45,6 +45,8 @@ def build_checkpoint_projection(inputs, *, history_snapshot, history_rows):
     reports = {s.key: s for s in base.sheets if s.key.rsplit(":", 1)[-1] in KINDS}
     facts = {}
     for selection, snapshot in inputs:
+        if no_fight(snapshot["metadata"]["configs"]["selected"]):
+            continue
         for kind in KINDS:
             key = selection.period_id + ":" + kind
             if key in reports:

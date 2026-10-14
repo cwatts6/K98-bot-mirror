@@ -130,6 +130,7 @@ def _entity_sheet(selection, snapshot, kind, issues):
     context = snapshot["reader_context"]
     pub, meta = context["publication"], context["metadata"]
     overall = meta["configs"]["selected"]["PeriodKind"] == "overall"
+    empty_overall = overall and no_fight(meta["configs"]["selected"])
     period = "Overall" if overall else meta["configs"]["selected"]["WindowName"]
     title = period + " " + {"player": "Players", "kingdom": "Kingdoms", "camp": "Camps"}[kind]
     key = selection.period_id + ":" + kind
@@ -143,8 +144,14 @@ def _entity_sheet(selection, snapshot, kind, issues):
     )
     population = None
     if kind == "player":
-        source_rows, population = _ranked_players(pub, source_rows)
+        if empty_overall:
+            if len(source_rows) != pub["EligibleCount"]:
+                raise SourceConflict("Reader requires the complete published player cohort.")
+        else:
+            source_rows, population = _ranked_players(pub, source_rows)
     else:
+        if empty_overall and source_rows:
+            raise SourceConflict("No-fight Overall cannot contain aggregate rows.")
         source_rows = sorted(
             source_rows, key=lambda r: r["Kingdom" if kind == "kingdom" else "CampID"]
         )
@@ -156,7 +163,7 @@ def _entity_sheet(selection, snapshot, kind, issues):
     ):
         raise SourceConflict("Pinned powers must cover the complete published roster exactly once.")
     output = []
-    for row in source_rows:
+    for row in (() if empty_overall else source_rows):
         derived = derive_report_metrics(
             publication_id=selection.publication_id,
             calculation_version=pub["CalculationVersion"],
@@ -258,6 +265,9 @@ def _entity_sheet(selection, snapshot, kind, issues):
     availability = REASONS.get(
         pub["PlayerState" if kind == "player" else "AggregateState"], "Unavailable"
     )
+    if empty_overall:
+        availability = "Not applicable"
+        notes.append("This Overall period has no fighting; no ranked rows are shown.")
     if not output:
         notes.append("No published rows are available for this report.")
     return _sheet(

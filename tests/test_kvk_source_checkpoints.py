@@ -128,6 +128,15 @@ def build(inputs):
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
 
 
+def test_equal_endpoint_overall_does_not_abort_fighting_checkpoint():
+    inputs = fixture(names=NAMES[:1])
+    inputs.append(reader_input(overall=True, end_scan=10))
+    projection = build(inputs)
+    assert sheet(projection, "Pass 4 Players").rows
+    assert sheet(projection, "Overall Players").rows == ()
+    assert sheet(projection, "Overall Players").availability == "Not applicable"
+
+
 @pytest.mark.parametrize("overall", [False, True])
 @pytest.mark.parametrize("change", ["move", "add", "remove"])
 def test_incompatible_camp_membership_fails_before_cumulative_or_comparison(overall, change):
