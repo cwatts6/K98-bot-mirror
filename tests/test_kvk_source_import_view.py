@@ -241,6 +241,7 @@ async def test_roster_mode_requires_its_own_review_and_survives_resume():
 async def test_setup_and_pair_modals_fit_discord_limits_and_preserve_update_id():
     from tests.test_kvk_source_admin import ADMIN
     from ui.views.kvk_source_import_view import (
+        SourceCalculationRefreshModal,
         SourceChoiceModal,
         SourceConfigurationReviewModal,
         SourcePairModal,
@@ -250,6 +251,7 @@ async def test_setup_and_pair_modals_fit_discord_limits_and_preserve_update_id()
     pair = SourcePairModal(service, ADMIN, 16, update_id="waiting-update")
     assert pair.update_id == "waiting-update"
     for modal in (
+        SourceCalculationRefreshModal(service, ADMIN, 16),
         SourceChoiceModal(service, ADMIN, 16),
         SourceConfigurationReviewModal(service, ADMIN, 16),
         pair,
