@@ -283,7 +283,11 @@ profile and an installed exact-hash protocol transition registry; see
 reviewed updater to be installed first. They are not evidence of current MINI_AMD
 capability. The reader-report transition is the initial registered bundle; unknown
 protected edits remain refused. The existing module profile remains unchanged.
-No production descriptor or updater installation is implied by this implementation.
+The committed `deploy/k98-release.json` explicitly selects the reader-history
+release using operator-observed MINI_AMD values. Preserve its pinned SQL commit
+as an ancestor of SQL main when merging, or repin and review the descriptor before
+merging Bot. Installation and activation require separate authorization. For later
+source-only releases retain the descriptor unchanged; do not delete it.
 
 Normal bot and SQL changes go through their Git repositories and review first.
 The source-only updater selects private `K98-bot/main`; it does not deploy mirror

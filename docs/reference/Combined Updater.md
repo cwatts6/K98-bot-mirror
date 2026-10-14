@@ -35,11 +35,14 @@ retained uncertainty, flags and single-successor checks are unchanged.
 
 The updated compatibility checker compares both the candidate preparation policy
 and registry with the actual installed manifest. Without installed observations,
-its result is source capability only. There is deliberately no production release
-descriptor in this implementation: produce the reviewed SQL profile using actual
-database/tempdb collations and compatibility, merge/pin its SQL commit, then bind
-the actual permitted private Bot predecessors in the Bot descriptor. Preparing an
-upgrade requires the real installed `update-tool.json`, not a fixture manifest.
+its result is source capability only. The committed `deploy/k98-release.json`
+now binds the operator-observed MINI_AMD private Bot predecessor to the reviewed
+SQL commit and exact history-profile hash. The profile uses the observed database
+and tempdb collations and compatibility. These are release inputs for review, not
+evidence of installation or activation. Before deployment, the pinned SQL commit
+must be reachable from reviewed SQL main; preserve its ancestry when merging or
+repin and review the descriptor before merging Bot. Preparing an upgrade requires
+the real installed `update-tool.json`, not a fixture manifest.
 
 Validation includes the normal updater regressions and the new protocol/profile
 tests. The SQL rehearsal uses explicitly approved disposable targets, tests real
@@ -77,7 +80,9 @@ and module files are acquired into a separate protected Git database and sealed
 into the release package. SQL main is never selected independently of this pin.
 Each profile lives at `migrations/<id>.release.json`; the SQL repository's
 `docs/module-release.md` defines its format. No operational release description
-or migration is added by the updater implementation itself.
+is synthesized by the updater: the committed reader descriptor is an explicit,
+reviewed release input. Retain it unchanged for subsequent source-only releases;
+removing it is refused, but leaving it unchanged does not reapply SQL.
 
 Descriptor-only pull requests trigger updater CI. The metadata check validates
 the actual descriptor's shape, exact commit/hash fields and explicit migration

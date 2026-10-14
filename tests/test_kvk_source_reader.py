@@ -317,6 +317,25 @@ def test_selected_times_one_pair_not_aggregate_asof():
     assert len(scan) == 7
 
 
+@pytest.mark.parametrize("aggregate_state", ["not_received", "validation_failed", "live"])
+def test_scan_status_includes_unfinished_aggregate_stream(aggregate_state):
+    inp = reader_input()
+    pub = inp[1]["envelope"]["publication"]
+    pub.update(PlayerState="final", AggregateState=aggregate_state, PeriodState="live")
+    sync(inp[1])
+    assert records(build(inp), "Scans")[0]["Status"] == "Live — provisional"
+
+
+@pytest.mark.parametrize(
+    "state, label", [("final", "Published"), ("corrected_final", "Published — corrected")]
+)
+def test_scan_status_uses_terminal_publication_state(state, label):
+    inp = reader_input()
+    inp[1]["envelope"]["publication"].update(PeriodState=state)
+    sync(inp[1])
+    assert records(build(inp), "Scans")[0]["Status"] == label
+
+
 def test_actual_coverage_difference_and_pending_selection_are_visible():
     inp = reader_input(desired_end=14)
     inp[1]["metadata"]["aggregate"]["CoverageEndUTC"] = NOW

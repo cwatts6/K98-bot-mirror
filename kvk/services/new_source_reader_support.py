@@ -92,7 +92,7 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
                 row["Status"] = (
                     "Update pending"
                     if not snapshot["envelope"]["is_current"]
-                    else REASONS.get(pub["PlayerState"], "Unavailable")
+                    else REASONS.get(pub["PeriodState"], "Unavailable")
                 )
                 row["Selection Notes"] = (
                     window.get("Notes")
