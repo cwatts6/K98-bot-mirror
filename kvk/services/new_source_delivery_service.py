@@ -316,8 +316,7 @@ def deliver_coordinated_export(
     from kvk.services.new_source_workbook_transport import ReaderSheetsTransport
 
     if isinstance(transport, ReaderSheetsTransport):
-        from kvk.rendering.new_source_workbook import build_workbook_generation
-        from kvk.services.new_source_reader_service import load_reader_projection
+        from kvk.services.source_reader_activation import load_reader_generation
 
         if (
             not isinstance(reader_guild_id, str)
@@ -326,21 +325,25 @@ def deliver_coordinated_export(
             or not 1 <= len(reader_guild_id) <= 32
         ):
             raise ValueError("Reader delivery requires its explicit authorised guild.")
-        generation = build_workbook_generation(
-            load_reader_projection(
-                connect=connect,
-                intent_id=job["IntentID"],
-                expected_hash=bytes(job["InputHash"]),
-                kvk_no=job["KVK_NO"],
-                guild_id=reader_guild_id,
-                with_checkpoints=True,
-            )
+        generation = load_reader_generation(
+            connect=connect,
+            intent_id=job["IntentID"],
+            expected_hash=bytes(job["InputHash"]),
+            kvk_no=job["KVK_NO"],
+            guild_id=reader_guild_id,
         )
     else:
         generation = load_intent_generation(
             connect=connect, intent_id=job["IntentID"], expected_hash=bytes(job["InputHash"])
         )
     generation = transport.prepare_generation(generation)
+    if getattr(dal, "output_operations", False) is True:
+        preflight = json.loads(job["ProvenanceJson"]).get("output_preflight", {})
+        if (
+            preflight.get("generation_key") != generation.key
+            or preflight.get("manifest_hash") != digest(generation.manifest()).hex()
+        ):
+            raise SourceConflict("Delivery generation differs from admitted capacity plan.")
     from kvk.dal.new_source_delivery_dal import Destination
 
     destination = Destination("sheets", registration.index_file_id)
@@ -426,6 +429,7 @@ def deliver_coordinated_export(
                     {
                         "reader_bindings": transport.reader_bindings,
                         "reader_index_id": transport.reader_index_id,
+                        "reader_guild_id": reader_guild_id,
                     }
                     if isinstance(transport, ReaderSheetsTransport)
                     else {}

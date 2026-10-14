@@ -212,7 +212,6 @@ class ExportRuntime(RuntimeLifetime):
     ):
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
         from kvk.services.new_source_admin_service import access_from_config
-        from kvk.services.new_source_export_service import load_intent_generation
         from kvk.services.source_export_operator_service import SourceExportOperatorService
         from kvk.services.source_output_pool_service import (
             RetirementRecovery,
@@ -278,9 +277,7 @@ class ExportRuntime(RuntimeLifetime):
             budget_factory=budget,
             authority_stream_factory=self.operations,
         )
-        generation_loader = lambda intent, fingerprint: load_intent_generation(
-            connect=connect, intent_id=intent, expected_hash=fingerprint
-        )
+        generation_loader = self.load_generation
         recovery = RetirementRecovery(
             pools=self.pools,
             coordinator=self.dal,
@@ -319,10 +316,69 @@ class ExportRuntime(RuntimeLifetime):
             rollover=self.rollover,
         )
 
-    def transport(self, context, stream):
+    def reader_binding(self, intent_id, expected_hash):
+        from kvk.dal.source_reader_activation_dal import intent_scope
+        from kvk.services.source_reader_activation import reader_manifest
+        from services.export_coordination_dal import checked_attempt_manifest
+
+        registered = self.registration.value()
+        season, versions = intent_scope(self.connect, intent_id, expected_hash)
+        retained = []
+        for pool in registered["pools"]:
+            snapshot = self.pools.snapshot(pool["pool_id"])
+            jobs = {j["JobID"] for j in snapshot.get("jobs", []) if j.get("IntentID") == intent_id}
+            for attempt in snapshot.get("attempts", []):
+                if attempt["JobID"] not in jobs:
+                    continue
+                parts = [p for p in snapshot["parts"] if p["AttemptID"] == attempt["AttemptID"]]
+                generation = checked_attempt_manifest(attempt, parts)["generation"]
+                if reader_manifest(generation["tables"]):
+                    guild = generation.get("reader_guild_id")
+                    if not isinstance(guild, str) or not re.fullmatch(r"[0-9]{1,32}", guild):
+                        raise SourceConflict("Reader recovery requires its retained guild binding.")
+                    retained.append(dict(pool_id=pool["pool_id"], kvk_no=season, guild_id=guild))
+                else:
+                    retained.append(None)
+        if retained:
+            if any(binding != retained[0] for binding in retained):
+                raise SourceConflict("Intent has conflicting retained layout bindings.")
+            # Repairs and retries keep the original layout and guild after flag changes.
+            return retained[0]
+        bindings = registered.get("reader_exports", [])
+        binding = next((b for b in bindings if b["kvk_no"] == season), None)
+        if binding is None or versions != {binding["calculation_version"]}:
+            return None
+        context = self.pools.snapshot(binding["pool_id"])
+        self.registration.sheets(context)
+        if context["pool"]["ActiveKVK"] != season:
+            raise SourceConflict("Reader activation belongs to another pool season.")
+        return binding
+
+    def load_generation(self, intent_id, expected_hash):
+        from kvk.services.new_source_export_service import load_intent_generation
+        from kvk.services.source_reader_activation import load_reader_generation
+
+        binding = self.reader_binding(intent_id, expected_hash)
+        if binding:
+            return load_reader_generation(
+                connect=self.connect,
+                intent_id=intent_id,
+                expected_hash=expected_hash,
+                kvk_no=binding["kvk_no"],
+                guild_id=binding["guild_id"],
+            )
+        return load_intent_generation(
+            connect=self.connect, intent_id=intent_id, expected_hash=expected_hash
+        )
+
+    def transport(self, context, stream, *, reader_binding=None):
         from kvk.services.new_source_export_service import GoogleSheetsTransport
+        from kvk.services.new_source_workbook_transport import ReaderSheetsTransport
+        from kvk.services.source_reader_activation import reader_manifest
 
         attempt_policy = None
+        transport_class = ReaderSheetsTransport if reader_binding else GoogleSheetsTransport
+        reader_guild = reader_binding["guild_id"] if reader_binding else None
         if stream.scope["OwnerKind"] == "job":
             attempts = [
                 a for a in context.get("attempts", []) if a["JobID"] == stream.scope["ObjectID"]
@@ -336,12 +392,20 @@ class ExportRuntime(RuntimeLifetime):
                 parts = [p for p in context["parts"] if p["AttemptID"] == attempt["AttemptID"]]
                 document = checked_attempt_manifest(attempt, parts)
                 attempt_policy = document["generation"].get("staging_audience", "private")
+                # Durable attempts determine recovery layout, independently of activation.
+                if reader_manifest(document["generation"]["tables"]):
+                    transport_class = ReaderSheetsTransport
+                    reader_guild = document["generation"].get("reader_guild_id")
+                else:
+                    transport_class, reader_guild = GoogleSheetsTransport, None
         if stream.scope["OwnerKind"] == "operation":
             context = self.pools.operation_snapshot(stream.scope["ObjectID"])["pool"]
         elif "pool" in context.get("pool", {}):
             context = context["pool"]
         registration = self.registration.sheets(context)
-        return GoogleSheetsTransport.from_authority(
+        if reader_binding and context["pool"]["PoolID"] != reader_binding["pool_id"]:
+            raise SourceConflict("Reader activation cannot cross output pools.")
+        transport = transport_class.from_authority(
             registration=registration,
             reuse_guard=lambda *_: False,
             protected_file_ids=self.registration.value()["protected_file_ids"],
@@ -350,6 +414,8 @@ class ExportRuntime(RuntimeLifetime):
             authorize=lambda **_: None,
             preserve_public_staging=(attempt_policy or registration.audience) == "public_viewer",
         )
+        transport.reader_guild_id = reader_guild
+        return transport
 
     def deliver(self, job, claim, dal, budget, stop, snapshot):
         from kvk.services.new_source_delivery_service import deliver_coordinated_export
@@ -358,7 +424,11 @@ class ExportRuntime(RuntimeLifetime):
             raise SourceConflict("Exact new-source coordinator and intent generation required.")
         stream = self.jobs.delivery(claim)
         context = self.dal.operator_snapshot(claim.job_id)["pool"]
-        transport = self.transport(context, stream)
+        transport = self.transport(
+            context,
+            stream,
+            reader_binding=self.reader_binding(job["IntentID"], bytes(job["InputHash"])),
+        )
         return deliver_coordinated_export(
             job=job,
             claim=claim,
@@ -371,6 +441,7 @@ class ExportRuntime(RuntimeLifetime):
             authority_stream=stream,
             retirement_stream_factory=self.jobs.retirement,
             retirement_transport_factory=self.transport,
+            reader_guild_id=transport.reader_guild_id,
         )
 
     def run_batch(self, stop, limit=8):
@@ -724,9 +795,15 @@ class RuntimeRegistration:
         }
         if (
             not isinstance(value, dict)
-            or set(value) not in (fields, fields | {"legacy_file_access"})
+            or set(value)
+            not in (
+                fields,
+                fields | {"legacy_file_access"},
+                fields | {"reader_exports"},
+                fields | {"legacy_file_access", "reader_exports"},
+            )
             or type(value["version"]) is not int
-            or value["version"] != 1
+            or value["version"] != (2 if "reader_exports" in value else 1)
             or any(
                 not isinstance(value[k], str)
                 or not re.fullmatch(r"[A-Za-z0-9_.@:-]{1,128}", value[k])
@@ -800,6 +877,10 @@ class RuntimeRegistration:
             pool_ids.add(pool["pool_id"])
             hashes.add(fingerprint)
             used.update(files)
+        if "reader_exports" in value:
+            from kvk.services.source_reader_activation import validate_bindings
+
+            validate_bindings(value["reader_exports"], pool_ids)
         from core.export_file_access_policy import validate_legacy_file_access
 
         try:

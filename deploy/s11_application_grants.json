@@ -293,6 +293,44 @@
       "source_sha256": "8069ce457d202011a6a16ea72d5ecddd76127699e816ae41ce9dead8565a10df"
     },
     {
+      "object": "KVK.SourceExportHistory",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistory.Table.sql",
+      "source_sha256": "47a7ad6ea442182350d7849b75f5220aa8cb4cfe32f884a72135fd52d9cd4d60"
+    },
+    {
+      "object": "KVK.SourceExportHistory",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistory.Table.sql",
+      "source_sha256": "47a7ad6ea442182350d7849b75f5220aa8cb4cfe32f884a72135fd52d9cd4d60"
+    },
+    {
+      "object": "KVK.SourceExportHistory",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistory.Table.sql",
+      "source_sha256": "47a7ad6ea442182350d7849b75f5220aa8cb4cfe32f884a72135fd52d9cd4d60",
+      "column": "AttemptCount"
+    },
+    {
+      "object": "KVK.SourceExportHistory",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistory.Table.sql",
+      "source_sha256": "47a7ad6ea442182350d7849b75f5220aa8cb4cfe32f884a72135fd52d9cd4d60",
+      "column": "ContentHash"
+    },
+    {
+      "object": "KVK.SourceExportHistoryRow",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistoryRow.Table.sql",
+      "source_sha256": "d0454149118adf004880cb4e9d32fe45352b74037edcda93276f55a424d4eaff"
+    },
+    {
+      "object": "KVK.SourceExportHistoryRow",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportHistoryRow.Table.sql",
+      "source_sha256": "d0454149118adf004880cb4e9d32fe45352b74037edcda93276f55a424d4eaff"
+    },
+    {
       "object": "KVK.SourceExportIntent",
       "permission": "INSERT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceExportIntent.Table.sql",

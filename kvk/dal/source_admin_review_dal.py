@@ -26,6 +26,16 @@ class SourceAdminReviewDAL:
 
         return SourceUpdateDAL(self.connect).read(update_id)
 
+    def refresh_context(self, season, period):
+        from kvk.dal.source_calculation_refresh_dal import refresh_context
+
+        return refresh_context(self.connect, season, period)
+
+    def refresh_preview_inputs(self, selected, confirmation_json, actor):
+        from kvk.dal.source_calculation_refresh_dal import preview_inputs
+
+        return preview_inputs(self.connect, selected, confirmation_json, actor)
+
     @staticmethod
     def _read(cursor, review_id, actor):
         cursor.execute(

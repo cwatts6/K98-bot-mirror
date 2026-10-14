@@ -705,6 +705,43 @@ class SourceConfigurationReviewModal(discord.ui.Modal):
             await report_failure(interaction, exc)
 
 
+class SourceCalculationRefreshModal(discord.ui.Modal):
+    def __init__(self, service, owner, season=None):
+        super().__init__(title="Review calculation refresh", timeout=CONFIRM_SECONDS)
+        self.service, self.owner = service, owner
+        self.season = discord.ui.InputText(
+            label="KVK season", value=str(season or ""), max_length=10
+        )
+        self.period = discord.ui.InputText(
+            label="Reporting period", placeholder="fight:pass4", max_length=128
+        )
+        self.reason = discord.ui.InputText(
+            label="Reason for recalculating the selected report", max_length=512
+        )
+        for item in (self.season, self.period, self.reason):
+            self.add_item(item)
+
+    async def callback(self, interaction):
+        try:
+            actor = await current_actor(interaction, self.service.access)
+            if actor != self.owner:
+                raise PermissionError("Refresh review identity changed; start again.")
+            if not await safe_defer(interaction, ephemeral=True):
+                return
+            row = await asyncio.to_thread(
+                self.service.prepare_refresh,
+                actor,
+                season=self.season.value,
+                period=self.period.value.strip(),
+                reason=self.reason.value,
+            )
+            await send_receipt(
+                interaction, self.service, row, SourceReviewView(self.service, row), saved=True
+            )
+        except Exception as exc:
+            await report_failure(interaction, exc)
+
+
 class SourcePairModal(discord.ui.Modal):
     def __init__(
         self, service, owner, season=None, receipt=None, update_id=None, receipt_origin=None

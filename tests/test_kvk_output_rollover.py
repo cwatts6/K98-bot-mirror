@@ -73,7 +73,7 @@ def test_database_guid_strings_are_canonical_but_file_ids_stay_byte_exact():
 def test_capacity_uses_complete_partition_manifest(monkeypatch):
     partition = Mock(return_value=[[{"name": "section"}], [{"name": "directory-and-section"}]])
     monkeypatch.setattr(
-        "kvk.services.source_output_pool_service.GoogleSheetsTransport.partition_manifest",
+        "kvk.services.source_output_pool_service.partition_manifest",
         partition,
     )
     manifest = {"complete": "including directory"}
@@ -92,7 +92,7 @@ def test_capacity_registration_bounds(slots):
 
 def test_s7_p2_allowance_is_nine_files_for_two_quarantined_parts(monkeypatch):
     monkeypatch.setattr(
-        "kvk.services.source_output_pool_service.GoogleSheetsTransport.partition_manifest",
+        "kvk.services.source_output_pool_service.partition_manifest",
         lambda _: [[], []],
     )
     assert capacity({}, quarantined_parts=2, protected_parts=0, slot_count=8).required_files == 9
@@ -937,7 +937,7 @@ def test_repeated_two_part_nonfinal_generations_do_not_exhaust_sixteen_slots(mon
     )
 
     monkeypatch.setattr(
-        "kvk.services.source_output_pool_service.GoogleSheetsTransport.partition_manifest",
+        "kvk.services.source_output_pool_service.partition_manifest",
         lambda _: [[], []],
     )
     s = retirement_snapshot_fixture()

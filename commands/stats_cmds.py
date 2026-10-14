@@ -119,6 +119,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 "configure",
                 "choose_source",
                 "match_update",
+                "refresh_calculation",
                 "cancel",
                 "export",
                 "export_status",
@@ -229,6 +230,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 raise ValueError("Roster correction is an explicit configure option.")
             from kvk.services.source_admin_review_service import configured_review_service
             from ui.views.kvk_source_import_view import (
+                SourceCalculationRefreshModal,
                 SourceChoiceModal,
                 SourceConfigurationReviewModal,
                 SourcePairModal,
@@ -238,6 +240,11 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
             interaction = getattr(ctx, "interaction", ctx)
             review_service = configured_review_service()
+            if action == "refresh_calculation" and not review:
+                await interaction.response.send_modal(
+                    SourceCalculationRefreshModal(review_service, actor, kvk_no)
+                )
+                return
             if action == "choose_source":
                 await interaction.response.send_modal(
                     SourceChoiceModal(review_service, actor, kvk_no, source)

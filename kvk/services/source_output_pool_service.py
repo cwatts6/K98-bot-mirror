@@ -9,7 +9,8 @@ from dataclasses import dataclass
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
-from kvk.services.new_source_export_service import GoogleSheetsTransport, compact_sheets_generation
+from kvk.services.new_source_export_service import GoogleSheetsTransport
+from kvk.services.source_reader_activation import partition_manifest, physical_generation
 from services.export_coordination_dal import bounded_json
 
 
@@ -31,7 +32,7 @@ def capacity(manifest, *, quarantined_parts, protected_parts, slot_count, measur
         raise ValueError("Exact nonnegative pool counts required.")
     if not 2 <= slot_count <= 16:
         raise SourceConflict("A pool requires two through sixteen registered slots.")
-    layout = GoogleSheetsTransport.partition_manifest(manifest)
+    layout = partition_manifest(manifest)
     parts = max(len(layout), measured_parts)
     required = 1 + parts + parts + max(parts, quarantined_parts) + parts + protected_parts
     result = Capacity(parts, quarantined_parts, protected_parts, required, 1 + slot_count)
@@ -247,7 +248,7 @@ class SourceOutputPlanner:
             "active",
         ):
             raise SourceConflict("Registered pool identity or admission changed.")
-        generation = compact_sheets_generation(self.generation_loader(intent_id, input_hash))
+        generation = physical_generation(self.generation_loader(intent_id, input_hash))
         needed = capacity_for_snapshot(generation.manifest(), context)
         return dict(
             pool_id=pool["PoolID"],

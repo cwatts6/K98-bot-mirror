@@ -126,6 +126,33 @@ class SourceAdminReviewService:
         self.access.authorize(actor, "cancel")
         return self.repository.finish(review_id, actor, version, now=self.now(), cancel=True)
 
+    def prepare_refresh(self, actor, *, season, period, reason):
+        """Review a calculation correction with every input derived from the selected result."""
+        from kvk.models.new_source_reporting import CALCULATION_VERSION
+
+        self.access.authorize(actor, "refresh_calculation")
+        season = positive(season)
+        bounded_text(period, 128)
+        selected = self.repository.refresh_context(season, period)
+        if selected["CalculationVersion"] == CALCULATION_VERSION:
+            raise SourceConflict(
+                "This publication already uses the current calculation; no refresh is needed."
+            )
+        return self.prepare_match(
+            actor,
+            season=season,
+            period=period,
+            end_scan_id=selected["EndScanID"],
+            coverage_start=selected["CoverageStartUTC"],
+            coverage_end=selected["CoverageEndUTC"],
+            as_of=selected["AsOfUTC"],
+            aggregate_revision_id=selected["AggregateRevisionID"],
+            counterpart_revision_id=selected["AggregateRevisionID"],
+            reason=reason,
+            action="correct",
+            _refresh=selected,
+        )
+
     def prepare_match(
         self,
         actor,
@@ -141,6 +168,7 @@ class SourceAdminReviewService:
         reason,
         action="publish",
         update_id=None,
+        _refresh=None,
     ):
         self.access.authorize(actor, "match_update")
         bounded_text(reason, 512)
@@ -158,6 +186,30 @@ class SourceAdminReviewService:
             raise SourceConflict("No-fight has no aggregate counterpart.")
         times = [utc_text(value) for value in (coverage_start, coverage_end, as_of)]
         proof = {"action": action, "reason": reason}
+        if _refresh is not None:
+            from kvk.models.new_source_reporting import CALCULATION_VERSION
+
+            self.access.authorize(actor, "refresh_calculation")
+            if (
+                context["base_update_id"] != _refresh["UpdateID"]
+                or config["ConfigVersionID"] != _refresh["ConfigVersionID"]
+                or config["RosterID"] != _refresh["RosterID"]
+                or config["StartScanID"] != _refresh["StartScanID"]
+                or context["scans"].get(str(config["StartScanID"])) != _refresh["StartRevisionID"]
+                or context["scans"].get(str(end)) != _refresh["EndRevisionID"]
+                or context.get("current_weights")
+                or context.get("configuration_review")
+                or context["request_id"]
+            ):
+                raise SourceConflict(
+                    "Selected inputs or configuration changed; review that change separately."
+                )
+            proof["calculation_refresh"] = dict(
+                base_update_id=_refresh["UpdateID"],
+                base_publication_id=_refresh["PublicationID"],
+                from_calculation=_refresh["CalculationVersion"],
+                to_calculation=CALCULATION_VERSION,
+            )
         if context.get("current_weights"):
             proof.update(action="correct", current_weights=True)
         if context.get("configuration_review"):
@@ -262,6 +314,15 @@ class SourceAdminReviewService:
                 confirmed_utc=retained["ConfirmedUTC"].replace(tzinfo=UTC),
                 confirmation_json=retained["ConfirmationJson"],
             )
+        preview = None
+        if _refresh is not None:
+            from kvk.services.source_calculation_refresh_service import preview as calculate_preview
+
+            preview = calculate_preview(
+                *self.repository.refresh_preview_inputs(
+                    _refresh, update.confirmation_json, str(actor.user_id)
+                )
+            )
         return self._create(
             actor,
             season,
@@ -275,6 +336,11 @@ class SourceAdminReviewService:
                     identity(counterpart_revision_id) if counterpart_revision_id else None
                 ),
                 reason=reason,
+                **(
+                    {"calculation_refresh": _refresh, "refresh_preview": preview}
+                    if _refresh is not None
+                    else {}
+                ),
             ),
         )
 
@@ -307,6 +373,15 @@ class SourceAdminReviewService:
                     return self._confirm_configuration(actor, locked, cursor, connect)
                 raise ValueError("Unsupported confirmation kind.")
             saved = payload["context"]
+            if "calculation_refresh" in payload:
+                self.access.authorize(actor, "refresh_calculation")
+                if (
+                    SourceAdminReviewDAL(connect).refresh_context(
+                        locked["KVK_NO"], saved["period_key"]
+                    )
+                    != payload["calculation_refresh"]
+                ):
+                    raise SourceConflict("Calculation refresh base changed; prepare a new review.")
             current = SourceAdminReviewDAL(connect).match_context(
                 locked["KVK_NO"],
                 saved["period_key"],
@@ -344,6 +419,17 @@ class SourceAdminReviewService:
                 authorized=True,
             )
             result = service.publish(update["UpdateID"])
+            if "refresh_preview" in payload:
+                from kvk.dal.source_calculation_refresh_dal import publication_result_hash
+
+                if (
+                    result is None
+                    or publication_result_hash(connect, result.publication_id)
+                    != payload["refresh_preview"]["result_hash"]
+                ):
+                    raise SourceConflict(
+                        "Calculated result differs from the reviewed preview; selection rolled back."
+                    )
             return dict(
                 state="complete selected" if result else update["UpdateState"],
                 update_id=context.update_id,
@@ -464,6 +550,24 @@ class SourceAdminReviewService:
             lines.append(
                 f"Counterpart validity attestation: {payload['counterpart_revision_id'] or 'none'}"
             )
+            if "calculation_refresh" in payload:
+                from kvk.models.new_source_reporting import CALCULATION_VERSION
+
+                refresh = payload["calculation_refresh"]
+                lines.extend(
+                    (
+                        f"Calculation refresh: {refresh['CalculationVersion']} -> {CALCULATION_VERSION}",
+                        f"Previous publication: {refresh['PublicationID']}",
+                        "Retains the selected scans, aggregate, coverage, roster and frozen weights.",
+                        "Confirm selects the recalculated result and queues its export.",
+                    )
+                )
+                preview = payload["refresh_preview"]
+                lines.append(
+                    f"Players: {preview['eligible_players']}; available ratios: "
+                    f"{preview['ratios_available_before']} -> {preview['ratios_available_after']}; "
+                    f"changed ratio values: {preview['ratio_values_changed']}. Other metrics unchanged."
+                )
         if row["ReviewKind"] == "configuration":
             lines.append(
                 "Imported player DKP weights: " + " / ".join(payload["snapshot"]["weights"])

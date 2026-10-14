@@ -34,7 +34,13 @@ CONTEXT_COLUMNS = (
 
 
 def update_hash(record):
-    return digest({key: record[key] for key in (*CONTEXT_COLUMNS, *INPUT_COLUMNS)})
+    from kvk.dal.source_calculation_refresh_dal import refresh_proof
+
+    payload = {key: record[key] for key in (*CONTEXT_COLUMNS, *INPUT_COLUMNS)}
+    refresh = refresh_proof(record)
+    if refresh:
+        payload["calculation_refresh"] = refresh
+    return digest(payload)
 
 
 def load_update(cursor, update_id):
@@ -182,6 +188,9 @@ def validate_update(cursor, update, *, complete=False, sealed=False):
             update["PeriodID"],
         )
         prior = one(cursor)
+        from kvk.dal.source_calculation_refresh_dal import validate_refresh
+
+        validate_refresh(cursor, update, prior)
         # BaseUpdateID is the persisted per-period CAS context, not a base guessed
         # by a restarted builder. Semantic replay may return its prior outcome.
         if (

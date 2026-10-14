@@ -9,8 +9,8 @@ from uuid import UUID, uuid4
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from kvk.services.new_source_admin_service import CONFIRM_SECONDS
-from kvk.services.new_source_export_service import compact_sheets_generation
 from kvk.services.source_output_pool_service import capacity_for_snapshot
+from kvk.services.source_reader_activation import physical_generation
 from services.export_coordination_dal import JobSpec, bounded_json
 from services.legacy_export_snapshot_service import bound_runtime
 
@@ -144,7 +144,7 @@ class SourceExportOperatorService:
                 )
                 return dict(job_id=previous["JobID"], state="queued", no_op=False)
             return dict(job_id=previous["JobID"], state=previous["State"], no_op=True)
-        generation = compact_sheets_generation(
+        generation = physical_generation(
             self.generation_loader(intent["IntentID"], bytes.fromhex(intent["VectorHash"]))
         )
         result = capacity_for_snapshot(generation.manifest(), context)
@@ -308,7 +308,7 @@ class SourceExportOperatorService:
         if pool["IndexFileID"] in proof.get("damaged_files", []):
             raise SourceConflict("A damaged index requires explicit registration retirement.")
         job = snapshot["job"]
-        generation = compact_sheets_generation(
+        generation = physical_generation(
             self.generation_loader(job["IntentID"], bytes.fromhex(job["InputHash"]))
         )
         old_parts = {p["FileID"] for p in snapshot["parts"] if p["Role"] != "index"}

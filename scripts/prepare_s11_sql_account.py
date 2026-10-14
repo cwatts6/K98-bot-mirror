@@ -97,9 +97,10 @@ def render(plan, *, server, database, principal, login_sid):
         if permission not in {"SELECT", "INSERT", "UPDATE", "DELETE", "EXECUTE"}:
             raise ValueError("Application object permission required")
         if column is not None and (
-            permission != "SELECT" or not re.fullmatch(r"[A-Za-z0-9_]{1,128}", column)
+            permission not in {"SELECT", "UPDATE"}
+            or not re.fullmatch(r"[A-Za-z0-9_]{1,128}", column)
         ):
-            raise ValueError("Exact SELECT column required")
+            raise ValueError("Exact SELECT or UPDATE column required")
         key = (name, permission, column)
         if key in seen:
             raise ValueError("Duplicate grant")
