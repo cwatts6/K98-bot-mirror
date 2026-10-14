@@ -4,7 +4,7 @@
   "bot_predecessors": [
     "ce754d15c4d71c234835ca5ac23635ce353f21bd"
   ],
-  "sql_commit": "20170921292ab2592c7c58d15c5e63f08b1f190f",
+  "sql_commit": "aee6262854c4e1f9ba0543aaff9edb40b23dd4e8",
   "migrations": [
     {
       "id": "20261013_001_kvk_export_history",
