@@ -12,6 +12,16 @@ and camp-label changes are allowed when membership is unchanged. No-fight window
 do not contribute to this compatibility check; conflicting membership stops the
 export before any provider write.
 
+Terminally unavailable player or aggregate streams cannot contribute numeric
+cumulative or comparison values, even when their publication retains result rows.
+The other stream and other comparison periods remain independent.
+
+Scans and Source Files retain their existing rows and columns. When one cell refers
+to several reports, it opens **Report Links**, with columns **Source Sheet**, **Source**,
+**Report**, and **Period**. Each destination has a separate linked Report cell; a
+single-destination source cell still links directly. Workbook generation rejects
+duplicate hyperlink coordinates rather than silently replacing a destination.
+
 ## Naming and delayed-write safety
 
 Readable aliases are presentation only. Data, formatting, filters and index writes
@@ -121,3 +131,5 @@ PR publication does not activate the reader, deploy SQL, change production flags
 republish historical results or backfill anything. The additive SQL migration must
 precede any future authorized reader activation. Preserve old publications,
 snapshots, receipts and outputs for audit/rollback.
+
+Latest review corrections blank fighting values and ranks in individual reports whose pinned stream is final unavailable, while retaining identities, independent Baseline Power and the immutable source audit. Comparisons blank that stream/period and cumulative reports remain incomplete. Independent streams remain unchanged. Shared source links now use the four-column Report Links support sheet. The complete fixture therefore contains 63 reports plus directory; the earlier real Google acceptance above covered 62 reports before this navigation correction. The new links are verified by offline typed Google API readback and Excel serialization.

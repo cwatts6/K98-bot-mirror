@@ -167,7 +167,7 @@ def test_reader_delivery_typed_values_headers_ids_and_directory():
     assert transport.verify(args["destination"], generation.key) == manifest
     grids = api.grids["fake-1"]
     assert next(iter(grids)) == DIRECTORY
-    assert len(grids) == 39
+    assert len(grids) == 40
     player = next(t for t in generation.tables if t.name == "Pass 4 Players")
     rows = api.cells["fake-1", grids[player.name]["sheetId"]]
     assert rows[5][0]["userEnteredValue"] == {"stringValue": "Governor ID"}
@@ -180,10 +180,37 @@ def test_reader_delivery_typed_values_headers_ids_and_directory():
     assert rows[6][1]["userEnteredFormat"]["wrapStrategy"] == "WRAP"
     assert "wrapStrategy" not in rows[6][7]["userEnteredFormat"]
     assert all(len(title) <= 31 for title in grids)
+    names = {t.logical_key: t.name for t in generation.tables}
+    navigation = next(s for s in generation.projection.sheets if s.key == "links")
+    assert len(navigation.links) >= 3
+    for link in navigation.links:
+        cell = api.cells["fake-1", grids[names["links"]]["sheetId"]][link.row + 6][link.column]
+        target_id = grids[names[link.target]]["sheetId"]
+        assert cell["userEnteredFormat"]["textFormat"]["link"]["uri"] == (
+            f"https://docs.google.com/spreadsheets/d/fake-1/edit#gid={target_id}"
+        )
     assert api.values["fake-index", "Sheet1"][0][:2] == [generation.key, "1"]
     assert not any(
         path == "/spreadsheets/values" and method == "update" for path, method, _ in api.calls
     )
+
+
+def test_shared_references_have_unique_links_and_duplicate_coordinates_are_rejected():
+    projection = build(fixture(names=("Pass 4", "1st Altar")))
+    navigation = next(s for s in projection.sheets if s.key == "links")
+    report_targets = {s.key for s in projection.sheets if s.period in {"Pass 4", "1st Altar"}}
+    scan_targets = {
+        link.target for link in navigation.links if navigation.rows[link.row][0] == "Scans"
+    }
+    assert report_targets <= scan_targets
+    assert any(":cumulative:" in link.target for link in navigation.links)
+    for logical in projection.sheets:
+        assert len({(link.row, link.column) for link in logical.links}) == len(logical.links)
+    build_workbook_generation(projection)
+    guide = projection.sheets[0]
+    broken = replace(guide, links=(*guide.links, guide.links[0]))
+    with pytest.raises(ValueError, match="single report link"):
+        build_workbook_generation(replace(projection, sheets=(broken, *projection.sheets[1:])))
 
 
 def test_google_whole_cell_hyperlinks_verify_on_cold_readback():
@@ -239,7 +266,7 @@ def test_excel_bundle_roundtrip_and_no_formulas():
     with zipfile.ZipFile(BytesIO(content)) as archive:
         book = load_workbook(BytesIO(archive.read("report-01.xlsx")))
         assert book.sheetnames[0] == DIRECTORY
-        assert len(book.sheetnames) == 63
+        assert len(book.sheetnames) == 64
         sheet = book["Pass 4 Players"]
         assert sheet["A6"].value == "Governor ID"
         assert sheet["A7"].data_type == "s"
@@ -256,6 +283,16 @@ def test_excel_bundle_roundtrip_and_no_formulas():
         assert all(c.data_type != "f" for ws in book for row in ws for c in row)
         assert json.loads(archive.read("manifest.json"))["key"] == generation.key
         assert "reader-exact.json" in archive.namelist() and "audit.json" in archive.namelist()
+        navigation = book["Report Links"]
+        expected = next(t for t in generation.tables if t.name == "Report Links")
+        targets = {t.name: t.name for t in generation.tables}
+        for row_number, row in enumerate(expected.raw_values(), start=1):
+            for column_number, spec in enumerate(row, start=1):
+                if "readerLink" in spec:
+                    target = targets[spec["readerLink"]].replace("'", "''")
+                    assert navigation.cell(row_number, column_number).hyperlink.target == (
+                        f"#'{target}'!A1"
+                    )
 
 
 def test_optional_decimals_keep_fractions_without_integer_decimal_points():
@@ -320,9 +357,9 @@ def test_aliases_collision_unicode_and_windows_invalid_characters():
 @pytest.mark.parametrize(
     "names,skip,count",
     [
-        (("Pass 4",), (), 38),
-        (("Pass 4", "Altar 1", "Altar 2", "Altar 3", "Pass 7"), (), 62),
-        (("Pass 4", "Altar 1", "Altar 2", "Altar 3", "Pass 7"), (2, 3), 50),
+        (("Pass 4",), (), 39),
+        (("Pass 4", "Altar 1", "Altar 2", "Altar 3", "Pass 7"), (), 63),
+        (("Pass 4", "Altar 1", "Altar 2", "Altar 3", "Pass 7"), (2, 3), 51),
     ],
 )
 def test_partition_budget_and_complete_pairs(names, skip, count):
@@ -486,7 +523,7 @@ def test_coordinator_persists_ids_before_writes_and_pins_retry_history(monkeypat
             method in {"update", "delete", "batchUpdate", "create"} for _, method, _ in api.calls
         )
         assert manifest["reader_index_id"] == 0
-        assert len(manifest["reader_bindings"]["fake-1"]) == 39
+        assert len(manifest["reader_bindings"]["fake-1"]) == 40
         assert len(json.dumps(dict(generation=manifest, parts=parts)).encode("utf-16-le")) <= 65536
         retained.update(manifest=deepcopy(manifest), parts=deepcopy(parts))
         # New imports/selections cannot cause the captured projection to be rebuilt.

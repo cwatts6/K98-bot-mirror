@@ -58,6 +58,7 @@ GOLDEN = {
         "Acclaim",
         "Data Status",
     ),
+    "Report Links": ("Source Sheet", "Source", "Report", "Period"),
     "Report Guide": ("Report", "Purpose", "Period", "Availability"),
     "Scans": (
         "Period",
@@ -197,7 +198,7 @@ def sync(snapshot):
 
 def test_golden_stage3_headers_and_audit_contract():
     projection = build()
-    assert len(projection.sheets) == 11
+    assert len(projection.sheets) == 12
     assert projection.sheets[0].title == "Report Guide"
     assert {s.title: tuple(c.label for c in s.columns) for s in projection.sheets} == GOLDEN
     assert len(projection.audit.tables) == 12
@@ -306,7 +307,7 @@ def test_history_all_outcomes_records_revision_uses_and_links():
     assert source[0]["Imported (UTC)"].second == 12
     targets = {s.key for s in projection.sheets}
     assert all(link.target in targets for s in projection.sheets for link in s.links)
-    assert len(sheet(projection, "Report Guide").links) == 10
+    assert len(sheet(projection, "Report Guide").links) == 11
 
 
 def test_selected_times_one_pair_not_aggregate_asof():

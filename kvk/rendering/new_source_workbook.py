@@ -23,7 +23,7 @@ DIRECTORY = "Report Directory"
 
 def column_layout(labels):
     """Bounded widths and wrapping shared by both physical workbook writers."""
-    wide = {"Report", "Open report", "Source File"}
+    wide = {"Report", "Open report", "Source File", "Source"}
     prose = {
         "Purpose",
         "Notes",
@@ -35,7 +35,15 @@ def column_layout(labels):
         "Used In",
         "Applies To",
     }
-    names = {"Player Name", "Camp", "Period", "Availability", "Data Status", "Import Status"}
+    names = {
+        "Player Name",
+        "Camp",
+        "Period",
+        "Availability",
+        "Data Status",
+        "Import Status",
+        "Source Sheet",
+    }
     return tuple(
         (
             (
@@ -217,6 +225,10 @@ def build_workbook_generation(projection):
                     cells[-1]["userEnteredFormat"]["wrapStrategy"] = "WRAP"
             rows.append(cells)
         for link in sheet.links:
+            if "readerLink" in rows[link.row + HEADER_ROW][link.column]:
+                raise ValueError(
+                    "Reader cells require a single report link; use Report Links for multiple destinations."
+                )
             rows[link.row + HEADER_ROW][link.column]["readerLink"] = names[link.target]
         identity = 2 if sheet.columns[0].label == "Governor ID" else 1
         tables.append(

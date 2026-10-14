@@ -144,6 +144,7 @@ def _entity_sheet(selection, snapshot, kind, issues):
             "SourceKingdomReportRow" if kind == "kingdom" else "SourceCampReportRow"
         ]
     )
+    terminal = pub["PlayerState" if kind == "player" else "AggregateState"] == "final_unavailable"
     population = None
     if kind == "player":
         if empty_overall:
@@ -254,6 +255,21 @@ def _entity_sheet(selection, snapshot, kind, issues):
             "; ".join((["Live — provisional"] if state == "live" else []) + list(unavailable))
             or "Available"
         )
+        if terminal:
+            for column in columns_for(kind, overall=overall):
+                if column.kind == "number" and column.label != "Baseline Power":
+                    result[column.label] = None
+            result["Data Status"] = "Final unavailable"
+            issues.append(
+                _issue(
+                    period,
+                    title,
+                    result,
+                    "Fighting metrics",
+                    "Final unavailable",
+                    "This stream was finalized as unavailable; retained source values are audit-only.",
+                )
+            )
         output.append(result)
     authority = (
         "Player DKP uses this publication's frozen weights. Only T4+T5 KP counts."
@@ -264,7 +280,7 @@ def _entity_sheet(selection, snapshot, kind, issues):
         authority,
         "KP Loss = Healed Troops × 20. Tanking Score = T4+T5 KP / (KP Loss + Deads); healed troops must be positive.",
     ]
-    if population is not None:
+    if population is not None and not terminal:
         notes.append(
             f"DKP ranked population: {population}; baseline roster: {pub['EligibleCount']}. Ordinal ties use Governor ID; valid zeros are included."
         )

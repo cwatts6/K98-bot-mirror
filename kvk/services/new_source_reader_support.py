@@ -184,6 +184,42 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
             ReaderLink(len(source_records) - 1, 7, target)
             for target in dict.fromkeys(targets[revision])
         )
+    # One spreadsheet cell can carry only one inert whole-cell hyperlink.
+    # Keep source rows intact and list multi-report destinations individually.
+    navigation, navigation_links = [], []
+    report_by_key = {report.key: report for report in reports}
+
+    def single_links(title, records, links):
+        grouped = defaultdict(list)
+        for link in links:
+            grouped[link.row, link.column].append(link.target)
+        result = []
+        for (row, column), destinations in grouped.items():
+            destinations = list(dict.fromkeys(destinations))
+            if len(destinations) == 1:
+                result.append(ReaderLink(row, column, destinations[0]))
+                continue
+            source = records[row]
+            label = source.get("Period") or (
+                source["Source File"]
+                + (" (Scan " + str(source["Scan"]) + ")" if source["Scan"] is not None else "")
+            )
+            result.append(ReaderLink(row, column, "links"))
+            for destination in destinations:
+                report = report_by_key[destination]
+                navigation_links.append(ReaderLink(len(navigation), 2, destination))
+                navigation.append(
+                    {
+                        "Source Sheet": title,
+                        "Source": label,
+                        "Report": report.title,
+                        "Period": report.period,
+                    }
+                )
+        return result
+
+    scan_links = single_links("Scans", scans, scan_links)
+    source_links = single_links("Source Files", source_records, source_links)
     support = [
         _sheet(
             issues,
@@ -195,6 +231,9 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
             columns=columns_for("scans"),
             records=scans,
             links=scan_links,
+            notes=(
+                "Cells referring to several reports open Report Links; each destination has its own link.",
+            ),
         ),
         _sheet(
             issues,
@@ -219,9 +258,27 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
             notes=(
                 "Includes unused imports and duplicates. Duplicate files do not add another contribution.",
                 "Import outcomes and selected revision uses are frozen for this export; receipt time is not data time.",
+                "Used In cells referring to several reports open Report Links; each destination has its own link.",
             ),
         ),
     ]
+    if navigation:
+        support.append(
+            _sheet(
+                issues,
+                key="links",
+                title="Report Links",
+                period="All periods",
+                purpose="Every report destination for shared Scans and Source Files references",
+                availability="Available",
+                columns=columns_for("links"),
+                records=navigation,
+                links=navigation_links,
+                notes=(
+                    "Filter Source Sheet and Source to find a reference, then open its Report links.",
+                ),
+            )
+        )
     # Link by report title only when unambiguous; logical targets never contain a URL/formula.
     title_targets = defaultdict(list)
     for report in reports + support:

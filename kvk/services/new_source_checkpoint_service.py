@@ -98,7 +98,20 @@ def build_checkpoint_projection(inputs, *, history_snapshot, history_rows):
             )
     overall = overall_ids[0] if overall_ids else "overall"
     output.extend(reports[overall + ":" + kind] for kind in KINDS)
-    output.extend(comparison_sheets(latest_members, overall, facts, issues, set(reports)))
+    unavailable = frozenset(
+        (selection.period_id, kind)
+        for selection, snapshot in inputs
+        for kind in KINDS
+        if snapshot["envelope"]["publication"][
+            "PlayerState" if kind == "player" else "AggregateState"
+        ]
+        == "final_unavailable"
+    )
+    output.extend(
+        comparison_sheets(
+            latest_members, overall, facts, issues, set(reports), unavailable=unavailable
+        )
+    )
     support = build_support(ordered, output, issues, history_rows, checkpoints=tuple(checkpoints))
     return ReaderProjection(
         tuple(support[:1] + output + support[1:]),

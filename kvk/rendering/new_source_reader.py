@@ -45,6 +45,7 @@ KINGDOM_COLUMNS = (
     "Data Status",
 )
 SUPPORT_COLUMNS = {
+    "links": ("Source Sheet", "Source", "Report", "Period"),
     "guide": ("Report", "Purpose", "Period", "Availability"),
     "scans": (
         "Period",
@@ -81,6 +82,8 @@ SUPPORT_COLUMNS = {
 }
 TEXT_COLUMNS = frozenset(
     (
+        "Source Sheet",
+        "Source",
         "Governor ID",
         "Player Name",
         "Kingdom",

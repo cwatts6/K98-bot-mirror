@@ -20,7 +20,7 @@ COMPARISON_METRICS = (
 )
 
 
-def comparison_sheets(members, overall_id, facts, issues, report_keys):
+def comparison_sheets(members, overall_id, facts, issues, report_keys, *, unavailable=()):
     active = [m for m in members if m.status != "no_fight"]
     names = Counter(m.name for m in active)
     reserved = {"Overall", "Data Notes", "Governor ID", "Player Name", "Kingdom", "Camp"}
@@ -54,9 +54,12 @@ def comparison_sheets(members, overall_id, facts, issues, report_keys):
                 row = {label: latest.get(label) for label in identity_labels}
                 missing = []
                 for (pid, label), table in zip(periods, tables, strict=True):
-                    row[label] = table.get(identity, {}).get(metric)
+                    terminal = (pid, kind) in unavailable
+                    row[label] = None if terminal else table.get(identity, {}).get(metric)
                     if row[label] is None:
-                        missing.append(label + ": unavailable")
+                        missing.append(
+                            label + (": final unavailable" if terminal else ": unavailable")
+                        )
                     if "Live" in (table.get(identity, {}).get("Data Status") or ""):
                         missing.append(label + ": Live — provisional")
                 row["Data Notes"] = "; ".join(missing)

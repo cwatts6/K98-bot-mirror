@@ -153,6 +153,60 @@ def test_terminal_unavailable_stream_cannot_supply_complete_cumulative_totals(po
                     assert row["DKP Rank"] is None
 
 
+@pytest.mark.parametrize("position", [0, 1, 2])
+@pytest.mark.parametrize("stream", ["PlayerState", "AggregateState"])
+def test_terminal_unavailable_comparison_blanks_only_its_stream_and_period(position, stream):
+    inputs = fixture(names=NAMES[:2], overall=True)
+    baseline = build(deepcopy(inputs))
+    snapshot = inputs[position][1]
+    snapshot["envelope"]["publication"][stream] = "final_unavailable"
+    sync(snapshot)
+    if position == 2 and stream == "AggregateState":
+        # Retaining an Overall aggregate revision requires a final aggregate;
+        # the existing audit contract refuses this contradictory input outright.
+        with pytest.raises(SourceConflict, match="separate final aggregate"):
+            build(inputs)
+        return
+    result = build(inputs)
+    label = ("Pass 4", "1st Altar", "Overall")[position]
+    for kind in ("Players", "Kingdoms", "Camps"):
+        title = label + " " + kind
+        report = sheet(result, title)
+        if (kind == "Players") == (stream == "PlayerState"):
+            assert report.availability == "Unavailable"
+            assert report.rows
+            for row in records(result, title):
+                assert row["Data Status"] == "Final unavailable"
+                assert all(
+                    row[column.label] is None
+                    for column in report.columns
+                    if column.kind == "number" and column.label != "Baseline Power"
+                )
+        else:
+            assert report == sheet(baseline, title)
+    for kind in ("Players", "Kingdoms", "Camps"):
+        for metric in ("DKP", "T4+T5 KP", "Tanking Score"):
+            title = kind + " " + metric
+            before, after = records(baseline, title), records(result, title)
+            affected = (kind == "Players") == (stream == "PlayerState")
+            if not affected:
+                assert sheet(result, title) == sheet(baseline, title)
+            else:
+                for row in after:
+                    assert row[label] is None
+                    assert label + ": final unavailable" in row["Data Notes"]
+                # Sorting may change when the latest comparison value disappears.
+                identity = (
+                    "Governor ID"
+                    if kind == "Players"
+                    else "Kingdom" if kind == "Kingdoms" else "Camp"
+                )
+                prior = {r[identity]: r for r in before}
+                for row in after:
+                    for other in {"Pass 4", "1st Altar", "Overall"} - {label}:
+                        assert row[other] == prior[row[identity]][other]
+
+
 def test_equal_endpoint_overall_does_not_abort_fighting_checkpoint():
     inputs = fixture(names=NAMES[:1])
     inputs.append(reader_input(overall=True, end_scan=10))
@@ -255,7 +309,7 @@ def first(projection, title):
 
 def test_five_fight_all_checkpoints_and_27_comparisons():
     result = build(fixture())
-    assert len(result.sheets) == 62
+    assert len(result.sheets) == 63
     assert len(result.checkpoints) == 5
     assert [len(c.sheet_keys) for c in result.checkpoints] == [3, 6, 6, 6, 6]
     assert len([s for s in result.sheets if s.key.startswith("comparison:")]) == 27
@@ -291,7 +345,7 @@ def test_aggregate_authority_and_recomputed_not_averaged_score():
 
 def test_skipped_altars_without_publications_and_source_links():
     result = build(fixture(skip=(2, 3)))
-    assert len(result.sheets) == 50
+    assert len(result.sheets) == 51
     assert all(
         not s.title.startswith(("2nd Altar ", "3rd Altar ", "Fights to 2nd", "Fights to 3rd"))
         for s in result.sheets
@@ -309,7 +363,7 @@ def test_skipped_altars_without_publications_and_source_links():
     assert len([r for r in records(result, "Report Guide") if r["Availability"] == "No fight"]) == 2
     sources = records(result, "Source Files")
     assert "Fights to Pass 7" in sources[0]["Used In"]
-    assert any(":cumulative:" in link.target for link in sheet(result, "Source Files").links)
+    assert any(":cumulative:" in link.target for link in sheet(result, "Report Links").links)
 
 
 def test_later_fight_does_not_change_earlier_manifest_or_results():
@@ -569,9 +623,9 @@ def test_kvk15_compatible_additive_control_without_legacy_kp_or_identity_rules()
         assert row[label] == control["metrics"][key]["cumulative"]
 
 
-def test_one_fight_has_38_sheets_and_exact_comparison_schema():
+def test_one_fight_has_39_sheets_and_exact_comparison_schema():
     result = build(fixture(names=("Pass 4",)))
-    assert len(result.sheets) == 38
+    assert len(result.sheets) == 39
     assert tuple(c.label for c in sheet(result, "Kingdoms Tanking Score").columns) == (
         "Kingdom",
         "Camp",
