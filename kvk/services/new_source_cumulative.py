@@ -102,6 +102,9 @@ def coverage_issues(members, by_period, *, aggregate):
             continue
         _, snap = by_period[m.period_id]
         meta, pub = snap["metadata"], snap["envelope"]["publication"]
+        if pub["AggregateState" if aggregate else "PlayerState"] == "final_unavailable":
+            problems[m.period_id] = "final unavailable"
+            continue
         times = tuple(
             utc_time((meta["endpoints"][r] or {}).get("ScanStartUTC")) for r in ("start", "end")
         )

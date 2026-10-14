@@ -128,6 +128,31 @@ def build(inputs):
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
 
 
+@pytest.mark.parametrize("position", [0, 1])
+@pytest.mark.parametrize("stream", ["PlayerState", "AggregateState"])
+def test_terminal_unavailable_stream_cannot_supply_complete_cumulative_totals(position, stream):
+    inputs = fixture(names=NAMES[:2])
+    baseline = build(deepcopy(inputs))
+    snap = inputs[position][1]
+    snap["envelope"]["publication"][stream] = "final_unavailable"
+    sync(snap)
+    result = build(inputs)
+    for kind in ("Players", "Kingdoms", "Camps"):
+        target = sheet(result, "Fights to 1st Altar " + kind)
+        affected = (kind == "Players") == (stream == "PlayerState")
+        if not affected:
+            assert target == sheet(baseline, target.title)
+            continue
+        assert target.availability == "Incomplete"
+        for row in records(result, target.title):
+            if affected:
+                for metric in ("T4+T5 KP", "Deads", "KP Loss", "Tanking Score (%)"):
+                    assert row[metric] is None
+                assert "final unavailable" in row["Data Status"]
+                if kind == "Players":
+                    assert row["DKP Rank"] is None
+
+
 def test_equal_endpoint_overall_does_not_abort_fighting_checkpoint():
     inputs = fixture(names=NAMES[:1])
     inputs.append(reader_input(overall=True, end_scan=10))
