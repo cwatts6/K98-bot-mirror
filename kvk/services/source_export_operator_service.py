@@ -145,7 +145,9 @@ class SourceExportOperatorService:
                 return dict(job_id=previous["JobID"], state="queued", no_op=False)
             return dict(job_id=previous["JobID"], state=previous["State"], no_op=True)
         generation = physical_generation(
-            self.generation_loader(intent["IntentID"], bytes.fromhex(intent["VectorHash"]))
+            self.generation_loader(
+                intent["IntentID"], bytes.fromhex(intent["VectorHash"]), pool_id=pool["PoolID"]
+            )
         )
         result = capacity_for_snapshot(generation.manifest(), context)
         proof = dict(
@@ -309,7 +311,12 @@ class SourceExportOperatorService:
             raise SourceConflict("A damaged index requires explicit registration retirement.")
         job = snapshot["job"]
         generation = physical_generation(
-            self.generation_loader(job["IntentID"], bytes.fromhex(job["InputHash"]))
+            self.generation_loader(
+                job["IntentID"],
+                bytes.fromhex(job["InputHash"]),
+                pool_id=pool["PoolID"],
+                job_id=job["JobID"],
+            )
         )
         old_parts = {p["FileID"] for p in snapshot["parts"] if p["Role"] != "index"}
         result = capacity_for_snapshot(
@@ -347,7 +354,7 @@ class SourceExportOperatorService:
             if row.action == "rollover_confirm" and pool:
                 files = [pool["IndexFileID"], *(s["FileID"] for s in payload["snapshot"]["slots"])]
                 return (
-                    f"Rollover preview {row.token}\nSeason {pool['ActiveKVK']} → {payload['new_choice']['KVK_NO']}; epoch {pool['Epoch']} → {pool['Epoch']+1}.\n"
+                    f"Rollover preview {row.token}\nSeason {pool['ActiveKVK']} → {payload['new_choice']['KVK_NO']}; epoch {pool['Epoch']} → {pool['Epoch'] + 1}.\n"
                     "Closes admission, drains/reconciles old writers, then privately clears all listed files.\n"
                     + "\n".join(files)
                     + "\nConfirm within five minutes. Restart expires this preview."

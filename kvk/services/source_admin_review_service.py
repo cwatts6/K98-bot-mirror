@@ -559,7 +559,8 @@ class SourceAdminReviewService:
                         f"Calculation refresh: {refresh['CalculationVersion']} -> {CALCULATION_VERSION}",
                         f"Previous publication: {refresh['PublicationID']}",
                         "Retains the selected scans, aggregate, coverage, roster and frozen weights.",
-                        "Confirm selects the recalculated result and queues its export.",
+                        "Confirm selects the recalculated result. "
+                        "Then run /kvk_admin source action:export to start delivery.",
                     )
                 )
                 preview = payload["refresh_preview"]

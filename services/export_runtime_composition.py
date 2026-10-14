@@ -316,17 +316,25 @@ class ExportRuntime(RuntimeLifetime):
             rollover=self.rollover,
         )
 
-    def reader_binding(self, intent_id, expected_hash):
+    def reader_binding(self, intent_id, expected_hash, *, pool_id, job_id=None):
         from kvk.dal.source_reader_activation_dal import intent_scope
         from kvk.services.source_reader_activation import reader_manifest
         from services.export_coordination_dal import checked_attempt_manifest
 
         registered = self.registration.value()
         season, versions = intent_scope(self.connect, intent_id, expected_hash)
+        if pool_id not in {pool["pool_id"] for pool in registered["pools"]}:
+            raise SourceConflict("Reader activation requires its registered destination pool.")
         retained = []
-        for pool in registered["pools"]:
-            snapshot = self.pools.snapshot(pool["pool_id"])
-            jobs = {j["JobID"] for j in snapshot.get("jobs", []) if j.get("IntentID") == intent_id}
+        snapshot = self.pools.snapshot(pool_id)
+        jobs = {
+            j["JobID"]
+            for j in snapshot.get("jobs", [])
+            if j.get("IntentID") == intent_id and (job_id is None or j["JobID"] == job_id)
+        }
+        if job_id is not None and job_id not in jobs:
+            raise SourceConflict("Reader recovery job differs from its destination pool or intent.")
+        if jobs:
             for attempt in snapshot.get("attempts", []):
                 if attempt["JobID"] not in jobs:
                     continue
@@ -336,7 +344,7 @@ class ExportRuntime(RuntimeLifetime):
                     guild = generation.get("reader_guild_id")
                     if not isinstance(guild, str) or not re.fullmatch(r"[0-9]{1,32}", guild):
                         raise SourceConflict("Reader recovery requires its retained guild binding.")
-                    retained.append(dict(pool_id=pool["pool_id"], kvk_no=season, guild_id=guild))
+                    retained.append(dict(pool_id=pool_id, kvk_no=season, guild_id=guild))
                 else:
                     retained.append(None)
         if retained:
@@ -345,20 +353,22 @@ class ExportRuntime(RuntimeLifetime):
             # Repairs and retries keep the original layout and guild after flag changes.
             return retained[0]
         bindings = registered.get("reader_exports", [])
-        binding = next((b for b in bindings if b["kvk_no"] == season), None)
+        binding = next(
+            (b for b in bindings if b["kvk_no"] == season and b["pool_id"] == pool_id), None
+        )
         if binding is None or versions != {binding["calculation_version"]}:
             return None
-        context = self.pools.snapshot(binding["pool_id"])
+        context = snapshot
         self.registration.sheets(context)
         if context["pool"]["ActiveKVK"] != season:
             raise SourceConflict("Reader activation belongs to another pool season.")
         return binding
 
-    def load_generation(self, intent_id, expected_hash):
+    def load_generation(self, intent_id, expected_hash, *, pool_id, job_id=None):
         from kvk.services.new_source_export_service import load_intent_generation
         from kvk.services.source_reader_activation import load_reader_generation
 
-        binding = self.reader_binding(intent_id, expected_hash)
+        binding = self.reader_binding(intent_id, expected_hash, pool_id=pool_id, job_id=job_id)
         if binding:
             return load_reader_generation(
                 connect=self.connect,
@@ -427,7 +437,12 @@ class ExportRuntime(RuntimeLifetime):
         transport = self.transport(
             context,
             stream,
-            reader_binding=self.reader_binding(job["IntentID"], bytes(job["InputHash"])),
+            reader_binding=self.reader_binding(
+                job["IntentID"],
+                bytes(job["InputHash"]),
+                pool_id=context["pool"]["PoolID"],
+                job_id=claim.job_id,
+            ),
         )
         return deliver_coordinated_export(
             job=job,

@@ -248,7 +248,9 @@ class SourceOutputPlanner:
             "active",
         ):
             raise SourceConflict("Registered pool identity or admission changed.")
-        generation = physical_generation(self.generation_loader(intent_id, input_hash))
+        generation = physical_generation(
+            self.generation_loader(intent_id, input_hash, pool_id=pool["PoolID"])
+        )
         needed = capacity_for_snapshot(generation.manifest(), context)
         return dict(
             pool_id=pool["PoolID"],
