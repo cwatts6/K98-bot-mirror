@@ -554,7 +554,10 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                             if link.get("uri") not in targets:
                                 raise SourceConflict("Reader navigation escapes its generation.")
                             value["readerLink"] = targets[link["uri"]]
-                            fmt.pop("textFormat")
+                            text = fmt["textFormat"]
+                            text.pop("link")
+                            if not text:
+                                fmt.pop("textFormat")
                         if "formulaValue" in value.get("userEnteredValue", {}):
                             raise SourceConflict("Reader contains an executable formula.")
                 prior = combined[p["table"]]

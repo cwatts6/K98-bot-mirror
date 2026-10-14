@@ -272,6 +272,34 @@ def test_google_hyperlink_readback_rejects_changed_targets_and_runs(damage):
         args["transport"].verify(args["destination"], args["generation"].key)
 
 
+@pytest.mark.parametrize("hyperlink_readback", [False, True])
+@pytest.mark.parametrize(
+    "formatting", [{"bold": True}, {"italic": True}, {"foregroundColor": {"red": 1.0}}]
+)
+def test_linked_data_cell_formatting_drift_is_not_normalized_away(hyperlink_readback, formatting):
+    args, _, api = setup_reader()
+    assert deliver_export(**args).delivery_state == "confirmed"
+    generation = args["generation"]
+    navigation = next(s for s in generation.projection.sheets if s.key == "links")
+    link = navigation.links[0]
+    name = next(t.name for t in generation.tables if t.logical_key == "links")
+    cell = api.cells["fake-1", api.grids["fake-1"][name]["sheetId"]][link.row + 6][link.column]
+    cell["userEnteredFormat"]["textFormat"].update(formatting)
+    api.hyperlink_readback = hyperlink_readback
+    fresh = ReaderSheetsTransport(
+        drive=api.client(),
+        sheets=api.client(),
+        registration=args["transport"].registration,
+        reuse_guard=lambda *_: False,
+        protected_file_ids=(),
+    )
+    assert fresh._assess_contents(args["destination"], generation.key) != generation.manifest()
+    with pytest.raises(SourceConflict, match="Typed reader contents differ"):
+        fresh.verify(args["destination"], generation.key)
+    with pytest.raises(SourceConflict, match="Verified reader"):
+        fresh.publish_current(args["destination"], generation.key, 1)
+
+
 def test_excel_bundle_roundtrip_and_no_formulas():
     from openpyxl import load_workbook
 
