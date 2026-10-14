@@ -51,7 +51,14 @@ def build_checkpoint_projection(inputs, *, history_snapshot, history_rows):
             key = selection.period_id + ":" + kind
             if key in reports:
                 facts[selection.period_id, kind] = entity_records(snapshot, reports[key], kind)
-    issues = exact_records(next(s for s in base.sheets if s.key == "issues"))
+    # Support sheets are rebuilt against the completed checkpoint reports below.
+    # Carry entity issues forward, but generate each support issue only once.
+    entity_titles = {s.title for s in reports.values()}
+    issues = [
+        row
+        for row in exact_records(next(s for s in base.sheets if s.key == "issues"))
+        if row["Report"] in entity_titles
+    ]
     output, checkpoints, latest_members = [], [], ()
     overall_ids = []
     for selection, snapshot in ordered:

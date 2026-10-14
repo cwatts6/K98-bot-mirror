@@ -1,5 +1,6 @@
 """Cumulative and comparison contracts from independently pinned synthetic fights."""
 
+from collections import Counter
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -126,6 +127,39 @@ def fixture(*, names=NAMES, skip=(), missing=(), overall=False):
 def build(inputs):
     snapshot, rows = history()
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
+
+
+def test_checkpoint_support_issues_are_generated_once_without_losing_entity_issues():
+    from kvk.models.new_source_history import encode_fact, hash_row
+    from kvk.services.new_source_reader_service import build_reader_projection
+
+    inputs = fixture(names=NAMES[:2])
+    snap = inputs[0][1]
+    snap["metadata"]["aggregate"]["CoverageEndUTC"] += timedelta(hours=1)
+    snap["weights"]["WeightT4XSource"] = "12345678901234567"
+    snap["player_powers"][0]["EndPower"] = None
+    sync(snap)
+    snapshot, rows = history()
+    # Two distinct imports can legitimately produce identical-looking issues.
+    for row in rows[:2]:
+        row["player_records"] = 12345678901234567
+    hasher = snapshot.hasher()
+    for row in rows:
+        hash_row(hasher, encode_fact(row))
+    snapshot = replace(snapshot, content_hash=hasher.digest())
+    base = build_reader_projection(inputs, history_snapshot=snapshot, history_rows=rows)
+    result = build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
+    base_issues, issues = records(base, "Data Issues"), records(result, "Data Issues")
+    for report in ("Scans", "DKP Weights", "Source Files", "Pass 4 Players"):
+        expected = [row for row in base_issues if row["Report"] == report]
+        actual = [row for row in issues if row["Report"] == report]
+        assert expected, report
+        assert Counter(tuple(row.items()) for row in actual) == Counter(
+            tuple(row.items()) for row in expected
+        )
+    source_issues = [row for row in issues if row["Report"] == "Source Files"]
+    assert len(source_issues) == 2
+    assert source_issues[0] == source_issues[1]
 
 
 @pytest.mark.parametrize("position", [0, 1])
