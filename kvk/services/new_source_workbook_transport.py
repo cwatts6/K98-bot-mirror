@@ -24,6 +24,30 @@ from kvk.services.new_source_export_service import GoogleSheetsTransport
 class ReaderSheetsTransport(GoogleSheetsTransport):
     """Explicitly composed reader version; legacy callers retain their transport."""
 
+    @classmethod
+    def validate_observation(cls, generation, files):
+        """Select only a complete persisted reader attempt, never provider metadata."""
+        try:
+            cls._validate_manifest(generation["tables"])
+            layout = cls.partition_manifest(generation["tables"])
+            bindings = generation["reader_bindings"]
+            index_id = generation["reader_index_id"]
+            if type(index_id) is not int or not 0 <= index_id < 2**31:
+                raise ValueError("Invalid index ID")
+            if set(bindings) != set(files[1:]) or len(layout) != len(files) - 1:
+                raise ValueError("Invalid binding membership")
+            for part, (file_id, pieces) in enumerate(zip(files[1:], layout, strict=True)):
+                titles = ([DIRECTORY] if part == 0 else []) + [p["name"] for p in pieces]
+                bound = bindings[file_id]
+                if (
+                    set(bound) != set(titles)
+                    or any(type(v) is not int or not 0 <= v < 2**31 for v in bound.values())
+                    or len(set(bound.values())) != len(bound)
+                ):
+                    raise ValueError("Invalid grid bindings")
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise SourceConflict("Complete persisted reader bindings required.") from exc
+
     def prepare_generation(self, generation):
         if not isinstance(generation, WorkbookGeneration):
             raise ValueError("Versioned reader generation required.")
@@ -51,6 +75,13 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
         if file.get("description"):
             parsed = json.loads(file["description"])
             if parsed.get("reader_version") == WORKBOOK_VERSION:
+                expected = getattr(self, "observation_bindings", None)
+                if expected is not None and (
+                    file_id not in expected
+                    or parsed.get("bindings") != expected[file_id]
+                    or parsed.get("index_id") != self.observation_index_id
+                ):
+                    raise SourceConflict("Reader identity differs from the persisted attempt.")
                 file["reader_bindings"] = parsed["bindings"]
                 file["reader_index_id"] = parsed["index_id"]
                 file["description"] = json.dumps(parsed["manifest"], sort_keys=True)
@@ -447,7 +478,17 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
         return result[:requested_count]
 
     def verify(self, destination, key):
+        return self._read_verified_manifest(destination, key, require_match=True)
+
+    def _assess_contents(self, destination, key):
+        return self._read_verified_manifest(destination, key, require_match=False)
+
+    def _read_verified_manifest(self, destination, key, *, require_match):
         self._verified.discard(key)
+        if hasattr(self, "observation_index_id"):
+            grids = self._properties(self.registration.index_file_id)
+            if len(grids) != 1 or grids[0]["properties"]["sheetId"] != self.observation_index_id:
+                raise SourceConflict("Reader index identity differs from the persisted attempt.")
         files = self._files(destination, key)
         manifest = json.loads(files[0]["description"])
         layout = self.partition_manifest(manifest)
@@ -520,10 +561,14 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                 if prior and prior[:6] != rows[:6]:
                     raise SourceConflict("Reader partition headers differ.")
                 prior.extend(rows if not prior else rows[6:])
-        if any(payload_hash(combined[name]) != spec["sha256"] for name, spec in manifest.items()):
+        observed = {
+            name: dict(spec, sha256=payload_hash(combined[name])) for name, spec in manifest.items()
+        }
+        if require_match and observed != manifest:
             raise SourceConflict("Typed reader contents differ from the generation.")
-        self._verified.add(key)
-        return manifest
+        if observed == manifest:
+            self._verified.add(key)
+        return observed
 
     def publish_current(self, destination, key, fence):
         if key not in self._verified or type(fence) is not int or fence <= 0:

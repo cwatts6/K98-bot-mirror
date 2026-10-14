@@ -840,12 +840,17 @@ def test_interrupted_nested_owner_probe_does_not_revive_mutation_admission():
         new_source_job_scope(snapshot, claim)
 
 
-def recorded_google_memory():
+def recorded_google_memory(*, reader=False):
     """Actual static SDK requests cross the typed boundary into an offline API fake."""
     from services.export_execution_protocol import ProviderRequest, validate_response
     from tests.test_kvk_source_delivery import google_delivery
 
-    args, _, api = google_delivery()
+    if reader:
+        from tests.test_kvk_source_workbooks import setup_reader
+
+        args, _, api = setup_reader()
+    else:
+        args, _, api = google_delivery()
     original = args["transport"]
     messages = []
 
@@ -906,7 +911,7 @@ def recorded_google_memory():
     client = Mock(execute=Mock(side_effect=execute))
     stream = AuthorityStream(client, {})
     args["authority_stream"] = stream
-    args["transport"] = GoogleSheetsTransport.from_authority(
+    args["transport"] = type(original).from_authority(
         registration=original.registration,
         reuse_guard=original.reuse_guard,
         protected_file_ids=original.protected,

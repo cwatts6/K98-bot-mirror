@@ -443,7 +443,20 @@ def observe_publication(
             raise SourceConflict("Publication observation cannot dispatch mutations.")
         return execute(message)
 
-    transport = GoogleSheetsTransport.from_authority(
+    generation = document["generation"]
+    transport_type = GoogleSheetsTransport
+    if (
+        "reader_bindings" in generation
+        or "reader_index_id" in generation
+        or any(
+            isinstance(spec, dict) and "version" in spec for spec in generation["tables"].values()
+        )
+    ):
+        from kvk.services.new_source_workbook_transport import ReaderSheetsTransport
+
+        ReaderSheetsTransport.validate_observation(generation, files)
+        transport_type = ReaderSheetsTransport
+    transport = transport_type.from_authority(
         registration=registration,
         reuse_guard=lambda *_: False,
         protected_file_ids=protected_file_ids,
@@ -459,7 +472,9 @@ def observe_publication(
         s["FileID"] for s in slots if s["State"] == "quarantined" and s["FileID"] not in files
     )
     transport._registered_quarantine = True
-    generation = document["generation"]
+    if transport_type is not GoogleSheetsTransport:
+        transport.observation_bindings = generation["reader_bindings"]
+        transport.observation_index_id = generation["reader_index_id"]
     state, contents = "confirmed", None
     if allow_absent and job["State"] in {"running", "uncertain"} and attempt["ReceiptJson"] is None:
         # This path additionally requires the closed catalogue to show that this

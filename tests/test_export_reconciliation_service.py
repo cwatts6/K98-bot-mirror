@@ -909,7 +909,7 @@ def test_each_other_settlement_requires_sql_proof_before_mutation(monkeypatch, r
     )
 
 
-def publication_observation_fixture(monkeypatch, *, public=False, retained=True):
+def publication_observation_fixture(monkeypatch, *, public=False, retained=True, reader=False):
     """Populate an in-memory provider with the real pinned delivery/readback path."""
     from dataclasses import replace
     from threading import Event
@@ -919,11 +919,16 @@ def publication_observation_fixture(monkeypatch, *, public=False, retained=True)
     from services.export_coordination_dal import bounded_json
     from tests.test_export_runtime_composition import recorded_google_memory
 
-    args, api, messages = recorded_google_memory()
+    args, api, messages = recorded_google_memory(reader=reader)
     transport, stream = args["transport"], args["authority_stream"]
     if public:
         transport.registration = replace(transport.registration, audience="public_viewer")
     generation = args["generation"]
+    if reader:
+        monkeypatch.setattr(
+            "kvk.services.new_source_reader_service.load_reader_projection",
+            lambda **_: generation.projection,
+        )
     monkeypatch.setattr(
         "kvk.services.new_source_export_service.load_intent_generation", lambda **_: generation
     )
@@ -963,6 +968,7 @@ def publication_observation_fixture(monkeypatch, *, public=False, retained=True)
         budget=Mock(side_effect=AssertionError("local budget escaped")),
         stop=Event(),
         authority_stream=stream,
+        reader_guild_id="123" if reader else None,
     )
     registration = transport.registration
     job.update(InputHash=(b"a" * 32).hex(), DestinationSetHash=job["DestinationSetHash"].hex())
@@ -1038,14 +1044,15 @@ def publication_observation_fixture(monkeypatch, *, public=False, retained=True)
 
 @pytest.mark.parametrize("public", [False, True])
 @pytest.mark.parametrize("retained", [False, True])
+@pytest.mark.parametrize("reader", [False, True])
 def test_publication_observation_reuses_real_readback_and_preserves_exact_receipt(
-    monkeypatch, public, retained
+    monkeypatch, public, retained, reader
 ):
     from services.export_coordination_dal import bounded_json
     from services.export_reconciliation_service import observe_publication
 
     args, api, observations, receipt = publication_observation_fixture(
-        monkeypatch, public=public, retained=retained
+        monkeypatch, public=public, retained=retained, reader=reader
     )
     result = observe_publication(**args)
     assert result.receipt_json == bounded_json(receipt)
@@ -1085,6 +1092,56 @@ def test_contradictory_publication_readback_is_unresolved_never_absence_or_damag
     with pytest.raises(SourceConflict, match="unresolved"):
         observe_publication(**args)
     assert observations
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_reader_confirmed_assessment_and_closed_replay(monkeypatch, changed):
+    from services.export_coordination_dal import bounded_json
+    from services.export_reconciliation_service import (
+        observe_closed_publication,
+        observe_publication,
+    )
+
+    args, api, observations, _ = publication_observation_fixture(monkeypatch, reader=True)
+    args["snapshot"]["job"]["State"] = "confirmed"
+    if changed:
+        sid = api.grids["fake-1"]["Pass 4 Players"]["sheetId"]
+        api.cells["fake-1", sid][6][7]["userEnteredValue"] = {"numberValue": 123}
+    result = observe_publication(**args)
+    assert result.state == ("damaged" if changed else "confirmed")
+    assert result.receipt_json == args["snapshot"]["attempts"][0]["ReceiptJson"]
+    expected = json.loads(args["snapshot"]["attempts"][0]["ManifestJson"])["generation"]["tables"]
+    assert (result.observed_manifest_json == bounded_json(expected)) is (not changed)
+    dal, store, _, _ = sealed_publication_fixture(args, observations)
+    replay = observe_closed_publication(
+        dal=dal, store=store, **{k: v for k, v in args.items() if k != "execute"}
+    )
+    assert replay == result
+
+
+@pytest.mark.parametrize("damage", ["bindings", "index", "version", "missing"])
+def test_reader_observation_rejects_persisted_identity_damage(monkeypatch, damage):
+    from services.export_coordination_dal import bounded_json
+    from services.export_reconciliation_service import observe_publication
+
+    args, _, observations, _ = publication_observation_fixture(monkeypatch, reader=True)
+    attempt = args["snapshot"]["attempts"][0]
+    document = json.loads(attempt["ManifestJson"])
+    generation = document["generation"]
+    if damage == "bindings":
+        generation["reader_bindings"]["fake-1"]["Pass 4 Players"] += 1000
+    elif damage == "index":
+        generation["reader_index_id"] += 1000
+    elif damage == "version":
+        next(iter(generation["tables"].values()))["version"] = "unknown"
+    else:
+        del generation["reader_bindings"]
+    attempt["ManifestJson"] = bounded_json(document)
+    attempt["ManifestHash"] = digest(document).hex()
+    with pytest.raises(SourceConflict):
+        observe_publication(**args)
+    if damage in {"version", "missing"}:
+        assert not observations
 
 
 @pytest.mark.parametrize("changed", [False, True])

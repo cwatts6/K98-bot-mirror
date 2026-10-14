@@ -1782,8 +1782,11 @@ class GoogleSheetsTransport:
         )
         if self._pointer(index) != [[key, str(fence), remote]]:
             raise SourceConflict("Changed publication pointer remains unresolved.")
-        observed = self.verify(destination, key)
+        observed = self._assess_contents(destination, key)
         return remote, observed
+
+    def _assess_contents(self, destination, key):
+        return self.verify(destination, key)
 
     def read_retirement_generation(self, destination, key, *, manifest, files):
         """Read an explicitly unretained old assignment; never authorize its reuse."""
