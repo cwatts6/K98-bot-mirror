@@ -97,6 +97,8 @@ def _power(row, role):
     state = statuses.get("power", statuses.get("Power", "unsupported"))
     if isinstance(state, dict):
         state = state.get("state", "unsupported")
+    if state == "invalid_source_value":
+        return CalculatedMetric(None, MetricState.INVALID_SOURCE_VALUE)
     if state != "available" or value is None:
         return CalculatedMetric(
             None, MetricState.MISSING_END if role == "End" else MetricState.MISSING_START
@@ -223,7 +225,11 @@ def _entity_sheet(selection, snapshot, kind, issues):
                 result[label] = value.value
                 if value.value is None:
                     unavailable[
-                        "Missing "
+                        (
+                            "Invalid "
+                            if value.state == MetricState.INVALID_SOURCE_VALUE
+                            else "Missing "
+                        )
                         + {"Baseline": "baseline", "Start": "start", "End": "end"}[role]
                         + " power"
                     ].append(label)

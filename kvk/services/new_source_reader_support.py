@@ -94,6 +94,11 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
                     if not snapshot["envelope"]["is_current"]
                     else REASONS.get(pub["PeriodState"], "Unavailable")
                 )
+                unavailable = [
+                    pub[state] == "final_unavailable" for state in ("PlayerState", "AggregateState")
+                ]
+                if snapshot["envelope"]["is_current"] and any(unavailable):
+                    row["Status"] = "Unavailable" if all(unavailable) else "Partly unavailable"
                 row["Selection Notes"] = (
                     window.get("Notes")
                     or "Selected endpoints from this publication's configuration."

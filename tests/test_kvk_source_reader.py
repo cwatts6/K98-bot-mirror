@@ -336,6 +336,29 @@ def test_scan_status_uses_terminal_publication_state(state, label):
     assert records(build(inp), "Scans")[0]["Status"] == label
 
 
+@pytest.mark.parametrize("period_state", ["live", "final", "corrected_final"])
+@pytest.mark.parametrize(
+    "player_unavailable, aggregate_unavailable", [(True, False), (False, True), (True, True)]
+)
+def test_scan_status_retains_terminal_stream_unavailability(
+    period_state, player_unavailable, aggregate_unavailable
+):
+    inp = reader_input()
+    pub = inp[1]["envelope"]["publication"]
+    pub.update(PeriodState=period_state)
+    if player_unavailable:
+        pub["PlayerState"] = "final_unavailable"
+    if aggregate_unavailable:
+        pub["AggregateState"] = "final_unavailable"
+    sync(inp[1])
+    expected = (
+        "Unavailable" if player_unavailable and aggregate_unavailable else "Partly unavailable"
+    )
+    assert records(build(inp), "Scans")[0]["Status"] == expected
+    inp[1]["envelope"]["is_current"] = False
+    assert records(build(inp), "Scans")[0]["Status"] == "Update pending"
+
+
 def test_actual_coverage_difference_and_pending_selection_are_visible():
     inp = reader_input(desired_end=14)
     inp[1]["metadata"]["aggregate"]["CoverageEndUTC"] = NOW
@@ -437,6 +460,32 @@ def test_missing_power_is_not_zero_and_does_not_retarget():
     projection = build(inp)
     assert records(projection, "Pass 4 Players")[0]["End Power"] is None
     assert records(projection, "Pass 4 Players")[0]["Player DKP"] == 1800
+
+
+@pytest.mark.parametrize(
+    "role, label",
+    [("Baseline", "Baseline Power"), ("Start", "Fight-start Power"), ("End", "End Power")],
+)
+@pytest.mark.parametrize("damage", ["explicit", "malformed", "missing"])
+def test_invalid_power_is_distinguished_from_missing_power(role, label, damage):
+    inp = reader_input()
+    power = inp[1]["player_powers"][0]
+    if damage == "explicit":
+        power[role + "FieldStatusJson"] = '{"power":"invalid_source_value"}'
+    else:
+        power[role + "Power"] = "malformed" if damage == "malformed" else None
+    projection = build(inp)
+    player = records(projection, "Pass 4 Players")[0]
+    assert player[label] is None and player["Player DKP"] == 1800
+    prefix = "Missing" if damage == "missing" else "Invalid"
+    expected = (
+        prefix + " " + {"Baseline": "baseline", "Start": "start", "End": "end"}[role] + " power"
+    )
+    assert any(
+        r["Issue"] == expected and label in r["Affected Metric"]
+        for r in records(projection, "Data Issues")
+    )
+    assert expected in player["Data Status"]
 
 
 @pytest.mark.parametrize(
