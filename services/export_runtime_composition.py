@@ -328,16 +328,47 @@ class ExportRuntime(RuntimeLifetime):
         retained = []
         snapshot = self.pools.snapshot(pool_id)
         jobs = {
-            j["JobID"]
+            j["JobID"]: j
             for j in snapshot.get("jobs", [])
             if j.get("IntentID") == intent_id and (job_id is None or j["JobID"] == job_id)
         }
         if job_id is not None and job_id not in jobs:
             raise SourceConflict("Reader recovery job differs from its destination pool or intent.")
-        if jobs:
-            for attempt in snapshot.get("attempts", []):
-                if attempt["JobID"] not in jobs:
-                    continue
+        for current_job in jobs.values():
+            attempts = [
+                a for a in snapshot.get("attempts", []) if a["JobID"] == current_job["JobID"]
+            ]
+            if not attempts and current_job.get("RepairID"):
+                # Admission pins the original job/attempt in durable repair provenance.
+                # A fresh repair has no attempt yet, but must retain that exact layout.
+                try:
+                    original = json.loads(current_job["ProvenanceJson"])["repair"]["snapshot"]
+                    original_job = original["job"]
+                    original_attempt = original["attempts"]
+                    if (
+                        original["pool"]["pool"]["PoolID"] != pool_id
+                        or original_job["IntentID"] != intent_id
+                        or original_job["InputHash"] != expected_hash.hex()
+                        or original_job["JobID"] == current_job["JobID"]
+                        or len(original_attempt) != 1
+                        or original_attempt[0]["JobID"] != original_job["JobID"]
+                        or not any(
+                            j["JobID"] == original_job["JobID"] and j["IntentID"] == intent_id
+                            for j in snapshot.get("jobs", [])
+                        )
+                    ):
+                        raise ValueError("Repair origin differs from its destination or intent.")
+                    attempts = [
+                        a
+                        for a in snapshot.get("attempts", [])
+                        if a["JobID"] == original_job["JobID"]
+                        and a["AttemptID"] == original_attempt[0]["AttemptID"]
+                    ]
+                    if len(attempts) != 1:
+                        raise ValueError("Repair origin requires its exact retained attempt.")
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise SourceConflict("Reader repair requires its retained origin.") from exc
+            for attempt in attempts:
                 parts = [p for p in snapshot["parts"] if p["AttemptID"] == attempt["AttemptID"]]
                 generation = checked_attempt_manifest(attempt, parts)["generation"]
                 if reader_manifest(generation["tables"]):

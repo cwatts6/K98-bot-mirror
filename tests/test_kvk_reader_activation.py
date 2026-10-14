@@ -277,6 +277,7 @@ def test_two_pool_planning_keeps_reader_activation_and_recovery_local(monkeypatc
         ]
         == "123"
     )
+
     assert (
         runtime.reader_binding("intent", b"a" * 32, pool_id=legacy_pool, job_id="legacy-job")
         is None
@@ -295,3 +296,134 @@ def test_two_pool_planning_keeps_reader_activation_and_recovery_local(monkeypatc
         ]
         == "123"
     )
+
+
+@pytest.mark.parametrize("was_reader", [False, True])
+def test_fresh_repair_delivery_retains_original_layout(monkeypatch, was_reader):
+    from tests.test_export_retirement_recovery_evidence import recovery_fixture
+
+    args, _, _, _ = recovery_fixture(monkeypatch, empty=True)
+    original = args["snapshot"]
+    context = original["pool"]
+    pool_id = context["pool"]["PoolID"]
+    job = original["job"]
+    intent_id, input_hash = job["IntentID"], bytes.fromhex(job["InputHash"])
+    attempt = original["attempts"][0]
+    document = json.loads(attempt["ManifestJson"])
+    reader = build_workbook_generation(build(fixture(names=("Pass 4",))))
+    if was_reader:
+        document["generation"]["tables"] = reader.manifest()
+        document["generation"]["reader_guild_id"] = "123"
+        attempt.update(ManifestJson=json.dumps(document), ManifestHash=digest(document).hex())
+    # Use the durable provenance shape emitted by admit_repair, with a new job
+    # and no new attempt. The original envelope is checked by the real validator.
+    repair = dict(
+        job,
+        JobID=str(uuid4()),
+        RepairID=str(uuid4()),
+        ProvenanceJson=json.dumps(dict(repair=dict(snapshot=deepcopy(original)))),
+    )
+    context["jobs"].append(repair)
+    runtime = object.__new__(ExportRuntime)
+    runtime.connect = Mock()
+    runtime.registration = Mock()
+    packet = activated()
+    packet["pools"][0]["pool_id"] = pool_id
+    packet["reader_exports"][0].update(pool_id=pool_id, guild_id="999")
+    if was_reader:
+        packet.pop("reader_exports")
+    runtime.registration.value.return_value = packet
+    runtime.pools = Mock()
+    runtime.pools.snapshot.return_value = context
+    runtime.dal = Mock()
+    runtime.dal.operator_snapshot.return_value = {"pool": context}
+    runtime.jobs = Mock()
+    runtime.reconciler = Mock()
+    runtime.transport = Mock(
+        side_effect=lambda *args, reader_binding: SimpleNamespace(
+            reader_guild_id=reader_binding["guild_id"] if reader_binding else None
+        )
+    )
+    monkeypatch.setattr(
+        "kvk.dal.source_reader_activation_dal.intent_scope",
+        lambda *args: (16, {CALCULATION_VERSION}),
+    )
+    delivery = Mock()
+    monkeypatch.setattr(
+        "kvk.services.new_source_delivery_service.deliver_coordinated_export", delivery
+    )
+    runtime.deliver(
+        dict(repair, InputHash=input_hash),
+        SimpleNamespace(job_id=repair["JobID"]),
+        runtime.dal,
+        Mock(),
+        Mock(),
+        None,
+    )
+    assert delivery.call_args.kwargs["reader_guild_id"] == ("123" if was_reader else None)
+    binding = runtime.transport.call_args.kwargs["reader_binding"]
+    assert bool(binding) is was_reader
+    runtime.registration.sheets.assert_not_called()
+
+    # Once the repair has its own attempt, future retries and repairs use it.
+    repair_attempt = dict(attempt, AttemptID=str(uuid4()), JobID=repair["JobID"])
+    context["attempts"].append(repair_attempt)
+    context["parts"].extend(
+        dict(p, AttemptID=repair_attempt["AttemptID"])
+        for p in list(context["parts"])
+        if p["AttemptID"] == attempt["AttemptID"]
+    )
+    repair["ProvenanceJson"] = "{}"
+    assert (
+        runtime.reader_binding(intent_id, input_hash, pool_id=pool_id, job_id=repair["JobID"])
+        == binding
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid", ["pool", "intent", "hash", "job", "attempt", "missing", "malformed"]
+)
+def test_fresh_repair_rejects_missing_or_foreign_origin(monkeypatch, invalid):
+    packet = activated()
+    pool_id = packet["pools"][0]["pool_id"]
+    original_job = dict(JobID="original", IntentID="intent", InputHash=(b"a" * 32).hex())
+    original_attempt = dict(JobID="original", AttemptID="original-attempt")
+    origin = dict(
+        job=original_job, attempts=[original_attempt], pool=dict(pool=dict(PoolID=pool_id))
+    )
+    context = dict(jobs=[deepcopy(original_job)], attempts=[deepcopy(original_attempt)], parts=[])
+    if invalid == "pool":
+        origin["pool"]["pool"]["PoolID"] = str(uuid4())
+    elif invalid == "intent":
+        origin["job"]["IntentID"] = "foreign"
+    elif invalid == "hash":
+        origin["job"]["InputHash"] = (b"b" * 32).hex()
+    elif invalid == "job":
+        origin["job"]["JobID"] = "foreign"
+    elif invalid == "attempt":
+        origin["attempts"][0]["AttemptID"] = "foreign"
+    elif invalid == "missing":
+        context["attempts"] = []
+    context["jobs"].append(
+        dict(
+            JobID="repair",
+            IntentID="intent",
+            RepairID="repair-id",
+            ProvenanceJson=(
+                "{" if invalid == "malformed" else json.dumps(dict(repair=dict(snapshot=origin)))
+            ),
+        )
+    )
+    runtime = object.__new__(ExportRuntime)
+    runtime.connect = Mock()
+    runtime.registration = Mock()
+    runtime.registration.value.return_value = packet
+    runtime.pools = Mock()
+    runtime.pools.snapshot.return_value = context
+    monkeypatch.setattr(
+        "kvk.dal.source_reader_activation_dal.intent_scope",
+        lambda *args: (16, {CALCULATION_VERSION}),
+    )
+    with pytest.raises(SourceConflict, match="retained origin"):
+        runtime.reader_binding("intent", b"a" * 32, pool_id=pool_id, job_id="repair")
+    runtime.registration.sheets.assert_not_called()
