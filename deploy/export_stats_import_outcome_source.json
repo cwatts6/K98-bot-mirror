@@ -1,0 +1,816 @@
+{
+  "version": 2,
+  "status": "authored-not-installed; outcome receipts require 20261009_001_stats_import_outcomes and protected contract reissue",
+  "database": "ROK_TRACKER",
+  "default_schema": "dbo",
+  "sql_server_major_version": 16,
+  "canonical_definition": "CRLF to LF; trim only outer space/tab/CR/LF; replace leading ALTER or CREATE OR ALTER with CREATE; SHA256 of UTF-16LE; no body normalization",
+  "roots": [
+    "dbo.UPDATE_ALL2",
+    "dbo.SP_Stats_for_Upload",
+    "dbo.sp_TARGETS_MASTER",
+    "dbo.sp_Upsert_ProcConfig_From_Staging",
+    "KVK.sp_KVK_AllPlayers_Ingest",
+    "KVK.sp_KVK_Recompute_Windows",
+    "KVK.sp_KVK_Get_Exports",
+    "dbo.usp_S11RunStatsImport"
+  ],
+  "modules": [
+    {
+      "name": "KVK.sp_KVK_AllPlayers_Ingest",
+      "path": "sql_schema/KVK.sp_KVK_AllPlayers_Ingest.StoredProcedure.sql",
+      "source_sha256": "b5be98136336da43c8d2647294878c659e61e52e102e909d2906fe06b9bdc33a",
+      "definition_sha256": "d574dfbd2896f5491e59923be165901fb658d6ee5b766a70f3c97c24767c9a20",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "4e4955c323d86e2c9e81e291e9810aded77bcfed892d4edca3c59fd573b9623e"
+      ]
+    },
+    {
+      "name": "KVK.sp_KVK_Get_Exports",
+      "path": "sql_schema/KVK.sp_KVK_Get_Exports.StoredProcedure.sql",
+      "source_sha256": "372ceb4ac13b06aa52c2328e19b38ad02f06120560dc0c365d3f968e1f35c511",
+      "definition_sha256": "545952ae65e57b0f592e5b9c1e9a5c0f1a1b74b354d96ff6764357e28cade29b",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "474067e3369edaca6161f84e3c9364206a4fa44acffa0588a59883a5e0ec0ce8"
+      ]
+    },
+    {
+      "name": "KVK.sp_KVK_Recompute_Windows",
+      "path": "sql_schema/KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql",
+      "source_sha256": "223d539151e091a85152e01c365da3f648746423f6e770440941c962bdaa5b69",
+      "definition_sha256": "51cd44ffc4c7f1929a6ecbe29295da96bcec2c18c5589f0c1d497a3959d66356",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": []
+    },
+    {
+      "name": "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+      "path": "sql_schema/dbo.ACQUIRE_KS4_IMPORT_LOCK.StoredProcedure.sql",
+      "source_sha256": "c9c139b25d05580d32bd29ecd246e4dfdf32776c769e90764402d7bd7d011da9",
+      "definition_sha256": "b600e0d4cac9ebda6fe1657386cd61fe105d3f597192e10e776788f77cb0c10c",
+      "object_type": "P",
+      "execute_as": -2,
+      "calls": [
+        "sys.sp_getapplock"
+      ],
+      "compatible_definition_sha256": [
+        "6e8921159a22e1f06dacac81dcca9af85722e524ae9c78f680299e9881d0df5b"
+      ]
+    },
+    {
+      "name": "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "path": "sql_schema/dbo.ARCHIVE_IMPORT_STAGING_FILE.StoredProcedure.sql",
+      "source_sha256": "390c24652e6c69e738840636530117b9278937cb6bc83414d8889a44affc0891",
+      "definition_sha256": "ae8d625386af7dec301e9b43126e455c31556047a198d1a3adb3b8f89e1e2dda",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+        "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+        "master.dbo.xp_cmdshell",
+        "master.dbo.xp_fileexist"
+      ]
+    },
+    {
+      "name": "dbo.CLAIM_KS4_IMPORT_FILE",
+      "path": "sql_schema/dbo.CLAIM_KS4_IMPORT_FILE.StoredProcedure.sql",
+      "source_sha256": "40aff5c7d0137078533a1bcee688a679bfeda852da333bfdb1bdcd04c3d024cc",
+      "definition_sha256": "b6a711b888684eb515f87b7de516043e1d384d8fea2bcc8adcb35afa514dc7ca",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+        "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+        "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+        "master.dbo.xp_cmdshell",
+        "master.dbo.xp_fileexist"
+      ]
+    },
+    {
+      "name": "dbo.CREATE_DASH2",
+      "path": "sql_schema/dbo.CREATE_DASH2.StoredProcedure.sql",
+      "source_sha256": "8e8ae3a43be5a6b03696a2e210775f302ed88eba6687cb7b45c00ee274aa8e03",
+      "definition_sha256": "32ec93c823b11800911d4fc7123fdf6730c1563de072703602a46bc36ccfe718",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sp_executesql"
+      ]
+    },
+    {
+      "name": "dbo.CREATE_DELTA_TABLES",
+      "path": "sql_schema/dbo.CREATE_DELTA_TABLES.StoredProcedure.sql",
+      "source_sha256": "7ef936c6357ff9c5af749d69271fe03cae7eeb0dfdd2de0d97203ac61754e2e8",
+      "definition_sha256": "e4c9150e8f8d5434f77cc2238e444891a56f02e5aa312eab182e7f4b0f0591ab",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sp_executesql",
+        "sys.sp_getapplock",
+        "sys.sp_releaseapplock"
+      ],
+      "compatible_definition_sha256": [
+        "ff21ecb032b929abf1333b4f699b360a5a033bf3a2e10166aa38035f0b2dc6d8"
+      ]
+    },
+    {
+      "name": "dbo.CREATE_THE_AVERAGES",
+      "path": "sql_schema/dbo.CREATE_THE_AVERAGES.StoredProcedure.sql",
+      "source_sha256": "84ccd9ce2c49e2150e09e51aaaaa7c7780098aaa8fbd272dd155432d1e1a4140",
+      "definition_sha256": "714359292281d729de77df2b2883f431552d243ba537cce35f18b37e2d3f267a",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": []
+    },
+    {
+      "name": "dbo.DEADSSUMMARY_PROC",
+      "path": "sql_schema/dbo.DEADSSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "02ddc26cceab8b35ae4e8c84e72b3c5cabc458d5972264365067b8b65734b124",
+      "definition_sha256": "3688d1adbc52dbf6f2686080fa789d2cb94522f0053b9c72120943994e2e6277",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "5105a600f8d628726b039217081b0fbe8c33a8a9c90570a97f4c23daf7d170a3"
+      ]
+    },
+    {
+      "name": "dbo.GOVERNOR_NAMES_PROC",
+      "path": "sql_schema/dbo.GOVERNOR_NAMES_PROC.StoredProcedure.sql",
+      "source_sha256": "48bf04d217d446b49c63321503463a3fd6c2351bd7634e072586bdd2081a52d8",
+      "definition_sha256": "ba171a53114fa45d03434ce038c09a4e66eaa59134006c8f6d5251b4b462e92e",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": []
+    },
+    {
+      "name": "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+      "path": "sql_schema/dbo.HASH_KS4_IMPORT_ARCHIVE_FILE.StoredProcedure.sql",
+      "source_sha256": "bf9965035b642d5103a8e0ac5294a4b54f34a83f8528872b3c7c775bb89b0464",
+      "definition_sha256": "dad532fb6309e6b9418806bc2e1142237c3e467c411ba6e833a95bf19db81207",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "master.dbo.xp_cmdshell"
+      ]
+    },
+    {
+      "name": "dbo.HEALEDSUMMARY_PROC",
+      "path": "sql_schema/dbo.HEALEDSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "f9441e2b582cdc6bd8388b544d3bfabd10db4b4aa08a3c3323354dc3b5b5ca9f",
+      "definition_sha256": "bdb4dc1e56b9bf2b4fdf50d03ebf068551d630c87ce2ab55b31f809e60e6bfed",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "01df5a9769a90c78831e84463ab5c889f0dcf7c1c33ce31f740fe393dfd54d28"
+      ]
+    },
+    {
+      "name": "dbo.IMPORT_STAGING_PROC_CORE",
+      "path": "sql_schema/dbo.IMPORT_STAGING_PROC_CORE.StoredProcedure.sql",
+      "source_sha256": "317c04073453f9a7348df3125e4a6465cf342326d41a5e7151ea911e4c91d5a7",
+      "definition_sha256": "c8a197d90fc7aea7d4e51935e39b7031203e25e41626847b6d9e0dd50867fd8c",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+        "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+        "dbo.HASH_KS4_IMPORT_ARCHIVE_FILE",
+        "master.dbo.xp_fileexist",
+        "sp_executesql"
+      ]
+    },
+    {
+      "name": "dbo.KILLPOINTSSUMMARY_PROC",
+      "path": "sql_schema/dbo.KILLPOINTSSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "feb7af4c70d23443e2a2b97577808734928f2b9620f10caa8401cddffd397956",
+      "definition_sha256": "294bee151bf87885b1500c1ac7274f53e6e4d600513c9b457b4c2e475c8f72ae",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "72222f1fc92ad53cf3daa148068579d59205926fdf0f74e12014474ac9385d5b"
+      ]
+    },
+    {
+      "name": "dbo.KILLSSUMMARY_PROC",
+      "path": "sql_schema/dbo.KILLSSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "f5c5ed21f60e9b26206e65f8230eb6ee99ff96bcd3f2bb42e87780678bc26b77",
+      "definition_sha256": "ff8798becd4c3cd300e2eddee1592066bd626a15fc69db4c81cf57b77ae8fbc2",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "ebe4551b755d36e22c8fc4c548e5985f5370bd04c31d80868e750abaa49f1143"
+      ]
+    },
+    {
+      "name": "dbo.KT4SUMMARY_PROC",
+      "path": "sql_schema/dbo.KT4SUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "ccf6186bdce1d20c7ed9c53bbe5fd067fd14461cba3468658f44ad035d576a9f",
+      "definition_sha256": "34d3a01a15f6b05e7eee503ea760f493dd5086d548a0ff7eb5de29e6b6cf979c",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "8153007c15b8b9108144f1411e9103f6c6bffd8142f6fbd4f1a5a54260371a12"
+      ]
+    },
+    {
+      "name": "dbo.KT5SUMMARY_PROC",
+      "path": "sql_schema/dbo.KT5SUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "2424630bb12efd37d4f03bebeaac4682fe8977db9443daf70bf3cfed2c55b22c",
+      "definition_sha256": "56288be469a924d16f821a40c3885bd12e07f80bfa6af29f781bca9d507c24d5",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "def6dcc8f40e17f1ecff3a669ce15a2d29aa97756a15596e32ba06dfe7f47acf"
+      ]
+    },
+    {
+      "name": "dbo.POWERSUMMARY_PROC",
+      "path": "sql_schema/dbo.POWERSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "a5cda535aeb163e2d6a10e586bf9ad6fe65f0a40fd93f983c9c4ad05b3d47f6e",
+      "definition_sha256": "1259508d96b6267e6b8b8508a3b069301254329d26fcb3a6871fb88247b64c3e",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "d3ad66170f6f70cd679b03b18ed46b6e75c4ccf4a77015493f594d971dbdaf2d"
+      ]
+    },
+    {
+      "name": "dbo.RANGEDSUMMARY_PROC",
+      "path": "sql_schema/dbo.RANGEDSUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "b4ef865065d354ecde80e55da420e7b21b7ccbea80a88524ca964e975db430ac",
+      "definition_sha256": "786ca62850c9f55270844dace6782278f0dbca3451e46e6d4f47b56fb9848c79",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "60081f590a2b49438e44c7d1e60dd461a78b6f568b72a4fd6c7c2f7636078bae"
+      ]
+    },
+    {
+      "name": "dbo.Refresh_PlayerScanMeta",
+      "path": "sql_schema/dbo.Refresh_PlayerScanMeta.StoredProcedure.sql",
+      "source_sha256": "860f709416e4618d9ae2d79e63669a64a5c94b6331c7afc50d8c3828b4afffbd",
+      "definition_sha256": "c5e6b156de73e9271b9545897ad77836e4b1ce3d34bc08f641ae73d97e9d6187",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "62266c69f1daf40c2150a6d0369a8ffa93fc1f3ada7f48d66ebb6b4b3f03ccd1"
+      ]
+    },
+    {
+      "name": "dbo.SP_Stats_for_Upload",
+      "path": "sql_schema/dbo.SP_Stats_for_Upload.StoredProcedure.sql",
+      "source_sha256": "c348ea6adb6819b5d11dbf6a7f5782dade03ab4ed1f9e360ab089e3d90d5cdbb",
+      "definition_sha256": "f027787931efdc66e8302a8576241aa046fd7b1512ecfcd31a3d186be53965ac",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+        "sys.sp_executesql",
+        "sys.sp_getapplock"
+      ],
+      "compatible_definition_sha256": [
+        "39c63023c69c8d1bf54088e58dc8949d3271768b1512fe02877efcb09e917d92"
+      ]
+    },
+    {
+      "name": "dbo.SUMMARY_PROC",
+      "path": "sql_schema/dbo.SUMMARY_PROC.StoredProcedure.sql",
+      "source_sha256": "9fd82ccb36257dadfd44ded203b5dea658cab1f896b069357ff105053e74c506",
+      "definition_sha256": "a4c1af34ff6c8d959375b77b1ee68294adb896379ff0d777e517170a8ffd78a1",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.DEADSSUMMARY_PROC",
+        "dbo.HEALEDSUMMARY_PROC",
+        "dbo.KILLPOINTSSUMMARY_PROC",
+        "dbo.KILLSSUMMARY_PROC",
+        "dbo.KT4SUMMARY_PROC",
+        "dbo.KT5SUMMARY_PROC",
+        "dbo.POWERSUMMARY_PROC",
+        "dbo.RANGEDSUMMARY_PROC"
+      ],
+      "compatible_definition_sha256": [
+        "73d9af67cd5516e870ed755542439d5977f6dff51da8dc1795434af1da3411e5"
+      ]
+    },
+    {
+      "name": "dbo.UPDATE_ALL2",
+      "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
+      "source_sha256": "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a",
+      "definition_sha256": "4a5640dbdf811d645ba9ed83062f08408f5d02e6c9c2338585042b031af080bc",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK",
+        "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+        "dbo.CLAIM_KS4_IMPORT_FILE",
+        "dbo.CREATE_DASH2",
+        "dbo.CREATE_THE_AVERAGES",
+        "dbo.GOVERNOR_NAMES_PROC",
+        "dbo.IMPORT_STAGING_PROC_CORE",
+        "dbo.Refresh_PlayerScanMeta",
+        "dbo.SP_Stats_for_Upload",
+        "dbo.SUMMARY_PROC",
+        "dbo.sp_ExcelOutput_ByKVK",
+        "dbo.sp_Rebuild_ExcelForDashboard",
+        "dbo.sp_RefreshInactiveGovernors",
+        "dbo.usp_UpsertGovernorNameHistoryForScan",
+        "sp_executesql"
+      ]
+    },
+    {
+      "name": "dbo.fn_NormalizeGovernorNameKey",
+      "path": "sql_schema/dbo.fn_NormalizeGovernorNameKey.UserDefinedFunction.sql",
+      "source_sha256": "364e5dae235f7d4b19ccdc4a6a83e8489672fa8827a77e2cde0dbe12715b0231",
+      "definition_sha256": "46e14cc25edf211145d2cfa64e125ecd5286e6de44605ac6d4fc68a2bdb2cfac",
+      "object_type": "FN",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "c462b37844e58e2a9e91ed119d984c48cafe0f4df7cf426092cb0e18d190cec1"
+      ]
+    },
+    {
+      "name": "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+      "path": "sql_schema/dbo.sp_Build_Prekvk_And_Honor_Rankings.StoredProcedure.sql",
+      "source_sha256": "782833774c294664e23176e62166bbebec99f2dcab6c46c5c3549cddb162bde0",
+      "definition_sha256": "3402b78fb19f7add67281c151522a88f14177c7a87e6c193b4f90bd374f797b1",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": []
+    },
+    {
+      "name": "dbo.sp_Create_Excel_For_Kvk_Indexes",
+      "path": "sql_schema/dbo.sp_Create_Excel_For_Kvk_Indexes.StoredProcedure.sql",
+      "source_sha256": "530e1e0e15778b1eabb53fbf77f882192609658203e06e677eacca1910338eaf",
+      "definition_sha256": "c4860487e09f82e0ceba3dbafd36df203f1506ca2af95d62832af86b10cd4f5f",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "e4e25af8f320f7a6c5638a301ea7017c215a1d490a869b89645d56aea13a4999"
+      ]
+    },
+    {
+      "name": "dbo.sp_ExcelOutput_ByKVK",
+      "path": "sql_schema/dbo.sp_ExcelOutput_ByKVK.StoredProcedure.sql",
+      "source_sha256": "27cc283d5f578f8a1294c8acbd128aa752db5ebab363bfd25922e66d1d192583",
+      "definition_sha256": "ecc7ae0efcb942e159459d51088bea281efcee6a3c711f9123dacef8d67c50fc",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.sp_Build_Prekvk_And_Honor_Rankings",
+        "dbo.sp_Create_Excel_For_Kvk_Indexes",
+        "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+        "dbo.usp_RecordKvkFinalReportCompletion",
+        "sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "019081cad5a1769bef54e908debfbbf84b4cbe0ab247621c50d0d4f912e31406"
+      ]
+    },
+    {
+      "name": "dbo.sp_Prep_ExcelExportTable",
+      "path": "sql_schema/dbo.sp_Prep_ExcelExportTable.StoredProcedure.sql",
+      "source_sha256": "382daf64fb859f74bba525901268455df1b42befee9fa75a6295fb51fbe1c31f",
+      "definition_sha256": "e79bf39bdbf265eac79cf54c00ac15a6240becc74f3fc9fc685de12eaec0c6f2",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sys.sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "ec723069c9a743650fcee2e3f5f48f6d0db7b89b2b6bf787226694d78bef1194"
+      ]
+    },
+    {
+      "name": "dbo.sp_Prep_ExcelOutputTable",
+      "path": "sql_schema/dbo.sp_Prep_ExcelOutputTable.StoredProcedure.sql",
+      "source_sha256": "f3c4d4cd432d6b90881840ee412cd80045a56e8392d10684accfbc0201a0b2fc",
+      "definition_sha256": "249a81e94fdac9f17bb927e9845c2bc4642c66e0455b44dc0c631b471a754f8d",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "13398d6e860dd2a052bba3147f2d4b733b0ab88944ab685a2bfd9fd0328a548f"
+      ]
+    },
+    {
+      "name": "dbo.sp_Prep_TargetTable",
+      "path": "sql_schema/dbo.sp_Prep_TargetTable.StoredProcedure.sql",
+      "source_sha256": "e8b883d4581bd73db5b7f7ae6ea9d5dc8fdfb052dde5227cfb60dae5513aa76c",
+      "definition_sha256": "14dc95d4380b2fe1af03c8615d9284d82bb0c3f326c4ba5389058537a063537a",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sys.sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "db7bf19c90d092c516744b3fb5b3cdbdcd3d5307c7e2d69fb19fb5600d429299"
+      ]
+    },
+    {
+      "name": "dbo.sp_Rebuild_ExcelForDashboard",
+      "path": "sql_schema/dbo.sp_Rebuild_ExcelForDashboard.StoredProcedure.sql",
+      "source_sha256": "afd9889dbbef79ead0dd0b63f6f1c438f44b62b0fd7faea73f0e4228b7bb5e93",
+      "definition_sha256": "6759004fe3110f5648c6825abacbe2b14d70f333dd9091a4239a23c54d986b45",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "b83ffcc7e576baa116a7085ed97522991713eef8655e233e46665c6b9f3894a6"
+      ]
+    },
+    {
+      "name": "dbo.sp_RefreshInactiveGovernors",
+      "path": "sql_schema/dbo.sp_RefreshInactiveGovernors.StoredProcedure.sql",
+      "source_sha256": "d541c839a5b58730eb0b50f28f5d668948df869716ec1bf0df9059720430133b",
+      "definition_sha256": "21a85705ff145f064a133bc42ccb5edb415fa7eb8543ae4ccec464bf04bcc994",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "323e66e9a12a033012f5d03d28789df67a04562a95346c5e8280fd4cc6c009f4"
+      ]
+    },
+    {
+      "name": "dbo.sp_Refresh_View_EXCEL_FOR_KVK_All",
+      "path": "sql_schema/dbo.sp_Refresh_View_EXCEL_FOR_KVK_All.StoredProcedure.sql",
+      "source_sha256": "7f74bc52b823bb03e9308474410f22e656ee790b083dbf53870b70bdf937ac79",
+      "definition_sha256": "17d436196b6bc5ddd9c1cdbcd63ed46c39c9b3c9ef821382c22cb5b389e963cc",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "sys.sp_executesql"
+      ]
+    },
+    {
+      "name": "dbo.sp_TARGETS_MASTER",
+      "path": "sql_schema/dbo.sp_TARGETS_MASTER.StoredProcedure.sql",
+      "source_sha256": "2ea82ec000c3e4d578c45871e3b107869ac885a3ad41af961a41292db7f31705",
+      "definition_sha256": "d20e2dc29c7d6455a17ebfcb59e78210e1c10aa20145974293ac5f417822ec20",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.CREATE_DELTA_TABLES",
+        "dbo.sp_ExcelOutput_ByKVK",
+        "dbo.sp_Prep_ExcelExportTable",
+        "dbo.sp_Prep_ExcelOutputTable",
+        "dbo.sp_Prep_TargetTable",
+        "sys.sp_executesql",
+        "sys.sp_getapplock",
+        "sys.sp_releaseapplock"
+      ],
+      "compatible_definition_sha256": [
+        "f298271b8e7a57e5cce55bca88cd2aa21a1243ebce0a5c0a9559fce1fd600a3e"
+      ]
+    },
+    {
+      "name": "dbo.sp_Upsert_ProcConfig_From_Staging",
+      "path": "sql_schema/dbo.sp_Upsert_ProcConfig_From_Staging.StoredProcedure.sql",
+      "source_sha256": "fcd5db517349bf9f767d71ba893c1019ff6201652e9c2de8ed3f33668bf759e9",
+      "definition_sha256": "1ab729a83b8e8674ef087f767e862b641841f2a89dc1ed30c618d7d8011476a6",
+      "object_type": "P",
+      "execute_as": -2,
+      "calls": []
+    },
+    {
+      "name": "dbo.usp_RecordKvkFinalReportCompletion",
+      "path": "sql_schema/dbo.usp_RecordKvkFinalReportCompletion.StoredProcedure.sql",
+      "source_sha256": "b8a277c6741fa93a140cd482900e053371ab52b44100a3b3936d691ce6e74d29",
+      "definition_sha256": "195d14e5dc42d17a8e4fa8bd632e61fbfe5f6ad43ec7e54bf1ef5fce61a441a7",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "3ada96d3bcc82eb5beb9d2c5989c0e4482f0335008dce6d7f79444565f79562c"
+      ]
+    },
+    {
+      "name": "dbo.usp_S11RunStatsImport",
+      "path": "sql_schema/dbo.usp_S11RunStatsImport.StoredProcedure.sql",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.UPDATE_ALL2"
+      ],
+      "source_sha256": "bcfe6fb93200f5b0493d59c183f061446d3948b2b46c67f850a4d989304695fc",
+      "definition_sha256": "f11f8395fd4837e4decd4b5573b9dc7d1573abf4c8bf24944265d78e8fcf0c68",
+      "compatible_definition_sha256": [
+        "034ca049c92a8b8ea654edca21f03269afae4884d398ea7d26e7ab0aade0b81e"
+      ]
+    },
+    {
+      "name": "dbo.usp_UpsertGovernorNameHistoryForScan",
+      "path": "sql_schema/dbo.usp_UpsertGovernorNameHistoryForScan.StoredProcedure.sql",
+      "source_sha256": "1100fefb00da1c5f42416b6a26b8fe50710f4f40545bf7eab39015eb1444f271",
+      "definition_sha256": "568b9d55e04a660c75571e136d4e33d59901f357f51d6d8e2b20a9dd59442ab6",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [],
+      "compatible_definition_sha256": [
+        "f420251839fa87b4e358a892a64e5f830f4ac945b0d72eeff411a4418877e97f"
+      ]
+    }
+  ],
+  "signatures": [],
+  "grants": [
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "KVK.sp_KVK_AllPlayers_Ingest",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "KVK.sp_KVK_Get_Exports",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "KVK.sp_KVK_Recompute_Windows",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.SP_Stats_for_Upload",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.UPDATE_ALL2",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.sp_TARGETS_MASTER",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.sp_Upsert_ProcConfig_From_Staging",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "DATABASE",
+      "target": "ROK_TRACKER",
+      "permission": "CHECKPOINT"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "DATABASE",
+      "target": "ROK_TRACKER",
+      "permission": "CREATE TABLE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "DATABASE",
+      "target": "ROK_TRACKER",
+      "permission": "CREATE VIEW"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "DATABASE",
+      "target": "ROK_TRACKER",
+      "permission": "VIEW DATABASE PERFORMANCE STATE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "SCHEMA",
+      "target": "dbo",
+      "permission": "ALTER"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "SCHEMA",
+      "target": "dbo",
+      "permission": "INSERT"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "SCHEMA",
+      "target": "dbo",
+      "permission": "SELECT"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.STATS_FOR_UPLOAD",
+      "permission": "ALTER"
+    },
+    {
+      "database": "master",
+      "principal": "$application",
+      "securable_class": "SERVER",
+      "target": "",
+      "permission": "ADMINISTER BULK OPERATIONS"
+    },
+    {
+      "database": "master",
+      "principal": "$application",
+      "securable_class": "SERVER",
+      "target": "",
+      "permission": "VIEW SERVER PERFORMANCE STATE"
+    },
+    {
+      "database": "master",
+      "principal": "$application",
+      "securable_class": "OBJECT",
+      "target": "dbo.xp_cmdshell",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "master",
+      "principal": "$application",
+      "securable_class": "OBJECT",
+      "target": "dbo.xp_fileexist",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.usp_S11RunStatsImport",
+      "permission": "EXECUTE"
+    }
+  ],
+  "scan_queries": [
+    {
+      "ordinal": 0,
+      "query": "SELECT * FROM KS",
+      "object": "dbo.KS",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.KS.Table.sql",
+      "sha256": "865e98130af4a2c1382d2165b98850a2fa567c4ddadd60e81d714c21c73bf923"
+    },
+    {
+      "ordinal": 1,
+      "query": "SELECT * FROM POWER_BY_MONTH",
+      "object": "dbo.POWER_BY_MONTH",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.POWER_BY_MONTH.Table.sql",
+      "sha256": "8f801915741f11d37094f64254c4469f9881d6f2416888071538edf191315966"
+    },
+    {
+      "ordinal": 2,
+      "query": "SELECT * FROM ALL_STATS_FOR_DASHBAORD",
+      "object": "dbo.ALL_STATS_FOR_DASHBAORD",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.ALL_STATS_FOR_DASHBAORD.Table.sql",
+      "sha256": "6c3da1bb4f34ba70d049102d6c90b9bbeef326991e5d96a681509c4c47c5f579"
+    },
+    {
+      "ordinal": 3,
+      "query": "SELECT * FROM STATS_FOR_UPLOAD",
+      "object": "dbo.STATS_FOR_UPLOAD",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.STATS_FOR_UPLOAD.Table.sql",
+      "sha256": "16bf2a6d6fb0a3fdc98d78957405aba9c884e6f74b8f6b1024fc2a651320c387"
+    },
+    {
+      "ordinal": 4,
+      "query": "SELECT * FROM RALLY_EXPORT",
+      "object": "dbo.RALLY_EXPORT",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.RALLY_EXPORT.Table.sql",
+      "sha256": "5ddd6f6ce142c3a154fc897cc0ea7b139448f1676ef7822b06aaa0d3416f0dfd"
+    },
+    {
+      "ordinal": 5,
+      "query": "SELECT * FROM SUMMARY_CHANGE_EXPORT",
+      "object": "dbo.SUMMARY_CHANGE_EXPORT",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.SUMMARY_CHANGE_EXPORT.Table.sql",
+      "sha256": "9deed7e6b86c446f98ed083dd47b3506e9f883ce172aac63580795208861c003"
+    },
+    {
+      "ordinal": 6,
+      "query": "SELECT * FROM ALL_GOVS",
+      "object": "dbo.ALL_GOVS",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.ALL_GOVS.Table.sql",
+      "sha256": "eff354927ca5d1b9bbb17de090561076426efba6b78c214ac70e3c2623e1b2c6"
+    },
+    {
+      "ordinal": 7,
+      "query": "SELECT * FROM ALL_GOVS_NAMES",
+      "object": "dbo.ALL_GOVS_NAMES",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.ALL_GOVS_NAMES.Table.sql",
+      "sha256": "056def27e0a24ff11724aa5cfec6b9d07d94358466991d3db742af074629d8d0"
+    },
+    {
+      "ordinal": 8,
+      "query": "SELECT * FROM ALL_GOVS_ALLIANCES",
+      "object": "dbo.ALL_GOVS_ALLIANCES",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.ALL_GOVS_ALLIANCES.Table.sql",
+      "sha256": "e37190ed2d92445fe8e907d6be91b4675211c862be96e1ca0f2ef8acf6c3dbe3"
+    },
+    {
+      "ordinal": 9,
+      "query": "SELECT * FROM [dbo].[v_TARGETS_FOR_UPLOAD]",
+      "object": "dbo.v_TARGETS_FOR_UPLOAD",
+      "explicit_database": null,
+      "explicit_schema": true,
+      "source": "sql_schema/dbo.v_TARGETS_FOR_UPLOAD.View.sql",
+      "sha256": "e047e79c92fb2e0fb55254f1b25a544af5d8120a36a7388c034d5e2d0b79742f"
+    },
+    {
+      "ordinal": 10,
+      "query": "SELECT * FROM INACTIVE_GOVERNORS",
+      "object": "dbo.INACTIVE_GOVERNORS",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.INACTIVE_GOVERNORS.Table.sql",
+      "sha256": "948dac365a2dea6bcbc7824e39737673df136e6fd80f740e9676beb1d52290eb"
+    },
+    {
+      "ordinal": 11,
+      "query": "SELECT * FROM SCAN_LIST",
+      "object": "dbo.SCAN_LIST",
+      "explicit_database": null,
+      "explicit_schema": false,
+      "source": "sql_schema/dbo.SCAN_LIST.Table.sql",
+      "sha256": "63e1c62f0d018f55e452ab32bed05f1fbcdab1de3faf79cfc54cb800ae1ae3cf"
+    },
+    {
+      "ordinal": 12,
+      "query": "SELECT [GovernorID], LTRIM(RTRIM([GovernorName])) AS GovernorName FROM [ROK_TRACKER].[dbo].[ALL_GOVS]",
+      "object": "dbo.ALL_GOVS",
+      "explicit_database": "ROK_TRACKER",
+      "explicit_schema": true,
+      "source": "sql_schema/dbo.ALL_GOVS.Table.sql",
+      "sha256": "eff354927ca5d1b9bbb17de090561076426efba6b78c214ac70e3c2623e1b2c6"
+    },
+    {
+      "ordinal": 13,
+      "query": "SELECT * FROM [ROK_TRACKER].[dbo].[v_PlayerAccounts_Migrate]",
+      "object": "dbo.v_PlayerAccounts_Migrate",
+      "explicit_database": "ROK_TRACKER",
+      "explicit_schema": true,
+      "source": "sql_schema/dbo.v_PlayerAccounts_Migrate.View.sql",
+      "sha256": "a92ac5085d5f9aedc36cda86ec7213bebe4442ba7b4f4c27995b09feb3af6e0a"
+    }
+  ],
+  "constraints": [
+    "Operator-approved direct-privilege application model replaces module-signing isolation.",
+    "Application credentials are trusted for the broader reviewed legacy database/schema/server rights; Discord/operator controls and SQL coordination remain required.",
+    "No certificate/signature requirement, no db_owner/sysadmin/CONTROL SERVER, grant option or impersonation.",
+    "Exact source module/owner/SET/context and metadata checks retained; SQL administrator observations cannot establish future application tokens.",
+    "master xp permissions require the same SID-bound application user; no xp_cmdshell enablement, proxy change or operational job rights implied."
+  ],
+  "compatibility_forms": "deploy/export_legacy_module_compatibility_forms.json",
+  "compatibility_forms_sha256": "2d20b6878f26bd90266b05bcf3048d885ebfdd729e89f0c20ef012f8253d5527",
+  "permission_model": "direct_application_v1"
+}
