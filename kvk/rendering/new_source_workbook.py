@@ -260,11 +260,21 @@ def partition_workbook(manifest, *, max_cells=9_000_000, max_rows=MAX_ROWS):
             or total < 0
         ):
             raise ValueError("Invalid reader manifest dimensions/version.")
+        atomic = spec.get("logical_key") == "links"
+        if atomic and (
+            total > max_rows - HEADER_ROW
+            or max(HEADER_ROW + 1, total + HEADER_ROW) * width > max_cells
+        ):
+            raise ValueError("Report Links exceeds single-sheet workbook capacity.")
         while True:
             if len(current) >= (199 if not bins else 200):
                 bins.append(current)
                 current, cells = [], 0
             available = min(max_rows - HEADER_ROW, (max_cells - cells) // width - HEADER_ROW)
+            if atomic and available < max(1, total):
+                bins.append(current)
+                current, cells = [], 0
+                continue
             if available < max(1, min(total - offset, 1)):
                 if not current:
                     raise ValueError("Reader columns exceed workbook capacity.")

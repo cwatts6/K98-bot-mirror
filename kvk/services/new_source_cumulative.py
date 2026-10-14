@@ -37,7 +37,8 @@ def entity_records(snapshot, sheet, kind):
     rows = sorted(
         snapshot["envelope"]["aggregates"]["SourceCampReportRow"], key=lambda r: r["CampID"]
     )
-    rows.sort(key=lambda r: (r["dkp"] is not None, r["dkp"] or Decimal(0)), reverse=True)
+    if snapshot["envelope"]["publication"]["AggregateState"] != "final_unavailable":
+        rows.sort(key=lambda r: (r["dkp"] is not None, r["dkp"] or Decimal(0)), reverse=True)
     return {r["CampID"]: record for r, record in zip(rows, records, strict=True)}
 
 

@@ -159,6 +159,9 @@ def _entity_sheet(selection, snapshot, kind, issues):
             source_rows, key=lambda r: r["Kingdom" if kind == "kingdom" else "CampID"]
         )
         source_rows.sort(key=lambda r: (r["dkp"] is not None, r["dkp"] or Decimal(0)), reverse=True)
+    if terminal:
+        identity = {"player": "GovernorID", "kingdom": "Kingdom", "camp": "CampID"}[kind]
+        source_rows = sorted(source_rows, key=lambda row: row[identity])
     powers = {r["GovernorID"]: r for r in snapshot["player_powers"]}
     if kind == "player" and (
         len(powers) != len(snapshot["player_powers"])

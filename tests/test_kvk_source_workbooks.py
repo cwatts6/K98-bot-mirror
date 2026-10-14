@@ -613,7 +613,10 @@ def test_excel_report_title_is_literal_and_oversize_text_is_rejected():
 
 def test_row_partition_headers_are_repeated_with_exact_row_coverage():
     generation = build_workbook_generation(build(fixture(names=("Pass 4",))))
-    parts = partition_workbook(generation.manifest(), max_rows=8)
+    manifest = {
+        name: spec for name, spec in generation.manifest().items() if spec["logical_key"] != "links"
+    }
+    parts = partition_workbook(manifest, max_rows=8)
     pieces = [p for part in parts for p in part if p["table"] == "Pass 4 Players"]
     assert len(pieces) == 2
     assert [(p["offset"], p["rows"]) for p in pieces] == [(0, 2), (2, 2)]
@@ -708,3 +711,26 @@ def test_column_width_authority_rejects_unbounded_or_unrelated_mutations(bad):
     instruction.update(bad)
     with pytest.raises(ProtocolError):
         validate_reader_batch("updateDimensionProperties", instruction)
+
+
+def test_report_links_moves_whole_to_next_workbook_and_refuses_oversize():
+    generation = build_workbook_generation(build(fixture(names=("Pass 4",))))
+    spec = generation.manifest()["Report Links"]
+    manifest = {
+        "Filler": dict(spec, logical_key="filler", columns=100, rows=100, order=0),
+        "Report Links": dict(spec, rows=200, order=1),
+    }
+    parts = partition_workbook(manifest, max_cells=11_000)
+    navigation = [
+        (i, piece)
+        for i, part in enumerate(parts)
+        for piece in part
+        if piece["table"] == "Report Links"
+    ]
+    assert len(navigation) == 1
+    index, piece = navigation[0]
+    assert index == 2 and piece["offset"] == 0 and piece["rows"] == 200
+    for bad in ({"max_cells": 11_000, "max_rows": 205}, {"max_cells": 11_000}):
+        oversized = {"Report Links": dict(spec, rows=200 if "max_rows" in bad else 3000)}
+        with pytest.raises(ValueError, match="Report Links exceeds"):
+            partition_workbook(oversized, **bad)

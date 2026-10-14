@@ -133,3 +133,5 @@ precede any future authorized reader activation. Preserve old publications,
 snapshots, receipts and outputs for audit/rollback.
 
 Latest review corrections blank fighting values and ranks in individual reports whose pinned stream is final unavailable, while retaining identities, independent Baseline Power and the immutable source audit. Comparisons blank that stream/period and cumulative reports remain incomplete. Independent streams remain unchanged. Shared source links now use the four-column Report Links support sheet. The complete fixture therefore contains 63 reports plus directory; the earlier real Google acceptance above covered 62 reports before this navigation correction. The new links are verified by offline typed Google API readback and Excel serialization.
+
+Unavailable reports use stable entity-ID order, never retained DKP order. Report Links stays in one physical sheet and moves intact to another workbook when needed. If it exceeds a single sheet or workbook capacity, export fails before writing rather than splitting shared navigation.

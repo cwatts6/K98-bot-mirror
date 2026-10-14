@@ -175,6 +175,10 @@ def test_terminal_unavailable_comparison_blanks_only_its_stream_and_period(posit
         if (kind == "Players") == (stream == "PlayerState"):
             assert report.availability == "Unavailable"
             assert report.rows
+            if kind != "Camps":
+                identity_label = "Governor ID" if kind == "Players" else "Kingdom"
+                ids = [int(row[identity_label]) for row in records(result, title)]
+                assert ids == sorted(ids)
             for row in records(result, title):
                 assert row["Data Status"] == "Final unavailable"
                 assert all(
@@ -639,3 +643,24 @@ def test_one_fight_has_39_sheets_and_exact_comparison_schema():
         "Overall",
         "Data Notes",
     )
+
+
+def test_terminal_camp_order_and_cumulative_mapping_use_identity_not_retained_dkp():
+    from kvk.services.new_source_cumulative import entity_records
+
+    inputs = fixture(names=NAMES[:1])
+    selection, snapshot = inputs[0]
+    camp = snapshot["envelope"]["aggregates"]["SourceCampReportRow"][0]
+    second = dict(
+        camp, CampID=8, CampLabel="Camp 8", dkp=camp["dkp"] * 2, dkp_raw=str(camp["dkp"] * 2)
+    )
+    snapshot["envelope"]["aggregates"]["SourceCampReportRow"].insert(0, second)
+    snapshot["envelope"]["publication"]["AggregateState"] = "final_unavailable"
+    sync(snapshot)
+    projection = build(inputs)
+    report = sheet(projection, "Pass 4 Camps")
+    rows = records(projection, "Pass 4 Camps")
+    assert [r["Camp"] for r in rows] == ["North Camp", "Camp 8"]
+    facts = entity_records(snapshot, report, "camp")
+    assert facts[1]["Camp"] == "North Camp" and facts[8]["Camp"] == "Camp 8"
+    assert all(r["DKP"] is None for r in rows)
