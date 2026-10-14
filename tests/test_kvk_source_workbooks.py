@@ -195,6 +195,20 @@ def test_reader_delivery_typed_values_headers_ids_and_directory():
     )
 
 
+@pytest.mark.parametrize("reader", [False, True])
+def test_empty_index_with_unrelated_app_properties_is_bound_and_published(reader):
+    args, _, api = setup_reader() if reader else google_delivery()
+    api.files_data["fake-index"]["appProperties"] = {"externalNote": "preserve me"}
+    result = deliver_export(**args)
+    assert result.delivery_state == "confirmed", result
+    props = api.files_data["fake-index"]["appProperties"]
+    assert props["externalNote"] == "preserve me"
+    assert props["k98Role"] == "index"
+    assert props["k98Destination"]
+    assert api.values["fake-index", "Sheet1"][0][0] == args["generation"].key
+    assert args["transport"].verify(args["destination"], args["generation"].key)
+
+
 def test_shared_references_have_unique_links_and_duplicate_coordinates_are_rejected():
     projection = build(fixture(names=("Pass 4", "1st Altar")))
     navigation = next(s for s in projection.sheets if s.key == "links")

@@ -129,6 +129,34 @@ def build(inputs):
     return build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
 
 
+@pytest.mark.parametrize("scan", [None, 1])
+def test_shared_import_without_filename_keeps_navigation_and_missing_filename_note(scan):
+    from kvk.models.new_source_history import encode_fact, hash_row
+    from kvk.rendering.new_source_workbook import build_workbook_generation, excel_bundle
+
+    inputs = fixture(names=NAMES[:2])
+    snapshot, rows = history()
+    rows[0].update(source_file=None, scan=scan, notes=["Source filename unavailable."])
+    hasher = snapshot.hasher()
+    for row in rows:
+        hash_row(hasher, encode_fact(row))
+    snapshot = replace(snapshot, content_hash=hasher.digest())
+    result = build_checkpoint_projection(inputs, history_snapshot=snapshot, history_rows=rows)
+    source = records(result, "Source Files")[0]
+    assert source["Source File"] is None
+    assert "Source filename unavailable." in source["Notes"]
+    label = "Source filename unavailable" + (" (Scan 1)" if scan is not None else "")
+    navigation = sheet(result, "Report Links")
+    targets = [
+        link.target
+        for link in navigation.links
+        if navigation.rows[link.row][:2] == ("Source Files", label)
+    ]
+    assert len(targets) > 1
+    assert any(":cumulative:" in target for target in targets)
+    assert excel_bundle(build_workbook_generation(result))
+
+
 def test_checkpoint_support_issues_are_generated_once_without_losing_entity_issues():
     from kvk.models.new_source_history import encode_fact, hash_row
     from kvk.services.new_source_reader_service import build_reader_projection

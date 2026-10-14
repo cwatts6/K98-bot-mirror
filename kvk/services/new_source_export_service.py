@@ -1467,7 +1467,7 @@ class GoogleSheetsTransport:
                     body={"values": directory[offset : offset + self.batch_rows]},
                 )
             )
-        if not index.get("appProperties"):
+        if not any(k.startswith("k98") for k in index.get("appProperties", {})):
             self._bind(destination, key, index, "index", {})
 
     def _directory(self, files, key, layout):

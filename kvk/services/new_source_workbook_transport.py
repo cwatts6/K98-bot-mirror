@@ -231,7 +231,7 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                     fileId=file["id"], fields="id", body=dict(appProperties=dict(k98Stage="built"))
                 )
             )
-        if not index.get("appProperties"):
+        if not any(k.startswith("k98") for k in index.get("appProperties", {})):
             self._bind(destination, key, index, "index", {})
         directory = self._reader_directory(files, layout)
         self._write_cells(

@@ -201,7 +201,7 @@ def build_support(periods, reports, issues, history_rows, *, checkpoints=None):
                 continue
             source = records[row]
             label = source.get("Period") or (
-                source["Source File"]
+                (source["Source File"] or "Source filename unavailable")
                 + (" (Scan " + str(source["Scan"]) + ")" if source["Scan"] is not None else "")
             )
             result.append(ReaderLink(row, column, "links"))
