@@ -99,7 +99,7 @@ class ConfigPreparationRecoveryDAL:
         resources = rows(cursor)
         cursor.execute(
             "SELECT s.* FROM dbo.ExportExecutionStream s WITH (UPDLOCK,HOLDLOCK) WHERE "
-            "s.PreparationID=? OR s.ActiveAccountKey=? OR (s.State<>'closed' AND EXISTS ("
+            "s.PreparationID=? OR s.ActiveAccountKey=? OR (s.State NOT IN ('closed','read_contained') AND EXISTS ("
             "SELECT 1 FROM OPENJSON(s.ScopeJson,'$.resources') WITH (ResourceKey varchar(256) '$.key') x "
             "JOIN dbo.ExportPreparationResource m ON m.ResourceKey=x.ResourceKey COLLATE Latin1_General_100_BIN2 "
             "WHERE m.PreparationID=?)) ORDER BY CONVERT(varchar(36),s.StreamID)",
@@ -148,13 +148,44 @@ class ConfigPreparationRecoveryDAL:
         with transaction(self.connect) as cursor:
             return self._snapshot(cursor, target)
 
-    def settle(self, target, expected, audit):
+    def settle(self, target, expected, audit, *, containment=None):
         if not audit.get("actor") or not audit.get("reason"):
             raise ValueError("Recovery requires an actor and reason.")
         evidence = bounded_json(audit)
         with transaction(self.connect) as cursor:
             if self._snapshot(cursor, target) != expected:
                 raise SourceConflict("Recovery raced with current state; no claims released.")
+            if containment is not None:
+                # These transitions share the release transaction. Any CAS failure
+                # rolls back every dispatch fence and every reservation change.
+                for stream in expected["streams"]:
+                    seal = containment["streams"][stream["StreamID"]]
+                    cursor.execute(
+                        "EXEC dbo.usp_ExportExecutionStreamTransition @SessionID=?,@StreamID=?,"
+                        "@Action='contain_read',@ExpectedVersion=?,@AccountKey=?,@ObjectID=?,"
+                        "@OwnerID=?,@Fence=?,@ClaimVersion=?,@ChildIdentity=?,@ClosureHash=?,"
+                        "@ClosureReference=?,@EventDigest=?,@LastSequence=?",
+                        stream["SessionID"],
+                        stream["StreamID"],
+                        stream["Version"],
+                        target.account,
+                        target.preparation_id,
+                        target.owner,
+                        target.fence,
+                        stream["ClaimVersion"],
+                        stream["ChildIdentity"],
+                        bytes.fromhex(containment["sha256"]),
+                        containment["reference"],
+                        bytes.fromhex(seal["event_digest"]),
+                        seal["last_sequence"],
+                    )
+                    row = one(cursor)
+                    if (
+                        not row
+                        or row["State"] != "read_contained"
+                        or row["Version"] != stream["Version"] + 1
+                    ):
+                        raise SourceConflict("Read dispatch containment was not acknowledged.")
             # Unavailable records an abandoned read, never successful health.
             # Owner/fence and immutable membership remain as historical evidence.
             _cas(

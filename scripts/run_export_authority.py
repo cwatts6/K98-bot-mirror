@@ -602,9 +602,13 @@ class AuthorityBroker:
             if set(message) != {"version", "action", "stream_id"}:
                 raise ValueError("Exact stream closure message required.")
             return self.authority.close_stream(uuid_text(message["stream_id"]))
-        if action in {"inspect_configuration_recovery", "apply_configuration_recovery"}:
+        if action in {
+            "inspect_configuration_recovery",
+            "apply_configuration_recovery",
+            "contain_configuration_recovery",
+        }:
             expected = {"version", "action", "preparation_id"}
-            if action == "apply_configuration_recovery":
+            if action != "inspect_configuration_recovery":
                 expected |= {"token", "actor", "reason"}
             if set(message) != expected:
                 raise ValueError("Exact configuration recovery message required.")
@@ -612,8 +616,8 @@ class AuthorityBroker:
             if self.boundary is not None:
                 self.boundary.recheck()
             from services.config_recovery_authority import (
-                inspect_configuration_recovery,
                 apply_configuration_recovery,
+                inspect_configuration_recovery,
             )
 
             if action == "inspect_configuration_recovery":
@@ -632,6 +636,9 @@ class AuthorityBroker:
                 message["token"],
                 message["actor"],
                 message["reason"],
+                action="contain_read"
+                if action == "contain_configuration_recovery"
+                else "release_read",
             )
         if action == "recover_configuration":
             if set(message) != {"version", "action", "stream_id"}:

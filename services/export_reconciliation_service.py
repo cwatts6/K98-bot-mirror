@@ -52,6 +52,23 @@ class ClosedStreamVerifier:
     ):
         uuid_text(stream_id)
         stream = self.dal.read_stream(stream_id)
+        if stream is not None and stream["State"] == "read_contained":
+            if (
+                str(stream["StreamID"]).lower() != stream_id
+                or not allow_failed_reads
+                or require_observation
+            ):
+                raise SourceConflict(
+                    "An isolated read cannot establish a fresh provider observation."
+                )
+            from services.config_read_containment import verify_contained_read
+
+            seal = verify_contained_read(
+                self.dal, self.store, stream, account=account, registration_hash=registration_hash
+            )
+            return ClosedStreamEvidence(
+                stream_id, stream["Version"], seal["last_sequence"], 0, 0, seal["event_digest"]
+            )
         if (
             stream is None
             or str(stream["StreamID"]).lower() != stream_id
