@@ -454,7 +454,22 @@ The publication catalogue already selects exact physical destination history: a 
 history does not enter an unrelated file's catalogue. A temporary SQL regression exercises this
 boundary without relaxing historical evidence or declaring an isolated writer terminated.
 
-This foundation requires fresh separate Bot and SQL Changes reviews before draft PR handoff.
+The 768-test affected run passed. The full suite recorded 7,922 passes, 342 skips and eight
+subtest passes; two stale test assertions were then corrected (source inventory count and
+private-evidence error wording). The final 117-test focused rerun passed, including a new
+SQL-compiled comparison of the immutable migration 007 predecessor and migration 008
+postcondition. It caught and fixed a generated predecessor check that wrongly used the new
+constraint for both images. The remaining full-suite failure is the pre-existing missing
+`.github/workflows/command-governance.yml` in the scrubbed mirror. No production logs changed.
+
+Separate Changes reviews finalized and their sealed artifacts were read back: Bot
+`a8d5c130-2a45-4185-b560-b11b2fbb4d21` (16 source files, `bef9b5a3..f5bebc17`), SQL
+`b943ba88-45ea-410b-b314-224bf4e8fd9b` (10 source files, `79987f7b..5078b513`) and the
+one-line migration correction `fc11619b-7fbb-4cd3-90fa-e8137b5f83a0`
+(`5078b513..48676668`). No security findings were reported. The Bot follow-up changes only
+regression tests and this evidence record; a further security discovery scan is skipped because
+they do not alter executable application, authority, permissions, SQL or deployment behavior.
+
 The complete guided workflow remains active implementation scope: replacement enrollment and
 registration, retained-input continuation, fresh publication verification, guided UI wiring,
 refused-stage linkage and continuation, and earlier rollover owners. The remaining P0/P1

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 
 import pytest
 
@@ -14,6 +15,7 @@ contained_job = fixture_module.contained_job
 pytestmark = pytest.mark.skipif(
     os.getenv("K98_TARGET_CONTAINMENT_SQL") != "1", reason="Explicit temporary SQL opt-in"
 )
+PREDECESSOR = "79987f7bd5e40aaecc66a36bcbd8ecdc93522667"
 
 
 def test_migration_postimages_match_engine_definitions_and_pinned_sources(contained_job):
@@ -63,6 +65,23 @@ def test_migration_postimages_match_engine_definitions_and_pinned_sources(contai
             next(v["sha256"] for v in manifest if v["name"] == name)
             == hashlib.sha256(source.encode()).hexdigest()
         )
+        if index < 4:
+            predecessor = (
+                subprocess.check_output(
+                    ["git", "show", f"{PREDECESSOR}:sql_schema/{name}.StoredProcedure.sql"],
+                    cwd=root,
+                )
+                .decode("utf-8-sig")
+                .replace("\r\n", "\n")
+            )
+            predecessor = (
+                predecessor[predecessor.index("CREATE PROCEDURE") :]
+                .strip()
+                .removesuffix("GO")
+                .rstrip()
+                + "\n"
+            )
+            assert "0x" + hashlib.sha256(predecessor.encode("utf-16-le")).hexdigest() in text
     # The migration's compiled trusted post-constraint must equal the actual
     # authoritative table constraint, not merely contain the new state text.
     start = text.index("CREATE TABLE #K98TargetStateBefore")
@@ -75,3 +94,24 @@ def test_migration_postimages_match_engine_definitions_and_pinned_sources(contai
         "SELECT definition FROM tempdb.sys.check_constraints WHERE parent_object_id=OBJECT_ID('tempdb..#K98TargetStateAfter')"
     ).fetchval()
     assert actual == expected
+    # Compile the immutable predecessor independently. Comparing only the
+    # postimage missed a generator bug that inserted it into both checks.
+    previous = (
+        subprocess.check_output(
+            ["git", "show", f"{PREDECESSOR}:migrations/20261015_007_read_dispatch_containment.sql"],
+            cwd=root,
+        )
+        .decode("utf-8-sig")
+        .replace("\r\n", "\n")
+    )
+    start = previous.index("CREATE TABLE #K98ReadStateAfter")
+    end = previous.index("DECLARE @Before", start)
+    sql.execute(previous[start:end])
+    before = sql.execute(
+        "SELECT definition FROM tempdb.sys.check_constraints WHERE parent_object_id=OBJECT_ID('tempdb..#K98TargetStateBefore')"
+    ).fetchval()
+    predecessor = sql.execute(
+        "SELECT definition FROM tempdb.sys.check_constraints WHERE parent_object_id=OBJECT_ID('tempdb..#K98ReadStateAfter')"
+    ).fetchval()
+    assert before == predecessor
+    assert before != actual
