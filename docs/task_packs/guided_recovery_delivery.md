@@ -39,7 +39,12 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   SQL at activation, source checks and affected regressions pass 625 tests.
   The standard baseline run recorded 8,065 passes, 446 skips, one deselection and
   eight subtest passes; its one stale-proposal failure is fixed and covered by the
-  passing affected run. The correction Changes review and publication remain.
+  passing affected run. The correction Changes review sealed with no findings;
+  the final compatibility review also sealed with no findings across its one
+  source file (247,530 measured total tokens). The final 85-test run passes,
+  including global exemptions and real SQL integer-staging round trips.
+  SQL configuration replacement is published as draft PR #117. Bot publication
+  is the next handoff; the remaining P0 workstreams below stay active.
 
 - Guided saved multi-page admin forms, strict file-link parsing, fresh read-only
   verification, original-journal finish/discard buttons, sealed activation and
