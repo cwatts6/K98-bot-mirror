@@ -157,6 +157,9 @@ class ReplacementActivationService:
             registration_sha256=projected["registration_sha256"],
             mapping=proposal["mapping"],
             files=observed["files"],
+            input_commitment=self.proposals.containment.inspect(proposal["job_id"])[
+                "input_commitment"
+            ],
             business_resolved=False,
         )
 

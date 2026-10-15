@@ -55,6 +55,11 @@ def rebind_snapshot(original, *, job, activation):
         activation_id=activation["activation_id"],
         replacement_id=activation["replacement_id"],
         original_config_sha256=old["generation"]["config_sha256"],
+        **(
+            {"input_evidence": activation["input_evidence"]}
+            if "input_evidence" in activation
+            else {}
+        ),
     )
     generation = deepcopy(old["generation"])
     generation.update(

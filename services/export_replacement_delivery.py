@@ -19,10 +19,12 @@ class ReplacementDelivery:
         store=None,
         source_plan=None,
         next_activation=None,
+        verify_input=None,
     ):
         self.dal, self.discovery, self.verify_delivery = dal, discovery, verify_delivery
         self.store, self.source_plan = store, source_plan
         self.next_activation = next_activation
+        self.verify_input = verify_input
 
     def inspect(self, job_id, activation, *, _visited=frozenset()):
         if job_id in _visited or len(_visited) >= 64:
@@ -45,16 +47,25 @@ class ReplacementDelivery:
             )
         snapshot = self.discovery.job(receipt["ReplacementJobID"])
         job = snapshot["job"]
+        original = self.discovery.job(job_id)["job"]
         lineage = json.loads(job["ProvenanceJson"]).get("replacement", {})
         if (
             receipt["OriginalJobID"] != job_id
             or receipt["ActivationID"] != activation["activation_id"]
             or receipt["ReplacementInputHash"] != job["InputHash"]
+            or receipt["OriginalInputHash"] != original["InputHash"]
+            or job["ConsumerKind"] != original["ConsumerKind"]
+            or (
+                job["ConsumerKind"] == "new_source"
+                and (job["InputHash"], job["IntentID"])
+                != (original["InputHash"], original["IntentID"])
+            )
             or lineage.get("original_job_id") != job_id
             or lineage.get("activation_id") != activation["activation_id"]
             or lineage.get("original_input_sha256") != receipt["OriginalInputHash"]
         ):
             raise SourceConflict("Replacement delivery differs from its immutable input lineage.")
+        root = self.verify_input(snapshot, activation) if self.verify_input is not None else None
         resolved = False
         if job["State"] == "confirmed":
             self.verify_delivery(snapshot, activation)
@@ -62,6 +73,8 @@ class ReplacementDelivery:
         elif snapshot.get("isolated_targets") and self.next_activation is not None:
             successor = self.next_activation(job["JobID"])
             if successor is not None:
+                if root is not None:
+                    successor = dict(successor, content_commitment=root)
                 result = self.inspect(job["JobID"], successor, _visited=_visited)
                 # Actions belong to the linked incident's exact evidence, never
                 # to the original incident's decision or registration.

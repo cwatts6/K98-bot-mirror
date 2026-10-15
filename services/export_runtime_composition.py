@@ -474,6 +474,11 @@ class ExportRuntime(RuntimeLifetime):
                 original_input_sha256=job["InputHash"],
                 activation_id=activation["activation_id"],
                 replacement_id=activation["replacement_id"],
+                **(
+                    {"input_evidence": activation["input_evidence"]}
+                    if "input_evidence" in activation
+                    else {}
+                ),
             ),
         )
         return JobSpec(

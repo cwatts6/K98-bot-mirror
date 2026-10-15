@@ -5,12 +5,15 @@ requests use bundled discovery, and no HTTP request is allowed to execute.
 """
 
 from copy import deepcopy
+import json
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 
+from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_execution_authority import ExecutionUncertain
 from services.export_execution_protocol import ProviderRequest, encode
 from services.export_provider_adapter import LegacyProviderJob
@@ -135,6 +138,8 @@ def prepare_publication(r):
     final = ReplacementAuthority.__new__(ReplacementAuthority)
     final.connect, final.authority = r.f.connect, authority
     r.delivery.verify_delivery = final.verify_delivery
+    r.delivery.verify_input = final.verify_input
+    r.final_verifier = final
     r.publish = lambda: r.worker(
         r.running, r.claim, r.coordinator, Mock(), Event(), r.spools[r.running["SpoolKey"]]
     )
@@ -168,4 +173,78 @@ def test_lost_provider_write_stays_open_with_link_to_replacement_recovery(public
     assert not result["resolved"] and result["stage"] == "replacement_needs_attention"
     assert result["job_id"] == r.claim.job_id
     assert sum(q.operation == "sheets.values.update" for q in r.provider.sent) == 1
+    r.http.request.assert_not_called()
+
+
+def test_waiting_legacy_export_publishes_and_verifies_its_private_input_decision(publication):
+    from kvk.dal.new_source_import_dal import one
+    from services.export_replacement_projection import continuation_activation
+    from services.legacy_export_snapshot_service import LegacySnapshot, OutputSection, output_digest
+
+    r = publication
+    r.publish()
+    assert r.delivery.inspect(r.f.job, r.activated)["resolved"]
+    r.f.sql.autocommit = True
+    original = one(r.f.sql.execute("SELECT * FROM #ExportJob WHERE JobID=?", r.f.job))
+    waiting_id = str(uuid4())
+    old = LegacySnapshot.load(r.f.original_payload).metadata()
+    sections = (OutputSection("old-file:Report", ("ID", "Value"), ((2, "waiting input"),)),)
+    waiting = LegacySnapshot.capture(
+        consumer="scan_data",
+        preparation_id=str(uuid4()),
+        generation=dict(old["generation"], output_sha256=output_digest(sections)),
+        config=old["config"],
+        provenance=old["provenance"],
+        sections=sections,
+    )
+    spool = r.delivery.store.put(waiting.payload)
+    r.f.insert(
+        "ExportJob",
+        dict(
+            original,
+            JobID=waiting_id,
+            State="waiting",
+            OwnerID=None,
+            Fence=0,
+            Version=1,
+            EnqueueSequence=50,
+            InputHash=bytes.fromhex(spool.sha256),
+            SpoolKey=spool.key,
+            SpoolBytes=spool.byte_count,
+            ProvenanceJson=json.dumps(waiting.metadata()["generation"]),
+        ),
+    )
+    for row in r.f.sql.execute(
+        "SELECT ResourceKey FROM #ExportJobResource WHERE JobID=?", r.f.job
+    ).fetchall():
+        r.f.insert("ExportJobResource", dict(JobID=waiting_id, ResourceKey=row[0]))
+    activation = continuation_activation(
+        [r.activated], targets=list(r.activated["mapping"]), consumer="scan_data"
+    )
+    activation = r.final_verifier.seal_waiting_input(
+        r.delivery.discovery.job(waiting_id), activation
+    )
+    r.delivery.execute(
+        waiting_id,
+        activation,
+        "publish_replacement",
+        actor="recovery:" + str(uuid4()),
+        reason="Continue waiting retained export",
+    )
+    assert not r.delivery.inspect(waiting_id, activation)["resolved"]
+    r.claim = r.coordinator.claim_next("test-account", storage_owner="disk")
+    assert r.claim is not None
+    r.running = r.coordinator.authorize(r.claim)
+    r.publish()
+    assert r.delivery.inspect(waiting_id, activation)["resolved"]
+    assert r.provider.rows == dict(values=[["ID", "Value"], [2, "waiting input"]])
+    provenance = json.loads(r.running["ProvenanceJson"])
+    provenance["replacement"].pop("input_evidence")
+    r.f.sql.execute(
+        "UPDATE #ExportJob SET ProvenanceJson=? WHERE JobID=?",
+        json.dumps(provenance),
+        r.claim.job_id,
+    )
+    with pytest.raises(SourceConflict, match="input decision"):
+        r.delivery.inspect(waiting_id, activation)
     r.http.request.assert_not_called()

@@ -357,6 +357,17 @@ class ExportTargetContainment:
         return dict(
             outcome="targets_isolated",
             business_resolved=False,
+            input_commitment={
+                key: old_job[key]
+                for key in (
+                    "JobID",
+                    "AccountKey",
+                    "ConsumerKind",
+                    "InputHash",
+                    "IntentID",
+                    "ProvenanceJson",
+                )
+            },
             token=audit["token"],
             targets=audit["targets"],
             actor=audit["actor"],

@@ -13,6 +13,9 @@ from services.export_replacement_delivery import ReplacementDelivery
 
 def fixture():
     receipts, snapshots = {}, {}
+    snapshots["original"] = dict(
+        job=dict(JobID="original", InputHash="original", ConsumerKind="scan_data")
+    )
     for original, child, activation in (("original", "second", "a"), ("second", "third", "b")):
         receipts[original, activation] = dict(
             OriginalJobID=original,
@@ -26,6 +29,7 @@ def fixture():
                 JobID=child,
                 State="uncertain",
                 InputHash=child,
+                ConsumerKind="scan_data",
                 ProvenanceJson=json.dumps(
                     dict(
                         replacement=dict(
@@ -91,6 +95,7 @@ def test_chain_rejects_cycles():
             JobID="original",
             State="uncertain",
             InputHash="original",
+            ConsumerKind="scan_data",
             ProvenanceJson=json.dumps(
                 dict(
                     replacement=dict(

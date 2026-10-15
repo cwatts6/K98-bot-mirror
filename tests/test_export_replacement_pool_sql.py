@@ -31,7 +31,9 @@ def recovery(contained_job):
     config.update(account="test-account", storage_owner="disk")
     descriptor = dict(pool=0)
     config["pools"][0].update(
-        pool_id=pool_id, index_file_id="old-file", slot_file_ids=[f"old-slot-{i}" for i in range(1, 5)]
+        pool_id=pool_id,
+        index_file_id="old-file",
+        slot_file_ids=[f"old-slot-{i}" for i in range(1, 5)],
     )
     registered = config["pools"][0]
     f.sql.execute(
@@ -46,6 +48,20 @@ def recovery(contained_job):
     )
     service.registration = RuntimeRegistration(config)
     service.discovery = ExportRecoveryDAL(f.connect, registration=service.registration)
+    from tests.test_kvk_source_delivery import google_delivery
+
+    memory, _, _ = google_delivery()
+    generation = memory["generation"]
+    f.sql.execute(
+        "UPDATE #ExportJob SET ProvenanceJson=?",
+        json.dumps(
+            dict(
+                output_preflight=dict(
+                    generation_key=generation.key, manifest_hash=digest(generation.manifest()).hex()
+                )
+            )
+        ),
+    )
     return service, f, docs
 
 

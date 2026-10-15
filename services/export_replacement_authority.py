@@ -5,7 +5,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import ExportCoordinationDAL, identity
-from services.export_execution_protocol import encode
+from services.export_execution_protocol import decode, encode
 from services.export_manual_enrollment import manual_profile
 from services.export_recovery_dal import ExportRecoveryDAL
 from services.export_replacement_activation import (
@@ -148,6 +148,7 @@ class ReplacementAuthority:
             dal=delivery_dal,
             discovery=discovery,
             verify_delivery=self.verify_delivery,
+            verify_input=self.verify_input,
             next_activation=self.activated_replacement,
         )
         plans = ExportReplacementDAL(self.connect)
@@ -234,6 +235,42 @@ class ReplacementAuthority:
             raise SourceConflict("Replacement delivery registration history is incomplete.")
         return self.services(base, history=registrations).verify(row, base)
 
+    def verify_input(self, snapshot, activation):
+        """Authenticate every hop, including a failed replacement and waiting work."""
+        job = snapshot["job"]
+        commitment = activation.get("input_commitment")
+        lineage = json.loads(job["ProvenanceJson"]).get("replacement", {})
+        if activation.get("queued_continuation"):
+            evidence = lineage.get("input_evidence", {})
+            try:
+                raw = self.authority.store.read_reference(
+                    evidence["reference"], bytes.fromhex(evidence["sha256"])
+                )
+                decision = decode(raw)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise SourceConflict("Original queued input decision is unavailable.") from exc
+            if (
+                decision.get("kind") != "replacement_waiting_input/1"
+                or decision.get("activation_id") != activation["activation_id"]
+                or decision.get("mapping") != activation["mapping"]
+            ):
+                raise SourceConflict("Queued input decision belongs to another recovery.")
+            commitment = decision["input_commitment"]
+        if (
+            not isinstance(commitment, dict)
+            or commitment["AccountKey"] != job["AccountKey"]
+            or commitment["ConsumerKind"] != job["ConsumerKind"]
+            or commitment["JobID"] != lineage.get("original_job_id")
+            or commitment["InputHash"] != lineage.get("original_input_sha256")
+            or (
+                job["ConsumerKind"] == "new_source"
+                and (job["InputHash"], job["IntentID"])
+                != (commitment["InputHash"], commitment["IntentID"])
+            )
+        ):
+            raise SourceConflict("Publication has no authenticated original input commitment.")
+        return activation.get("content_commitment", commitment)
+
     def verify_delivery(self, snapshot, activation):
         from services.config_read_containment import stream_wire
         from services.export_coordination_dal import (
@@ -243,6 +280,7 @@ class ReplacementAuthority:
         from services.export_reconciliation_service import ClosedStreamVerifier
 
         job = snapshot["job"]
+        content = self.verify_input(snapshot, activation)
         if (
             job["State"] != "confirmed"
             or len(snapshot["attempts"]) != 1
@@ -276,6 +314,7 @@ class ReplacementAuthority:
             raise SourceConflict("Replacement receipt differs from its retained publication.")
         registration = RuntimeRegistration(activation["registration"])
         verifier = ClosedStreamVerifier(dal=self.authority.dal, store=self.authority.store)
+        mutations = []
         for entry in snapshot["streams"]:
             key = identity(entry["StreamID"])
             stream = self.authority.dal.read_stream(key)
@@ -294,6 +333,89 @@ class ReplacementAuthority:
                 registration_hash=bytes(stream["RegistrationHash"]),
                 require_observation=False,
             )
+            if stream["Purpose"] == "mutation":
+                mutations.append(key)
+        if len(mutations) != 1:
+            raise SourceConflict("Exactly one retained publication mutation stream is required.")
+        from services.export_replacement_publication import (
+            legacy_content,
+            publication_records,
+            source_content,
+        )
+
+        records = publication_records(self.authority.dal, self.authority.store, mutations[0])
+        expected = json.loads(content["ProvenanceJson"])
+        if job["ConsumerKind"] == "new_source":
+            if (job["InputHash"], job["IntentID"]) != (content["InputHash"], content["IntentID"]):
+                raise SourceConflict("Replacement chain changed its original source intent.")
+            pool = next(p for p in registration.value()["pools"] if p["index_file_id"] == files[0])
+            from kvk.services.new_source_export_service import SheetsRegistration
+
+            sheets = SheetsRegistration(
+                pool["index_file_id"],
+                tuple(pool["slot_file_ids"]),
+                pool["owner_email"],
+                registration.value()["service_account_email"],
+                pool["audience"],
+            )
+            remote = source_content(
+                records,
+                registration=sheets,
+                generation=document["generation"],
+                files=files,
+                fence=job["Fence"],
+                expected=expected.get("output_preflight", {}),
+                stream_id=mutations[0],
+            )
+            if remote != receipt["remote_id"]:
+                raise SourceConflict("Private final publication pointer differs from its receipt.")
+        else:
+            mappings = [activation["mapping"]]
+            if hasattr(self, "broker"):
+                _, history = self.authenticated_history()
+                mappings = [item["mapping"] for item in history]
+            legacy_content(records, mappings, expected.get("output_sha256"))
+
+    def seal_waiting_input(self, snapshot, activation):
+        """Persist the reviewed unstarted input before the Bot admits publication."""
+        if not activation.get("queued_continuation"):
+            return activation
+        job = snapshot["job"]
+        if (
+            snapshot["attempts"]
+            or snapshot["streams"]
+            or any(r["ActiveJobID"] == job["JobID"] for r in snapshot["resources"])
+        ):
+            raise SourceConflict("Only the reviewed unstarted input may acquire a decision seal.")
+        commitment = {
+            key: job[key]
+            for key in (
+                "JobID",
+                "AccountKey",
+                "ConsumerKind",
+                "InputHash",
+                "IntentID",
+                "ProvenanceJson",
+            )
+        }
+        raw = encode(
+            dict(
+                kind="replacement_waiting_input/1",
+                activation_id=activation["activation_id"],
+                mapping=activation["mapping"],
+                input_commitment=commitment,
+            )
+        )
+        stored = self.authority.store.put(raw)
+        evidence = dict(reference=identity(stored.key), sha256=stored.sha256)
+        if (
+            self.authority.store.read_reference(
+                evidence["reference"], bytes.fromhex(evidence["sha256"])
+            )
+            != raw
+        ):
+            raise SourceConflict("Queued input decision did not verify.")
+        return dict(activation, input_evidence=evidence)
 
     def dispatch(self, message):
         expected = {"version", "action", "job_id", "operation"}
@@ -331,6 +453,8 @@ class ReplacementAuthority:
                 _, state = workflow._reviewed(job_id, message["token"])
                 if state["activation"] is None:
                     raise SourceConflict("Verified activation is required before continuation.")
+                if state["activation"].get("queued_continuation"):
+                    return self.seal_waiting_input(state["snapshot"], state["activation"])
                 return state["activation"]
             if operation == "reconcile":
                 return workflow.reconcile(job_id, message["recovery_action"])

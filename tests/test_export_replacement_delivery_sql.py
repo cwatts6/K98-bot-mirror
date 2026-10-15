@@ -1,5 +1,6 @@
 from copy import deepcopy
 import hashlib
+import json
 import os
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -49,9 +50,10 @@ def recovery(contained_job, request):
         )
     original, _, _ = fixture()
     f.sql.execute(
-        "UPDATE #ExportJob SET InputHash=CAST(? AS binary(32)),SpoolBytes=?",
+        "UPDATE #ExportJob SET InputHash=CAST(? AS binary(32)),SpoolBytes=?,ProvenanceJson=?",
         hashlib.sha256(original.payload).digest(),
         len(original.payload),
+        json.dumps(original.metadata()["generation"]),
     )
     f.original_payload = original.payload
     return service, f, docs

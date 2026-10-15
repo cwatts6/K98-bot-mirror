@@ -51,9 +51,16 @@ Active implementation checkpoint (unpublished working changes on
   enrollment also accepts the intended hyphen in a canonical storage-owner ID.
 - SQL Changes reviews sealed successfully for `48676668..2dd649bf` (20 files)
   and its `2dd649bf..9dc3e42b` correction (3 files), with no reported vulnerabilities.
-  Bot review and final regression remain pending. An interrupted broad run is
-  not accepted as a pass. Its missing containment fixture was corrected; related
-  skip/admission failures pass in the sequential focused run. An unchanged
+  The Bot base Changes review also sealed successfully. Publication verification
+  now binds the original private input commitment to complete closed-journal
+  content, including chained replacements, waiting jobs and both source renderers.
+  Waiting work carries a private input decision through restart. Reader publication
+  records the same final grid-identity checks used by cold recovery. The resulting
+  correction is undergoing its own Changes review and focused regression run.
+  The standard suite before this correction passed 8,028 tests with 436 skips
+  and one explicit deselection. An earlier interrupted run is not counted.
+  Its missing containment fixture was corrected; related skip/admission failures
+  pass in the sequential focused run. An unchanged
   atomic-writer concurrency test separately produced Windows access-denied and
   remains a documented validation limitation, outside this replacement change.
 

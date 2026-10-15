@@ -143,11 +143,13 @@ def source_delivery(monkeypatch, request):
     )
     verifier = ReplacementAuthority.__new__(ReplacementAuthority)
     verifier.connect, verifier.authority = r.f.connect, r.service.authority
+    r.delivery_verifier = verifier
     r.delivery = ReplacementDelivery(
         dal=ReplacementDeliveryDAL(r.f.connect, coordinator),
         discovery=discovery,
         source_plan=runtime.replacement_source_plan,
         verify_delivery=verifier.verify_delivery,
+        verify_input=verifier.verify_input,
     )
     r.actor, r.reason = "recovery:" + str(uuid4()), "Publish retained original source"
     r.delivery.execute(r.f.job, r.activated, "publish_replacement", actor=r.actor, reason=r.reason)
@@ -164,9 +166,9 @@ def source_delivery(monkeypatch, request):
         r.running = coordinator.authorize(r.claim)
         pool = runtime.pools.snapshot(r.activated["replacement_id"])
         sheets_registration = registration.sheets(pool)
-        api.files_data.clear()
-        api.grids.clear()
         for file_id in r.activated["mapping"].values():
+            if file_id in api.files_data:
+                continue
             api.files_data[file_id] = dict(
                 deepcopy(template),
                 id=file_id,
@@ -296,6 +298,31 @@ def test_complete_replacement_pool_publishes_retained_intent_and_verifies_delive
         == 4
     )
     r.weights.assert_not_called()
+
+
+def test_matching_sql_lineage_cannot_replace_original_private_commitment(source_delivery):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    r = source_delivery
+    r.publish()
+    provenance = json.loads(
+        r.f.sql.execute(
+            "SELECT ProvenanceJson FROM #ExportJob WHERE JobID=?", r.claim.job_id
+        ).fetchval()
+    )
+    provenance["replacement"]["original_input_sha256"] = "ab" * 32
+    r.f.sql.execute(
+        "UPDATE #ExportJob SET ProvenanceJson=? WHERE JobID=?",
+        json.dumps(provenance),
+        r.claim.job_id,
+    )
+    r.f.sql.execute(
+        "UPDATE #ExportReplacementDelivery SET OriginalInputHash=? WHERE OriginalJobID=?",
+        bytes.fromhex("ab" * 32),
+        r.f.job,
+    )
+    with pytest.raises(SourceConflict, match="lineage"):
+        r.delivery.inspect(r.f.job, r.activated)
 
 
 def test_lost_source_write_links_repair_without_replaying_original(source_delivery):
@@ -458,6 +485,8 @@ def recover_failed_replacement(r, monkeypatch):
 def test_waiting_source_queues_its_own_retained_intent_after_blocker_finishes(
     source_delivery, monkeypatch, replacement_failed
 ):
+    from dataclasses import replace
+
     from kvk.dal.new_source_import_dal import digest
     from services.export_replacement_projection import continuation_activation
 
@@ -472,6 +501,19 @@ def test_waiting_source_queues_its_own_retained_intent_after_blocker_finishes(
     job = one(cursor)
     waiting_id, intent_id = str(uuid4()), str(uuid4())
     input_hash = digest("different committed source generation")
+    previous_generation = r.runtime.load_generation.return_value
+    waiting_generation = replace(
+        previous_generation,
+        selections=tuple(
+            replace(s, selection_version=s.selection_version + 1)
+            for s in previous_generation.selections
+        ),
+    )
+    r.runtime.load_generation.return_value = waiting_generation
+    monkeypatch.setattr(
+        "kvk.services.new_source_export_service.load_intent_generation",
+        lambda **kwargs: waiting_generation,
+    )
     intent = one(r.f.sql.execute("SELECT * FROM #SourceExportIntent"))
     r.f.insert(
         "SourceExportIntent",
@@ -495,7 +537,14 @@ def test_waiting_source_queues_its_own_retained_intent_after_blocker_finishes(
             Fence=0,
             Version=1,
             EnqueueSequence=50,
-            ProvenanceJson="{}",
+            ProvenanceJson=json.dumps(
+                dict(
+                    output_preflight=dict(
+                        generation_key=waiting_generation.key,
+                        manifest_hash=digest(waiting_generation.manifest()).hex(),
+                    )
+                )
+            ),
         ),
     )
     for key in r.f.sql.execute(
@@ -511,6 +560,9 @@ def test_waiting_source_queues_its_own_retained_intent_after_blocker_finishes(
     monkeypatch.setattr("kvk.dal.source_update_dal.read_export_intent", retained_intent)
     activation = continuation_activation(
         history, targets=list(history[0]["mapping"]), consumer="new_source"
+    )
+    activation = r.delivery_verifier.seal_waiting_input(
+        r.delivery.discovery.job(waiting_id), activation
     )
     r.delivery.execute(
         waiting_id,
@@ -532,3 +584,6 @@ def test_waiting_source_queues_its_own_retained_intent_after_blocker_finishes(
         == len(history) + 1
     )
     r.weights.assert_not_called()
+    r.prepare_publication(activation)
+    r.publish()
+    assert r.delivery.inspect(waiting_id, activation)["resolved"]

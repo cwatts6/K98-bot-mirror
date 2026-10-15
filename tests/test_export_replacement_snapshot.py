@@ -14,7 +14,7 @@ from services.legacy_export_snapshot_service import (
 
 
 def fixture():
-    sections = (OutputSection("original-data", ("ID", "Value"), ((1, "retained"),)),)
+    sections = (OutputSection("old-file:Report", ("ID", "Value"), ((1, "retained"),)),)
     config = dict(
         destinations=["old-file"],
         queries=["original query"],
@@ -23,7 +23,7 @@ def fixture():
                 file_id="old-file",
                 tab="Report",
                 grid_id=7,
-                section="original-data",
+                section="old-file:Report",
                 format_requests=[
                     dict(
                         repeatCell=dict(

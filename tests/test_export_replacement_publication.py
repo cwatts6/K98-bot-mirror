@@ -11,6 +11,7 @@ import pytest
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_replacement_authority import ReplacementAuthority
 from services.legacy_export_snapshot_service import configuration_digest
+from tests.test_export_replacement_content import expected_hash, legacy_records
 from tests.test_export_runtime_composition import registration_fixture
 
 
@@ -60,6 +61,9 @@ def published(monkeypatch):
         Fence=7,
         Version=9,
         ConsumerKind="scan_data",
+        ProvenanceJson=json.dumps(
+            dict(replacement=dict(original_job_id="original", original_input_sha256="a" * 64))
+        ),
     )
     snapshot = dict(job=job, attempts=[attempt], streams=[dict(StreamID=stream_id)], resources=[])
     stream = dict(
@@ -100,6 +104,12 @@ def published(monkeypatch):
     authority.authority = SimpleNamespace(
         dal=SimpleNamespace(read_stream=lambda key: deepcopy(stream)), store=object()
     )
+    records = legacy_records()
+    for request, _ in records:
+        request.target = file_id
+    monkeypatch.setattr(
+        "services.export_replacement_publication.publication_records", lambda *args: records
+    )
     return SimpleNamespace(
         service=authority,
         snapshot=snapshot,
@@ -107,7 +117,18 @@ def published(monkeypatch):
         verifier=verifier,
         receipt=receipt,
         part=part,
-        activation=dict(registration=registration, mapping={"original": file_id}),
+        activation=dict(
+            registration=registration,
+            mapping={"old-file": file_id},
+            input_commitment=dict(
+                JobID="original",
+                AccountKey="account-a",
+                ConsumerKind="scan_data",
+                InputHash="a" * 64,
+                IntentID=None,
+                ProvenanceJson=json.dumps(dict(output_sha256=expected_hash())),
+            ),
+        ),
     )
 
 
@@ -164,3 +185,40 @@ def test_unverified_parts_and_retained_resource_keep_incident_open(published):
     p.snapshot["resources"].append(dict(ActiveJobID=p.snapshot["job"]["JobID"]))
     with pytest.raises(SourceConflict, match="ownership"):
         p.service.verify_delivery(p.snapshot, p.activation)
+
+
+@pytest.mark.parametrize("damage", ["missing", "hash", "activation", "mapping", "input"])
+def test_waiting_private_decision_cannot_be_missing_or_substituted(published, damage):
+    from services.export_execution_protocol import encode
+
+    p = published
+    activation_id = str(uuid4())
+    p.activation.update(queued_continuation=True, activation_id=activation_id)
+    evidence = dict(reference=str(uuid4()), sha256="d" * 64)
+    decision = dict(
+        kind="replacement_waiting_input/1",
+        activation_id=activation_id,
+        mapping=deepcopy(p.activation["mapping"]),
+        input_commitment=deepcopy(p.activation["input_commitment"]),
+    )
+    lineage = json.loads(p.snapshot["job"]["ProvenanceJson"])
+    lineage["replacement"]["input_evidence"] = evidence
+    store = Mock()
+    p.service.authority.store = store
+    store.read_reference.return_value = encode(decision)
+    p.snapshot["job"]["ProvenanceJson"] = json.dumps(lineage)
+    assert p.service.verify_input(p.snapshot, p.activation) == decision["input_commitment"]
+    if damage == "missing":
+        lineage["replacement"].pop("input_evidence")
+    elif damage == "hash":
+        evidence["sha256"] = "not-a-hash"
+    elif damage == "activation":
+        decision["activation_id"] = str(uuid4())
+    elif damage == "mapping":
+        decision["mapping"]["old-file"] = "another-file"
+    else:
+        decision["input_commitment"]["InputHash"] = "b" * 64
+    store.read_reference.return_value = encode(decision)
+    p.snapshot["job"]["ProvenanceJson"] = json.dumps(lineage)
+    with pytest.raises(SourceConflict):
+        p.service.verify_input(p.snapshot, p.activation)
