@@ -154,26 +154,35 @@ def test_pending_retirement_resumes_only_same_action_and_never_replays_unknown_c
     assert adapter.reconcile("source", action) == "not_applied"
 
 
-def test_damage_rebuild_uses_durable_repair_id_and_reads_receipt_after_ack_loss():
-    adapter, snapshot = job_fixture(state="confirmed", attempted=True)
+@pytest.mark.parametrize(
+    "outcome,state,kind",
+    [
+        ("damaged", "confirmed", "rebuild_damaged"),
+        ("absent", "failed", "retry_absent"),
+    ],
+)
+def test_recovery_export_uses_durable_repair_id_and_reads_receipt_after_ack_loss(
+    outcome, state, kind
+):
+    adapter, snapshot = job_fixture(state=state, attempted=True)
     job_id = snapshot["job"]["JobID"]
     action_id = str(uuid4())
     snapshot["job"]["ProvenanceJson"] = json.dumps(
-        dict(reconciliations=[dict(proof=dict(state="damaged"))])
+        dict(reconciliations=[dict(proof=dict(state=outcome))])
     )
     adapter.discovery.repairs.return_value = []
     adapter.rebuild_plan = Mock(
         return_value=dict(
             snapshot=dict(job={k: v for k, v in snapshot["job"].items() if k != "Stalled"}),
             actor="admin",
-            proof=dict(state="damaged"),
+            proof=dict(state=outcome),
         )
     )
     evidence, token, resolved = adapter.inspect(job_id)
-    assert not resolved and set(evidence["actions"]) == {"rebuild_damaged"}
+    assert not resolved and set(evidence["actions"]) == {kind}
     adapter.coordinator.admit_repair.side_effect = TimeoutError("commit acknowledgement lost")
     with pytest.raises(TimeoutError):
-        adapter.execute(job_id, "rebuild_damaged", token, "recovery:" + action_id, "replace damage")
+        adapter.execute(job_id, kind, token, "recovery:" + action_id, "recover export")
     repair_id, plan = adapter.coordinator.admit_repair.call_args.args
     assert repair_id == action_id and plan["actor"] == "recovery:" + action_id
     repair = dict(JobID=str(uuid4()), ProvenanceJson=json.dumps(dict(repair=plan)))
@@ -185,7 +194,7 @@ def test_damage_rebuild_uses_durable_repair_id_and_reads_receipt_after_ack_loss(
     )
     action = dict(
         ActionID=action_id,
-        ActionKind="rebuild_damaged",
+        ActionKind=kind,
         EvidenceHash=token,
         Reason="replace damage",
     )

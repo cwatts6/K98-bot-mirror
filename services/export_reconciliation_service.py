@@ -434,7 +434,7 @@ def observe_publication(
         or job["ConsumerKind"] != "new_source"
         or job["AccountKey"] != pool["AccountKey"]
         or (job["KVK_NO"], job["PoolEpoch"]) != (pool["ActiveKVK"], pool["Epoch"])
-        or job["State"] not in {"running", "uncertain", "confirmed"}
+        or job["State"] not in {"running", "uncertain", "confirmed", "failed"}
         or len(snapshot["attempts"]) != 1
         or digest(json.loads(pool["RegistrationJson"])).hex() != pool["RegistrationHash"]
     ):
@@ -497,7 +497,11 @@ def observe_publication(
         transport.observation_bindings = generation["reader_bindings"]
         transport.observation_index_id = generation["reader_index_id"]
     state, contents = "confirmed", None
-    if allow_absent and job["State"] in {"running", "uncertain"} and attempt["ReceiptJson"] is None:
+    if (
+        allow_absent
+        and job["State"] in {"running", "uncertain", "failed"}
+        and attempt["ReceiptJson"] is None
+    ):
         # This path additionally requires the closed catalogue to show that this
         # exact job never dispatched a mutation. A missing pointer alone never
         # supplies that fact, and SQL checks all job streams again at issue.
@@ -627,7 +631,7 @@ class PublicationProbe:
         origin_hash = self.origins.verify(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
         catalogue = CatalogueVerifier(dal=self.dal, store=self.store)
         history = catalogue.before_probe(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
-        allow_absent = snapshot["job"]["State"] in {"running", "uncertain"}
+        allow_absent = snapshot["job"]["State"] in {"running", "uncertain", "failed"}
         if allow_absent:
             with closing(
                 self.dal.read_catalogue(

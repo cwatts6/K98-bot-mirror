@@ -303,14 +303,15 @@ class SourceExportOperatorService:
         snapshot = self.coordinator.operator_snapshot(str(UUID(str(job_id))))
         proof = self.reconciler.probe(deepcopy(snapshot))
         if (
-            snapshot["job"]["State"] != "confirmed"
-            or proof.get("state") != "damaged"
+            (snapshot["job"]["State"], proof.get("state"))
+            not in {("confirmed", "damaged"), ("failed", "absent")}
+            or (proof.get("state") == "absent" and proof.get("no_delayed_effect") is not True)
             or proof.get("snapshot_hash") != digest(snapshot).hex()
             or proof.get("writer_terminated") is not True
             or not proof.get("evidence_id")
         ):
             raise SourceConflict(
-                "Repair requires confirmed damage and exact old-writer termination."
+                "Repair requires confirmed damage or verified absence, with exact old-writer termination and no delayed effect."
             )
         pool_context = snapshot["pool"]
         pool = pool_context["pool"]

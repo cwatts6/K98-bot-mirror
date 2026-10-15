@@ -147,3 +147,30 @@ and restart persistence. The authoritative ExportPreparation and ExportResource 
 were checked in the SQL source repository; this slice introduces no persistent SQL objects.
 Missing checkpoints, unverifiable output and all other remaining programme workflows above
 remain required implementation work. This slice does not claim full recovery completion.
+
+The capture/queue slice is [Bot PR 337](https://github.com/cwatts6/K98-bot-mirror/pull/337).
+336 affected tests and 74 log-isolation tests passed, including temporary SQL fault cases;
+the exact eight-source Changes review is sealed with no findings. Full-suite validation
+continues separately and is recorded in the PR.
+
+## Verified absent-publication retry
+
+An attempted new-source export settled as absent keeps its original failed attempt and
+quarantined parts. The recovery centre now offers **Retry verified absent export**:
+admin confirmation requests a fresh authority probe, complete closed journal verification
+with no dispatched mutation, current absence, original retained input and safe capacity.
+Only then can one separate RepairID export be admitted. The original attempt is never reset.
+Lost admission acknowledgements resolve from that exact repair receipt. Unknown writes
+remain in the distinct containment/reconciliation scope; they cannot use this action.
+
+The coordinated SQL change allows failed jobs to enter a read-only probe. Mutation admission
+stays running-only. The migration pins the exact installed predecessor/postimage and retains
+session, resource, ownership, membership and role checks. Bot source pins and updater
+transitions change with it. The action preserves existing quarantine rather than inventing
+a replacement history.
+
+During this review, the stream-close SQL gate was found to reject unfinished read prefixes
+before the private verifier can evaluate them. Completing that close gate with exact positive
+child closure and read-only membership is the next required focused P0 correction. It is
+distinct from missing/corrupt private evidence and lost-authority-process recovery, which
+remain required. No recheck-only path is considered completed programme coverage.
