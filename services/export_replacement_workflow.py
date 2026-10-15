@@ -349,9 +349,18 @@ class ReplacementWorkflow:
                     service = discard_service(self, lost["replacement_id"], check_id)
                     snapshot, _ = service._snapshot(check_id)
                     if snapshot["attempt"]["State"] == "discarded":
-                        checked = service.inspect(check_id)
+                        try:
+                            checked = service.inspect(check_id)
+                        except (SourceConflict, ValueError, KeyError, TypeError):
+                            # _state independently verified the complete terminal
+                            # read ledger and released ownership. Lost evidence
+                            # cannot prove this action succeeded, but must not
+                            # hide a later intact discard or replay the old one.
+                            continue
                         if checked["actor"] == actor and checked["reason"] == action["Reason"]:
                             return "verified"
+                if lost["checking"] is None:
+                    return "not_applied"
         if kind == "isolate_targets" and state["isolation"]["actor"] == actor:
             return "verified"
         if kind == "choose_replacements":

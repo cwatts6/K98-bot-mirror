@@ -9,6 +9,7 @@ from core.export_execution_host import PrivateEvidenceStore
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_evidence_recovery import EvidenceRecoveryAdapter
 from services.export_evidence_storage import EvidenceCopies
+from services.export_execution_authority import ExecutionUncertain
 from services.recovery_service import RecoveryService
 from tests.test_export_evidence_supersession_sql import (
     contained_job as contained_job,
@@ -169,10 +170,11 @@ def test_invalid_original_scope_cannot_release_or_replace(rpc, tmp_path, defect)
         r.f.sql.execute("UPDATE #ExportReplacementPlan SET MappingJson='[]'")
     r.f.sql.commit()
     if defect == "mapping":
-        with pytest.raises(SourceConflict):
+        with pytest.raises(ExecutionUncertain):
             r.recovery.review(ACTOR, r.row["IncidentID"])
     else:
-        apply(r, "discard_replacement_check")
+        with pytest.raises(ExecutionUncertain):
+            apply(r, "discard_replacement_check")
     assert (
         r.f.sql.execute("SELECT State FROM #ExportReplacementVerification").fetchval() == "checking"
     )
@@ -239,3 +241,70 @@ async def test_proposal_alert_button_opens_the_guided_form(rpc, tmp_path, monkey
     sent = interaction.followup.send.call_args.kwargs
     assert sent["ephemeral"]
     assert "Re-enter replacement links" in [b.label for b in sent["view"].children]
+
+
+def remove_read_receipt(r, tmp_path, check_id):
+    reference = str(
+        r.f.sql.execute(
+            "SELECT ReceiptReference FROM #ExportReplacementVerification WHERE VerificationID=?",
+            check_id,
+        ).fetchval()
+    ).lower()
+    for name in (UUID(reference).hex, "replica_" + UUID(reference).hex):
+        (tmp_path / name).unlink(missing_ok=True)
+
+
+def test_lost_discard_reply_and_receipt_still_offers_fresh_proposal(rpc, tmp_path, monkeypatch):
+    r = rpc
+    lose_proposal(r, tmp_path, "checking")
+    check_id = str(
+        r.f.sql.execute("SELECT VerificationID FROM #ExportReplacementVerification").fetchval()
+    ).lower()
+    original, lost = r.broker.dispatch, []
+
+    def dispatch(message):
+        result = original(message)
+        if (
+            message.get("operation") == "execute"
+            and message.get("step") == "discard_replacement_check"
+            and not lost
+        ):
+            lost.append(True)
+            remove_read_receipt(r, tmp_path, check_id)
+            raise ExecutionUncertain("Injected lost discard reply and receipt")
+        return result
+
+    monkeypatch.setattr(r.broker, "dispatch", dispatch)
+    row = apply(r, "discard_replacement_check")
+    assert not row["pending_action"]
+    assert row["evidence"]["outcome"] == "replacement_proposal_required"
+    r.runtime.failure = None
+    assert new_proposal(r)["evidence"]["outcome"] == "verification_required"
+    assert apply(r, "verify_replacements")["evidence"]["outcome"] == "activation_required"
+    assert (
+        r.f.sql.execute(
+            "SELECT Version FROM #ExportReplacementVerification WHERE VerificationID=?", check_id
+        ).fetchval()
+        == 2
+    )
+
+
+def test_older_lost_discard_receipt_does_not_hide_later_verified_discard(rpc, tmp_path):
+    r = rpc
+    r.runtime.failure = "drive.files.get"
+    apply(r, "verify_replacements")
+    apply(r, "discard_replacement_check")
+    first_id = str(
+        r.f.sql.execute("SELECT VerificationID FROM #ExportReplacementVerification").fetchval()
+    ).lower()
+    lose_proposal(r, tmp_path, "checking")
+    remove_read_receipt(r, tmp_path, first_id)
+    row = apply(r, "discard_replacement_check")
+    assert not row["pending_action"]
+    assert row["evidence"]["outcome"] == "replacement_proposal_required"
+    assert (
+        r.f.sql.execute(
+            "SELECT COUNT(*) FROM #ExportReplacementVerification WHERE State='discarded' AND Version=2"
+        ).fetchval()
+        == 2
+    )
