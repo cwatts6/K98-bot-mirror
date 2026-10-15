@@ -660,3 +660,29 @@ guided admin input/buttons remain unfinished in this branch. The new SQL objects
 changes still need a literal migration, source/permission pins and separate final Changes reviews.
 No provider calls, persistent SQL installation, production deployment or admin action exposure
 has occurred. The six current P0 workstreams remain open.
+# Lost replacement-read evidence delivery — 2026-10-15
+
+The `codex/guided-evidence-loss` slice adds proactive evidence incidents with a
+**Recover replacement check** button. For an unactivated replacement whose complete
+typed read ledger is settled and owns no reservations, the guided workflow offers
+**Run fresh read check**, then the existing verified activation and retained-input
+publication actions. Lost receipts remain unverified; a new complete private
+readback is required. Evidence already used by an activation cannot use this path.
+
+Validation: 44 affected temporary-SQL tests, three additional ownership/activation/
+confirmation cases and 71 admin/recovery/notification tests passed. Architecture,
+deferred-item, security-routing, lint, formatting, test selection, synthetic smoke
+imports and command registration passed. Operational log files were unchanged.
+The previous standard-suite checkpoint remains 8,115 passes; it was not repeated
+for this bounded follow-up. The separately recorded isolated UI-import fixture
+failure is unrelated and unchanged.
+
+Changes review `ba065c03-d438-4cb7-b04a-06b5210fd2ca` finalized successfully for
+`7fd1b17f..dfc3b52d`: all six source files reviewed, no reported findings, Deep off.
+The sealed artifacts were read back. This also confirms the review finalization
+path works. No persistent SQL installation or production/provider operation ran.
+
+P0 remains open. Lost proposal, containment and active registration-history
+evidence, earlier rollover phases, producer checkpoints and admission-refused
+continuation remain required implementation work, not deferred optimisations.
+
