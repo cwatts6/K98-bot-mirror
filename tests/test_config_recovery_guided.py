@@ -125,6 +125,37 @@ def test_transient_unverifiable_evidence_does_not_retire_pending_action():
     client.apply_configuration_recovery.assert_not_called()
 
 
+def test_authorized_automatic_policy_uses_same_durable_receipt_and_verification(monkeypatch):
+    client, dal, snapshot, source, _, _ = authority_fixture(monkeypatch, lost_ack=True)
+    adapter = ConfigReadRecoveryAdapter(dal, client, account="account-a", storage_owner="fixture")
+    store = Store()
+    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    row = service.review_source(ACTOR, adapter.kind, source)
+    result = service.recover_automatic(row["IncidentID"])
+    assert result["State"] == "resolved"
+    assert store.actions[0]["Actor"] == "system:guided_recovery"
+    assert store.actions[0]["State"] == "verified"
+    assert len(store.actions) == 1
+    dal.settle.assert_called_once()
+
+
+def test_automatic_policy_never_accepts_partial_import_or_unverifiable_read(monkeypatch):
+    from tests.test_guided_recovery import setup
+
+    service, import_dal, store, row = setup("partial")
+    assert service.recover_automatic(row["IncidentID"])["State"] == "open"
+    assert not store.actions and not import_dal.calls
+    client, dal, snapshot, source, _, stream = authority_fixture(monkeypatch)
+    stream["State"] = snapshot["streams"][0]["State"] = "open"
+    adapter = ConfigReadRecoveryAdapter(dal, client, account="account-a", storage_owner="fixture")
+    store = Store()
+    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    row = service.review_source(ACTOR, adapter.kind, source)
+    assert service.recover_automatic(row["IncidentID"])["State"] == "open"
+    assert not store.actions
+    dal.settle.assert_not_called()
+
+
 def test_broker_rejects_caller_authored_targets_and_binds_result(monkeypatch):
     from uuid import uuid4
 

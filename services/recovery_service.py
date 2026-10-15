@@ -68,6 +68,26 @@ class RecoveryService:
 
     def execute(self, actor, incident_id, revision, token, action, reason):
         self.authorize(actor)
+        return self._execute(
+            incident_id, revision, token, action, reason, f"discord:{actor.user_id}"
+        )
+
+    def recover_automatic(self, incident_id):
+        """Operator-approved policy: only adapters with a verified safe action opt in."""
+        row = self.refresh(incident_id)
+        action = getattr(self.adapters[row["SourceKind"]], "automatic_action", None)
+        if row["State"] == "resolved" or action not in row["evidence"]["actions"]:
+            return row
+        return self._execute(
+            incident_id,
+            row["Revision"],
+            row["EvidenceHash"],
+            action,
+            "Authority verified closed read-only execution and exact reservations",
+            "system:guided_recovery",
+        )
+
+    def _execute(self, incident_id, revision, token, action, reason, actor_identity):
         row = self.refresh(incident_id)
         if row["State"] == "resolved":
             return row
@@ -79,7 +99,7 @@ class RecoveryService:
         if action not in row["evidence"]["actions"]:
             raise SourceConflict("This action is not permitted by the current evidence.")
         action_id, acquired = self.store.claim(
-            incident_id, revision, token, action, f"discord:{actor.user_id}", reason
+            incident_id, revision, token, action, actor_identity, reason
         )
         if not acquired:
             # No redispatch, even if another process died between intent and call.

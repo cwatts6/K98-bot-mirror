@@ -34,6 +34,7 @@ TABLES = (
 )
 SERVER = r"localhost\K98DEV"
 DATABASE = "master"
+SQL_SOURCE = Path(os.environ.get("K98_CONFIG_RECOVERY_SQL_SOURCE", "C:/K98-bot-SQL-Server"))
 
 
 def local_sql(sql):
@@ -63,7 +64,7 @@ def sql_fixture():
         )
         assert database_identity == DATABASE
         for name in TABLES:
-            raw = (Path("C:/K98-bot-SQL-Server/sql_schema") / f"dbo.{name}.Table.sql").read_text(
+            raw = (SQL_SOURCE / "sql_schema" / f"dbo.{name}.Table.sql").read_text(
                 encoding="utf-8-sig"
             )
             raw = "\n".join(line for line in raw.splitlines() if "FOREIGN KEY" not in line)
@@ -217,8 +218,8 @@ def test_real_sql_history_gate_distinguishes_failed_reads_from_writes(
     sql_fixture, purpose, kind, terminal, fresh, rejected
 ):
     _, sql = sql_fixture
-    source = Path(
-        "C:/K98-bot-SQL-Server/sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql"
+    source = (
+        SQL_SOURCE / "sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql"
     ).read_text(encoding="utf-8-sig")
     start = " IF EXISTS (SELECT 1 FROM @Members m JOIN dbo.ExportProviderRequest r ON r.StreamID=m.StreamID"
     gate = source[source.index(start) :].split("  THROW 51700,'Request gaps", 1)[0].strip()

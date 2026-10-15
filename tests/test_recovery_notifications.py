@@ -137,7 +137,9 @@ def test_failed_check_remains_degraded_across_pages_and_empty_reset(monkeypatch)
 
     @contextmanager
     def service():
-        yield SimpleNamespace(store=store, adapters={"stats_import": adapter}, refresh=refresh)
+        yield SimpleNamespace(
+            store=store, adapters={"stats_import": adapter}, recover_automatic=refresh
+        )
 
     monkeypatch.setattr(module, "recovery_service", service)
     monkeypatch.setattr(module, "_cursors", {})

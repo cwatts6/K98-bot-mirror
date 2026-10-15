@@ -1146,9 +1146,13 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         # --- Check Google Sheets
         try:
-            success, message = check_basic_gsheets_access(CREDENTIALS_FILE, SHEET_ID)
-            gsheets_ok = bool(success)
-            gsheets_status = f"🟢 {message}" if success else f"🟠 {message}"
+            from services.gsheets_health_service import check_health
+
+            success, message = await check_health(CREDENTIALS_FILE, SHEET_ID)
+            gsheets_ok = success
+            gsheets_status = (
+                f"{'🟢' if success is True else '🟠' if success is None else '🔴'} {message}"
+            )
         except Exception as e:
             gsheets_ok = False
             gsheets_status = _safe_operator_field(

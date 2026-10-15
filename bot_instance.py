@@ -94,8 +94,7 @@ from event_scheduler import (
 )
 
 # added emit_telemetry_event import
-from file_utils import append_csv_line, emit_telemetry_event, fetch_one_dict, run_blocking_in_thread
-from gsheet_module import check_basic_gsheets_access  # <-- add
+from file_utils import append_csv_line, emit_telemetry_event, fetch_one_dict
 from logging_setup import (
     LOG_DIR,
     clean_old_lock_files,
@@ -879,66 +878,10 @@ def _pick_health_sheet_id() -> str | None:
 
 
 async def _check_gsheets_health(timeout_sec: float = 5.0):
-    """
-    Run the synchronous GSheets health check off the event loop with a timeout.
-    Returns (success: bool, message: str)
-    """
-    sheet_id = _pick_health_sheet_id()
-    if not sheet_id:
-        # No configured sheet to probe; don't fail health for this
-        return True, "No sheet configured for probe"
+    """True/False/None denotes healthy/failed/deferred; retain any active work."""
+    from services.gsheets_health_service import check_health
 
-    try:
-        # Run the blocking function in a thread and bound the total wait time
-        success, message = await asyncio.wait_for(
-            run_blocking_in_thread(
-                check_basic_gsheets_access,
-                CREDENTIALS_FILE,
-                sheet_id,
-                name="check_basic_gsheets_access",
-                meta={"sheet_id": sheet_id},
-            ),
-            timeout=timeout_sec,
-        )
-        return success, message
-    except asyncio.CancelledError:
-        # Preserve cancellation so shutdown isn't swallowed; log then re-raise
-        logger.warning("[HEALTH][GS] _check_gsheets_health cancelled")
-        raise
-    except TimeoutError:
-        # Fast fail if the GSheets call times out — don't block the event loop
-        logger.warning("[HEALTH][GS] GSheets check timed out after %.1fs", timeout_sec)
-        try:
-            emit_telemetry_event(
-                {
-                    "event": "gsheets_health_check",
-                    "status": "timeout",
-                    "timeout_seconds": timeout_sec,
-                    "orphaned_offload_possible": True,
-                }
-            )
-        except Exception:
-            logger.debug(
-                "[TELEMETRY] Failed to emit gsheets_health_check timeout telemetry", exc_info=True
-            )
-        return False, f"GSheets check timed out after {timeout_sec}s"
-    except Exception as exc:
-        # Log full exception with stack for diagnostics and return failure
-        logger.exception("[HEALTH][GS] GSheets check raised exception: %s", exc)
-        try:
-            emit_telemetry_event(
-                {
-                    "event": "gsheets_health_check",
-                    "status": "failed",
-                    "error": str(exc),
-                    "orphaned_offload_possible": False,
-                }
-            )
-        except Exception:
-            logger.debug(
-                "[TELEMETRY] Failed to emit gsheets_health_check failed telemetry", exc_info=True
-            )
-        return False, f"GSheets check raised exception: {exc}"
+    return await check_health(CREDENTIALS_FILE, _pick_health_sheet_id(), timeout=timeout_sec)
 
 
 def _uptime_hms() -> tuple[int, int, int, int]:
@@ -1018,7 +961,7 @@ class HealthView(discord.ui.View):
                 f"**Database:** {'🟢 OK' if sql_ok else '🔴 Error'}"
                 + (f" — `{(sql_reason or '')[:120]}`" if not sql_ok else "")
                 + "\n"
-                f"**GSheets:** {'🟢 ' if gs_ok else '🔴 '}{gs_message}\n"
+                f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
                 f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
                 f"**Queue depth:** {queue_depth}\n"
                 f"{profile_line}\n"
@@ -1033,7 +976,7 @@ class HealthView(discord.ui.View):
                     0xE74C3C
                     if (
                         not sql_ok
-                        or not gs_ok
+                        or gs_ok is False
                         or err_60m >= ERROR_SPIKE_THRESHOLD
                         or sess != "🟢 connected"
                     )
@@ -1186,7 +1129,7 @@ async def _update_health_embed():
         f"**Database:** {'🟢 OK' if sql_ok else '🔴 Error'}"
         + (f" — `{(sql_reason or '')[:120]}`" if not sql_ok else "")
         + "\n"
-        f"**GSheets:** {'🟢 ' if gs_ok else '🔴 '}{gs_message}\n"  # <-- add this line
+        f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
         f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
         f"**Queue depth:** {queue_depth}\n"
         f"{profile_line}\n"
@@ -1205,7 +1148,7 @@ async def _update_health_embed():
             0xE74C3C
             if (
                 not sql_ok
-                or not gs_ok
+                or gs_ok is False
                 or err_60m >= ERROR_SPIKE_THRESHOLD
                 or sess != "🟢 connected"
             )
@@ -1235,7 +1178,7 @@ async def _update_health_embed():
             need_alert = True
             reasons.append("DB check failed" + (f": {sql_reason}" if sql_reason else ""))
 
-        if not gs_ok:
+        if gs_ok is False:
             need_alert = True
             reasons.append("GSheets check failed" + (f": {gs_message}" if gs_message else ""))
             logger.warning("[HEALTH][GS] Probe failed: %s", gs_message)

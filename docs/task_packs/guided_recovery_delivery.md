@@ -7,8 +7,8 @@ The programme remains incomplete until every workstream and acceptance gate belo
 
 | Package | Priority | Status | Acceptance |
 | --- | --- | --- | --- |
-| Durable incidents and guided actions; SQL import settlement vertical | P0 | Implementing | Proactive discovery, persistent alert entry, fresh authorised preview/confirm, durable action identity, postcondition verification; restart/concurrency tests |
-| Contested access and abandoned read ownership | P0 | Required | Proven-safe automatic release, exact-owner fencing, incident buttons, eligible work resumes |
+| Durable incidents and guided actions; SQL import settlement vertical | P0 | Draft Bot PR 331 / SQL PR 108 | Proactive discovery, persistent alert entry, fresh authorised preview/confirm, durable action identity, postcondition verification; restart/concurrency tests |
+| Contested access and abandoned read ownership | P0 | Implementing | Proven-safe automatic release, exact-owner fencing, incident buttons, eligible work resumes |
 | Unknown spreadsheet writes, exports and rollover | P0 | Required | Mutation-specific reconciliation, verified completion/continuation or guided containment, no blind replay or unsafe unlock |
 | Committed import checkpoint/capture and partial processing | P0 | Required | Resume remaining stages without replaying committed import; explicit partial-result choice |
 | Discord deliveries and domain publication | P1 | Required | Existing-post reconciliation, guided missing-post repair, expired-reminder policy; Ark/MGE/voting/calendar coverage |
@@ -43,3 +43,23 @@ Implementation and focused mirror/SQL PRs are authorised. Production merge, SQL 
 deployment and provider operations are not performed by this implementation task.
 Preserve existing reader/updater work in the original checkout. New work uses isolated branches.
 Any newly discovered recovery gap in these categories remains required programme work.
+
+## Current evidence and remaining P0 work
+
+The first slice is published as [Bot PR 331](https://github.com/cwatts6/K98-bot-mirror/pull/331)
+and [SQL PR 108](https://github.com/cwatts6/K98-bot-SQL-Server/pull/108). Its clean full suite
+passed 7,717 tests, with 113 skipped and one existing scrubbed-mirror failure for the absent
+command-governance workflow. Production installation and integrated acceptance remain open.
+
+The next slice provides authority-derived investigation and guided release for closed abandoned
+configuration reads, including after authority restart. On 2026-10-15 the operator explicitly
+approved automatic release when the authority verifies the complete private journal, read-only
+requests, closed child and exact ownership. The monitor uses the same durable action intent and
+verified settlement as the admin button. This approval does not cover unknown writes or
+unverifiable history. Normal contention remains amber/deferred in health displays, and repeated
+health checks share their retained operation rather than abandoning it at the UI timeout.
+
+Still required in P0: incomplete journal/closure recovery, unknown provider-write reconciliation
+or verified containment, export/rollover guidance, committed SQL checkpoint/capture continuation,
+and proof that eligible queued work resumes. A held incident with only a recheck button does
+not satisfy programme completion. These are required implementation packages, not optimisation.

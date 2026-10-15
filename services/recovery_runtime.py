@@ -70,7 +70,11 @@ def observe_recovery():
                     _cursors[(scope, kind)] = source_id
                     try:
                         evidence, token, resolved = adapter.inspect(source_id)
-                        service.store.observe(kind, source_id, evidence, token, resolved=resolved)
+                        row = service.store.observe(
+                            kind, source_id, evidence, token, resolved=resolved
+                        )
+                        if getattr(adapter, "automatic_action", None):
+                            service.recover_automatic(row["IncidentID"])
                     except ImportExecutionActive:
                         # An active execution lock is not an abandoned writer.
                         continue
@@ -85,7 +89,7 @@ def observe_recovery():
         for incident in incidents:
             _incident_cursor = (scope, incident["IncidentID"])
             try:
-                service.refresh(incident["IncidentID"])
+                service.recover_automatic(incident["IncidentID"])
             except Exception as exc:
                 service.store.check_failed(incident["IncidentID"], type(exc).__name__)
                 failures.append(type(exc).__name__)

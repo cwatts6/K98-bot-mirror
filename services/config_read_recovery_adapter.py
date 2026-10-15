@@ -3,6 +3,7 @@
 
 class ConfigReadRecoveryAdapter:
     kind = "configuration_read"
+    automatic_action = "release_read"
 
     def __init__(self, dal, client, *, account, storage_owner):
         self.dal, self.client = dal, client
