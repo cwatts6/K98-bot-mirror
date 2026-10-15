@@ -90,6 +90,7 @@ class AllKvkCaptureRecoveryDAL:
             return dict(
                 preparation=prep,
                 execution=None,
+                resources=resources,
                 action=action,
                 token=self.token(prep, execution, resources),
                 explanation=explanation,

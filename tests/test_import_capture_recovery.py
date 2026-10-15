@@ -75,7 +75,7 @@ def test_guided_capture_action_describes_verification_and_queueing():
     adapter = ImportRecoveryAdapter(service.outcomes, service)
     display, _, resolved = adapter.inspect("source")
     assert not resolved
-    assert set(display["actions"]) == {"resume_capture"}
+    assert set(display["actions"]) == {"resume_capture", "abandon_capture"}
     assert "import is not rerun" in display["actions"]["resume_capture"]["effect"]
 
 

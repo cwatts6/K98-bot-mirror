@@ -92,9 +92,32 @@ class ImportRecoveryAdapter:
             ),
             "actions": actions,
         }
+        if self.capture_recovery:
+            try:
+                disposition = self.capture_recovery.abandonment(preview)
+            except (SourceConflict, ValueError, KeyError, TypeError):
+                disposition = None
+            if disposition == "abandoned":
+                evidence.update(
+                    actions={},
+                    outcome="export_skipped",
+                    explanation="The committed SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current.",
+                )
+                return evidence, preview["token"], True
+            if disposition in {"available", "failed"}:
+                from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION
+
+                if disposition == "failed":
+                    actions.clear()
+                    evidence["explanation"] = (
+                        "The capture repair could not verify its output. SQL data and retained evidence are preserved. Review the option to skip this export and unblock later work."
+                    )
+                actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == "abandon_capture" and self.capture_recovery:
+            return self.capture_recovery.abandon(source_id, token, actor, reason)
         if action == "queue_capture" and self.capture_recovery:
             return self.capture_recovery.queue(source_id, token)
         if action == "resume_capture" and self.capture_recovery:
@@ -110,30 +133,32 @@ class ImportRecoveryAdapter:
         )
 
     def reconcile(self, source_id, action):
+        if action["ActionKind"] in {"resume_capture", "queue_capture"} and self.capture_recovery:
+            return self.capture_recovery.reconcile_capture(source_id, action)
+        if action["ActionKind"] == "abandon_capture" and self.capture_recovery:
+            preview = self.dal.inspect(source_id)
+            prep = preview["preparation"]
+            marker = json.loads(prep["GenerationJson"] or "{}").get("capture_abandoned")
+            expected = dict(
+                token=action["EvidenceHash"],
+                actor=f"recovery:{action['ActionID']}",
+                reason=action["Reason"],
+            )
+            if marker == expected and self.capture_recovery.abandonment(preview) == "abandoned":
+                return "verified"
+            if preview["token"] != action["EvidenceHash"]:
+                return "not_applied"
+            self.execute(
+                source_id,
+                "abandon_capture",
+                action["EvidenceHash"],
+                expected["actor"],
+                action["Reason"],
+            )
+            return None
         # inspect checks exact account/storage and obtains the SQL execution lock.
         preview = self.dal.inspect(source_id)
         receipt = preview["execution"] or {}
-        if action["ActionKind"] == "queue_capture" and self.capture_recovery:
-            if not preview["preparation"]["JobID"] and preview["token"] != action["EvidenceHash"]:
-                return "not_applied"
-            self.capture_recovery.queue(source_id, action["EvidenceHash"])
-            return "verified" if self.capture_recovery.verify_queued(source_id) else None
-        if action["ActionKind"] == "resume_capture" and self.capture_recovery:
-            prep = preview["preparation"]
-            marker = json.loads(prep["GenerationJson"] or "{}").get("capture_recovery")
-            expected = dict(token=action["EvidenceHash"], actor=f"recovery:{action['ActionID']}")
-            if marker == expected and preview["captured"] and prep["JobID"]:
-                # Re-read and hash-check the retained spool through idempotent queue
-                # admission, including after a lost enqueue commit acknowledgement.
-                self.capture_recovery.run(source_id, expected["token"], expected["actor"])
-                return "verified"
-            if marker != expected and preview["token"] != action["EvidenceHash"]:
-                return "not_applied"
-            self.capture_recovery.run(source_id, expected["token"], expected["actor"])
-            verified = self.dal.inspect(source_id)
-            if verified["captured"] and verified["preparation"]["JobID"]:
-                return "verified"
-            return None
         if receipt.get("Resolution") == action["ActionKind"]:
             # Settlement is atomic with release in the existing DAL. An equivalent
             # settlement by the automatic observer also establishes this postcondition.

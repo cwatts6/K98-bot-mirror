@@ -6,6 +6,7 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 from services.legacy_export_snapshot_service import (
     LegacySnapshot,
+    SnapshotUnavailable,
     configuration_digest,
     output_digest,
 )
@@ -54,6 +55,7 @@ class ImportCaptureRecovery:
 
     def run(self, preparation_id, token, actor):
         preview = self.outcomes.inspect(preparation_id)
+        self._assert_not_closed(preview["preparation"])
         if preview["captured"]:
             marker = json.loads(preview["preparation"]["GenerationJson"]).get("capture_recovery")
             if marker != dict(token=token, actor=actor):
@@ -104,6 +106,7 @@ class ImportCaptureRecovery:
 
     def queue(self, source_id, token):
         preview = self.outcomes.inspect(source_id)
+        self._assert_not_closed(preview["preparation"])
         self.generation(preview["preparation"], preview["execution"])
         if not preview["captured"]:
             raise SourceConflict("A retained immutable capture is required.")
@@ -112,3 +115,77 @@ class ImportCaptureRecovery:
         # Only called after a durable confirmed action. The coordinator atomically
         # links this immutable preparation to its single job.
         return self.runtime.enqueue_snapshot(source_id)
+
+    @staticmethod
+    def _assert_not_closed(prep):
+        generation = json.loads(prep["GenerationJson"] or "{}")
+        if generation.get("capture_failure") or generation.get("capture_abandoned"):
+            raise SourceConflict("Capture needs an admin decision; its prior repair cannot resume.")
+
+    def abandonment(self, preview):
+        """Read-only presentation; consuming DAL repeats every scope/ownership check."""
+        prep, execution = preview["preparation"], preview["execution"]
+        generation = self.generation(prep, execution)
+        if prep["JobID"]:
+            return None
+        if self.consumer == "scan_data" and (
+            not execution
+            or execution["State"] != "completed"
+            or execution["Resolution"] is not None
+        ):
+            return None
+        if (
+            generation.get("capture_abandoned")
+            and prep["State"] == "unavailable"
+            and not preview.get("resources")
+        ):
+            return "abandoned"
+        if preview["action"] in {"resume_capture", "queue_capture"} or preview["captured"]:
+            return "failed" if generation.get("capture_failure") else "available"
+        return None
+
+    def abandon(self, source_id, token, actor, reason):
+        self.dal.conclude(source_id, token, actor, reason, self.generation, abandon=True)
+
+    def reconcile_capture(self, source_id, action):
+        """Classify deterministic output failure only after producer exclusion and fencing."""
+        preview = self.outcomes.inspect(source_id)
+        prep = preview["preparation"]
+        generation = self.generation(prep, preview["execution"])
+        actor, token = f"recovery:{action['ActionID']}", action["EvidenceHash"]
+        failure = generation.get("capture_failure", {})
+        if failure.get("actor") == actor and failure.get("token") == token:
+            return "not_applied"
+        if generation.get("capture_abandoned"):
+            return "not_applied"
+        try:
+            if action["ActionKind"] == "queue_capture":
+                if not prep["JobID"] and preview["token"] != token:
+                    return "not_applied"
+                self.queue(source_id, token)
+            else:
+                marker = generation.get("capture_recovery")
+                if marker != dict(token=token, actor=actor) and preview["token"] != token:
+                    return "not_applied"
+                self.run(source_id, token, actor)
+            return "verified" if self.verify_queued(source_id) else None
+        except (SnapshotUnavailable, FileNotFoundError, ValueError):
+            # SQL/transport timeouts are not evidence of non-dispatch. This path
+            # accepts only deterministic local output/format failure, and the DAL
+            # proves no queue job exists while excluding all producer/capture work.
+            self.dal.conclude(
+                source_id,
+                token,
+                actor,
+                "Output unavailable or failed verification",
+                self.generation,
+                abandon=False,
+            )
+            return "not_applied"
+
+
+ABANDON_CAPTURE_ACTION = {
+    "label": "Keep SQL; skip this export",
+    "check": "Confirm you accept no spreadsheet export for this completed import. Committed SQL data stays in place; any older spreadsheet may remain out of date.",
+    "effect": "Exclude active SQL producers, preserve the checkpoint and any retained files, close only this unqueued capture and release its exact snapshot reservation. No import, recompute or provider write is rerun. Later eligible work can continue.",
+}

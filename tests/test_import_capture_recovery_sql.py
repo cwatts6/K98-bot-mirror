@@ -40,7 +40,12 @@ def recovery(tmp_path, request):
     namespace = uuid4().hex
     names = {
         "dbo." + name: "##Capture_" + namespace + "_" + name
-        for name in ("ExportPreparation", "ExportResource", "StatsImportExecution")
+        for name in (
+            "ExportPreparation",
+            "ExportResource",
+            "StatsImportExecution",
+            "ExportExecutionStream",
+        )
     }
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
 
@@ -326,7 +331,7 @@ def test_normal_capture_queue_gap_is_discovered_and_confirmed_once(recovery, mon
     )
     adapter = adapter_type(r.outcomes, r.service)
     evidence, token, resolved = adapter.inspect(r.source)
-    assert not resolved and set(evidence["actions"]) == {"queue_capture"}
+    assert not resolved and set(evidence["actions"]) == {"queue_capture", "abandon_capture"}
     assert r.outcomes.inspect(r.source)["preparation"]["JobID"] is None
     monkeypatch.setattr(r.runtime, "enqueue_snapshot", original)
     r.state.fail = "queue"

@@ -1037,6 +1037,9 @@ class LegacyExportRuntime:
             raise SnapshotUnavailable("Capture belongs to another account or storage owner.")
         if row["State"] not in {"captured", "materialized"}:
             raise SnapshotUnavailable("Committed capture is pending or unavailable.")
+        generation = json.loads(row["GenerationJson"] or "{}")
+        if generation.get("capture_failure") or generation.get("capture_abandoned"):
+            raise SnapshotUnavailable("Capture needs an admin decision before export admission.")
         receipt = SnapshotReceipt(
             row["SpoolKey"], row["SpoolBytes"], bytes(row["SpoolHash"]).hex(), row["StorageOwner"]
         )

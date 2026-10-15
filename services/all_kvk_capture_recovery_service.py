@@ -63,12 +63,12 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
     kind = "all_kvk_capture"
 
     def execute(self, source_id, action, token, actor, reason):
-        if action not in {"resume_capture", "queue_capture"}:
+        if action not in {"resume_capture", "queue_capture", "abandon_capture"}:
             raise ValueError("Unsupported all-KVK capture recovery.")
         return super().execute(source_id, action, token, actor, reason)
 
     def reconcile(self, source_id, action):
-        if action["ActionKind"] not in {"resume_capture", "queue_capture"}:
+        if action["ActionKind"] not in {"resume_capture", "queue_capture", "abandon_capture"}:
             raise ValueError("Unsupported all-KVK capture recovery.")
         return super().reconcile(source_id, action)
 
@@ -95,11 +95,25 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
                 }
         except (SourceConflict, ValueError, KeyError, TypeError):
             explanation = "The retained checkpoint, registration or captured output does not verify. Evidence is preserved and the incident remains open."
+        try:
+            disposition = self.capture_recovery.abandonment(preview)
+        except (SourceConflict, ValueError, KeyError, TypeError):
+            disposition = None
+        if disposition == "abandoned":
+            actions, resolved = {}, True
+            explanation = "The committed all-KVK SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current."
+        elif disposition in {"available", "failed"}:
+            from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION
+
+            if disposition == "failed":
+                actions.clear()
+                explanation = "The capture repair could not verify its output. SQL data and retained evidence are preserved. Review the option to skip this export and unblock later work."
+            actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
         return (
             {
                 "title": "All-KVK output recovery",
                 "season": prep["KVK_NO"],
-                "outcome": prep["State"],
+                "outcome": "export_skipped" if disposition == "abandoned" else prep["State"],
                 "explanation": explanation
                 or (
                     "Retained output and queue admission are verified. Export delivery is monitored separately."
