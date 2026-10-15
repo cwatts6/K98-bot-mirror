@@ -4,8 +4,10 @@ Only temporary SQL objects and simulated provider children are used. DPAPI is
 replaced by reversible test encoding; OS peer authentication is not exercised.
 """
 
+from datetime import datetime
 import hashlib
-from uuid import UUID
+import json
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -15,6 +17,7 @@ from services.export_evidence_catalog_dal import EvidenceCatalogDAL
 from services.export_evidence_recovery import EvidenceRecoveryAdapter
 from services.export_evidence_storage import EvidenceCopies
 from services.recovery_service import RecoveryService
+from tests import test_export_target_containment_sql as fixture_module
 from tests.test_export_replacement_rpc_sql import (
     contained_job as contained_job,
     guided as guided,
@@ -27,6 +30,61 @@ from tests.test_export_replacement_rpc_sql import (
     verification as verification,
 )
 from tests.test_guided_recovery import ACTOR
+
+
+@pytest.fixture(autouse=True)
+def proof_catalogue(monkeypatch):
+    monkeypatch.setattr(
+        fixture_module, "TABLES", (*fixture_module.TABLES, "dbo.ExportReconciliationProof")
+    )
+
+
+def test_proof_audit_hex_key_is_discovered_and_scoped_to_its_account(rpc, tmp_path):
+    r = rpc
+    private = PrivateEvidenceStore(
+        tmp_path, "disk", protect=lambda b: b[::-1], unprotect=lambda b: b[::-1]
+    )
+    raw = b'{"kind":"saved-reconciliation-audit"}'
+    receipt = private.put(raw)
+    reference = str(UUID(receipt.key))
+    r.f.insert(
+        "ExportReconciliationProof",
+        dict(
+            ProofID=str(uuid4()),
+            SessionID=r.f.session,
+            AccountKey="test-account",
+            SnapshotHash=b"s" * 32,
+            RegistrationHash=b"r" * 32,
+            ProofKind="publication",
+            Outcome="confirmed",
+            MembershipHash=b"m" * 32,
+            MembershipJson="[]",
+            EvidenceJson=json.dumps(dict(evidence_id=receipt.key, evidence_hash=receipt.sha256)),
+            CreatedUTC=datetime(2026, 10, 1),
+        ),
+    )
+    r.f.sql.commit()
+    catalog = EvidenceCatalogDAL(r.f.connect, "test-account")
+    assert reference in catalog.page()
+    assert catalog.get(reference)["kinds"] == ["reconciliation audit"]
+    with pytest.raises(SourceConflict, match="outside"):
+        EvidenceCatalogDAL(r.f.connect, "another-account").get(reference)
+    r.broker.authority.store = private
+    (tmp_path / receipt.key).unlink()
+    adapter = EvidenceRecoveryAdapter(r.rpc_runtime.client)
+    service = RecoveryService(
+        r.recovery.store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3
+    )
+    row = service.review_source(ACTOR, adapter.kind, reference)
+    done = service.execute(
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "restore_evidence",
+        "Confirm saved audit restoration",
+    )
+    assert done["State"] == "resolved" and private.read(receipt) == raw
 
 
 @pytest.mark.parametrize("damage", ["missing", "corrupt"])

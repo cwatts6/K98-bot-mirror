@@ -1,7 +1,8 @@
 """Guided evidence restoration across encrypted disk, typed broker and admin actions."""
 
+import asyncio
 from contextlib import contextmanager
-from threading import RLock
+from threading import Event, RLock
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID, uuid4
@@ -274,3 +275,70 @@ def test_recovery_only_startup_never_publishes_normal_admission_until_history_ve
     with pytest.raises(SourceConflict, match="closed"):
         with composition.recovery_caller_scope():
             pytest.fail("shutdown admitted recovery")
+
+
+@pytest.mark.asyncio
+async def test_guided_restore_reopens_admission_and_wakes_queued_exports_without_restart(
+    recovery, monkeypatch
+):
+    from services import (
+        export_coordination_service as coordinator,
+        export_runtime_composition as composition,
+    )
+
+    r = recovery
+    row = damage(r)
+    for name, value in (
+        ("_installed", None),
+        ("_recovery_bundle", None),
+        ("_runtime_stopped", False),
+        ("_installing", False),
+    ):
+        monkeypatch.setattr(composition, name, value)
+    monkeypatch.setattr(coordinator, "_worker", None)
+    monkeypatch.setattr(coordinator, "_loop", None)
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    bundle = composition.ExportRuntime.__new__(composition.ExportRuntime)
+    composition.RuntimeLifetime.__init__(bundle, SimpleNamespace())
+
+    def verify_history():
+        assert r.private.read(r.receipt) == r.raw
+
+    bundle.refresh_replacement_registration = verify_history
+    monkeypatch.setattr(composition, "_prepare_configured_runtime", lambda: bundle)
+    with pytest.raises((OSError, SourceConflict)):
+        composition.install_configured_runtime()
+    attempted, resumed = Event(), Event()
+
+    def admission():
+        attempted.set()
+        return composition.configured_runtime()
+
+    def process_queue(stop, limit):
+        resumed.set()
+        stop.set()
+
+    bundle.run_batch = process_queue
+    monkeypatch.setattr(coordinator, "configured_coordinator", admission)
+    monitor = Mock()
+    monitor.is_running.return_value = False
+    worker = coordinator.register_exports(monitor)
+    assert worker is not None and not resumed.is_set()
+    monitor.is_running.return_value = True
+    assert coordinator.register_exports(monitor) is worker
+    monitor.create.assert_called_once()
+    task = asyncio.create_task(worker.run())
+    try:
+        assert await asyncio.to_thread(attempted.wait, 2)
+        # Drain the failed factory's continuation before the repair wake; no
+        # polling interval elapses in this test (the normal interval is 30s).
+        await asyncio.sleep(0.02)
+        assert not resumed.is_set()
+        assert restore(r, row)["State"] == "resolved"
+        composition.retry_recovery_admission()
+        assert await asyncio.to_thread(resumed.wait, 2)
+        await asyncio.wait_for(task, 2)
+    finally:
+        worker.stop.set()
+        coordinator.wake_exports()
+        await asyncio.wait_for(task, 2)

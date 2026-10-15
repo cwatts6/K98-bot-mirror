@@ -338,8 +338,13 @@ def test_invalid_registration_fails_before_sql_or_credentials(monkeypatch):
     sql.assert_not_called()
 
 
-def test_s10b_default_off_and_missing_adapters_cannot_activate(monkeypatch):
-    from services.export_coordination_service import register_exports
+@pytest.mark.asyncio
+async def test_s10b_default_off_and_missing_adapters_cannot_activate(monkeypatch):
+    from services import export_coordination_service as coordinator
+
+    register_exports = coordinator.register_exports
+    monkeypatch.setattr(coordinator, "_worker", None)
+    monkeypatch.setattr(coordinator, "_loop", None)
 
     monitor, factory = Mock(), Mock()
     monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", False)
@@ -348,8 +353,12 @@ def test_s10b_default_off_and_missing_adapters_cannot_activate(monkeypatch):
     factory.assert_not_called()
     monkeypatch.setattr(bot_config, "EXPORT_COORDINATION_ENABLED", True)
     monitor.is_running.return_value = False
-    assert register_exports(monitor) is None
-    monitor.create.assert_not_called()
+    admission = Mock(side_effect=SourceConflict("Protected runtime unavailable"))
+    monkeypatch.setattr(coordinator, "configured_coordinator", admission)
+    worker = register_exports(monitor)
+    assert worker.factory is admission
+    monitor.create.assert_called_once_with("export_coordination", worker.run)
+    admission.assert_not_called()
 
 
 def test_s10b_pair_recovery_only_wakes_durable_export_discovery(monkeypatch):

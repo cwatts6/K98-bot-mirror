@@ -167,6 +167,9 @@ def retry_recovery_admission():
         retry = _installed is None and _recovery_bundle is not None and not _runtime_stopped
     if retry:
         install_configured_runtime()
+        from services.export_coordination_service import wake_exports
+
+        wake_exports()
 
 
 def validate_caller_context(runtime):
