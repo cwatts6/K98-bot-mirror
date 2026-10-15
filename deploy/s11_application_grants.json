@@ -769,6 +769,18 @@
       "source_sha256": "da4bf5dcd42997e92faf5cae9f93c1009ba8fd2b46d27ccf094f24f77adddb6e"
     },
     {
+      "object": "dbo.ExportContainedStream",
+      "permission": "SELECT",
+      "source": "C:\\\\K98-bot-SQL-Server\\\\sql_schema\\\\dbo.ExportContainedStream.Table.sql",
+      "source_sha256": "90d7400b10aeb1f47405f0e763fa09605555b145a93269a080b4896a0468605c"
+    },
+    {
+      "object": "dbo.ExportContainedTarget",
+      "permission": "SELECT",
+      "source": "C:\\\\K98-bot-SQL-Server\\\\sql_schema\\\\dbo.ExportContainedTarget.Table.sql",
+      "source_sha256": "65ede42fdfd888e6d652194dab76411a87684727b391e626c5e45850a7da1e89"
+    },
+    {
       "object": "dbo.ExportExecutionSession",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionSession.Table.sql",
@@ -778,7 +790,7 @@
       "object": "dbo.ExportExecutionStream",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionStream.Table.sql",
-      "source_sha256": "566e28a2e929b395de791a604feb9091deb30bcd5a43d52cd9065943688bcf47"
+      "source_sha256": "893e4c28550d3c3b263de4238786be8eb1452ac1b6870607f5f357da00af630f"
     },
     {
       "object": "dbo.ExportJob",
@@ -905,6 +917,12 @@
       "permission": "UPDATE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportResource.Table.sql",
       "source_sha256": "2929a8f34f6ff77a615140ae22d84678babf3d7bf2ea480849a76e0c5e3c8b0d"
+    },
+    {
+      "object": "dbo.ExportTargetContainment",
+      "permission": "SELECT",
+      "source": "C:\\\\K98-bot-SQL-Server\\\\sql_schema\\\\dbo.ExportTargetContainment.Table.sql",
+      "source_sha256": "aafd412359f3139bb69f5416bec6e4ff93012f002341a353296b6878b04875e9"
     },
     {
       "object": "dbo.FallbackImportBatchControl",
@@ -1103,13 +1121,19 @@
       "object": "dbo.usp_ExportExecutionSessionTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionSessionTransition.StoredProcedure.sql",
-      "source_sha256": "787ed16f0874826e59a20c1a5c37d401529b6381157e24a8b80b8734e6080b8d"
+      "source_sha256": "efcfd6b7f617a9d334534e6f581684d30d1889ddfb70960fc267db96496482e1"
     },
     {
       "object": "dbo.usp_ExportExecutionStreamTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-      "source_sha256": "8b75b9022cf2a4718ab2e6e8975137b209392b11ad8a3e7cff322e3dc46503d6"
+      "source_sha256": "6bc8696af9e34cf4bde4e347ca6117eeb641a0cb275c88cc3ba603cc5773fa9b"
+    },
+    {
+      "object": "dbo.usp_ExportJobContainTargets",
+      "permission": "EXECUTE",
+      "source": "C:\\\\K98-bot-SQL-Server\\\\sql_schema\\\\dbo.usp_ExportJobContainTargets.StoredProcedure.sql",
+      "source_sha256": "a1f51f1e03a5a405a92ea0d1204b972284083ed607f6ea3ae8bf034bda2783d2"
     },
     {
       "object": "dbo.usp_ExportManualOutputEnrollmentTransition",
@@ -1127,13 +1151,13 @@
       "object": "dbo.usp_ExportProviderRequestEventAppend",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-      "source_sha256": "45fcc041f5cdcfc2074e647d9bf728256533e6c8bbc685542207bf980b84d5d0"
+      "source_sha256": "0f3f0411522d168d3e06e2f62668e8a87ea87b957e1088f7f6064a325a6fc66f"
     },
     {
       "object": "dbo.usp_ExportReconciliationProofIssue",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
-      "source_sha256": "4ea1e5ba462edbd725d7f624e026215ece47cb6bef42806d41e474a1ce4f62bb"
+      "source_sha256": "c78ca8054bba72c6d42da0a8ccdfe7d4707d80e448a7f91b95546fa91d8a52b0"
     },
     {
       "object": "dbo.usp_MarkLogBackupTriggerProcessed",

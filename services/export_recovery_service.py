@@ -13,6 +13,8 @@ def job_token(snapshot):
     # falsely retire a pending safe-retry intent whose job CAS can still commit.
     durable = deepcopy({key: snapshot[key] for key in ("job", "attempts", "streams")})
     durable["job"].pop("Stalled", None)
+    if snapshot.get("isolated_targets"):
+        durable["isolated_targets"] = snapshot["isolated_targets"]
     return digest(durable).hex()
 
 
@@ -119,10 +121,26 @@ class ExportRecoveryAdapter:
                 check="Confirm you accept no spreadsheet update from this queued export. SQL data and retained files stay in place; the spreadsheet may remain out of date.",
                 effect="Verify there is no provider attempt or execution stream, fence any stale worker, retain the original job and input, and release only its exact reservations. No provider write or SQL import is replayed.",
             )
+        replacement_required = (
+            bool(snapshot.get("isolated_targets"))
+            and not (provenance.get("export_skipped") and resolved)
+            and job["State"] not in {"cancelled", "coalesced"}
+        )
+        if replacement_required:
+            resolved = False
+            actions = {key: value for key, value in actions.items() if key == "skip_unstarted"}
+            explanation = (
+                "This export references permanently isolated spreadsheet files. Its input and original "
+                "history are retained, and it cannot enter provider execution or block unrelated queue "
+                "admission. A queued retry does not resolve this incident. Verified replacement files "
+                "and a separately verified publication are required; no delivery is being claimed."
+            )
         return (
             dict(
                 title="Spreadsheet export recovery",
-                outcome="export_skipped"
+                outcome="replacement_required"
+                if replacement_required
+                else "export_skipped"
                 if provenance.get("export_skipped") and resolved
                 else job["State"],
                 scan=job.get("KVK_NO"),
@@ -137,6 +155,8 @@ class ExportRecoveryAdapter:
         snapshot = self.discovery.job(source_id)
         _unchanged(job_token(snapshot), token)
         job = snapshot["job"]
+        if snapshot.get("isolated_targets") and action != "skip_unstarted":
+            raise SourceConflict("Permanently isolated targets require verified replacements.")
         if action == "skip_unstarted":
             self.coordinator.skip_unstarted(
                 source_id,

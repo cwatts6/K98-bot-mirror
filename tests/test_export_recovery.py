@@ -110,6 +110,22 @@ def test_age_threshold_does_not_change_durable_action_identity():
     assert job_token(snapshot) == token
 
 
+@pytest.mark.parametrize("queued", [False, True])
+def test_isolated_destination_reopens_incident_and_disables_ordinary_retry(queued):
+    adapter, snapshot = job_fixture(consumer="scan_data")
+    if queued:
+        snapshot["job"]["ProvenanceJson"] = json.dumps(dict(safe_retry=dict(requested=True)))
+    original_token = job_token(snapshot)
+    snapshot["isolated_targets"] = [dict(FileID="old-file", ContainmentID=str(uuid4()))]
+    evidence, token, resolved = adapter.inspect("source")
+    assert not resolved and evidence["outcome"] == "replacement_required"
+    assert "retry_unstarted" not in evidence["actions"]
+    assert token != original_token
+    with pytest.raises(SourceConflict, match="replacements"):
+        adapter.execute("source", "retry_unstarted", token, "recovery:action", "retry")
+    adapter.coordinator.request_safe_retry.assert_not_called()
+
+
 def test_skip_reconciles_only_exact_receipt_and_stale_stream_fences_intent():
     adapter, snapshot = job_fixture(consumer="scan_data")
     action = dict(

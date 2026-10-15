@@ -640,6 +640,30 @@ class AuthorityBroker:
                 if action == "contain_configuration_recovery"
                 else "release_read",
             )
+        if action in {"inspect_target_recovery", "isolate_export_targets"}:
+            expected = {"version", "action", "job_id"}
+            if action == "isolate_export_targets":
+                expected |= {"token", "actor", "reason"}
+            if set(message) != expected:
+                raise ValueError("Exact target recovery message required.")
+            job_id = uuid_text(message["job_id"])
+            if self.boundary is not None:
+                self.boundary.recheck()
+            from services.export_target_recovery_authority import (
+                inspect_target_recovery,
+                isolate_export_targets,
+            )
+
+            if action == "inspect_target_recovery":
+                return inspect_target_recovery(self.authority, self.registration, job_id)
+            return isolate_export_targets(
+                self.authority,
+                self.registration,
+                job_id,
+                message["token"],
+                message["actor"],
+                message["reason"],
+            )
         if action == "recover_configuration":
             if set(message) != {"version", "action", "stream_id"}:
                 raise ValueError("Exact owned configuration stream required.")

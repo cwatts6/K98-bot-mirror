@@ -33,6 +33,8 @@ class ExportRecoveryDAL:
         self.job_parameters = (self.account, self.storage_owner, *self.destinations)
 
     def pending_jobs(self, *, after=None):
+        from services.export_target_admission_dal import ISOLATED_JOB_TARGETS_SQL
+
         with transaction(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (20) JobID FROM dbo.ExportJob WHERE "
@@ -41,7 +43,9 @@ class ExportRecoveryDAL:
                 "(SELECT 1 FROM OPENJSON(ProvenanceJson,'$.reconciliations') WITH "
                 "(ProofState varchar(32) '$.proof.state') a WHERE a.ProofState='damaged')) "
                 "OR (State IN ('running','waiting','ready') "
-                "AND UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()))) "
+                "AND (UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) OR "
+                + ISOLATED_JOB_TARGETS_SQL
+                + "))) "
                 "ORDER BY CASE WHEN JobID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,JobID",
                 *self.job_parameters,
                 identity(after) if after else None,
@@ -90,11 +94,26 @@ class ExportRecoveryDAL:
                 job_id,
             )
             resources = rows(cursor)
+            cursor.execute(
+                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportContainedTarget c "
+                "JOIN dbo.ExportJobResource m ON m.ResourceKey='destination:'+c.FileID "
+                "WHERE m.JobID=? ORDER BY c.FileID",
+                job_id,
+            )
+            isolated_targets = rows(cursor)
             if job["ConsumerKind"] == "new_source" and frozenset(
                 r["ResourceKey"] for r in resources
             ) != self.destinations.get(bytes(job["DestinationSetHash"])):
                 raise SourceConflict("Export resource membership differs from its registered pool.")
-            return _wire(dict(job=job, attempts=attempts, streams=streams, resources=resources))
+            return _wire(
+                dict(
+                    job=job,
+                    attempts=attempts,
+                    streams=streams,
+                    resources=resources,
+                    isolated_targets=isolated_targets,
+                )
+            )
 
     def repairs(self, job_id):
         original = self.job(job_id)["job"]
