@@ -174,3 +174,24 @@ before the private verifier can evaluate them. Completing that close gate with e
 child closure and read-only membership is the next required focused P0 correction. It is
 distinct from missing/corrupt private evidence and lost-authority-process recovery, which
 remain required. No recheck-only path is considered completed programme coverage.
+
+## Read-prefix closure correction
+
+The SQL close gate now permits a preserved nonterminal request only when the persisted
+stream purpose is `probe`, its request kind is `read`, and its history contains `prepared`
+with no events outside `prepared`/`dispatch_intent`. Missing events, mutation requests and
+other purposes remain blocked. The unchanged exact session/account/child/version/sequence
+CAS and authority-derived positive child termination still govern closure. The independent
+private verifier then checks complete bytes and ordering before any configuration release.
+No terminal event is fabricated, and an unfinished read cannot count as a fresh observation.
+
+Migration `20261015_005_read_prefix_closure.sql` follows the failed-publication probe migration,
+pins the whole predecessor/postimage, refuses unexpected signatures and preserves roles.
+Coordinated Bot source pins must be deployed with it. Actual temporary SQL tests exercise the
+close predicate, unchanged history, all closure CAS dimensions and installed module hash.
+Separate Bot/SQL Changes reviews use the focused `guided-read-close` branches, Deep off.
+No persistent SQL installation or provider operation is part of these tests.
+
+This closes the read-prefix SQL/verifier mismatch only. Whole-authority process loss,
+unverifiable evidence, unknown-write containment and the other required P0/P1 workflows
+remain active programme obligations, with guided actions and verification required throughout.
