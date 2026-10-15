@@ -38,6 +38,7 @@ class ExportRecoveryAdapter:
         queued = provenance.get("safe_retry", {}).get("requested") is True
         history = provenance.get("reconciliations", [])
         damaged = bool(history and history[-1].get("proof", {}).get("state") == "damaged")
+        absent = bool(history and history[-1].get("proof", {}).get("state") == "absent")
         repairs = []
         actions = {}
         explanation = "The export has not reached a verified terminal outcome. Its current reservation and attempt evidence are retained."
@@ -54,21 +55,27 @@ class ExportRecoveryAdapter:
                 check="Confirm that the bot should check this retained publication. Keep its registered Sheets and receipts intact while verification runs.",
                 effect="Verify every old writer and current publication. If proven safe, finish clearing only retired, unreferenced slots, verify again and settle the exact outcome. Unknown writes remain held.",
             )
-        elif job["ConsumerKind"] == "new_source" and job["State"] == "confirmed" and damaged:
+        elif job["ConsumerKind"] == "new_source" and (
+            (job["State"] == "confirmed" and damaged) or (job["State"] == "failed" and absent)
+        ):
             repairs = self.discovery.repairs(source_id)
             if repairs:
-                explanation = "A separate repair export has been queued for this damaged publication. Its delivery and any new failure are monitored under that export; the original receipts are preserved."
+                explanation = "A separate recovery export has been queued. Its delivery and any new failure are monitored under that export; the original attempt and receipts are preserved."
             elif self.rebuild_plan is not None:
-                actions["rebuild_damaged"] = dict(
-                    label="Rebuild verified damage",
-                    check="Confirm that this report should be rebuilt from its retained generation. Keep the registered files unchanged while the bot verifies the damage and available capacity.",
-                    effect="Recheck original writer closure and damage, quarantine the old report parts and queue one new physical export with a durable repair identity. The original receipt remains intact.",
+                actions["retry_absent" if absent else "rebuild_damaged"] = dict(
+                    label="Retry verified absent export" if absent else "Rebuild verified damage",
+                    check="Confirm that this retained report should be exported. Keep the registered files unchanged while the bot verifies the outcome and available capacity.",
+                    effect="Recheck old writer closure and current publication. Require proof of no delayed write for an absent export; preserve the original attempt and quarantine, then queue one separate physical export with a durable repair identity.",
                 )
-                explanation = "The original export completed but its latest verified publication is damaged. A rebuild needs a fresh authority proof, retained source generation and safe output capacity."
+                explanation = (
+                    "The attempted publication was verified absent. A separate retry requires fresh proof that no mutation was dispatched, retained input and safe output capacity."
+                    if absent
+                    else "The original export completed but its latest verified publication is damaged. A rebuild needs a fresh authority proof, retained source generation and safe output capacity."
+                )
         if queued:
             explanation = "The safe retry is recorded. Normal queue admission will take its original turn and acquire a fresh fence. This does not yet confirm delivery."
         resolved = job["State"] in {"confirmed", "cancelled", "coalesced"} or queued
-        if job["State"] == "confirmed" and damaged:
+        if (job["State"] == "confirmed" and damaged) or (job["State"] == "failed" and absent):
             resolved = bool(repairs)
         if (
             job["State"] == "running"
@@ -111,11 +118,14 @@ class ExportRecoveryAdapter:
             if {k: v for k, v in job.items() if k != "Stalled"} != current["job"]:
                 raise SourceConflict("Publication changed after review.")
             self._settle_publication(source_id, current, actor)
-        elif action == "rebuild_damaged" and self.rebuild_plan is not None:
+        elif action in {"rebuild_damaged", "retry_absent"} and self.rebuild_plan is not None:
             self.discovery.registered_publication(source_id, self.coordinator)
             plan = self.rebuild_plan(source_id, reason)
             if {k: v for k, v in job.items() if k != "Stalled"} != plan["snapshot"]["job"]:
                 raise SourceConflict("Publication changed while preparing its repair.")
+            expected_outcome = "absent" if action == "retry_absent" else "damaged"
+            if plan["proof"].get("state") != expected_outcome:
+                raise SourceConflict("Publication outcome changed. Review its current recovery.")
             # The centre persists the initiating Discord admin; the downstream
             # audit uses the durable action identity for acknowledgement recovery.
             plan["actor"] = actor
@@ -137,7 +147,7 @@ class ExportRecoveryAdapter:
         snapshot = self.discovery.job(source_id)
         provenance = json.loads(snapshot["job"]["ProvenanceJson"])
         actor = f"recovery:{action['ActionID']}"
-        if action["ActionKind"] == "rebuild_damaged":
+        if action["ActionKind"] in {"rebuild_damaged", "retry_absent"}:
             receipt = self.coordinator.repair_receipt(action["ActionID"])
             if receipt is not None:
                 repair = self.discovery.job(receipt["job_id"])["job"]

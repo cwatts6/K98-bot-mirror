@@ -1542,14 +1542,15 @@ class ExportCoordinationDAL:
         def validate_proof(proof):
             if (
                 not self.output_operations
-                or original["State"] != "confirmed"
-                or proof.get("state") != "damaged"
+                or (original["State"], proof.get("state"))
+                not in {("confirmed", "damaged"), ("failed", "absent")}
+                or (proof.get("state") == "absent" and proof.get("no_delayed_effect") is not True)
                 or proof.get("snapshot_hash") != digest(snapshot).hex()
                 or proof.get("writer_terminated") is not True
                 or not proof.get("evidence_id")
             ):
                 raise SourceConflict(
-                    "Confirmed damage and exact termination required for RepairID."
+                    "Verified damage or absence and exact termination required for RepairID."
                 )
 
         if not self.execution_evidence:

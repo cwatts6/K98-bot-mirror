@@ -107,7 +107,11 @@ def record_export_parts(cursor, job, claim, attempt_id, parts, *, action, damage
         expected_owner = None if damage_proof is not None else claim.owner_id
         if damage_proof is not None and (
             damage_proof.get("writer_terminated") is not True
-            or damage_proof.get("state") != "damaged"
+            or damage_proof.get("state") not in {"damaged", "absent"}
+            or (
+                damage_proof.get("state") == "absent"
+                and damage_proof.get("no_delayed_effect") is not True
+            )
             or not damage_proof.get("evidence_id")
         ):
             raise SourceConflict("Confirmed damage requires independent termination proof.")
@@ -136,6 +140,8 @@ def record_export_parts(cursor, job, claim, attempt_id, parts, *, action, damage
                 # A later repair retains the original quarantine event. Its separate
                 # repair plan carries the fresh damage/termination evidence.
                 continue
+            if damage_proof is not None and damage_proof.get("state") == "absent":
+                raise SourceConflict("Absent-publication retry requires its retained quarantine.")
         event = str(uuid4())
         sequence += 1
         sv = slot["Version"] if slot else None
@@ -1526,10 +1532,12 @@ class SourceOutputPoolDAL:
             # Resource owner tokens remain byte-for-byte intact. No independent release.
 
     def complete(self, claim, *, _owned_values=None):
-        with self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
-            cursor,
-            pool,
-            op,
+        with (
+            self._owned(claim) if _owned_values is None else nullcontext(_owned_values) as (
+                cursor,
+                pool,
+                op,
+            )
         ):
             self._execution_gate(cursor, claim.account)
             progress = json.loads(op["ProgressJson"])

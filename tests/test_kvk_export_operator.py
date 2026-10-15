@@ -48,6 +48,59 @@ def test_config_is_rechecked_for_every_action(service, actor):
     service.pools.export_context.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "state,outcome,delayed,accepted",
+    [
+        ("confirmed", "damaged", False, True),
+        ("failed", "absent", True, True),
+        ("failed", "absent", False, False),
+        ("failed", "damaged", True, False),
+        ("uncertain", "absent", True, False),
+    ],
+)
+def test_repair_plan_requires_exact_terminal_outcome_and_no_delayed_absent_effect(
+    service, actor, monkeypatch, state, outcome, delayed, accepted
+):
+    from types import SimpleNamespace
+
+    from kvk.dal.new_source_import_dal import digest
+    import kvk.services.source_export_operator_service as module
+
+    job = dict(State=state, JobID=str(uuid4()), IntentID="intent", InputHash="a" * 64)
+    snapshot = dict(
+        job=job,
+        parts=[],
+        pool=dict(
+            pool=dict(PoolID="pool", IndexFileID="index", Version=2, RegistrationHash="r", Epoch=3),
+            slots=[],
+        ),
+    )
+    service.coordinator.operator_snapshot.return_value = snapshot
+    service.reconciler.probe.return_value = dict(
+        state=outcome,
+        no_delayed_effect=delayed,
+        writer_terminated=True,
+        evidence_id="verified",
+        snapshot_hash=digest(snapshot).hex(),
+    )
+    generation = SimpleNamespace(key="generation", manifest=lambda: {})
+    monkeypatch.setattr(module, "physical_generation", lambda _: generation)
+    monkeypatch.setattr(
+        module,
+        "capacity_for_snapshot",
+        lambda *_args, **_kwargs: SimpleNamespace(current_parts=1, required_files=5),
+    )
+    if accepted:
+        plan = service.prepare_rebuild(actor, job["JobID"], reason="recover retained report")
+        assert plan["proof"]["state"] == outcome
+        assert plan["snapshot"]["job"] == job
+        service.coordinator.admit_repair.assert_not_called()
+    else:
+        with pytest.raises(SourceConflict):
+            service.prepare_rebuild(actor, job["JobID"], reason="recover retained report")
+        service.generation_loader.assert_not_called()
+
+
 def test_rollover_reconciliation_uses_exact_snapshot_and_no_mutation_adapter(service, actor):
     operation_id = str(uuid4())
     service.pools.operation.side_effect = None

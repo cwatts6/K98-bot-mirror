@@ -1856,7 +1856,11 @@ def new_source_job_scope(snapshot, claim, *, purpose="mutation"):
         )
         or purpose not in {"mutation", "probe"}
         or job["State"]
-        not in ({"running"} if purpose == "mutation" else {"running", "uncertain", "confirmed"})
+        not in (
+            {"running"}
+            if purpose == "mutation"
+            else {"running", "uncertain", "confirmed", "failed"}
+        )
         or any(type(v) is not int or v <= 0 for v in (claim.fence, claim.version, pool["Epoch"]))
         or pool["AccountKey"] != claim.account
         or pool["Epoch"] != job["PoolEpoch"]

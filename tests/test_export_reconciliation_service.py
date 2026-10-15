@@ -37,9 +37,9 @@ class ProofCursor:
 
     def execute(self, statement, *values):
         self.statements.append((statement, values))
-        assert statement.startswith(
-            ("SELECT", "WITH catalogue_scope")
-        ), "Unexpected mutation before proof validation"
+        assert statement.startswith(("SELECT", "WITH catalogue_scope")), (
+            "Unexpected mutation before proof validation"
+        )
         if "SELECT o.*" in statement:
             self.description = tuple((k,) for k in self.origins[0]) if self.origins else ()
             self.batch = [tuple(r.values()) for r in self.origins]
@@ -848,6 +848,7 @@ def test_journal_gaps_unknowns_and_tampering_remain_unresolved(damage):
     "route,kind",
     [
         ("repair", "publication"),
+        ("repair_absent", "publication"),
         ("retirement", "retirement"),
         ("recovery", "retirement_recovery"),
         ("rollover", "rollover_complete"),
@@ -883,8 +884,10 @@ def test_each_other_settlement_requires_sql_proof_before_mutation(monkeypatch, r
     pools = SourceOutputPoolDAL(Mock(), execution_evidence=True)
     pools._locked = Mock(return_value=nullcontext((cursor, pool)))
     reference = dict(proof_id=str(uuid4()))
-    if route == "repair":
+    if route in {"repair", "repair_absent"}:
         snapshot, _, _ = proof_fixture()
+        if route == "repair_absent":
+            snapshot["job"]["State"] = "failed"
         coordinator._operator_snapshot = Mock(return_value=snapshot)
         invoke = lambda: coordinator.admit_repair(
             str(uuid4()), dict(snapshot=snapshot, proof=reference)
@@ -1222,13 +1225,15 @@ def test_confirmed_assessment_never_relabels_unknown_structure_identity_or_acl(m
         observe_publication(**args)
 
 
-def test_absence_observation_requires_no_dispatch_prerequisite_and_sealed_reads(monkeypatch):
+@pytest.mark.parametrize("state", ["uncertain", "failed"])
+def test_absence_observation_requires_no_dispatch_prerequisite_and_sealed_reads(monkeypatch, state):
     from services.export_reconciliation_service import (
         observe_closed_publication,
         observe_publication,
     )
 
     args, api, observations, _ = publication_observation_fixture(monkeypatch, retained=False)
+    args["snapshot"]["job"]["State"] = state
     for file in api.files_data.values():
         file.get("appProperties", {}).pop("k98Generation", None)
     api.values["fake-index", "Sheet1"] = []
