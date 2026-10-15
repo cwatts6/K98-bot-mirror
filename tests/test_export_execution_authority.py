@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -24,12 +25,30 @@ class DAL:
         self.calls, self.requests = [], set()
         self.fail = None
         self.version = 0
+        self.streams = {}
 
     def transition(self, kind, **values):
         self.calls.append((kind, values))
         if kind == "event":
             self.requests.add(values["RequestID"])
         self.version += 1
+        if kind == "stream":
+            row = self.streams.setdefault(values["StreamID"], {})
+            row.update(values)
+            if values["Action"] == "open":
+                row[
+                    {
+                        "job": "JobID",
+                        "preparation": "PreparationID",
+                        "operation": "OutputOperationID",
+                    }[values["OwnerKind"]]
+                ] = values["ObjectID"]
+            row.update(
+                Version=self.version,
+                State={"open": "open", "freeze": "frozen", "close": "closed"}[values["Action"]],
+            )
+        elif kind == "event":
+            self.streams[values["StreamID"]]["Version"] = self.version
         # Simulate a committed result whose acknowledgment is lost.
         if self.fail == values.get("State", values.get("Action")):
             raise RuntimeError("lost acknowledgment")
@@ -37,6 +56,9 @@ class DAL:
 
     def read_request(self, identifier):
         return ({"RequestID": identifier} if identifier in self.requests else None), []
+
+    def read_stream(self, identifier):
+        return deepcopy(self.streams.get(identifier))
 
     def stream_digest(self, stream_id):
         return len(self.requests), b"d" * 32
@@ -306,6 +328,112 @@ def test_read_unknown_journal_commit_never_invents_terminal_evidence(runtime, fa
     with pytest.raises(ExecutionUncertain):
         authority.execute(request)
     assert not any(v.get("State") in {"not_sent", "unknown"} for _, v in dal.calls)
+
+
+@pytest.mark.parametrize("failure", ["freeze", "close", "store", "digest", "termination"])
+def test_interrupted_closure_resumes_exact_retained_child_without_provider_replay(runtime, failure):
+    authority, dal, store, child, _, request = runtime
+    stream_id = request["stream_id"]
+    terminate = child.terminate_and_observe
+    child.terminate_and_observe = Mock(side_effect=terminate)
+    original_put, original_digest = store.put, dal.stream_digest
+    if failure in {"freeze", "close"}:
+        dal.fail = failure
+    elif failure == "store":
+        store.put = Mock(side_effect=OSError("disk unavailable"))
+    elif failure == "digest":
+        dal.stream_digest = Mock(side_effect=RuntimeError("SQL unavailable"))
+    else:
+        child.terminate_and_observe.side_effect = RuntimeError("termination unverified")
+    with pytest.raises(ExecutionUncertain):
+        authority.close_stream(stream_id)
+    assert not authority._streams[stream_id].closed
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    dal.fail = None
+    store.put, dal.stream_digest = original_put, original_digest
+    child.terminate_and_observe.side_effect = terminate
+    result = authority.recover_owned_closure(stream_id)
+    assert result["version"] == dal.streams[stream_id]["Version"]
+    assert authority._streams[stream_id].closed and child.terminated
+    assert child.calls == []
+    assert child.terminate_and_observe.call_count == (2 if failure == "termination" else 1)
+    count = len(dal.calls)
+    assert authority.close_stream(stream_id) == result
+    assert len(dal.calls) == count
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "SessionID",
+        "ChildIdentity",
+        "AccountKey",
+        "StreamID",
+        "ClosureHash",
+        "ClosureReference",
+        "EventDigest",
+        "LastSequence",
+        "Version",
+    ],
+)
+def test_lost_close_ack_requires_exact_committed_receipt_and_owner(runtime, field):
+    authority, dal, _, child, _, request = runtime
+    stream_id = request["stream_id"]
+    dal.fail = "close"
+    with pytest.raises(ExecutionUncertain):
+        authority.close_stream(stream_id)
+    row = dal.streams[stream_id]
+    original = row[field]
+    row[field] = (
+        b"z" * 32
+        if isinstance(original, bytes)
+        else (original + 1 if isinstance(original, int) else str(uuid4()))
+    )
+    with pytest.raises(ExecutionUncertain):
+        authority.recover_owned_closure(stream_id)
+    assert not authority._streams[stream_id].closed
+    assert child.calls == []
+
+
+def test_recovery_does_not_close_healthy_or_adopt_unowned_stream(runtime):
+    authority, _, _, child, _, request = runtime
+    with pytest.raises(ExecutionUncertain):
+        authority.recover_owned_closure(request["stream_id"])
+    with pytest.raises(ExecutionUncertain):
+        authority.recover_owned_closure(str(uuid4()))
+    assert not child.terminated
+
+
+def test_registered_proof_recovers_only_matching_interrupted_object(runtime):
+    authority, dal, _, child, _, request = runtime
+    stream_id = request["stream_id"]
+    job_id = dal.streams[stream_id]["JobID"]
+    authority.recover_object_closures("test", job_id)
+    assert not child.terminated
+    authority._streams[stream_id].uncertain = True
+    authority.recover_object_closures("other", job_id)
+    authority.recover_object_closures("test", str(uuid4()))
+    assert not child.terminated
+    authority.recover_object_closures("test", job_id)
+    assert child.terminated and authority._streams[stream_id].closed
+
+
+def test_handle_cleanup_failure_preserves_positive_termination_receipt(runtime):
+    authority, _, _, child, _, request = runtime
+
+    def terminate():
+        child.termination_evidence = dict(
+            child_id=child.identity, job_empty=True, process_signaled=True
+        )
+        raise OSError("handle cleanup failed after observed termination")
+
+    child.terminate_and_observe = Mock(side_effect=terminate)
+    with pytest.raises(ExecutionUncertain):
+        authority.close_stream(request["stream_id"])
+    authority.recover_owned_closure(request["stream_id"])
+    child.terminate_and_observe.assert_called_once()
+    assert authority._streams[request["stream_id"]].closed
 
 
 def test_read_guard_failure_after_acknowledged_intent_can_close(runtime):

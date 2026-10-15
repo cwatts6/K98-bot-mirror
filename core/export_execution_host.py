@@ -944,6 +944,7 @@ class WindowsProviderChild:
         self.pid, self.pipe, self.sid, self.api = pid, pipe, sid, api
         self.resumed = False
         self.terminated = False
+        self.termination_evidence = None
 
     def resume(self):
         if self.resumed or self.terminated:
@@ -990,6 +991,9 @@ class WindowsProviderChild:
             "job_empty": True,
             "process_signaled": True,
         }
+        # Keep the observed receipt even if a subsequent handle Close fails.
+        # It is historical positive termination evidence, never a fresh OS probe.
+        self.termination_evidence = dict(evidence)
         self.terminated = True
         for handle in (self.thread, self.process, self.job, self.pipe.handle):
             if handle is not None:

@@ -215,6 +215,7 @@ def test_fixed_issuer_uses_private_observation_and_exact_sql_identity_only(
         dal.transition.side_effect = EvidenceCommitUnknown("Commit acknowledgement lost")
     authority = SimpleNamespace(
         dal=dal,
+        recover_object_closures=Mock(),
         store=SimpleNamespace(
             put=put,
             read=lambda receipt: (
@@ -250,8 +251,10 @@ def test_fixed_issuer_uses_private_observation_and_exact_sql_identity_only(
         assert dal.transition.call_count == int(failure == "commit_unknown")
         if failure in {"stale", "boundary"}:
             probe.assert_not_called()
+            authority.recover_object_closures.assert_not_called()
     else:
         result = issuer.issue(**args)
+        authority.recover_object_closures.assert_called_once_with("account-a", job["JobID"])
         values = dal.transition.call_args.kwargs
         assert dal.transition.call_count == 1 and dal.transition.call_args.args == ("proof",)
         assert values["ProofID"] == result["proof_id"]

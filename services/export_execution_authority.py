@@ -4,6 +4,7 @@ No default clients, credentials or in-memory recovery claims. Each stream belong
 to one exact supervised child. Only its trusted parent can author response events.
 """
 
+from copy import deepcopy
 from dataclasses import dataclass
 import logging
 import threading
@@ -37,6 +38,9 @@ class OwnedStream:
     closed: bool = False
     enrollment_phase: str | None = None
     enrollment_ordinal: int | None = None
+    termination_evidence: dict | None = None
+    closure_receipt: object | None = None
+    closure_document: dict | None = None
 
 
 class ExportExecutionAuthority:
@@ -132,7 +136,7 @@ class ExportExecutionAuthority:
             except BaseException as exc:
                 stream.uncertain = True
                 stream.frozen = True
-                child.terminate_and_observe()
+                self._terminate_child(stream)
                 raise ExecutionUncertain(
                     "Stream admission/child startup requires reconciliation."
                 ) from exc
@@ -273,32 +277,72 @@ class ExportExecutionAuthority:
         """Freeze, observe exact child termination, then commit closure; no release."""
         with self._lock:
             stream = self._streams.get(stream_id)
-            if stream is None or stream.frozen:
-                raise ExecutionUncertain("Stream closure is already pending or unavailable.")
+            if stream is None:
+                raise ExecutionUncertain("Stream is not owned by this authority.")
+            if stream.closed:
+                return {"stream_id": stream_id, "version": stream.version}
+            recover = stream.frozen or stream.uncertain
             stream.frozen = True
             try:
-                row = self.dal.transition(
-                    "stream",
-                    SessionID=self.session_id,
-                    StreamID=stream_id,
-                    AccountKey=stream.account,
-                    Action="freeze",
-                    ExpectedVersion=stream.version,
-                )
-                stream.version = row["Version"]
-                evidence = stream.child.terminate_and_observe()
-                last_sequence, event_digest = self.dal.stream_digest(stream_id)
-                receipt = self.store.put(
-                    encode(
-                        {
-                            "stream_id": stream_id,
-                            "version": stream.version,
-                            "closure": evidence,
-                            "last_sequence": last_sequence,
-                            "event_digest": event_digest.hex(),
-                        }
+                state = "open"
+                if recover:
+                    retained = self.dal.read_stream(stream_id)
+                    if not retained or (
+                        str(retained["StreamID"]).lower(),
+                        str(retained["SessionID"]).lower(),
+                        str(retained["ChildIdentity"]).lower(),
+                        retained["AccountKey"],
+                    ) != (stream_id, self.session_id, stream.child.identity, stream.account):
+                        raise ExecutionUncertain("Closure recovery identity differs.")
+                    state = retained["State"]
+                    if state == "closed":
+                        receipt, document = stream.closure_receipt, stream.closure_document
+                        sequence, event_digest = self.dal.stream_digest(stream_id)
+                        if (
+                            receipt is None
+                            or document is None
+                            or bytes(retained["ClosureHash"]).hex() != receipt.sha256
+                            or str(retained["ClosureReference"]).lower() != str(UUID(receipt.key))
+                            or retained["Version"] != document["version"] + 1
+                            or retained["LastSequence"] != document["last_sequence"]
+                            or retained["LastSequence"] != sequence
+                            or bytes(retained["EventDigest"]).hex() != document["event_digest"]
+                            or event_digest.hex() != document["event_digest"]
+                        ):
+                            raise ExecutionUncertain(
+                                "Committed closure differs from retained evidence."
+                            )
+                        stream.version, stream.closed = retained["Version"], True
+                        return {"stream_id": stream_id, "version": stream.version}
+                    if state not in {"open", "frozen"}:
+                        raise ExecutionUncertain("Stream has no recoverable closure transition.")
+                    stream.version = retained["Version"]
+                if state == "open":
+                    row = self.dal.transition(
+                        "stream",
+                        SessionID=self.session_id,
+                        StreamID=stream_id,
+                        AccountKey=stream.account,
+                        Action="freeze",
+                        ExpectedVersion=stream.version,
                     )
-                )
+                    stream.version = row["Version"]
+                if stream.termination_evidence is None:
+                    self._terminate_child(stream)
+                last_sequence, event_digest = self.dal.stream_digest(stream_id)
+                document = {
+                    "stream_id": stream_id,
+                    "version": stream.version,
+                    "closure": stream.termination_evidence,
+                    "last_sequence": last_sequence,
+                    "event_digest": event_digest.hex(),
+                }
+                if stream.closure_document is not None and stream.closure_document != document:
+                    raise ExecutionUncertain("Frozen journal changed after closure evidence.")
+                stream.closure_document = deepcopy(document)
+                if stream.closure_receipt is None:
+                    stream.closure_receipt = self.store.put(encode(document))
+                receipt = stream.closure_receipt
                 row = self.dal.transition(
                     "stream",
                     SessionID=self.session_id,
@@ -321,6 +365,46 @@ class ExportExecutionAuthority:
                     "Stream closure requires reconciliation; retain claims."
                 ) from exc
 
+    @staticmethod
+    def _terminate_child(stream):
+        try:
+            stream.termination_evidence = deepcopy(stream.child.terminate_and_observe())
+        except BaseException:
+            retained = getattr(stream.child, "termination_evidence", None)
+            if (
+                isinstance(retained, dict)
+                and retained.get("child_id") == stream.child.identity
+                and retained.get("job_empty") is True
+                and retained.get("process_signaled") is True
+            ):
+                stream.termination_evidence = deepcopy(retained)
+            raise
+
+    def recover_owned_closure(self, stream_id):
+        """Finish an interrupted local closure; never adopt another session's child."""
+        with self._lock:
+            stream = self._streams.get(stream_id)
+            if stream is None or not (stream.uncertain or stream.frozen):
+                raise ExecutionUncertain("No interrupted locally owned stream closure.")
+            return self.close_stream(stream_id)
+
+    def recover_object_closures(self, account, object_id):
+        """A registered proof request can finish only its interrupted local children."""
+        with self._lock:
+            for stream_id, owned in tuple(self._streams.items()):
+                if (
+                    owned.account != account
+                    or owned.closed
+                    or not (owned.frozen or owned.uncertain)
+                ):
+                    continue
+                row = self.dal.read_stream(stream_id)
+                if row and object_id in {
+                    str(row.get("JobID")).lower(),
+                    str(row.get("OutputOperationID")).lower(),
+                }:
+                    self.recover_owned_closure(stream_id)
+
     def stop(self):
         """Close admission. Caller drains owned streams; no automatic adoption/retry."""
         with self._lock:
@@ -336,9 +420,6 @@ class ExportExecutionAuthority:
         failures = []
         for stream_id, stream in tuple(self._streams.items()):
             if stream.closed:
-                continue
-            if stream.frozen:
-                failures.append(stream_id)
                 continue
             try:
                 self.close_stream(stream_id)

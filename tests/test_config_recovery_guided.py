@@ -55,6 +55,7 @@ def authority_fixture(monkeypatch, *, preflight=False, lost_ack=False):
     )
     source = snapshot["preparation"]["PreparationID"]
     client = SimpleNamespace(
+        authority=authority,
         inspect_configuration_recovery=lambda key: module.inspect_configuration_recovery(
             authority, registration, key
         ),
@@ -63,6 +64,26 @@ def authority_fixture(monkeypatch, *, preflight=False, lost_ack=False):
         ),
     )
     return client, dal, snapshot, source, documents, stream
+
+
+def test_monitor_finishes_only_interrupted_locally_owned_read_closure(monkeypatch):
+    client, dal, snapshot, source, _, stream = authority_fixture(monkeypatch)
+    authority = client.authority
+    owned = SimpleNamespace(purpose="probe", frozen=True, uncertain=True)
+    authority._streams[stream["StreamID"]] = owned
+    stream["State"] = snapshot["streams"][0]["State"] = "frozen"
+
+    def close(_):
+        stream["State"] = snapshot["streams"][0]["State"] = "closed"
+
+    authority.recover_owned_closure = Mock(side_effect=close)
+    assert client.inspect_configuration_recovery(source)["eligible"]
+    authority.recover_owned_closure.assert_called_once_with(stream["StreamID"])
+    dal.settle.assert_not_called()
+    authority.recover_owned_closure.reset_mock()
+    owned.frozen = owned.uncertain = False
+    client.inspect_configuration_recovery(source)
+    authority.recover_owned_closure.assert_not_called()
 
 
 @pytest.mark.parametrize("preflight", [False, True])

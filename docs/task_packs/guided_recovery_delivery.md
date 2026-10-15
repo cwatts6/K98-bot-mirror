@@ -94,6 +94,21 @@ resolves repair admission only; its delivery remains separately monitored. Exist
 mutation proofs cannot be overridden by a button or admin assertion. No new persistent SQL
 objects are introduced in this slice; authoritative schemas are used in temporary-table tests.
 
+That export slice is now [Bot PR 334](https://github.com/cwatts6/K98-bot-mirror/pull/334).
+Its exact Changes review covered all five changed source files with no findings and was
+sealed/read back successfully. Its focused suite passed 197 tests; the full suite remains
+in progress at this checkpoint.
+
+The next closure slice retains positive exact-child termination evidence and its immutable
+closure receipt across local acknowledgement/storage failures. It re-reads the exact session,
+child, account, frozen version and sealed journal before finishing closure. Configuration
+discovery can finish an already interrupted owned read; registered proof requests can finish
+only the matching job/rollover's interrupted locally owned children. Healthy streams are not
+interrupted, old-session children are not adopted, and no provider request is replayed. Closed
+streams still need the independent complete-journal and operation-specific settlement proofs.
+Recovery after losing the entire authority process before durable closure, and incomplete
+read-terminal journals, remain required P0 work in the subsequent focused slice.
+
 Still required before P0 completion: legacy unknown writes, absent attempted-publication retry,
 damaged-index/unknown-write containment and registration replacement, earlier rollover phases,
 incomplete private journal/child closure recovery, all-KVK generation and missing/unverifiable

@@ -773,6 +773,7 @@ class TrustedProofIssuer:
             context = snapshot if kind == "retirement" else snapshot["pool"]
             registration = self.registration.sheets(context)
             account = context["pool"]["AccountKey"]
+            self.authority.recover_object_closures(account, object_id)
             common = dict(
                 dal=self.authority.dal,
                 store=self.authority.store,
