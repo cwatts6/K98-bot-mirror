@@ -27,6 +27,20 @@ async def show_target_page(interaction, incident_id, page):
                 text += (
                     f" → [Replacement](https://docs.google.com/spreadsheets/d/{mapping[old]}/edit)"
                 )
+                summary = row["evidence"].get("configuration_checks", {}).get(mapping[old], [])
+                if summary:
+                    text += "\nConfiguration checked: " + ", ".join(
+                        f"{item['tab']}: {item['rows']} rows" for item in summary
+                    )
+                    text += "\nOpen the replacement and verify these settings before activation."
+                    text += " Empty optional tabs keep existing SQL settings; blank ProcConfig cells also retain stored values."
+                    checked = row["evidence"].get("configuration_preflight", {}).get(mapping[old])
+                    if checked:
+                        text += (
+                            f"\nSQL preflight: season {checked['season']}, "
+                            f"selected scan {checked['selected_scan']}, "
+                            f"{checked['source_periods_checked']} source periods checked."
+                        )
             else:
                 text += " · Replacement not yet chosen"
             embed.add_field(name=f"Output {ordinal}", value=text, inline=False)

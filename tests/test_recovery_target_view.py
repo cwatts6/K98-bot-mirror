@@ -70,3 +70,16 @@ async def test_final_incident_keeps_output_links_and_removes_repair_link():
     labels = {button.label for button in RecoveryIncidentView(current).children}
     assert "Review output links" in labels
     assert "Review replacement export" not in labels
+
+
+@pytest.mark.asyncio
+async def test_configuration_checklist_shows_row_counts_and_review_link(interaction):
+    current = row()
+    current["evidence"]["configuration_checks"] = {
+        "new-file-0": [dict(tab="ProcConfig", rows=2, sha256="a" * 64)]
+    }
+    view.call.return_value = current
+    await view.show_target_page(interaction, current["IncidentID"], 0)
+    text = interaction.followup.send.call_args.kwargs["embed"].fields[0].value
+    assert "ProcConfig: 2 rows" in text and "/new-file-0/edit" in text
+    assert "verify these settings before activation" in text

@@ -15,6 +15,11 @@ from kvk_state import (
     get_latest_kvk_details,
     is_scan_within_open_window,
 )
+from services.legacy_export_snapshot_service import (
+    bound_runtime,
+    configuration_destination,
+    read_configuration,
+)
 
 # Fixed import: parse_mixed_dates exists as that name in formatters.py
 from stats_alerts.formatters import parse_mixed_dates as _parse_mixed_dates
@@ -49,11 +54,14 @@ def get_latest_kvk_metadata_sql() -> dict[str, Any] | None:
         return None
 
 
+@bound_runtime
 def get_latest_kvk_metadata() -> dict[str, Any] | None:
     """Sheets fallback for *display only* (name/dates/banner)."""
     try:
         # Use centralized gsheet wrapper for consistent retry/telemetry.
-        rows = gm.get_sheet_values(KVK_SHEET_ID, "KVK_Details!A1:Z")
+        rows = read_configuration(
+            lambda: gm.get_sheet_values(configuration_destination(KVK_SHEET_ID), "KVK_Details!A1:Z")
+        )
         # gm.get_sheet_values returns None on error, [] for empty ranges
         if not rows:
             return None

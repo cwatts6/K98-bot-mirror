@@ -201,6 +201,7 @@ INSTALLATION_MIGRATIONS = (
     "20260929_001_manual_export_registration",
     "20261015_008_export_target_containment",
     "20261015_009_guided_export_replacement",
+    "20261015_010_configuration_replacement",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -217,6 +218,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261001_010_reconciliation_file_id_characters",
     "20261015_008_export_target_containment",
     "20261015_009_guided_export_replacement",
+    "20261015_010_configuration_replacement",
 )
 
 
@@ -532,9 +534,9 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "91e0b22cbc6d1b6e4ebad27293e9847d9ea12b3b5208b9819e95228d52f19a7c"
+APPLICATION_SCHEMA_SOURCE_HASH = "4662d142be840e2ae7ff94df48443c314d42c66cf311b763489f0c7387370b8b"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
-APPLICATION_ACTIVATION_SCOPE_HASH = "e89a14618ce2a07aef89803a19477bd52ee7aebc211cf9622ce08dee9fc50281"
+APPLICATION_ACTIVATION_SCOPE_HASH = "d6b4c875891c197266203c26ee2e59e9067e2cd175d96b1ffd538f514ad8765d"
 
 
 def application_activation_scope():

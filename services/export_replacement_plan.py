@@ -87,15 +87,34 @@ def replacement_registration(registration, *, targets, replacements, replacement
                 binding["pool_id"] = replacement_id
     else:
         scopes = projected["legacy_configuration"]
-        if set(targets) & set(scopes["config"]["destinations"]):
-            raise SourceConflict(
-                "A configuration input cannot be replaced with a blank output workbook."
-            )
+        configuration_targets = set(targets) & set(scopes["config"]["destinations"])
         writable = {f for kind in ("scan_data", "all_kvk") for f in scopes[kind]["destinations"]}
         if not set(targets) <= writable:
             raise SourceConflict("Only registered legacy output destinations can be rebound.")
+        if configuration_targets:
+            from services.export_replacement_configuration import CONFIGURATION_TABS
+
+            config = scopes["config"]
+            aliases = {
+                old: mapping.get(current, current)
+                for old, current in config.get("input_aliases", {}).items()
+            }
+            aliases.update({old: mapping[old] for old in configuration_targets})
+            config["input_aliases"] = aliases
+            config["destinations"] = [mapping.get(f, f) for f in config["destinations"]]
         for kind in ("scan_data", "all_kvk"):
             scope = scopes[kind]
+            for old in configuration_targets & set(scope["destinations"]):
+                existing = scope.get("grid_ids", {}).get(old, {})
+                preserved = scope.get("preserved_tabs", {}).get(old, [])
+                if (set(existing) & set(CONFIGURATION_TABS)) - set(preserved):
+                    raise SourceConflict("Report output overlaps a protected configuration tab.")
+            if "preserved_tabs" in scope:
+                scope["preserved_tabs"] = {
+                    mapping.get(f, f): tabs for f, tabs in scope["preserved_tabs"].items()
+                }
+            for old in configuration_targets & set(scope["destinations"]):
+                scope.setdefault("preserved_tabs", {})[mapping[old]] = list(CONFIGURATION_TABS)
             scope["destinations"] = [mapping.get(f, f) for f in scope["destinations"]]
             if "spreadsheets" in scope:
                 scope["spreadsheets"] = {
@@ -144,10 +163,19 @@ def verified_registration(proposal, files):
                     if title in configured and configured[title] != grid_id:
                         raise SourceConflict("Shared legacy tab registrations disagree.")
                     configured[title] = grid_id
+            protected = {
+                g["title"]: g["sheet_id"]
+                for g in file.get("configuration_grids", [])
+                if g["title"] != "Sheet1"
+            }
+            configured = {
+                title: grid_id for title, grid_id in configured.items() if title not in protected
+            }
             configured[file["title"]] = file["sheet_id"]
-            used = set(configured.values())
+            reserved = {file["sheet_id"], *protected.values()}
+            used = set(configured.values()) | reserved
             for title in sorted(configured):
-                if title != file["title"] and configured[title] == file["sheet_id"]:
+                if title != file["title"] and configured[title] in reserved:
                     candidate = (
                         int.from_bytes(hashlib.sha256(title.encode()).digest()[:4], "big")
                         & 0x7FFFFFFF
@@ -156,6 +184,7 @@ def verified_registration(proposal, files):
                         candidate = (candidate + 1) & 0x7FFFFFFF
                     configured[title] = candidate
                     used.add(candidate)
+            configured.update(protected)
             for kind in ("scan_data", "all_kvk"):
                 if file["file_id"] in scopes[kind]["destinations"]:
                     scopes[kind].setdefault("grid_ids", {})[file["file_id"]] = deepcopy(configured)

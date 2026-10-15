@@ -5,8 +5,46 @@ The programme remains incomplete until every workstream and acceptance gate belo
 
 ## Current P0 completion checklist — 2026-10-15
 
-Active implementation checkpoint (unpublished working changes on
-`codex/guided-target-replacement`; **not P0 completion**):
+Active implementation checkpoint (**not P0 completion**): the complete output
+replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
+`codex/guided-config-replacement` slice adds shared configuration/output recovery.
+
+- The admin form identifies configuration workbooks and lists the seven required
+  copied input tabs. The read-only check validates owner/sharing, complete bounded
+  grid contents, formulas, schema, dates and keys, plus the blank output area.
+  Review output links shows tab row counts. Activation requires the admin to
+  verify the intended settings and switches configuration reads and report output
+  together. Copied input tabs are protected from subsequent report publication.
+- Configuration aliases compose through repeated replacement and restart;
+  ProcConfig imports, validation, health checks and display metadata resolve the
+  active input. Report delivery continues from retained input without repeating
+  committed imports. Incomplete reads offer guided discard and fresh verification.
+- Temporary SQL tests exercise the full admin path through verified publication
+  and a subsequent configuration read, plus lost reads and malformed roles.
+  The affected regression run passed 205 tests; another 498-test run covers the
+  final configuration cases, runtime contracts, source pins, permissions and Sheets
+  regressions. Migration 010 literal bodies and predecessor/postimage hashes match
+  the authoritative SQL snapshots. SQL Changes review
+  `3235fc22-5123-4607-ae8c-3c29c415c81f` sealed with no findings across all three files;
+  measured usage: 1,827,020 total tokens (1,822,389 input, 4,631 output).
+  Bot Changes review sealed successfully. Review corrections validate actual
+  formatted import tokens, numeric bounds/precision, SQL UTF-16 text lengths,
+  camp IDs and ordered scan windows before activation. The current SQL preflight
+  checks retained/overlaid ProcConfig values, effective season, exact scan rows,
+  official target publication and enabled source period/weight prerequisites.
+  Failed prerequisites offer a guided configuration-copy correction and fresh
+  check; activation rechecks SQL. Empty optional tabs and blank ProcConfig cells
+  explicitly retain existing SQL values, matching the current importer.
+  The complete seven-tab populated fixture, guided correction/recheck, changed
+  SQL at activation, source checks and affected regressions pass 625 tests.
+  The standard baseline run recorded 8,065 passes, 446 skips, one deselection and
+  eight subtest passes; its one stale-proposal failure is fixed and covered by the
+  passing affected run. The correction Changes review sealed with no findings;
+  the final compatibility review also sealed with no findings across its one
+  source file (247,530 measured total tokens). The final 85-test run passes,
+  including global exemptions and real SQL integer-staging round trips.
+  SQL configuration replacement is published as draft PR #117. Bot publication
+  is the next handoff; the remaining P0 workstreams below stay active.
 
 - Guided saved multi-page admin forms, strict file-link parsing, fresh read-only
   verification, original-journal finish/discard buttons, sealed activation and
@@ -71,9 +109,9 @@ Active implementation checkpoint (unpublished working changes on
   atomic-writer concurrency test separately produced Windows access-denied and
   remains a documented validation limitation, outside this replacement change.
 
-Required work still inside unknown-write recovery: configuration-input/output
-aliases, corrupt private-evidence restoration, final negative-path review,
-immutable Bot Changes review, and focused draft PR publication. These are
+Required work still inside unknown-write recovery: corrupt private-evidence
+restoration, final negative-path review, immutable Bot Changes review, and
+focused draft PR publication for configuration replacement. These are
 active acceptance requirements, **not deferred optimisation**. The wider P0
 workstreams in the table remain required after this slice.
 

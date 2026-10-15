@@ -20,10 +20,11 @@ from services.export_replacement_verification import (
     METADATA,
     ReplacementVerificationEvidence,
     ReplacementVerificationPlan,
-    discovered_grid,
+    discover_replacement,
+    file_request_count,
     replacement_readback,
-    replacement_requests,
     verification_plan,
+    verification_requests,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,8 +174,8 @@ class ReplacementVerificationService:
                     )
                     return worker.execute(typed.message())
 
-                grid = discovered_grid(policy["file_id"], request(*METADATA))
-                responses = [request(op, args) for op, args in replacement_requests(grid)]
+                grid = discover_replacement(policy, request(*METADATA))
+                responses = [request(op, args) for op, args in verification_requests(grid)]
                 replacement_readback(plan, policy, grid, responses)
         finally:
             if stream_id in worker._streams:
@@ -209,6 +210,41 @@ class ReplacementVerificationService:
         if self.authority.store.read_reference(reference, bytes.fromhex(receipt.sha256)) != raw:
             raise SourceConflict("Private replacement verification receipt did not verify.")
         return dict(reference=reference, sha256=receipt.sha256)
+
+    def configuration_readiness(self, verification_id):
+        """Live SQL prerequisites, separate from immutable historical read evidence."""
+        import bot_config
+        from services.export_configuration_preflight_dal import ConfigurationPreflightDAL
+
+        snapshot, plan = self._snapshot(verification_id)
+        if snapshot["attempt"]["State"] != "verified":
+            raise SourceConflict("Configuration readiness requires a verified read check.")
+        if not any(f.get("kind") == "configuration_output" for f in plan.value()["files"]):
+            return dict(ready=True, files={})
+        tables = ReplacementVerificationEvidence(
+            dal=self.authority.dal, store=self.authority.store
+        ).configuration_tables(plan, identity(snapshot["streams"][0]["StreamID"]))
+        checker = ConfigurationPreflightDAL(self.authority.dal.connect)
+        results = {}
+        for file, values in tables.items():
+            try:
+                results[file] = checker.inspect(
+                    values,
+                    source_recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
+                    source_intake=bot_config.KVK_SOURCE_INTAKE_ENABLED,
+                )
+            except SourceConflict as exc:
+                return dict(ready=False, files=results, issue=str(exc)[:512])
+            except Exception:
+                logger.warning(
+                    "Replacement configuration SQL preflight unavailable: %s", verification_id
+                )
+                return dict(
+                    ready=False,
+                    files=results,
+                    issue="SQL prerequisites could not be checked. Keep the replacement unchanged and use Refresh to retry the read-only check.",
+                )
+        return dict(ready=True, files=results)
 
     def finish(self, verification_id):
         with self.authority._lock:
@@ -305,10 +341,13 @@ class ReplacementVerificationService:
             reason=attempt["Reason"],
         )
         if attempt["State"] == "checking":
-            completed = min(
-                plan.value()["file_count"],
-                sum(s["LastSequence"] for s in snapshot["streams"]) // 5,
-            )
+            remaining = sum(s["LastSequence"] for s in snapshot["streams"])
+            completed = 0
+            for policy in plan.value()["files"]:
+                remaining -= file_request_count(policy)
+                if remaining < 0:
+                    break
+                completed += 1
             result.update(
                 can_finish=False,
                 files_requested=completed,

@@ -1061,6 +1061,35 @@ def _legacy_configuration(configuration):
             or (kind != "all_kvk" and configured.get("kvk_no") is not None)
         ):
             raise SourceConflict("Exact legacy/configuration registration required.")
+        if "input_aliases" in configured:
+            aliases = configured["input_aliases"]
+            if (
+                kind != "config"
+                or not isinstance(aliases, dict)
+                or any(
+                    not isinstance(old, str)
+                    or not re.fullmatch(r"[A-Za-z0-9_-]{6,128}", old)
+                    or old in files
+                    or current not in files
+                    for old, current in aliases.items()
+                )
+            ):
+                raise SourceConflict(
+                    "Configuration aliases must resolve directly to active registered inputs."
+                )
+        if "preserved_tabs" in configured:
+            from services.export_replacement_configuration import CONFIGURATION_TABS
+
+            preserved = configured["preserved_tabs"]
+            if (
+                kind == "config"
+                or not isinstance(preserved, dict)
+                or any(
+                    file not in files or tabs != list(CONFIGURATION_TABS)
+                    for file, tabs in preserved.items()
+                )
+            ):
+                raise SourceConflict("Exact protected configuration tab registration required.")
     return document
 
 
