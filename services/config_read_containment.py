@@ -181,3 +181,23 @@ def verify_contained_read(execution, store, stream, *, account, registration_has
     ):
         raise SourceConflict("Contained read ledger differs from its private seal.")
     return seal
+
+
+def verify_preparation_receipt(store, audit, *, preparation_id, account, storage_owner):
+    """Verify the whole committed decision, including a read with no stream rows."""
+    receipt = audit["receipt"]
+    body = {key: value for key, value in audit.items() if key != "receipt"}
+    raw = encode(body)
+    original = body["before"]["preparation"]
+    if (
+        body["kind"] != "config_read_containment/1"
+        or body["provider_observation"] is not False
+        or body["child_termination_verified"] is not False
+        or (original["PreparationID"], original["AccountKey"], original["StorageOwner"])
+        != (preparation_id, account, storage_owner)
+        or digest(body["before"]).hex() != body["snapshot_sha256"]
+        or hashlib.sha256(raw).hexdigest() != receipt["sha256"]
+        or body["streams"] != receipt["streams"]
+        or store.read_reference(receipt["reference"], bytes.fromhex(receipt["sha256"])) != raw
+    ):
+        raise SourceConflict("Committed read containment receipt differs.")

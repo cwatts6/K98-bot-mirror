@@ -17,7 +17,13 @@ class ConfigReadRecoveryAdapter:
     def inspect(self, source_id):
         result = self.client.inspect_configuration_recovery(source_id)
         actions = {}
-        if result["eligible"] and result["outcome"] == "read_containment":
+        if result["eligible"] and result["outcome"] == "unstarted_read":
+            actions["contain_read"] = dict(
+                label="Cancel unstarted read",
+                check="Confirm this configuration read should be cancelled. The bot verified that it holds reservations but has no execution stream or provider requests. A new read can be requested after cancellation.",
+                effect="Fence the original claim and release only its exact reservations in one transaction, preserve the cancellation receipt, then verify the release. The old worker cannot open a stream using its cancelled claim.",
+            )
+        elif result["eligible"] and result["outcome"] == "read_containment":
             actions["contain_read"] = dict(
                 label="Isolate read & release",
                 check="Confirm this failed configuration read can be discarded. The bot verified that all recorded requests are read-only. A previously dispatched read may still finish, but its result will not be used. No child termination or provider health is being asserted.",
@@ -48,10 +54,10 @@ class ConfigReadRecoveryAdapter:
         result = self.client.inspect_configuration_recovery(source_id)
         if result["settled_token"] == action["EvidenceHash"]:
             return "verified"
-        matches_action = result["outcome"] == {
-            "release_read": "abandoned_read",
-            "contain_read": "read_containment",
-        }.get(action.get("ActionKind"))
+        matches_action = result["outcome"] in {
+            "release_read": {"abandoned_read"},
+            "contain_read": {"read_containment", "unstarted_read"},
+        }.get(action.get("ActionKind"), set())
         if result["eligible"] and matches_action and result["token"] == action["EvidenceHash"]:
             self.execute(
                 source_id,
