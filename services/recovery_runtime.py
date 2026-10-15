@@ -79,6 +79,8 @@ def observe_recovery():
                     incident["IncidentID"],
                     type(exc).__name__,
                 )
+        if service.store.has_failed_checks():
+            failures.append("PersistedCheckUnavailable")
     return failures
 
 

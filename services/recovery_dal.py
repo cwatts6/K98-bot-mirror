@@ -124,6 +124,16 @@ class RecoveryDAL:
                 self.scope,
             )
 
+    def has_failed_checks(self):
+        """Include failures outside the current discovery page and across restarts."""
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT TOP (1) IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? "
+                "AND State='open' AND JSON_VALUE(EvidenceJson,'$.check_unavailable') IS NOT NULL",
+                self.scope,
+            )
+            return one(cursor) is not None
+
     def alerts_due(self):
         with transaction(self.connect) as cursor:
             cursor.execute(

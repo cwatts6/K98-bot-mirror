@@ -30,10 +30,14 @@ async def observe_recovery_outcomes(bot):
                 logger.info("recovery_observer available=true")
             unavailable = False
             if outage_message:
-                await outage_message.edit(
-                    content="Recovery monitoring has resumed. Review the recovery centre for outstanding incidents.",
-                    view=RecoveryEntryView(),
-                )
+                try:
+                    await outage_message.edit(
+                        content="Recovery monitoring has resumed. Review the recovery centre for outstanding incidents.",
+                        view=RecoveryEntryView(),
+                    )
+                except discord.NotFound:
+                    # A deleted diagnostic message cannot invalidate successful checks.
+                    pass
                 outage_message = None
         except asyncio.CancelledError:
             raise

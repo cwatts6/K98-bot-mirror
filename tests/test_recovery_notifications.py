@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -109,3 +111,69 @@ async def test_recovery_registered_independently_and_entry_rehydrated(monkeypatc
     monitor.create.reset_mock()
     register_recovery_monitor(bot, monitor)
     monitor.create.assert_not_called()
+
+
+def test_failed_check_remains_degraded_across_pages_and_empty_reset(monkeypatch):
+    from services import recovery_runtime as module
+
+    failed = set()
+    pages = iter(
+        [[{"IncidentID": "failed"}], [{"IncidentID": "healthy"}], [], [{"IncidentID": "failed"}]]
+    )
+    restored = False
+
+    def refresh(key):
+        if key == "failed" and not restored:
+            raise TimeoutError()
+        failed.discard(key)
+
+    store = SimpleNamespace(
+        scope="test",
+        list_open=lambda **kwargs: next(pages),
+        check_failed=lambda key, error: failed.add(key),
+        has_failed_checks=lambda: bool(failed),
+    )
+    adapter = SimpleNamespace(dal=SimpleNamespace(pending_recovery=lambda **kwargs: []))
+
+    @contextmanager
+    def service():
+        yield SimpleNamespace(store=store, adapters={"stats_import": adapter}, refresh=refresh)
+
+    monkeypatch.setattr(module, "recovery_service", service)
+    monkeypatch.setattr(module, "_cursor", None)
+    monkeypatch.setattr(module, "_incident_cursor", None)
+    assert module.observe_recovery()
+    assert module.observe_recovery()
+    assert module.observe_recovery()
+    restored = True
+    assert module.observe_recovery() == []
+
+
+@pytest.mark.asyncio
+async def test_deleted_outage_alert_does_not_block_monitor_recovery(monkeypatch):
+    import bot_config
+    from core import recovery_lifecycle as module
+
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 3)
+    monkeypatch.setattr(bot_config, "GUILD_ID", 2)
+    message = SimpleNamespace(
+        edit=AsyncMock(
+            side_effect=discord.NotFound(SimpleNamespace(status=404, reason="deleted"), "deleted")
+        )
+    )
+    channel = SimpleNamespace(guild=SimpleNamespace(id=2), send=AsyncMock(return_value=message))
+    bot = SimpleNamespace(get_channel=lambda _: channel)
+    monkeypatch.setattr(module, "drain_thread", AsyncMock(side_effect=[TimeoutError(), [], []]))
+    monkeypatch.setattr(module, "publish_recovery_alerts", AsyncMock())
+    healthy = Mock()
+    unhealthy = Mock()
+    monkeypatch.setattr(module.recovery_health, "record_success", healthy)
+    monkeypatch.setattr(module.recovery_health, "record_failure", unhealthy)
+    monkeypatch.setattr(
+        module.asyncio, "sleep", AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await module.observe_recovery_outcomes(bot)
+    assert healthy.call_count == 2
+    unhealthy.assert_called_once()
+    message.edit.assert_awaited_once()
