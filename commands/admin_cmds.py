@@ -1184,7 +1184,17 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.set_footer(text=f"Checked by {ctx.user.name} • {SERVER}/{DATABASE}")
         embed.timestamp = now
 
-        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
+        from services.recovery_health import status as recovery_status
+        from ui.views.recovery_view import RecoveryEntryView
+
+        recovery_ok, recovery_text = recovery_status()
+        embed.add_field(name="Recovery monitoring", value=recovery_text, inline=False)
+        if not recovery_ok:
+            embed.description = "Recovery monitoring needs attention"
+            embed.colour = discord.Color.orange()
+        await ctx.interaction.edit_original_response(
+            embed=_validated_operator_embed(embed), view=RecoveryEntryView()
+        )
 
     @ops_group.command(
         name="logs",

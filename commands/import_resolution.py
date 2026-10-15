@@ -37,6 +37,24 @@ def attach_import_resolution(group):
         if not await safe_defer(ctx, ephemeral=True):
             return
         try:
+            if action in {"status", "preview"}:
+                from services.recovery_runtime import call_recovery
+                from ui.views.recovery_view import RecoveryIncidentView, actor_for, incident_embed
+
+                row = await drain_thread(
+                    call_recovery,
+                    "review_source",
+                    actor_for(ctx.interaction),
+                    "stats_import",
+                    preparation_id,
+                )
+                await ctx.respond(
+                    embed=incident_embed(row),
+                    view=RecoveryIncidentView(row),
+                    ephemeral=True,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                return
             text = await drain_thread(
                 operate_import_resolution,
                 preparation_id,

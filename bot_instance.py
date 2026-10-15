@@ -1805,6 +1805,9 @@ async def _run_ready_runtime_services() -> None:
     from services.processing_outcome_worker import register_processing_outcomes
 
     register_processing_outcomes(task_monitor)
+    from core.recovery_lifecycle import register_recovery_monitor
+
+    register_recovery_monitor(bot, task_monitor)
 
     # Start heartbeat now that the loop is running
     try:

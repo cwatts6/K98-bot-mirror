@@ -189,6 +189,26 @@ class StatsImportOutcomeDAL:
             )
             return [identity(r["PreparationID"]) for r in rows(cursor)]
 
+    def pending_recovery(self, *, after=None, limit=20):
+        """Discover held/partial imports without requiring the next processing job."""
+        if type(limit) is not int or not 1 <= limit <= 25:
+            raise ValueError("Bounded recovery discovery required.")
+        after = identity(after) if after else None
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT TOP (?) p.PreparationID FROM dbo.ExportPreparation p "
+                "LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
+                "WHERE p.AccountKey=? AND p.StorageOwner=? AND p.ConsumerKind='scan_data' "
+                "AND p.State IN ('writing','committed','uncertain') AND p.JobID IS NULL "
+                "AND e.Resolution IS NULL AND p.UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
+                "ORDER BY CASE WHEN p.PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,p.PreparationID",
+                limit,
+                self.account,
+                self.storage_owner,
+                after,
+            )
+            return [identity(r["PreparationID"]) for r in rows(cursor)]
+
     def settle(self, preparation_id, *, token, actor, reason, allow_partial=False):
         if (
             not isinstance(actor, str)
