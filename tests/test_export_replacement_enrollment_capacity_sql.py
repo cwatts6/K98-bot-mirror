@@ -93,9 +93,7 @@ def test_repeated_replacement_checks_do_not_exhaust_ordinary_enrollment(
     else:
         # A preparation that no longer matches the protected verification
         # cannot use this exception to bypass ordinary capacity reservations.
-        r.f.sql.execute(
-            "UPDATE #ExportPreparation SET RequestHash=CAST(? AS binary(32))", b"x" * 32
-        )
+        r.f.sql.execute("UPDATE #ExportPreparation SET RequestHash=HASHBYTES('SHA2_256',RequestHash)")
         r.f.sql.commit()
         with pytest.raises(pyodbc.Error, match="capacity"):
             begin()
