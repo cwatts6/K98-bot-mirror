@@ -57,7 +57,18 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   private receipt, restore through the admin service and typed broker, and verify
   the unchanged authenticated chain and unresolved original write history.
   The affected authority, startup, recovery, notification and temporary-SQL suite
-  passes 551 tests with one existing skip. Final security review is pending.
+  passes 551 tests with one existing skip. Changes review
+  `1702f46e-dc04-4d97-97fc-94ef936dcd57` sealed with no findings across nine source
+  files. The correction adds reconciliation-proof audit receipts to the inventory
+  and registers worker supervision while startup admission is closed. Verified
+  repair wakes queued exports without restart. Its 138-test run passes, including
+  real temporary SQL proof-audit repair and the repair-to-resume regression.
+  Changes review `a9c1e208-56b9-4510-b380-ba3ce057e77f` sealed with no findings
+  across all three changed source files. Another 352 runtime/recovery tests pass.
+  The selector's unrelated UI-import fixture fails because its constants stub
+  omits `PLAYER_STATS_LAST_CACHE`; this slice does not change that import path.
+  Synthetic-config import smoke, command registration, architecture, deferred-item,
+  security-routing and log-noise checks pass. The broader suite is still running.
   Loss of every valid copy, registration-checkpoint recovery, earlier rollover
   phases and refused-stage continuation are still required implementation, not
   deferred optimisations. This slice does not close those acceptance gates.
@@ -125,9 +136,9 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   atomic-writer concurrency test separately produced Windows access-denied and
   remains a documented validation limitation, outside this replacement change.
 
-Required work still inside unknown-write recovery: corrupt private-evidence
-restoration, final negative-path review, immutable Bot Changes review, and
-focused draft PR publication for configuration replacement. These are
+Required work still inside unknown-write recovery: loss of every valid private
+evidence copy, separately verified superseding recovery for those losses,
+registration-checkpoint recovery and integrated negative-path acceptance. These are
 active acceptance requirements, **not deferred optimisation**. The wider P0
 workstreams in the table remain required after this slice.
 
@@ -136,7 +147,7 @@ lists are not a count of current work. The current remaining P0 workstreams are:
 
 | Workstream | Remaining acceptance |
 | --- | --- |
-| Unknown-write replacement | Guided fresh-file proposal, read-only verification, exact registration activation, retained-input continuation and verified publication; both legacy outputs and complete new-source pools; isolation alone cannot resolve the incident |
+| Unknown-write replacement | Fresh-file proposal through verified publication is implemented for legacy outputs, configuration workbooks and complete source pools. Finish missing-evidence/superseding paths and integrated negative-path acceptance; isolation alone cannot resolve the incident |
 | Earlier rollover failures | Guided decisions and verified continuation for every interrupted phase before the already-covered completed-rollover/retirement paths |
 | Remaining producer checkpoints | Atomic completion evidence and safe remaining-stage continuation for all enabled producers, including player stats, configuration imports and stats procedures; explicit partial/unverifiable-output decisions |
 | Admission-refused stages | Durable refused-stage identity and exact blocker linkage, proactive discovery, healthy-contention distinction and guided safe continuation without replaying earlier committed work |
