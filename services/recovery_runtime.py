@@ -47,6 +47,11 @@ def recovery_service():
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter}
+        from services.producer_refusal_dal import ProducerRefusalDAL
+        from services.producer_refusal_recovery import ProducerRefusalRecovery
+
+        refused = ProducerRefusalRecovery(ProducerRefusalDAL(runtime), adapter)
+        adapters[refused.kind] = refused
         from services.all_kvk_capture_recovery_dal import AllKvkCaptureRecoveryDAL
         from services.all_kvk_capture_recovery_service import (
             AllKvkCaptureRecovery,

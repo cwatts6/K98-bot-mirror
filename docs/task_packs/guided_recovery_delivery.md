@@ -1,5 +1,34 @@
 # Guided recovery delivery
 
+## Refused SQL stage checkpoint — 2026-10-16
+
+`codex/guided-refused-stage` adds durable exact stats inputs before writer admission,
+proactive discovery of confirmed pre-execution refusals, scoped blocker buttons,
+an explicit **Resume saved SQL stage** confirmation and links to the resulting
+SQL receipt/capture recovery. Excel conversion and archive are not repeated.
+Action reservations and terminal markers prevent replay after lost replies;
+dispatcher, producer and per-import SQL guards exclude live work. An interrupted
+continuation without any execution receipt, provider stream or generation is
+fenced and released by exact ownership checks before another action is offered.
+A registered execution is handed to the existing guided import recovery and is
+never replayed by this adapter. Recovery does not overwrite another pipeline's
+global metadata manifest.
+
+172 focused tests pass, including temporary SQL, real Discord view callbacks,
+authorization, changed registration, lost intent reply, late dispatch, interrupted
+admission phases, external session locks, discovery pagination and receipt handoff.
+Architecture (167 files), deferred-item and security-routing validation, synthetic
+imports and command registration pass. Test selection was run. Existing isolated
+UI-import fixture limitations and the preceding full-suite evidence remain as
+recorded below. SQL statements were checked against the authoritative existing
+preparation/resource/execution tables; this slice adds no schema or installed SQL.
+
+This is a focused recovery workflow, **not P0 completion**. Remaining-stage pipeline
+checkpoints, original admission/withdrawal acknowledgement failures, historical
+refusals without retained inputs, partial producer results, earlier rollover
+failures, and all-copy containment/active-history evidence loss remain active P0
+implementation requirements. None is moved to deferred optimisation.
+
 ## Lost proposal recovery checkpoint — 2026-10-16
 
 Read-evidence supersession is published as draft Bot PR #350, stacked on the
