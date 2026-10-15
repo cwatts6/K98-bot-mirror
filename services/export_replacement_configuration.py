@@ -5,10 +5,10 @@ No query or provider operation comes from the administrator's input.
 """
 
 from copy import deepcopy
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.export_configuration_values import numeric_value, sql_text, verify_import_values
 
 CONFIGURATION_COLUMNS = {
     "ProcConfig": (
@@ -101,7 +101,7 @@ def configuration_requests(file):
     return tuple(result)
 
 
-def _table_values(name, grid, sheet, cells):
+def _table_values(name, grid, sheet, cells, *, include_rows=False):
     from services.export_manual_enrollment import _range_suffix
 
     if (
@@ -174,7 +174,11 @@ def _table_values(name, grid, sheet, cells):
     if actual != expected:
         raise SourceConflict("Configuration value and formula readbacks disagree.")
     columns = CONFIGURATION_COLUMNS[name]
-    if not values or tuple(values[0]) != columns:
+    if (
+        not values
+        or tuple(values[0]) != columns
+        or tuple(formatted.get((0, c), "") for c in range(len(columns))) != columns
+    ):
         raise SourceConflict(f"{name}: use these headers in order: {', '.join(columns)}.")
     rows = []
     for row_index, source in enumerate(values[1:], 1):
@@ -183,13 +187,26 @@ def _table_values(name, grid, sheet, cells):
         if len(source) > len(columns):
             raise SourceConflict(f"{name}: unexpected values outside the configuration columns.")
         row = dict(zip(columns, [*source, *([None] * (len(columns) - len(source)))], strict=True))
-        # The importer reads formatted values. A serial without its copied date
-        # format would silently become an invalid date during the later import.
+        # Import uses FORMATTED_VALUE for every column. Keep the independent
+        # entered/formula comparison above, then validate the actual import text.
         for c, column in enumerate(columns):
-            if column.endswith("_DATE") and row[column] not in (None, ""):
-                row[column] = formatted.get((row_index, c), row[column])
+            if row[column] not in (None, ""):
+                entered = row[column]
+                displayed = formatted.get((row_index, c), entered)
+                if type(entered) in (int, float) and not column.endswith("_DATE"):
+                    try:
+                        if Decimal(str(entered)) != Decimal(str(displayed)):
+                            raise ValueError("Changed numeric meaning")
+                    except (ValueError, InvalidOperation) as exc:
+                        raise SourceConflict(
+                            f"{name}: {column} formatting changes its imported value. "
+                            "Use plain numbers, then check again."
+                        ) from exc
+                row[column] = str(displayed) if not isinstance(displayed, bool) else displayed
         rows.append(row)
     _validate_rows(name, rows)
+    if include_rows:
+        return rows
     return dict(tab=name, rows=len(rows), sha256=digest(values).hex())
 
 
@@ -227,49 +244,22 @@ def _validate_rows(name, rows):
                     raise SourceConflict(f"{name}: {column} is required on every data row.")
                 continue
             if column in text:
-                if not isinstance(value, str) or not value.strip() or len(value) > text[column]:
+                if not sql_text(value, text[column]):
                     raise SourceConflict(f"{name}: {column} has invalid text.")
                 normalized[column] = value.strip().casefold()
             elif column in dates:
-                try:
-                    try:
-                        date = datetime.strptime(str(value), "%d/%m/%Y")
-                    except ValueError:
-                        date = datetime.strptime(str(value), "%d/%m/%y")
-                    if date.year < 1753:
-                        raise ValueError("SQL datetime range")
-                except (ValueError, OverflowError) as exc:
-                    raise SourceConflict(
-                        f"{name}: preserve DD/MM/YYYY formatting for {column}."
-                    ) from exc
+                continue  # The actual importer date parser is checked below.
             else:
-                try:
-                    number = Decimal(int(value) if type(value) is bool else str(value))
-                    limit = (
-                        2**63 - 1
-                        if column in {"GovernorID", "MinPower"}
-                        else (
-                            255
-                            if column in {"CampID", "WindowSeq"}
-                            else 1 if column == "Exempt" else 2**31 - 1
-                        )
-                    )
-                    floating = column.startswith("Weight") or (
-                        name == "EXEMPT" and column == "KVK_NO"
-                    )
-                    if (
-                        not number.is_finite()
-                        or number < 0
-                        or (not floating and (number != int(number) or number > limit))
-                    ):
-                        raise ValueError("Invalid numeric configuration")
-                    normalized[column] = number
-                except (ValueError, InvalidOperation) as exc:
-                    raise SourceConflict(f"{name}: {column} has an invalid numeric value.") from exc
+                normalized[column] = numeric_value(name, column, value)
+        if name == "KVK_Windows":
+            start, end = normalized.get("StartScanID"), normalized.get("EndScanID")
+            if start is not None and end is not None and end < start:
+                raise SourceConflict("KVK_Windows: EndScanID must not precede StartScanID.")
         key = tuple(normalized.get(column) for column in keys[name])
         if keys[name] and key in seen:
             raise SourceConflict(f"{name}: duplicate configuration key.")
         seen.add(key)
+    verify_import_values(name, rows, text, dates)
 
 
 def configuration_readback(value, file, responses):

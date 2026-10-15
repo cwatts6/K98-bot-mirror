@@ -27,7 +27,19 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   the authoritative SQL snapshots. SQL Changes review
   `3235fc22-5123-4607-ae8c-3c29c415c81f` sealed with no findings across all three files;
   measured usage: 1,827,020 total tokens (1,822,389 input, 4,631 output).
-  Bot Changes review and final publication gates remain in progress.
+  Bot Changes review sealed successfully. Review corrections validate actual
+  formatted import tokens, numeric bounds/precision, SQL UTF-16 text lengths,
+  camp IDs and ordered scan windows before activation. The current SQL preflight
+  checks retained/overlaid ProcConfig values, effective season, exact scan rows,
+  official target publication and enabled source period/weight prerequisites.
+  Failed prerequisites offer a guided configuration-copy correction and fresh
+  check; activation rechecks SQL. Empty optional tabs and blank ProcConfig cells
+  explicitly retain existing SQL values, matching the current importer.
+  The complete seven-tab populated fixture, guided correction/recheck, changed
+  SQL at activation, source checks and affected regressions pass 625 tests.
+  The standard baseline run recorded 8,065 passes, 446 skips, one deselection and
+  eight subtest passes; its one stale-proposal failure is fixed and covered by the
+  passing affected run. The correction Changes review and publication remain.
 
 - Guided saved multi-page admin forms, strict file-link parsing, fresh read-only
   verification, original-journal finish/discard buttons, sealed activation and

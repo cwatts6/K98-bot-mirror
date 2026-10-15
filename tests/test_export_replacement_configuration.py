@@ -41,7 +41,7 @@ def configuration_fixture():
     return plan, configuration_responses(plan, "replacement-file")
 
 
-def configuration_responses(plan, file_id):
+def configuration_responses(plan, file_id, *, rows_by_tab=None):
     """Realistic Sheets metadata, cell and FORMULA responses; no provider calls."""
     grids, sheets, replies = [], [], []
     for number, title in enumerate((*CONFIGURATION_TABS, "Sheet1")):
@@ -57,6 +57,8 @@ def configuration_responses(plan, file_id):
             rows = [list(CONFIGURATION_COLUMNS[title])]
             if title == "ProcConfig":
                 rows.append([42, 100, 101, 102, 103, 104, 105, 106, 3, 107])
+            if rows_by_tab and title in rows_by_tab:
+                rows = [list(CONFIGURATION_COLUMNS[title]), *rows_by_tab[title]]
             reply[3]["valueRanges"][0]["values"] = rows
             reply[2]["sheets"][0]["data"] = [
                 dict(
@@ -78,6 +80,73 @@ def configuration_responses(plan, file_id):
         replies.extend(reply[2:])
     metadata = dict(spreadsheetId=file_id, sheets=sheets)
     return metadata, [*responses(plan, grids[-1])[:2], *replies]
+
+
+COMPLETE_CONFIGURATION = {
+    "ProcConfig": [[42, 100, 101, 102, 103, 104, 105, 106, 3, 107]],
+    "KVKTargetBands": [[42, 100000000, 20000000, 10000000, 1000000]],
+    "EXEMPT": [[12345, "Example governor", 1, 42]],
+    "KVK_Details": [
+        [
+            42,
+            "Season",
+            "01/10/2026",
+            "15/10/2026",
+            "15/12/2026",
+            101,
+            106,
+            43,
+            "01/10/2026",
+            "15/10/2026",
+            102,
+        ]
+    ],
+    "KVK_DKPWeights": [[42, "0.125", "2", "3"]],
+    "KVK_Windows": [[42, "Pass 4", 1, 102, 103, "First fight"]],
+    "KVK_CampMap": [[42, 1098, 1, "Water"]],
+}
+
+
+def test_complete_populated_configuration_matches_all_import_contracts():
+    plan, _ = configuration_fixture()
+    metadata, replies = configuration_responses(
+        plan, "replacement-file", rows_by_tab=COMPLETE_CONFIGURATION
+    )
+    policy = plan.value()["files"][0]
+    summary = replacement_readback(plan, policy, discover_replacement(policy, metadata), replies)
+    assert len(summary) == 7 and all(item["rows"] == 1 for item in summary)
+
+
+@pytest.mark.parametrize(
+    "tab,column,bad",
+    [
+        ("ProcConfig", "KVK_NO", "1e999999999"),
+        ("KVK_CampMap", "CampID", 9),
+        ("KVK_CampMap", "CampName", "\U0001f600" * 21),
+        ("KVK_Windows", "StartScanID", 0),
+        ("KVK_Windows", "EndScanID", 101),
+        ("EXEMPT", "KVK_NO", "42.5"),
+        ("KVK_DKPWeights", "WeightT4X", "0.1234567890123"),
+    ],
+)
+def test_complete_copy_rejects_values_that_would_fail_after_activation(tab, column, bad):
+    data = deepcopy(COMPLETE_CONFIGURATION)
+    data[tab][0][CONFIGURATION_COLUMNS[tab].index(column)] = bad
+    plan, _ = configuration_fixture()
+    metadata, replies = configuration_responses(plan, "replacement-file", rows_by_tab=data)
+    policy = plan.value()["files"][0]
+    with pytest.raises(SourceConflict):
+        replacement_readback(plan, policy, discover_replacement(policy, metadata), replies)
+
+
+@pytest.mark.parametrize("displayed", ["1,000", "12.5%", "999"])
+def test_readback_checks_displayed_numeric_meaning(displayed):
+    plan, (metadata, replies) = configuration_fixture()
+    offset = 2 + 2 * CONFIGURATION_TABS.index("ProcConfig")
+    replies[offset]["sheets"][0]["data"][0]["rowData"][1]["values"][1]["formattedValue"] = displayed
+    policy = plan.value()["files"][0]
+    with pytest.raises(SourceConflict, match="formatting"):
+        replacement_readback(plan, policy, discover_replacement(policy, metadata), replies)
 
 
 def test_complete_configuration_observation_and_exact_bounded_read_plan():

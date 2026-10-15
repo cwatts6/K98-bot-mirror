@@ -53,6 +53,10 @@ class ReplacementActivationService:
                 raise SourceConflict(
                     "Review the current successful replacement verification before activation."
                 )
+            if any(f.get("configuration_summary") for f in checked["files"]):
+                readiness = self.verification.configuration_readiness(verification_id)
+                if not readiness["ready"]:
+                    raise SourceConflict(readiness["issue"])
             projected = replacement_registration(
                 self.proposals.registration,
                 targets=sorted(proposal["mapping"]),

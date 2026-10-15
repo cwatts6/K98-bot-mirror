@@ -211,6 +211,41 @@ class ReplacementVerificationService:
             raise SourceConflict("Private replacement verification receipt did not verify.")
         return dict(reference=reference, sha256=receipt.sha256)
 
+    def configuration_readiness(self, verification_id):
+        """Live SQL prerequisites, separate from immutable historical read evidence."""
+        import bot_config
+        from services.export_configuration_preflight_dal import ConfigurationPreflightDAL
+
+        snapshot, plan = self._snapshot(verification_id)
+        if snapshot["attempt"]["State"] != "verified":
+            raise SourceConflict("Configuration readiness requires a verified read check.")
+        if not any(f.get("kind") == "configuration_output" for f in plan.value()["files"]):
+            return dict(ready=True, files={})
+        tables = ReplacementVerificationEvidence(
+            dal=self.authority.dal, store=self.authority.store
+        ).configuration_tables(plan, identity(snapshot["streams"][0]["StreamID"]))
+        checker = ConfigurationPreflightDAL(self.authority.dal.connect)
+        results = {}
+        for file, values in tables.items():
+            try:
+                results[file] = checker.inspect(
+                    values,
+                    source_recovery=bot_config.KVK_SOURCE_RECOVERY_ENABLED,
+                    source_intake=bot_config.KVK_SOURCE_INTAKE_ENABLED,
+                )
+            except SourceConflict as exc:
+                return dict(ready=False, files=results, issue=str(exc)[:512])
+            except Exception:
+                logger.warning(
+                    "Replacement configuration SQL preflight unavailable: %s", verification_id
+                )
+                return dict(
+                    ready=False,
+                    files=results,
+                    issue="SQL prerequisites could not be checked. Keep the replacement unchanged and use Refresh to retry the read-only check.",
+                )
+        return dict(ready=True, files=results)
+
     def finish(self, verification_id):
         with self.authority._lock:
             snapshot, plan = self._snapshot(verification_id)

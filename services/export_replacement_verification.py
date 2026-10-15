@@ -335,6 +335,33 @@ def replacement_readback(plan, policy, grid, responses):
 
 
 class ReplacementVerificationEvidence(EnrollmentEvidence):
+    def configuration_tables(self, plan, stream_id):
+        """Reconstruct private import inputs from the same authenticated transcript."""
+        from services.export_replacement_configuration import _table_values
+
+        self.eligibility(plan, stream_id)
+        _, records = self.transcript(plan, stream_id)
+        result, offset = {}, 0
+        for policy in plan.value()["files"]:
+            count = file_request_count(policy)
+            group = records[offset : offset + count]
+            offset += count
+            if policy.get("kind") != "configuration_output":
+                continue
+            grid = discover_replacement(policy, group[0][1])
+            tables = {}
+            for index, member in enumerate(grid["configuration_grids"]):
+                if member["title"] != "Sheet1":
+                    tables[member["title"]] = _table_values(
+                        member["title"],
+                        member,
+                        group[3 + index * 2][1],
+                        group[4 + index * 2][1],
+                        include_rows=True,
+                    )
+            result[policy["file_id"]] = tables
+        return result
+
     def eligibility(self, plan, stream_id):
         stream, records = self.transcript(plan, stream_id)
         files = []

@@ -46,6 +46,7 @@ class ReplacementWorkflow:
             activation=None,
             delivery=None,
             current_registration_sha256=self.proposal_writer.registration.fingerprint,
+            configuration_readiness=None,
         )
         # The containment inspector contains private ledger details before its
         # decision. Only its opaque review token and bounded target IDs leave it.
@@ -67,6 +68,14 @@ class ReplacementWorkflow:
             if activated:
                 result["activation"] = self.activation.verify(activated[0], self.registration)
                 result["delivery"] = self.continuation.inspect(job_id, result["activation"])
+            elif (
+                result["check"]
+                and result["check"]["state"] == "verified"
+                and any(f.get("configuration_summary") for f in result["check"].get("files", []))
+            ):
+                result["configuration_readiness"] = self.verification.configuration_readiness(
+                    result["check"]["verification_id"]
+                )
         return result
 
     def inspect(self, job_id):
@@ -135,9 +144,19 @@ class ReplacementWorkflow:
                 explanation = "Replacement owner, sharing, configuration schema and blank output checks passed. Open Review output links to inspect the configuration tab counts and links. Verify the actual settings against your intended season, then confirm activation."
                 actions["activate_replacements"] = choice(
                     "Use verified replacements",
-                    "Open each replacement configuration workbook. Verify season and scan IDs, target bands, exemptions, dates, weights, windows and camp mappings. Confirm the complete intended settings, row counts and sharing; keep the files unchanged after checking.",
+                    "Open each replacement configuration workbook. Verify season and scan IDs, target bands, exemptions, dates, weights, windows and camp mappings. Empty optional tabs retain existing SQL settings; blank ProcConfig cells also retain stored values. Confirm the complete intended settings, row counts and sharing; keep the files unchanged after checking.",
                     "Switch configuration reads and report outputs together. Protect the copied configuration tabs, then offer publication of the retained report. The original files remain isolated.",
                 )
+                actions["choose_replacements"] = choice(
+                    "Update configuration copy",
+                    "Correct the listed configuration cells in the fresh workbook, then enter its links again. The bot must check the edited copy before activation.",
+                    "Save a fresh proposal and offer a new read-only check. Original uncertain outputs remain isolated.",
+                    input=True,
+                )
+                if not state["configuration_readiness"]["ready"]:
+                    stage = "configuration_attention"
+                    explanation = state["configuration_readiness"]["issue"]
+                    actions.pop("activate_replacements", None)
         else:
             stage = "choose_replacements" if proposal is None else "verification_required"
             explanation = "The old targets are permanently isolated. The form lists every required replacement, its owner and sharing policy. Saved pages survive reopening and restart."
@@ -165,9 +184,11 @@ class ReplacementWorkflow:
         if checked and checked["state"] == "verified":
             evidence["configuration_checks"] = {
                 f["file_id"]: f["configuration_summary"]
-                for f in checked["files"]
+                for f in checked.get("files", [])
                 if f.get("configuration_summary")
             }
+            if state["configuration_readiness"] is not None:
+                evidence["configuration_preflight"] = state["configuration_readiness"]["files"]
         return evidence, digest(state).hex(), resolved
 
     def _reviewed(self, job_id, token):

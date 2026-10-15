@@ -7,13 +7,20 @@ from uuid import uuid4
 
 import pytest
 
+from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.schemas.new_source_schema import SOURCE_KEY
+from services.export_configuration_preflight_dal import ConfigurationPreflightDAL
 from services.export_execution_protocol import ProviderRequest
 from services.export_replacement_configuration import CONFIGURATION_TABS
 from services.export_replacement_verification_service import ReplacementVerificationService
 from services.legacy_export_snapshot_service import LegacyExportRuntime
 from tests import test_export_target_containment as authority_fixture
+from tests.configuration_preflight_sql_fixture import install_preflight_tables
 from tests.test_export_enrollment_service import FakeChild
-from tests.test_export_replacement_configuration import configuration_responses
+from tests.test_export_replacement_configuration import (
+    COMPLETE_CONFIGURATION,
+    configuration_responses,
+)
 from tests.test_export_replacement_guided_sql import (
     apply,
     contained_job as contained_job,
@@ -38,13 +45,17 @@ def shared(monkeypatch, request):
 
     monkeypatch.setattr(authority_fixture, "registration_fixture", registration)
     r = request.getfixturevalue("guided")
+    install_preflight_tables(monkeypatch, r.f)
     r.failure_tab = None
+    r.configuration_rows = deepcopy(COMPLETE_CONFIGURATION)
 
     class Child(FakeChild):
         def execute(self, message):
             typed = ProviderRequest.parse(message, enrollment=True)
             r.runtime.sent.append(typed)
-            metadata, responses = configuration_responses(r.runtime.plan, typed.target)
+            metadata, responses = configuration_responses(
+                r.runtime.plan, typed.target, rows_by_tab=r.configuration_rows
+            )
             if typed.operation == "drive.files.get":
                 return responses[0]
             if typed.operation == "drive.permissions.list":
@@ -170,3 +181,161 @@ def test_incomplete_copy_read_is_guided_discarded_then_rechecked(shared):
         ).fetchval()
         == 1
     )
+
+
+def test_invalid_configuration_is_guided_discarded_fixed_and_checked(shared):
+    r = shared
+    r.configuration_rows["KVK_CampMap"][0][2] = 9
+    row = apply(r, "verify_replacements")
+    assert "CampID" in row["evidence"]["explanation"]
+    assert "activate_replacements" not in row["evidence"]["actions"]
+    apply(r, "discard_replacement_check")
+    r.configuration_rows["KVK_CampMap"][0][2] = 8
+    row = apply(r, "verify_replacements")
+    assert row["evidence"]["outcome"] == "activation_required"
+    assert apply(r, "activate_replacements")["evidence"]["outcome"] == "publication_required"
+
+
+def test_official_target_conflict_guides_copy_correction_and_new_check(shared):
+    r = shared
+    r.f.sql.execute("INSERT #KingdomScanData4 VALUES (103)")
+    r.f.sql.execute("INSERT #KVK_Target_Publication VALUES (42,'OFFICIAL',103,103,1)")
+    r.f.sql.commit()
+    row = apply(r, "verify_replacements")
+    assert row["evidence"]["outcome"] == "configuration_attention"
+    assert "scan 103" in row["evidence"]["explanation"]
+    assert "activate_replacements" not in row["evidence"]["actions"]
+    assert r.f.sql.execute("SELECT COUNT(*) FROM #ExportReplacementActivation").fetchval() == 0
+    r.configuration_rows["ProcConfig"][0][2] = 103
+    page = r.recovery.input_page(ACTOR, row["IncidentID"], "choose_replacements")
+    r.recovery.save_input(
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "choose_replacements",
+        page["draft_version"],
+        0,
+        {"owner_email": "owner@example.com", "old-file": "fresh-file"},
+    )
+    preview = r.recovery.input_confirmation(ACTOR, row["IncidentID"], "choose_replacements")
+    r.recovery.execute_input(
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "choose_replacements",
+        preview["draft_version"],
+    )
+    row = apply(r, "verify_replacements")
+    assert row["evidence"]["outcome"] == "activation_required"
+    assert apply(r, "activate_replacements")["evidence"]["outcome"] == "publication_required"
+
+
+def test_activation_rechecks_sql_after_the_admin_review(shared):
+    r = shared
+    apply(r, "verify_replacements")
+    state = r.workflow._state(r.f.job)
+    r.f.sql.execute("INSERT #KVK_Target_Publication VALUES (42,'OFFICIAL',103,103,1)")
+    r.f.sql.commit()
+    with pytest.raises(SourceConflict, match="official targets"):
+        r.workflow.activation.apply(
+            state["proposal"]["replacement_id"],
+            state["check"]["verification_id"],
+            token=state["check"]["token"],
+            actor="recovery:" + str(uuid4()),
+            reason="Admin reviewed prior state",
+        )
+    assert r.f.sql.execute("SELECT COUNT(*) FROM #ExportReplacementActivation").fetchval() == 0
+
+
+@pytest.mark.parametrize(
+    "fault", ["no_fight", "null_symmetry", "timestamps", "ambiguous", "closed"]
+)
+def test_source_prerequisites_are_checked_without_creating_requests(shared, fault):
+    from services.export_replacement_configuration import CONFIGURATION_COLUMNS
+
+    r = shared
+    tables = {
+        tab: [dict(zip(CONFIGURATION_COLUMNS[tab], row, strict=True)) for row in records]
+        for tab, records in COMPLETE_CONFIGURATION.items()
+    }
+    period, config = str(uuid4()), str(uuid4())
+    r.f.sql.execute(
+        "INSERT #SeasonSource VALUES (42,?,?)",
+        SOURCE_KEY,
+        "closed" if fault == "closed" else "open",
+    )
+    r.f.sql.execute(
+        "INSERT #SourcePeriod VALUES (?,?,42,'pass4',?)",
+        period,
+        SOURCE_KEY,
+        "no_fight" if fault in {"no_fight", "null_symmetry"} else "fight",
+    )
+    r.f.sql.execute("INSERT #SourceConfigVersion VALUES (?,?,42,1)", config, SOURCE_KEY)
+    r.f.sql.execute(
+        "INSERT #SourceWindowConfig VALUES (?,?,42,'pass4','Pass 4',102,103)", config, SOURCE_KEY
+    )
+    if fault == "null_symmetry":
+        tables["KVK_Windows"][0]["StartScanID"] = None
+    elif fault == "ambiguous":
+        r.f.sql.execute(
+            "INSERT #SourcePeriod VALUES (?,?,42,'pass4','fight')", str(uuid4()), SOURCE_KEY
+        )
+    elif fault == "timestamps":
+        for scan, stamp in [(102, "2026-10-15"), (103, "2026-10-14")]:
+            observation = str(uuid4())
+            r.f.sql.execute("INSERT #SourceObservation VALUES (?,?)", observation, stamp)
+            r.f.sql.execute(
+                "INSERT #SourceLogicalScan VALUES (?,42,?,?)", SOURCE_KEY, scan, observation
+            )
+    r.f.sql.commit()
+    with pytest.raises(SourceConflict):
+        ConfigurationPreflightDAL(r.f.connect).inspect(
+            tables, source_recovery=True, source_intake=False
+        )
+    assert r.f.sql.execute("SELECT COUNT(*) FROM #SourceConfigRequest").fetchval() == 0
+
+
+@pytest.mark.parametrize("mode", ["windows", "weights", "unchanged_closed_weights"])
+def test_valid_source_preflight_does_not_create_configuration_requests(shared, mode):
+    from services.export_replacement_configuration import CONFIGURATION_COLUMNS
+
+    r = shared
+    tables = {
+        tab: [dict(zip(CONFIGURATION_COLUMNS[tab], row, strict=True)) for row in records]
+        for tab, records in COMPLETE_CONFIGURATION.items()
+    }
+    period, config = str(uuid4()), str(uuid4())
+    state = "closed" if mode == "unchanged_closed_weights" else "open"
+    r.f.sql.execute("INSERT #SeasonSource VALUES (42,?,?)", SOURCE_KEY, state)
+    r.f.sql.execute("INSERT #SourcePeriod VALUES (?,?,42,'pass4','fight')", period, SOURCE_KEY)
+    r.f.sql.execute("INSERT #SourceConfigVersion VALUES (?,?,42,1)", config, SOURCE_KEY)
+    r.f.sql.execute(
+        "INSERT #SourceWindowConfig VALUES (?,?,42,'pass4','Pass 4',102,103)", config, SOURCE_KEY
+    )
+    if mode == "unchanged_closed_weights":
+        r.f.sql.execute("INSERT #SourceWeightConfig VALUES (?,0.125,2,3)", config)
+    r.f.sql.commit()
+    result = ConfigurationPreflightDAL(r.f.connect).inspect(
+        tables, source_recovery=mode == "windows", source_intake=mode != "windows"
+    )
+    assert result["source_periods_checked"] == 1
+    assert r.f.sql.execute("SELECT COUNT(*) FROM #SourceConfigRequest").fetchval() == 0
+
+
+def test_empty_details_and_blank_procconfig_cells_use_retained_sql(shared):
+    from services.export_replacement_configuration import CONFIGURATION_COLUMNS
+
+    r = shared
+    tables = {name: [] for name in CONFIGURATION_COLUMNS}
+    tables["ProcConfig"] = [dict(KVK_NO="42", MATCHMAKING_SCAN=None, DRAFTSCAN=None)]
+    r.f.sql.execute("INSERT #KVK_Details VALUES (43)")
+    r.f.sql.execute("INSERT #ProcConfig VALUES (43,'MATCHMAKING_SCAN',101)")
+    r.f.sql.execute("INSERT #KVK_Target_Publication VALUES (43,'OFFICIAL',101,101,1)")
+    r.f.sql.commit()
+    result = ConfigurationPreflightDAL(r.f.connect).inspect(
+        tables, source_recovery=False, source_intake=False
+    )
+    assert result["season"] == 43 and result["selected_scan"] == 101
+    assert "KVK_Details" in result["empty_tabs_retain_sql"]
