@@ -20,9 +20,12 @@ class ProducerRefusalDAL:
     def pending(self, after=None):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT TOP (100) PreparationID FROM dbo.ExportPreparation "
-                "WHERE AccountKey=? AND StorageOwner=? AND State='unavailable' "
-                "AND Version IN (2,4) AND GenerationJson IS NULL "
+                "SELECT TOP (100) PreparationID FROM dbo.ExportPreparation p "
+                "WHERE AccountKey=? AND StorageOwner=? "
+                "AND (State='unavailable' OR (State IN ('pending','preflight','sql_pending','writing','uncertain') "
+                "AND UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()))) "
+                "AND NOT EXISTS (SELECT 1 FROM dbo.StatsImportExecution e WHERE e.PreparationID=p.PreparationID) "
+                "AND (GenerationJson IS NULL OR JSON_VALUE(GenerationJson,'$.producer_admission_closed.action') IS NOT NULL) "
                 "AND JSON_VALUE(RequestJson,'$.request.producer.parent') IS NULL "
                 "AND JSON_VALUE(RequestJson,'$.request.producer.kind')='stats_import' "
                 "ORDER BY CASE WHEN PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,PreparationID",
@@ -50,20 +53,20 @@ class ProducerRefusalDAL:
             )
             membership = [r["ResourceKey"] for r in rows(cursor)]
             cursor.execute(
-                "SELECT COUNT(*) AS n FROM dbo.ExportResource WHERE ActivePreparationID=?",
+                "SELECT * FROM dbo.ExportResource WHERE ActivePreparationID=? ORDER BY ResourceKey",
                 source_id,
             )
-            held = one(cursor)["n"]
+            held = rows(cursor)
             cursor.execute(
                 "SELECT COUNT(*) AS n FROM dbo.ExportExecutionStream WHERE PreparationID=?",
                 source_id,
             )
             streams = one(cursor)["n"]
             cursor.execute(
-                "SELECT COUNT(*) AS n FROM dbo.StatsImportExecution WHERE PreparationID=?",
+                "SELECT * FROM dbo.StatsImportExecution WHERE PreparationID=?",
                 source_id,
             )
-            execution = one(cursor)["n"]
+            execution = one(cursor)
             cursor.execute(
                 "SELECT TOP (101) p.*,e.State AS ExecutionState,e.CompletedFileName,e.Resolution,"
                 "(SELECT COUNT(*) FROM dbo.ExportResource r WHERE r.ActivePreparationID=p.PreparationID) AS HeldCount,"
@@ -93,24 +96,28 @@ class ProducerRefusalDAL:
         validate_inputs(producer.get("inputs"))
         if (
             prep["ConsumerKind"] != "scan_data"
-            or prep["State"] != "unavailable"
-            or prep["Version"] not in {2, 4}
-            or any(
-                prep[k] is not None
-                for k in ("GenerationJson", "SpoolKey", "SpoolBytes", "SpoolHash", "JobID")
+            or (
+                not execution
+                and any(
+                    prep[k] is not None for k in ("SpoolKey", "SpoolBytes", "SpoolHash", "JobID")
+                )
             )
-            or held
             or streams
-            or execution
-            or membership != ([] if prep["Version"] == 2 else ["account:" + self.account])
             or bytes(prep["RequestHash"]) != digest(document)
             or document.get("consumer") != "scan_data"
             or document.get("storage_owner") != self.storage_owner
             or document.get("request", {}).get("kind") != "scan_data"
             or producer.get("kind") != "stats_import"
+            or producer.get("parent") is not None
             or producer.get("operation") != document["request"].get("operation")
         ):
             raise SourceConflict("Exact withdrawn stage with no producer execution is required.")
+        if execution:
+            if execution["CompletedFileName"] != producer["inputs"]["completed_filename"]:
+                raise SourceConflict("Registered import differs from the saved input.")
+            phase = "execution_registered"
+        else:
+            phase = self._original_phase(prep, membership, held)
         identity(producer["operation"])
         if len(attempts) > 100:
             raise SourceConflict("Refused-stage attempt history exceeds its verification bound.")
@@ -144,8 +151,161 @@ class ProducerRefusalDAL:
             if blocker.pop("OperationAccount") != self.account:
                 blocker["ActiveOutputOperationID"] = None
         return _wire(
-            dict(preparation=prep, producer=producer, attempts=attempts, blockers=blockers)
+            dict(
+                preparation=prep,
+                producer=producer,
+                attempts=attempts,
+                blockers=blockers,
+                original_phase=phase,
+                original_resources=held,
+                original_execution=execution,
+            )
         )
+
+    def _original_phase(self, prep, membership, resources):
+        account, sql = "account:" + self.account, "sql_snapshot:legacy_outputs"
+        states = {
+            "pending": (1, [], []),
+            "preflight": (2, [account], [account]),
+            "sql_pending": (3, [account], []),
+            "writing": (4, [account, sql], [sql]),
+            "uncertain": (5, [account, sql], [sql]),
+        }
+        marker = json.loads(prep["GenerationJson"] or "{}").get("producer_admission_closed")
+        if prep["State"] == "unavailable":
+            if resources:
+                raise SourceConflict("Closed admission still has reservations.")
+            if marker is not None:
+                previous = states.get(marker.get("state"))
+                if (
+                    not previous
+                    or set(json.loads(prep["GenerationJson"])) != {"producer_admission_closed"}
+                    or marker.get("version") != previous[0]
+                    or prep["Version"] != previous[0] + 1
+                    or membership != previous[1]
+                    or prep["Fence"] != marker.get("fence", -2) + 1
+                    or set(marker) != {"action", "token", "state", "version", "fence"}
+                ):
+                    raise SourceConflict("Admission closure checkpoint does not verify.")
+                identity(marker["action"])
+                if (
+                    not isinstance(marker["token"], str)
+                    or len(marker["token"]) != 64
+                    or any(c not in "0123456789abcdef" for c in marker["token"])
+                ):
+                    raise SourceConflict("Admission closure token is malformed.")
+            elif (
+                prep["GenerationJson"] is not None
+                or prep["Version"] not in {2, 4, 5}
+                or membership != {2: [], 4: [account], 5: [account, sql]}.get(prep["Version"])
+            ):
+                raise SourceConflict("Refusal checkpoint does not verify.")
+            return "refused"
+        expected = states.get(prep["State"])
+        if (
+            not expected
+            or prep["GenerationJson"] is not None
+            or prep["Version"] != expected[0]
+            or membership != expected[1]
+            or [r["ResourceKey"] for r in resources] != expected[2]
+            or any(
+                identity(r["OwnerID"]) != identity(prep["OwnerID"])
+                or r["Fence"] != prep["Fence"]
+                or r["ActiveJobID"] is not None
+                or r["ActiveOutputOperationID"] is not None
+                for r in resources
+            )
+        ):
+            raise SourceConflict("Exact unstarted admission ownership is required.")
+        return "unstarted"
+
+    def close_admission(self, source_id, token, action_id):
+        """Fence an original typed stats admission only before SQL registration."""
+        self._require_serialized(source_id)
+        state = self.snapshot(source_id)
+        if digest(state).hex() != token or state["original_phase"] != "unstarted":
+            raise SourceConflict("Admission evidence changed; review the current incident.")
+        with transaction(self.connect) as cursor:
+            from services.stats_import_outcome_dal import StatsImportOutcomeDAL
+
+            StatsImportOutcomeDAL._idle(cursor, source_id)
+            cursor.execute(
+                "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'k98-legacy-output-snapshot',"
+                "@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0; SELECT @r AS LockResult"
+            )
+            if one(cursor)["LockResult"] < 0:
+                raise SourceConflict(
+                    "The producer is still running; its admission cannot be cancelled."
+                )
+            _mutex(cursor, "account:" + self.account)
+            _mutex(cursor, "sql_snapshot:legacy_outputs")
+            prep, execution, resources = StatsImportOutcomeDAL._snapshot(cursor, source_id)
+            if (
+                not prep
+                or execution
+                or prep["Version"] != state["preparation"]["Version"]
+                or prep["Fence"] != state["preparation"]["Fence"]
+                or prep["State"] != state["preparation"]["State"]
+                or _wire(resources) != state["original_resources"]
+            ):
+                raise SourceConflict("SQL registration exists; use its exact receipt recovery.")
+            cursor.execute(
+                "SELECT ResourceKey FROM dbo.ExportPreparationResource WHERE PreparationID=? ORDER BY ResourceKey",
+                source_id,
+            )
+            membership = [r["ResourceKey"] for r in rows(cursor)]
+            if self._original_phase(prep, membership, resources) != "unstarted":
+                raise SourceConflict("Admission is already closed.")
+            cursor.execute(
+                "SELECT COUNT(*) AS n FROM dbo.ExportExecutionStream WHERE PreparationID=?",
+                source_id,
+            )
+            if one(cursor)["n"] or (
+                prep["AccountKey"],
+                prep["StorageOwner"],
+                prep["ConsumerKind"],
+            ) != (self.account, self.storage_owner, "scan_data"):
+                raise SourceConflict("Original admission scope or execution changed.")
+            request = json.loads(prep["RequestJson"])
+            producer = request.get("request", {}).get("producer", {})
+            validate_inputs(producer.get("inputs"))
+            if (
+                producer.get("kind") != "stats_import"
+                or producer.get("parent")
+                or bytes(prep["RequestHash"]) != digest(request)
+            ):
+                raise SourceConflict("Original typed producer request is required.")
+            marker = dict(
+                producer_admission_closed=dict(
+                    action=identity(action_id),
+                    token=token,
+                    state=prep["State"],
+                    version=prep["Version"],
+                    fence=prep["Fence"],
+                )
+            )
+            if any(r["ResourceKey"] == "account:" + self.account for r in resources):
+                self.runtime.dal._execution_gate(cursor, self.account)
+            for r in resources:
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportResource SET ActivePreparationID=NULL,OwnerID=NULL,BlockedReason=NULL,"
+                    "Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND ActivePreparationID=? AND OwnerID=? AND Fence=? AND Version=?",
+                    r["ResourceKey"],
+                    source_id,
+                    prep["OwnerID"],
+                    prep["Fence"],
+                    r["Version"],
+                )
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportPreparation SET State='unavailable',OwnerID=COALESCE(OwnerID,?),Fence=Fence+1,"
+                "Version=Version+1,GenerationJson=?,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND Version=?",
+                identity(action_id),
+                bounded_json(marker),
+                source_id,
+                prep["Version"],
+            )
 
     @contextmanager
     def serialized(self, source_id):

@@ -53,7 +53,27 @@ class ProducerRefusalRecovery:
             recovery_links=links,
         )
         resolved = False
-        if active:
+        if state["original_phase"] == "execution_registered":
+            if state["attempts"]:
+                raise SourceConflict("Original and replacement execution cannot both be admitted.")
+            child, _, resolved = self.imports.inspect(source_id)
+            evidence.update(outcome=child["outcome"], explanation=child["explanation"])
+            links.append(
+                dict(label="Review original SQL stage", kind="stats_import", source_id=source_id)
+            )
+        elif state["original_phase"] == "unstarted":
+            if active:
+                raise SourceConflict("An unclosed admission cannot have a continuation.")
+            evidence.update(
+                outcome="admission_unconfirmed",
+                explanation="Writer admission did not reach a confirmed execution receipt. The saved inputs are retained. Cancel this unstarted reservation before choosing whether to continue it.",
+            )
+            actions["close_unstarted_admission"] = dict(
+                label="Cancel unstarted reservation",
+                check="Confirm this interrupted admission should be cancelled. The bot will exclude active SQL execution and require no import receipt, provider stream, generation or captured output.",
+                effect="Fence the exact original claim and release only its reservations. A late worker cannot enter SQL with that claim. Verify the closure, then offer a separate confirmation to resume the saved inputs.",
+            )
+        elif active:
             attempt = active[0]
             if attempt["ExecutionState"] is not None:
                 child, _, child_resolved = self.imports.inspect(attempt["PreparationID"])
@@ -125,13 +145,17 @@ class ProducerRefusalRecovery:
         return evidence, digest(state).hex(), resolved
 
     def execute(self, source_id, action, token, actor, reason):
-        if action != "resume_sql_stage" or not actor.startswith("recovery:"):
+        if action not in {"resume_sql_stage", "close_unstarted_admission"} or not actor.startswith(
+            "recovery:"
+        ):
             raise SourceConflict("Exact confirmed continuation action required.")
         action_id = identity(actor.removeprefix("recovery:"))
         with self.dal.serialized(source_id):
             evidence, current, resolved = self.inspect(source_id)
             if resolved or current != token or action not in evidence["actions"]:
                 raise SourceConflict("Continuation evidence changed. Review the current incident.")
+            if action == "close_unstarted_admission":
+                return self.dal.close_admission(source_id, token, action_id)
             state = self.dal.snapshot(source_id)
             identifier = self.dal.reserve(source_id, action_id)
             # A prior reconciliation may have left a terminal tombstone. It can
@@ -148,6 +172,21 @@ class ProducerRefusalRecovery:
                     self.runner(state["producer"]["inputs"])
 
     def reconcile(self, source_id, action):
+        if action["ActionKind"] == "close_unstarted_admission":
+            with self.dal.serialized(source_id):
+                state = self.dal.snapshot(source_id)
+                marker = json.loads(state["preparation"]["GenerationJson"] or "{}").get(
+                    "producer_admission_closed", {}
+                )
+                if (
+                    marker.get("action") == identity(action["ActionID"])
+                    and marker.get("token") == action["EvidenceHash"]
+                ):
+                    return "verified"
+                if digest(state).hex() != action["EvidenceHash"]:
+                    return "not_applied"
+                self.dal.close_admission(source_id, action["EvidenceHash"], action["ActionID"])
+                return None
         if action["ActionKind"] != "resume_sql_stage":
             raise SourceConflict("Unsupported producer continuation receipt.")
         with self.dal.serialized(source_id):
