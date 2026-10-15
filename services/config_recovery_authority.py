@@ -20,8 +20,8 @@ def _inspect(authority, registration, preparation_id):
     data = dal.target_data(
         preparation_id, account=configured["account"], storage_owner=configured["storage_owner"]
     )
-    # Discovery may finish recording closure only for this authority's already
-    # interrupted read child. Healthy/live streams and old sessions are not adopted.
+    # Finish interrupted local closure, or verify retirement of an old-session
+    # read from its private birth. No live process or writer is adopted.
     for stream_id in data["stream_ids"]:
         owned = authority._streams.get(stream_id)
         if owned is not None and owned.purpose == "probe" and (owned.frozen or owned.uncertain):
@@ -30,6 +30,13 @@ def _inspect(authority, registration, preparation_id):
             except Exception:
                 # Existing inspection below retains the incident and explains the
                 # unverified closure. A temporary SQL/store failure is not release.
+                pass
+        elif owned is None:
+            try:
+                authority.recover_abandoned_read_closure(stream_id)
+            except Exception:
+                # Older/missing birth, another host, live child or unknown SQL
+                # acknowledgement retains ownership; inspection reports the hold.
                 pass
     data = dal.target_data(
         preparation_id, account=configured["account"], storage_owner=configured["storage_owner"]

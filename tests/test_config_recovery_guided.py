@@ -59,8 +59,8 @@ def authority_fixture(monkeypatch, *, preflight=False, lost_ack=False):
         inspect_configuration_recovery=lambda key: module.inspect_configuration_recovery(
             authority, registration, key
         ),
-        apply_configuration_recovery=lambda key, token, actor, reason: module.apply_configuration_recovery(
-            authority, registration, key, token, actor, reason
+        apply_configuration_recovery=lambda key, token, actor, reason: (
+            module.apply_configuration_recovery(authority, registration, key, token, actor, reason)
         ),
     )
     return client, dal, snapshot, source, documents, stream
@@ -175,6 +175,99 @@ def test_automatic_policy_never_accepts_partial_import_or_unverifiable_read(monk
     assert service.recover_automatic(row["IncidentID"])["State"] == "open"
     assert not store.actions
     dal.settle.assert_not_called()
+
+
+@pytest.mark.parametrize("live", [False, True])
+def test_restart_closure_flows_through_verified_automatic_incident_release(monkeypatch, live):
+    import hashlib
+    from types import MethodType
+    from uuid import uuid4
+
+    from core.export_execution_host import HostBoundaryError
+    from kvk.dal.source_output_pool_dal import _wire
+    from services.export_execution_authority import ExportExecutionAuthority
+    from services.export_execution_protocol import encode
+    from tests.test_export_child_restart import host_birth
+
+    client, dal, snapshot, source, documents, stream = authority_fixture(monkeypatch)
+    authority = client.authority
+    authority.session_id = str(uuid4())
+    stream.update(SessionID=str(uuid4()), State="open", ActiveAccountKey="account-a")
+    birth = host_birth(stream["ChildIdentity"])
+    raw = encode(
+        dict(
+            kind="provider_child_birth/1",
+            stream_id=stream["StreamID"],
+            session_id=stream["SessionID"],
+            account="account-a",
+            host=birth,
+        )
+    )
+    reference = str(uuid4())
+    documents[reference] = raw
+    stream["ScopeJson"] = json.dumps(
+        dict(
+            json.loads(stream["ScopeJson"]),
+            host_birth=dict(reference=reference, sha256=hashlib.sha256(raw).hexdigest()),
+        )
+    )
+    snapshot["streams"] = [_wire(stream)]
+
+    def put(data):
+        key = uuid4()
+        documents[str(key)] = data
+        return SimpleNamespace(key=key.hex, sha256=hashlib.sha256(data).hexdigest())
+
+    def transition(kind, **values):
+        assert kind == "stream" and values["SessionID"] == stream["SessionID"]
+        assert values["ExpectedVersion"] == stream["Version"]
+        stream["Version"] += 1
+        if values["Action"] == "freeze":
+            stream["State"] = "frozen"
+        else:
+            assert values["ChildIdentity"] == stream["ChildIdentity"]
+            stream.update(
+                State="closed",
+                ActiveAccountKey=None,
+                ClosureHash=values["ClosureHash"],
+                ClosureReference=values["ClosureReference"],
+            )
+        snapshot["streams"] = [_wire(stream)]
+        return dict(Version=stream["Version"])
+
+    authority.store.put = put
+    authority.dal.transition = Mock(side_effect=transition)
+    authority.host = SimpleNamespace(
+        observe_retired_child=Mock(
+            return_value=dict(
+                child_id=birth["child_id"],
+                pid=birth["pid"],
+                job_empty=True,
+                process_terminated=True,
+                termination_method="named_job_destroyed",
+                job_name_sha256=hashlib.sha256(birth["job_name"].encode()).hexdigest(),
+            )
+        )
+    )
+    if live:
+        authority.host.observe_retired_child.side_effect = HostBoundaryError("Still live")
+    authority.recover_abandoned_read_closure = MethodType(
+        ExportExecutionAuthority.recover_abandoned_read_closure, authority
+    )
+    adapter = ConfigReadRecoveryAdapter(dal, client, account="account-a", storage_owner="fixture")
+    store = Store()
+    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    row = service.review_source(ACTOR, adapter.kind, source)
+    result = service.recover_automatic(row["IncidentID"])
+    if live:
+        assert result["State"] == "open" and not store.actions
+        authority.dal.transition.assert_not_called()
+        dal.settle.assert_not_called()
+    else:
+        assert result["State"] == "resolved" and len(store.actions) == 1
+        assert store.actions[0]["State"] == "verified"
+        assert snapshot["resources"] == []
+        dal.settle.assert_called_once()
 
 
 def test_broker_rejects_caller_authored_targets_and_binds_result(monkeypatch):

@@ -65,6 +65,9 @@ def validate_snapshot(snapshot, target, *, registration_hash, storage_owner, all
     if not streams or tuple(s["StreamID"] for s in streams) != target.stream_ids:
         raise SourceConflict("Complete stream membership changed or a conflicting stream exists.")
     for s in streams:
+        scope = json.loads(s["ScopeJson"])
+        if set(scope) not in ({"resources"}, {"resources", "host_birth"}):
+            raise SourceConflict("Configuration stream scope fields differ.")
         if (
             (s["PreparationID"], s["AccountKey"], s["OwnerID"], s["Fence"], s["ClaimVersion"])
             != (
@@ -79,8 +82,8 @@ def validate_snapshot(snapshot, target, *, registration_hash, storage_owner, all
             or any(s[k] is not None for k in ("JobID", "OutputOperationID", "NestedToken", "Epoch"))
             or s["RegistrationHash"] != registration_hash
             or (not allow_reads and s["EventDigest"] != hashlib.sha256(b"").hexdigest())
-            or json.loads(s["ScopeJson"])
-            != {"resources": [{"key": k, "version": v - offset} for k, v in target.resources]}
+            or scope["resources"]
+            != [{"key": k, "version": v - offset} for k, v in target.resources]
         ):
             raise SourceConflict("Stream is not the exact closed, empty configuration read.")
     if not allow_reads and (snapshot["request_count"] != 0 or snapshot["event_count"] != 0):

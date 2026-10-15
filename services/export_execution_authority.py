@@ -95,7 +95,13 @@ class ExportExecutionAuthority:
             raise ValueError("Complete exact owner scope required.")
         import json
 
-        resources = json.loads(scope["ScopeJson"])["resources"]
+        supplied_scope = json.loads(scope["ScopeJson"])
+        expected_detail = (
+            {"resources", "enrollment"} if self.enrollment_plan is not None else {"resources"}
+        )
+        if set(supplied_scope) != expected_detail:
+            raise ValueError("Only the registered resource/enrollment scope may be supplied.")
+        resources = supplied_scope["resources"]
         destinations = frozenset(
             r["key"].removeprefix("destination:")
             for r in resources
@@ -122,6 +128,38 @@ class ExportExecutionAuthority:
             # resume it or infer whether the durable stream exists.
             self._streams[stream_id] = stream
             try:
+                birth = getattr(child, "birth_evidence", None)
+                if (
+                    birth is not None
+                    and enrollment is None
+                    and scope["OwnerKind"] == "preparation"
+                    and scope["Purpose"] == "probe"
+                ):
+                    from core.export_child_lifecycle import validate_host_birth
+
+                    validate_host_birth(birth)
+                    if birth["child_id"] != child.identity:
+                        raise ExecutionUncertain("Host birth belongs to another child.")
+                    receipt = self.store.put(
+                        encode(
+                            dict(
+                                kind="provider_child_birth/1",
+                                stream_id=stream_id,
+                                session_id=self.session_id,
+                                account=scope["AccountKey"],
+                                host=birth,
+                            )
+                        )
+                    )
+                    scope = deepcopy(scope)
+                    scope["ScopeJson"] = encode(
+                        dict(
+                            resources=resources,
+                            host_birth=dict(
+                                reference=str(UUID(receipt.key)), sha256=receipt.sha256
+                            ),
+                        )
+                    ).decode()
                 row = self.dal.transition(
                     "stream",
                     SessionID=self.session_id,
@@ -246,7 +284,9 @@ class ExportExecutionAuthority:
                     terminal = (
                         "not_sent"
                         if prepared and not intent_attempted
-                        else "unknown" if intent_confirmed and not outcome_attempted else None
+                        else "unknown"
+                        if intent_confirmed and not outcome_attempted
+                        else None
                     )
                     if terminal is not None:
                         try:
@@ -389,6 +429,68 @@ class ExportExecutionAuthority:
             if stream is None or not (stream.uncertain or stream.frozen):
                 raise ExecutionUncertain("No interrupted locally owned stream closure.")
             return self.close_stream(stream_id)
+
+    def recover_abandoned_read_closure(self, stream_id):
+        """Close an old-session read only from its private birth and retired exact job."""
+        from core.export_child_lifecycle import read_birth, validate_retirement
+
+        with self._lock:
+            row = self.dal.read_stream(stream_id)
+            if (
+                row is None
+                or str(row["StreamID"]).lower() != stream_id
+                or row["Purpose"] != "probe"
+                or row["PreparationID"] is None
+                or row.get("JobID") is not None
+                or row.get("OutputOperationID") is not None
+                or str(row["SessionID"]).lower() == self.session_id
+                or row["State"] not in {"open", "frozen"}
+            ):
+                raise ExecutionUncertain("Exact old-session configuration read required.")
+            birth, birth_hash = read_birth(self.store, row)
+            # Observe first: a live child or inaccessible/missing birth is not abandoned.
+            observed = self.host.observe_retired_child(birth)
+            observed = dict(observed, birth_sha256=birth_hash)
+            validate_retirement(observed, birth, birth_hash)
+            old_session = str(row["SessionID"]).lower()
+            version = row["Version"]
+            if row["State"] == "open":
+                version = self.dal.transition(
+                    "stream",
+                    SessionID=old_session,
+                    StreamID=stream_id,
+                    AccountKey=row["AccountKey"],
+                    Action="freeze",
+                    ExpectedVersion=version,
+                )["Version"]
+            sequence, event_digest = self.dal.stream_digest(stream_id)
+            receipt = self.store.put(
+                encode(
+                    dict(
+                        stream_id=stream_id,
+                        version=version,
+                        closure=observed,
+                        last_sequence=sequence,
+                        event_digest=event_digest.hex(),
+                    )
+                )
+            )
+            result = self.dal.transition(
+                "stream",
+                SessionID=old_session,
+                StreamID=stream_id,
+                AccountKey=row["AccountKey"],
+                Action="close",
+                ExpectedVersion=version,
+                ChildIdentity=birth["child_id"],
+                ClosureHash=bytes.fromhex(receipt.sha256),
+                ClosureReference=str(UUID(receipt.key)),
+                EventDigest=event_digest,
+                LastSequence=sequence,
+            )
+            # Closure alone never releases the preparation. The caller must still
+            # verify every private request/event and exact ownership before settlement.
+            return dict(stream_id=stream_id, version=result["Version"])
 
     def recover_object_closures(self, account, object_id):
         """A registered proof request can finish only its interrupted local children."""

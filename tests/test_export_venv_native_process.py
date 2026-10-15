@@ -53,9 +53,16 @@ def test_direct_native_launch_preserves_venv_without_redirector_pid(tmp_path, mo
         QueryInformationJobObject=Mock(return_value={"BasicLimitInformation": {}}),
         SetInformationJobObject=Mock(),
         AssignProcessToJobObject=Mock(),
+        IsProcessInJob=Mock(return_value=True),
     )
     for name, value in {
-        "pywintypes": SimpleNamespace(error=RuntimeError),
+        "pywintypes": SimpleNamespace(error=RuntimeError, SECURITY_ATTRIBUTES=SimpleNamespace),
+        "win32api": SimpleNamespace(SetLastError=Mock(), GetLastError=lambda: 0),
+        "win32security": SimpleNamespace(
+            ConvertSidToStringSid=lambda value: value,
+            ConvertStringSidToSid=lambda value: value,
+            ConvertStringSecurityDescriptorToSecurityDescriptor=lambda value, revision: value,
+        ),
         "win32event": Mock(),
         "win32job": jobs,
         "win32pipe": Mock(),
@@ -64,6 +71,11 @@ def test_direct_native_launch_preserves_venv_without_redirector_pid(tmp_path, mo
         monkeypatch.setitem(sys.modules, name, value)
     monkeypatch.setattr(host_module, "create_private_pipe", Mock(return_value=pipe))
     monkeypatch.setattr(host_module, "MessagePipe", lambda handle, **_: handle)
+    monkeypatch.setattr(
+        host_module,
+        "machine_identity",
+        lambda: {"machine_guid": "11111111-1111-1111-1111-111111111111", "hostname": "fixture"},
+    )
     monkeypatch.setenv("PYTHONEXECUTABLE", "unreviewed-image")
     monkeypatch.setenv("__PYVENV_LAUNCHER__", "unreviewed-venv")
     monkeypatch.setenv("PYTHONPATH", "unreviewed-path")
@@ -78,6 +90,12 @@ def test_direct_native_launch_preserves_venv_without_redirector_pid(tmp_path, mo
     assert not {"PYTHONEXECUTABLE", "PYTHONHOME", "PYTHONPATH"} & {key.upper() for key in args[6]}
     assert child.pid == 123 and child.process is process
     jobs.AssignProcessToJobObject.assert_called_once_with(job, process)
+    attributes, job_name = jobs.CreateJobObject.call_args.args
+    assert attributes.bInheritHandle is False
+    assert attributes.SECURITY_DESCRIPTOR == f"D:P(A;;GA;;;{host.sid})"
+    assert job_name.startswith("Global\\K98ExportChild-")
+    assert child.birth_evidence["job_name"] == job_name
+    assert child.birth_evidence["assigned"] is True
     files["native.exe"].write_bytes(b"changed after host construction")
     with pytest.raises(host_module.HostBoundaryError, match="Native interpreter differs"):
         host.create_suspended(str(uuid4()))
