@@ -69,6 +69,18 @@ class ClosedStreamVerifier:
             raise SourceConflict("Closed request membership differs from its seal.")
         closure = self._document(stream["ClosureReference"], stream["ClosureHash"])
         observed = closure.get("closure", {})
+        terminated = observed.get("process_signaled") is True
+        if observed.get("termination_method") is not None:
+            from core.export_child_lifecycle import read_birth, validate_retirement
+
+            if stream["Purpose"] != "probe":
+                raise SourceConflict("Restarted-child closure is only admitted for read probes.")
+            try:
+                birth, birth_hash = read_birth(self.store, stream)
+                validate_retirement(observed, birth, birth_hash)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise SourceConflict("Private restarted-child closure differs.") from exc
+            terminated = True
         if (
             closure.get("stream_id") != stream_id
             or closure.get("version") != stream["Version"] - 1
@@ -76,7 +88,7 @@ class ClosedStreamVerifier:
             or closure.get("event_digest") != event_digest.hex()
             or observed.get("child_id") != str(stream["ChildIdentity"]).lower()
             or observed.get("job_empty") is not True
-            or observed.get("process_signaled") is not True
+            or not terminated
         ):
             raise SourceConflict("Private closure evidence differs from the exact child/stream.")
         count = mutations = reads = 0

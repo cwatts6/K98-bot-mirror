@@ -263,3 +263,40 @@ ExportResource, ExportJobResource, ExportExecutionStream and SourceDelivery cont
 This closes the no-provider-execution queued-input case only. Attempted legacy writes,
 unknown-write containment, missing authority evidence, earlier rollover stages and every P1
 workflow remain required active scope; the programme cannot be marked complete yet.
+
+The no-attempt queue decision is [Bot PR 342](https://github.com/cwatts6/K98-bot-mirror/pull/342).
+297 affected/log-isolation tests passed, including actual temporary SQL. Its three-source
+Changes review is sealed with no findings. The isolated UI-import fixture also fails on the
+unchanged parent because of its incomplete constants stub; import smoke passes.
+
+## Configuration read closure after authority-process loss
+
+New Windows provider children use a unique, private global job name with a non-inheritable
+authority-only handle, kill-on-close and no breakaway. For configuration-read streams the
+authority encrypts and verifies the exact child/job/host/session birth record before SQL
+admission and child resume; SQL retains only its private reference and hash in ScopeJson.
+Caller-supplied birth fields are rejected. Existing enrollment and mutation scope contracts
+remain unchanged.
+
+After an authority restart, discovery can finish closure of an old-session read only from
+that exact private birth and a same-host job observation. A live job, changed containment,
+access-denied or other lookup error cannot establish retirement. Windows job destruction
+requires all associated processes to have terminated; an existing job must have zero active
+processes. Closure records this distinct observation method without fabricating a process-
+handle wait. Exact old session/child/version/sequence SQL CAS remains mandatory. No provider
+request is replayed, no live process is adopted or killed by recovery, and closure alone
+does not release ownership. Complete private-journal verification and the durable recovery
+action still precede the approved automatic read release and independent postcondition read.
+
+References: [Windows job lifecycle](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),
+[named-job open](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-openjobobjectw),
+[global namespace](https://learn.microsoft.com/en-us/windows/win32/termserv/kernel-object-namespaces).
+Tests cover lost freeze/close replies, foreign/corrupt birth, live job refusal, private closure
+binding and restart-to-incident-to-verified automatic release. A disposable suspended local
+test child exercises actual Windows live/empty/destroyed observations; no provider child,
+credentials or existing process is used. Existing SQL stream/session/scope contracts were
+validated; the previously required read-prefix close migration remains necessary.
+
+Older streams without a bound birth and missing/corrupt private evidence still require the
+programme's guided containment workflow. Unknown writes, earlier rollover stages and P1
+work remain required, with no deferral or claim that this slice completes the programme.

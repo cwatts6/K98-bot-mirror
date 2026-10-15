@@ -1066,10 +1066,12 @@ class WindowsExecutionHost:
         import os
 
         import pywintypes
+        import win32api
         import win32event
         import win32job
         import win32pipe
         import win32process
+        import win32security
 
         self._verify_native_image()
         executable = self.native_python or self.python
@@ -1092,12 +1094,41 @@ class WindowsExecutionHost:
         pipe = create_private_pipe(
             name, authority_sid=self.sid, client_sid=self.sid, overlapped=True
         )
-        job = win32job.CreateJobObject(None, "")  # pywin32 requires an empty unnamed-job string.
-        limits = win32job.QueryInformationJobObject(job, 9)
-        limits["BasicLimitInformation"]["LimitFlags"] = 0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
-        win32job.SetInformationJobObject(job, 9, limits)
+        from uuid import uuid4
+
+        # A private random global name survives session changes and is never reused.
+        # Its binding is encrypted before SQL admission or child resume.
+        job_name = "Global\\K98ExportChild-" + uuid4().hex + uuid4().hex
+        if (
+            win32security.ConvertSidToStringSid(win32security.ConvertStringSidToSid(self.sid))
+            != self.sid
+        ):
+            pipe.Close()
+            raise HostBoundaryError("Canonical authority SID required.")
+        attributes = pywintypes.SECURITY_ATTRIBUTES()
+        attributes.SECURITY_DESCRIPTOR = (
+            win32security.ConvertStringSecurityDescriptorToSecurityDescriptor(
+                f"D:P(A;;GA;;;{self.sid})", 1
+            )
+        )
+        attributes.bInheritHandle = False
+        win32api.SetLastError(0)
+        try:
+            job = win32job.CreateJobObject(attributes, job_name)
+        except BaseException:
+            pipe.Close()
+            raise
+        if win32api.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            job.Close()
+            pipe.Close()
+            raise HostBoundaryError("Provider child job name already exists.")
         process = thread = None
         try:
+            limits = win32job.QueryInformationJobObject(job, 9)
+            limits["BasicLimitInformation"]["LimitFlags"] = (
+                0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
+            )
+            win32job.SetInformationJobObject(job, 9, limits)
             command = subprocess.list2cmdline(
                 [
                     str(executable),
@@ -1123,7 +1154,7 @@ class WindowsExecutionHost:
                 win32process.STARTUPINFO(),
             )
             win32job.AssignProcessToJobObject(job, process)
-            return WindowsProviderChild(
+            child = WindowsProviderChild(
                 identity=identity,
                 process=process,
                 thread=thread,
@@ -1139,6 +1170,23 @@ class WindowsExecutionHost:
                     "error": pywintypes.error,
                 },
             )
+            if not win32job.IsProcessInJob(process, job):
+                raise HostBoundaryError("Exact provider child job assignment is unproven.")
+            if (
+                win32job.QueryInformationJobObject(job, 9)["BasicLimitInformation"]["LimitFlags"]
+                != 0x2000
+            ):
+                raise HostBoundaryError("Exact provider child containment is unproven.")
+            child.birth_evidence = dict(
+                child_id=identity,
+                pid=pid,
+                job_name=job_name,
+                machine=machine_identity(),
+                authority_sid=self.sid,
+                limit_flags=limits["BasicLimitInformation"]["LimitFlags"],
+                assigned=True,
+            )
+            return child
         except BaseException:
             if process is not None:
                 # Assignment failure must terminate the still-suspended process.
@@ -1150,3 +1198,41 @@ class WindowsExecutionHost:
             job.Close()
             pipe.Close()
             raise
+
+    def observe_retired_child(self, birth):
+        """Observe one previously bound job; never terminate or enumerate other processes."""
+        import pywintypes
+        import win32job
+
+        from core.export_child_lifecycle import validate_host_birth
+
+        validate_host_birth(birth)
+        if birth["authority_sid"] != self.sid or birth["machine"] != machine_identity():
+            raise HostBoundaryError("Child birth belongs to another Windows host or identity.")
+        try:
+            job = win32job.OpenJobObject(0x0004, False, birth["job_name"])  # JOB_OBJECT_QUERY
+        except pywintypes.error as exc:
+            if exc.winerror != 2:  # Only ERROR_FILE_NOT_FOUND establishes object destruction.
+                raise HostBoundaryError("Exact named child job cannot be observed.") from exc
+            method = "named_job_destroyed"
+        else:
+            try:
+                limits = win32job.QueryInformationJobObject(job, 9)
+                accounting = win32job.QueryInformationJobObject(job, 1)
+                if limits["BasicLimitInformation"]["LimitFlags"] != 0x2000:
+                    raise HostBoundaryError("Retained child job containment changed.")
+                if accounting["ActiveProcesses"] != 0:
+                    raise HostBoundaryError("The exact child job still contains live processes.")
+                method = "named_job_empty"
+            finally:
+                job.Close()
+        # Windows destroys a job only after every associated process has exited.
+        # Do not claim a process-handle wait occurred after those handles were lost.
+        return dict(
+            child_id=birth["child_id"],
+            pid=birth["pid"],
+            job_empty=True,
+            process_terminated=True,
+            termination_method=method,
+            job_name_sha256=hashlib.sha256(birth["job_name"].encode()).hexdigest(),
+        )
