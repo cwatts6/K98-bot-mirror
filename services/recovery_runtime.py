@@ -35,6 +35,21 @@ def recovery_service():
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter}
+        from services.all_kvk_capture_recovery_dal import AllKvkCaptureRecoveryDAL
+        from services.all_kvk_capture_recovery_service import (
+            AllKvkCaptureRecovery,
+            AllKvkCaptureRecoveryAdapter,
+        )
+
+        kvk_outcomes = AllKvkCaptureRecoveryDAL(
+            runtime.dal.connect,
+            account=runtime.account,
+            storage_owner=runtime.store.storage_owner,
+        )
+        kvk_adapter = AllKvkCaptureRecoveryAdapter(
+            kvk_outcomes, AllKvkCaptureRecovery(runtime, kvk_outcomes)
+        )
+        adapters[kvk_adapter.kind] = kvk_adapter
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:

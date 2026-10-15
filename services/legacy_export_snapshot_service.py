@@ -1030,9 +1030,8 @@ class LegacyExportRuntime:
         if collection is not None and capture not in collection:
             collection.append(capture)
 
-    def enqueue_snapshot(self, preparation_id):
-        from services.export_coordination_dal import JobSpec
-
+    def verified_snapshot(self, preparation_id):
+        """Read-only retained-byte and registration verification; never admit work."""
         row = self.dal.read(preparation_id)
         if row["AccountKey"] != self.account or row["StorageOwner"] != self.store.storage_owner:
             raise SnapshotUnavailable("Capture belongs to another account or storage owner.")
@@ -1045,10 +1044,16 @@ class LegacyExportRuntime:
         metadata = snapshot.metadata()
         if metadata["preparation_id"] != str(row["PreparationID"]).lower():
             raise SnapshotUnavailable("Snapshot preparation identity differs.")
-        config = metadata["config"]
         registered = json.loads(self.configuration)[row["ConsumerKind"]]
         if metadata["generation"].get("registration_sha256") != configuration_digest(registered):
             raise SnapshotUnavailable("Retained output registration differs from this runtime.")
+        return row, receipt, metadata
+
+    def enqueue_snapshot(self, preparation_id):
+        from services.export_coordination_dal import JobSpec
+
+        row, receipt, metadata = self.verified_snapshot(preparation_id)
+        config = metadata["config"]
         job = self.coordinator.enqueue(
             JobSpec(
                 account=row["AccountKey"],

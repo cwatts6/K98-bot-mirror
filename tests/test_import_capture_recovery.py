@@ -28,6 +28,7 @@ def fixture():
     runtime = SimpleNamespace(
         configuration=json.dumps(dict(scan_data=scope)),
         store=SimpleNamespace(storage_owner="disk-a"),
+        verified_snapshot=Mock(return_value=(prep, None, {})),
     )
     outcomes = Mock()
     service = ImportCaptureRecovery(runtime, outcomes)
@@ -81,12 +82,13 @@ def test_guided_capture_action_describes_verification_and_queueing():
 def test_capture_without_queue_receipt_does_not_resolve_incident():
     service, preview, _ = fixture()
     preview.update(captured=True, action="hold")
-    preview["preparation"]["GenerationJson"] = json.dumps(
-        dict(capture_recovery=dict(token="proof", actor="recovery:action"))
-    )
+    generation = service.generation(preview["preparation"], preview["execution"])
+    generation["capture_recovery"] = dict(token="proof", actor="recovery:action")
+    preview["preparation"]["GenerationJson"] = json.dumps(generation)
     adapter = ImportRecoveryAdapter(service.outcomes, service)
     assert adapter.inspect("source")[2] is False
     preview["preparation"]["JobID"] = "queue-receipt"
+    preview["preparation"]["State"] = "materialized"
     assert adapter.inspect("source")[2] is True
 
 

@@ -10,6 +10,11 @@ from uuid import uuid4
 import pytest
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.all_kvk_capture_recovery_dal import AllKvkCaptureRecoveryDAL
+from services.all_kvk_capture_recovery_service import (
+    AllKvkCaptureRecovery,
+    AllKvkCaptureRecoveryAdapter,
+)
 from services.export_snapshot_store import ExportSnapshotStore
 from services.import_capture_recovery_service import ImportCaptureRecovery
 from services.import_recovery_service import ImportRecoveryAdapter
@@ -28,8 +33,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
-def recovery(tmp_path):
+@pytest.fixture(params=["scan_data", "all_kvk"])
+def recovery(tmp_path, request):
     import pyodbc
 
     namespace = uuid4().hex
@@ -96,7 +101,12 @@ def recovery(tmp_path):
             def __getattr__(self, key):
                 return getattr(self.inner, key)
 
-        base, preview, resources = fixture()
+        if request.param == "all_kvk":
+            from tests.test_all_kvk_capture_recovery import fixture as kvk_fixture
+
+            base, preview, resources = kvk_fixture()
+        else:
+            base, preview, resources = fixture()
         prep, execution = preview["preparation"], preview["execution"]
         prep.update(
             RequestHash=b"r" * 32, EnqueueSequence=1, Actor="test", Reason="isolated recovery test"
@@ -106,6 +116,8 @@ def recovery(tmp_path):
             ("StatsImportExecution", execution),
             ("ExportResource", dict(resources[0], ResourceKind="sql_snapshot")),
         ):
+            if row is None:
+                continue
             values = dict(row)
             if table == "ExportPreparation":
                 from datetime import datetime
@@ -120,7 +132,10 @@ def recovery(tmp_path):
                 *(values[c] for c in columns),
             )
 
-        outcomes = StatsImportOutcomeDAL(Connection, account="a", storage_owner="disk-a")
+        outcome_type = (
+            AllKvkCaptureRecoveryDAL if request.param == "all_kvk" else StatsImportOutcomeDAL
+        )
+        outcomes = outcome_type(Connection, account="a", storage_owner="disk-a")
         state = SimpleNamespace(sections=(OutputSection("output", ("value",), ((7,),)),), fail=None)
         store = ExportSnapshotStore(tmp_path, "disk-a")
         runtime = SimpleNamespace(
@@ -129,11 +144,11 @@ def recovery(tmp_path):
             dal=LegacySnapshotDAL(Connection),
             capture=lambda *_: (
                 state.sections,
-                dict(consumer="scan_data", destinations=["registered"]),
+                dict(consumer=request.param, destinations=["registered"]),
             ),
         )
 
-        def enqueue(preparation_id):
+        def verified_snapshot(preparation_id):
             row = outcomes.inspect(preparation_id)["preparation"]
             from services.export_snapshot_store import SnapshotReceipt
 
@@ -144,6 +159,10 @@ def recovery(tmp_path):
                     )
                 )
             )
+            return row, None, {}
+
+        def enqueue(preparation_id):
+            row, _, _ = verified_snapshot(preparation_id)
             if not row["JobID"]:
                 owner.execute(
                     rewrite(
@@ -158,7 +177,11 @@ def recovery(tmp_path):
             return str(outcomes.inspect(preparation_id)["preparation"]["JobID"])
 
         runtime.enqueue_snapshot = enqueue
-        service = ImportCaptureRecovery(runtime, outcomes)
+        service_type = (
+            AllKvkCaptureRecovery if request.param == "all_kvk" else ImportCaptureRecovery
+        )
+        service = service_type(runtime, outcomes)
+        runtime.verified_snapshot = verified_snapshot
         yield SimpleNamespace(
             service=service,
             outcomes=outcomes,
@@ -204,8 +227,13 @@ def test_restart_at_each_acknowledgement_finishes_capture_once(recovery, monkeyp
     else:
         r.service.run(r.source, token, actor)
     # New service instances resume only the original persisted action identity.
-    restarted = ImportCaptureRecovery(r.runtime, r.outcomes)
-    adapter = ImportRecoveryAdapter(r.outcomes, restarted)
+    restarted = type(r.service)(r.runtime, r.outcomes)
+    adapter_type = (
+        AllKvkCaptureRecoveryAdapter
+        if isinstance(restarted, AllKvkCaptureRecovery)
+        else ImportRecoveryAdapter
+    )
+    adapter = adapter_type(r.outcomes, restarted)
     assert adapter.reconcile(r.source, action) == "verified"
     assert adapter.inspect(r.source)[2]
     final = r.outcomes.inspect(r.source)
@@ -219,6 +247,9 @@ def test_restart_at_each_acknowledgement_finishes_capture_once(recovery, monkeyp
 @pytest.mark.parametrize("lock", ["k98-legacy-output-snapshot", "S11:stats-import:"])
 def test_live_original_session_prevents_capture(recovery, lock):
     r = recovery
+    if isinstance(r.service, AllKvkCaptureRecovery) and lock == "S11:stats-import:":
+        # This receipt/guard belongs only to scan-data, not the all-KVK producer.
+        return
     token = r.outcomes.inspect(r.source)["token"]
     resource = r.parameter(lock + (r.source if lock.endswith(":") else ""))
     r.owner.execute(
@@ -267,3 +298,59 @@ def test_old_claim_and_different_action_cannot_capture_after_adoption(recovery):
         )
         with pytest.raises(SourceConflict):
             r.runtime.dal.authorize(old)
+
+
+def test_normal_capture_queue_gap_is_discovered_and_confirmed_once(recovery, monkeypatch):
+    r = recovery
+    token = r.outcomes.inspect(r.source)["token"]
+    original = r.runtime.enqueue_snapshot
+    monkeypatch.setattr(
+        r.runtime, "enqueue_snapshot", lambda *_: (_ for _ in ()).throw(TimeoutError())
+    )
+    with pytest.raises(TimeoutError):
+        r.service.run(r.source, token, "recovery:capture")
+    # A normal producer capture has no recovery marker at all.
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET GenerationJson=JSON_MODIFY(GenerationJson,"
+            "'$.capture_recovery',NULL),UpdatedUTC=DATEADD(minute,-5,SYSUTCDATETIME()) "
+            "WHERE PreparationID=?"
+        ),
+        r.source,
+    )
+    assert r.source in r.outcomes.pending_recovery()
+    adapter_type = (
+        AllKvkCaptureRecoveryAdapter
+        if isinstance(r.service, AllKvkCaptureRecovery)
+        else ImportRecoveryAdapter
+    )
+    adapter = adapter_type(r.outcomes, r.service)
+    evidence, token, resolved = adapter.inspect(r.source)
+    assert not resolved and set(evidence["actions"]) == {"queue_capture"}
+    assert r.outcomes.inspect(r.source)["preparation"]["JobID"] is None
+    monkeypatch.setattr(r.runtime, "enqueue_snapshot", original)
+    r.state.fail = "queue"
+    with pytest.raises(TimeoutError):
+        adapter.execute(r.source, "queue_capture", token, "recovery:queue", "continue output")
+    job = r.outcomes.inspect(r.source)["preparation"]["JobID"]
+    action = dict(ActionKind="queue_capture", EvidenceHash=token, ActionID="queue")
+    assert adapter.reconcile(r.source, action) == "verified"
+    assert r.outcomes.inspect(r.source)["preparation"]["JobID"] == job
+    assert r.source not in r.outcomes.pending_recovery()
+
+
+def test_capture_discovery_excludes_other_storage_and_account(recovery):
+    r = recovery
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET UpdatedUTC=DATEADD(minute,-5,"
+            "SYSUTCDATETIME()) WHERE PreparationID=?"
+        ),
+        r.source,
+    )
+    assert r.source in r.outcomes.pending_recovery()
+    for account, storage in (("other", "disk-a"), ("a", "other")):
+        foreign = type(r.outcomes)(r.outcomes.connect, account=account, storage_owner=storage)
+        assert r.source not in foreign.pending_recovery()
+        with pytest.raises(SourceConflict):
+            foreign.inspect(r.source)

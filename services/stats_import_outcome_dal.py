@@ -221,7 +221,7 @@ class StatsImportOutcomeDAL:
                 "SELECT TOP (?) p.PreparationID FROM dbo.ExportPreparation p "
                 "LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
                 "WHERE p.AccountKey=? AND p.StorageOwner=? AND p.ConsumerKind='scan_data' "
-                "AND p.State IN ('writing','committed','uncertain') AND p.JobID IS NULL "
+                "AND p.State IN ('writing','committed','uncertain','captured') AND p.JobID IS NULL "
                 "AND e.Resolution IS NULL AND p.UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
                 "ORDER BY CASE WHEN p.PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,p.PreparationID",
                 limit,
