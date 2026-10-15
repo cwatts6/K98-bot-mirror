@@ -372,3 +372,29 @@ async def test_alert_footer_opens_exact_incident_after_view_recreation(monkeypat
     recreated = view.RecoveryEntryView()
     await recreated.children[0].callback(interaction)
     view.show_incident.assert_awaited_once_with(interaction, row["IncidentID"])
+
+
+@pytest.mark.asyncio
+async def test_queued_export_skip_requires_guided_confirmation(monkeypatch):
+    from tests.test_export_recovery import job_fixture
+    from ui.views import recovery_view as view
+
+    adapter, snapshot = job_fixture(consumer="all_kvk")
+    _, _, _, row = setup()
+    row["evidence"] = adapter.inspect(snapshot["job"]["JobID"])[0]
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "call", AsyncMock(return_value=row))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    button = next(
+        item
+        for item in view.RecoveryIncidentView(row).children
+        if item.label == "Keep SQL; skip queued export"
+    )
+    await button.callback(interaction)
+    view.call.assert_awaited_once_with("review", ACTOR, row["IncidentID"])
+    sent = interaction.followup.send.call_args.kwargs
+    assert sent["ephemeral"] and isinstance(sent["view"], view.RecoveryConfirmView)
+    assert "spreadsheet may remain out of date" in sent["embed"].fields[0].value
+    assert sent["view"].action == "skip_unstarted"
+    adapter.coordinator.skip_unstarted.assert_not_called()

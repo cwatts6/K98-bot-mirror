@@ -22,7 +22,13 @@ pytestmark = pytest.mark.skipif(
 def scoped_jobs():
     import pyodbc
 
-    names = ("ExportJobResource", "ExportResource", "ExportAttempt", "ExportJob")
+    names = (
+        "ExportJobResource",
+        "ExportResource",
+        "ExportAttempt",
+        "ExportJob",
+        "ExportExecutionStream",
+    )
     sql = pyodbc.connect(
         "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes",
         autocommit=True,
@@ -32,6 +38,7 @@ def scoped_jobs():
     def rewrite(text):
         for name in names:
             text = re.sub(r"\bdbo\." + name + r"\b", "#" + name, text)
+        text = text.replace("KVK.SourceDelivery", "#SourceDelivery")
         return text
 
     try:
@@ -41,6 +48,9 @@ def scoped_jobs():
             text = "\n".join(line for line in text.splitlines() if "FOREIGN KEY" not in line)
             text = re.sub(r",\s*\);", "\n);", text)
             sql.execute(rewrite(text))
+        text = (schema / "KVK.SourceDelivery.Table.sql").read_text(encoding="utf-8-sig")
+        text = "\n".join(line for line in text.splitlines() if "FOREIGN KEY" not in line)
+        sql.execute(rewrite(text))
 
         class Cursor:
             def __init__(self):

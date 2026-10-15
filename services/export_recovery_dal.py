@@ -80,6 +80,11 @@ class ExportRecoveryDAL:
             )
             attempts = rows(cursor)
             cursor.execute(
+                "SELECT StreamID FROM dbo.ExportExecutionStream WHERE JobID=? ORDER BY StreamID",
+                job_id,
+            )
+            streams = rows(cursor)
+            cursor.execute(
                 "SELECT r.* FROM dbo.ExportResource r JOIN dbo.ExportJobResource m "
                 "ON m.ResourceKey=r.ResourceKey WHERE m.JobID=? ORDER BY r.ResourceKey",
                 job_id,
@@ -89,7 +94,7 @@ class ExportRecoveryDAL:
                 r["ResourceKey"] for r in resources
             ) != self.destinations.get(bytes(job["DestinationSetHash"])):
                 raise SourceConflict("Export resource membership differs from its registered pool.")
-            return _wire(dict(job=job, attempts=attempts, resources=resources))
+            return _wire(dict(job=job, attempts=attempts, streams=streams, resources=resources))
 
     def repairs(self, job_id):
         original = self.job(job_id)["job"]

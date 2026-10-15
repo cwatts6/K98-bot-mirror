@@ -852,6 +852,8 @@ class ExportCoordinationDAL:
                     )
                     if one(cursor):
                         continue
+                if json.loads(job["ProvenanceJson"]).get("export_skipped"):
+                    raise SourceConflict("This export was closed by a verified recovery decision.")
                 retry = (
                     job["State"] == "failed"
                     and json.loads(job["ProvenanceJson"]).get("safe_retry", {}).get("requested")
@@ -1024,6 +1026,8 @@ class ExportCoordinationDAL:
 
                 require_source(cursor, job["KVK_NO"], job["SourceKey"])
             evidence = json.loads(job["ProvenanceJson"])
+            if evidence.get("export_skipped"):
+                raise SourceConflict("A skipped export cannot be retried.")
             history = evidence.setdefault("safe_retry_history", [])
             cursor.execute("SELECT CONVERT(varchar(33),SYSUTCDATETIME(),126) AS NowUTC")
             history.append(
@@ -1043,6 +1047,110 @@ class ExportCoordinationDAL:
                 bounded_json(evidence),
                 job["JobID"],
                 expected_version,
+            )
+
+    def skip_unstarted(self, job_id, account, *, storage_owner, expected_version, actor, reason):
+        """Close a legacy export with no provider history, retaining its identity and input."""
+        if (
+            not isinstance(actor, str)
+            or not actor.strip()
+            or len(actor) > 128
+            or not isinstance(reason, str)
+            or not reason.strip()
+            or len(reason) > 1024
+        ):
+            raise ValueError("Bounded recovery actor and reason required.")
+        job_id = identity(job_id)
+        with self._account(account) as cursor:
+            cursor.execute(
+                "SELECT ResourceKey FROM dbo.ExportJobResource WHERE JobID=? ORDER BY ResourceKey",
+                job_id,
+            )
+            keys = [r["ResourceKey"] for r in rows(cursor)]
+            resources = []
+            for key in keys:
+                _mutex(cursor, key)
+                cursor.execute(
+                    "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) WHERE ResourceKey=?",
+                    key,
+                )
+                resources.append(one(cursor))
+            job = _job(cursor, job_id)
+            if (
+                not job
+                or job["AccountKey"] != account
+                or job["StorageOwner"] != storage_owner
+                or job["ConsumerKind"] not in {"scan_data", "all_kvk"}
+                or job["Version"] != expected_version
+                or job["State"] not in {"waiting", "ready", "running", "failed", "uncertain"}
+            ):
+                raise SourceConflict("The exact unstarted legacy export is required.")
+            destinations = tuple(
+                k.removeprefix("destination:") for k in keys if k.startswith("destination:")
+            )
+            if (
+                not destinations
+                or keys != ["account:" + account, *("destination:" + d for d in destinations)]
+                or any(r is None for r in resources)
+                or digest(destinations) != bytes(job["DestinationSetHash"])
+            ):
+                raise SourceConflict("Frozen destination membership changed.")
+            cursor.execute(
+                "SELECT TOP (1) AttemptID FROM dbo.ExportAttempt WITH (UPDLOCK,HOLDLOCK) WHERE JobID=?",
+                job_id,
+            )
+            if one(cursor):
+                raise SourceConflict("Attempted exports require provider reconciliation.")
+            cursor.execute(
+                "SELECT TOP (1) StreamID FROM dbo.ExportExecutionStream WITH (UPDLOCK,HOLDLOCK) WHERE JobID=?",
+                job_id,
+            )
+            if one(cursor):
+                raise SourceConflict("Provider execution evidence requires separate recovery.")
+            evidence = json.loads(job["ProvenanceJson"])
+            if evidence.get("export_skipped"):
+                raise SourceConflict("Export was already closed by another decision.")
+            cursor.execute("SELECT CONVERT(varchar(33),SYSUTCDATETIME(),126) AS NowUTC")
+            evidence["export_skipped"] = dict(
+                actor=actor,
+                reason=reason,
+                utc=one(cursor)["NowUTC"],
+                version=job["Version"],
+                owner=job["OwnerID"],
+                fence=job["Fence"],
+            )
+            evidence.pop("safe_retry", None)
+            for resource in resources:
+                if resource["ActiveJobID"] is None or identity(resource["ActiveJobID"]) != job_id:
+                    continue  # A later owner's reservation must never be changed.
+                if (
+                    resource["OwnerID"] != job["OwnerID"]
+                    or resource["Fence"] != job["Fence"]
+                    or resource["ActivePreparationID"] is not None
+                    or resource["ActiveOutputOperationID"] is not None
+                ):
+                    raise SourceConflict("Retained reservation ownership differs.")
+                _cas(
+                    cursor,
+                    "UPDATE dbo.ExportResource SET ActiveJobID=NULL,OwnerID=NULL,BlockedReason=NULL,Version=Version+1 "
+                    "OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID=? AND OwnerID=? AND Fence=? "
+                    "AND ActivePreparationID IS NULL AND ActiveOutputOperationID IS NULL",
+                    resource["ResourceKey"],
+                    resource["Version"],
+                    job_id,
+                    job["OwnerID"],
+                    job["Fence"],
+                )
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportJob SET State=?,ProvenanceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() "
+                "OUTPUT inserted.Version WHERE JobID=? AND Version=? AND State=? AND Fence=?",
+                "cancelled" if job["OwnerID"] is None else "failed",
+                bounded_json(evidence),
+                job_id,
+                expected_version,
+                job["State"],
+                job["Fence"],
             )
 
     def begin_attempt(self, claim, manifest, parts, *, legacy=None):

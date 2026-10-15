@@ -28,6 +28,7 @@ def job_fixture(*, consumer="new_source", state="failed", attempted=False):
             KVK_NO=1,
         ),
         attempts=[{}] if attempted else [],
+        streams=[],
         resources=[],
     )
     discovery, coordinator, reconciler = Mock(account="account"), Mock(), Mock()
@@ -42,7 +43,9 @@ def job_fixture(*, consumer="new_source", state="failed", attempted=False):
 def test_guided_retry_only_for_proven_pre_attempt_failure(consumer):
     adapter, snapshot = job_fixture(consumer=consumer)
     evidence, token, resolved = adapter.inspect(snapshot["job"]["JobID"])
-    assert not resolved and set(evidence["actions"]) == {"retry_unstarted"}
+    assert not resolved and set(evidence["actions"]) == (
+        {"retry_unstarted"} if consumer == "new_source" else {"retry_unstarted", "skip_unstarted"}
+    )
     adapter.execute(
         snapshot["job"]["JobID"], "retry_unstarted", token, "recovery:action", "corrected"
     )
@@ -105,6 +108,45 @@ def test_age_threshold_does_not_change_durable_action_identity():
     assert job_token(snapshot) == token
     snapshot["resources"] = [{"Version": 99}]
     assert job_token(snapshot) == token
+
+
+def test_skip_reconciles_only_exact_receipt_and_stale_stream_fences_intent():
+    adapter, snapshot = job_fixture(consumer="scan_data")
+    action = dict(
+        ActionID="action",
+        ActionKind="skip_unstarted",
+        EvidenceHash=job_token(snapshot),
+        Reason="skip",
+    )
+    snapshot["streams"] = [dict(StreamID="new-stream")]
+    assert adapter.reconcile("source", action) == "not_applied"
+    adapter.coordinator.skip_unstarted.assert_not_called()
+    snapshot["streams"] = []
+    snapshot["job"].update(
+        Version=4,
+        ProvenanceJson=json.dumps(
+            dict(export_skipped=dict(actor="recovery:action", reason="skip"))
+        ),
+    )
+    assert adapter.reconcile("source", action) == "verified"
+    snapshot["attempts"] = [{}]
+    assert adapter.reconcile("source", action) is None
+    assert not adapter.inspect("source")[2]
+
+
+def test_skip_timeout_does_not_claim_success_or_resend_with_new_identity():
+    adapter, snapshot = job_fixture(consumer="all_kvk")
+    adapter.coordinator.skip_unstarted.side_effect = TimeoutError("commit acknowledgement lost")
+    action = dict(
+        ActionID="action",
+        ActionKind="skip_unstarted",
+        EvidenceHash=job_token(snapshot),
+        Reason="skip",
+    )
+    with pytest.raises(TimeoutError):
+        adapter.reconcile("source", action)
+    assert adapter.coordinator.skip_unstarted.call_args.kwargs["actor"] == "recovery:action"
+    assert not adapter.inspect("source")[2]
 
 
 def test_failed_retry_reopens_incident_even_with_prior_successful_queue_action():

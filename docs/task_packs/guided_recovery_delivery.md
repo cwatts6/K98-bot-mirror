@@ -234,3 +234,32 @@ This branch requires a Bot Changes review, Deep off; no SQL schema delta is need
 the authoritative preparation, resource and execution contracts already represent this
 state. Missing atomic checkpoints, queued corrupt exports and unknown provider writes retain
 their separate required workflows; no programme completion or deferral is claimed.
+
+The committed-capture decision is [Bot PR 341](https://github.com/cwatts6/K98-bot-mirror/pull/341).
+Its nine-source Changes review is sealed with no findings. The broad run passed 7,843 tests
+with 250 optional/platform skips and eight subtests; the only failure is the existing absent
+mirror workflow. The final queue fences passed a separate 205-test affected run.
+
+## Queued legacy export without provider execution
+
+Stats and all-KVK export incidents offer **Keep SQL; skip queued export** when no attempt or
+execution stream exists. This includes missing/corrupt retained input and a worker interrupted
+before provider execution. The guided confirmation explicitly accepts no spreadsheet update.
+The account/resource transaction rechecks custody, immutable destination membership, exact
+job version and complete absence of provider evidence. It fences the old worker, releases
+only reservations still owned by that exact job and preserves the job, input and audit history.
+It never changes another owner's reservation. Confirmed skip receipts cannot request or admit
+a later retry of the same job. The monitor verifies the original decision after lost replies.
+
+Actual temporary SQL tests cover both consumers, lost acknowledgement, stale/foreign inputs,
+attempt/stream rejection, mismatched ownership, a later owner's preserved reservation, old
+worker rejection and successful admission of later eligible work. Discord tests verify that
+the button opens an ephemeral checklist and confirmation before any action executes.
+The existing coordinator, scoped discovery and recovery confirmation are reused; no new
+command, cache or persistent SQL object is needed. Changes security review, Deep off, covers
+this focused branch against `249e9665`. Existing authoritative ExportJob, ExportAttempt,
+ExportResource, ExportJobResource, ExportExecutionStream and SourceDelivery contracts apply.
+
+This closes the no-provider-execution queued-input case only. Attempted legacy writes,
+unknown-write containment, missing authority evidence, earlier rollover stages and every P1
+workflow remain required active scope; the programme cannot be marked complete yet.
