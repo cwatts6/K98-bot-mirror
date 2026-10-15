@@ -3,6 +3,27 @@
 Approved 2026-10-15. This is active delivery scope, not deferred optimisation.
 The programme remains incomplete until every workstream and acceptance gate below is satisfied.
 
+## Current P0 completion checklist — 2026-10-15
+
+The chronological sections below retain earlier checkpoints; their historical "still required"
+lists are not a count of current work. The current remaining P0 workstreams are:
+
+| Workstream | Remaining acceptance |
+| --- | --- |
+| Unknown-write replacement | Guided fresh-file proposal, read-only verification, exact registration activation, retained-input continuation and verified publication; both legacy outputs and complete new-source pools; isolation alone cannot resolve the incident |
+| Earlier rollover failures | Guided decisions and verified continuation for every interrupted phase before the already-covered completed-rollover/retirement paths |
+| Remaining producer checkpoints | Atomic completion evidence and safe remaining-stage continuation for all enabled producers, including player stats, configuration imports and stats procedures; explicit partial/unverifiable-output decisions |
+| Admission-refused stages | Durable refused-stage identity and exact blocker linkage, proactive discovery, healthy-contention distinction and guided safe continuation without replaying earlier committed work |
+| Missing/corrupt evidence | Guided receipt restoration or a separately verified containment/repair outcome; no permanent recheck-only incident, fabricated success or timeout unlock |
+| Integrated P0 acceptance | Alert-only entry through admin checks/buttons to verified repair and resumed eligible work, with restart, lost replies, concurrent actions and failure during recovery |
+
+Implemented slices remain draft PRs and have not been deployed. The common incident/action
+framework, verified read-only automatic release, several guided read/capture/export recoveries
+and permanent target fencing are implemented. Containment is in
+[Bot PR 346](https://github.com/cwatts6/K98-bot-mirror/pull/346) and
+[SQL PR 115](https://github.com/cwatts6/K98-bot-SQL-Server/pull/115); their Changes reviews sealed
+successfully. P0 is not at final polish, and no workstream above is deferred optimisation.
+
 ## Required packages
 
 | Package | Priority | Status | Acceptance |
@@ -475,3 +496,25 @@ registration, retained-input continuation, fresh publication verification, guide
 refused-stage linkage and continuation, and earlier rollover owners. The remaining P0/P1
 workflows also remain required. No containment button is exposed before its replacement workflow
 is implemented; target isolation alone cannot resolve an unknown-write business outcome.
+
+### Replacement workflow in progress
+
+The unpublished `codex/guided-target-replacement` branches now contain deterministic
+destination-only registration proposals, authority-private proposal receipts and immutable
+SQL proposal/mapping records. Lost SQL replies are resolved by reading the original receipt;
+proposals explicitly remain unverified, inactive and business-unresolved. Projection tests
+preserve queries, audience, reader bindings, unrelated pools and original registration bytes.
+
+The manual enrollment SQL path now recognizes an exact stored replacement proposal for one
+isolated pool. It verifies complete index/slot order, owner and audience before allowing fresh
+read-only enrollment despite the original isolated job remaining uncertain. Healthy queued
+work retains priority, ordinary enrollment retains its guards, and old files stay fenced.
+Engine testing also found and corrected the manual enrollment storage-owner pattern so its
+Unicode JSON validation accepts hyphens consistently with Python.
+
+This is an implementation checkpoint, not a PR-ready workflow. Provider verification orchestration,
+failed-verification recovery, activation/registration history, retained-input publication and
+guided admin input/buttons remain unfinished in this branch. The new SQL objects and procedure
+changes still need a literal migration, source/permission pins and separate final Changes reviews.
+No provider calls, persistent SQL installation, production deployment or admin action exposure
+has occurred. The six current P0 workstreams remain open.
