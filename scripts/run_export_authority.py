@@ -451,6 +451,12 @@ class AuthorityBroker:
         ):
             raise ValueError("Versioned authority action required.")
         action = message.get("action")
+        if action == "evidence_recovery":
+            from services.export_evidence_recovery import EvidenceRecovery
+
+            if self.boundary is None:
+                raise ValueError("Protected evidence recovery boundary required.")
+            return EvidenceRecovery(self).dispatch(message)
         if action == "effective_registration":
             if set(message) != {"version", "action"} or self.replacements is None:
                 raise ValueError("Provisioned replacement registration authority required.")
@@ -864,8 +870,9 @@ def main(argv=None):
         from services.export_replacement_authority import ReplacementAuthority
 
         broker.replacements = ReplacementAuthority(broker)
-        # Authenticate the entire retained chain before accepting any caller.
-        broker.replacements.current()
+        # Effective-registration, open and prove still authenticate the complete
+        # chain on every admission. Serve the independent recovery control plane
+        # even when a missing private receipt prevents that authentication.
         try:
             serve(
                 manifest=manifest,

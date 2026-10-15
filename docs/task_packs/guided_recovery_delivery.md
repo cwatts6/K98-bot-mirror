@@ -43,8 +43,24 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   the final compatibility review also sealed with no findings across its one
   source file (247,530 measured total tokens). The final 85-test run passes,
   including global exemptions and real SQL integer-staging round trips.
-  SQL configuration replacement is published as draft PR #117. Bot publication
-  is the next handoff; the remaining P0 workstreams below stay active.
+  Configuration replacement is published as Bot draft PR #348 / SQL draft PR #117.
+  The remaining P0 workstreams below stay active.
+
+- The next active slice adds proactive inventory of private evidence, a second
+  encrypted copy, guided exact-byte restoration, and recovery-only startup when
+  an activation receipt cannot be read. The admin sees the affected receipt and
+  copy verification, confirms restoration, and the bot verifies both saved hashes
+  before retrying normal admission. New healthy receipts do not create alerts.
+  Damaged ciphertext is retained. Authority and Bot recovery access is independent
+  of effective-registration verification; normal writes still require it.
+  Temporary SQL tests exercise a real completed activation, delete/corrupt its
+  private receipt, restore through the admin service and typed broker, and verify
+  the unchanged authenticated chain and unresolved original write history.
+  The affected authority, startup, recovery, notification and temporary-SQL suite
+  passes 551 tests with one existing skip. Final security review is pending.
+  Loss of every valid copy, registration-checkpoint recovery, earlier rollover
+  phases and refused-stage continuation are still required implementation, not
+  deferred optimisations. This slice does not close those acceptance gates.
 
 - Guided saved multi-page admin forms, strict file-link parsing, fresh read-only
   verification, original-journal finish/discard buttons, sealed activation and

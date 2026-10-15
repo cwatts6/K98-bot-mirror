@@ -17,11 +17,11 @@ _incident_cursor = None
 @contextmanager
 def recovery_service():
     import bot_config
+    from services.export_runtime_composition import recovery_caller_scope
     from services.import_capture_recovery_service import ImportCaptureRecovery
-    from services.legacy_export_snapshot_service import caller_runtime
     from services.stats_import_outcome_service import outcome_dal
 
-    with caller_runtime() as runtime:
+    with recovery_caller_scope() as runtime:
         if runtime is None:
             raise SourceConflict(
                 "Recovery checks are unavailable. Your incident remains open; use Recheck after service connectivity returns."
@@ -32,6 +32,18 @@ def recovery_service():
             storage_owner=runtime.store.storage_owner,
             guild_id=bot_config.GUILD_ID,
         )
+        if getattr(runtime, "recovery_only", False):
+            from services.export_evidence_recovery import EvidenceRecoveryAdapter
+
+            adapter = EvidenceRecoveryAdapter(runtime.recovery_client)
+            yield RecoveryService(
+                store,
+                {adapter.kind: adapter},
+                admin_id=bot_config.ADMIN_USER_ID,
+                guild_id=bot_config.GUILD_ID,
+                channel_id=bot_config.NOTIFY_CHANNEL_ID,
+            )
+            return
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter}
@@ -74,7 +86,21 @@ def recovery_service():
 
 def call_recovery(method, *args):
     with recovery_service() as service:
-        return getattr(service, method)(*args)
+        result = getattr(service, method)(*args)
+    if method in {"execute", "execute_input"}:
+        _retry_admission()
+    return result
+
+
+def _retry_admission():
+    from services.export_runtime_composition import retry_recovery_admission
+
+    try:
+        retry_recovery_admission()
+        return True
+    except Exception as exc:
+        logger.warning("recovery_admission_unavailable error_type=%s", type(exc).__name__)
+        return False
 
 
 def observe_recovery():
@@ -89,6 +115,10 @@ def observe_recovery():
                     _cursors[(scope, kind)] = source_id
                     try:
                         evidence, token, resolved = adapter.inspect(source_id)
+                        if resolved and not getattr(adapter, "observe_healthy", True):
+                            # Existing open incidents are reconciled below. A
+                            # healthy receipt is not a new admin notification.
+                            continue
                         row = service.store.observe(
                             kind, source_id, evidence, token, resolved=resolved
                         )
@@ -107,6 +137,10 @@ def observe_recovery():
             _incident_cursor = None
         for incident in incidents:
             _incident_cursor = (scope, incident["IncidentID"])
+            if incident["SourceKind"] not in service.adapters:
+                # Evidence repair remains available while other domain adapters
+                # await authenticated registration. Do not mutate their history.
+                continue
             try:
                 service.recover_automatic(incident["IncidentID"])
             except Exception as exc:
@@ -119,6 +153,8 @@ def observe_recovery():
                 )
         if service.store.has_failed_checks():
             failures.append("PersistedCheckUnavailable")
+    if not _retry_admission():
+        failures.append("RegistrationUnavailable")
     return failures
 
 

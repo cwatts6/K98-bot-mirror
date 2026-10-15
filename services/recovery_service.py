@@ -32,6 +32,11 @@ class RecoveryService:
 
     def refresh(self, incident_id):
         row = self.store.get(incident_id)
+        if row["SourceKind"] not in self.adapters:
+            raise SourceConflict(
+                "Repair the private-evidence incident in the recovery centre first. "
+                "Normal recovery checks will resume after registration verifies."
+            )
         adapter = self.adapters[row["SourceKind"]]
         for action in self.store.pending_actions(incident_id):
             outcome = adapter.reconcile(row["SourceID"], action)
@@ -83,7 +88,11 @@ class RecoveryService:
             row["Revision"],
             row["EvidenceHash"],
             action,
-            "Authority verified closed read-only execution and exact reservations",
+            getattr(
+                self.adapters[row["SourceKind"]],
+                "automatic_reason",
+                "Authority verified closed read-only execution and exact reservations",
+            ),
             "system:guided_recovery",
         )
 
