@@ -212,9 +212,14 @@ def test_snapshot_race_and_unapproved_snapshot_refuse_settlement():
     service.dal.settle.assert_not_called()
 
 
-def test_unknown_read_verification_cannot_be_used_as_health_or_write_finality():
+@pytest.mark.parametrize("terminal", ["prepared", "dispatch_intent", "unknown"])
+def test_unknown_read_verification_cannot_be_used_as_health_or_write_finality(terminal):
     verifier, stream, request, events, documents = closed_stream_fixture(purpose="probe")
     events[-1]["State"] = "unknown"
+    if terminal == "prepared":
+        del events[1:]
+    elif terminal == "dispatch_intent":
+        del events[2:]
     result = verifier.verify(
         stream["StreamID"],
         account="account-a",
@@ -227,6 +232,32 @@ def test_unknown_read_verification_cannot_be_used_as_health_or_write_finality():
         verifier.verify(stream["StreamID"], account="account-a", registration_hash=b"r" * 32)
     stream["Purpose"] = "mutation"
     with pytest.raises(SourceConflict):
+        verifier.verify(
+            stream["StreamID"],
+            account="account-a",
+            registration_hash=b"r" * 32,
+            require_observation=False,
+            allow_failed_reads=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "damage", ["missing_prepared", "private_bytes", "sequence", "payload", "child"]
+)
+def test_abandoned_read_prefix_still_requires_complete_private_membership(damage):
+    verifier, stream, request, events, documents = closed_stream_fixture(purpose="probe")
+    del events[2:]
+    if damage == "missing_prepared":
+        events.pop(0)
+    elif damage == "private_bytes":
+        documents[events[-1]["EvidenceReference"]] = b"{}"
+    elif damage == "sequence":
+        events[-1]["EventSequence"] = 7
+    elif damage == "payload":
+        request["RequestKind"] = "mutation"
+    else:
+        stream["ChildIdentity"] = str(uuid4())
+    with pytest.raises((SourceConflict, AssertionError)):
         verifier.verify(
             stream["StreamID"],
             account="account-a",

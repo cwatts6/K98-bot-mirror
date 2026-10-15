@@ -99,7 +99,7 @@ Its exact Changes review covered all five changed source files with no findings 
 sealed/read back successfully. Its focused suite passed 197 tests; the full suite remains
 in progress at this checkpoint.
 
-The next closure slice retains positive exact-child termination evidence and its immutable
+The closure slice, [Bot PR 335](https://github.com/cwatts6/K98-bot-mirror/pull/335), retains positive exact-child termination evidence and its immutable
 closure receipt across local acknowledgement/storage failures. It re-reads the exact session,
 child, account, frozen version and sealed journal before finishing closure. Configuration
 discovery can finish an already interrupted owned read; registered proof requests can finish
@@ -108,6 +108,17 @@ interrupted, old-session children are not adopted, and no provider request is re
 streams still need the independent complete-journal and operation-specific settlement proofs.
 Recovery after losing the entire authority process before durable closure, and incomplete
 read-terminal journals, remain required P0 work in the subsequent focused slice.
+
+The read-journal slice accepts only complete sealed historical probe prefixes consisting of
+`prepared`, or `prepared` then `dispatch_intent`, as abandoned reads. All immutable request
+identities, private payload/event bytes, sequence membership, closure and registration still
+verify. The same prefixes remain forbidden as fresh provider observations or mutation proof.
+An additive SQL migration makes the historical catalogue gate agree with the private verifier,
+so a recovered failed read cannot poison the next independent reconciliation. Bot and SQL must
+be deployed together with refreshed protected source/installation pins. Temporary SQL tests
+execute the migration's actual predicate and procedure postimage; no persistent objects are
+installed. Missing/corrupt private bytes and unproven old-session closure remain separately
+required recovery paths, along with the unknown-write and P1 packages above.
 
 Still required before P0 completion: legacy unknown writes, absent attempted-publication retry,
 damaged-index/unknown-write containment and registration replacement, earlier rollover phases,

@@ -433,7 +433,7 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "42a7eedbd8ac5f9b41bc6f2e39fab77ba6db2e154bfd704ddc8bfd260112eddb"
+APPLICATION_SCHEMA_SOURCE_HASH = "9238127fa67dbdf120deb4f81da0a983a555b6084d5dc7e5db9cf6f6fff423ce"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
     "d30f2795213180f850b31e38939441349b346fba9a27e46d6e49db1b746d915f"

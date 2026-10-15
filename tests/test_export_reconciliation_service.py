@@ -591,12 +591,14 @@ def test_complete_private_history_and_fresh_probe_produce_inventory_only():
     assert "proof_id" not in membership and "state" not in membership
 
 
-def test_failed_historical_read_does_not_poison_next_fresh_reconciliation():
+@pytest.mark.parametrize("length", [1, 2, 3])
+def test_failed_historical_read_does_not_poison_next_fresh_reconciliation(length):
     verifier, snapshot, old, probe, visible, docs, requests = catalogue_fixture(
         historical_purpose="probe"
     )
     old_events = next(e for r, e in requests.values() if r["StreamID"] == old["StreamID"])
     old_events[-1]["State"] = "unknown"
+    del old_events[length:]
     history = verifier.before_probe(snapshot=snapshot, account="account-a")
     visible.append(probe)
     membership = verifier.bind_probe(history, snapshot=snapshot, stream_id=probe["StreamID"])

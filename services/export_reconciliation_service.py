@@ -108,7 +108,14 @@ class ClosedStreamVerifier:
                     ["prepared", "dispatch_intent", "succeeded"],
                 )
                 if allow_failed_reads and not typed.mutation:
-                    allowed_states += (["prepared", "dispatch_intent", "unknown"],)
+                    # A sealed complete read-only prefix cannot leave a delayed
+                    # mutation. Its missing terminal event is not a provider
+                    # observation, and every retained private event still verifies.
+                    allowed_states += (
+                        ["prepared"],
+                        ["prepared", "dispatch_intent"],
+                        ["prepared", "dispatch_intent", "unknown"],
+                    )
                 if states not in allowed_states:
                     raise SourceConflict("Unknown request outcome cannot become finality proof.")
                 event_ids = set()
