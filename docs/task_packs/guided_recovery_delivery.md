@@ -10,7 +10,7 @@ The programme remains incomplete until every workstream and acceptance gate belo
 | Durable incidents and guided actions; SQL import settlement vertical | P0 | Draft Bot PR 331 / SQL PR 108 | Proactive discovery, persistent alert entry, fresh authorised preview/confirm, durable action identity, postcondition verification; restart/concurrency tests |
 | Contested access and abandoned read ownership | P0 | Implementing | Proven-safe automatic release, exact-owner fencing, incident buttons, eligible work resumes |
 | Unknown spreadsheet writes, exports and rollover | P0 | Required | Mutation-specific reconciliation, verified completion/continuation or guided containment, no blind replay or unsafe unlock |
-| Committed import checkpoint/capture and partial processing | P0 | Required | Resume remaining stages without replaying committed import; explicit partial-result choice |
+| Committed import checkpoint/capture and partial processing | P0 | Implementing | Resume remaining stages without replaying committed import; explicit partial-result choice |
 | Discord deliveries and domain publication | P1 | Required | Existing-post reconciliation, guided missing-post repair, expired-reminder policy; Ark/MGE/voting/calendar coverage |
 | Files, archives, caches and queues | P1 | Required | Identity-checked continuation, conflicting-file preservation, no duplicate timeout fallback |
 | Monitor health, outage recovery and complete write inventory | P1 | Required | Independent outage detection, guided host recovery, every enabled write path classified and covered |
@@ -63,3 +63,14 @@ Still required in P0: incomplete journal/closure recovery, unknown provider-writ
 or verified containment, export/rollover guidance, committed SQL checkpoint/capture continuation,
 and proof that eligible queued work resumes. A held incident with only a recheck button does
 not satisfy programme completion. These are required implementation packages, not optimisation.
+
+The committed stats-import continuation adds a guided **Finish capture & queue export**
+action. It requires the original completion receipt, original registered configuration,
+exact retained reservation and both SQL session guards. Adoption increments preparation
+and resource versions while preserving the import receipt. A durable action marker lets
+the same repair continue after checkpoint, spool, capture-receipt or queue-acknowledgement
+loss. Complete output hashes cannot be replaced. Resolution requires verified retained
+bytes and idempotent queue admission; provider delivery remains a distinct incident.
+Temporary-table engine tests cover those interruption points, active original sessions,
+stale claims and changed output. All-KVK generation recovery and unverifiable or missing
+output still require their guided workflows before the programme can be complete.

@@ -17,6 +17,7 @@ _incident_cursor = None
 @contextmanager
 def recovery_service():
     import bot_config
+    from services.import_capture_recovery_service import ImportCaptureRecovery
     from services.legacy_export_snapshot_service import caller_runtime
     from services.stats_import_outcome_service import outcome_dal
 
@@ -31,7 +32,8 @@ def recovery_service():
             storage_owner=runtime.store.storage_owner,
             guild_id=bot_config.GUILD_ID,
         )
-        adapter = ImportRecoveryAdapter(outcome_dal(runtime))
+        outcomes = outcome_dal(runtime)
+        adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter}
         if runtime.recovery_client is not None:
             from services.config_preparation_recovery_dal import ConfigPreparationRecoveryDAL

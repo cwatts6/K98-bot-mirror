@@ -1,11 +1,16 @@
 """Guided SQL import settlement using the existing exact receipt and lock checks."""
 
+import json
+
+from kvk.dal.new_source_import_dal import SourceConflict
+
 
 class ImportRecoveryAdapter:
     kind = "stats_import"
 
-    def __init__(self, dal):
+    def __init__(self, dal, capture_recovery=None):
         self.dal = dal
+        self.capture_recovery = capture_recovery
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(after=after)
@@ -15,8 +20,28 @@ class ImportRecoveryAdapter:
         execution = preview["execution"] or {}
         decision = preview["action"]
         captured = preview.get("captured", False)
+        prep = preview.get("preparation") or {}
+        marker = json.loads(prep.get("GenerationJson") or "{}").get("capture_recovery")
+        capture_pending_queue = captured and marker and not prep.get("JobID")
+        if capture_pending_queue:
+            captured = False
         actions = {}
-        if decision == "release_failure":
+        if decision == "resume_capture" and self.capture_recovery:
+            # Validate registered output and producer identity before offering a button.
+            try:
+                self.capture_recovery.generation(prep, execution)
+            except (SourceConflict, ValueError, KeyError, TypeError):
+                preview["explanation"] = (
+                    "SQL completed, but the retained capture evidence or registered output does not match. "
+                    "The incident and reservation are retained for investigation."
+                )
+            else:
+                actions[decision] = {
+                    "label": "Finish capture & queue export",
+                    "check": "SQL confirms the import and reports completed. Confirm that the bot should retain this output and continue its export.",
+                    "effect": "Verify both execution locks and the completion receipt, finish the retained output capture, release its exact snapshot reservation, and queue that snapshot once. The import is not rerun.",
+                }
+        elif decision == "release_failure":
             actions[decision] = {
                 "label": "Release failed import",
                 "check": "Confirm you want to close this failed attempt. SQL records no committed import for this attempt.",
@@ -34,9 +59,13 @@ class ImportRecoveryAdapter:
             "scan": execution.get("ScanOrder"),
             "resolution": execution.get("Resolution"),
             "explanation": (
-                "SQL processing completed and its output was captured; the snapshot reservation is released. Export delivery is a separate outcome."
-                if captured
-                else preview.get("explanation")
+                "Output capture is verified; recovery is still checking its export queue admission."
+                if capture_pending_queue
+                else (
+                    "SQL processing completed and its output was captured; the snapshot reservation is released. Export delivery is a separate outcome."
+                    if captured
+                    else preview.get("explanation")
+                )
             )
             or (
                 "The reservation has been settled. This is not proof that reports completed."
@@ -48,6 +77,8 @@ class ImportRecoveryAdapter:
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == "resume_capture" and self.capture_recovery:
+            return self.capture_recovery.run(source_id, token, actor)
         if action not in {"release_failure", "supersede_partial"}:
             raise ValueError("Unsupported import repair.")
         self.dal.settle(
@@ -62,6 +93,22 @@ class ImportRecoveryAdapter:
         # inspect checks exact account/storage and obtains the SQL execution lock.
         preview = self.dal.inspect(source_id)
         receipt = preview["execution"] or {}
+        if action["ActionKind"] == "resume_capture" and self.capture_recovery:
+            prep = preview["preparation"]
+            marker = json.loads(prep["GenerationJson"] or "{}").get("capture_recovery")
+            expected = dict(token=action["EvidenceHash"], actor=f"recovery:{action['ActionID']}")
+            if marker == expected and preview["captured"] and prep["JobID"]:
+                # Re-read and hash-check the retained spool through idempotent queue
+                # admission, including after a lost enqueue commit acknowledgement.
+                self.capture_recovery.run(source_id, expected["token"], expected["actor"])
+                return "verified"
+            if marker != expected and preview["token"] != action["EvidenceHash"]:
+                return "not_applied"
+            self.capture_recovery.run(source_id, expected["token"], expected["actor"])
+            verified = self.dal.inspect(source_id)
+            if verified["captured"] and verified["preparation"]["JobID"]:
+                return "verified"
+            return None
         if receipt.get("Resolution") == action["ActionKind"]:
             # Settlement is atomic with release in the existing DAL. An equivalent
             # settlement by the automatic observer also establishes this postcondition.

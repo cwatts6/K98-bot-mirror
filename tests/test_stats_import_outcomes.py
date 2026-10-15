@@ -50,13 +50,14 @@ def evidence(state="rolled_back"):
         ("prepared", "release_failure"),
         ("rolled_back", "release_failure"),
         ("partial", "supersede_partial"),
+        ("completed", "resume_capture"),
     ],
 )
 def test_only_proven_states_admit_specific_resolution(state, expected):
     assert DAL.action(*evidence(state)) == expected
 
 
-@pytest.mark.parametrize("state", ["running", "import_committed", "completed", "unknown"])
+@pytest.mark.parametrize("state", ["running", "import_committed", "unknown"])
 def test_nonterminal_or_completed_import_never_discarded(state):
     with pytest.raises(SourceConflict):
         DAL.action(*evidence(state))

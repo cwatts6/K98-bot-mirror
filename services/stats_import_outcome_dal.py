@@ -155,9 +155,7 @@ class StatsImportOutcomeDAL:
         if state == "partial":
             return "supersede_partial"
         if state == "completed":
-            raise SourceConflict(
-                "SQL completed. Preserve the committed generation and finish its checkpoint/capture; do not re-import or discard it."
-            )
+            return "resume_capture"
         raise SourceConflict(
             "SQL outcome is unproven. Obtain the exact execution/transaction evidence; absence of a running process is insufficient."
         )
@@ -257,6 +255,10 @@ class StatsImportOutcomeDAL:
             action = self.action(prep, execution, resources)
             if action == "resolved":
                 return action
+            if action not in {"release_failure", "supersede_partial"}:
+                raise SourceConflict(
+                    "Completed imports must finish capture, not release their output."
+                )
             if token != self.token(prep, execution, resources):
                 raise SourceConflict("Evidence changed since preview; inspect and preview again.")
             if action == "supersede_partial" and not allow_partial:
