@@ -347,12 +347,16 @@ class LegacySnapshotDAL:
                         )
                         return None
             if stage == "preflight":
+                from services.export_target_admission_dal import AVAILABLE_JOB_TARGETS_SQL
+
                 # A writer retains its original ticket while waiting for SQL.
                 # New provider/configuration readers must not move ahead of it.
                 cursor.execute(
                     "SELECT TOP (1) Ticket,QueuedKind,QueuedID FROM (SELECT EnqueueSequence AS Ticket,"
                     "'job' AS QueuedKind,CONVERT(varchar(36),JobID) AS QueuedID "
-                    "FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' UNION ALL SELECT "
+                    "FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' "
+                    + (AVAILABLE_JOB_TARGETS_SQL if self.execution_evidence else "")
+                    + "UNION ALL SELECT "
                     "EnqueueSequence,'preparation',CONVERT(varchar(36),PreparationID) "
                     "FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending')"
                     + (

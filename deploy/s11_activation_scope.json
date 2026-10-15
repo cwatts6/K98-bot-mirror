@@ -73,6 +73,8 @@
     "dbo.EXEMPT_FROM_STATS",
     "dbo.ExportAttempt",
     "dbo.ExportAttemptPart",
+    "dbo.ExportContainedStream",
+    "dbo.ExportContainedTarget",
     "dbo.ExportExecutionSession",
     "dbo.ExportExecutionStream",
     "dbo.ExportJob",
@@ -86,6 +88,7 @@
     "dbo.ExportReconciliationProof",
     "dbo.ExportRequestBudget",
     "dbo.ExportResource",
+    "dbo.ExportTargetContainment",
     "dbo.FIX_IMPORT_STAGING",
     "dbo.FallbackImportBatchControl",
     "dbo.GOVERNOR_NAMES_PROC",
@@ -122,6 +125,7 @@
     "dbo.SUMMARY_CHANGE_EXPORT",
     "dbo.SUMMARY_PROC",
     "dbo.SchemaMigrationHistory",
+    "dbo.StatsImportExecution",
     "dbo.TARGETS",
     "dbo.TARGETS_NEW",
     "dbo.TEST",
@@ -173,6 +177,7 @@
     "dbo.usp_CleanupLogBackupTriggerQueue",
     "dbo.usp_ExportExecutionSessionTransition",
     "dbo.usp_ExportExecutionStreamTransition",
+    "dbo.usp_ExportJobContainTargets",
     "dbo.usp_ExportManualOutputEnrollmentTransition",
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
@@ -195,6 +200,7 @@
     "dbo.usp_PurgeLeadershipPlayerReviewAudit",
     "dbo.usp_RecordKvkFinalReportCompletion",
     "dbo.usp_RecordLeadershipPlayerReviewAudit",
+    "dbo.usp_S11RunStatsImport",
     "dbo.usp_SetAllianceActivitySnapshotCompletion",
     "dbo.usp_UpsertGovernorNameHistoryForScan",
     "dbo.usp_VoteSurveyAdminDelete",
@@ -245,9 +251,7 @@
     "dbo.vw_ArkPlayerReport",
     "dbo.vw_Governor_KVK_Summary_GlobalLatest",
     "dbo.vw_Top3_Week",
-    "dbo.vw_Top3_Yesterday",
-    "dbo.usp_S11RunStatsImport",
-    "dbo.StatsImportExecution"
+    "dbo.vw_Top3_Yesterday"
   ],
   "objects": [
     "KVK.KVK_AllPlayers_Raw",
@@ -374,6 +378,8 @@
     "dbo.ErrorAudit",
     "dbo.ExportAttempt",
     "dbo.ExportAttemptPart",
+    "dbo.ExportContainedStream",
+    "dbo.ExportContainedTarget",
     "dbo.ExportExecutionSession",
     "dbo.ExportExecutionStream",
     "dbo.ExportJob",
@@ -387,6 +393,7 @@
     "dbo.ExportReconciliationProof",
     "dbo.ExportRequestBudget",
     "dbo.ExportResource",
+    "dbo.ExportTargetContainment",
     "dbo.FIX_IMPORT_STAGING",
     "dbo.FallbackImportBatchControl",
     "dbo.GOVERNOR_NAMES_PROC",
@@ -607,6 +614,7 @@
     "dbo.usp_CleanupLogBackupTriggerQueue",
     "dbo.usp_ExportExecutionSessionTransition",
     "dbo.usp_ExportExecutionStreamTransition",
+    "dbo.usp_ExportJobContainTargets",
     "dbo.usp_ExportManualOutputEnrollmentTransition",
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
@@ -1161,6 +1169,13 @@
     "dbo.ExportAttemptPart": [
       "dbo.ExportAttempt"
     ],
+    "dbo.ExportContainedStream": [
+      "dbo.ExportExecutionStream",
+      "dbo.ExportTargetContainment"
+    ],
+    "dbo.ExportContainedTarget": [
+      "dbo.ExportTargetContainment"
+    ],
     "dbo.ExportExecutionSession": [],
     "dbo.ExportExecutionStream": [
       "KVK.SourceOutputOperation",
@@ -1207,6 +1222,11 @@
       "KVK.SourceOutputOperationResource",
       "dbo.ExportJobResource",
       "dbo.ExportPreparationResource"
+    ],
+    "dbo.ExportTargetContainment": [
+      "KVK.SourceOutputOperation",
+      "dbo.ExportJob",
+      "dbo.ExportPreparation"
     ],
     "dbo.FIX_IMPORT_STAGING": [
       "dbo.ACQUIRE_KS4_IMPORT_LOCK",
@@ -1594,6 +1614,9 @@
     ],
     "dbo.SUMMARY_PROC_STATE": [],
     "dbo.SchemaMigrationHistory": [],
+    "dbo.StatsImportExecution": [
+      "dbo.ExportPreparation"
+    ],
     "dbo.T4KillDelta": [],
     "dbo.T4T5KillDelta": [],
     "dbo.T5KillDelta": [],
@@ -1992,6 +2015,7 @@
       "KVK.SourceOutputOperation",
       "KVK.SourceOutputOperationResource",
       "KVK.SourceOutputPool",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2001,6 +2025,20 @@
       "dbo.ExportProviderRequest",
       "dbo.ExportProviderRequestEvent",
       "dbo.ExportResource"
+    ],
+    "dbo.usp_ExportJobContainTargets": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportContainedStream",
+      "dbo.ExportContainedTarget",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment"
     ],
     "dbo.usp_ExportManualOutputEnrollmentTransition": [
       "KVK.SourceOutputOperation",
@@ -2036,6 +2074,7 @@
       "KVK.SourceOutputOperationResource",
       "KVK.SourceOutputPool",
       "dbo.ExportAttempt",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2047,6 +2086,7 @@
       "dbo.ExportResource"
     ],
     "dbo.usp_ExportReconciliationProofIssue": [
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportManagedFileOrigin",
@@ -2054,8 +2094,7 @@
       "dbo.ExportPreparation",
       "dbo.ExportProviderRequest",
       "dbo.ExportProviderRequestEvent",
-      "dbo.ExportReconciliationProof",
-      "dbo.TARGETS"
+      "dbo.ExportReconciliationProof"
     ],
     "dbo.usp_GetKvkHistorySummaryMetricRanks": [
       "dbo.HealedTroopsDelta",
@@ -2168,6 +2207,12 @@
     "dbo.usp_RecordLeadershipPlayerReviewAudit": [
       "dbo.LeadershipPlayerReviewAudit",
       "dbo.usp_PurgeLeadershipPlayerReviewAudit"
+    ],
+    "dbo.usp_S11RunStatsImport": [
+      "dbo.ExportPreparation",
+      "dbo.ExportResource",
+      "dbo.StatsImportExecution",
+      "dbo.UPDATE_ALL2"
     ],
     "dbo.usp_SetAllianceActivitySnapshotCompletion": [
       "dbo.AllianceActivitySnapshotHeader",
@@ -2408,15 +2453,6 @@
     "dbo.vw_Top3_Yesterday": [
       "dbo.AllianceActivityDelta",
       "dbo.AllianceActivitySnapshotHeader"
-    ],
-    "dbo.usp_S11RunStatsImport": [
-      "dbo.ExportPreparation",
-      "dbo.ExportResource",
-      "dbo.StatsImportExecution",
-      "dbo.UPDATE_ALL2"
-    ],
-    "dbo.StatsImportExecution": [
-      "dbo.ExportPreparation"
     ]
   }
 }

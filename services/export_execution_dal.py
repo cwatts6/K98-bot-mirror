@@ -119,7 +119,27 @@ _PROCEDURES = {
     "proof": "dbo.usp_ExportReconciliationProofIssue",
     "enrollment": "dbo.usp_ExportOutputEnrollmentTransition",
     "manual_enrollment": "dbo.usp_ExportManualOutputEnrollmentTransition",
+    "target_containment": "dbo.usp_ExportJobContainTargets",
 }
+_PARAMETERS["target_containment"] = (
+    "ContainmentID",
+    "AccountKey",
+    "JobID",
+    "OwnerID",
+    "Fence",
+    "ExpectedVersion",
+    "SnapshotHash",
+    "ReceiptHash",
+    "ReceiptReference",
+    "ResourcesJson",
+    "StreamsJson",
+    "Actor",
+    "Reason",
+    "RegistrationHash",
+    "StorageOwner",
+    "PoolID",
+    "PoolVersion",
+)
 
 # Source-of-truth: the S10A/C/D/E migrations and the additive S11 migration in
 # K98-bot-SQL-Server. An approved contract may not omit one of these dependencies.
@@ -130,6 +150,7 @@ INSTALLATION_MIGRATIONS = (
     "20260915_002_kvk_output_operation_ownership",
     "20260924_001_export_execution_evidence",
     "20260929_001_manual_export_registration",
+    "20261015_008_export_target_containment",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -144,6 +165,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261001_008_manual_file_id_constraint",
     "20261001_009_manual_resource_membership_order",
     "20261001_010_reconciliation_file_id_characters",
+    "20261015_008_export_target_containment",
 )
 
 
@@ -163,6 +185,9 @@ EVIDENCE_TABLES = tuple(
         "ExportReconciliationProof",
         "ExportManagedFileOrigin",
         "ExportManualFileOrigin",
+        "ExportTargetContainment",
+        "ExportContainedTarget",
+        "ExportContainedStream",
     )
 )
 INSTALLATION_OBJECTS = {
@@ -184,6 +209,9 @@ INSTALLATION_OBJECTS = {
             "ExportReconciliationProof",
             "ExportManagedFileOrigin",
             "ExportManualFileOrigin",
+            "ExportTargetContainment",
+            "ExportContainedTarget",
+            "ExportContainedStream",
         )
     },
     **{
@@ -433,10 +461,10 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "41cdd3409089cb4802e682e5e3e30ad809e653c1a074fd9d437309173cc2a722"
+APPLICATION_SCHEMA_SOURCE_HASH = "24852720086d152fba1398aacaeaa6421aa3aba3db6a47db403d3ccfccb6d560"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "d30f2795213180f850b31e38939441349b346fba9a27e46d6e49db1b746d915f"
+    "b935c34c1aae21c6a68ba6a6477b59cc69d62d75b2f8ddd6890af3f043968457"
 )
 
 

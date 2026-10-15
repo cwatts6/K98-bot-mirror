@@ -779,10 +779,17 @@ class ExportCoordinationDAL:
             )
 
     def claim_next(self, account, *, storage_owner=None):
+        from services.export_target_admission_dal import (
+            AVAILABLE_JOB_TARGETS_SQL,
+            contained_resources,
+        )
+
         with self._account(account) as cursor:
             cursor.execute(
                 "SELECT JobID FROM dbo.ExportJob WHERE AccountKey=? AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) "
-                "AND (StorageOwner IS NULL OR StorageOwner=?) ORDER BY EnqueueSequence,CreatedUTC,JobID",
+                "AND (StorageOwner IS NULL OR StorageOwner=?) "
+                + (AVAILABLE_JOB_TARGETS_SQL if self.execution_evidence else "")
+                + "ORDER BY EnqueueSequence,CreatedUTC,JobID",
                 account,
                 storage_owner,
             )
@@ -803,6 +810,8 @@ class ExportCoordinationDAL:
                         key,
                     )
                     resources.append(one(cursor))
+                if self.execution_evidence and contained_resources(cursor, keys):
+                    continue
                 if any(
                     not r
                     or r["ActiveJobID"] is not None

@@ -377,3 +377,101 @@ Changes review is required against Bot `d18716e9`, Deep off.
 Unknown-write containment, corrupted/missing typed history, receipt restoration, remaining
 producer checkpoints, earlier rollover phases and P1 workflows remain required work. These
 are active programme obligations; this slice is not programme completion or a deferral.
+
+The unstarted-read slice is [Bot PR 345](https://github.com/cwatts6/K98-bot-mirror/pull/345).
+468 affected/log-isolation tests passed, including actual temporary SQL; its five-source
+Changes review finalized with no findings and was read back successfully.
+
+## Account-admission refusal is required recovery scope
+
+The reported `SQL execution failed: Writer unavailable: account admission refused before
+execution` comes from `LegacyExportRuntime.begin_writer` after up to 60 seconds of
+acknowledged admission refusals and successful withdrawal of that unstarted ticket. It
+does not establish that this writer executed SQL, or that the blocking owner is abandoned.
+The outer SQL-failure wording must distinguish admission refusal from execution uncertainty.
+
+Acceptance requires retaining and showing the refused stage's identity, linking its exact
+blocking reservation or older ticket to the relevant recovery incident, distinguishing healthy
+active contention from stranded/uncertain ownership, and detecting the blocker independently
+of the next failed process. Guided repair must verify the blocker and safe continuation of the
+affected stage. No automatic replay of an earlier committed import is permitted. Configuration
+read recovery in PRs 332–345 addresses some blockers; this complete refused-work workflow is
+not yet implemented and remains required P0 work, including refusal/withdrawal acknowledgement
+loss and producer paths without atomic checkpoints.
+
+## Unknown-write containment implementation boundary
+
+Unknown writes cannot be made safe by a timeout, a current readback or an admin assertion.
+The next paired implementation must permanently fence the entire verified possible target set,
+preserve original request/ownership history, logically retire its streams without claiming
+process termination, and release only exact held ownership in the same transaction. All future
+mutation admission must consult that permanent target fence, including a changed account or
+new job. A retired target must not become reusable through rollover, retry or registration.
+
+The guided action must name the affected outputs, explain that a delayed old write can still
+change them, obtain confirmation, verify the permanent fence and retained receipt, and show
+replacement/continuation progress. Target retirement alone must not mark the business export
+delivered or the overall recovery resolved. Replacement registration, queued-work migration,
+fresh publication verification and admission-refusal linkage remain part of this implementation,
+including legacy fixed targets, new-source indexes/slots and rollover. Temporary SQL and fault
+tests must prove the dispatch fence, stale clicks, lost commits, other-owner preservation and
+successful work on verified replacement targets before programme completion.
+
+### Current unpublished target-containment work
+
+The paired `codex/guided-write-containment` worktrees contain an unfinished implementation,
+not a deployable recovery workflow. The SQL prototype preserves the unknown provider ledger,
+permanently fences the complete physical target set across accounts, logically isolates its
+streams, and releases only the exact job owner in one transaction. New-source pool isolation
+requires exact season, epoch, registration, pool version and complete slot membership. Original
+slot history remains unchanged. The authority service reconstructs the installed scope, seals
+the decision privately, compares the locked snapshot, and verifies the original receipt after
+commit or a lost reply. It explicitly keeps `business_resolved=false`.
+
+Thirty session-local SQL cases and sixteen authority/DAL integration cases passed during
+development. They cover strict JSON shapes, stale/foreign confirmation, preserved unknown
+events, late child refusal, global target fencing, rollback, later unrelated stream admission,
+lost acknowledgements and changed/missing postconditions. These are temporary-object tests,
+not production installation or provider acceptance. The final affected rerun, including the
+pool postcondition check and slot-count guard, passed all 46 tests with unchanged operational
+logs; lint passed for the four new Python files.
+
+Migration 008, permission/source pins and bounded authority RPC are now implemented locally.
+Actual temporary SQL validates the literal migration procedure definitions and stream-state
+constraint against the checked-in snapshots; installation and role permissions remain separate
+deployment checks. The migration has not been installed into a persistent database.
+
+Queue admission excludes jobs with permanently isolated targets, including safe-retry jobs and
+another account using the same physical file. A second check after sorted resource locks rejects
+a stale candidate list. Legacy writer and rollover queue fairness ignore those ineligible jobs;
+healthy older work retains its priority. Inputs, tickets and old jobs remain unchanged. Recovery
+discovery immediately includes affected queued jobs, without waiting for age or a failed execution.
+An ordinary retry cannot close their incidents or bypass the replacement requirement. Existing
+explicit skip of an unstarted legacy export still requires its original evidence-bound checks.
+
+Whole-pool authority tests now verify original slot history, exact pool state and lost replies.
+The publication catalogue already selects exact physical destination history: a retired file's
+history does not enter an unrelated file's catalogue. A temporary SQL regression exercises this
+boundary without relaxing historical evidence or declaring an isolated writer terminated.
+
+The 768-test affected run passed. The full suite recorded 7,922 passes, 342 skips and eight
+subtest passes; two stale test assertions were then corrected (source inventory count and
+private-evidence error wording). The final 117-test focused rerun passed, including a new
+SQL-compiled comparison of the immutable migration 007 predecessor and migration 008
+postcondition. It caught and fixed a generated predecessor check that wrongly used the new
+constraint for both images. The remaining full-suite failure is the pre-existing missing
+`.github/workflows/command-governance.yml` in the scrubbed mirror. No production logs changed.
+
+Separate Changes reviews finalized and their sealed artifacts were read back: Bot
+`a8d5c130-2a45-4185-b560-b11b2fbb4d21` (16 source files, `bef9b5a3..f5bebc17`), SQL
+`b943ba88-45ea-410b-b314-224bf4e8fd9b` (10 source files, `79987f7b..5078b513`) and the
+one-line migration correction `fc11619b-7fbb-4cd3-90fa-e8137b5f83a0`
+(`5078b513..48676668`). No security findings were reported. The Bot follow-up changes only
+regression tests and this evidence record; a further security discovery scan is skipped because
+they do not alter executable application, authority, permissions, SQL or deployment behavior.
+
+The complete guided workflow remains active implementation scope: replacement enrollment and
+registration, retained-input continuation, fresh publication verification, guided UI wiring,
+refused-stage linkage and continuation, and earlier rollover owners. The remaining P0/P1
+workflows also remain required. No containment button is exposed before its replacement workflow
+is implemented; target isolation alone cannot resolve an unknown-write business outcome.

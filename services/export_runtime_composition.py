@@ -2284,6 +2284,68 @@ class AuthorityClient:
     def inspect_configuration_recovery(self, preparation_id):
         return self._configuration_recovery("inspect_configuration_recovery", preparation_id)
 
+    def inspect_target_recovery(self, job_id):
+        return self._target_recovery("inspect_target_recovery", job_id)
+
+    def isolate_export_targets(self, job_id, token, actor, reason):
+        return self._target_recovery(
+            "isolate_export_targets", job_id, token=token, actor=actor, reason=reason
+        )
+
+    def _target_recovery(self, action, job_id, **kwargs):
+        uuid_text(job_id)
+        result = self._invoke(dict(version=1, action=action, job_id=job_id, **kwargs))
+        if (
+            not isinstance(result, dict)
+            or set(result)
+            != {
+                "job_id",
+                "token",
+                "outcome",
+                "eligible",
+                "targets",
+                "actor",
+                "reason",
+                "explanation",
+            }
+            or result["job_id"] != job_id
+            or not isinstance(result["token"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
+            or result["outcome"] not in {"held", "unknown_write", "targets_isolated"}
+            or type(result["eligible"]) is not bool
+            or result["eligible"] != (result["outcome"] == "unknown_write")
+            or not isinstance(result["targets"], list)
+            or len(result["targets"]) > 1024
+            or any(
+                not isinstance(f, str) or re.fullmatch(r"[A-Za-z0-9_-]{3,128}", f) is None
+                for f in result["targets"]
+            )
+            or result["targets"] != sorted(set(result["targets"]))
+            or (result["outcome"] != "held" and not result["targets"])
+            or not isinstance(result["explanation"], str)
+            or len(result["explanation"]) > 3500
+            or (
+                result["outcome"] == "targets_isolated"
+                and (
+                    not isinstance(result["actor"], str)
+                    or re.fullmatch(
+                        r"recovery:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                        result["actor"],
+                    )
+                    is None
+                    or not isinstance(result["reason"], str)
+                    or not result["reason"].strip()
+                    or len(result["reason"]) > 512
+                )
+            )
+            or (
+                result["outcome"] != "targets_isolated"
+                and (result["actor"] is not None or result["reason"] is not None)
+            )
+        ):
+            raise ExecutionUncertain("Target recovery acknowledgement differs.")
+        return result
+
     def apply_configuration_recovery(self, preparation_id, token, actor, reason):
         return self._configuration_recovery(
             "apply_configuration_recovery", preparation_id, token=token, actor=actor, reason=reason

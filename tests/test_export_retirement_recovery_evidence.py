@@ -648,7 +648,7 @@ def test_empty_current_readback_never_overrides_unresolved_former_nested_writer(
         "unknown_request": "Unknown request outcome",
         "live_child": "Private closure evidence",
         "unfinished_stream": "Exact registered closed stream",
-        "missing_private_bytes": "private hash mismatch",
+        "missing_private_bytes": "Private execution evidence is unavailable",
     }[failure]
     with pytest.raises(SourceConflict, match=rejection):
         service.run(snapshot["job"]["JobID"])

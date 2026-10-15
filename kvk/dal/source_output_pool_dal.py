@@ -1322,13 +1322,20 @@ class SourceOutputPoolDAL:
             return tuple(r["FileID"] for r in rows(cursor))
 
     def claim(self, operation_id):
+        from services.export_target_admission_dal import (
+            AVAILABLE_JOB_TARGETS_SQL,
+            contained_resources,
+        )
+
         operation = self.operation(operation_id)
         with self._locked(operation["PoolID"]) as (cursor, pool):
             op = self._operation(cursor, operation_id)
             if op["State"] != "ready" or op["OwnerID"] is not None:
                 raise SourceConflict("Only ready operations can be admitted.")
             cursor.execute(
-                "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending') UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready') q WHERE Ticket<?",
+                "SELECT TOP (1) Ticket FROM (SELECT EnqueueSequence AS Ticket FROM dbo.ExportJob WHERE AccountKey=? AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) "
+                + (AVAILABLE_JOB_TARGETS_SQL if self.execution_evidence else "")
+                + "UNION ALL SELECT EnqueueSequence FROM dbo.ExportPreparation WHERE AccountKey=? AND State IN ('pending','sql_pending') UNION ALL SELECT EnqueueSequence FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State='ready') q WHERE Ticket<?",
                 op["AccountKey"],
                 op["AccountKey"],
                 op["AccountKey"],
@@ -1343,6 +1350,10 @@ class SourceOutputPoolDAL:
             resources = rows(cursor)
             if len(resources) != len(json.loads(op["PlanJson"])["snapshot"]["slots"]) + 2:
                 raise SourceConflict("Operation resource membership differs.")
+            if self.execution_evidence and contained_resources(
+                cursor, [r["ResourceKey"] for r in resources]
+            ):
+                return None
             if any(
                 any(
                     r[k] is not None
