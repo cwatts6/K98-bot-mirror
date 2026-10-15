@@ -344,3 +344,36 @@ immutable history, historical catalogue inclusion, rejection as a fresh observat
 late child-event refusal. Unknown-write target containment, missing typed SQL evidence,
 remaining producer checkpoints, earlier rollover phases and every P1 recovery obligation
 are still required delivery scope. This paired slice does not close the programme.
+
+Published as [Bot PR 344](https://github.com/cwatts6/K98-bot-mirror/pull/344) and
+[SQL PR 114](https://github.com/cwatts6/K98-bot-SQL-Server/pull/114). All three Changes
+reviews (Bot, SQL and the private-I/O correction) finalized successfully and were read back;
+no security findings remain in those reviewed ranges. The affected suite passed 1,216 tests
+with one skip and unchanged operational logs; 18 temporary SQL tests passed. The broad run
+passed 7,888 tests, 281 skips and eight subtests; only the known absent mirror workflow failed.
+The final private-I/O correction passed 201 targeted tests. Hash and Windows decryption
+failures now deny private verification without preventing an independent guided typed-read
+containment decision. SQL errors remain outside that normalization boundary.
+
+## Configuration claim interrupted before execution
+
+The next focused Bot slice offers **Cancel unstarted read** when a canonical configuration
+read claimed reservations but has no stream, request or event. It requires the complete exact
+account/storage/resource/owner/fence/version snapshot and excludes enrollment or ambiguous
+request identities. Cancellation is an explicit durable admin action, never automatic.
+The existing recovery transaction fences the original preparation and releases reservations
+together. It rechecks absence of execution under the same admission locks; a concurrent
+stream causes the whole action to fail. The cancelled old claim cannot later open a stream.
+
+The authority verifies the whole committed private receipt even when there are no stream
+rows, and resolves lost acknowledgements from that exact receipt. The confirmation explains
+that no provider execution occurred. Existing read containment and closed-read automatic
+release retain their separate semantics. No SQL schema or permission change is introduced;
+the authoritative preparation, resource and stream admission contracts were validated against
+the paired SQL source. Temporary SQL tests exercise cancellation, late-open rejection,
+concurrent stream appearance and complete rollback; Discord tests exercise the actual button.
+Changes review is required against Bot `d18716e9`, Deep off.
+
+Unknown-write containment, corrupted/missing typed history, receipt restoration, remaining
+producer checkpoints, earlier rollover phases and P1 workflows remain required work. These
+are active programme obligations; this slice is not programme completion or a deferral.

@@ -63,8 +63,18 @@ def _inspect(authority, registration, preparation_id):
         and audit.get("kind") in {"config_no_dispatch_recovery/1", "config_read_containment/1"}
     ):
         if audit["kind"] == "config_read_containment/1":
-            from services.config_read_containment import verify_contained_read
+            from services.config_read_containment import (
+                verify_contained_read,
+                verify_preparation_receipt,
+            )
 
+            verify_preparation_receipt(
+                authority.store,
+                audit,
+                preparation_id=preparation_id,
+                account=configured["account"],
+                storage_owner=configured["storage_owner"],
+            )
             if data["stream_ids"] != [s["StreamID"] for s in audit["before"]["streams"]]:
                 raise SourceConflict("Contained read membership changed after release.")
             for stream_id in data["stream_ids"]:
@@ -85,7 +95,9 @@ def _inspect(authority, registration, preparation_id):
             outcome="resolved",
             settled_token=audit.get("snapshot_sha256"),
             explanation=(
-                "The read was isolated from further dispatch and its exact reservations released. Its result was discarded; no child termination or provider health is asserted."
+                "The read was cancelled before execution and its exact reservations released. No provider request was dispatched."
+                if audit.get("kind") == "config_read_containment/1" and not data["stream_ids"]
+                else "The read was isolated from further dispatch and its exact reservations released. Its result was discarded; no child termination or provider health is asserted."
                 if audit.get("kind") == "config_read_containment/1"
                 else "The abandoned read was safely closed and its reservations released. This does not assert that the provider is healthy."
             ),
@@ -141,8 +153,12 @@ def _inspect(authority, registration, preparation_id):
         result.update(
             token=report["snapshot_sha256"],
             eligible=True,
-            outcome="read_containment",
-            explanation="Private closure could not be verified. The complete SQL request ledger is read-only. An admin can discard this read and atomically prevent further requests before releasing its exact reservations. This does not assert child termination or provider health.",
+            outcome="read_containment" if data["stream_ids"] else "unstarted_read",
+            explanation=(
+                "The registered configuration read claimed reservations but never opened an execution stream. Its complete SQL ledger contains no provider request. An admin can cancel this read and atomically fence its old claim before releasing its exact reservations."
+                if not data["stream_ids"]
+                else "Private closure could not be verified. The complete SQL request ledger is read-only. An admin can discard this read and atomically prevent further requests before releasing its exact reservations. This does not assert child termination or provider health."
+            ),
         )
         return result, recovery
     result.update(
@@ -171,11 +187,15 @@ def apply_configuration_recovery(
         result, recovery = _inspect(authority, registration, identity(preparation_id))
         if result["outcome"] == "resolved" and result["settled_token"] == token:
             return result
-        expected_outcome = {
-            "release_read": "abandoned_read",
-            "contain_read": "read_containment",
-        }.get(action)
-        if recovery is None or result["token"] != token or result["outcome"] != expected_outcome:
+        expected_outcomes = {
+            "release_read": {"abandoned_read"},
+            "contain_read": {"read_containment", "unstarted_read"},
+        }.get(action, set())
+        if (
+            recovery is None
+            or result["token"] != token
+            or result["outcome"] not in expected_outcomes
+        ):
             raise SourceConflict("Read recovery evidence changed; review its current status.")
         recovery.apply(approved_snapshot_sha256=token, actor=actor, reason=reason)
         # Read the committed release; an unknown acknowledgement remains unknown.

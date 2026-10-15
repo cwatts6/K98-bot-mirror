@@ -64,8 +64,22 @@ def validate_snapshot(
         ):
             raise SourceConflict("Resource claim changed; retain all claims.")
     streams = snapshot["streams"]
-    if not streams or tuple(s["StreamID"] for s in streams) != target.stream_ids:
+    if tuple(s["StreamID"] for s in streams) != target.stream_ids:
         raise SourceConflict("Complete stream membership changed or a conflicting stream exists.")
+    if not streams:
+        from services.export_execution_protocol import uuid_text
+
+        request = json.loads(p["RequestJson"])
+        if (
+            not containment
+            or set(request) != {"read_configuration"}
+            or snapshot["request_count"] != 0
+            or snapshot["event_count"] != 0
+        ):
+            raise SourceConflict(
+                "An unstarted read needs its exact request and empty execution ledger."
+            )
+        uuid_text(request["read_configuration"])
     for s in streams:
         scope = json.loads(s["ScopeJson"])
         if set(scope) not in ({"resources"}, {"resources", "host_birth"}):

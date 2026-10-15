@@ -2311,8 +2311,10 @@ class AuthorityClient:
             or not isinstance(result["token"], str)
             or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
             or type(result["eligible"]) is not bool
-            or result["outcome"] not in {"held", "abandoned_read", "read_containment", "resolved"}
-            or result["eligible"] != (result["outcome"] in {"abandoned_read", "read_containment"})
+            or result["outcome"]
+            not in {"held", "abandoned_read", "read_containment", "unstarted_read", "resolved"}
+            or result["eligible"]
+            != (result["outcome"] in {"abandoned_read", "read_containment", "unstarted_read"})
             or (
                 result["settled_token"] is not None
                 and (
