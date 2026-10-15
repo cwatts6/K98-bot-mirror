@@ -17,7 +17,13 @@ class ConfigReadRecoveryAdapter:
     def inspect(self, source_id):
         result = self.client.inspect_configuration_recovery(source_id)
         actions = {}
-        if result["eligible"]:
+        if result["eligible"] and result["outcome"] == "read_containment":
+            actions["contain_read"] = dict(
+                label="Isolate read & release",
+                check="Confirm this failed configuration read can be discarded. The bot verified that all recorded requests are read-only. A previously dispatched read may still finish, but its result will not be used. No child termination or provider health is being asserted.",
+                effect="Atomically fence further requests and release only this read's exact reservations. Preserve its original history and a verified isolation receipt, then verify the committed release so eligible work can continue.",
+            )
+        elif result["eligible"]:
             actions["release_read"] = dict(
                 label="Release abandoned read",
                 check="Confirm that this failed configuration read should be closed. The bot has verified that its complete request history contains no writes.",
@@ -32,6 +38,8 @@ class ConfigReadRecoveryAdapter:
         return evidence, result["token"], result["outcome"] == "resolved"
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == "contain_read":
+            return self.client.contain_configuration_recovery(source_id, token, actor, reason)
         if action != "release_read":
             raise ValueError("Unsupported configuration repair.")
         return self.client.apply_configuration_recovery(source_id, token, actor, reason)
@@ -40,7 +48,11 @@ class ConfigReadRecoveryAdapter:
         result = self.client.inspect_configuration_recovery(source_id)
         if result["settled_token"] == action["EvidenceHash"]:
             return "verified"
-        if result["eligible"] and result["token"] == action["EvidenceHash"]:
+        matches_action = result["outcome"] == {
+            "release_read": "abandoned_read",
+            "contain_read": "read_containment",
+        }.get(action.get("ActionKind"))
+        if result["eligible"] and matches_action and result["token"] == action["EvidenceHash"]:
             self.execute(
                 source_id,
                 action["ActionKind"],
@@ -51,8 +63,8 @@ class ConfigReadRecoveryAdapter:
             return "verified"
         # Changed SQL evidence makes the original compare-and-set inapplicable.
         # The authority serialises inspect/apply and rechecks exact SQL ownership.
-        if (result["eligible"] or result["outcome"] == "resolved") and result["token"] != action[
-            "EvidenceHash"
-        ]:
+        if (result["eligible"] or result["outcome"] == "resolved") and (
+            result["token"] != action["EvidenceHash"] or not matches_action
+        ):
             return "not_applied"
         return None

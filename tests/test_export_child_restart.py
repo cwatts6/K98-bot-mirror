@@ -164,6 +164,18 @@ def test_caller_cannot_inject_a_private_birth_binding():
     assert dal.calls == before
 
 
+@pytest.mark.parametrize("error", [HostBoundaryError("Hash differs"), RuntimeError("DPAPI failed")])
+def test_private_birth_io_failure_is_unavailable_without_process_or_sql_changes(error):
+    authority, dal, store, stream_id, _, child = restarted_fixture()
+    store.read_reference = Mock(side_effect=error)
+    before = deepcopy(dal.calls)
+    with pytest.raises(ValueError, match="Private child birth is unavailable") as caught:
+        read_birth(store, dal.streams[stream_id])
+    assert caught.value.__cause__ is error
+    assert dal.calls == before and not child.calls
+    authority.host.observe_retired_child.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "result", ["destroyed", "empty", "live", "denied", "other_error", "changed_limits"]
 )

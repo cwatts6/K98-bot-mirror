@@ -2289,6 +2289,15 @@ class AuthorityClient:
             "apply_configuration_recovery", preparation_id, token=token, actor=actor, reason=reason
         )
 
+    def contain_configuration_recovery(self, preparation_id, token, actor, reason):
+        return self._configuration_recovery(
+            "contain_configuration_recovery",
+            preparation_id,
+            token=token,
+            actor=actor,
+            reason=reason,
+        )
+
     def _configuration_recovery(self, action, preparation_id, **kwargs):
         uuid_text(preparation_id)
         result = self._invoke(
@@ -2302,8 +2311,8 @@ class AuthorityClient:
             or not isinstance(result["token"], str)
             or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
             or type(result["eligible"]) is not bool
-            or result["outcome"] not in {"held", "abandoned_read", "resolved"}
-            or result["eligible"] != (result["outcome"] == "abandoned_read")
+            or result["outcome"] not in {"held", "abandoned_read", "read_containment", "resolved"}
+            or result["eligible"] != (result["outcome"] in {"abandoned_read", "read_containment"})
             or (
                 result["settled_token"] is not None
                 and (

@@ -271,6 +271,13 @@ unchanged parent because of its incomplete constants stub; import smoke passes.
 
 ## Configuration read closure after authority-process loss
 
+Published as [Bot PR 343](https://github.com/cwatts6/K98-bot-mirror/pull/343), stacked
+on PR 342. Runtime and updater Changes reviews are sealed with no security findings.
+974 affected/log-isolation tests passed, one optional skip; 174 updater tests passed.
+The broad run passed 7,869 tests, 263 skips and eight subtests. Its outdated Windows
+test double was corrected and a 52-test rerun passed; the known absent mirror workflow
+is unrelated. This is source validation, not deployed recovery.
+
 New Windows provider children use a unique, private global job name with a non-inheritable
 authority-only handle, kill-on-close and no breakaway. For configuration-read streams the
 authority encrypts and verifies the exact child/job/host/session birth record before SQL
@@ -300,3 +307,40 @@ validated; the previously required read-prefix close migration remains necessary
 Older streams without a bound birth and missing/corrupt private evidence still require the
 programme's guided containment workflow. Unknown writes, earlier rollover stages and P1
 work remain required, with no deferral or claim that this slice completes the programme.
+
+## Guided containment of older configuration reads
+
+The next paired Bot/SQL slice adds **Isolate read & release** when historical private
+closure cannot verify but the complete typed SQL request ledger proves a configuration
+read. The existing alert opens an ephemeral checklist and a separate confirmation.
+It explicitly explains that a previously dispatched read may still finish and that its
+result will be discarded. This action never runs under the automatic-release policy.
+
+The authority reconstructs account, registration, storage, preparation, owner, fence,
+versions and complete resource/stream membership. It seals the current typed read ledger
+and original snapshot in private storage. One SQL transaction compares the entire snapshot,
+changes the exact streams to `read_contained`, marks the preparation unavailable and
+releases only its exact reservations. Any failure rolls back every fence and release.
+The private receipt and SQL audit preserve original closure hashes, request events and
+ownership. Late prepare, dispatch and terminal-result events are rejected after containment.
+No request replay, child-termination assertion or provider-health assertion is introduced.
+
+Historical catalogue verification accepts this distinct sealed no-write coverage; fresh
+observational proofs still require a genuinely closed successful probe. SQL proof issuance
+and consumption agree with that distinction. Verification after a lost reply reads the
+committed preparation, exact receipt and every contained stream before resolving the incident.
+An unrelated owner, enrollment, mutation, incomplete typed ledger or changed evidence cannot
+use this action. Existing normal closed-read release and automatic policy remain separate.
+
+Migration `20261015_007_read_dispatch_containment` follows the reviewed recovery module
+chain through 006. It compares trusted predecessor/postimage definitions and rolls back
+constraint/module updates together. The Bot source manifest and protected updater transition
+must move with it. Installation and production permission proofs remain deployment gates;
+tests use only temporary SQL objects and do not install the migration or change roles.
+
+Acceptance covers guided confirmation, no automatic isolation, missing historical private
+bytes, complete read prefixes, same-transaction rollback, stale/foreign scope, lost replies,
+immutable history, historical catalogue inclusion, rejection as a fresh observation and
+late child-event refusal. Unknown-write target containment, missing typed SQL evidence,
+remaining producer checkpoints, earlier rollover phases and every P1 recovery obligation
+are still required delivery scope. This paired slice does not close the programme.

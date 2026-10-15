@@ -433,7 +433,7 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "91256c70a54b65350eb2484df92411c2466507714448da9a9777521ea1306f96"
+APPLICATION_SCHEMA_SOURCE_HASH = "41cdd3409089cb4802e682e5e3e30ad809e653c1a074fd9d437309173cc2a722"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
     "d30f2795213180f850b31e38939441349b346fba9a27e46d6e49db1b746d915f"
@@ -1202,7 +1202,18 @@ class ExportExecutionDAL:
                 identifier = str(stream["StreamID"]).lower()
                 if (
                     identifier <= previous
-                    or stream["State"] != "closed"
+                    or stream["State"] not in {"closed", "read_contained"}
+                    or (
+                        stream["State"] == "read_contained"
+                        and (
+                            stream["Purpose"] != "probe"
+                            or stream["PreparationID"] is None
+                            or any(
+                                stream[k] is not None
+                                for k in ("JobID", "OutputOperationID", "NestedToken", "Epoch")
+                            )
+                        )
+                    )
                     or stream["ActiveAccountKey"] is not None
                     or stream["AccountKey"] != account
                     or stream["ClosureHash"] is None
@@ -1221,6 +1232,7 @@ class ExportExecutionDAL:
             {"count": count, "sha256": root.hex()} != membership["history"]
             or probe is None
             or probe["Purpose"] != "probe"
+            or probe["State"] != "closed"
             or probe["Version"] != membership["probe"]["version"]
             or bytes(probe["SnapshotHash"]) != digest(snapshot)
             or bytes(probe["RegistrationHash"]) != bytes(proof["RegistrationHash"])

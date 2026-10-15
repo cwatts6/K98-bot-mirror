@@ -21,7 +21,9 @@ class RecoveryTarget:
     stream_ids: tuple[str, ...]
 
 
-def validate_snapshot(snapshot, target, *, registration_hash, storage_owner, allow_reads=False):
+def validate_snapshot(
+    snapshot, target, *, registration_hash, storage_owner, allow_reads=False, containment=False
+):
     """Require the complete exact abandoned read; no writes or inferred success."""
     p = snapshot["preparation"]
     if not p or p["State"] not in {"preflight", "uncertain"}:
@@ -77,7 +79,13 @@ def validate_snapshot(snapshot, target, *, registration_hash, storage_owner, all
                 target.fence,
                 target.version - offset,
             )
-            or (s["Purpose"], s["State"], s["ActiveAccountKey"]) != ("probe", "closed", None)
+            or s["Purpose"] != "probe"
+            or (
+                (s["State"], s["ActiveAccountKey"])
+                not in (("open", target.account), ("frozen", target.account), ("closed", None))
+                if containment
+                else (s["State"], s["ActiveAccountKey"]) != ("closed", None)
+            )
             or (not allow_reads and s["LastSequence"] != 0)
             or any(s[k] is not None for k in ("JobID", "OutputOperationID", "NestedToken", "Epoch"))
             or s["RegistrationHash"] != registration_hash

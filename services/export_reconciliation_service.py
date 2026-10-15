@@ -39,7 +39,13 @@ class ClosedStreamVerifier:
         self.dal, self.store = dal, store
 
     def _document(self, reference, expected_hash):
-        return decode(self.store.read_reference(reference, expected_hash))
+        try:
+            raw = self.store.read_reference(reference, expected_hash)
+        except Exception as exc:
+            # Storage/hash/DPAPI failures deny private verification. Callers may
+            # separately prove typed read containment; this is never success.
+            raise SourceConflict("Private execution evidence is unavailable.") from exc
+        return decode(raw)
 
     def verify(
         self,
@@ -52,6 +58,23 @@ class ClosedStreamVerifier:
     ):
         uuid_text(stream_id)
         stream = self.dal.read_stream(stream_id)
+        if stream is not None and stream["State"] == "read_contained":
+            if (
+                str(stream["StreamID"]).lower() != stream_id
+                or not allow_failed_reads
+                or require_observation
+            ):
+                raise SourceConflict(
+                    "An isolated read cannot establish a fresh provider observation."
+                )
+            from services.config_read_containment import verify_contained_read
+
+            seal = verify_contained_read(
+                self.dal, self.store, stream, account=account, registration_hash=registration_hash
+            )
+            return ClosedStreamEvidence(
+                stream_id, stream["Version"], seal["last_sequence"], 0, 0, seal["event_digest"]
+            )
         if (
             stream is None
             or str(stream["StreamID"]).lower() != stream_id
