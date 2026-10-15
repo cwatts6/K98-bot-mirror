@@ -333,6 +333,35 @@ async def test_pending_or_unavailable_verification_hides_repair_buttons():
 
 
 @pytest.mark.asyncio
+async def test_skip_export_preview_shows_consequences_and_season(monkeypatch):
+    from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION
+    from ui.views import recovery_view as view
+
+    _, _, _, row = setup()
+    row["evidence"].update(season=7, actions={"abandon_capture": ABANDON_CAPTURE_ACTION})
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "call", AsyncMock(return_value=row))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    button = next(
+        item
+        for item in view.RecoveryIncidentView(row).children
+        if item.label == "Keep SQL; skip this export"
+    )
+    await button.callback(interaction)
+    view.call.assert_awaited_once_with("review", ACTOR, row["IncidentID"])
+    sent = interaction.followup.send.call_args.kwargs
+    assert sent["ephemeral"] and isinstance(sent["view"], view.RecoveryConfirmView)
+    assert "no spreadsheet export" in sent["embed"].fields[0].value
+    assert "older spreadsheet may remain out of date" in sent["embed"].fields[0].value
+    assert sent["view"].action == "abandon_capture"
+    assert any(
+        field.name == "KVK season" and field.value == "7"
+        for field in view.incident_embed(row).fields
+    )
+
+
+@pytest.mark.asyncio
 async def test_alert_footer_opens_exact_incident_after_view_recreation(monkeypatch):
     from ui.views import recovery_view as view
 

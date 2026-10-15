@@ -211,3 +211,26 @@ job-ownership dimensions, plus probe mutation rejection and exact compiled posti
 Separate Changes reviews cover the focused Bot and SQL `guided-probe-events` branches.
 This is required completion of the verified-absence button's probe path, not a new recovery
 policy or permission to replay unknown writes. All remaining P0/P1 obligations stay active.
+
+## Committed capture with unavailable output
+
+Stats and all-KVK incidents now offer **Keep SQL; skip this export** alongside capture/queue
+continuation. The confirmation states that committed SQL data is preserved and the spreadsheet
+may remain out of date. The repair excludes active producers, checks the original completed
+checkpoint and exact account/storage/owner/fence/version, refuses any queued job or associated
+provider stream, and atomically marks only the unqueued preparation unavailable and releases
+its exact SQL snapshot reservation. Original requests, execution receipts, generation hashes
+and spool references remain intact. Resolution explicitly reports `export_skipped`.
+
+A deterministic local output/format failure during a capture repair records a durable failure
+checkpoint under the same producer guards. That fences the old action and exposes the next
+guided decision rather than leaving it perpetually pending. SQL timeouts and unknown queue
+commits are not classified as safe failure. A queued export cannot use this action.
+
+Tests cover the full failed-capture to confirmed-skip flow, lost acknowledgement, later
+unowned reservation, stale/foreign scope, active SQL work, provider evidence and retained
+spool preservation for both consumers. The existing confirmation view displays KVK season.
+This branch requires a Bot Changes review, Deep off; no SQL schema delta is needed because
+the authoritative preparation, resource and execution contracts already represent this
+state. Missing atomic checkpoints, queued corrupt exports and unknown provider writes retain
+their separate required workflows; no programme completion or deferral is claimed.

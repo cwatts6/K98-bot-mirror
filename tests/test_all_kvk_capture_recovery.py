@@ -69,7 +69,7 @@ def test_both_atomic_producer_checkpoints_offer_guided_capture(procedure):
     adapter = AllKvkCaptureRecoveryAdapter(service.outcomes, service)
     evidence, _, resolved = adapter.inspect(prep["PreparationID"])
     assert not resolved
-    assert set(evidence["actions"]) == {"resume_capture"}
+    assert set(evidence["actions"]) == {"resume_capture", "abandon_capture"}
     assert "not rerun" in evidence["actions"]["resume_capture"]["effect"]
     service.runtime.enqueue_snapshot.assert_not_called()
 
@@ -127,7 +127,7 @@ def test_captured_queue_gap_requires_confirmation_and_inspection_is_read_only():
     preview.update(action="queue_capture", captured=True, explanation=None)
     adapter = AllKvkCaptureRecoveryAdapter(service.outcomes, service)
     evidence, token, resolved = adapter.inspect("source")
-    assert not resolved and set(evidence["actions"]) == {"queue_capture"}
+    assert not resolved and set(evidence["actions"]) == {"queue_capture", "abandon_capture"}
     service.runtime.enqueue_snapshot.assert_not_called()
     adapter.execute("source", "queue_capture", token, "admin", "continue")
     service.runtime.enqueue_snapshot.assert_called_once_with("source")

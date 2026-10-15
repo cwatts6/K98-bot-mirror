@@ -391,6 +391,8 @@ class ExportCoordinationDAL:
                 if (
                     not preparation
                     or preparation["State"] not in {"captured", "materialized"}
+                    or json.loads(preparation["GenerationJson"] or "{}").get("capture_failure")
+                    or json.loads(preparation["GenerationJson"] or "{}").get("capture_abandoned")
                     or (
                         preparation["AccountKey"],
                         preparation["ConsumerKind"],

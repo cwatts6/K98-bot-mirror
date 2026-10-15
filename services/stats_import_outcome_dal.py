@@ -176,6 +176,7 @@ class StatsImportOutcomeDAL:
                 token=self.token(prep, execution, resources),
                 preparation=prep,
                 execution=execution,
+                resources=resources,
                 explanation=explanation,
                 captured=self.capture_completed(prep, execution, resources),
             )

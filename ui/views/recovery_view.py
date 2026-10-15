@@ -49,6 +49,8 @@ def incident_embed(row):
     )
     if evidence.get("scan") is not None:
         embed.add_field(name="Committed scan", value=str(evidence["scan"]), inline=True)
+    if evidence.get("season") is not None:
+        embed.add_field(name="KVK season", value=str(evidence["season"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
     if evidence.get("check_unavailable"):
         embed.add_field(

@@ -857,6 +857,7 @@ def test_submission_returns_only_job_id_from_dal_job_row(tmp_path, consumer, sea
         SpoolHash=bytes.fromhex(receipt.sha256),
         Actor="operator",
         Reason="test",
+        GenerationJson="{}",
     )
     runtime.coordinator.enqueue.return_value = {"JobID": job_id, "ProvenanceJson": "internal-row"}
     result = runtime.submit(consumer=consumer, kvk_no=season, preparation_id=preparation_id)
@@ -864,6 +865,20 @@ def test_submission_returns_only_job_id_from_dal_job_row(tmp_path, consumer, sea
     assert isinstance(result, str) and "internal-row" not in result
     runtime.coordinator.enqueue.assert_called_once()
     assert runtime.coordinator.enqueue.call_args.kwargs["preparation_id"] == preparation_id
+
+
+@pytest.mark.parametrize("marker", ["capture_failure", "capture_abandoned"])
+def test_failed_capture_cannot_reenter_runtime_queue(tmp_path, marker):
+    runtime, dal = producer_runtime(tmp_path)
+    dal.read.return_value = dict(
+        AccountKey="acct",
+        StorageOwner=runtime.store.storage_owner,
+        State="captured",
+        GenerationJson=json.dumps({marker: {"actor": "recovery:test"}}),
+    )
+    with pytest.raises(SnapshotUnavailable, match="admin decision"):
+        runtime.enqueue_snapshot(str(uuid4()))
+    runtime.coordinator.enqueue.assert_not_called()
 
 
 @pytest.mark.parametrize(
