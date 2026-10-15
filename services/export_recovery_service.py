@@ -11,7 +11,7 @@ def job_token(snapshot):
     # Resource versions can advance independently after a failed job released
     # them. They are freshly scoped and proof-checked at execution; they must not
     # falsely retire a pending safe-retry intent whose job CAS can still commit.
-    durable = deepcopy({key: snapshot[key] for key in ("job", "attempts")})
+    durable = deepcopy({key: snapshot[key] for key in ("job", "attempts", "streams")})
     durable["job"].pop("Stalled", None)
     return digest(durable).hex()
 
@@ -19,6 +19,18 @@ def job_token(snapshot):
 def _unchanged(actual, token):
     if actual != token:
         raise SourceConflict("Export evidence changed. Review the current recovery choices.")
+
+
+def skipped_export_verified(snapshot):
+    job = snapshot["job"]
+    return bool(
+        json.loads(job["ProvenanceJson"]).get("export_skipped")
+        and job["ConsumerKind"] in {"scan_data", "all_kvk"}
+        and job["State"] in {"failed", "cancelled"}
+        and not snapshot["attempts"]
+        and not snapshot["streams"]
+        and not any(r["ActiveJobID"] == job["JobID"] for r in snapshot["resources"])
+    )
 
 
 class ExportRecoveryAdapter:
@@ -86,10 +98,33 @@ class ExportRecoveryAdapter:
             explanation = (
                 "The requested retry has been admitted. Delivery remains monitored separately."
             )
+        if provenance.get("export_skipped"):
+            resolved = skipped_export_verified(snapshot)
+            actions.clear()
+            explanation = (
+                "Admin chose to skip this export. Its input and history are preserved, no provider execution occurred, "
+                "and its reservations are released. SQL data is unchanged; the spreadsheet may remain out of date."
+                if resolved
+                else "The recorded skip does not match its current evidence. The incident remains open."
+            )
+        elif (
+            job["ConsumerKind"] in {"scan_data", "all_kvk"}
+            and job["State"] in {"waiting", "ready", "running", "failed", "uncertain"}
+            and not attempts
+            and not snapshot["streams"]
+            and not queued
+        ):
+            actions["skip_unstarted"] = dict(
+                label="Keep SQL; skip queued export",
+                check="Confirm you accept no spreadsheet update from this queued export. SQL data and retained files stay in place; the spreadsheet may remain out of date.",
+                effect="Verify there is no provider attempt or execution stream, fence any stale worker, retain the original job and input, and release only its exact reservations. No provider write or SQL import is replayed.",
+            )
         return (
             dict(
                 title="Spreadsheet export recovery",
-                outcome=job["State"],
+                outcome="export_skipped"
+                if provenance.get("export_skipped") and resolved
+                else job["State"],
                 scan=job.get("KVK_NO"),
                 explanation=explanation,
                 actions=actions,
@@ -102,7 +137,16 @@ class ExportRecoveryAdapter:
         snapshot = self.discovery.job(source_id)
         _unchanged(job_token(snapshot), token)
         job = snapshot["job"]
-        if action == "retry_unstarted":
+        if action == "skip_unstarted":
+            self.coordinator.skip_unstarted(
+                source_id,
+                self.discovery.account,
+                storage_owner=self.discovery.storage_owner,
+                expected_version=job["Version"],
+                actor=actor,
+                reason=reason,
+            )
+        elif action == "retry_unstarted":
             if job["ConsumerKind"] == "new_source":
                 self.discovery.registered_publication(source_id, self.coordinator)
             self.coordinator.request_safe_retry(
@@ -147,6 +191,16 @@ class ExportRecoveryAdapter:
         snapshot = self.discovery.job(source_id)
         provenance = json.loads(snapshot["job"]["ProvenanceJson"])
         actor = f"recovery:{action['ActionID']}"
+        if action["ActionKind"] == "skip_unstarted":
+            receipt = provenance.get("export_skipped", {})
+            if receipt.get("actor") == actor and receipt.get("reason") == action["Reason"]:
+                return "verified" if skipped_export_verified(snapshot) else None
+            if job_token(snapshot) != action["EvidenceHash"]:
+                return "not_applied"
+            self.execute(
+                source_id, "skip_unstarted", action["EvidenceHash"], actor, action["Reason"]
+            )
+            return None
         if action["ActionKind"] in {"rebuild_damaged", "retry_absent"}:
             receipt = self.coordinator.repair_receipt(action["ActionID"])
             if receipt is not None:
