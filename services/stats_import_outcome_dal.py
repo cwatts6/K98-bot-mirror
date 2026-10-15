@@ -10,6 +10,10 @@ from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 
 
+class ImportExecutionActive(SourceConflict):
+    """An execution still owns its SQL session guard; not an abandoned import."""
+
+
 class StatsImportOutcomeDAL:
     def __init__(self, connect, *, account, storage_owner):
         self.connect = connect
@@ -61,7 +65,9 @@ class StatsImportOutcomeDAL:
         )
         result = one(cursor)
         if not result or result["LockResult"] < 0:
-            raise SourceConflict("SQL execution is still active; wait and check status again.")
+            raise ImportExecutionActive(
+                "SQL execution is still active; wait and check status again."
+            )
 
     def read(self, preparation_id):
         with transaction(self.connect) as cursor:
@@ -173,7 +179,25 @@ class StatsImportOutcomeDAL:
                 preparation=prep,
                 execution=execution,
                 explanation=explanation,
+                captured=self.capture_completed(prep, execution, resources),
             )
+
+    @staticmethod
+    def capture_completed(prep, execution, resources):
+        """SQL completion plus released snapshot and durable capture; not export success."""
+        return bool(
+            prep
+            and execution
+            and not resources
+            and execution["State"] == "completed"
+            and execution["Resolution"] is None
+            and prep["State"] in {"captured", "materialized"}
+            and prep["SpoolKey"]
+            and prep["SpoolHash"]
+            and prep["SpoolBytes"] > 0
+            and (identity(prep["OwnerID"]), prep["Fence"])
+            == (identity(execution["OwnerID"]), execution["Fence"])
+        )
 
     def pending_failures(self, limit=16, *, after=None):
         if type(limit) is not int or not 1 <= limit <= 32:

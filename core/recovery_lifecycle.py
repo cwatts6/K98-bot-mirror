@@ -21,8 +21,10 @@ async def observe_recovery_outcomes(bot):
     outage_message = None
     while True:
         try:
-            await drain_thread(observe_recovery)
+            failures = await drain_thread(observe_recovery)
             await publish_recovery_alerts(bot)
+            if failures:
+                raise RuntimeError("One or more incident checks are unavailable")
             recovery_health.record_success()
             if unavailable:
                 logger.info("recovery_observer available=true")

@@ -181,6 +181,52 @@ def test_unavailable_sql_keeps_original_action_then_recovers_same_identity():
     assert len(dal.calls) == 1
 
 
+def test_changed_evidence_retires_old_sql_intent_and_requires_new_confirmation():
+    service, dal, store, row = setup()
+    dal.fail = True
+    pending = execute(service, row)
+    assert pending["pending_action"]["state"] == "unknown"
+    dal.version += 1
+    dal.fail = False
+    fresh = service.refresh(row["IncidentID"])
+    assert store.actions[0]["State"] == "not_applied"
+    assert fresh["pending_action"] is None
+    assert not dal.calls
+    with pytest.raises(SourceConflict, match="evidence changed"):
+        execute(service, row)
+    assert execute(service, fresh)["State"] == "resolved"
+    assert len(dal.calls) == 1 and len(store.actions) == 2
+
+
+def test_normal_capture_closes_incident_without_metadata_settlement():
+    service, dal, store, row = setup("completed")
+    inspected = dal.inspect(row["SourceID"])
+    inspected.update(captured=True)
+    dal.inspect = lambda _: inspected
+    fresh = service.refresh(row["IncidentID"])
+    assert fresh["State"] == "resolved"
+    assert "Export delivery is a separate outcome" in fresh["evidence"]["explanation"]
+    assert not dal.calls and not store.actions
+
+
+def test_capture_verification_requires_receipt_owner_spool_and_released_resource():
+    from services.stats_import_outcome_dal import StatsImportOutcomeDAL
+    from tests.test_stats_import_outcomes import evidence
+
+    prep, receipt, resources = evidence("completed")
+    prep.update(State="captured", SpoolKey="captured-output", SpoolBytes=1024, SpoolHash=b"h" * 32)
+    assert StatsImportOutcomeDAL.capture_completed(prep, receipt, [])
+    assert not StatsImportOutcomeDAL.capture_completed(prep, receipt, resources)
+    for field, value in [
+        ("State", "writing"),
+        ("SpoolHash", None),
+        ("SpoolBytes", 0),
+        ("OwnerID", str(uuid4())),
+    ]:
+        changed = dict(prep, **{field: value})
+        assert not StatsImportOutcomeDAL.capture_completed(changed, receipt, [])
+
+
 @pytest.mark.parametrize(
     "actor", [RecoveryActor(9, 2, 3), RecoveryActor(1, 9, 3), RecoveryActor(1, 2, 9)]
 )
@@ -267,6 +313,20 @@ async def test_expired_interaction_never_dispatches(monkeypatch):
     confirm = view.RecoveryConfirmView(row, "supersede_partial")
     await confirm.children[0].callback(Mock())
     view.call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_pending_or_unavailable_verification_hides_repair_buttons():
+    from ui.views.recovery_view import RecoveryIncidentView, incident_embed
+
+    _, _, _, row = setup()
+    row["pending_action"] = {"state": "unknown", "kind": "supersede_partial"}
+    assert [item.label for item in RecoveryIncidentView(row).children] == ["Recheck"]
+    assert any(field.name == "Repair being verified" for field in incident_embed(row).fields)
+    row["pending_action"] = None
+    row["evidence"]["check_unavailable"] = "TimeoutError"
+    assert [item.label for item in RecoveryIncidentView(row).children] == ["Recheck"]
+    assert any(field.name == "Verification unavailable" for field in incident_embed(row).fields)
 
 
 @pytest.mark.asyncio

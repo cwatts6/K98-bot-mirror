@@ -97,6 +97,39 @@ def test_scoped_discovery_revision_and_alert_roundtrip(store):
     assert other.list_open() == []
 
 
+def test_check_failure_is_persisted_and_cleared_only_by_successful_observation(store):
+    row = incident(store)
+    store.check_failed(row["IncidentID"], "TimeoutError")
+    failed = store.get(row["IncidentID"])
+    assert failed["evidence"]["check_unavailable"] == "TimeoutError"
+    assert failed["LastSeenUTC"] == row["LastSeenUTC"]
+    assert failed["Revision"] == 2
+    store.check_failed(row["IncidentID"], "TimeoutError")
+    assert store.get(row["IncidentID"])["Revision"] == 2
+    fresh = store.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "a" * 64)
+    assert "check_unavailable" not in fresh["evidence"]
+    assert fresh["Revision"] == 3
+
+
+def test_alert_lease_and_paired_identity_constraint(store):
+    import pyodbc
+
+    row = incident(store)
+    assert store.claim_alert(row["IncidentID"]) is True
+    assert store.claim_alert(row["IncidentID"]) is False
+    store.alert_sent(row["IncidentID"], 1, 3, 4)
+    connection = store.connect()
+    try:
+        with pytest.raises(pyodbc.IntegrityError):
+            connection.cursor().execute(
+                "UPDATE dbo.RecoveryIncident SET AlertChannelID=NULL WHERE IncidentID=?",
+                row["IncidentID"],
+            )
+        connection.rollback()
+    finally:
+        connection.close()
+
+
 def test_concurrent_claims_dispatch_once_and_survive_new_dal(store):
     row = incident(store)
 

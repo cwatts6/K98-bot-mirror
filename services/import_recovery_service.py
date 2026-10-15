@@ -11,6 +11,7 @@ class ImportRecoveryAdapter:
         preview = self.dal.inspect(source_id)
         execution = preview["execution"] or {}
         decision = preview["action"]
+        captured = preview.get("captured", False)
         actions = {}
         if decision == "release_failure":
             actions[decision] = {
@@ -29,7 +30,11 @@ class ImportRecoveryAdapter:
             "outcome": execution.get("State", "unproven"),
             "scan": execution.get("ScanOrder"),
             "resolution": execution.get("Resolution"),
-            "explanation": preview.get("explanation")
+            "explanation": (
+                "SQL processing completed and its output was captured; the snapshot reservation is released. Export delivery is a separate outcome."
+                if captured
+                else preview.get("explanation")
+            )
             or (
                 "The reservation has been settled. This is not proof that reports completed."
                 if decision == "resolved"
@@ -37,7 +42,7 @@ class ImportRecoveryAdapter:
             ),
             "actions": actions,
         }
-        return evidence, preview["token"], decision == "resolved"
+        return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):
         if action not in {"release_failure", "supersede_partial"}:
@@ -58,6 +63,12 @@ class ImportRecoveryAdapter:
             # Settlement is atomic with release in the existing DAL. An equivalent
             # settlement by the automatic observer also establishes this postcondition.
             return "verified"
+        if preview["token"] != action["EvidenceHash"]:
+            # inspect() locks the exact receipt/preparation/resource rows. A changed
+            # version-bound token with no matching atomic settlement proves this
+            # old intent cannot now apply: settle() will reject its original token.
+            # An in-flight settlement holds those same row locks until its commit.
+            return "not_applied"
         # This one adapter can safely resume the SAME SQL settlement: settle()
         # locks and compares the original evidence, and writes its resolution and
         # resource release atomically. It cannot replay the business import.

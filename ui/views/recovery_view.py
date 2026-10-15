@@ -48,6 +48,18 @@ def incident_embed(row):
     if evidence.get("scan") is not None:
         embed.add_field(name="Committed scan", value=str(evidence["scan"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
+    if evidence.get("check_unavailable"):
+        embed.add_field(
+            name="Verification unavailable",
+            value="The latest check failed. The evidence above is the last successful observation. Automatic checks will retry; repair choices are disabled until verification succeeds.",
+            inline=False,
+        )
+    if row.get("pending_action"):
+        embed.add_field(
+            name="Repair being verified",
+            value=f"The accepted repair is {row['pending_action']['state']}. The bot will reconcile its existing receipt on the next monitor cycle. No second repair will be dispatched. Use Recheck for current progress.",
+            inline=False,
+        )
     if row["State"] != "resolved" and not evidence["actions"]:
         embed.add_field(
             name="Recovery checks",
@@ -120,7 +132,12 @@ class RecoveryIncidentView(discord.ui.View):
     def __init__(self, row):
         super().__init__(timeout=300)
         self.row = row
-        for action, details in row["evidence"]["actions"].items():
+        actions = (
+            {}
+            if row.get("pending_action") or row["evidence"].get("check_unavailable")
+            else row["evidence"]["actions"]
+        )
+        for action, details in actions.items():
             button = discord.ui.Button(label=details["label"], style=discord.ButtonStyle.primary)
 
             async def preview(interaction, action=action):

@@ -63,7 +63,11 @@ class RecoveryDAL:
             row = one(cursor)
             if row:
                 incident_id = identity(row["IncidentID"])
-                changed = row["EvidenceHash"] != evidence_hash or row["State"] != state
+                changed = (
+                    row["EvidenceHash"] != evidence_hash
+                    or row["State"] != state
+                    or row["EvidenceJson"] != encoded
+                )
                 cursor.execute(
                     "UPDATE dbo.RecoveryIncident SET EvidenceJson=?,EvidenceHash=?,State=?,"
                     "Revision=Revision+?,LastSeenUTC=SYSUTCDATETIME() WHERE IncidentID=? AND ScopeKey=?",
@@ -106,6 +110,19 @@ class RecoveryDAL:
                 row["IncidentID"] = identity(row["IncidentID"])
                 row["evidence"] = json.loads(row["EvidenceJson"])
             return result
+
+    def check_failed(self, incident_id, error_type):
+        with transaction(self.connect) as cursor:
+            row = self._get(cursor, incident_id, lock=True)
+            if row["evidence"].get("check_unavailable") == error_type:
+                return
+            evidence = dict(row["evidence"], check_unavailable=error_type)
+            cursor.execute(
+                "UPDATE dbo.RecoveryIncident SET EvidenceJson=?,Revision=Revision+1 WHERE IncidentID=? AND ScopeKey=?",
+                document(evidence),
+                row["IncidentID"],
+                self.scope,
+            )
 
     def alerts_due(self):
         with transaction(self.connect) as cursor:

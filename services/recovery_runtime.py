@@ -7,6 +7,7 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.recovery_dal import RecoveryDAL
 from services.recovery_service import RecoveryService
+from services.stats_import_outcome_dal import ImportExecutionActive
 
 logger = logging.getLogger(__name__)
 _cursor = None
@@ -47,6 +48,7 @@ def call_recovery(method, *args):
 
 def observe_recovery():
     global _cursor, _incident_cursor
+    failures = []
     with recovery_service() as service:
         adapter = service.adapters["stats_import"]
         scope = service.store.scope
@@ -56,9 +58,11 @@ def observe_recovery():
             try:
                 evidence, token, resolved = adapter.inspect(source_id)
                 service.store.observe(adapter.kind, source_id, evidence, token, resolved=resolved)
-            except SourceConflict:
+            except ImportExecutionActive:
                 # An active execution lock is not an abandoned writer.
                 continue
+            except Exception as exc:
+                failures.append(type(exc).__name__)
         after = _incident_cursor[1] if _incident_cursor and _incident_cursor[0] == scope else None
         incidents = service.store.list_open(after=after)
         if not incidents:
@@ -68,16 +72,19 @@ def observe_recovery():
             try:
                 service.refresh(incident["IncidentID"])
             except Exception as exc:
+                service.store.check_failed(incident["IncidentID"], type(exc).__name__)
+                failures.append(type(exc).__name__)
                 logger.warning(
                     "recovery_recheck_unavailable incident=%s error_type=%s",
                     incident["IncidentID"],
                     type(exc).__name__,
                 )
+    return failures
 
 
 def alert_rows():
     with recovery_service() as service:
-        return [service.store.get(key) for key in service.store.alerts_due()]
+        return [service.present(service.store.get(key)) for key in service.store.alerts_due()]
 
 
 def record_alert(incident_id, revision, channel_id, message_id):

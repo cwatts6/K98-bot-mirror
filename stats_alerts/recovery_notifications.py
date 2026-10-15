@@ -45,7 +45,7 @@ async def publish_recovery_alerts(bot):
                 view=RecoveryEntryView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
-        elif row["AlertedRevision"] != row["Revision"]:
+        else:
             await message.edit(
                 embed=incident_embed(row),
                 view=RecoveryEntryView(),

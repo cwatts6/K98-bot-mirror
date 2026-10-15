@@ -40,9 +40,17 @@ class RecoveryService:
                     incident_id, action["ActionID"], outcome, {"verification": outcome}
                 )
         evidence, token, resolved = adapter.inspect(row["SourceID"])
-        return self.store.observe(
+        current = self.store.observe(
             row["SourceKind"], row["SourceID"], evidence, token, resolved=resolved
         )
+        return self.present(current)
+
+    def present(self, row):
+        pending = self.store.pending_actions(row["IncidentID"])
+        row["pending_action"] = (
+            {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
+        )
+        return row
 
     def review(self, actor, incident_id):
         self.authorize(actor)
