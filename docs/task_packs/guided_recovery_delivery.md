@@ -1,5 +1,34 @@
 # Guided recovery delivery
 
+## Interrupted original admission checkpoint — 2026-10-16
+
+Draft PR #352 provides confirmed-refusal continuation. The next focused
+`codex/guided-unstarted-stage` change also discovers typed original admissions
+interrupted in pending, preflight, SQL-pending, writing or uncertain state before
+SQL execution registration. **Cancel unstarted reservation** checks both SQL
+guards, exact ownership, immutable inputs, and absence of receipts/streams/output;
+it atomically fences and releases the reservation. Only then is a separate
+**Resume saved SQL stage** confirmation offered. A registration race instead
+links the exact original import receipt without release or replay.
+
+62 focused tests pass, including temporary SQL for all five interruption phases,
+lost closure/intent replies, live original writer exclusion, changed ownership,
+late callbacks, child-adoption rejection, discovery and existing guided flows.
+An initial fixture query qualification and test timestamp transaction were fixed;
+the final run passes. Architecture (168 files), deferred-item/security-routing
+checks, test selection, Ruff, Black and synthetic imports pass. The prior command
+registration check is retained because this change adds no command/view surface.
+No schema, persistent SQL installation or provider/production operation is added.
+
+Changes review `fd9f6167-de78-43e6-8a52-141ebfaf5c25` sealed successfully for
+`fb394d51..1d54e2ba`: both source files reviewed, zero findings, sealed result
+read back. The final semantic draft was accepted before completion.
+
+Historical inputs and changed-registration decisions, durable remaining pipeline
+stages, partial producer results, earlier rollover phases, all-copy containment/
+active-history evidence recovery and integrated full P0 acceptance remain active.
+This checkpoint does not mark P0 complete or defer a recovery requirement.
+
 ## Refused SQL stage checkpoint — 2026-10-16
 
 `codex/guided-refused-stage` adds durable exact stats inputs before writer admission,
