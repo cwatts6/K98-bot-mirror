@@ -136,6 +136,45 @@ class RecoveryIncidentView(discord.ui.View):
     def __init__(self, row):
         super().__init__(timeout=300)
         self.row = row
+        delivery = row["evidence"].get("delivery") or {}
+        links_to_jobs = []
+        if delivery.get("job_id"):
+            links_to_jobs.append(("Review replacement export", delivery["job_id"]))
+        blockers = row["evidence"].get("blocking_job_ids", [])
+        if blockers:
+            links_to_jobs.append(("Review blocking recovery", blockers[0]))
+        for label, linked_job in links_to_jobs if row["State"] != "resolved" else []:
+            linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+
+            async def review_replacement(interaction, linked_job=linked_job):
+                try:
+                    actor = actor_for(interaction)
+                    if not await safe_defer(interaction, ephemeral=True):
+                        return
+                    current = await call("review_source", actor, "export_job", linked_job)
+                    await interaction.followup.send(
+                        embed=incident_embed(current),
+                        view=RecoveryIncidentView(current),
+                        ephemeral=True,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                except Exception as exc:
+                    await report_error(interaction, exc)
+
+            linked.callback = review_replacement
+            self.add_item(linked)
+        if row["evidence"].get("targets"):
+            links = discord.ui.Button(
+                label="Review output links", style=discord.ButtonStyle.secondary
+            )
+
+            async def review_links(interaction):
+                from ui.views.recovery_target_view import show_target_page
+
+                await show_target_page(interaction, row["IncidentID"], 0)
+
+            links.callback = review_links
+            self.add_item(links)
         actions = (
             {}
             if row.get("pending_action") or row["evidence"].get("check_unavailable")
@@ -158,6 +197,12 @@ class RecoveryIncidentView(discord.ui.View):
                             ephemeral=True,
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
+                        return
+                    if detail.get("input") is True:
+                        from ui.views.recovery_input_view import show_input_page
+
+                        page = await call("input_page", actor, current["IncidentID"], action, 0)
+                        await show_input_page(interaction, page)
                         return
                     embed = discord.Embed(title=detail["label"], color=0xF1C40F)
                     embed.add_field(

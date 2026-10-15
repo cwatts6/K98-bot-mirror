@@ -59,3 +59,14 @@ class ExportReplacementDAL:
                 raise SourceConflict(
                     "Replacement proposal acknowledgement is missing; verify its original receipt."
                 )
+
+    def for_job(self, job_id, *, account):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT p.ReplacementID FROM dbo.ExportReplacementPlan p "
+                "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
+                "WHERE c.JobID=? AND c.AccountKey=? AND p.AccountKey=c.AccountKey ORDER BY p.CreatedUTC,p.ReplacementID",
+                identity(job_id),
+                account,
+            )
+            return [identity(r["ReplacementID"]) for r in rows(cursor)]

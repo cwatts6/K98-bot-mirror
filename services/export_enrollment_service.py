@@ -592,6 +592,17 @@ class ManagedOriginVerifier:
         ):
             raise SourceConflict("Complete canonical enrolled pool required.")
         rows = self.dal.read_origins(account, targets)
+        if not rows:
+            from services.export_replacement_origin import verify_replacement_origin
+
+            return verify_replacement_origin(
+                dal=self.dal,
+                store=self.store,
+                account=account,
+                targets=targets,
+                owner_email=owner_email,
+                editor_email=editor_email,
+            )
         if any(row["Stage"] == "registered" for row in rows):
             from services.export_manual_enrollment import verify_manual_origin
 

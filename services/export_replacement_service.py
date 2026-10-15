@@ -27,7 +27,7 @@ class ExportReplacementService:
             raise SourceConflict("Private replacement receipt hash differs.")
         return raw
 
-    def propose(self, job_id, *, token, replacements, actor, reason):
+    def propose(self, job_id, *, token, replacements, actor, reason, owner_email=None):
         job_id = identity(job_id)
         if not isinstance(actor, str) or not actor.startswith("recovery:"):
             raise SourceConflict("Durable admin recovery action required.")
@@ -42,6 +42,8 @@ class ExportReplacementService:
         existing = self.dal.read(replacement_id, account=self.registration.value()["account"])
         if existing is not None:
             result = self.verify(existing)
+            if owner_email is not None and result["owner_email"] != owner_email:
+                raise SourceConflict("Another proposal owns this recovery action.")
             if (
                 result["job_id"],
                 result["containment_token"],
@@ -57,6 +59,13 @@ class ExportReplacementService:
                 "Verified permanent isolation and the exact reviewed decision are required."
             )
         containment_id = identity(isolated["actor"].removeprefix("recovery:"))
+        from services.export_replacement_input import replacement_owners
+
+        owners = replacement_owners(self.registration, isolated["targets"])
+        if owner_email is None and len(owners) == 1:
+            owner_email = owners[0]
+        if owner_email not in owners:
+            raise SourceConflict("Choose a registered owner using the guided replacement form.")
         proposal = replacement_registration(
             self.registration,
             targets=isolated["targets"],
@@ -71,6 +80,7 @@ class ExportReplacementService:
             proposal=proposal,
             actor=actor,
             reason=reason,
+            owner_email=owner_email,
             files_verified=False,
             registration_activated=False,
             business_resolved=False,
@@ -111,6 +121,8 @@ class ExportReplacementService:
             replacements=mapping,
             replacement_id=plan["ReplacementID"],
         )
+        from services.export_replacement_input import replacement_owners
+
         if (
             audit.get("kind") != "export_replacement_plan/1"
             or any(
@@ -122,6 +134,8 @@ class ExportReplacementService:
             or isolated["token"] != audit["containment_token"]
             or isolated["actor"] != "recovery:" + plan["ContainmentID"]
             or proposal != expected
+            or audit.get("owner_email")
+            not in replacement_owners(self.registration, isolated["targets"])
             or (audit["job_id"], audit["containment_id"], audit["actor"], audit["reason"])
             != (plan["JobID"], plan["ContainmentID"], plan["Actor"], plan["Reason"])
             or plan["Actor"] != "recovery:" + plan["ReplacementID"]
@@ -138,6 +152,7 @@ class ExportReplacementService:
             mapping=mapping,
             actor=plan["Actor"],
             reason=plan["Reason"],
+            owner_email=audit["owner_email"],
             outcome="verification_required",
             files_verified=False,
             registration_activated=False,

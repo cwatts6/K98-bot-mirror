@@ -12,10 +12,17 @@ from kvk.dal.new_source_import_dal import SourceConflict, canonical, one, rows, 
 from services.export_coordination_dal import identity
 
 
-def document(value):
+def document(value, *, export_incident=False):
     encoded = canonical(value)
-    if len(encoded.encode("utf-16-le")) > 32768:
+    if len(encoded.encode("utf-16-le")) > (1048576 if export_incident else 32768):
         raise ValueError("Recovery evidence exceeds its bound.")
+    return encoded
+
+
+def input_document(value):
+    encoded = canonical(value)
+    if len(encoded.encode("utf-16-le")) > 1048576:
+        raise SourceConflict("Guided recovery input exceeds its bound.")
     return encoded
 
 
@@ -50,7 +57,7 @@ class RecoveryDAL:
         source_id = identity(source_id)
         if len(evidence_hash) != 64 or any(c not in "0123456789abcdef" for c in evidence_hash):
             raise ValueError("Exact evidence digest required.")
-        encoded = document(evidence)
+        encoded = document(evidence, export_incident=kind == "export_job")
         state = "resolved" if resolved else "open"
         with transaction(self.connect) as cursor:
             cursor.execute(
@@ -119,7 +126,7 @@ class RecoveryDAL:
             evidence = dict(row["evidence"], check_unavailable=error_type)
             cursor.execute(
                 "UPDATE dbo.RecoveryIncident SET EvidenceJson=?,Revision=Revision+1 WHERE IncidentID=? AND ScopeKey=?",
-                document(evidence),
+                document(evidence, export_incident=row["SourceKind"] == "export_job"),
                 row["IncidentID"],
                 self.scope,
             )
@@ -172,7 +179,18 @@ class RecoveryDAL:
             )
             return one(cursor) is not None
 
-    def claim(self, incident_id, revision, evidence_hash, kind, actor, reason):
+    def claim(
+        self,
+        incident_id,
+        revision,
+        evidence_hash,
+        kind,
+        actor,
+        reason,
+        *,
+        payload=None,
+        draft_version=None,
+    ):
         if not (
             1 <= len(actor) <= 128 and 1 <= len(reason.strip()) <= 512 and 1 <= len(kind) <= 64
         ):
@@ -196,6 +214,12 @@ class RecoveryDAL:
                     "The evidence changed. Review the refreshed incident before confirming."
                 )
             action_id = str(uuid4())
+            if payload is not None:
+                draft = self._input_draft(cursor, row, kind, lock=True)
+                if draft["version"] != draft_version or draft["input"] != payload:
+                    raise SourceConflict(
+                        "The replacement choices changed. Review them again before confirming."
+                    )
             cursor.execute(
                 "INSERT dbo.RecoveryAction (ActionID,IncidentID,IncidentRevision,ActionKind,EvidenceHash,Actor,Reason,State) "
                 "VALUES (?,?,?,?,?,?,?,'dispatched')",
@@ -207,7 +231,81 @@ class RecoveryDAL:
                 actor,
                 reason.strip(),
             )
+            if payload is not None:
+                cursor.execute(
+                    "UPDATE dbo.RecoveryAction SET InputJson=? WHERE ActionID=?",
+                    input_document(payload),
+                    action_id,
+                )
             return action_id, True
+
+    def _input_draft(self, cursor, row, action, *, lock=False):
+        hint = " WITH(UPDLOCK,HOLDLOCK)" if lock else ""
+        cursor.execute(
+            "SELECT * FROM dbo.RecoveryInputDraft"
+            + hint
+            + " WHERE IncidentID=? AND IncidentRevision=? AND ActionKind=?",
+            row["IncidentID"],
+            row["Revision"],
+            action,
+        )
+        draft = one(cursor)
+        if draft is None:
+            return dict(version=0, input={})
+        if draft["EvidenceHash"] != row["EvidenceHash"]:
+            raise SourceConflict("Saved input belongs to different recovery evidence.")
+        return dict(version=draft["Version"], input=json.loads(draft["InputJson"]))
+
+    def input_draft(self, incident_id, action):
+        with transaction(self.connect) as cursor:
+            return self._input_draft(cursor, self._get(cursor, incident_id), action)
+
+    def save_input(self, incident_id, revision, token, action, version, values, actor):
+        with transaction(self.connect) as cursor:
+            row = self._get(cursor, incident_id, lock=True)
+            if row["State"] != "open" or (row["Revision"], row["EvidenceHash"]) != (
+                revision,
+                token,
+            ):
+                raise SourceConflict("Recovery evidence changed. Reopen the guided form.")
+            cursor.execute(
+                "SELECT TOP (1) ActionID FROM dbo.RecoveryAction WHERE IncidentID=? AND "
+                "(State IN ('dispatched','unknown') OR IncidentRevision=?)",
+                row["IncidentID"],
+                revision,
+            )
+            if one(cursor):
+                raise SourceConflict(
+                    "A confirmed action already owns this evidence; recheck its result."
+                )
+            draft = self._input_draft(cursor, row, action, lock=True)
+            if draft["version"] != version:
+                raise SourceConflict("Another form saved newer choices. Reopen this page.")
+            payload = draft["input"] | values
+            encoded = input_document(payload)
+            if version == 0:
+                cursor.execute(
+                    "INSERT dbo.RecoveryInputDraft(IncidentID,IncidentRevision,ActionKind,EvidenceHash,Version,InputJson,Actor,UpdatedUTC) "
+                    "VALUES(?,?,?,?,1,?,?,SYSUTCDATETIME())",
+                    row["IncidentID"],
+                    revision,
+                    action,
+                    token,
+                    encoded,
+                    actor,
+                )
+            else:
+                cursor.execute(
+                    "UPDATE dbo.RecoveryInputDraft SET Version=Version+1,InputJson=?,Actor=?,UpdatedUTC=SYSUTCDATETIME() "
+                    "WHERE IncidentID=? AND IncidentRevision=? AND ActionKind=? AND Version=?",
+                    encoded,
+                    actor,
+                    row["IncidentID"],
+                    revision,
+                    action,
+                    version,
+                )
+            return dict(version=version + 1, input=payload)
 
     def pending_actions(self, incident_id):
         with transaction(self.connect) as cursor:

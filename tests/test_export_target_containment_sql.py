@@ -69,9 +69,18 @@ def contained_job():
         timeout=5,
     )
     try:
-        for name in TABLES:
+        constraint_suffix = uuid4().hex[:12]
+        for name in dict.fromkeys(TABLES):
             source = (root / (name + ".Table.sql")).read_text(encoding="utf-8-sig")
             source = "\n".join(line for line in source.splitlines() if "FOREIGN KEY" not in line)
+            # Named temporary-table constraints share tempdb's namespace even
+            # when separate pooled sessions own the tables. Keep every actual
+            # constraint while avoiding cross-fixture naming collisions.
+            source = re.sub(
+                r"\bCONSTRAINT\s+(\w+)",
+                lambda match: "CONSTRAINT " + match[1] + "_" + constraint_suffix,
+                source,
+            )
             sql.execute(local_sql(re.sub(r",\s*\);", "\n);", source)))
         for name in PROCEDURES:
             source = (root / (name + ".StoredProcedure.sql")).read_text(encoding="utf-8-sig")
@@ -551,7 +560,7 @@ def test_late_request_outside_complete_target_set_keeps_ownership(contained_job,
     assert_untouched(f)
 
 
-def pool_job(f):
+def pool_job(f, *, slot_count=2):
     """Extend the temporary job into a complete registered source pool."""
     pool = str(uuid4())
     choice = str(uuid4())
@@ -585,7 +594,7 @@ def pool_job(f):
             RegistrationJson="{}",
         ),
     )
-    for number in (1, 2):
+    for number in range(1, slot_count + 1):
         file_id = f"old-slot-{number}"
         f.insert(
             "SourceOutputSlot",
@@ -623,7 +632,7 @@ def pool_job(f):
     )
     f.sql.execute(
         "UPDATE #ExportJob SET DestinationSetHash=CAST(? AS binary(32))",
-        digest(["old-file", "old-slot-1", "old-slot-2"]),
+        digest(sorted(["old-file", *(f"old-slot-{i}" for i in range(1, slot_count + 1))])),
     )
     return pool, slots
 

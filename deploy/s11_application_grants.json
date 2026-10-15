@@ -484,13 +484,13 @@
       "object": "KVK.SourceOutputPool",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputPool.Table.sql",
-      "source_sha256": "395a9a826d2252a3db42e2cffd0806f99951f1a2f8d7930a03107ebf16d51abf"
+      "source_sha256": "1351006b5ebf7bd223444a011347c860f6061e44bdb8bcfd83bc40f6c2d63c9a"
     },
     {
       "object": "KVK.SourceOutputPool",
       "permission": "UPDATE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\KVK.SourceOutputPool.Table.sql",
-      "source_sha256": "395a9a826d2252a3db42e2cffd0806f99951f1a2f8d7930a03107ebf16d51abf"
+      "source_sha256": "1351006b5ebf7bd223444a011347c860f6061e44bdb8bcfd83bc40f6c2d63c9a"
     },
     {
       "object": "KVK.SourceOutputSlot",
@@ -790,7 +790,7 @@
       "object": "dbo.ExportExecutionStream",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionStream.Table.sql",
-      "source_sha256": "893e4c28550d3c3b263de4238786be8eb1452ac1b6870607f5f357da00af630f"
+      "source_sha256": "fd44aedf50d21ca71d0abb92550b60e59bcabe8a882b3c11408618276c6f340a"
     },
     {
       "object": "dbo.ExportJob",
@@ -838,19 +838,19 @@
       "object": "dbo.ExportPreparation",
       "permission": "INSERT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
-      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+      "source_sha256": "aa995b18c4c142f14c82c05c32f84685f1895528d671e6586a3e1fa2385ceb54"
     },
     {
       "object": "dbo.ExportPreparation",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
-      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+      "source_sha256": "aa995b18c4c142f14c82c05c32f84685f1895528d671e6586a3e1fa2385ceb54"
     },
     {
       "object": "dbo.ExportPreparation",
       "permission": "UPDATE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportPreparation.Table.sql",
-      "source_sha256": "e3c6d864a5a69c641dbec91ee44dc8a286c482c2a32bf846d5199778bfbd62e0"
+      "source_sha256": "aa995b18c4c142f14c82c05c32f84685f1895528d671e6586a3e1fa2385ceb54"
     },
     {
       "object": "dbo.ExportPreparationResource",
@@ -881,6 +881,42 @@
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReconciliationProof.Table.sql",
       "source_sha256": "655aefc606f7c27f8764c27d559c9ef6eac74949a1b290ed8ed6a779bc72a736"
+    },
+    {
+      "object": "dbo.ExportReplacementActivation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementActivation.Table.sql",
+      "source_sha256": "79505cae13de9fe7d2c775fdc4a5cac91cfbd91f2c8e75739d70e1aba3c6ecd8"
+    },
+    {
+      "object": "dbo.ExportReplacementDelivery",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementDelivery.Table.sql",
+      "source_sha256": "3a279cf920ba79f495c29cd7241ae951bc6df539502de50e776575b622e8c161"
+    },
+    {
+      "object": "dbo.ExportReplacementDelivery",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementDelivery.Table.sql",
+      "source_sha256": "3a279cf920ba79f495c29cd7241ae951bc6df539502de50e776575b622e8c161"
+    },
+    {
+      "object": "dbo.ExportReplacementPlan",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementPlan.Table.sql",
+      "source_sha256": "36ac537bb5e84a7a7fdd6688924ee8b5e1eaef5320291ab9950b2656410608e8"
+    },
+    {
+      "object": "dbo.ExportReplacementTarget",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementTarget.Table.sql",
+      "source_sha256": "b2366be0790c5a89fc5442b846b590402493ba9d0d4aa33abce075cfa56f11bc"
+    },
+    {
+      "object": "dbo.ExportReplacementVerification",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementVerification.Table.sql",
+      "source_sha256": "7a63ba2f6e828bb4135d462f50c77043a26bfb81f960137bd515c18caeed18ed"
     },
     {
       "object": "dbo.ExportRequestBudget",
@@ -1046,6 +1082,60 @@
       "source_sha256": "5ddd6f6ce142c3a154fc897cc0ea7b139448f1676ef7822b06aaa0d3416f0dfd"
     },
     {
+      "object": "dbo.RecoveryAction",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryAction.Table.sql",
+      "source_sha256": "f933144dae1bfb5a5b9d99aee75effd42fb0eba737559dce040595e69b877a01"
+    },
+    {
+      "object": "dbo.RecoveryAction",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryAction.Table.sql",
+      "source_sha256": "f933144dae1bfb5a5b9d99aee75effd42fb0eba737559dce040595e69b877a01"
+    },
+    {
+      "object": "dbo.RecoveryAction",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryAction.Table.sql",
+      "source_sha256": "f933144dae1bfb5a5b9d99aee75effd42fb0eba737559dce040595e69b877a01"
+    },
+    {
+      "object": "dbo.RecoveryIncident",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryIncident.Table.sql",
+      "source_sha256": "67bf6e2f4e7a30a43edcd556979778b78734e888254f1d15b5ca249c730a571c"
+    },
+    {
+      "object": "dbo.RecoveryIncident",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryIncident.Table.sql",
+      "source_sha256": "67bf6e2f4e7a30a43edcd556979778b78734e888254f1d15b5ca249c730a571c"
+    },
+    {
+      "object": "dbo.RecoveryIncident",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryIncident.Table.sql",
+      "source_sha256": "67bf6e2f4e7a30a43edcd556979778b78734e888254f1d15b5ca249c730a571c"
+    },
+    {
+      "object": "dbo.RecoveryInputDraft",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryInputDraft.Table.sql",
+      "source_sha256": "bb6fea1f948177f80898b75e0e4a31823be5d0a9a0b7c3c6f95b95e463b3868e"
+    },
+    {
+      "object": "dbo.RecoveryInputDraft",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryInputDraft.Table.sql",
+      "source_sha256": "bb6fea1f948177f80898b75e0e4a31823be5d0a9a0b7c3c6f95b95e463b3868e"
+    },
+    {
+      "object": "dbo.RecoveryInputDraft",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RecoveryInputDraft.Table.sql",
+      "source_sha256": "bb6fea1f948177f80898b75e0e4a31823be5d0a9a0b7c3c6f95b95e463b3868e"
+    },
+    {
       "object": "dbo.SCAN_LIST",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.SCAN_LIST.Table.sql",
@@ -1127,7 +1217,7 @@
       "object": "dbo.usp_ExportExecutionStreamTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-      "source_sha256": "6bc8696af9e34cf4bde4e347ca6117eeb641a0cb275c88cc3ba603cc5773fa9b"
+      "source_sha256": "54269a8332bb28c3bf8c3d82d6943727e5f461881a0590ecf412fb42bb8a5e3b"
     },
     {
       "object": "dbo.usp_ExportJobContainTargets",
@@ -1139,25 +1229,43 @@
       "object": "dbo.usp_ExportManualOutputEnrollmentTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportManualOutputEnrollmentTransition.StoredProcedure.sql",
-      "source_sha256": "b8f9df85cb382b043c1672242de58558f6a64b6ef14655988ffa1887782b3563"
+      "source_sha256": "3ebd0dd60b06c50040c917e2414a848c0bb75f8e4ed32665b1db22ac5d3156ad"
     },
     {
       "object": "dbo.usp_ExportOutputEnrollmentTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
-      "source_sha256": "813865c1537ad0be386d4cb26bf57c5bdb4f6b278be8210fe03f746a2ba3efa3"
+      "source_sha256": "4146d6fc8f6b23b4f034ef696b470ab36077573754d78b0c7ac3770f91818487"
     },
     {
       "object": "dbo.usp_ExportProviderRequestEventAppend",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-      "source_sha256": "0f3f0411522d168d3e06e2f62668e8a87ea87b957e1088f7f6064a325a6fc66f"
+      "source_sha256": "ede3e55393138555a3d0309d8bc7c9ef96fc99eaeafd56baf62d3c029aacf968"
     },
     {
       "object": "dbo.usp_ExportReconciliationProofIssue",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
-      "source_sha256": "c78ca8054bba72c6d42da0a8ccdfe7d4707d80e448a7f91b95546fa91d8a52b0"
+      "source_sha256": "6d139f37aaa1614eed28d44da71045e93017de5660c5603ecc52614fb57f315a"
+    },
+    {
+      "object": "dbo.usp_ExportReplacementActivate",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReplacementActivate.StoredProcedure.sql",
+      "source_sha256": "0a4f8b9d522886ebe7101a64047b2e23cd0e9c3c99300b0125de7ab0c688302c"
+    },
+    {
+      "object": "dbo.usp_ExportReplacementPlanCreate",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReplacementPlanCreate.StoredProcedure.sql",
+      "source_sha256": "3b244f93bd532cdaed7208d80cbb21f0be7a061061d11892b4d18f5f1cfe9b35"
+    },
+    {
+      "object": "dbo.usp_ExportReplacementVerificationTransition",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReplacementVerificationTransition.StoredProcedure.sql",
+      "source_sha256": "b5aa13c8835e8ab9a690658ac1bfe61dd9ee0b6dd025d5010cfd2eae6b888ad7"
     },
     {
       "object": "dbo.usp_MarkLogBackupTriggerProcessed",

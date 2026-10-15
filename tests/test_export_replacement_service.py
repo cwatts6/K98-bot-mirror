@@ -25,7 +25,13 @@ def proposal_service(monkeypatch, request):
     monkeypatch.setattr(
         fixture_module,
         "TABLES",
-        (*fixture_module.TABLES, "dbo.ExportReplacementPlan", "dbo.ExportReplacementTarget"),
+        (
+            *fixture_module.TABLES,
+            "dbo.ExportReplacementPlan",
+            "dbo.ExportReplacementTarget",
+            "dbo.ExportReplacementVerification",
+            "dbo.ExportReplacementActivation",
+        ),
     )
     monkeypatch.setattr(
         fixture_module,
@@ -45,7 +51,10 @@ def proposal_service(monkeypatch, request):
     )
     args = dict(
         token=original["token"],
-        replacements={"old-file": "fresh-file"},
+        replacements={
+            old: "fresh-file" if old == "old-file" else "fresh-" + old
+            for old in original["targets"]
+        },
         actor="recovery:" + str(uuid4()),
         reason="Verify fresh output",
     )

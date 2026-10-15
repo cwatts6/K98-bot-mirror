@@ -1535,7 +1535,7 @@ def test_publication_probe_with_no_actual_origins_stops_before_catalogue_or_prov
     coordinator = Mock(execution_evidence=True, output_operations=True)
     coordinator.operator_snapshot.return_value = args["snapshot"]
     streams = Mock(coordinator=coordinator)
-    dal = Mock(read_origins=Mock(return_value=[]))
+    dal = Mock(read_origins=Mock(return_value=[]), read_replacement_origins=Mock(return_value=[]))
     service = PublicationProbe(
         coordinator=coordinator,
         streams=streams,

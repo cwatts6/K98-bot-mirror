@@ -178,6 +178,41 @@ def _private_manual_permissions(value, acl):
         raise SourceConflict("Exact initial private owner/Editor permissions required.")
 
 
+def verify_direct_permission_details(permission, *, owner_email):
+    """Validate supplied Drive details without widening the top-level ACL."""
+    if "permissionDetails" not in permission:
+        return
+    details = permission["permissionDetails"]
+    if not isinstance(details, list) or not 1 <= len(details) <= 4:
+        raise SourceConflict("Direct permission details required.")
+    seen, direct = set(), 0
+    for detail in details:
+        if (
+            not isinstance(detail, dict)
+            or set(detail) != {"permissionType", "role", "inherited"}
+            or detail["permissionType"] != "file"
+            or not isinstance(detail["role"], str)
+            or type(detail["inherited"]) is not bool
+        ):
+            raise SourceConflict("Malformed or unscoped permission details.")
+        entry = (detail["role"], detail["inherited"])
+        if entry in seen:
+            raise SourceConflict("Duplicate permission details.")
+        seen.add(entry)
+        if not detail["inherited"]:
+            if detail["role"] != permission["role"]:
+                raise SourceConflict("Direct role differs from permission.")
+            direct += 1
+        elif (permission.get("type"), permission.get("emailAddress"), permission["role"]) != (
+            "user",
+            owner_email,
+            "owner",
+        ) or detail["role"] not in {"reader", "commenter", "writer"}:
+            raise SourceConflict("Only subordinate same-owner inheritance is allowed.")
+    if direct != 1:
+        raise SourceConflict("Exactly one matching direct grant required.")
+
+
 def _public_manual_permissions(value, acl):
     """Exact link-viewer policy; same-owner inherited roles add no principal."""
     permissions = acl.get("permissions")
@@ -219,36 +254,7 @@ def _public_manual_permissions(value, acl):
             raise SourceConflict("Unexpected discovery flag on user permission.")
         # Drive omits these output-only details for My Drive files. The exact
         # top-level ACL remains mandatory; supplied details must still be safe.
-        if "permissionDetails" in permission:
-            details = permission.get("permissionDetails")
-            if not isinstance(details, list) or not 1 <= len(details) <= 4:
-                raise SourceConflict("Direct permission details required.")
-            seen, direct = set(), 0
-            for detail in details:
-                if (
-                    not isinstance(detail, dict)
-                    or set(detail) != {"permissionType", "role", "inherited"}
-                    or detail["permissionType"] != "file"
-                    or not isinstance(detail["role"], str)
-                    or type(detail["inherited"]) is not bool
-                ):
-                    raise SourceConflict("Malformed or unscoped permission details.")
-                entry = (detail["role"], detail["inherited"])
-                if entry in seen:
-                    raise SourceConflict("Duplicate permission details.")
-                seen.add(entry)
-                if not detail["inherited"]:
-                    if detail["role"] != identity[2]:
-                        raise SourceConflict("Direct role differs from permission.")
-                    direct += 1
-                elif identity != ("user", value["owner_email"], "owner") or detail["role"] not in {
-                    "reader",
-                    "commenter",
-                    "writer",
-                }:
-                    raise SourceConflict("Only subordinate same-owner inheritance is allowed.")
-            if direct != 1:
-                raise SourceConflict("Exactly one matching direct grant required.")
+        verify_direct_permission_details(permission, owner_email=value["owner_email"])
         ids.add(permission_id)
         observed.add(identity)
     if observed != expected:
@@ -258,6 +264,17 @@ def _public_manual_permissions(value, acl):
 def manual_readback(plan, file, responses):
     metadata, acl, sheet, cells = responses
     value = plan.value()
+    if acl.get("nextPageToken"):
+        raise SourceConflict("Complete manual permissions required.")
+    if value["version"] == 3:
+        _public_manual_permissions(value, acl)
+    else:
+        _private_manual_permissions(value, acl)
+    verify_blank_workbook(value, file, metadata, sheet, cells)
+
+
+def verify_blank_workbook(value, file, metadata, sheet, cells):
+    """Owner, metadata and full blank-grid checks; caller verifies the ACL separately."""
     if (
         metadata.get("id") != file["file_id"]
         or metadata.get("mimeType") != "application/vnd.google-apps.spreadsheet"
@@ -266,13 +283,8 @@ def manual_readback(plan, file, responses):
         or metadata.get("owners") != [{"emailAddress": value["owner_email"]}]
         or metadata.get("appProperties", {})
         or metadata.get("description", "")
-        or acl.get("nextPageToken")
     ):
         raise SourceConflict("Manual owner or file metadata differs.")
-    if value["version"] == 3:
-        _public_manual_permissions(value, acl)
-    else:
-        _private_manual_permissions(value, acl)
     sheets = sheet.get("sheets")
     if (
         sheet.get("spreadsheetId") != file["file_id"]

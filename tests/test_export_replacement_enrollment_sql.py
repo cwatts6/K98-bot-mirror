@@ -21,7 +21,8 @@ def replacement_enrollment(monkeypatch, request):
     monkeypatch.setattr(
         fixture_module,
         "TABLES",
-        (*fixture_module.TABLES, "dbo.ExportReplacementPlan", "dbo.ExportReplacementTarget"),
+        (*fixture_module.TABLES, "dbo.ExportReplacementPlan", "dbo.ExportReplacementTarget",
+         "dbo.ExportReplacementVerification", "dbo.ExportReplacementActivation"),
     )
     monkeypatch.setattr(
         fixture_module,

@@ -6,6 +6,7 @@ and never establish that an unknown write succeeded or stopped.
 """
 
 from copy import deepcopy
+import hashlib
 import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
@@ -121,3 +122,43 @@ def replacement_registration(registration, *, targets, replacements, replacement
         mapping=dict(sorted(mapping.items())),
         pool_registration=pool_document,
     )
+
+
+def verified_registration(proposal, files):
+    """Resolve fresh-grid collisions without changing queries, data or policies."""
+    projected = deepcopy(proposal)
+    if {f["file_id"] for f in files} != set(proposal["mapping"].values()) or len(files) != len(
+        proposal["mapping"]
+    ):
+        raise SourceConflict("Complete verified file descriptors required for activation.")
+    if projected["pool_registration"] is None:
+        scopes = projected["registration"]["legacy_configuration"]
+        for file in files:
+            # The original default worksheet can remain as an unused blank tab.
+            # Route an identically named output to it; move conflicting IDs to
+            # unused integers consistently across both legacy consumers.
+            configured = {}
+            for kind in ("scan_data", "all_kvk"):
+                tabs = scopes[kind].get("grid_ids", {}).get(file["file_id"], {})
+                for title, grid_id in tabs.items():
+                    if title in configured and configured[title] != grid_id:
+                        raise SourceConflict("Shared legacy tab registrations disagree.")
+                    configured[title] = grid_id
+            configured[file["title"]] = file["sheet_id"]
+            used = set(configured.values())
+            for title in sorted(configured):
+                if title != file["title"] and configured[title] == file["sheet_id"]:
+                    candidate = (
+                        int.from_bytes(hashlib.sha256(title.encode()).digest()[:4], "big")
+                        & 0x7FFFFFFF
+                    )
+                    while candidate in used:
+                        candidate = (candidate + 1) & 0x7FFFFFFF
+                    configured[title] = candidate
+                    used.add(candidate)
+            for kind in ("scan_data", "all_kvk"):
+                if file["file_id"] in scopes[kind]["destinations"]:
+                    scopes[kind].setdefault("grid_ids", {})[file["file_id"]] = deepcopy(configured)
+    effective = RuntimeRegistration(projected["registration"])
+    projected["registration_sha256"] = effective.fingerprint
+    return projected

@@ -375,7 +375,15 @@ class ExportCoordinationDAL:
                 raise SourceConflict("Export intent has no retained configuration members.")
             require_current_export_weights(cursor, intent, vector)
 
-    def enqueue(self, spec, *, preparation_id=None, _cursor=None, _repair_plan=None):
+    def enqueue(
+        self,
+        spec,
+        *,
+        preparation_id=None,
+        _cursor=None,
+        _repair_plan=None,
+        _replacement_original=None,
+    ):
         if not isinstance(spec, JobSpec):
             raise ValueError("Validated immutable job specification required.")
         with self._account(spec.account) if _cursor is None else nullcontext(_cursor) as cursor:
@@ -468,6 +476,21 @@ class ExportCoordinationDAL:
                     epoch=spec.epoch,
                     destinations=spec.destinations,
                 )
+                cursor.execute(
+                    "SELECT a.ActivationID,c.JobID FROM dbo.ExportReplacementActivation a "
+                    "JOIN dbo.ExportReplacementPlan p ON p.ReplacementID=a.ReplacementID "
+                    "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
+                    "WHERE a.NewPoolID=? AND NOT EXISTS (SELECT 1 FROM dbo.ExportReplacementDelivery d WHERE d.ActivationID=a.ActivationID)",
+                    pool["PoolID"],
+                )
+                initial = one(cursor)
+                if initial is not None and (
+                    _replacement_original is None
+                    or identity(initial["JobID"]) != _replacement_original["JobID"]
+                ):
+                    raise SourceConflict(
+                        "Use the guided initial replacement publication before queuing new reports."
+                    )
                 proof = json.loads(spec.provenance).get("output_preflight", {})
                 if (
                     proof.get("pool_id"),
@@ -498,13 +521,28 @@ class ExportCoordinationDAL:
                 intent, vector = read_export_intent(cursor, spec.intent_id)
                 from kvk.dal.source_weight_dal import require_current_export_weights
 
-                require_current_export_weights(cursor, intent, vector)
+                if _replacement_original is None:
+                    require_current_export_weights(cursor, intent, vector)
+                elif (
+                    _cursor is None
+                    or spec.repair_id is not None
+                    or identity(_replacement_original["IntentID"]) != spec.intent_id
+                    or _replacement_original["InputHash"] != spec.input_hash.hex()
+                    or _replacement_original["ConsumerKind"] != "new_source"
+                    or _replacement_original["AccountKey"] != spec.account
+                ):
+                    raise SourceConflict(
+                        "Exact isolated original intent required for retained-input publication."
+                    )
                 if (
                     intent["KVK_NO"] != spec.kvk_no
                     or bytes(intent["VectorHash"]) != spec.input_hash
                 ):
                     raise SourceConflict("Job differs from its sealed export vector.")
-                if intent["IntentState"] in {"blocked", "coalesced"}:
+                if (
+                    intent["IntentState"] in {"blocked", "coalesced"}
+                    and _replacement_original is None
+                ):
                     raise SourceConflict("Intent is not eligible for materialization.")
             for key in spec.resource_keys:
                 _mutex(cursor, key)
@@ -557,6 +595,7 @@ class ExportCoordinationDAL:
                 "SELECT * FROM dbo.ExportJob WITH (UPDLOCK,HOLDLOCK) WHERE AccountKey=? "
                 "AND ConsumerKind='new_source' AND State IN ('waiting','ready') "
                 "AND KVK_NO=? AND DestinationSetHash=? AND PoolEpoch=? AND RepairID IS NULL "
+                "AND JSON_VALUE(ProvenanceJson,'$.replacement.original_job_id') IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM dbo.ExportAttempt a WHERE a.JobID=ExportJob.JobID)",
                 spec.account,
                 spec.kvk_no,
@@ -645,7 +684,7 @@ class ExportCoordinationDAL:
         missing_registration = False
         if self.output_operations:
             cursor.execute(
-                "SELECT p.* FROM KVK.SourceOutputPool p JOIN KVK.SourceExportIntent i ON i.KVK_NO=p.ActiveKVK AND i.SourceKey=p.SourceKey AND i.ChoiceID=p.ChoiceID WHERE i.IntentID=? AND p.PoolState IN ('active','closing','blocked') ORDER BY p.RegistrationNo",
+                "SELECT p.* FROM KVK.SourceOutputPool p JOIN KVK.SourceExportIntent i ON i.KVK_NO=p.ActiveKVK AND i.SourceKey=p.SourceKey AND i.ChoiceID=p.ChoiceID WHERE i.IntentID=? AND p.RetiredByReplacementID IS NULL AND p.PoolState IN ('active','closing','blocked') ORDER BY p.RegistrationNo",
                 intent_id,
             )
             registered = rows(cursor)

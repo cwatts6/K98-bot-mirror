@@ -6,11 +6,17 @@ from services.export_coordination_dal import identity
 
 
 class ExportRecoveryDAL:
-    def __init__(self, connect, *, registration):
+    def __init__(self, connect, *, registration, history=()):
         self.connect, self.registration = connect, registration
         config = registration.value()
         self.account, self.storage_owner = config["account"], config["storage_owner"]
-        self.pools = {p["pool_id"]: p for p in config["pools"]}
+        self.history = tuple(history) or (registration,)
+        if any(
+            (r.value()["account"], r.value()["storage_owner"]) != (self.account, self.storage_owner)
+            for r in self.history
+        ):
+            raise SourceConflict("Recovery history crosses registered account or custody.")
+        self.pools = {p["pool_id"]: p for r in self.history for p in r.value()["pools"]}
         self.destinations = {
             digest(sorted([p["index_file_id"], *p["slot_file_ids"]])): frozenset(
                 [
@@ -19,7 +25,7 @@ class ExportRecoveryDAL:
                     *("destination:" + f for f in p["slot_file_ids"]),
                 ]
             )
-            for p in config["pools"]
+            for p in self.pools.values()
         }
         # New-source rows have no spool/storage owner by their SQL contract.
         # Only exact destination sets from THIS storage owner's protected runtime
