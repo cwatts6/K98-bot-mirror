@@ -290,6 +290,13 @@ class SourceExportOperatorService:
 
     @bound_runtime
     def preview_rebuild(self, actor, job_id, *, reason):
+        return self._preview(
+            actor, "export_rebuild", self.prepare_rebuild(actor, job_id, reason=reason)
+        )
+
+    @bound_runtime
+    def prepare_rebuild(self, actor, job_id, *, reason):
+        """Build the same fresh authorised plan for previews and durable recovery."""
         self.authorize(actor, "export_rebuild")
         if not reason or not reason.strip() or len(reason.encode("utf-16-le")) > 2048:
             raise ValueError("A bounded repair reason is required.")
@@ -332,18 +339,14 @@ class SourceExportOperatorService:
             parts=result.current_parts,
             required_files=result.required_files,
         )
-        return self._preview(
-            actor,
-            "export_rebuild",
-            dict(
-                snapshot=snapshot,
-                proof=proof,
-                actor=str(actor.user_id),
-                guild=str(actor.guild_id),
-                channel=str(actor.channel_id),
-                reason=reason.strip(),
-                output_preflight=preflight,
-            ),
+        return dict(
+            snapshot=snapshot,
+            proof=proof,
+            actor=str(actor.user_id),
+            guild=str(actor.guild_id),
+            channel=str(actor.channel_id),
+            reason=reason.strip(),
+            output_preflight=preflight,
         )
 
     @staticmethod

@@ -271,6 +271,10 @@ class ExportRuntime(RuntimeLifetime):
         )
         super().__init__(legacy)
         self.reconciler = AuthorityReconciler(client)
+        from services.export_recovery_dal import ExportRecoveryDAL
+        from services.export_recovery_service import ExportRecoveryAdapter, RolloverRecoveryAdapter
+
+        recovery_discovery = ExportRecoveryDAL(connect, registration=registration)
         budget = lambda account: RequestBudget(self.dal, account)
         self.rollover = SourceOutputPoolService(
             self.pools,
@@ -300,6 +304,29 @@ class ExportRuntime(RuntimeLifetime):
             weight_refresher=lambda season: refresh_season_weights(
                 connect, season, require_current=True
             ),
+        )
+
+        def rebuild_plan(job_id, reason):
+            import bot_config
+            from services.recovery_service import RecoveryActor
+
+            return self.operator.prepare_rebuild(
+                RecoveryActor(
+                    bot_config.ADMIN_USER_ID, bot_config.GUILD_ID, bot_config.NOTIFY_CHANNEL_ID
+                ),
+                job_id,
+                reason=reason,
+            )
+
+        legacy.recovery_adapters = (
+            ExportRecoveryAdapter(
+                recovery_discovery,
+                self.dal,
+                self.reconciler,
+                retirement=recovery,
+                rebuild_plan=rebuild_plan,
+            ),
+            RolloverRecoveryAdapter(recovery_discovery, self.pools, self.reconciler),
         )
         legacy_adapter = LegacyProviderJob(
             lambda _: recorded_clients(),

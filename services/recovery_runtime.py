@@ -35,6 +35,8 @@ def recovery_service():
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter}
+        for export_adapter in getattr(runtime, "recovery_adapters", ()):
+            adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:
             from services.config_preparation_recovery_dal import ConfigPreparationRecoveryDAL
             from services.config_read_recovery_adapter import ConfigReadRecoveryAdapter

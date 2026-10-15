@@ -8,9 +8,9 @@ The programme remains incomplete until every workstream and acceptance gate belo
 | Package | Priority | Status | Acceptance |
 | --- | --- | --- | --- |
 | Durable incidents and guided actions; SQL import settlement vertical | P0 | Draft Bot PR 331 / SQL PR 108 | Proactive discovery, persistent alert entry, fresh authorised preview/confirm, durable action identity, postcondition verification; restart/concurrency tests |
-| Contested access and abandoned read ownership | P0 | Implementing | Proven-safe automatic release, exact-owner fencing, incident buttons, eligible work resumes |
-| Unknown spreadsheet writes, exports and rollover | P0 | Required | Mutation-specific reconciliation, verified completion/continuation or guided containment, no blind replay or unsafe unlock |
-| Committed import checkpoint/capture and partial processing | P0 | Implementing | Resume remaining stages without replaying committed import; explicit partial-result choice |
+| Contested access and abandoned read ownership | P0 | Draft Bot PR 332 / SQL PR 109; incomplete-journal/closure paths still required | Proven-safe automatic release, exact-owner fencing, incident buttons, eligible work resumes |
+| Unknown spreadsheet writes, exports and rollover | P0 | Guided verified-outcome slice implementing; unknown-mutation containment still required | Mutation-specific reconciliation, verified completion/continuation or guided containment, no blind replay or unsafe unlock |
+| Committed import checkpoint/capture and partial processing | P0 | Draft Bot PR 333; all-KVK/missing-output paths still required | Resume remaining stages without replaying committed import; explicit partial-result choice |
 | Discord deliveries and domain publication | P1 | Required | Existing-post reconciliation, guided missing-post repair, expired-reminder policy; Ark/MGE/voting/calendar coverage |
 | Files, archives, caches and queues | P1 | Required | Identity-checked continuation, conflicting-file preservation, no duplicate timeout fallback |
 | Monitor health, outage recovery and complete write inventory | P1 | Required | Independent outage detection, guided host recovery, every enabled write path classified and covered |
@@ -74,3 +74,28 @@ bytes and idempotent queue admission; provider delivery remains a distinct incid
 Temporary-table engine tests cover those interruption points, active original sessions,
 stale claims and changed output. All-KVK generation recovery and unverifiable or missing
 output still require their guided workflows before the programme can be complete.
+
+## Focused publication and export recovery checkpoint
+
+The read slice is [Bot PR 332](https://github.com/cwatts6/K98-bot-mirror/pull/332)
+and [SQL PR 109](https://github.com/cwatts6/K98-bot-SQL-Server/pull/109).
+The committed scan-data capture slice is
+[Bot PR 333](https://github.com/cwatts6/K98-bot-mirror/pull/333). Its full suite passed
+7,799 tests, with 113 skipped and the same existing absent command-governance workflow
+failure. Both final Changes reviews are sealed and read back; the draft-schema finalization
+error was corrected on the original scan without replacing it.
+
+The next focused export slice connects account/storage/registered-pool scoped discovery to
+the existing recovery centre. It provides pre-attempt retry, authority-verified publication
+settlement, verified interrupted-retirement continuation, completed-rollover settlement and
+proven-damage rebuild. Each uses durable action identity, fresh registration and evidence,
+existing exact-version SQL transitions and independent receipt verification. A queued repair
+resolves repair admission only; its delivery remains separately monitored. Existing unknown
+mutation proofs cannot be overridden by a button or admin assertion. No new persistent SQL
+objects are introduced in this slice; authoritative schemas are used in temporary-table tests.
+
+Still required before P0 completion: legacy unknown writes, absent attempted-publication retry,
+damaged-index/unknown-write containment and registration replacement, earlier rollover phases,
+incomplete private journal/child closure recovery, all-KVK generation and missing/unverifiable
+output. P1 and integrated alert-to-resolution acceptance also remain required. These entries
+are implementation obligations, not deferred optimisation or claims of completed coverage.
