@@ -995,10 +995,30 @@ class WindowsProviderChild:
         # It is historical positive termination evidence, never a fresh OS probe.
         self.termination_evidence = dict(evidence)
         self.terminated = True
-        for handle in (self.thread, self.process, self.job, self.pipe.handle):
-            if handle is not None:
-                handle.Close()
+        self.retry_handle_cleanup()
         return evidence
+
+    def retry_handle_cleanup(self):
+        """Retry only handle disposal after positive termination, never termination proof."""
+        if not self.terminated or self.termination_evidence is None:
+            raise HostBoundaryError("No observed termination for handle cleanup.")
+        failure = None
+        for owner, name in (
+            (self, "thread"),
+            (self, "process"),
+            (self, "job"),
+            (self.pipe, "handle"),
+        ):
+            handle = getattr(owner, name)
+            if handle is not None:
+                try:
+                    handle.Close()
+                except Exception as exc:
+                    failure = exc
+                else:
+                    setattr(owner, name, None)
+        if failure is not None:
+            raise HostBoundaryError("Terminated child handle cleanup is incomplete.") from failure
 
 
 class WindowsExecutionHost:

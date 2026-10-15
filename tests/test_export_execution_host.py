@@ -594,3 +594,33 @@ def test_live_windows_containment_is_a_separate_operation():
     finally:
         if not child.terminated:
             child.terminate_and_observe()
+
+
+def test_terminated_child_cleanup_attempts_every_handle_and_retries_only_failed_ones():
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from core.export_execution_host import HostBoundaryError, WindowsProviderChild
+
+    handles = [Mock() for _ in range(4)]
+    handles[0].Close.side_effect = [OSError("temporary close failure"), None]
+    child = WindowsProviderChild(
+        identity="child",
+        process=handles[1],
+        thread=handles[0],
+        job=handles[2],
+        pid=17,
+        pipe=SimpleNamespace(handle=handles[3]),
+        sid="sid",
+        api={},
+    )
+    child.terminated = True
+    child.termination_evidence = dict(child_id="child", job_empty=True, process_signaled=True)
+    with pytest.raises(HostBoundaryError, match="cleanup"):
+        child.retry_handle_cleanup()
+    assert [h.Close.call_count for h in handles] == [1, 1, 1, 1]
+    assert child.process is child.job is child.pipe.handle is None
+    child.retry_handle_cleanup()
+    assert [h.Close.call_count for h in handles] == [2, 1, 1, 1]
+    assert child.thread is None
+    assert child.termination_evidence["process_signaled"]

@@ -329,6 +329,8 @@ class ExportExecutionAuthority:
                     stream.version = row["Version"]
                 if stream.termination_evidence is None:
                     self._terminate_child(stream)
+                elif callable(getattr(stream.child, "retry_handle_cleanup", None)):
+                    stream.child.retry_handle_cleanup()
                 last_sequence, event_digest = self.dal.stream_digest(stream_id)
                 document = {
                     "stream_id": stream_id,
