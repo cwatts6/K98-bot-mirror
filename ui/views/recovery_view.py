@@ -150,6 +150,10 @@ class RecoveryIncidentView(discord.ui.View):
         self.row = row
         delivery = row["evidence"].get("delivery") or {}
         links_to_jobs = []
+        if row["evidence"].get("evidence_recovery_job_id"):
+            links_to_jobs.append(
+                ("Recover replacement check", row["evidence"]["evidence_recovery_job_id"])
+            )
         if delivery.get("job_id"):
             links_to_jobs.append(("Review replacement export", delivery["job_id"]))
         blockers = row["evidence"].get("blocking_job_ids", [])

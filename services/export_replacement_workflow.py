@@ -8,6 +8,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
+from services.export_replacement_check_recovery import inspect_read_check
 from services.export_replacement_input import replacement_fields, replacement_input
 
 
@@ -55,9 +56,6 @@ class ReplacementWorkflow:
         }
         if proposals:
             result["proposal"] = self.proposals.inspect(proposals[-1])
-            checks = self.verification.dal.list_for_plan(proposals[-1], account=self.account)
-            if checks:
-                result["check"] = self.verification.inspect(checks[-1])
             activated = [
                 r
                 for r in self.activation.dal.chain(self.account)
@@ -65,6 +63,13 @@ class ReplacementWorkflow:
             ]
             if len(activated) > 1:
                 raise SourceConflict("The original job has conflicting replacement activations.")
+            checks = self.verification.dal.list_for_plan(proposals[-1], account=self.account)
+            if checks:
+                result["check"] = (
+                    self.verification.inspect(checks[-1])
+                    if activated
+                    else inspect_read_check(self.verification, checks[-1])
+                )
             if activated:
                 result["activation"] = self.activation.verify(activated[0], self.registration)
                 result["delivery"] = self.continuation.inspect(job_id, result["activation"])
@@ -171,6 +176,19 @@ class ReplacementWorkflow:
                     "Check replacement files",
                     "Confirm the proposed files are ready for read-only owner, sharing and content verification.",
                     "Start one bounded read-only check of the complete proposed set. Its durable identity prevents a duplicate check after a lost reply.",
+                )
+            if checked is not None and checked["state"] == "unverifiable":
+                stage = "replacement_recheck_required"
+                explanation = (
+                    "The saved replacement check can no longer be verified. Its typed read ledger "
+                    "is settled and owns no reservations. Run a fresh check of the proposed files, "
+                    "or enter different files. The lost result remains unverified in the history; "
+                    "only a complete new readback can authorize activation."
+                )
+                actions["verify_replacements"] = choice(
+                    "Run fresh read check",
+                    "Confirm these replacement files are still intended. Keep them unchanged while the bot checks owner, sharing, configuration where applicable and output contents again.",
+                    "Create a new durable read attempt and verify its complete private journal. Do not replay the old uncertain write, restore a missing result or release any existing owner.",
                 )
         evidence = dict(
             title="Unknown-write replacement recovery",
@@ -297,7 +315,7 @@ class ReplacementWorkflow:
                     )
                 return "verified"
         if kind == "verify_replacements":
-            checked = self.verification.inspect(key)
+            checked = inspect_read_check(self.verification, key)
             if checked is not None:
                 if (
                     state["proposal"] is None

@@ -103,6 +103,28 @@ class EvidenceCatalogDAL:
     def _parameters(self):
         return [self.account] * CATALOG.count("?")
 
+    def replacement_check(self, reference):
+        """Locate a check from its terminal receipt or private read journal."""
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT DISTINCT v.VerificationID,c.JobID FROM dbo.ExportReplacementVerification v "
+                "JOIN dbo.ExportReplacementPlan p ON p.ReplacementID=v.ReplacementID "
+                "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
+                "AND c.AccountKey=p.AccountKey "
+                "LEFT JOIN dbo.ExportExecutionStream s ON s.PreparationID=v.PreparationID "
+                "AND s.AccountKey=p.AccountKey WHERE p.AccountKey=? AND (v.ReceiptReference=? "
+                "OR s.ClosureReference=? "
+                "OR EXISTS(SELECT 1 FROM dbo.ExportProviderRequest r WHERE r.StreamID=s.StreamID "
+                "AND (r.PayloadReference=? OR EXISTS(SELECT 1 FROM dbo.ExportProviderRequestEvent e "
+                "WHERE e.RequestID=r.RequestID AND e.EvidenceReference=?))))",
+                self.account,
+                *([identity(reference)] * 4),
+            )
+            found = rows(cursor)
+        if len(found) != 1:
+            raise SourceConflict("One exact replacement check is required for fresh verification.")
+        return {key: identity(value) for key, value in found[0].items()}
+
     def page(self, after=None):
         after = identity(after) if after is not None else None
         with transaction(self.connect) as cursor:

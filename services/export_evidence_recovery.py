@@ -21,6 +21,8 @@ class EvidenceRecovery:
         copies = self.copies.inspect(reference, bytes.fromhex(binding["sha256"]))
         good = {key for key, value in copies.items() if value["state"] == "verified"}
         actions = {}
+        replacement = None
+        resolved = len(good) == 2
         if len(good) == 2:
             outcome = "verified"
             explanation = "Both protected evidence copies match the original saved hash. Normal recovery will verify the operation separately; restoring evidence does not establish write success."
@@ -40,6 +42,26 @@ class EvidenceRecovery:
         else:
             outcome = "backup_required"
             explanation = "Neither protected evidence copy verifies. The original operation remains unresolved. Exact backup restoration or a separately verified superseding recovery is required; confirmation alone cannot recreate this receipt."
+            if set(binding["kinds"]) <= {
+                "replacement verification",
+                "stream closure",
+                "request payload",
+                "request event",
+            }:
+                from services.export_evidence_replacement import replacement_check_recovery
+
+                try:
+                    replacement = replacement_check_recovery(self.broker, self.catalog, reference)
+                except SourceConflict:
+                    pass  # Never bypass a missing active-history or proposal commitment.
+                if replacement is not None:
+                    resolved = replacement["successor_check_id"] is not None
+                    outcome = "superseded_read" if resolved else "fresh_read_required"
+                    explanation = (
+                        "A separate replacement check has independently verified the complete new readback. The lost read result remains unverified in the audit history. This resolves its recovery dependency, not the original unknown write or publication."
+                        if resolved
+                        else "The old read attempt is settled and holds no reservations, but its result cannot be verified. Use Recover replacement check below for the guided fresh read check or new file choices. Activation still requires a complete new verified journal."
+                    )
         evidence = dict(
             title="Private recovery evidence",
             outcome=outcome,
@@ -49,10 +71,16 @@ class EvidenceRecovery:
             evidence_kinds=binding["kinds"],
             copies={key: value["state"] for key, value in copies.items()},
         )
+        if replacement is not None:
+            evidence.update(
+                evidence_recovery_job_id=replacement["job_id"],
+                lost_check_id=replacement["lost_check_id"],
+                successor_check_id=replacement["successor_check_id"],
+            )
         return dict(
             evidence=evidence,
-            token=digest(dict(binding=binding, copies=copies)).hex(),
-            resolved=len(good) == 2,
+            token=digest(dict(binding=binding, copies=copies, replacement=replacement)).hex(),
+            resolved=resolved,
         )
 
     def dispatch(self, message):
@@ -131,7 +159,7 @@ class EvidenceRecoveryAdapter:
     def reconcile(self, source_id, action):
         evidence, token, resolved = self.inspect(source_id)
         if resolved:
-            return "verified"
+            return "not_applied" if evidence["outcome"] == "superseded_read" else "verified"
         if token != action["EvidenceHash"] or action["ActionKind"] not in evidence["actions"]:
             # Repair is exact-byte and idempotent. Partial local restoration may
             # be reviewed afresh, but can never author an operation-success proof.
