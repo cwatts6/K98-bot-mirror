@@ -52,6 +52,18 @@ def incident_embed(row):
     if evidence.get("season") is not None:
         embed.add_field(name="KVK season", value=str(evidence["season"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
+    if evidence.get("evidence_reference"):
+        embed.add_field(
+            name="Affected evidence", value=evidence["evidence_reference"], inline=False
+        )
+        embed.add_field(
+            name="Used for", value=", ".join(evidence["evidence_kinds"])[:1024], inline=False
+        )
+        embed.add_field(
+            name="Verified copy checks",
+            value="\n".join(f"{key.title()}: {value}" for key, value in evidence["copies"].items()),
+            inline=False,
+        )
     if evidence.get("check_unavailable"):
         embed.add_field(
             name="Verification unavailable",

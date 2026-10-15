@@ -118,7 +118,12 @@ def test_failed_check_remains_degraded_across_pages_and_empty_reset(monkeypatch)
 
     failed = set()
     pages = iter(
-        [[{"IncidentID": "failed"}], [{"IncidentID": "healthy"}], [], [{"IncidentID": "failed"}]]
+        [
+            [{"IncidentID": "failed", "SourceKind": "stats_import"}],
+            [{"IncidentID": "healthy", "SourceKind": "stats_import"}],
+            [],
+            [{"IncidentID": "failed", "SourceKind": "stats_import"}],
+        ]
     )
     restored = False
 

@@ -565,9 +565,13 @@ class PrivateEvidenceStore:
         if self._unprotect(self._store.read(receipt)) != data:
             raise HostBoundaryError("Evidence encryption readback differs.")
         # SQL stores plaintext hash and opaque UUID. The file remains encrypted.
-        return SnapshotReceipt(
+        result = SnapshotReceipt(
             receipt.key, len(data), hashlib.sha256(data).hexdigest(), receipt.storage_owner
         )
+        from services.export_evidence_storage import EvidenceCopies
+
+        EvidenceCopies(self).retain_replica(result)
+        return result
 
     def read(self, receipt):
         path = self._store._path(receipt.key)

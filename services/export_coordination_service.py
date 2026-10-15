@@ -262,11 +262,9 @@ def register_exports(task_monitor, *, factory=None):
     if task_monitor.is_running("export_coordination"):
         return _worker
     if factory is None:
-        try:
-            configured_coordinator()
-        except SourceConflict:
-            logger.warning("Export admission disabled: protected S11 runtime is unavailable.")
-            return None
+        # Register supervision even when protected admission is still recovering.
+        # The worker retries the factory without admitting or retaining a service
+        # until configured_runtime() has independently verified readiness.
         factory = configured_coordinator
     _loop = asyncio.get_running_loop()
     _worker = ExportWorker(factory)

@@ -17,6 +17,7 @@ from services.export_execution_authority import ExecutionUncertain
 from services.export_execution_protocol import ProviderRequest, uuid_text
 
 _installed = None
+_recovery_bundle = None
 _installing = False
 _runtime_stopped = False
 _installation_lock = threading.RLock()
@@ -146,6 +147,31 @@ def configured_runtime():
         return _installed
 
 
+@contextmanager
+def recovery_caller_scope():
+    """Use the verified base packet only for evidence repair while admission is shut."""
+    from services.legacy_export_snapshot_service import caller_runtime
+
+    with _installation_lock:
+        bundle = _recovery_bundle if _installed is None and not _runtime_stopped else None
+    if bundle is None:
+        with caller_runtime() as runtime:
+            yield runtime
+    else:
+        with bundle.owned():
+            yield bundle.legacy
+
+
+def retry_recovery_admission():
+    with _installation_lock:
+        retry = _installed is None and _recovery_bundle is not None and not _runtime_stopped
+    if retry:
+        install_configured_runtime()
+        from services.export_coordination_service import wake_exports
+
+        wake_exports()
+
+
 def validate_caller_context(runtime):
     call = _caller.get()
     if call is not None:
@@ -196,13 +222,15 @@ def stop_runtime_admission():
         _runtime_stopped = True
         if _installed is not None:
             _installed.stop()
+        if _recovery_bundle is not None and _recovery_bundle is not _installed:
+            _recovery_bundle.stop()
 
 
 async def drain_runtime():
     from services.legacy_export_snapshot_service import drain_thread
 
     with _installation_lock:
-        bundle = _installed
+        bundle = _installed or _recovery_bundle
     if bundle is not None:
         await drain_thread(bundle.drain)
 
@@ -397,6 +425,9 @@ class ExportRuntime(RuntimeLifetime):
             ReplacementRecoveryAdapter(legacy.recovery_adapters[0], runtime=self, store=store),
             legacy.recovery_adapters[1],
         )
+        from services.export_evidence_recovery import EvidenceRecoveryAdapter
+
+        legacy.recovery_adapters += (EvidenceRecoveryAdapter(client),)
         self.coordinator = ExportCoordinator(
             self.dal,
             adapters={
@@ -772,7 +803,7 @@ def install_configured_runtime():
 
     if not bot_config.EXPORT_COORDINATION_ENABLED:
         return None
-    global _installed, _installing
+    global _installed, _installing, _recovery_bundle
     with _installation_lock:
         if _runtime_stopped:
             raise SourceConflict("A stopped runtime cannot be activated in this process.")
@@ -783,7 +814,18 @@ def install_configured_runtime():
         _installing = True
     try:
         # No event-loop caller waits on a lock held across filesystem, SQL or IPC.
-        bundle = _prepare_configured_runtime()
+        bundle = _recovery_bundle or _prepare_configured_runtime()
+        if isinstance(bundle, ExportRuntime) and _installed is None:
+            bundle.legacy.recovery_only = True
+        with _installation_lock:
+            if _runtime_stopped:
+                bundle.stop()
+                raise SourceConflict("Shutdown closed admission during runtime readiness.")
+            _recovery_bundle = bundle
+        if isinstance(bundle, ExportRuntime):
+            with bundle.reconfigure():
+                bundle.refresh_replacement_registration()
+                bundle.legacy.recovery_only = False
         with _installation_lock:
             if _runtime_stopped:
                 bundle.stop()
@@ -962,7 +1004,6 @@ def _prepare_configured_runtime():
         application_sql_contract=config["application_sql_contract"],
         sql_profile=config["sql_contract"]["profile"],
     )
-    bundle.refresh_replacement_registration()
     return bundle
 
 
@@ -2585,6 +2626,26 @@ class AuthorityClient:
 
     def inspect_configuration_recovery(self, preparation_id):
         return self._configuration_recovery("inspect_configuration_recovery", preparation_id)
+
+    def evidence_recovery(self, operation, **values):
+        result = self._invoke(
+            dict(version=1, action="evidence_recovery", operation=operation, **values)
+        )
+        if operation == "pending":
+            if not isinstance(result, list) or len(result) > 100:
+                raise ExecutionUncertain("Evidence inventory acknowledgement differs.")
+            for reference in result:
+                uuid_text(reference)
+        elif (
+            not isinstance(result, dict)
+            or set(result) != {"evidence", "token", "resolved"}
+            or type(result["resolved"]) is not bool
+            or not isinstance(result["token"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
+            or not isinstance(result["evidence"], dict)
+        ):
+            raise ExecutionUncertain("Evidence recovery acknowledgement differs.")
+        return result
 
     def inspect_target_recovery(self, job_id):
         return self._target_recovery("inspect_target_recovery", job_id)
