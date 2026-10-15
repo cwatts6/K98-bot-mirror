@@ -1,5 +1,36 @@
 # Guided recovery delivery
 
+## Lost proposal recovery checkpoint — 2026-10-16
+
+Read-evidence supersession is published as draft Bot PR #350, stacked on the
+private-evidence restoration PR #349. The next `codex/guided-proposal-loss` slice
+provides the full guided path for a lost or corrupt unactivated proposal receipt:
+proactive evidence incident, **Recover replacement**, **Discard unfinished read**
+when needed, **Re-enter replacement links**, fresh verification, activation and
+retained-input publication. Original approval and read results remain unverified.
+Activated evidence cannot use this shortcut; active-history recovery remains P0.
+
+All 15 proposal-loss temporary-SQL tests pass, covering both lost copies, combined
+proposal/read loss, restart, stale/foreign confirmation, lost discard replies,
+lost discard receipts, earlier damaged receipts, invalid ledger/ownership/mapping,
+the actual ephemeral admin button and complete publication. The earlier affected
+run had 43 passes and three incorrect exception expectations; those expectations
+are corrected in the passing 15-test run. Another 71 admin/recovery/notification
+tests pass with operational logs unchanged. Architecture, deferred-item,
+security-routing, Ruff, Black, synthetic smoke imports and command registration
+pass. The previous 8,115-pass standard suite is retained; this bounded follow-up
+uses focused regression validation.
+
+Changes review `91eb0a8b-2355-45a8-9087-9b36b37d8fba` for
+`99b4b369..02ba51c4` reviewed all six changed source files. Its draft initially used
+an unsupported coverage disposition; the final semantic draft was corrected and
+accepted before successful completion on the same scan. The ordinary pending-
+discard correctness issue found during review is fixed in `bd9234f6`; correction
+review `c23b9241-ed76-4da4-a68b-b27128e8c8c6` covers its one source file. Both scans
+sealed successfully with no reported security findings and their results were
+read back. No new SQL schema, persistent installation or production/provider
+execution was performed. P0 remains active; no recovery workstream is deferred.
+
 Approved 2026-10-15. This is active delivery scope, not deferred optimisation.
 The programme remains incomplete until every workstream and acceptance gate below is satisfied.
 

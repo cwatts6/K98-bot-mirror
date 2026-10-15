@@ -152,7 +152,10 @@ class RecoveryIncidentView(discord.ui.View):
         links_to_jobs = []
         if row["evidence"].get("evidence_recovery_job_id"):
             links_to_jobs.append(
-                ("Recover replacement check", row["evidence"]["evidence_recovery_job_id"])
+                (
+                    row["evidence"].get("evidence_recovery_label", "Recover replacement check"),
+                    row["evidence"]["evidence_recovery_job_id"],
+                )
             )
         if delivery.get("job_id"):
             links_to_jobs.append(("Review replacement export", delivery["job_id"]))

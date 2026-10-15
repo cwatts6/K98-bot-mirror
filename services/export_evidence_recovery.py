@@ -42,6 +42,23 @@ class EvidenceRecovery:
         else:
             outcome = "backup_required"
             explanation = "Neither protected evidence copy verifies. The original operation remains unresolved. Exact backup restoration or a separately verified superseding recovery is required; confirmation alone cannot recreate this receipt."
+            if binding["kinds"] == ["replacement proposal"]:
+                from services.export_evidence_replacement import replacement_proposal_recovery
+
+                try:
+                    replacement = replacement_proposal_recovery(
+                        self.broker, self.catalog, reference
+                    )
+                except SourceConflict:
+                    pass
+                if replacement is not None:
+                    resolved = replacement["successor_check_id"] is not None
+                    outcome = "superseded_proposal" if resolved else "fresh_proposal_required"
+                    explanation = (
+                        "A new admin proposal and complete fresh readback now verify. The lost proposal remains unverified. Publication is tracked separately."
+                        if resolved
+                        else "The original proposal cannot be verified. Use Recover replacement below to discard any unfinished read, re-enter the intended files and confirm a new proposal. The bot will check all files again before activation."
+                    )
             if set(binding["kinds"]) <= {
                 "replacement verification",
                 "stream closure",
@@ -74,9 +91,12 @@ class EvidenceRecovery:
         if replacement is not None:
             evidence.update(
                 evidence_recovery_job_id=replacement["job_id"],
-                lost_check_id=replacement["lost_check_id"],
+                lost_check_id=replacement.get("lost_check_id"),
                 successor_check_id=replacement["successor_check_id"],
             )
+            if "lost_proposal_id" in replacement:
+                evidence["lost_proposal_id"] = replacement["lost_proposal_id"]
+                evidence["evidence_recovery_label"] = "Recover replacement"
         return dict(
             evidence=evidence,
             token=digest(dict(binding=binding, copies=copies, replacement=replacement)).hex(),
@@ -159,7 +179,7 @@ class EvidenceRecoveryAdapter:
     def reconcile(self, source_id, action):
         evidence, token, resolved = self.inspect(source_id)
         if resolved:
-            return "not_applied" if evidence["outcome"] == "superseded_read" else "verified"
+            return "not_applied" if evidence["outcome"].startswith("superseded_") else "verified"
         if token != action["EvidenceHash"] or action["ActionKind"] not in evidence["actions"]:
             # Repair is exact-byte and idempotent. Partial local restoration may
             # be reviewed afresh, but can never author an operation-success proof.
