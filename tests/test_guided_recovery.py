@@ -198,11 +198,14 @@ def test_changed_evidence_retires_old_sql_intent_and_requires_new_confirmation()
     assert len(dal.calls) == 1 and len(store.actions) == 2
 
 
-def test_normal_capture_closes_incident_without_metadata_settlement():
+def test_normal_capture_requires_queue_admission_before_incident_closes():
     service, dal, store, row = setup("completed")
     inspected = dal.inspect(row["SourceID"])
     inspected.update(captured=True)
     dal.inspect = lambda _: inspected
+    fresh = service.refresh(row["IncidentID"])
+    assert fresh["State"] == "open"
+    inspected["preparation"] = dict(JobID="queue-receipt")
     fresh = service.refresh(row["IncidentID"])
     assert fresh["State"] == "resolved"
     assert "Export delivery is a separate outcome" in fresh["evidence"]["explanation"]

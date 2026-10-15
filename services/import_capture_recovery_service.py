@@ -12,6 +12,8 @@ from services.legacy_export_snapshot_service import (
 
 
 class ImportCaptureRecovery:
+    consumer = "scan_data"
+
     def __init__(self, runtime, outcomes):
         self.runtime = runtime
         self.outcomes = outcomes
@@ -66,7 +68,7 @@ class ImportCaptureRecovery:
                     self.runtime.dal.verify_producer_cursor(claim, cursor)
                 finally:
                     cursor.close()
-                scope = json.loads(self.runtime.configuration)["scan_data"]
+                scope = json.loads(self.runtime.configuration)[self.consumer]
                 sections, planned = self.runtime.capture(connection, scope)
                 if generation["capture"] == "pending":
                     generation = dict(
@@ -81,7 +83,7 @@ class ImportCaptureRecovery:
                 # Existing complete proof is immutable. Capture verifies exact hashes
                 # before writing another immutable spool after a lost acknowledgement.
                 snapshot = LegacySnapshot.capture(
-                    consumer="scan_data",
+                    consumer=self.consumer,
                     preparation_id=claim.preparation_id,
                     generation=generation,
                     config=planned,
@@ -93,3 +95,20 @@ class ImportCaptureRecovery:
         # This is an idempotent queue admission of the retained snapshot, not export
         # dispatch. Its acknowledgement must also be reconciled before resolution.
         return self.runtime.enqueue_snapshot(preparation_id)
+
+    def verify_queued(self, source_id):
+        preview = self.outcomes.inspect(source_id)
+        self.generation(preview["preparation"], preview["execution"])
+        row, _, _ = self.runtime.verified_snapshot(source_id)
+        return bool(preview["captured"] and row["JobID"] and row["State"] == "materialized")
+
+    def queue(self, source_id, token):
+        preview = self.outcomes.inspect(source_id)
+        self.generation(preview["preparation"], preview["execution"])
+        if not preview["captured"]:
+            raise SourceConflict("A retained immutable capture is required.")
+        if not preview["preparation"]["JobID"] and preview["token"] != token:
+            raise SourceConflict("Capture evidence changed. Review the current incident.")
+        # Only called after a durable confirmed action. The coordinator atomically
+        # links this immutable preparation to its single job.
+        return self.runtime.enqueue_snapshot(source_id)

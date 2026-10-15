@@ -21,12 +21,30 @@ class ImportRecoveryAdapter:
         decision = preview["action"]
         captured = preview.get("captured", False)
         prep = preview.get("preparation") or {}
-        marker = json.loads(prep.get("GenerationJson") or "{}").get("capture_recovery")
-        capture_pending_queue = captured and marker and not prep.get("JobID")
+        capture_pending_queue = captured and not prep.get("JobID")
         if capture_pending_queue:
             captured = False
+        elif captured and self.capture_recovery:
+            try:
+                captured = self.capture_recovery.verify_queued(source_id)
+            except (SourceConflict, ValueError, KeyError, TypeError):
+                captured = False
+                preview["explanation"] = (
+                    "The queued capture could not be verified. The incident remains open."
+                )
         actions = {}
-        if decision == "resume_capture" and self.capture_recovery:
+        if capture_pending_queue and self.capture_recovery:
+            try:
+                self.capture_recovery.generation(prep, execution)
+            except (SourceConflict, ValueError, KeyError, TypeError):
+                preview["explanation"] = "The retained capture registration does not verify."
+            else:
+                actions["queue_capture"] = {
+                    "label": "Queue verified capture",
+                    "check": "Confirm this completed stats output should continue to its registered export destination.",
+                    "effect": "Verify the retained capture and original registration, then queue it once. The import is not rerun.",
+                }
+        elif decision == "resume_capture" and self.capture_recovery:
             # Validate registered output and producer identity before offering a button.
             try:
                 self.capture_recovery.generation(prep, execution)
@@ -77,6 +95,8 @@ class ImportRecoveryAdapter:
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == "queue_capture" and self.capture_recovery:
+            return self.capture_recovery.queue(source_id, token)
         if action == "resume_capture" and self.capture_recovery:
             return self.capture_recovery.run(source_id, token, actor)
         if action not in {"release_failure", "supersede_partial"}:
@@ -93,6 +113,11 @@ class ImportRecoveryAdapter:
         # inspect checks exact account/storage and obtains the SQL execution lock.
         preview = self.dal.inspect(source_id)
         receipt = preview["execution"] or {}
+        if action["ActionKind"] == "queue_capture" and self.capture_recovery:
+            if not preview["preparation"]["JobID"] and preview["token"] != action["EvidenceHash"]:
+                return "not_applied"
+            self.capture_recovery.queue(source_id, action["EvidenceHash"])
+            return "verified" if self.capture_recovery.verify_queued(source_id) else None
         if action["ActionKind"] == "resume_capture" and self.capture_recovery:
             prep = preview["preparation"]
             marker = json.loads(prep["GenerationJson"] or "{}").get("capture_recovery")

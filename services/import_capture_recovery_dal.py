@@ -9,8 +9,14 @@ from services.legacy_export_snapshot_dal import PreparationClaim
 
 
 class ImportCaptureRecoveryDAL:
-    def __init__(self, outcomes):
+    def __init__(self, outcomes, *, stats_execution=True):
         self.outcomes = outcomes
+        self.stats_execution = stats_execution
+
+    def guards(self, preparation_id):
+        return ("k98-legacy-output-snapshot",) + (
+            ("S11:stats-import:" + identity(preparation_id),) if self.stats_execution else ()
+        )
 
     @contextmanager
     def session(self, preparation_id):
@@ -21,10 +27,7 @@ class ImportCaptureRecoveryDAL:
             try:
                 # Match producer lock order. Neither elapsed time nor a completed
                 # receipt substitutes for exclusion of a still-live SQL session.
-                for resource in (
-                    "k98-legacy-output-snapshot",
-                    "S11:stats-import:" + identity(preparation_id),
-                ):
+                for resource in self.guards(preparation_id):
                     cursor.execute(
                         "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
                         "@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; "
@@ -39,10 +42,7 @@ class ImportCaptureRecoveryDAL:
                 yield connection
             finally:
                 # Explicit release also covers drivers which pool closed connections.
-                for resource in (
-                    "S11:stats-import:" + identity(preparation_id),
-                    "k98-legacy-output-snapshot",
-                ):
+                for resource in reversed(self.guards(preparation_id)):
                     cursor.execute(
                         "IF APPLOCK_MODE('public',?,'Session')='Exclusive' "
                         "EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'",
@@ -59,13 +59,10 @@ class ImportCaptureRecoveryDAL:
         cursor = connection.cursor()
         try:
             cursor.execute("BEGIN TRANSACTION")
-            for resource in (
-                "k98-legacy-output-snapshot",
-                "S11:stats-import:" + preparation_id,
-            ):
+            for resource in self.guards(preparation_id):
                 cursor.execute("SELECT APPLOCK_MODE('public',?,'Session') AS Mode", resource)
                 if one(cursor)["Mode"] != "Exclusive":
-                    raise SourceConflict("Both recovery session guards are required.")
+                    raise SourceConflict("All producer recovery session guards are required.")
             _mutex(cursor, "account:" + self.outcomes.account)
             prep, execution, resources = self.outcomes._snapshot(cursor, preparation_id)
             self.outcomes._scope(prep)

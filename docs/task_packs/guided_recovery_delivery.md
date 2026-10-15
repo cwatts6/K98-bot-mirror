@@ -96,8 +96,8 @@ objects are introduced in this slice; authoritative schemas are used in temporar
 
 That export slice is now [Bot PR 334](https://github.com/cwatts6/K98-bot-mirror/pull/334).
 Its exact Changes review covered all five changed source files with no findings and was
-sealed/read back successfully. Its focused suite passed 197 tests; the full suite remains
-in progress at this checkpoint.
+sealed/read back successfully. Its focused suite passed 197 tests; its full suite passed
+7,816 tests with 113 skipped and the same baseline missing-workflow failure.
 
 The closure slice, [Bot PR 335](https://github.com/cwatts6/K98-bot-mirror/pull/335), retains positive exact-child termination evidence and its immutable
 closure receipt across local acknowledgement/storage failures. It re-reads the exact session,
@@ -125,3 +125,25 @@ damaged-index/unknown-write containment and registration replacement, earlier ro
 incomplete private journal/child closure recovery, all-KVK generation and missing/unverifiable
 output. P1 and integrated alert-to-resolution acceptance also remain required. These entries
 are implementation obligations, not deferred optimisation or claims of completed coverage.
+
+## All-KVK capture and retained queue admission
+
+The next focused slice resumes all-KVK capture only from the atomic completion checkpoint
+written by KVK ingest/recompute or KVK recompute. It rechecks original configuration and season,
+exclusive SQL producer exclusion, exact retained reservation, immutable completed output hashes
+and the original recovery action. The shared capture implementation preserves checkpoints and
+reconciles lost acknowledgements without rerunning SQL producers.
+
+Both all-KVK and stats captures stranded before queue admission are independently discovered.
+The recovery centre offers **Queue verified capture** with a confirmation checklist. Inspection
+is read-only; only a durable confirmed action can admit that snapshot to the queue. Its
+idempotent job link and retained bytes are verified before resolution. Stale confirmation,
+foreign storage/account, changed output, active original producer and lost queue acknowledgement
+are covered by focused tests and actual temporary SQL transactions.
+
+Security routing: Changes review of this focused branch against `e4eacf39`, Deep off,
+covering SQL fencing, storage/account scope, retained file verification, admin confirmation
+and restart persistence. The authoritative ExportPreparation and ExportResource definitions
+were checked in the SQL source repository; this slice introduces no persistent SQL objects.
+Missing checkpoints, unverifiable output and all other remaining programme workflows above
+remain required implementation work. This slice does not claim full recovery completion.
