@@ -698,10 +698,11 @@ def test_probe_evaluator_must_consume_every_observation():
 def test_probe_response_bytes_are_rechecked_when_evaluated():
     replay, message, probe, documents, requests = probe_replay_fixture()
     events = next(e for r, e in requests.values() if r["StreamID"] == probe["StreamID"])
-    with pytest.raises(SourceConflict, match="private hash"):
+    with pytest.raises(SourceConflict, match="Private execution evidence is unavailable") as caught:
         with replay:
             documents[events[-1]["EvidenceReference"]] = b"{}"
             replay.execute(message)
+    assert "private hash" in str(caught.value.__cause__)
 
 
 @pytest.mark.parametrize(

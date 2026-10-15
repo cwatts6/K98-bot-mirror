@@ -52,7 +52,12 @@ def read_birth(store, stream):
     ):
         raise ValueError("Exact private child-birth reference required.")
     uuid_text(binding["reference"])
-    raw = store.read_reference(binding["reference"], bytes.fromhex(binding["sha256"]))
+    try:
+        raw = store.read_reference(binding["reference"], bytes.fromhex(binding["sha256"]))
+    except Exception as exc:
+        # Normalize only private I/O, including platform decryption errors. No
+        # SQL or process observation is inside this unavailable-evidence path.
+        raise ValueError("Private child birth is unavailable.") from exc
     if hashlib.sha256(raw).hexdigest() != binding["sha256"]:
         raise ValueError("Private child-birth bytes differ.")
     birth = json.loads(raw)

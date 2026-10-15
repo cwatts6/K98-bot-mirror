@@ -39,7 +39,13 @@ class ClosedStreamVerifier:
         self.dal, self.store = dal, store
 
     def _document(self, reference, expected_hash):
-        return decode(self.store.read_reference(reference, expected_hash))
+        try:
+            raw = self.store.read_reference(reference, expected_hash)
+        except Exception as exc:
+            # Storage/hash/DPAPI failures deny private verification. Callers may
+            # separately prove typed read containment; this is never success.
+            raise SourceConflict("Private execution evidence is unavailable.") from exc
+        return decode(raw)
 
     def verify(
         self,

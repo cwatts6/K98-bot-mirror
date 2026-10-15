@@ -3,10 +3,11 @@ import hashlib
 import json
 from types import SimpleNamespace
 from unittest.mock import Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from core.export_execution_host import PrivateEvidenceStore
 from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit
 from services import config_recovery_authority as authority_module
 from services.config_read_containment import stream_wire
@@ -196,6 +197,44 @@ def test_stale_confirmation_cannot_release_changed_ownership(monkeypatch):
             "contain_read",
             "Discard read",
         )
+    dal.settle.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["hash", "decrypt"])
+def test_real_private_store_failure_offers_confirmed_containment(monkeypatch, tmp_path, failure):
+    client, dal, snapshot, source, stream, _, service, store = setup(monkeypatch, "closed")
+    win_types = pytest.importorskip("pywintypes") if failure == "decrypt" else None
+
+    def unprotect(raw):
+        if failure == "decrypt" and raw == b"unreadable historical evidence":
+            raise win_types.error(13, "CryptUnprotectData", "Invalid data")
+        return raw
+
+    private = PrivateEvidenceStore(
+        tmp_path, "fixture", protect=lambda raw: raw, unprotect=unprotect
+    )
+    original = private._store.put(b"unreadable historical evidence")
+    stream["ClosureReference"] = str(UUID(original.key))
+    stream["ClosureHash"] = b"x" * 32
+    snapshot["streams"] = [stream_wire(stream)]
+    client.authority.store = private
+    row = service.review_source(ACTOR, "configuration_read", source)
+    assert set(row["evidence"]["actions"]) == {"contain_read"}
+    assert service.recover_automatic(row["IncidentID"])["State"] == "open"
+    dal.settle.assert_not_called()
+    result = service.execute(
+        ACTOR, row["IncidentID"], row["Revision"], row["EvidenceHash"],
+        "contain_read", "Discard failed read",
+    )
+    assert result["State"] == "resolved" and store.actions[0]["State"] == "verified"
+    assert private._store.read(original) == b"unreadable historical evidence"
+
+
+def test_sql_runtime_error_is_not_reclassified_as_private_evidence_failure(monkeypatch):
+    client, dal, _, source, _, _, _, _ = setup(monkeypatch, "closed")
+    client.authority.dal.read_stream.side_effect = RuntimeError("SQL connection lost")
+    with pytest.raises(RuntimeError, match="SQL connection lost"):
+        client.inspect_configuration_recovery(source)
     dal.settle.assert_not_called()
 
 
