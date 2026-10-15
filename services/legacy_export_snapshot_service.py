@@ -263,6 +263,15 @@ def record_writer_completion(*, cursor=None, **evidence):
         require_runtime().checkpoint_writer(owner, evidence, cursor=cursor)
 
 
+def begin_writer_transaction(cursor):
+    """Keep exact preparation ownership locked through producer and checkpoint commit."""
+    owner = current_owner()
+    if owner is not None:
+        runtime = require_runtime()
+        runtime._require_writer(owner)
+        runtime.dal.begin_producer_transaction(owner.claim, cursor)
+
+
 def verify_producer_cursor(cursor, *, before_side_effects=False):
     """Actual connection gate; a separate snapshot guard session is insufficient."""
     runtime = _writer_runtime()
@@ -839,7 +848,7 @@ class LegacyExportRuntime:
         producer = current_intent()
         request = {"operation": str(uuid4()), "kind": kind, "config": scope}
         if producer is not None:
-            if kind != "scan_data" or producer["kind"] != "stats_import":
+            if kind != "scan_data" or producer["kind"] not in {"stats_import", "player_stats_report"}:
                 raise SnapshotUnavailable("Producer intent differs from writer scope.")
             request.update(operation=producer["operation"], producer=producer)
         identifier = self.dal.request(

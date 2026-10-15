@@ -19,6 +19,7 @@ from services.legacy_export_snapshot_service import (
     current_owner,
     record_writer_completion,
 )
+from services.producer_recovery_intent import player_report_intent
 
 logger = logging.getLogger(__name__)
 
@@ -437,6 +438,7 @@ def _validate_last_refresh(value: str) -> str:
     return parsed.isoformat()
 
 
+@player_report_intent
 @admitted_writer("scan_data")
 def _execute_sp_with_retries(
     cn: pyodbc.Connection,
@@ -471,11 +473,13 @@ def _execute_sp_with_retries(
             sp_start = time.perf_counter()
             cur = cn.cursor()
             from services.legacy_export_snapshot_service import (
+                begin_writer_transaction,
                 record_writer_stage,
                 verify_producer_cursor,
             )
 
             verify_producer_cursor(cur, before_side_effects=True)
+            begin_writer_transaction(cur)
 
             # Set query timeout
             cur.execute(f"SET LOCK_TIMEOUT {_SP_EXECUTION_TIMEOUT * 1000};")  # milliseconds
@@ -483,13 +487,21 @@ def _execute_sp_with_retries(
             # Execute stored procedure
             record_writer_stage("producer_entered")
             cur.execute(_SQL_EXEC_SP)
+            while cur.nextset():
+                pass
             record_writer_stage("producer_returned")
+
+            if current_owner() is not None:
+                record_writer_completion(
+                    cursor=cur, procedure="dbo.SP_Stats_for_Upload", atomic_checkpoint=1
+                )
 
             # Explicitly commit the transaction
             record_writer_stage("commit_requested")
             cn.commit()
             record_writer_stage("commit_confirmed")
-            record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
+            if current_owner() is None:
+                record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
 
             sp_duration = time.perf_counter() - sp_start
             logger.info(

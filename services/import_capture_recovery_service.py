@@ -128,7 +128,7 @@ class ImportCaptureRecovery:
         generation = self.generation(prep, execution)
         if prep["JobID"]:
             return None
-        if self.consumer == "scan_data" and (
+        if self.dal.stats_execution and (
             not execution
             or execution["State"] != "completed"
             or execution["Resolution"] is not None

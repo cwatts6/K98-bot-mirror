@@ -61,6 +61,8 @@ class AllKvkCaptureRecovery(ImportCaptureRecovery):
 
 class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
     kind = "all_kvk_capture"
+    output_name = "all-KVK"
+    title = "All-KVK output recovery"
 
     def execute(self, source_id, action, token, actor, reason):
         if action not in {"resume_capture", "queue_capture", "abandon_capture"}:
@@ -80,7 +82,7 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
         explanation = preview["explanation"]
         resolved = False
         try:
-            self.capture_recovery.generation(prep)
+            self.capture_recovery.generation(prep, preview["execution"])
             if decision == "resolved":
                 resolved = self.capture_recovery.verify_queued(source_id)
             elif decision in {"resume_capture", "queue_capture"}:
@@ -90,7 +92,7 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
                         if decision == "resume_capture"
                         else "Queue verified capture"
                     ),
-                    "check": "Confirm this completed all-KVK output should continue to its registered export destination.",
+                    "check": f"Confirm this completed {self.output_name} output should continue to its registered export destination.",
                     "effect": "Verify the committed checkpoint, original registration and retained output; finish capture if needed and queue it once. The import and recompute are not rerun.",
                 }
         except (SourceConflict, ValueError, KeyError, TypeError):
@@ -101,7 +103,7 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
             disposition = None
         if disposition == "abandoned":
             actions, resolved = {}, True
-            explanation = "The committed all-KVK SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current."
+            explanation = f"The committed {self.output_name} SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current."
         elif disposition in {"available", "failed"}:
             from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION
 
@@ -111,7 +113,7 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
             actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
         return (
             {
-                "title": "All-KVK output recovery",
+                "title": self.title,
                 "season": prep["KVK_NO"],
                 "outcome": "export_skipped" if disposition == "abandoned" else prep["State"],
                 "explanation": explanation

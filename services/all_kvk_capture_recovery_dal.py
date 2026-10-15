@@ -6,6 +6,7 @@ from services.stats_import_outcome_dal import ImportExecutionActive, StatsImport
 
 
 class AllKvkCaptureRecoveryDAL:
+    consumer = "all_kvk"
     token = staticmethod(StatsImportOutcomeDAL.token)
 
     def __init__(self, connect, *, account, storage_owner):
@@ -17,7 +18,7 @@ class AllKvkCaptureRecoveryDAL:
         if not prep or (prep["AccountKey"], prep["StorageOwner"], prep["ConsumerKind"]) != (
             self.account,
             self.storage_owner,
-            "all_kvk",
+            self.consumer,
         ):
             raise SourceConflict("Exact runtime account, storage and all-KVK capture required.")
 
@@ -89,7 +90,7 @@ class AllKvkCaptureRecoveryDAL:
                 action, explanation = "hold", str(exc)
             return dict(
                 preparation=prep,
-                execution=None,
+                execution=execution,
                 resources=resources,
                 action=action,
                 token=self.token(prep, execution, resources),

@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import wraps
 import json
 from uuid import uuid4
 
@@ -52,6 +53,30 @@ def validate_inputs(value):
 
 def current_intent():
     return _intent.get()
+
+
+def player_report_intent(function):
+    """Identify the atomic report producer before its writer request is saved."""
+
+    @wraps(function)
+    def run(*args, **kwargs):
+        current = _intent.get()
+        if current is not None:
+            if (
+                current.get("kind") != "player_stats_report"
+                or current.get("atomic_checkpoint") != 1
+            ):
+                raise SourceConflict("Report execution cannot inherit a different producer intent.")
+            return function(*args, **kwargs)
+        token = _intent.set(
+            dict(kind="player_stats_report", atomic_checkpoint=1, operation=str(uuid4()))
+        )
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _intent.reset(token)
+
+    return run
 
 
 @contextmanager

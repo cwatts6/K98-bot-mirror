@@ -677,6 +677,19 @@ class LegacySnapshotDAL:
                 self.application_sql_contract,
             )
 
+    def begin_producer_transaction(self, claim, cursor):
+        """The actual business connection owns the fence until its atomic commit.
+
+        Autocommit callers cannot use this contract: a completion checkpoint must
+        commit with the report, and ownership locks must cover delayed execution.
+        """
+        if cursor.connection.autocommit:
+            raise SourceConflict("An explicit producer transaction is required.")
+        cursor.execute("IF @@TRANCOUNT=0 BEGIN TRANSACTION;")
+        row = self._authorize(cursor, claim)
+        if row["State"] != "writing":
+            raise SourceConflict("Only this exact writing claim may enter its transaction.")
+
     @staticmethod
     def capture_result_sets(cursor, names):
         from services.legacy_export_snapshot_service import OutputSection, SnapshotUnavailable

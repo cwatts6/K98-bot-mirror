@@ -14,6 +14,10 @@ from services.all_kvk_capture_recovery_service import (
 )
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.legacy_export_snapshot_service import SnapshotUnavailable
+from services.player_report_recovery_service import (
+    PlayerReportCaptureRecovery,
+    PlayerReportRecoveryAdapter,
+)
 from services.recovery_service import RecoveryService
 from tests import test_import_capture_recovery_sql as capture_fixtures
 from tests.test_guided_recovery import ACTOR, Store
@@ -28,9 +32,13 @@ pytestmark = pytest.mark.skipif(
 
 def adapter_for(r):
     kind = (
-        AllKvkCaptureRecoveryAdapter
-        if isinstance(r.service, AllKvkCaptureRecovery)
-        else ImportRecoveryAdapter
+        PlayerReportRecoveryAdapter
+        if isinstance(r.service, PlayerReportCaptureRecovery)
+        else (
+            AllKvkCaptureRecoveryAdapter
+            if isinstance(r.service, AllKvkCaptureRecovery)
+            else ImportRecoveryAdapter
+        )
     )
     return kind(r.outcomes, r.service)
 
