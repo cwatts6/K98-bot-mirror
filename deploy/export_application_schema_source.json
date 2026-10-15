@@ -2823,7 +2823,7 @@
     "name": "dbo.usp_ExportProviderRequestEventAppend",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-    "sha256": "a02859fce33aa2cf1315be554ead18b40ad8776747e096a7f9697cdc74ade0a8"
+    "sha256": "f55b3a61e732bd9fd430eaf48d985373ae9dc4a925aa2fbe3e7627b71ab1008b"
   },
   {
     "name": "dbo.usp_ExportReconciliationProofIssue",
