@@ -339,3 +339,15 @@ def test_empty_details_and_blank_procconfig_cells_use_retained_sql(shared):
     )
     assert result["season"] == 43 and result["selected_scan"] == 101
     assert "KVK_Details" in result["empty_tabs_retain_sql"]
+
+
+@pytest.mark.parametrize("token", ["42", "+42", " 42 ", "0042", "2147483647"])
+def test_accepted_procconfig_text_round_trips_through_sql_integer_staging(shared, token):
+    from services.export_configuration_values import numeric_value
+
+    expected = numeric_value("ProcConfig", "KVK_NO", token)
+    shared.f.sql.execute("CREATE TABLE #ConfigurationIntegerCheck (Value int NOT NULL)")
+    shared.f.sql.execute("INSERT #ConfigurationIntegerCheck VALUES (?)", token)
+    assert (
+        shared.f.sql.execute("SELECT Value FROM #ConfigurationIntegerCheck").fetchval() == expected
+    )

@@ -21,6 +21,10 @@ from services.export_configuration_values import (
         ("ProcConfig", "KVK_NO", True),
         ("ProcConfig", "MATCHMAKING_SCAN", 0),
         ("ProcConfig", "DRAFTSCAN", 0),
+        ("ProcConfig", "DRAFTSCAN", "1e3"),
+        ("ProcConfig", "KVK_NO", "42.0"),
+        ("ProcConfig", "KVK_NO", "4_2"),
+        ("ProcConfig", "KVK_NO", "\u0664\u0662"),
         ("EXEMPT", "KVK_NO", "42.5"),
         ("KVK_CampMap", "CampID", 0),
         ("KVK_CampMap", "CampID", 9),
@@ -59,6 +63,8 @@ def test_valid_integer_float_and_dates_match_importer():
     verify_import_values("KVK_DKPWeights", [{"WeightT4X": "0.123456789012"}], {}, {})
     verify_import_values("KVK_Details", [{"KVK_START_DATE": "15/10/26"}], {}, {"KVK_START_DATE"})
     assert numeric_value("KVK_CampMap", "CampID", 8) == Decimal(8)
+    assert numeric_value("EXEMPT", "KVK_NO", "0") == Decimal(0)
+    assert numeric_value("ProcConfig", "MATCHMAKING_SCAN", 101.0) == Decimal(101)
 
 
 def test_invalid_calendar_date_is_rejected_by_the_import_parser():

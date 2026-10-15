@@ -2,6 +2,7 @@
 
 from decimal import Decimal, InvalidOperation
 import math
+import re
 
 import pandas as pd
 
@@ -43,7 +44,8 @@ def numeric_value(name, column, value):
         )
         minimum = (
             1
-            if column in {"CampID", "StartScanID", "EndScanID", "KVK_NO"}
+            if column in {"CampID", "StartScanID", "EndScanID"}
+            or (column == "KVK_NO" and name != "EXEMPT")
             or (name == "ProcConfig" and column in {"MATCHMAKING_SCAN", "DRAFTSCAN"})
             else 0
         )
@@ -54,8 +56,13 @@ def numeric_value(name, column, value):
                 raise ValueError("Weight representation")
         elif number != number.to_integral_value():
             raise ValueError("Integer required")
-        if name == "KVK_DKPWeights" and column == "KVK_NO" and int(str(value)) != number:
-            raise ValueError("Source weight season requires plain integer text")
+        if name == "ProcConfig" or (name == "KVK_DKPWeights" and column == "KVK_NO"):
+            # ProcConfig goes directly to SQL integer staging; source season
+            # capture also calls int on the original text before pandas coercion.
+            if isinstance(value, str) and (
+                not re.fullmatch(r"[+-]?[0-9]+", value.strip(" ")) or int(value) != number
+            ):
+                raise ValueError("Plain integer text required")
         return number
     except (ValueError, InvalidOperation, OverflowError) as exc:
         raise SourceConflict(f"{name}: {column} has an invalid numeric value.") from exc

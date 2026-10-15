@@ -85,7 +85,7 @@ def configuration_responses(plan, file_id, *, rows_by_tab=None):
 COMPLETE_CONFIGURATION = {
     "ProcConfig": [[42, 100, 101, 102, 103, 104, 105, 106, 3, 107]],
     "KVKTargetBands": [[42, 100000000, 20000000, 10000000, 1000000]],
-    "EXEMPT": [[12345, "Example governor", 1, 42]],
+    "EXEMPT": [[12345, "Example governor", 1, 0]],
     "KVK_Details": [
         [
             42,
