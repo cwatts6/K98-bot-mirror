@@ -25,6 +25,8 @@ def rebind_snapshot(original, *, job, activation):
     }:
         raise SourceConflict("Every retained output needs an activated replacement.")
     registered = activation["registration"]["legacy_configuration"][old["consumer"]]
+    if "preserved_tabs" in registered:
+        config["preserved_tabs"] = deepcopy(registered["preserved_tabs"])
     config["destinations"] = sorted(mapping[f] for f in config["destinations"])
     if not set(config["destinations"]) <= set(registered["destinations"]):
         raise SourceConflict("Replacement outputs escape the activated registration.")

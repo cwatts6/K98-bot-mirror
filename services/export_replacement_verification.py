@@ -29,6 +29,9 @@ def verification_plan(
     """Derive all destinations and access policy from the sealed admin choice."""
     value = registration.value()
     mapping = proposal["mapping"]
+    configuration_targets = set(mapping) & set(
+        value["legacy_configuration"]["config"]["destinations"]
+    )
     policies = []
     for old, fresh in sorted(mapping.items()):
         pool = next(
@@ -38,17 +41,25 @@ def verification_plan(
         policies.append(
             dict(
                 file_id=fresh,
-                audience=legacy["audience"]
-                if legacy
-                else "anyone_reader"
-                if pool and pool["audience"] == "public_viewer"
-                else "private",
+                audience=(
+                    legacy["audience"]
+                    if legacy
+                    else (
+                        "anyone_reader"
+                        if pool and pool["audience"] == "public_viewer"
+                        else "private"
+                    )
+                ),
                 editors=legacy["editors"] if legacy else [value["service_account_email"]],
             )
         )
+        if configuration_targets:
+            policies[-1]["kind"] = (
+                "configuration_output" if old in configuration_targets else "output"
+            )
     return ReplacementVerificationPlan(
         dict(
-            version=4,
+            version=5 if configuration_targets else 4,
             purpose="output_enrollment",
             account=value["account"],
             storage_owner=value["storage_owner"],
@@ -113,6 +124,26 @@ def replacement_requests(file):
     return tuple(requests)
 
 
+def discover_replacement(policy, response):
+    if policy.get("kind") == "configuration_output":
+        from services.export_replacement_configuration import configuration_grids
+
+        return configuration_grids(policy["file_id"], response)
+    return discovered_grid(policy["file_id"], response)
+
+
+def verification_requests(grid):
+    if "configuration_grids" in grid:
+        from services.export_replacement_configuration import configuration_requests
+
+        return configuration_requests(grid)
+    return replacement_requests(grid)
+
+
+def file_request_count(policy):
+    return 19 if policy.get("kind") == "configuration_output" else 5
+
+
 @dataclass(frozen=True, init=False)
 class ReplacementVerificationPlan:
     document: bytes
@@ -135,8 +166,8 @@ class ReplacementVerificationPlan:
             "files",
         }:
             raise SourceConflict("Exact replacement verification plan required.")
-        if type(value["version"]) is not int or value["version"] != 4:
-            raise SourceConflict("Version 4 replacement verification required.")
+        if type(value["version"]) is not int or value["version"] not in (4, 5):
+            raise SourceConflict("Version 4 or 5 replacement verification required.")
         # Share the established identity/profile validation; the replacement
         # count is independently checked below because legacy groups can be one file.
         identity = {k: v for k, v in value.items() if k not in {"replacement_id", "files"}}
@@ -155,7 +186,15 @@ class ReplacementVerificationPlan:
         for file in files:
             if (
                 not isinstance(file, dict)
-                or set(file) != {"file_id", "audience", "editors"}
+                or set(file)
+                != (
+                    {"file_id", "audience", "editors"}
+                    | ({"kind"} if value["version"] == 5 else set())
+                )
+                or (
+                    value["version"] == 5
+                    and file.get("kind") not in {"output", "configuration_output"}
+                )
                 or not isinstance(file["file_id"], str)
                 or not re.fullmatch(r"[A-Za-z0-9_-]{6,128}", file["file_id"])
                 or file["audience"] not in {"private", "anyone_reader", "anyone_writer"}
@@ -189,6 +228,10 @@ class ReplacementVerificationPlan:
 
     def value(self):
         return decode(self.document)
+
+    @property
+    def verification_request_count(self):
+        return sum(file_request_count(f) for f in self.value()["files"])
 
     @property
     def sql_json(self):
@@ -246,7 +289,7 @@ class ReplacementVerificationPlan:
 def replacement_readback(plan, policy, grid, responses):
     """Reuse blank-file checks while requiring the exact installed legacy ACL."""
     value = plan.value()
-    metadata, acl, sheet, cells = deepcopy(responses)
+    metadata, acl, *observations = deepcopy(responses)
     permissions = acl.get("permissions")
     if not isinstance(permissions, list) or acl.get("nextPageToken"):
         raise SourceConflict("Complete replacement permissions are required.")
@@ -283,6 +326,11 @@ def replacement_readback(plan, policy, grid, responses):
         raise SourceConflict("Replacement is missing an approved owner, Editor or audience grant.")
     # ACL has been checked above. Existing manual validation checks all remaining
     # metadata, complete grid contents and formula readback without modifying files.
+    if policy.get("kind") == "configuration_output":
+        from services.export_replacement_configuration import configuration_readback
+
+        return configuration_readback(value, grid, responses)
+    sheet, cells = observations
     verify_blank_workbook(value, grid, metadata, sheet, cells)
 
 
@@ -290,19 +338,24 @@ class ReplacementVerificationEvidence(EnrollmentEvidence):
     def eligibility(self, plan, stream_id):
         stream, records = self.transcript(plan, stream_id)
         files = []
-        for ordinal, policy in enumerate(plan.value()["files"]):
-            group = records[ordinal * 5 : (ordinal + 1) * 5]
-            if len(group) != 5 or (group[0][0].operation, group[0][0].arguments) != METADATA:
+        offset = 0
+        for policy in plan.value()["files"]:
+            count = file_request_count(policy)
+            group = records[offset : offset + count]
+            offset += count
+            if len(group) != count or (group[0][0].operation, group[0][0].arguments) != METADATA:
                 raise SourceConflict("Complete replacement discovery and verification required.")
-            grid = discovered_grid(policy["file_id"], group[0][1])
+            grid = discover_replacement(policy, group[0][1])
             if any(r.target != policy["file_id"] for r, _, _ in group) or [
                 (r.operation, r.arguments) for r, _, _ in group[1:]
-            ] != list(replacement_requests(grid)):
+            ] != list(verification_requests(grid)):
                 raise SourceConflict("Replacement reads differ from the discovered full grid.")
-            replacement_readback(plan, policy, grid, [body for _, body, _ in group[1:]])
+            summary = replacement_readback(plan, policy, grid, [body for _, body, _ in group[1:]])
+            if summary is not None:
+                grid["configuration_summary"] = summary
             files.append(grid)
         return dict(
-            version=4,
+            version=plan.value()["version"],
             replacement_id=plan.value()["replacement_id"],
             plan_sha256=plan.digest.hex(),
             files=files,

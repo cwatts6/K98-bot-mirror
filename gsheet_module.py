@@ -3821,6 +3821,8 @@ def plan_legacy_outputs(scope, *, frames):
             self.tabs = {}
 
         def worksheet(self, title):
+            if title in scope.get("preserved_tabs", {}).get(self.id, []):
+                raise SnapshotUnavailable("Report output cannot overwrite a configuration tab.")
             if title not in self.tabs:
                 known = scope.get("grid_ids", {}).get(self.id, {})
                 from services.export_legacy_grid_identity import legacy_grid_identity

@@ -42,6 +42,7 @@ def replacement_owners(registration, targets):
 def replacement_fields(registration, targets):
     value = registration.value()
     roles = {}
+    configuration = set(value["legacy_configuration"]["config"]["destinations"])
     for pool in value["pools"]:
         roles[pool["index_file_id"]] = "Report index"
         for ordinal, file_id in enumerate(pool["slot_file_ids"], 1):
@@ -63,6 +64,15 @@ def replacement_fields(registration, targets):
         )
     ]
     for old in targets:
+        from services.export_replacement_configuration import CONFIGURATION_TABS
+
+        preparation = (
+            "Create a fresh spreadsheet. Copy these configuration tabs as values from your verified settings: "
+            + ", ".join(CONFIGURATION_TABS)
+            + ". Preserve UK date formatting, keep one blank Sheet1 for output, and remove old report tabs. Each tab must have at most 50,000 cells. "
+            if old in configuration
+            else "Create a new spreadsheet with one blank worksheet named Sheet1; keep it at 50,000 cells or fewer. "
+        )
         policy = value.get("legacy_file_access", {}).get(old)
         pool = next(
             (p for p in value["pools"] if old in {p["index_file_id"], *p["slot_file_ids"]}), None
@@ -70,21 +80,23 @@ def replacement_fields(registration, targets):
         audience = (
             policy["audience"]
             if policy
-            else "anyone_reader"
-            if pool and pool["audience"] == "public_viewer"
-            else "private"
+            else "anyone_reader" if pool and pool["audience"] == "public_viewer" else "private"
         )
         editors = policy["editors"] if policy else [value["service_account_email"]]
         fields.append(
             dict(
                 key=old,
-                label=roles.get(old, "Output spreadsheet")[:45],
+                label=(
+                    "Configuration and report workbook"
+                    if old in configuration
+                    else roles.get(old, "Output spreadsheet")[:45]
+                ),
                 max_length=512,
                 placeholder="Paste the NEW Google Sheets link",
                 help=(
                     f"Replaces [this old output](https://docs.google.com/spreadsheets/d/{old}/edit). "
-                    "Create a new spreadsheet with one blank worksheet named Sheet1; keep it at 50,000 cells or fewer. "
-                    f"Editors: {', '.join(editors)}. Sharing: {audience.replace('_', ' ')}. "
+                    + preparation
+                    + f"Editors: {', '.join(editors)}. Sharing: {audience.replace('_', ' ')}. "
                     "The bot checks the owner, permissions and all cells before using it."
                 ),
             )

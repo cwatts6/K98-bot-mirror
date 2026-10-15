@@ -127,6 +127,9 @@ class LegacySnapshot:
                 raise SnapshotUnavailable("Incomplete committed output proof.")
         if not isinstance(config, dict) or not isinstance(provenance, dict):
             raise SnapshotUnavailable("Complete configuration and provenance are required.")
+        for output in config.get("outputs", []):
+            if output["tab"] in config.get("preserved_tabs", {}).get(output["file_id"], []):
+                raise SnapshotUnavailable("Report output cannot overwrite a configuration tab.")
         documents = [section.document() for section in sections]
         if not documents or len({s["name"] for s in documents}) != len(documents):
             raise SnapshotUnavailable("Unique complete result sections are required.")
@@ -363,6 +366,12 @@ def require_runtime():
     if runtime is None:
         raise SnapshotUnavailable("Coordinated export setup is unavailable; no export started.")
     return runtime
+
+
+def configuration_destination(preferred):
+    """Resolve protected input aliases within the caller's current runtime."""
+    runtime = _writer_runtime()
+    return runtime.configuration_destination(preferred) if runtime is not None else preferred
 
 
 def _writer_runtime():
@@ -618,6 +627,14 @@ class LegacyExportRuntime:
         ):
             raise ValueError("Configuration preparation and coordinator evidence gates differ.")
 
+    def configuration_destination(self, preferred):
+        """Resolve a retired input using the activated immutable registration."""
+        scope = json.loads(self.configuration).get("config", {})
+        destination = scope.get("input_aliases", {}).get(preferred, preferred)
+        if destination not in scope.get("destinations", []):
+            raise SnapshotUnavailable("Configuration input is outside the activated registration.")
+        return destination
+
     def configuration_health_destination(self, preferred):
         """Select a representative from the immutable admitted health scope."""
         scope = json.loads(self.configuration).get("config", {})
@@ -628,6 +645,7 @@ class LegacyExportRuntime:
             or any(not isinstance(value, str) or not value for value in destinations)
         ):
             raise SnapshotUnavailable("Registered configuration health scope is unavailable.")
+        preferred = scope.get("input_aliases", {}).get(preferred, preferred)
         return preferred if preferred in destinations else min(destinations)
 
     @contextmanager

@@ -293,7 +293,9 @@ def _read_sheet_to_df(sheet, spreadsheet_id: str, range_name: str) -> pd.DataFra
     Fallback: use sheet.values().get(...).execute() with _safe_execute for compatibility.
     """
     from services.export_provider_adapter import current_provider
+    from services.legacy_export_snapshot_service import configuration_destination
 
+    spreadsheet_id = configuration_destination(spreadsheet_id)
     provider = current_provider()
     if provider is not None and provider.execution is not None:
         import gsheet_module as gm
@@ -676,8 +678,12 @@ def run_proc_config_import(
         from services.legacy_export_snapshot_service import read_configuration, writer_scope
 
         def collect_inputs():
+            from services.legacy_export_snapshot_service import configuration_destination
+
             sheet = _get_sheet_service()
-            logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, KVK_SHEET_ID)
+            active_file = configuration_destination(KVK_SHEET_ID)
+            report["meta"]["spreadsheet_id"] = active_file
+            logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, active_file)
             frame = _read_sheet_to_df(sheet, KVK_SHEET_ID, RANGE_NAME)
             if frame.empty or "KVK_NO" not in frame.columns:
                 return frame, {}

@@ -297,6 +297,8 @@ class LegacyProviderJob:
         # RAW-ready values are captured, including headers. No live SQL/parser.
         prepared = []
         for output in outputs:
+            if output["tab"] in config.get("preserved_tabs", {}).get(output["file_id"], []):
+                raise SnapshotUnavailable("Report output cannot overwrite a configuration tab.")
             section = sections[output["section"]]
             values = [list(section.columns), *(list(row) for row in section.rows)]
             if any(

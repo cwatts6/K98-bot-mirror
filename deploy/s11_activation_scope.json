@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "9dc3e42beeed905ba9a3454ba1ad5e197c5db299",
+  "sql_revision": "95b4e91b86adbf66f7ab21fc48d195261bf3b4e3",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",

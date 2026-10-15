@@ -30,9 +30,11 @@ def recovery(contained_job):
     config.update(account="test-account", storage_owner="disk")
     config["legacy_configuration"]["scan_data"]["destinations"] = ["old-file"]
     config["protected_file_ids"] = sorted(
-        file_id
-        for scope in config["legacy_configuration"].values()
-        for file_id in scope["destinations"]
+        {
+            file_id
+            for scope in config["legacy_configuration"].values()
+            for file_id in scope["destinations"]
+        }
     )
     registration = RuntimeRegistration(config)
     f.sql.execute(

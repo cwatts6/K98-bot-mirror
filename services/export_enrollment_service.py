@@ -381,6 +381,10 @@ class EnrollmentEvidence:
             if phase["phase"] == "create"
             else (4 if plan.value()["version"] in (2, 3) else 5) * plan.value()["file_count"]
         )
+        from services.export_replacement_verification import ReplacementVerificationPlan
+
+        if isinstance(plan, ReplacementVerificationPlan):
+            expected_count = plan.verification_request_count
         if stream["LastSequence"] != expected_count:
             raise SourceConflict("Enrollment transcript exceeds the fixed complete request set.")
         records = []

@@ -5,8 +5,29 @@ The programme remains incomplete until every workstream and acceptance gate belo
 
 ## Current P0 completion checklist — 2026-10-15
 
-Active implementation checkpoint (unpublished working changes on
-`codex/guided-target-replacement`; **not P0 completion**):
+Active implementation checkpoint (**not P0 completion**): the complete output
+replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
+`codex/guided-config-replacement` slice adds shared configuration/output recovery.
+
+- The admin form identifies configuration workbooks and lists the seven required
+  copied input tabs. The read-only check validates owner/sharing, complete bounded
+  grid contents, formulas, schema, dates and keys, plus the blank output area.
+  Review output links shows tab row counts. Activation requires the admin to
+  verify the intended settings and switches configuration reads and report output
+  together. Copied input tabs are protected from subsequent report publication.
+- Configuration aliases compose through repeated replacement and restart;
+  ProcConfig imports, validation, health checks and display metadata resolve the
+  active input. Report delivery continues from retained input without repeating
+  committed imports. Incomplete reads offer guided discard and fresh verification.
+- Temporary SQL tests exercise the full admin path through verified publication
+  and a subsequent configuration read, plus lost reads and malformed roles.
+  The affected regression run passed 205 tests; another 498-test run covers the
+  final configuration cases, runtime contracts, source pins, permissions and Sheets
+  regressions. Migration 010 literal bodies and predecessor/postimage hashes match
+  the authoritative SQL snapshots. SQL Changes review
+  `3235fc22-5123-4607-ae8c-3c29c415c81f` sealed with no findings across all three files;
+  measured usage: 1,827,020 total tokens (1,822,389 input, 4,631 output).
+  Bot Changes review and final publication gates remain in progress.
 
 - Guided saved multi-page admin forms, strict file-link parsing, fresh read-only
   verification, original-journal finish/discard buttons, sealed activation and
@@ -71,9 +92,9 @@ Active implementation checkpoint (unpublished working changes on
   atomic-writer concurrency test separately produced Windows access-denied and
   remains a documented validation limitation, outside this replacement change.
 
-Required work still inside unknown-write recovery: configuration-input/output
-aliases, corrupt private-evidence restoration, final negative-path review,
-immutable Bot Changes review, and focused draft PR publication. These are
+Required work still inside unknown-write recovery: corrupt private-evidence
+restoration, final negative-path review, immutable Bot Changes review, and
+focused draft PR publication for configuration replacement. These are
 active acceptance requirements, **not deferred optimisation**. The wider P0
 workstreams in the table remain required after this slice.
 

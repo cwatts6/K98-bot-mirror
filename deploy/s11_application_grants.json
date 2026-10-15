@@ -1217,7 +1217,7 @@
       "object": "dbo.usp_ExportExecutionStreamTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-      "source_sha256": "54269a8332bb28c3bf8c3d82d6943727e5f461881a0590ecf412fb42bb8a5e3b"
+      "source_sha256": "9bb51a4b821e66f067049a66591002b6f05aa4a31186883b3652231e192109b2"
     },
     {
       "object": "dbo.usp_ExportJobContainTargets",
@@ -1265,7 +1265,7 @@
       "object": "dbo.usp_ExportReplacementVerificationTransition",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_ExportReplacementVerificationTransition.StoredProcedure.sql",
-      "source_sha256": "b5aa13c8835e8ab9a690658ac1bfe61dd9ee0b6dd025d5010cfd2eae6b888ad7"
+      "source_sha256": "5439571b3381fce8355358aaa64e722394f445648a598dadf0b5bc5986243d9f"
     },
     {
       "object": "dbo.usp_MarkLogBackupTriggerProcessed",

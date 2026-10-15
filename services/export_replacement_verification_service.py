@@ -20,10 +20,11 @@ from services.export_replacement_verification import (
     METADATA,
     ReplacementVerificationEvidence,
     ReplacementVerificationPlan,
-    discovered_grid,
+    discover_replacement,
+    file_request_count,
     replacement_readback,
-    replacement_requests,
     verification_plan,
+    verification_requests,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,8 +174,8 @@ class ReplacementVerificationService:
                     )
                     return worker.execute(typed.message())
 
-                grid = discovered_grid(policy["file_id"], request(*METADATA))
-                responses = [request(op, args) for op, args in replacement_requests(grid)]
+                grid = discover_replacement(policy, request(*METADATA))
+                responses = [request(op, args) for op, args in verification_requests(grid)]
                 replacement_readback(plan, policy, grid, responses)
         finally:
             if stream_id in worker._streams:
@@ -305,10 +306,13 @@ class ReplacementVerificationService:
             reason=attempt["Reason"],
         )
         if attempt["State"] == "checking":
-            completed = min(
-                plan.value()["file_count"],
-                sum(s["LastSequence"] for s in snapshot["streams"]) // 5,
-            )
+            remaining = sum(s["LastSequence"] for s in snapshot["streams"])
+            completed = 0
+            for policy in plan.value()["files"]:
+                remaining -= file_request_count(policy)
+                if remaining < 0:
+                    break
+                completed += 1
             result.update(
                 can_finish=False,
                 files_requested=completed,

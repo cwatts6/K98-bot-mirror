@@ -131,12 +131,19 @@ class ReplacementWorkflow:
                 "Confirm the displayed new files are the intended output locations and remain unchanged since verification.",
                 "Seal the new registration and retire the original pool where applicable. Delivery remains open until the retained input is published and verified.",
             )
+            if any(f.get("configuration_summary") for f in checked["files"]):
+                explanation = "Replacement owner, sharing, configuration schema and blank output checks passed. Open Review output links to inspect the configuration tab counts and links. Verify the actual settings against your intended season, then confirm activation."
+                actions["activate_replacements"] = choice(
+                    "Use verified replacements",
+                    "Open each replacement configuration workbook. Verify season and scan IDs, target bands, exemptions, dates, weights, windows and camp mappings. Confirm the complete intended settings, row counts and sharing; keep the files unchanged after checking.",
+                    "Switch configuration reads and report outputs together. Protect the copied configuration tabs, then offer publication of the retained report. The original files remain isolated.",
+                )
         else:
             stage = "choose_replacements" if proposal is None else "verification_required"
             explanation = "The old targets are permanently isolated. The form lists every required replacement, its owner and sharing policy. Saved pages survive reopening and restart."
             actions["choose_replacements"] = choice(
                 "Enter replacement links",
-                "Create fresh blank spreadsheets under the displayed registered owner and apply the listed sharing permissions.",
+                "Prepare each fresh workbook using its displayed role checklist, including copied configuration tabs where listed. Apply the listed owner and sharing permissions.",
                 "Save the complete file mapping for verification. Pasting links does not authorize writes or activate them.",
                 input=True,
             )
@@ -155,6 +162,12 @@ class ReplacementWorkflow:
             replacements=proposal["mapping"] if proposal else {},
             delivery=state["delivery"],
         )
+        if checked and checked["state"] == "verified":
+            evidence["configuration_checks"] = {
+                f["file_id"]: f["configuration_summary"]
+                for f in checked["files"]
+                if f.get("configuration_summary")
+            }
         return evidence, digest(state).hex(), resolved
 
     def _reviewed(self, job_id, token):
