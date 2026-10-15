@@ -68,8 +68,14 @@ class ClosedStreamVerifier:
                     "An isolated read cannot establish a fresh provider observation."
                 )
             from services.config_read_containment import verify_contained_read
+            from services.export_replacement_read_containment import verify_discarded_replacement
 
-            seal = verify_contained_read(
+            verify_read = (
+                verify_discarded_replacement
+                if stream["Purpose"] == "enrollment"
+                else verify_contained_read
+            )
+            seal = verify_read(
                 self.dal, self.store, stream, account=account, registration_hash=registration_hash
             )
             return ClosedStreamEvidence(
@@ -265,7 +271,8 @@ class CatalogueVerifier:
                     account=account,
                     registration_hash=bytes(stream["RegistrationHash"]),
                     require_observation=False,
-                    allow_failed_reads=stream["Purpose"] == "probe",
+                    allow_failed_reads=stream["Purpose"] == "probe"
+                    or stream["State"] == "read_contained",
                 )
                 if (result.version, result.event_digest) != (
                     stream["Version"],

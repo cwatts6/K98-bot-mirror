@@ -27,7 +27,7 @@ def store():
 
     names = {
         f"dbo.Recovery{kind}": f"##K98Recovery_{uuid4().hex}_{kind}"
-        for kind in ("Incident", "Action")
+        for kind in ("Incident", "Action", "InputDraft")
     }
 
     def rewrite(sql):
@@ -39,11 +39,13 @@ def store():
     connection_string = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
     owner = pyodbc.connect(connection_string, autocommit=True, timeout=5)
     schema = Path(os.environ["K98_RECOVERY_SQL_SCHEMA"])
-    for kind in ("Incident", "Action"):
+    for kind in ("Incident", "Action", "InputDraft"):
         sql = (schema / f"dbo.Recovery{kind}.Table.sql").read_text(encoding="utf-8-sig")
         # SQL Server does not enforce FKs for temporary tables. Persistent FK is
         # covered by source validation; all other table constraints run here.
-        sql = re.sub(r"^\s*CONSTRAINT FK_RecoveryAction_Incident[^\n]*\n", "", sql, flags=re.M)
+        sql = re.sub(
+            r"^\s*CONSTRAINT FK_Recovery(?:Action|InputDraft)_Incident[^\n]*\n", "", sql, flags=re.M
+        )
         sql = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + uuid4().hex, sql)
         owner.execute(rewrite(sql))
 
@@ -74,6 +76,25 @@ def store():
         yield dal
     finally:
         owner.close()  # SQL Server removes only these session-owned temp objects.
+
+
+def test_large_export_incident_preserves_all_guided_links_and_failure_diagnostic(store):
+    evidence = dict(
+        title="Replacement",
+        explanation="Review the supplied output roles",
+        actions={},
+        targets=[f"old-{i:04}-" + "x" * 100 for i in range(1024)],
+    )
+    row = store.observe("export_job", str(uuid4()), evidence, "a" * 64)
+    assert row["evidence"] == evidence
+    store.check_failed(row["IncidentID"], "SourceConflict")
+    restored = store.get(row["IncidentID"])["evidence"]
+    assert restored["targets"] == evidence["targets"]
+    assert restored["check_unavailable"] == "SourceConflict"
+    with pytest.raises(ValueError, match="bound"):
+        store.observe("stats_import", str(uuid4()), evidence, "b" * 64)
+    with pytest.raises(ValueError, match="bound"):
+        store.observe("export_job", str(uuid4()), dict(evidence, padding="x" * 1048576), "c" * 64)
 
 
 def incident(store):

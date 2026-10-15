@@ -28,6 +28,7 @@ def scoped_jobs():
         "ExportAttempt",
         "ExportJob",
         "ExportExecutionStream",
+        "ExportContainedTarget",
     )
     sql = pyodbc.connect(
         "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes",
@@ -42,7 +43,10 @@ def scoped_jobs():
         return text
 
     try:
-        schema = Path(os.getenv("K98_CAPTURE_SQL_SCHEMA", "C:/K98-bot-SQL-Server/sql_schema"))
+        schema = Path(
+            os.getenv("K98_RECOVERY_SQL_SCHEMA")
+            or os.getenv("K98_CAPTURE_SQL_SCHEMA", "C:/K98-bot-SQL-Server/sql_schema")
+        )
         for name in names:
             text = (schema / f"dbo.{name}.Table.sql").read_text(encoding="utf-8-sig")
             text = "\n".join(line for line in text.splitlines() if "FOREIGN KEY" not in line)

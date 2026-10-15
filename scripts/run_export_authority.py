@@ -428,8 +428,11 @@ class AuthorityBroker:
             raise ValueError("Immutable protected authority registration required.")
         self.authority = authority
         self.registration = registration
+        self.base_registration = registration
+        self.registration_history = (registration,)
         self.boundary = boundary
         self.issuer = None
+        self.replacements = None
 
     def dispatch(self, message):
         from services.export_execution_protocol import ProviderRequest, uuid_text
@@ -448,6 +451,19 @@ class AuthorityBroker:
         ):
             raise ValueError("Versioned authority action required.")
         action = message.get("action")
+        if action == "effective_registration":
+            if set(message) != {"version", "action"} or self.replacements is None:
+                raise ValueError("Provisioned replacement registration authority required.")
+            self.boundary.recheck()
+            return self.replacements.current()
+        if action == "replacement_recovery":
+            if self.replacements is None:
+                raise ValueError("Provisioned replacement recovery authority required.")
+            return self.replacements.dispatch(message)
+        if self.replacements is not None and action in {"open", "prove"}:
+            self.registration_history, self.registration = self.replacements.registrations()
+            if self.issuer is not None:
+                self.issuer.registration = self.registration
         if action == "ready":
             if (
                 set(message) != {"version", "action"}
@@ -457,7 +473,7 @@ class AuthorityBroker:
                 raise ValueError("Complete provisioned authority required.")
             result = dict(
                 deployment_hash=self.boundary.recheck(),
-                registration_hash=self.registration.fingerprint,
+                registration_hash=self.base_registration.fingerprint,
             )
             from core.export_process_identity import TRUST_MODEL
 
@@ -582,7 +598,7 @@ class AuthorityBroker:
                 raise ValueError("Exact sorted resource membership required.")
             from services.export_execution_protocol import encode
 
-            self.registration.authorize_scope(scope)
+            self.registration.authorize_retained_scope(scope, self.registration_history)
             for key in ("RegistrationHash", "SnapshotHash"):
                 scope[key] = bytes.fromhex(scope[key])
             scope["ScopeJson"] = encode(scope["ScopeJson"]).decode()
@@ -845,6 +861,11 @@ def main(argv=None):
             pools=SourceOutputPoolDAL(connect, execution_evidence=True),
             client=LocalAuthorityClient(broker),
         )
+        from services.export_replacement_authority import ReplacementAuthority
+
+        broker.replacements = ReplacementAuthority(broker)
+        # Authenticate the entire retained chain before accepting any caller.
+        broker.replacements.current()
         try:
             serve(
                 manifest=manifest,

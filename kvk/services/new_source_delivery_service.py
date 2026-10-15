@@ -484,6 +484,11 @@ def deliver_coordinated_export(
         )
         dal.publication_pending(claim, attempt_id)
         remote = transport.publish_current(destination, delivery_key, claim.fence)
+        if isinstance(transport, ReaderSheetsTransport):
+            # Final delivery and cold recovery verify the same persisted grid
+            # identities, including the index, from a complete private readback.
+            transport.observation_bindings = transport.reader_bindings
+            transport.observation_index_id = transport.reader_index_id
         probe = SimpleNamespace(
             receipt=canonical({"export_key": delivery_key}),
             fence=claim.fence,

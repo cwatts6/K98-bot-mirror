@@ -1288,9 +1288,9 @@ def _render_run_all_exports(
     Returns a tuple (success: bool, log_messages: str) for the run. The second element is a single string
     (joined lines) to remain compatible with callers expecting to call .strip().
     """
-    assert all(
-        [server, database, username, password, credentials_file]
-    ), "One or more required parameters are missing"
+    assert all([server, database, username, password, credentials_file]), (
+        "One or more required parameters are missing"
+    )
     engine = get_sql_engine(server, database, username, password)
     client = get_gsheet_client(credentials_file)
     service = get_sort_service(credentials_file)
@@ -1530,9 +1530,9 @@ def run_single_export(
 def _render_run_single_export(
     server, database, username, password, config_path, credentials_file=CREDENTIALS_FILE
 ):
-    assert all(
-        [server, database, username, password, credentials_file]
-    ), "One or more required parameters are missing"
+    assert all([server, database, username, password, credentials_file]), (
+        "One or more required parameters are missing"
+    )
     engine = get_sql_engine(server, database, username, password)
     client = get_gsheet_client(credentials_file)
     service = get_sort_service(credentials_file)
@@ -3799,7 +3799,6 @@ def plan_legacy_outputs(scope, *, frames):
     Spreadsheet titles resolve only through supplied registered IDs. Grid IDs are
     captured too; a later rename/ID mismatch fails closed before content writes.
     """
-    import hashlib
     from types import SimpleNamespace
 
     from services.legacy_export_snapshot_service import OutputSection, SnapshotUnavailable
@@ -3824,10 +3823,9 @@ def plan_legacy_outputs(scope, *, frames):
         def worksheet(self, title):
             if title not in self.tabs:
                 known = scope.get("grid_ids", {}).get(self.id, {})
-                grid_id = known.get(
-                    title,
-                    int.from_bytes(hashlib.sha256(title.encode()).digest()[:4], "big") & 0x7FFFFFFF,
-                )
+                from services.export_legacy_grid_identity import legacy_grid_identity
+
+                grid_id = legacy_grid_identity(title, known)
                 if (self.id, grid_id) in by_grid:
                     raise SnapshotUnavailable("Planned grid ID collision.")
 

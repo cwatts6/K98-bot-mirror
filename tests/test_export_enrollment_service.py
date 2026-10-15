@@ -203,6 +203,9 @@ class MemoryDAL:
             hashlib.sha256(encode({k: [e["State"] for e in self.events[k]] for k in ids})).digest(),
         )
 
+    def read_replacement_origins(self, account, targets):
+        return []
+
     def read_origins(self, account, targets):
         return [
             r

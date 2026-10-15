@@ -60,8 +60,9 @@ class ExportExecutionAuthority:
         self.dispatch_guard = dispatch_guard
         if enrollment_plan is not None:
             from services.export_enrollment_service import EnrollmentPlan
+            from services.export_replacement_verification import ReplacementVerificationPlan
 
-            if not isinstance(enrollment_plan, EnrollmentPlan):
+            if not isinstance(enrollment_plan, (EnrollmentPlan, ReplacementVerificationPlan)):
                 raise ValueError("Protected typed enrollment plan required.")
         self.enrollment_plan = enrollment_plan
         # SQL owns cross-process exclusion. This lock also serializes local
@@ -69,6 +70,8 @@ class ExportExecutionAuthority:
         self._lock = threading.RLock()
         self._streams = {}
         self._closed = False
+        self._replacement_readers = {}
+        self._replacement_threads = {}
 
     def open_stream(self, *, stream_id, scope):
         """Called by the authenticated broker after immutable manifest validation."""
@@ -522,11 +525,62 @@ class ExportExecutionAuthority:
         """
         self.stop()
         failures = []
+        # Replacement checks own real supervised children, although their slow
+        # read-only requests intentionally do not hold this authority's lock.
+        # Close them before the parent session can be recorded as drained.
+        for key, worker in tuple(self._replacement_readers.items()):
+            if not worker.drain():
+                failures.append(key)
+        for thread in tuple(self._replacement_threads.values()):
+            if thread is not threading.current_thread():
+                thread.join()
         for stream_id, stream in tuple(self._streams.items()):
             if stream.closed:
                 continue
             try:
+                if self._drain_discarded_replacement(stream_id, stream):
+                    continue
                 self.close_stream(stream_id)
             except ExecutionUncertain:
                 failures.append(stream_id)
         return not failures and all(stream.closed for stream in self._streams.values())
+
+    def _drain_discarded_replacement(self, stream_id, owned):
+        from services.export_replacement_read_containment import verify_discarded_replacement
+        from services.export_replacement_verification import ReplacementVerificationPlan
+
+        if not isinstance(self.enrollment_plan, ReplacementVerificationPlan):
+            return False
+        with self._lock:
+            stream = self.dal.read_stream(stream_id)
+            if stream is None or stream["State"] != "read_contained":
+                return False
+            if (str(stream["SessionID"]).lower(), str(stream["ChildIdentity"]).lower()) != (
+                self.session_id,
+                owned.child.identity,
+            ):
+                raise ExecutionUncertain("Discarded read belongs to another local child.")
+            try:
+                verify_discarded_replacement(
+                    self.dal,
+                    self.store,
+                    stream,
+                    account=owned.account,
+                    registration_hash=self.enrollment_plan.digest,
+                )
+                self._terminate_child(owned)
+                observed = owned.termination_evidence
+                if (
+                    observed.get("child_id") != owned.child.identity
+                    or observed.get("process_signaled") is not True
+                    or observed.get("job_empty") is not True
+                ):
+                    raise ValueError("Child termination was not observed")
+            except Exception as exc:
+                raise ExecutionUncertain(
+                    "Discarded read child still requires termination verification."
+                ) from exc
+            # This is local handle retirement only. The SQL stream remains
+            # read_contained and never becomes evidence of provider success.
+            owned.closed = True
+            return True

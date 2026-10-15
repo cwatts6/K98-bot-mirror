@@ -80,7 +80,9 @@ class ExportTargetContainmentDAL:
                 pool_id,
             )
             slots = rows(cursor)
-            cursor.execute("SELECT COUNT(*) AS n FROM KVK.SourceOutputPool")
+            cursor.execute(
+                "SELECT COUNT(*) AS n FROM KVK.SourceOutputPool WHERE RetiredByReplacementID IS NULL"
+            )
             registration_count = one(cursor)["n"]
         cursor.execute(
             "SELECT * FROM dbo.ExportTargetContainment WITH(UPDLOCK,HOLDLOCK) WHERE JobID=?", job_id
@@ -106,6 +108,18 @@ class ExportTargetContainmentDAL:
             return self._snapshot(
                 cursor, identity(job_id), account, identity(pool_id) if pool_id else None
             )
+
+    def replacement_retirement(self, pool_id, account):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT a.*,p.ContainmentID FROM dbo.ExportReplacementActivation a "
+                "JOIN dbo.ExportReplacementPlan p ON p.ReplacementID=a.ReplacementID "
+                "WHERE a.OldPoolID=? AND a.AccountKey=? AND p.AccountKey=a.AccountKey",
+                identity(pool_id),
+                account,
+            )
+            result = one(cursor)
+            return _wire(result) if result is not None else None
 
     def settle(
         self,

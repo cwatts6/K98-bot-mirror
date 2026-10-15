@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "9103f2c2b54821e8145aedf63a17e4aca474c911",
+  "sql_revision": "9dc3e42beeed905ba9a3454ba1ad5e197c5db299",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -86,6 +86,11 @@
     "dbo.ExportProviderRequest",
     "dbo.ExportProviderRequestEvent",
     "dbo.ExportReconciliationProof",
+    "dbo.ExportReplacementActivation",
+    "dbo.ExportReplacementDelivery",
+    "dbo.ExportReplacementPlan",
+    "dbo.ExportReplacementTarget",
+    "dbo.ExportReplacementVerification",
     "dbo.ExportRequestBudget",
     "dbo.ExportResource",
     "dbo.ExportTargetContainment",
@@ -117,6 +122,9 @@
     "dbo.ProcConfig_Staging",
     "dbo.RALLY_EXPORT",
     "dbo.RANGEDSUMMARY_PROC",
+    "dbo.RecoveryAction",
+    "dbo.RecoveryIncident",
+    "dbo.RecoveryInputDraft",
     "dbo.Refresh_PlayerScanMeta",
     "dbo.SCAN_LIST",
     "dbo.SP_Stats_for_Upload",
@@ -182,6 +190,9 @@
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
     "dbo.usp_ExportReconciliationProofIssue",
+    "dbo.usp_ExportReplacementActivate",
+    "dbo.usp_ExportReplacementPlanCreate",
+    "dbo.usp_ExportReplacementVerificationTransition",
     "dbo.usp_GetKvkHistorySummaryMetricRanks",
     "dbo.usp_GetLeadershipPlayerIdentityHistory",
     "dbo.usp_GetLeadershipPlayerKvkHistory",
@@ -391,6 +402,11 @@
     "dbo.ExportProviderRequest",
     "dbo.ExportProviderRequestEvent",
     "dbo.ExportReconciliationProof",
+    "dbo.ExportReplacementActivation",
+    "dbo.ExportReplacementDelivery",
+    "dbo.ExportReplacementPlan",
+    "dbo.ExportReplacementTarget",
+    "dbo.ExportReplacementVerification",
     "dbo.ExportRequestBudget",
     "dbo.ExportResource",
     "dbo.ExportTargetContainment",
@@ -537,6 +553,9 @@
     "dbo.RallyData",
     "dbo.RallyData_Raw",
     "dbo.RangedPointsDelta",
+    "dbo.RecoveryAction",
+    "dbo.RecoveryIncident",
+    "dbo.RecoveryInputDraft",
     "dbo.Refresh_PlayerScanMeta",
     "dbo.SCAN_LIST",
     "dbo.SP_ExecutionLog",
@@ -619,6 +638,9 @@
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
     "dbo.usp_ExportReconciliationProofIssue",
+    "dbo.usp_ExportReplacementActivate",
+    "dbo.usp_ExportReplacementPlanCreate",
+    "dbo.usp_ExportReplacementVerificationTransition",
     "dbo.usp_GetKvkHistorySummaryMetricRanks",
     "dbo.usp_GetLeadershipPlayerIdentityHistory",
     "dbo.usp_GetLeadershipPlayerKvkHistory",
@@ -801,7 +823,8 @@
     "KVK.SourceOutputPool": [
       "KVK.SeasonSource",
       "KVK.SourceOutputFile",
-      "dbo.ExportResource"
+      "dbo.ExportResource",
+      "dbo.TARGETS"
     ],
     "KVK.SourceOutputSlot": [
       "KVK.SourceOutputDisposition",
@@ -1217,6 +1240,26 @@
     "dbo.ExportReconciliationProof": [
       "dbo.ExportExecutionSession"
     ],
+    "dbo.ExportReplacementActivation": [
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportReplacementVerification"
+    ],
+    "dbo.ExportReplacementDelivery": [
+      "dbo.ExportJob",
+      "dbo.ExportReplacementActivation"
+    ],
+    "dbo.ExportReplacementPlan": [
+      "dbo.ExportTargetContainment"
+    ],
+    "dbo.ExportReplacementTarget": [
+      "dbo.ExportContainedTarget",
+      "dbo.ExportReplacementPlan"
+    ],
+    "dbo.ExportReplacementVerification": [
+      "dbo.ExportExecutionSession",
+      "dbo.ExportPreparation",
+      "dbo.ExportReplacementPlan"
+    ],
     "dbo.ExportRequestBudget": [],
     "dbo.ExportResource": [
       "KVK.SourceOutputOperationResource",
@@ -1547,6 +1590,13 @@
     "dbo.RallyData": [],
     "dbo.RallyData_Raw": [],
     "dbo.RangedPointsDelta": [],
+    "dbo.RecoveryAction": [
+      "dbo.RecoveryIncident"
+    ],
+    "dbo.RecoveryIncident": [],
+    "dbo.RecoveryInputDraft": [
+      "dbo.RecoveryIncident"
+    ],
     "dbo.Refresh_PlayerScanMeta": [
       "dbo.KS",
       "dbo.KingdomScanData4",
@@ -2044,16 +2094,23 @@
       "KVK.SourceOutputOperation",
       "KVK.SourceOutputPool",
       "KVK.SourceOutputSlot",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
+      "dbo.ExportJobResource",
       "dbo.ExportManagedFileOrigin",
       "dbo.ExportManualFileOrigin",
       "dbo.ExportPreparation",
       "dbo.ExportPreparationResource",
       "dbo.ExportProviderRequest",
       "dbo.ExportProviderRequestEvent",
-      "dbo.ExportResource"
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportReplacementTarget",
+      "dbo.ExportReplacementVerification",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment",
+      "dbo.TARGETS"
     ],
     "dbo.usp_ExportOutputEnrollmentTransition": [
       "KVK.SourceOutputOperation",
@@ -2067,6 +2124,7 @@
       "dbo.ExportPreparationResource",
       "dbo.ExportProviderRequest",
       "dbo.ExportProviderRequestEvent",
+      "dbo.ExportReplacementVerification",
       "dbo.ExportResource"
     ],
     "dbo.usp_ExportProviderRequestEventAppend": [
@@ -2094,7 +2152,70 @@
       "dbo.ExportPreparation",
       "dbo.ExportProviderRequest",
       "dbo.ExportProviderRequestEvent",
-      "dbo.ExportReconciliationProof"
+      "dbo.ExportReconciliationProof",
+      "dbo.ExportReplacementActivation",
+      "dbo.ExportReplacementTarget",
+      "dbo.ExportReplacementVerification",
+      "dbo.TARGETS"
+    ],
+    "dbo.usp_ExportReplacementActivate": [
+      "KVK.SourceOutputFile",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportContainedTarget",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportManualFileOrigin",
+      "dbo.ExportPreparation",
+      "dbo.ExportReplacementActivation",
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportReplacementTarget",
+      "dbo.ExportReplacementVerification",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment",
+      "dbo.TARGETS"
+    ],
+    "dbo.usp_ExportReplacementPlanCreate": [
+      "KVK.SourceOutputOperationResource",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportContainedTarget",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportManualFileOrigin",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportReplacementActivation",
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportReplacementTarget",
+      "dbo.ExportReplacementVerification",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment"
+    ],
+    "dbo.usp_ExportReplacementVerificationTransition": [
+      "KVK.SourceOutputOperation",
+      "KVK.SourceOutputPool",
+      "KVK.SourceOutputSlot",
+      "dbo.ExportContainedTarget",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportManagedFileOrigin",
+      "dbo.ExportManualFileOrigin",
+      "dbo.ExportPreparation",
+      "dbo.ExportPreparationResource",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportReplacementActivation",
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportReplacementTarget",
+      "dbo.ExportReplacementVerification",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment"
     ],
     "dbo.usp_GetKvkHistorySummaryMetricRanks": [
       "dbo.HealedTroopsDelta",

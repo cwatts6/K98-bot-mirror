@@ -443,7 +443,9 @@ class SourceOutputPoolDAL:
             raise SourceConflict("Immutable registration hash differs.")
         cursor.execute("SELECT * FROM KVK.SourceOutputSlot WHERE PoolID=? ORDER BY FileID", pool_id)
         slots = rows(cursor)
-        cursor.execute("SELECT COUNT(*) AS Count FROM KVK.SourceOutputPool")
+        cursor.execute(
+            "SELECT COUNT(*) AS Count FROM KVK.SourceOutputPool WHERE RetiredByReplacementID IS NULL"
+        )
         count = one(cursor)["Count"]
         cursor.execute(
             "SELECT j.* FROM dbo.ExportJob j WHERE j.AccountKey=? AND j.ConsumerKind='new_source' AND j.KVK_NO=? AND j.PoolEpoch=? AND EXISTS (SELECT 1 FROM dbo.ExportJobResource r WHERE r.JobID=j.JobID AND r.ResourceKey=?) ORDER BY j.EnqueueSequence,j.JobID",

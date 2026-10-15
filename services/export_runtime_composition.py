@@ -38,6 +38,8 @@ class RuntimeLifetime:
         self._condition = threading.Condition()
         self._calls = set()
         self._accepting = True
+        self._reconfiguring = False
+        self._reconfiguration_calls = set()
 
     @contextmanager
     def owned(self):
@@ -56,6 +58,7 @@ class RuntimeLifetime:
                 call = inherited
                 call.references += 1
             else:
+                self._condition.wait_for(lambda: not self._reconfiguring or not self._accepting)
                 if not self._accepting:
                     raise SourceConflict("Export runtime admission is closed.")
                 call, root = RuntimeCall(self), True
@@ -76,13 +79,64 @@ class RuntimeLifetime:
     def stop(self):
         with self._condition:
             self._accepting = False
+            self._condition.notify_all()
+
+    @contextmanager
+    def reconfigure(self, *, recovery=False):
+        """Keep every admitted caller on one registration during admin activation."""
+        inherited = _caller.get()
+        if inherited is not None and not recovery:
+            raise SourceConflict("Registration cannot change inside an active export call.")
+        suspended = False
+        acquired = False
+        token = None
+        try:
+            with self._condition:
+                if inherited is not None:
+                    if (
+                        inherited.bundle is not self
+                        or inherited not in self._calls
+                        or not inherited.active
+                        or inherited.references != 1
+                    ):
+                        raise SourceConflict("Recovery activation requires a sole, active caller.")
+                    # Recovery owns no provider operation here. Suspend only this
+                    # call while existing export work drains. Track it separately
+                    # so shutdown still waits for the complete admin action.
+                    self._calls.remove(inherited)
+                    self._reconfiguration_calls.add(inherited)
+                    suspended = True
+                    token = _caller.set(None)
+                    self._condition.notify_all()
+                self._condition.wait_for(lambda: not self._reconfiguring or not self._accepting)
+                if not self._accepting:
+                    raise SourceConflict("Export runtime admission is closed.")
+                self._reconfiguring = True
+                acquired = True
+                self._condition.wait_for(lambda: not self._calls or not self._accepting)
+                if not self._accepting:
+                    raise SourceConflict("Export runtime admission is closed.")
+            yield
+        finally:
+            with self._condition:
+                if acquired:
+                    self._reconfiguring = False
+                if suspended:
+                    self._reconfiguration_calls.remove(inherited)
+                    self._calls.add(inherited)
+                    _caller.reset(token)
+                self._condition.notify_all()
 
     def drain(self):
         if _caller.get() is not None:
             raise SourceConflict("An owned export call cannot wait for itself to drain.")
         self.stop()
         with self._condition:
-            self._condition.wait_for(lambda: not self._calls)
+            self._condition.wait_for(
+                lambda: (
+                    not self._calls and not self._reconfiguration_calls and not self._reconfiguring
+                )
+            )
 
 
 def configured_runtime():
@@ -233,6 +287,8 @@ class ExportRuntime(RuntimeLifetime):
         if client.deployment_hash is None:
             raise SourceConflict("Runtime requires the approved authority deployment identity.")
         self.connect, self.registration, self.client = connect, registration, client
+        self.base_registration = registration
+        self.registration_history = (registration,)
         self.sql_profile = sql_profile
         config = registration.value()
         if store.storage_owner != config["storage_owner"]:
@@ -259,6 +315,7 @@ class ExportRuntime(RuntimeLifetime):
             storage_owner=store.storage_owner,
             configuration=config["legacy_configuration"],
         )
+        self._legacy_streams = legacy_streams
         legacy = LegacyExportRuntime(
             dal=preparations,
             coordinator=self.dal,
@@ -333,6 +390,13 @@ class ExportRuntime(RuntimeLifetime):
             authority_stream=legacy_streams.delivery,
             legacy_file_access=config.get("legacy_file_access", {}),
         )
+        self._legacy_adapter = legacy_adapter
+        from services.export_replacement_recovery_adapter import ReplacementRecoveryAdapter
+
+        legacy.recovery_adapters = (
+            ReplacementRecoveryAdapter(legacy.recovery_adapters[0], runtime=self, store=store),
+            legacy.recovery_adapters[1],
+        )
         self.coordinator = ExportCoordinator(
             self.dal,
             adapters={
@@ -345,15 +409,115 @@ class ExportRuntime(RuntimeLifetime):
             rollover=self.rollover,
         )
 
-    def reader_binding(self, intent_id, expected_hash, *, pool_id, job_id=None):
+    def refresh_replacement_registration(self):
+        from services.export_recovery_dal import ExportRecoveryDAL
+
+        current, history = self.client.effective_registration(self.base_registration)
+        # Called under reconfigure, or before initial publication of the bundle.
+        if self._calls:
+            raise SourceConflict("Active callers must drain before registration changes.")
+        config = current.value()
+        self.registration, self.registration_history = current, tuple(history)
+        encoded = _legacy_configuration(config["legacy_configuration"])
+        self.legacy.configuration = encoded
+        self._legacy_streams.configuration_json = encoded
+        self._legacy_streams.configuration_history = tuple(
+            _legacy_configuration(r.value()["legacy_configuration"]) for r in history
+        )
+        self._legacy_adapter.legacy_file_access = config.get("legacy_file_access", {})
+        discovery = ExportRecoveryDAL(self.connect, registration=current, history=history)
+        self.legacy.recovery_adapters[0].base.discovery = discovery
+        self.legacy.recovery_adapters[1].discovery = discovery
+
+    def replacement_source_plan(self, snapshot, activation, actor, reason):
+        from kvk.services.source_output_pool_service import capacity_for_snapshot
+        from kvk.services.source_reader_activation import physical_generation
+        from services.export_coordination_dal import JobSpec, bounded_json
+
+        job = snapshot["job"]
+        config = self.registration.value()
+        files = tuple(sorted(activation["mapping"].values()))
+        selected = [
+            p for p in config["pools"] if set(files) == {p["index_file_id"], *p["slot_file_ids"]}
+        ]
+        if len(selected) != 1:
+            raise SourceConflict("One activated complete replacement pool required.")
+        context = self.pools.snapshot(selected[0]["pool_id"])
+        self.registration.sheets(context)
+        pool = context["pool"]
+        if pool["ActiveKVK"] != job["KVK_NO"] or pool["PoolState"] != "active":
+            raise SourceConflict("Replacement pool season or admission changed.")
+        original = self.dal.operator_snapshot(job["JobID"])
+        generation = physical_generation(
+            self.load_generation(
+                job["IntentID"],
+                bytes.fromhex(job["InputHash"]),
+                pool_id=original["pool"]["pool"]["PoolID"],
+                job_id=job["JobID"],
+            )
+        )
+        needed = capacity_for_snapshot(generation.manifest(), context)
+        proof = dict(
+            pool_id=pool["PoolID"],
+            pool_version=pool["Version"],
+            registration_hash=pool["RegistrationHash"],
+            epoch=pool["Epoch"],
+            generation_key=generation.key,
+            manifest_hash=digest(generation.manifest()).hex(),
+            parts=needed.current_parts,
+            required_files=needed.required_files,
+        )
+        provenance = dict(
+            output_preflight=proof,
+            replacement=dict(
+                original_job_id=job["JobID"],
+                original_input_sha256=job["InputHash"],
+                activation_id=activation["activation_id"],
+                replacement_id=activation["replacement_id"],
+                **(
+                    {"input_evidence": activation["input_evidence"]}
+                    if "input_evidence" in activation
+                    else {}
+                ),
+            ),
+        )
+        return JobSpec(
+            account=job["AccountKey"],
+            consumer="new_source",
+            kvk_no=job["KVK_NO"],
+            intent_id=job["IntentID"],
+            input_hash=bytes.fromhex(job["InputHash"]),
+            destinations=files,
+            epoch=pool["Epoch"],
+            actor=actor,
+            reason=reason,
+            provenance=bounded_json(provenance),
+        )
+
+    def reader_binding(
+        self, intent_id, expected_hash, *, pool_id, job_id=None, _visited=frozenset()
+    ):
         from kvk.dal.source_reader_activation_dal import intent_scope
         from kvk.services.source_reader_activation import reader_manifest
         from services.export_coordination_dal import checked_attempt_manifest
 
-        registered = self.registration.value()
+        if job_id is not None:
+            if job_id in _visited or len(_visited) >= 64:
+                raise SourceConflict("Replacement reader lineage is cyclic or exceeds its bound.")
+            _visited = _visited | {job_id}
         season, versions = intent_scope(self.connect, intent_id, expected_hash)
-        if pool_id not in {pool["pool_id"] for pool in registered["pools"]}:
+        history = getattr(self, "registration_history", (self.registration,))
+        original_registration = next(
+            (
+                item
+                for item in reversed(history)
+                if any(pool["pool_id"] == pool_id for pool in item.value()["pools"])
+            ),
+            None,
+        )
+        if original_registration is None:
             raise SourceConflict("Reader activation requires its registered destination pool.")
+        registered = original_registration.value()
         retained = []
         snapshot = self.pools.snapshot(pool_id)
         jobs = {
@@ -367,6 +531,54 @@ class ExportRuntime(RuntimeLifetime):
             attempts = [
                 a for a in snapshot.get("attempts", []) if a["JobID"] == current_job["JobID"]
             ]
+            replacement = None
+            if not attempts:
+                try:
+                    provenance = json.loads(current_job["ProvenanceJson"])
+                    if not isinstance(provenance, dict):
+                        raise ValueError("Retained provenance must be an object.")
+                    replacement = provenance.get("replacement")
+                    if replacement is not None and (
+                        not isinstance(replacement, dict)
+                        or not {"original_job_id", "activation_id"} <= set(replacement)
+                    ):
+                        raise ValueError("Replacement provenance is incomplete.")
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise SourceConflict(
+                        "Reader recovery requires its intact retained origin."
+                    ) from exc
+            if not attempts and replacement is not None:
+                from services.export_replacement_delivery_dal import ReplacementDeliveryDAL
+
+                link = ReplacementDeliveryDAL(self.connect, self.dal).read(
+                    replacement["original_job_id"],
+                    replacement["activation_id"],
+                    current_job["AccountKey"],
+                )
+                if (
+                    link is None
+                    or link["ReplacementJobID"] != current_job["JobID"]
+                    or link["OriginalInputHash"] != expected_hash.hex()
+                    or link["ReplacementInputHash"] != expected_hash.hex()
+                ):
+                    raise SourceConflict(
+                        "Replacement reader layout has no exact original delivery link."
+                    )
+                original = self.dal.operator_snapshot(link["OriginalJobID"])
+                if (
+                    original["job"]["IntentID"] != intent_id
+                    or original["job"]["InputHash"] != expected_hash.hex()
+                ):
+                    raise SourceConflict("Replacement reader intent differs from its original.")
+                binding = self.reader_binding(
+                    intent_id,
+                    expected_hash,
+                    pool_id=original["pool"]["pool"]["PoolID"],
+                    job_id=link["OriginalJobID"],
+                    _visited=_visited,
+                )
+                retained.append(dict(binding, pool_id=pool_id) if binding else None)
+                continue
             if not attempts and current_job.get("RepairID"):
                 # Admission pins the original job/attempt in durable repair provenance.
                 # A fresh repair has no attempt yet, but must retain that exact layout.
@@ -419,7 +631,7 @@ class ExportRuntime(RuntimeLifetime):
         if binding is None or versions != {binding["calculation_version"]}:
             return None
         context = snapshot
-        self.registration.sheets(context)
+        original_registration.sheets(context)
         if context["pool"]["ActiveKVK"] != season:
             raise SourceConflict("Reader activation belongs to another pool season.")
         return binding
@@ -527,11 +739,20 @@ class ExportRuntime(RuntimeLifetime):
             if stop.is_set():
                 return
             registrations = []
+            from services.export_replacement_delivery_dal import ReplacementDeliveryDAL
+
+            awaiting = ReplacementDeliveryDAL(self.connect, self.dal).awaiting_initial_publication(
+                self.registration.value()["account"]
+            )
             for configured in self.registration.value()["pools"]:
                 context = self.pools.snapshot(configured["pool_id"])
                 sheets = self.registration.sheets(context)
                 pool = context["pool"]
-                if pool["PoolState"] == "active" and pool["OwnerID"] is None:
+                if (
+                    pool["PoolState"] == "active"
+                    and pool["OwnerID"] is None
+                    and pool["PoolID"] not in awaiting
+                ):
                     registrations.append(
                         ExportRegistration(
                             pool["ActiveKVK"],
@@ -741,6 +962,7 @@ def _prepare_configured_runtime():
         application_sql_contract=config["application_sql_contract"],
         sql_profile=config["sql_contract"]["profile"],
     )
+    bundle.refresh_replacement_registration()
     return bundle
 
 
@@ -1016,6 +1238,44 @@ class RuntimeRegistration:
                     raise SourceConflict("Exact registered legacy/configuration scope required.")
                 return
         raise SourceConflict("Stream registration is absent from the protected authority manifest.")
+
+    def authorize_retained_scope(self, scope, history):
+        """Keep immutable queued legacy inputs valid when unrelated outputs move."""
+        try:
+            self.authorize_scope(scope)
+            return
+        except SourceConflict:
+            if scope["OwnerKind"] != "job" or scope["Purpose"] != "mutation":
+                raise
+        from services.legacy_export_snapshot_service import configuration_digest
+
+        current = self.value()
+        files = {
+            r["key"].removeprefix("destination:")
+            for r in scope["ScopeJson"]["resources"]
+            if r["key"].startswith("destination:")
+        }
+        for original in history:
+            old = original.value()
+            for kind in ("scan_data", "all_kvk"):
+                configured = old["legacy_configuration"][kind]
+                active = current["legacy_configuration"][kind]
+                if (
+                    scope["RegistrationHash"] == configuration_digest(configured)
+                    and files <= set(active["destinations"])
+                    and configured.get("kvk_no") == active.get("kvk_no")
+                    and old["service_account_email"] == current["service_account_email"]
+                    and all(
+                        old.get("legacy_file_access", {}).get(f)
+                        == current.get("legacy_file_access", {}).get(f)
+                        and configured.get("grid_ids", {}).get(f)
+                        == active.get("grid_ids", {}).get(f)
+                        for f in files
+                    )
+                ):
+                    original.authorize_scope(scope)
+                    return
+        raise SourceConflict("Retained legacy scope has changed destinations or access policy.")
 
     def sheets(self, context):
         """Resolve one exact current SQL pool; never infer a file from a title."""
@@ -2054,6 +2314,7 @@ class LegacyExecutionStreams:
         self.coordinator, self.preparations, self.client = coordinator, preparations, client
         self.account, self.storage_owner = account, storage_owner
         self.configuration_json = _legacy_configuration(configuration)
+        self.configuration_history = (self.configuration_json,)
 
     def _scope(self, row, claim, destinations, *, kind, configured):
         from kvk.dal.source_output_pool_dal import _wire
@@ -2101,9 +2362,21 @@ class LegacyExecutionStreams:
         from services.legacy_export_snapshot_service import configuration_digest
 
         current = _wire(self.coordinator.authorize(claim))
-        configured = json.loads(self.configuration_json).get(current["ConsumerKind"])
+        active = json.loads(self.configuration_json).get(current["ConsumerKind"])
+        expected = json.loads(current["ProvenanceJson"]).get("registration_sha256")
+        configured = next(
+            (
+                scope
+                for document in reversed(self.configuration_history)
+                if (scope := json.loads(document).get(current["ConsumerKind"])) is not None
+                and configuration_digest(scope) == expected
+            ),
+            None,
+        )
         if (
             configured is None
+            or active is None
+            or not set(destinations) <= set(active["destinations"])
             or current["ConsumerKind"] not in {"all_kvk", "scan_data"}
             or current != _wire(job)
             or current["State"] != "running"
@@ -2286,6 +2559,48 @@ class AuthorityClient:
 
     def inspect_target_recovery(self, job_id):
         return self._target_recovery("inspect_target_recovery", job_id)
+
+    def effective_registration(self, base):
+        result = self._invoke(dict(version=1, action="effective_registration"))
+        if (
+            not isinstance(result, dict)
+            or set(result) != {"base_sha256", "registration", "registration_sha256", "history"}
+            or result["base_sha256"] != base.fingerprint
+        ):
+            raise ExecutionUncertain("Replacement registration belongs to another deployment.")
+        current = RuntimeRegistration(result["registration"])
+        history = [RuntimeRegistration(r) for r in result["history"]]
+        if (
+            not history
+            or history[0] != base
+            or history[-1] != current
+            or current.fingerprint != result["registration_sha256"]
+        ):
+            raise ExecutionUncertain("Authenticated replacement registration history differs.")
+        return current, history
+
+    def replacement_recovery(self, job_id, operation, **values):
+        uuid_text(job_id)
+        result = self._invoke(
+            dict(
+                version=1,
+                action="replacement_recovery",
+                job_id=job_id,
+                operation=operation,
+                **values,
+            )
+        )
+        if operation in {"inspect", "execute"}:
+            if (
+                not isinstance(result, dict)
+                or set(result) != {"evidence", "token", "resolved"}
+                or type(result["resolved"]) is not bool
+                or not isinstance(result["token"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
+                or not isinstance(result["evidence"], dict)
+            ):
+                raise ExecutionUncertain("Replacement recovery acknowledgement differs.")
+        return result
 
     def isolate_export_targets(self, job_id, token, actor, reason):
         return self._target_recovery(

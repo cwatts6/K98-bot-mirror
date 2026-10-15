@@ -1,0 +1,315 @@
+"""One guided unknown-write recovery, from isolation to verified replacement delivery.
+
+Every choice belongs to a durable recovery action. Inspection and reconciliation
+use original receipts; neither a missing response nor a restart replays a write.
+"""
+
+import json
+
+from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.export_coordination_dal import identity
+from services.export_replacement_input import replacement_fields, replacement_input
+
+
+def choice(label, check, effect, *, input=False):
+    result = dict(label=label, check=check, effect=effect)
+    if input:
+        result["input"] = True
+    return result
+
+
+class ReplacementWorkflow:
+    def __init__(
+        self,
+        *,
+        proposals,
+        verification,
+        activation,
+        plan_factory,
+        continuation,
+        proposal_writer=None,
+    ):
+        self.proposals, self.verification, self.activation = proposals, verification, activation
+        self.plan_factory, self.continuation = plan_factory, continuation
+        self.registration = proposals.registration
+        self.account = self.registration.value()["account"]
+        self.proposal_writer = proposal_writer or proposals
+
+    def _state(self, job_id):
+        isolated = self.proposals.containment.inspect(job_id)
+        proposals = self.proposals.dal.for_job(job_id, account=self.account)
+        result = dict(
+            job_id=job_id,
+            isolation=isolated,
+            proposal=None,
+            check=None,
+            activation=None,
+            delivery=None,
+            current_registration_sha256=self.proposal_writer.registration.fingerprint,
+        )
+        # The containment inspector contains private ledger details before its
+        # decision. Only its opaque review token and bounded target IDs leave it.
+        result["isolation"] = {
+            k: isolated.get(k) for k in ("outcome", "token", "targets", "actor", "reason")
+        }
+        if proposals:
+            result["proposal"] = self.proposals.inspect(proposals[-1])
+            checks = self.verification.dal.list_for_plan(proposals[-1], account=self.account)
+            if checks:
+                result["check"] = self.verification.inspect(checks[-1])
+            activated = [
+                r
+                for r in self.activation.dal.chain(self.account)
+                if identity(r["ReplacementID"]) in proposals
+            ]
+            if len(activated) > 1:
+                raise SourceConflict("The original job has conflicting replacement activations.")
+            if activated:
+                result["activation"] = self.activation.verify(activated[0], self.registration)
+                result["delivery"] = self.continuation.inspect(job_id, result["activation"])
+        return result
+
+    def inspect(self, job_id):
+        state = self._state(identity(job_id))
+        actions, resolved = {}, False
+        isolated, proposal, checked = state["isolation"], state["proposal"], state["check"]
+        if isolated["outcome"] != "targets_isolated":
+            stage = "isolation_required"
+            explanation = "The old write may still arrive. Retire its complete output set, then use verified fresh files to publish the retained input. The original uncertainty will remain in the audit history."
+            actions["isolate_targets"] = choice(
+                "Retire affected outputs",
+                "Confirm the listed old outputs must no longer be used. Warn readers that those links may still change.",
+                "Permanently fence these targets and release this job's exact reservations. Continue here to replace the outputs; this does not confirm delivery.",
+            )
+        elif state["activation"] is not None:
+            delivery = state["delivery"]
+            stage, explanation = delivery["stage"], delivery["explanation"]
+            resolved = delivery["resolved"]
+            actions = delivery["actions"]
+        elif self.registration.fingerprint != self.proposal_writer.registration.fingerprint and (
+            checked is None or checked["state"] != "checking"
+        ):
+            stage = "refresh_replacement_choices"
+            explanation = (
+                "Another recovery updated the output registration while these choices were being reviewed. "
+                "Re-enter the replacement links against the current registration, then run a fresh check. "
+                "The earlier proposal and verification remain in the audit history."
+            )
+            actions["choose_replacements"] = choice(
+                "Refresh replacement choices",
+                "Review the current output roles and enter the fresh replacement files again.",
+                "Create a new immutable proposal that preserves the other completed recovery. Recheck the files before activation.",
+                input=True,
+            )
+        elif checked is not None and checked["state"] == "checking":
+            stage = "checking_replacements"
+            explanation = "The read-only check has been admitted. Recheck progress here. If its response was lost, verify the original journal; if it cannot verify, discard this read attempt and start a fresh check. No old write is retried."
+            actions["finish_replacement_check"] = choice(
+                "Verify original check",
+                "Keep the replacement files unchanged while the bot verifies its retained journal.",
+                "Accept only a complete original readback and positive child closure. This makes no new provider request.",
+            )
+            actions["discard_replacement_check"] = choice(
+                "Discard this read check",
+                "Confirm this unfinished read result can be discarded. The old uncertain write stays isolated.",
+                "Verify the complete typed read ledger, fence this check and release its exact reservations. Then offer a fresh verification or new file choices.",
+            )
+            explanation += " " + checked.get("diagnostic", "")
+            if "files_total" in checked:
+                explanation += (
+                    f" Read requests issued for {checked['files_requested']} of "
+                    f"{checked['files_total']} files. Completed read requests alone do not "
+                    "confirm verification; the original journal must pass all checks."
+                )
+            if checked.get("can_finish") is not True:
+                actions.pop("finish_replacement_check", None)
+        elif checked is not None and checked["state"] == "verified":
+            stage = "activation_required"
+            explanation = "All replacement files passed owner, sharing and blank-content checks. Confirm activation, then publish the original retained input to the replacements."
+            actions["activate_replacements"] = choice(
+                "Use verified replacements",
+                "Confirm the displayed new files are the intended output locations and remain unchanged since verification.",
+                "Seal the new registration and retire the original pool where applicable. Delivery remains open until the retained input is published and verified.",
+            )
+        else:
+            stage = "choose_replacements" if proposal is None else "verification_required"
+            explanation = "The old targets are permanently isolated. The form lists every required replacement, its owner and sharing policy. Saved pages survive reopening and restart."
+            actions["choose_replacements"] = choice(
+                "Enter replacement links",
+                "Create fresh blank spreadsheets under the displayed registered owner and apply the listed sharing permissions.",
+                "Save the complete file mapping for verification. Pasting links does not authorize writes or activate them.",
+                input=True,
+            )
+            if proposal is not None:
+                actions["verify_replacements"] = choice(
+                    "Check replacement files",
+                    "Confirm the proposed files are ready for read-only owner, sharing and content verification.",
+                    "Start one bounded read-only check of the complete proposed set. Its durable identity prevents a duplicate check after a lost reply.",
+                )
+        evidence = dict(
+            title="Unknown-write replacement recovery",
+            outcome=stage,
+            explanation=explanation,
+            actions=actions,
+            targets=isolated["targets"],
+            replacements=proposal["mapping"] if proposal else {},
+            delivery=state["delivery"],
+        )
+        return evidence, digest(state).hex(), resolved
+
+    def _reviewed(self, job_id, token):
+        evidence, actual, resolved = self.inspect(job_id)
+        if actual != token or resolved:
+            raise SourceConflict("Replacement recovery changed. Review its current choices.")
+        state = self._state(job_id)
+        if digest(state).hex() != token:
+            raise SourceConflict("Replacement recovery changed. Review its current choices.")
+        return evidence, state
+
+    def input_fields(self, job_id, action, token):
+        evidence, state = self._reviewed(job_id, token)
+        if action != "choose_replacements" or action not in evidence["actions"]:
+            raise SourceConflict("The replacement form is no longer available.")
+        return replacement_fields(self.proposal_writer.registration, state["isolation"]["targets"])
+
+    def validate_input(self, job_id, action, token, payload):
+        self.input_fields(job_id, action, token)
+        _, state = self._reviewed(job_id, token)
+        owner, mapping = replacement_input(
+            self.proposal_writer.registration, state["isolation"]["targets"], payload
+        )
+        from uuid import uuid4
+
+        from services.export_replacement_plan import replacement_registration
+
+        replacement_registration(
+            self.proposal_writer.registration,
+            targets=state["isolation"]["targets"],
+            replacements=mapping,
+            replacement_id=str(uuid4()),
+        )
+        return f"Verify {len(mapping)} fresh spreadsheets owned by {owner}. The original targets remain isolated. Review the saved role/link pairs on each form page before confirming."
+
+    def execute(self, job_id, action, token, actor, reason, *, payload=None):
+        evidence, state = self._reviewed(job_id, token)
+        if action not in evidence["actions"]:
+            raise SourceConflict("This replacement step is no longer available.")
+        action_id = identity(actor.removeprefix("recovery:"))
+        if actor != "recovery:" + action_id:
+            raise SourceConflict("Durable admin recovery identity required.")
+        if action == "isolate_targets":
+            self.proposals.containment.apply(
+                job_id, token=state["isolation"]["token"], actor=actor, reason=reason
+            )
+        elif action == "choose_replacements":
+            owner, mapping = replacement_input(
+                self.proposal_writer.registration, state["isolation"]["targets"], payload
+            )
+            self.proposal_writer.propose(
+                job_id,
+                token=state["isolation"]["token"],
+                replacements=mapping,
+                owner_email=owner,
+                actor=actor,
+                reason=reason,
+            )
+        elif action == "verify_replacements":
+            plan = self.plan_factory(state["proposal"], action_id)
+            self.verification.start(plan, actor=actor, reason=reason)
+        elif action == "finish_replacement_check":
+            self.verification.finish(state["check"]["verification_id"])
+        elif action == "discard_replacement_check":
+            self.verification.discard(
+                state["check"]["verification_id"],
+                token=state["check"]["token"],
+                actor=actor,
+                reason=reason,
+            )
+        elif action == "activate_replacements":
+            self.activation.apply(
+                state["proposal"]["replacement_id"],
+                state["check"]["verification_id"],
+                token=state["check"]["token"],
+                actor=actor,
+                reason=reason,
+            )
+        else:
+            self.continuation.execute(
+                job_id, state["activation"], action, actor=actor, reason=reason
+            )
+
+    def reconcile(self, job_id, action):
+        state = self._state(job_id)
+        kind, key = action["ActionKind"], action["ActionID"]
+        actor = "recovery:" + key
+        if kind == "isolate_targets" and state["isolation"]["actor"] == actor:
+            return "verified"
+        if kind == "choose_replacements":
+            row = self.proposals.dal.read(key, account=self.account)
+            if row is not None:
+                proposal = self.proposals.verify(row)
+                owner, mapping = replacement_input(
+                    self.registration,
+                    state["isolation"]["targets"],
+                    json.loads(action["InputJson"]),
+                )
+                if (
+                    proposal["job_id"] != job_id
+                    or proposal["mapping"] != mapping
+                    or proposal["owner_email"] != owner
+                ):
+                    raise SourceConflict(
+                        "Saved replacement choices differ from their action receipt."
+                    )
+                return "verified"
+        if kind == "verify_replacements":
+            checked = self.verification.inspect(key)
+            if checked is not None:
+                if (
+                    state["proposal"] is None
+                    or checked["replacement_id"] != state["proposal"]["replacement_id"]
+                ):
+                    raise SourceConflict("Verification belongs to another replacement proposal.")
+                return "verified"  # Admission of this step only; incident remains open.
+        if (
+            kind == "finish_replacement_check"
+            and state["check"]
+            and state["check"]["state"] == "verified"
+        ):
+            return "verified"
+        if kind == "finish_replacement_check":
+            # This step dispatches no provider operation. If it did not settle,
+            # unlock the guided discard choice instead of retrying a bad journal
+            # forever as an uncertain admin action.
+            return "not_applied"
+        if (
+            kind == "discard_replacement_check"
+            and state["check"]
+            and state["check"]["state"] == "discarded"
+            and state["check"]["actor"] == actor
+        ):
+            return "verified"
+        if (
+            kind == "activate_replacements"
+            and state["activation"]
+            and state["activation"]["activation_id"] == key
+        ):
+            return "verified"
+        if state["activation"] is not None and kind not in {
+            "activate_replacements",
+            "finish_replacement_check",
+        }:
+            result = self.continuation.reconcile(job_id, state["activation"], action)
+            if result is not None:
+                return result
+        if self.inspect(job_id)[1] != action["EvidenceHash"]:
+            return "not_applied"
+        self.execute(
+            job_id,
+            kind,
+            action["EvidenceHash"],
+            actor,
+            action["Reason"],
+            payload=json.loads(action["InputJson"]) if action.get("InputJson") else None,
+        )
+        return None

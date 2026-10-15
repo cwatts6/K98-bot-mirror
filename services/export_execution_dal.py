@@ -120,7 +120,56 @@ _PROCEDURES = {
     "enrollment": "dbo.usp_ExportOutputEnrollmentTransition",
     "manual_enrollment": "dbo.usp_ExportManualOutputEnrollmentTransition",
     "target_containment": "dbo.usp_ExportJobContainTargets",
+    "replacement_plan": "dbo.usp_ExportReplacementPlanCreate",
+    "replacement_verification": "dbo.usp_ExportReplacementVerificationTransition",
+    "replacement_activation": "dbo.usp_ExportReplacementActivate",
 }
+_PARAMETERS["replacement_plan"] = (
+    "ReplacementID",
+    "ContainmentID",
+    "AccountKey",
+    "BaseRegistrationHash",
+    "ProjectedRegistrationHash",
+    "ReceiptHash",
+    "ReceiptReference",
+    "MappingJson",
+    "Actor",
+    "Reason",
+)
+_PARAMETERS["replacement_verification"] = (
+    "VerificationID",
+    "ReplacementID",
+    "SessionID",
+    "AccountKey",
+    "Action",
+    "PlanJson",
+    "Actor",
+    "Reason",
+    "ReceiptHash",
+    "ReceiptReference",
+    "ExpectedVersion",
+    "StreamID",
+    "StreamVersion",
+    "LastSequence",
+    "EventDigest",
+)
+_PARAMETERS["replacement_activation"] = (
+    "ActivationID",
+    "ReplacementID",
+    "VerificationID",
+    "AccountKey",
+    "BaseRegistrationHash",
+    "RegistrationHash",
+    "RegistrationJson",
+    "ReceiptHash",
+    "ReceiptReference",
+    "Actor",
+    "Reason",
+    "OldPoolID",
+    "OldPoolVersion",
+    "PoolRegistrationJson",
+    "PoolRegistrationHash",
+)
 _PARAMETERS["target_containment"] = (
     "ContainmentID",
     "AccountKey",
@@ -151,6 +200,7 @@ INSTALLATION_MIGRATIONS = (
     "20260924_001_export_execution_evidence",
     "20260929_001_manual_export_registration",
     "20261015_008_export_target_containment",
+    "20261015_009_guided_export_replacement",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -166,6 +216,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261001_009_manual_resource_membership_order",
     "20261001_010_reconciliation_file_id_characters",
     "20261015_008_export_target_containment",
+    "20261015_009_guided_export_replacement",
 )
 
 
@@ -188,6 +239,14 @@ EVIDENCE_TABLES = tuple(
         "ExportTargetContainment",
         "ExportContainedTarget",
         "ExportContainedStream",
+        "ExportReplacementPlan",
+        "ExportReplacementTarget",
+        "ExportReplacementVerification",
+        "ExportReplacementActivation",
+        "ExportReplacementDelivery",
+        "RecoveryInputDraft",
+        "RecoveryIncident",
+        "RecoveryAction",
     )
 )
 INSTALLATION_OBJECTS = {
@@ -212,6 +271,14 @@ INSTALLATION_OBJECTS = {
             "ExportTargetContainment",
             "ExportContainedTarget",
             "ExportContainedStream",
+            "ExportReplacementPlan",
+            "ExportReplacementTarget",
+            "ExportReplacementVerification",
+            "ExportReplacementActivation",
+            "ExportReplacementDelivery",
+            "RecoveryInputDraft",
+            "RecoveryIncident",
+            "RecoveryAction",
         )
     },
     **{
@@ -237,6 +304,10 @@ INSTALLATION_OBJECTS = {
 # entries preserve their existing source-selection/configuration/publication
 # callers; they do not authorize activation or invent a new writer.
 BOT_COORDINATION_WRITES = {
+    "dbo.ExportReplacementDelivery": ("INSERT",),
+    "dbo.RecoveryInputDraft": ("INSERT", "UPDATE"),
+    "dbo.RecoveryIncident": ("INSERT", "UPDATE"),
+    "dbo.RecoveryAction": ("INSERT", "UPDATE"),
     "dbo.ExportJob": ("INSERT", "UPDATE"),
     "dbo.ExportResource": ("INSERT", "UPDATE"),
     "dbo.ExportJobResource": ("INSERT",),
@@ -461,11 +532,9 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "24852720086d152fba1398aacaeaa6421aa3aba3db6a47db403d3ccfccb6d560"
+APPLICATION_SCHEMA_SOURCE_HASH = "91e0b22cbc6d1b6e4ebad27293e9847d9ea12b3b5208b9819e95228d52f19a7c"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
-APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "b935c34c1aae21c6a68ba6a6477b59cc69d62d75b2f8ddd6890af3f043968457"
-)
+APPLICATION_ACTIVATION_SCOPE_HASH = "e89a14618ce2a07aef89803a19477bd52ee7aebc211cf9622ce08dee9fc50281"
 
 
 def application_activation_scope():
@@ -1156,6 +1225,20 @@ class ExportExecutionDAL:
         finally:
             connection.close()
 
+    def read_replacement_origins(self, account, targets):
+        from services.export_replacement_activation_dal import origin_rows
+
+        connection = self.connect()
+        try:
+            connection.autocommit = True
+            cursor = connection.cursor()
+            try:
+                return origin_rows(cursor, account, targets)
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
     @staticmethod
     def assert_eligible_origins(cursor, account, targets):
         """Repeat origin membership within the existing settlement transaction."""
@@ -1167,7 +1250,15 @@ class ExportExecutionDAL:
             if o["Stage"] == "eligible" and o["PreparationState"] == "completed"
         ]
         if sorted(eligible) != targets:
-            raise SourceConflict("Complete authenticated managed-file origins required.")
+            from services.export_replacement_activation_dal import origin_rows
+
+            replacements = origin_rows(cursor, account, targets)
+            if (
+                origins
+                or [r["FileID"] for r in replacements] != targets
+                or len({str(r["ActivationID"]) for r in replacements}) != 1
+            ):
+                raise SourceConflict("Complete authenticated managed-file origins required.")
 
     def read_catalogue(self, account, targets):
         """Keyset-read bounded batches; close SQL before private evidence is read.
@@ -1234,7 +1325,7 @@ class ExportExecutionDAL:
                     or (
                         stream["State"] == "read_contained"
                         and (
-                            stream["Purpose"] != "probe"
+                            stream["Purpose"] not in {"probe", "enrollment"}
                             or stream["PreparationID"] is None
                             or any(
                                 stream[k] is not None

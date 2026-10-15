@@ -120,6 +120,7 @@ def authority_launch(monkeypatch, tmp_path):
     import services.export_execution_dal as persistence
     import services.export_manual_enrollment as enrollment_service
     import services.export_reconciliation_service as reconciliation
+    import services.export_replacement_authority as replacement
     import services.export_runtime_composition as runtime
 
     path = tmp_path / "fixture-manifest.json"
@@ -151,6 +152,7 @@ def authority_launch(monkeypatch, tmp_path):
         "ExportCoordinationDAL": coordination,
         "AuthorityBroker": launcher,
         "ManualOutputEnrollment": enrollment_service,
+        "ReplacementAuthority": replacement,
     }.items():
         factories[name] = Mock()
         monkeypatch.setattr(module, name, factories[name])

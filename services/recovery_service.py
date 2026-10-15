@@ -87,7 +87,105 @@ class RecoveryService:
             "system:guided_recovery",
         )
 
-    def _execute(self, incident_id, revision, token, action, reason, actor_identity):
+    def input_page(self, actor, incident_id, action, page=0):
+        self.authorize(actor)
+        row = self.refresh(incident_id)
+        fields = self._input_fields(row, action)
+        if type(page) is not int or not 0 <= page < (len(fields) + 4) // 5:
+            raise SourceConflict("Choose a current guided recovery page.")
+        draft = self.store.input_draft(incident_id, action)
+        return dict(
+            row=row,
+            action=action,
+            page=page,
+            pages=(len(fields) + 4) // 5,
+            fields=[
+                dict(field, value=draft["input"].get(field["key"], ""))
+                for field in fields[page * 5 : (page + 1) * 5]
+            ],
+            draft_version=draft["version"],
+            completed=sum(bool(draft["input"].get(f["key"])) for f in fields),
+            total=len(fields),
+        )
+
+    def _input_fields(self, row, action):
+        if (
+            row["pending_action"]
+            or row["State"] != "open"
+            or row["evidence"]["actions"].get(action, {}).get("input") is not True
+        ):
+            raise SourceConflict("This guided input is no longer available; recheck the incident.")
+        return self.adapters[row["SourceKind"]].input_fields(
+            row["SourceID"], action, row["EvidenceHash"]
+        )
+
+    def save_input(self, actor, incident_id, revision, token, action, page, draft_version, values):
+        self.authorize(actor)
+        current = self.input_page(actor, incident_id, action, page)
+        if (current["row"]["Revision"], current["row"]["EvidenceHash"]) != (revision, token):
+            raise SourceConflict("Recovery evidence changed. Reopen the guided form.")
+        fields = {f["key"]: f for f in current["fields"]}
+        if (
+            not isinstance(values, dict)
+            or set(values) != set(fields)
+            or any(
+                not isinstance(v, str) or not 1 <= len(v.strip()) <= fields[k]["max_length"]
+                for k, v in values.items()
+            )
+        ):
+            raise SourceConflict("Complete the displayed recovery fields within their limits.")
+        self.store.save_input(
+            incident_id,
+            revision,
+            token,
+            action,
+            draft_version,
+            {k: v.strip() for k, v in values.items()},
+            f"discord:{actor.user_id}",
+        )
+        return self.input_page(actor, incident_id, action, page)
+
+    def input_confirmation(self, actor, incident_id, action):
+        self.authorize(actor)
+        row = self.refresh(incident_id)
+        fields = self._input_fields(row, action)
+        draft = self.store.input_draft(incident_id, action)
+        if set(draft["input"]) != {f["key"] for f in fields}:
+            raise SourceConflict("Complete every guided page before confirming.")
+        preview = self.adapters[row["SourceKind"]].validate_input(
+            row["SourceID"], action, row["EvidenceHash"], draft["input"]
+        )
+        return dict(row=row, action=action, draft_version=draft["version"], preview=preview)
+
+    def execute_input(self, actor, incident_id, revision, token, action, draft_version):
+        self.authorize(actor)
+        preview = self.input_confirmation(actor, incident_id, action)
+        if preview["draft_version"] != draft_version:
+            raise SourceConflict("Saved choices changed; review the confirmation again.")
+        draft = self.store.input_draft(incident_id, action)
+        return self._execute(
+            incident_id,
+            revision,
+            token,
+            action,
+            "Admin confirmed the displayed replacement choices and checks",
+            f"discord:{actor.user_id}",
+            payload=draft["input"],
+            draft_version=draft_version,
+        )
+
+    def _execute(
+        self,
+        incident_id,
+        revision,
+        token,
+        action,
+        reason,
+        actor_identity,
+        *,
+        payload=None,
+        draft_version=None,
+    ):
         row = self.refresh(incident_id)
         if row["State"] == "resolved":
             return row
@@ -98,14 +196,31 @@ class RecoveryService:
         adapter = self.adapters[row["SourceKind"]]
         if action not in row["evidence"]["actions"]:
             raise SourceConflict("This action is not permitted by the current evidence.")
+        if row["evidence"]["actions"][action].get("input") is True and payload is None:
+            raise SourceConflict("Complete the guided recovery form before confirming.")
+        if payload is not None:
+            adapter.validate_input(row["SourceID"], action, token, payload)
         action_id, acquired = self.store.claim(
-            incident_id, revision, token, action, actor_identity, reason
+            incident_id,
+            revision,
+            token,
+            action,
+            actor_identity,
+            reason,
+            **(dict(payload=payload, draft_version=draft_version) if payload is not None else {}),
         )
         if not acquired:
             # No redispatch, even if another process died between intent and call.
             return self.refresh(incident_id)
         try:
-            adapter.execute(row["SourceID"], action, token, f"recovery:{action_id}", reason)
+            adapter.execute(
+                row["SourceID"],
+                action,
+                token,
+                f"recovery:{action_id}",
+                reason,
+                **(dict(payload=payload) if payload is not None else {}),
+            )
         except Exception as exc:
             logger.warning(
                 "recovery_action_uncertain incident=%s action=%s error_type=%s",

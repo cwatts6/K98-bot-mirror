@@ -213,7 +213,7 @@
     "name": "KVK.SourceOutputPool",
     "type": "U",
     "path": "sql_schema/KVK.SourceOutputPool.Table.sql",
-    "sha256": "c55cb639628e4b6325a7aa7d0a421f3b12481f2b2a11fda88034395a9ec53be5"
+    "sha256": "1351006b5ebf7bd223444a011347c860f6061e44bdb8bcfd83bc40f6c2d63c9a"
   },
   {
     "name": "KVK.SourceOutputSlot",
@@ -1059,7 +1059,7 @@
     "name": "dbo.ExportExecutionStream",
     "type": "U",
     "path": "sql_schema/dbo.ExportExecutionStream.Table.sql",
-    "sha256": "893e4c28550d3c3b263de4238786be8eb1452ac1b6870607f5f357da00af630f"
+    "sha256": "fd44aedf50d21ca71d0abb92550b60e59bcabe8a882b3c11408618276c6f340a"
   },
   {
     "name": "dbo.ExportJob",
@@ -1089,7 +1089,7 @@
     "name": "dbo.ExportPreparation",
     "type": "U",
     "path": "sql_schema/dbo.ExportPreparation.Table.sql",
-    "sha256": "b5cb782d61ad5f7f9cdbcfb0dbe7000452556c627fa7909855b0a8b8d72d495a"
+    "sha256": "aa995b18c4c142f14c82c05c32f84685f1895528d671e6586a3e1fa2385ceb54"
   },
   {
     "name": "dbo.ExportPreparationResource",
@@ -1114,6 +1114,36 @@
     "type": "U",
     "path": "sql_schema/dbo.ExportReconciliationProof.Table.sql",
     "sha256": "47ef6d2677c43ea180289d09004a1661bc706523350a64ad43d91e6e9f99d243"
+  },
+  {
+    "name": "dbo.ExportReplacementActivation",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReplacementActivation.Table.sql",
+    "sha256": "79505cae13de9fe7d2c775fdc4a5cac91cfbd91f2c8e75739d70e1aba3c6ecd8"
+  },
+  {
+    "name": "dbo.ExportReplacementDelivery",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReplacementDelivery.Table.sql",
+    "sha256": "3a279cf920ba79f495c29cd7241ae951bc6df539502de50e776575b622e8c161"
+  },
+  {
+    "name": "dbo.ExportReplacementPlan",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReplacementPlan.Table.sql",
+    "sha256": "36ac537bb5e84a7a7fdd6688924ee8b5e1eaef5320291ab9950b2656410608e8"
+  },
+  {
+    "name": "dbo.ExportReplacementTarget",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReplacementTarget.Table.sql",
+    "sha256": "b2366be0790c5a89fc5442b846b590402493ba9d0d4aa33abce075cfa56f11bc"
+  },
+  {
+    "name": "dbo.ExportReplacementVerification",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportReplacementVerification.Table.sql",
+    "sha256": "7a63ba2f6e828bb4135d462f50c77043a26bfb81f960137bd515c18caeed18ed"
   },
   {
     "name": "dbo.ExportRequestBudget",
@@ -2196,6 +2226,24 @@
     "sha256": "6d712602add518b720d9cc8fcac48824bdc33855668de2a2c2c3b8eb7863192c"
   },
   {
+    "name": "dbo.RecoveryAction",
+    "type": "U",
+    "path": "sql_schema/dbo.RecoveryAction.Table.sql",
+    "sha256": "f933144dae1bfb5a5b9d99aee75effd42fb0eba737559dce040595e69b877a01"
+  },
+  {
+    "name": "dbo.RecoveryIncident",
+    "type": "U",
+    "path": "sql_schema/dbo.RecoveryIncident.Table.sql",
+    "sha256": "67bf6e2f4e7a30a43edcd556979778b78734e888254f1d15b5ca249c730a571c"
+  },
+  {
+    "name": "dbo.RecoveryInputDraft",
+    "type": "U",
+    "path": "sql_schema/dbo.RecoveryInputDraft.Table.sql",
+    "sha256": "bb6fea1f948177f80898b75e0e4a31823be5d0a9a0b7c3c6f95b95e463b3868e"
+  },
+  {
     "name": "dbo.Refresh_PlayerScanMeta",
     "type": "P",
     "path": "sql_schema/dbo.Refresh_PlayerScanMeta.StoredProcedure.sql",
@@ -2823,7 +2871,7 @@
     "name": "dbo.usp_ExportExecutionStreamTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-    "sha256": "6bc8696af9e34cf4bde4e347ca6117eeb641a0cb275c88cc3ba603cc5773fa9b"
+    "sha256": "54269a8332bb28c3bf8c3d82d6943727e5f461881a0590ecf412fb42bb8a5e3b"
   },
   {
     "name": "dbo.usp_ExportJobContainTargets",
@@ -2835,25 +2883,43 @@
     "name": "dbo.usp_ExportManualOutputEnrollmentTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportManualOutputEnrollmentTransition.StoredProcedure.sql",
-    "sha256": "e4facfb2ad61ebc975ca86c839fccc306ee277483ea3ac918d52028d81ff3a87"
+    "sha256": "3ebd0dd60b06c50040c917e2414a848c0bb75f8e4ed32665b1db22ac5d3156ad"
   },
   {
     "name": "dbo.usp_ExportOutputEnrollmentTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
-    "sha256": "ce05e66de0153c4c88008d5d94eff6ebce07c2aaf39812d74ed468653c07e179"
+    "sha256": "4146d6fc8f6b23b4f034ef696b470ab36077573754d78b0c7ac3770f91818487"
   },
   {
     "name": "dbo.usp_ExportProviderRequestEventAppend",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-    "sha256": "0f3f0411522d168d3e06e2f62668e8a87ea87b957e1088f7f6064a325a6fc66f"
+    "sha256": "ede3e55393138555a3d0309d8bc7c9ef96fc99eaeafd56baf62d3c029aacf968"
   },
   {
     "name": "dbo.usp_ExportReconciliationProofIssue",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
-    "sha256": "c78ca8054bba72c6d42da0a8ccdfe7d4707d80e448a7f91b95546fa91d8a52b0"
+    "sha256": "6d139f37aaa1614eed28d44da71045e93017de5660c5603ecc52614fb57f315a"
+  },
+  {
+    "name": "dbo.usp_ExportReplacementActivate",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportReplacementActivate.StoredProcedure.sql",
+    "sha256": "0a4f8b9d522886ebe7101a64047b2e23cd0e9c3c99300b0125de7ab0c688302c"
+  },
+  {
+    "name": "dbo.usp_ExportReplacementPlanCreate",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportReplacementPlanCreate.StoredProcedure.sql",
+    "sha256": "3b244f93bd532cdaed7208d80cbb21f0be7a061061d11892b4d18f5f1cfe9b35"
+  },
+  {
+    "name": "dbo.usp_ExportReplacementVerificationTransition",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportReplacementVerificationTransition.StoredProcedure.sql",
+    "sha256": "b5aa13c8835e8ab9a690658ac1bfe61dd9ee0b6dd025d5010cfd2eae6b888ad7"
   },
   {
     "name": "dbo.usp_GetKvkHistorySummaryMetricRanks",
