@@ -10,6 +10,7 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
 from services.export_replacement_check_recovery import inspect_read_check
 from services.export_replacement_input import replacement_fields, replacement_input
+from services.export_replacement_proposal_recovery import discard_service, inspect_lost_proposal
 
 
 def choice(label, check, effect, *, input=False):
@@ -48,6 +49,7 @@ class ReplacementWorkflow:
             delivery=None,
             current_registration_sha256=self.proposal_writer.registration.fingerprint,
             configuration_readiness=None,
+            lost_proposal=None,
         )
         # The containment inspector contains private ledger details before its
         # decision. Only its opaque review token and bounded target IDs leave it.
@@ -55,7 +57,6 @@ class ReplacementWorkflow:
             k: isolated.get(k) for k in ("outcome", "token", "targets", "actor", "reason")
         }
         if proposals:
-            result["proposal"] = self.proposals.inspect(proposals[-1])
             activated = [
                 r
                 for r in self.activation.dal.chain(self.account)
@@ -63,6 +64,17 @@ class ReplacementWorkflow:
             ]
             if len(activated) > 1:
                 raise SourceConflict("The original job has conflicting replacement activations.")
+            try:
+                result["proposal"] = self.proposals.inspect(proposals[-1])
+            except (SourceConflict, ValueError, KeyError, TypeError):
+                if activated:
+                    raise
+                lost = inspect_lost_proposal(self, proposals[-1])
+                if lost["job_id"] != job_id:
+                    raise SourceConflict("Lost proposal belongs to another recovery.")
+                result["lost_proposal"] = lost
+                result["check"] = lost["checking"]
+                return result
             checks = self.verification.dal.list_for_plan(proposals[-1], account=self.account)
             if checks:
                 result["check"] = (
@@ -100,6 +112,28 @@ class ReplacementWorkflow:
             stage, explanation = delivery["stage"], delivery["explanation"]
             resolved = delivery["resolved"]
             actions = delivery["actions"]
+        elif state["lost_proposal"] is not None:
+            stage = "replacement_proposal_required"
+            explanation = (
+                "The saved proposal cannot be verified. Its original approval will remain "
+                "unverified. Re-enter the intended replacement links, confirm a new proposal, "
+                "then run a complete fresh check before activation. The old outputs stay isolated."
+            )
+            if checked is not None:
+                stage = "proposal_read_discard_required"
+                explanation += " First discard the unfinished read associated with that proposal."
+                actions["discard_replacement_check"] = choice(
+                    "Discard unfinished read",
+                    "Confirm this read result and its unverified proposal must be abandoned. No old write will be retried.",
+                    "Verify the complete typed read ledger, fence that attempt and release only its exact reservations. Then offer the replacement form and a new verification.",
+                )
+            else:
+                actions["choose_replacements"] = choice(
+                    "Re-enter replacement links",
+                    "Review every required output role, owner and sharing policy. Enter the intended replacement files again.",
+                    "Save a new admin decision with fresh private evidence. Require a new complete read check before activation and retained-input publication.",
+                    input=True,
+                )
         elif self.registration.fingerprint != self.proposal_writer.registration.fingerprint and (
             checked is None or checked["state"] != "checking"
         ):
@@ -271,7 +305,16 @@ class ReplacementWorkflow:
         elif action == "finish_replacement_check":
             self.verification.finish(state["check"]["verification_id"])
         elif action == "discard_replacement_check":
-            self.verification.discard(
+            verifier = (
+                discard_service(
+                    self,
+                    state["lost_proposal"]["replacement_id"],
+                    state["check"]["verification_id"],
+                )
+                if state["lost_proposal"]
+                else self.verification
+            )
+            verifier.discard(
                 state["check"]["verification_id"],
                 token=state["check"]["token"],
                 actor=actor,
@@ -294,6 +337,21 @@ class ReplacementWorkflow:
         state = self._state(job_id)
         kind, key = action["ActionKind"], action["ActionID"]
         actor = "recovery:" + key
+        lost = state["lost_proposal"]
+        if lost is not None:
+            if kind == "choose_replacements" and key == lost["replacement_id"]:
+                # Admission remains recorded, but lost approval is never recreated.
+                return "not_applied"
+            if kind == "verify_replacements" and key in lost["checks"]:
+                return "verified"  # Original read admission only, not its result.
+            if kind == "discard_replacement_check":
+                for check_id in lost["checks"]:
+                    service = discard_service(self, lost["replacement_id"], check_id)
+                    snapshot, _ = service._snapshot(check_id)
+                    if snapshot["attempt"]["State"] == "discarded":
+                        checked = service.inspect(check_id)
+                        if checked["actor"] == actor and checked["reason"] == action["Reason"]:
+                            return "verified"
         if kind == "isolate_targets" and state["isolation"]["actor"] == actor:
             return "verified"
         if kind == "choose_replacements":

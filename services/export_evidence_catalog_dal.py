@@ -125,6 +125,20 @@ class EvidenceCatalogDAL:
             raise SourceConflict("One exact replacement check is required for fresh verification.")
         return {key: identity(value) for key, value in found[0].items()}
 
+    def replacement_proposal(self, reference):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT p.ReplacementID,c.JobID FROM dbo.ExportReplacementPlan p "
+                "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
+                "AND c.AccountKey=p.AccountKey WHERE p.AccountKey=? AND p.ReceiptReference=?",
+                self.account,
+                identity(reference),
+            )
+            found = rows(cursor)
+        if len(found) != 1:
+            raise SourceConflict("One exact replacement proposal is required for recovery.")
+        return {key: identity(value) for key, value in found[0].items()}
+
     def page(self, after=None):
         after = identity(after) if after is not None else None
         with transaction(self.connect) as cursor:
