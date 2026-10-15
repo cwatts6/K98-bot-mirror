@@ -56,7 +56,14 @@ Active implementation checkpoint (unpublished working changes on
   content, including chained replacements, waiting jobs and both source renderers.
   Waiting work carries a private input decision through restart. Reader publication
   records the same final grid-identity checks used by cold recovery. The resulting
-  correction is undergoing its own Changes review and focused regression run.
+  correction's Changes review sealed successfully for `30a57dfb..daae1110`
+  (eight source files, no reported vulnerabilities). The focused replacement,
+  containment, source publication and guided-admin run passed 470 tests; the
+  final private-content run passed 27 tests. A subsequent test-only review
+  addition verifies every replacement hop and the root content commitment;
+  all five chain tests pass. That inert test/documentation delta requires no
+  additional security scan. Architecture, deferred-item and security-routing
+  validators, Ruff, command registration and synthetic-config smoke imports pass.
   The standard suite before this correction passed 8,028 tests with 436 skips
   and one explicit deselection. An earlier interrupted run is not counted.
   Its missing containment fixture was corrected; related skip/admission failures

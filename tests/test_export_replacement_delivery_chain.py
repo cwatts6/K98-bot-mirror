@@ -109,3 +109,51 @@ def test_chain_rejects_cycles():
     service.next_activation = lambda job: dict(activation_id="a" if job == "original" else "b")
     with pytest.raises(SourceConflict, match="cyclic"):
         service.inspect("original", dict(activation_id="a"))
+
+
+def test_each_hop_authenticates_its_input_and_final_content_uses_root_commitment():
+    from services.export_replacement_authority import ReplacementAuthority
+    from services.export_replacement_publication import legacy_content
+    from tests.test_export_replacement_content import expected_hash, legacy_records
+
+    service, _, snapshots, _ = fixture()
+    for snapshot in snapshots.values():
+        snapshot["job"].update(AccountKey="account", IntentID=None)
+    snapshots["third"]["job"]["State"] = "confirmed"
+    root = dict(
+        snapshots["original"]["job"], ProvenanceJson=json.dumps(dict(output_sha256=expected_hash()))
+    )
+    intermediate = dict(
+        snapshots["second"]["job"], ProvenanceJson=json.dumps(dict(output_sha256="c" * 64))
+    )
+    service.next_activation = lambda _: dict(activation_id="b", input_commitment=intermediate)
+    authority = ReplacementAuthority.__new__(ReplacementAuthority)
+    service.verify_input = Mock(wraps=authority.verify_input)
+    records = legacy_records()
+
+    def verify(snapshot, activation):
+        commitment = authority.verify_input(snapshot, activation)
+        assert commitment == root
+        legacy_content(
+            records,
+            [{"old-file": "fresh-file"}],
+            json.loads(commitment["ProvenanceJson"])["output_sha256"],
+        )
+
+    service.verify_delivery = Mock(side_effect=verify)
+    activation = dict(activation_id="a", input_commitment=root)
+    assert service.inspect("original", activation)["resolved"]
+    assert [call.args[0]["job"]["JobID"] for call in service.verify_input.call_args_list] == [
+        "second",
+        "third",
+    ]
+    assert service.verify_delivery.call_args.args[1]["content_commitment"] == root
+    records[2][0].arguments["body"]["values"][1][1] = "wrong final content"
+    records[3][1]["values"][1][1] = "wrong final content"
+    with pytest.raises(SourceConflict, match="original private input"):
+        service.inspect("original", activation)
+    intermediate["InputHash"] = "forged intermediate"
+    service.verify_delivery.reset_mock()
+    with pytest.raises(SourceConflict, match="original input commitment"):
+        service.inspect("original", activation)
+    service.verify_delivery.assert_not_called()
