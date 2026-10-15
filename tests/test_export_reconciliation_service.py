@@ -529,13 +529,15 @@ def closed_stream_fixture(*, purpose="mutation"):
     return verifier, stream, request, events, documents
 
 
-def catalogue_fixture():
+def catalogue_fixture(*, historical_purpose="mutation"):
     import hashlib
     from types import SimpleNamespace
 
     from services.export_reconciliation_service import CatalogueVerifier
 
-    old, old_stream, old_request, old_events, old_documents = closed_stream_fixture()
+    old, old_stream, old_request, old_events, old_documents = closed_stream_fixture(
+        purpose=historical_purpose
+    )
     fresh, fresh_stream, fresh_request, fresh_events, fresh_documents = closed_stream_fixture(
         purpose="probe"
     )
@@ -584,6 +586,22 @@ def test_complete_private_history_and_fresh_probe_produce_inventory_only():
     assert membership["history"] == dict(count=1, sha256=history.sha256)
     assert membership["probe"] == dict(stream_id=probe["StreamID"], version=probe["Version"])
     assert "proof_id" not in membership and "state" not in membership
+
+
+def test_failed_historical_read_does_not_poison_next_fresh_reconciliation():
+    verifier, snapshot, old, probe, visible, docs, requests = catalogue_fixture(
+        historical_purpose="probe"
+    )
+    old_events = next(e for r, e in requests.values() if r["StreamID"] == old["StreamID"])
+    old_events[-1]["State"] = "unknown"
+    history = verifier.before_probe(snapshot=snapshot, account="account-a")
+    visible.append(probe)
+    membership = verifier.bind_probe(history, snapshot=snapshot, stream_id=probe["StreamID"])
+    assert membership["history"]["count"] == 1
+    fresh_events = next(e for r, e in requests.values() if r["StreamID"] == probe["StreamID"])
+    fresh_events[-1]["State"] = "unknown"
+    with pytest.raises(SourceConflict):
+        verifier.bind_probe(history, snapshot=snapshot, stream_id=probe["StreamID"])
 
 
 def probe_replay_fixture():

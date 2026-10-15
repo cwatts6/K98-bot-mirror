@@ -7,6 +7,9 @@ class ImportRecoveryAdapter:
     def __init__(self, dal):
         self.dal = dal
 
+    def pending_recovery(self, *, after=None):
+        return self.dal.pending_recovery(after=after)
+
     def inspect(self, source_id):
         preview = self.dal.inspect(source_id)
         execution = preview["execution"] or {}

@@ -602,6 +602,47 @@ class AuthorityBroker:
             if set(message) != {"version", "action", "stream_id"}:
                 raise ValueError("Exact stream closure message required.")
             return self.authority.close_stream(uuid_text(message["stream_id"]))
+        if action in {"inspect_configuration_recovery", "apply_configuration_recovery"}:
+            expected = {"version", "action", "preparation_id"}
+            if action == "apply_configuration_recovery":
+                expected |= {"token", "actor", "reason"}
+            if set(message) != expected:
+                raise ValueError("Exact configuration recovery message required.")
+            preparation_id = uuid_text(message["preparation_id"])
+            if self.boundary is not None:
+                self.boundary.recheck()
+            from services.config_recovery_authority import (
+                inspect_configuration_recovery,
+                apply_configuration_recovery,
+            )
+
+            if action == "inspect_configuration_recovery":
+                return inspect_configuration_recovery(
+                    self.authority, self.registration, preparation_id
+                )
+            if (
+                not isinstance(message["token"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", message["token"]) is None
+            ):
+                raise ValueError("Canonical recovery evidence hash required.")
+            return apply_configuration_recovery(
+                self.authority,
+                self.registration,
+                preparation_id,
+                message["token"],
+                message["actor"],
+                message["reason"],
+            )
+        if action == "recover_configuration":
+            if set(message) != {"version", "action", "stream_id"}:
+                raise ValueError("Exact owned configuration stream required.")
+            from services.config_preparation_recovery_service import recover_owned_configuration
+
+            if self.boundary is not None:
+                self.boundary.recheck()
+            return recover_owned_configuration(
+                self.authority, self.registration, uuid_text(message["stream_id"])
+            )
         raise ValueError("Unsupported authority action.")
 
 

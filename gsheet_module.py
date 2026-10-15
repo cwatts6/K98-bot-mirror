@@ -1749,7 +1749,11 @@ def _reject_uncoordinated_credentials():
 def check_basic_gsheets_access(
     credentials_file: str, sheet_id: str, max_retries: int = 2, retry_backoff_sec: float = 1.0
 ):
-    from services.legacy_export_snapshot_service import _writer_runtime, configuration_requests
+    from services.legacy_export_snapshot_service import (
+        ConfigurationAdmissionDeferred,
+        _writer_runtime,
+        read_configuration,
+    )
 
     runtime = _writer_runtime()
     if runtime is not None:
@@ -1757,7 +1761,9 @@ def check_basic_gsheets_access(
         try:
             sheet_id = runtime.configuration_health_destination(sheet_id)
             stage = "admission"
-            with configuration_requests():
+
+            def probe():
+                nonlocal stage
                 from services.export_provider_adapter import recorded_clients
 
                 stage = "client_construction"
@@ -1767,10 +1773,15 @@ def check_basic_gsheets_access(
                     sheets.spreadsheets().get(spreadsheetId=sheet_id, fields="spreadsheetId")
                 )
                 stage = "closure"
+
+            read_configuration(probe, wait_for_admission=False)
             return (
                 True,
                 "GSheets access confirmed through the S11 authority (registered configuration)",
             )
+        except ConfigurationAdmissionDeferred:
+            logger.info("[HEALTH][S11] Probe deferred: account admission unavailable")
+            return None, "S11 probe deferred; account busy or retained work requires reconciliation"
         except Exception as exc:
             error_type = type(exc).__name__
             if len(error_type) > 64 or not error_type.isascii() or not error_type.isidentifier():

@@ -618,3 +618,25 @@ def test_legacy_health_keeps_requested_sheet(monkeypatch):
 
     assert ok and message == "GSheets access OK"
     client.open_by_key.assert_called_once_with("kingdom-summary")
+
+
+def test_s11_health_busy_is_deferred_without_warning_or_provider_call(monkeypatch, caplog):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as legacy
+
+    runtime = Mock()
+    runtime.configuration_health_destination.return_value = "registered-config"
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
+    monkeypatch.setattr(
+        legacy,
+        "configuration_requests",
+        Mock(side_effect=legacy.ConfigurationAdmissionDeferred("account admission refused")),
+    )
+    forbidden = Mock(side_effect=AssertionError("must not dispatch"))
+    monkeypatch.setattr(gm, "current_provider", forbidden)
+    for _ in range(3):
+        ok, message = gm.check_basic_gsheets_access.__wrapped__("unused", "registered-config")
+        assert ok is None and "deferred" in message
+    forbidden.assert_not_called()
+    assert not [r for r in caplog.records if r.levelno >= 30]

@@ -41,7 +41,15 @@ class ClosedStreamVerifier:
     def _document(self, reference, expected_hash):
         return decode(self.store.read_reference(reference, expected_hash))
 
-    def verify(self, stream_id, *, account, registration_hash, require_observation=True):
+    def verify(
+        self,
+        stream_id,
+        *,
+        account,
+        registration_hash,
+        require_observation=True,
+        allow_failed_reads=False,
+    ):
         uuid_text(stream_id)
         stream = self.dal.read_stream(stream_id)
         if (
@@ -54,6 +62,8 @@ class ClosedStreamVerifier:
             or stream["Purpose"] not in {"mutation", "probe", "enrollment"}
         ):
             raise SourceConflict("Exact registered closed stream required.")
+        if allow_failed_reads and (stream["Purpose"] != "probe" or require_observation):
+            raise SourceConflict("Failed-read verification is only for abandoned read-only probes.")
         sequence, event_digest = self.dal.stream_digest(stream_id)
         if sequence != stream["LastSequence"] or event_digest != bytes(stream["EventDigest"]):
             raise SourceConflict("Closed request membership differs from its seal.")
@@ -93,10 +103,13 @@ class ClosedStreamVerifier:
                 ):
                     raise SourceConflict("Private payload differs from immutable request identity.")
                 states = [event["State"] for event in events]
-                if states not in (
+                allowed_states = (
                     ["prepared", "not_sent"],
                     ["prepared", "dispatch_intent", "succeeded"],
-                ):
+                )
+                if allow_failed_reads and not typed.mutation:
+                    allowed_states += (["prepared", "dispatch_intent", "unknown"],)
+                if states not in allowed_states:
                     raise SourceConflict("Unknown request outcome cannot become finality proof.")
                 event_ids = set()
                 for index, event in enumerate(events, 1):
@@ -210,6 +223,7 @@ class CatalogueVerifier:
                     account=account,
                     registration_hash=bytes(stream["RegistrationHash"]),
                     require_observation=False,
+                    allow_failed_reads=stream["Purpose"] == "probe",
                 )
                 if (result.version, result.event_digest) != (
                     stream["Version"],
@@ -620,6 +634,7 @@ class PublicationProbe:
                             account=snapshot["job"]["AccountKey"],
                             registration_hash=bytes(prior["RegistrationHash"]),
                             require_observation=False,
+                            allow_failed_reads=prior["Purpose"] == "probe",
                         )
                         if checked.dispatched_mutations:
                             allow_absent = False

@@ -651,6 +651,61 @@ def test_configuration_failure_after_admission_is_not_replayed(tmp_path, monkeyp
     sleep.assert_not_called()
 
 
+def test_recovered_configuration_read_retries_only_the_read_collection(monkeypatch):
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    entered = []
+
+    @contextmanager
+    def scope(**_kwargs):
+        entered.append(1)
+        yield
+
+    monkeypatch.setattr(module, "configuration_requests", scope)
+    monkeypatch.setattr(module.time, "sleep", Mock())
+    read = Mock(side_effect=[module.ConfigurationReadRecovered("settled"), "inputs"])
+    assert module.read_configuration(read) == "inputs"
+    assert len(entered) == read.call_count == 2
+    unknown = Mock(side_effect=OSError("unknown outcome"))
+    with pytest.raises(OSError):
+        module.read_configuration(unknown)
+    assert unknown.call_count == 1
+
+
+def test_configuration_cleanup_recovers_only_after_uncertainty_ack(tmp_path):
+    from unittest.mock import Mock
+
+    import services.legacy_export_snapshot_service as module
+
+    runtime, dal = producer_runtime(
+        tmp_path, configuration={"config": {"destinations": ["file-a"]}}
+    )
+    from contextlib import nullcontext
+
+    stream = Mock()
+    runtime.authority_stream = lambda *_: nullcontext(stream)
+    # This fixture does not enable execution evidence, so replace only the owner
+    # factory after entering the test's legacy admission compatibility path.
+    dal.execution_evidence = True
+    runtime.recover_configuration = Mock(
+        return_value={"preparation_id": dal.claim.return_value.preparation_id}
+    )
+    with pytest.raises(module.ConfigurationReadRecovered):
+        with runtime.configuration_requests():
+            raise RuntimeError("read failed")
+    dal.uncertain.assert_called_once()
+    runtime.recover_configuration.assert_called_once_with(stream)
+    dal.uncertain.side_effect = RuntimeError("commit unknown")
+    runtime.recover_configuration.reset_mock()
+    with pytest.raises(RuntimeError, match="commit unknown"):
+        with runtime.configuration_requests():
+            raise RuntimeError("read failed")
+    runtime.recover_configuration.assert_not_called()
+
+
 @pytest.mark.parametrize("exception", [OSError("unknown claim outcome"), KeyboardInterrupt()])
 def test_admission_exception_never_retries_or_withdraws(tmp_path, monkeypatch, exception, caplog):
     import logging

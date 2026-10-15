@@ -33,6 +33,14 @@ class SnapshotUnavailable(ValueError):
     """Missing generation evidence is an unavailable output, never a fallback."""
 
 
+class ConfigurationAdmissionDeferred(SnapshotUnavailable):
+    """Acknowledged refusal and withdrawal; no provider work was admitted."""
+
+
+class ConfigurationReadRecovered(SnapshotUnavailable):
+    """Failed read with authoritative closure and released claims; safe fresh retry."""
+
+
 def _json(value):
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -327,6 +335,29 @@ def configuration_requests(*, wait_for_admission=False):
             yield
 
 
+def read_configuration(read, *, wait_for_admission=True, attempts=3):
+    """Retry only after authority-proven read-only settlement, with fresh admission.
+
+    The callback must collect provider inputs only, before SQL/business writes.
+    Normal pacing and provider cooldown still apply to every new stream.
+    """
+    if type(attempts) is not int or not 1 <= attempts <= 3:
+        raise ValueError("Configuration retry bound must be between one and three.")
+    for attempt in range(attempts):
+        try:
+            scope = (
+                configuration_requests(wait_for_admission=True)
+                if wait_for_admission
+                else configuration_requests()
+            )
+            with scope:
+                return read()
+        except ConfigurationReadRecovered:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(2**attempt)
+
+
 def require_runtime():
     runtime = _runtime.get()
     if runtime is None:
@@ -570,12 +601,16 @@ class LegacyExportRuntime:
         configuration,
         capture=None,
         authority_stream=None,
+        recover_configuration=None,
+        recovery_client=None,
     ):
         self.dal, self.coordinator, self.store = dal, coordinator, store
         self.account = account
         self.configuration = _json(configuration)
         self.capture = capture or dal.capture_outputs
         self.authority_stream = authority_stream
+        self.recover_configuration = recover_configuration
+        self.recovery_client = recovery_client
         if not coordinator.preparations:
             raise ValueError("S10C preparation-aware coordinator required.")
         if (getattr(dal, "execution_evidence", False) is True) != (
@@ -635,7 +670,9 @@ class LegacyExportRuntime:
         )
         if claim is None:
             self.dal.withdraw_unstarted(identifier)
-            raise SnapshotUnavailable("Configuration read unavailable: account admission refused.")
+            raise ConfigurationAdmissionDeferred(
+                "Configuration read unavailable: account admission refused."
+            )
 
         def authorize(*, mutation):
             if mutation:
@@ -649,6 +686,7 @@ class LegacyExportRuntime:
             if self.authority_stream is not None
             else nullcontext(None)
         )
+        stream = None
         try:
             with owner as stream:
                 adapter = ProviderAdapter(
@@ -661,8 +699,27 @@ class LegacyExportRuntime:
                 with use_provider(adapter):
                     yield
             self.dal.transition(claim, expected="preflight", state="completed", release=True)
-        except BaseException:
+        except BaseException as original:
             self.dal.uncertain(claim)
+            if stream is not None and self.recover_configuration is not None:
+                try:
+                    recovered = self.recover_configuration(stream)
+                    if recovered.get("preparation_id") != claim.preparation_id:
+                        raise SnapshotUnavailable("Recovered preparation differs.")
+                except Exception as recovery_error:
+                    logger.warning(
+                        "Configuration reconciliation retained preparation=%s error_type=%s",
+                        claim.preparation_id,
+                        type(recovery_error).__name__,
+                    )
+                else:
+                    logger.info(
+                        "Configuration read safely abandoned preparation=%s", claim.preparation_id
+                    )
+                    if isinstance(original, Exception):
+                        raise ConfigurationReadRecovered(
+                            "Configuration read failed; exact claims safely released."
+                        ) from original
             raise
 
     def _claim_unstarted(self, identifier, *, wait_for_admission=True, **kwargs):

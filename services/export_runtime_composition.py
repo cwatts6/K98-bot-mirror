@@ -266,6 +266,8 @@ class ExportRuntime(RuntimeLifetime):
             account=config["account"],
             configuration=config["legacy_configuration"],
             authority_stream=legacy_streams.configuration,
+            recover_configuration=legacy_streams.recover_configuration,
+            recovery_client=client,
         )
         super().__init__(legacy)
         self.reconciler = AuthorityReconciler(client)
@@ -2102,6 +2104,11 @@ class LegacyExecutionStreams:
         scope = self._scope(current, claim, destinations, kind="preparation", configured=configured)
         return self.client.stream(scope)
 
+    def recover_configuration(self, stream):
+        if not isinstance(stream, AuthorityStream) or stream.closure is None:
+            raise SourceConflict("Acknowledged configuration stream closure required.")
+        return self.client.recover_configuration(stream.stream_id)
+
 
 class AuthorityClient:
     def __init__(
@@ -2228,6 +2235,56 @@ class AuthorityClient:
 
     def stream(self, scope):
         return AuthorityStream(self, scope)
+
+    def recover_configuration(self, stream_id):
+        uuid_text(stream_id)
+        result = self._invoke(dict(version=1, action="recover_configuration", stream_id=stream_id))
+        if (
+            not isinstance(result, dict)
+            or set(result) != {"stream_id", "preparation_id", "state", "provider_observation"}
+            or result["stream_id"] != stream_id
+            or result["state"] != "unavailable"
+            or result["provider_observation"] is not False
+        ):
+            raise ExecutionUncertain("Configuration settlement acknowledgment differs.")
+        uuid_text(result["preparation_id"])
+        return result
+
+    def inspect_configuration_recovery(self, preparation_id):
+        return self._configuration_recovery("inspect_configuration_recovery", preparation_id)
+
+    def apply_configuration_recovery(self, preparation_id, token, actor, reason):
+        return self._configuration_recovery(
+            "apply_configuration_recovery", preparation_id, token=token, actor=actor, reason=reason
+        )
+
+    def _configuration_recovery(self, action, preparation_id, **kwargs):
+        uuid_text(preparation_id)
+        result = self._invoke(
+            dict(version=1, action=action, preparation_id=preparation_id, **kwargs)
+        )
+        if (
+            not isinstance(result, dict)
+            or set(result)
+            != {"preparation_id", "token", "outcome", "eligible", "settled_token", "explanation"}
+            or result["preparation_id"] != preparation_id
+            or not isinstance(result["token"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
+            or type(result["eligible"]) is not bool
+            or result["outcome"] not in {"held", "abandoned_read", "resolved"}
+            or result["eligible"] != (result["outcome"] == "abandoned_read")
+            or (
+                result["settled_token"] is not None
+                and (
+                    not isinstance(result["settled_token"], str)
+                    or re.fullmatch(r"[0-9a-f]{64}", result["settled_token"]) is None
+                )
+            )
+            or not isinstance(result["explanation"], str)
+            or len(result["explanation"]) > 3500
+        ):
+            raise ExecutionUncertain("Configuration recovery acknowledgement differs.")
+        return result
 
     def prove(
         self, kind, object_id, snapshot_hash, *, current_attempt_id=None, old_attempt_id=None

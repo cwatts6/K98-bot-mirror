@@ -634,11 +634,11 @@ def run_proc_config_import(
     if dry_run:
         logger.info("[IMPORT] Dry-run requested - validating Google Sheets schemas (no DB changes)")
         try:
-            from services.legacy_export_snapshot_service import configuration_requests
+            from services.legacy_export_snapshot_service import read_configuration
 
-            with configuration_requests(wait_for_admission=True):
-                sheet_service = _get_sheet_service()
-                ok_sheets, sheet_errors = _validate_sheet_schemas(sheet_service)
+            ok_sheets, sheet_errors = read_configuration(
+                lambda: _validate_sheet_schemas(_get_sheet_service())
+            )
             if not ok_sheets:
                 for e in sheet_errors:
                     logger.error("[IMPORT][DRYRUN] Schema check:  %s", e)
@@ -673,23 +673,15 @@ def run_proc_config_import(
     _tx_tables = [t.strip() for t in IMPORT_TRANSACTIONAL_TABLES.split(",") if t.strip()]
 
     try:
-        from services.legacy_export_snapshot_service import configuration_requests, writer_scope
+        from services.legacy_export_snapshot_service import read_configuration, writer_scope
 
-        with configuration_requests(wait_for_admission=True):
+        def collect_inputs():
             sheet = _get_sheet_service()
-
             logger.info("Importing ProcConfig (range=%s spreadsheet=%s)", RANGE_NAME, KVK_SHEET_ID)
-            df = _read_sheet_to_df(sheet, KVK_SHEET_ID, RANGE_NAME)
-            if df.empty or "KVK_NO" not in df.columns:
-                msg = "ProcConfig tab empty or missing KVK_NO. Aborting import"
-                logger.error(msg)
-                report["errors"].append(msg)
-                _set_last_import_report(report)
-                return False, report
-
-            df = df[df["KVK_NO"].notna()]
-            # All provider reads finish before SQL admission/transactions begin.
-            collected_frames = {
+            frame = _read_sheet_to_df(sheet, KVK_SHEET_ID, RANGE_NAME)
+            if frame.empty or "KVK_NO" not in frame.columns:
+                return frame, {}
+            frames = {
                 name: _read_sheet_to_df(sheet, KVK_SHEET_ID, name)
                 for name in (
                     BAND_RANGE_NAME,
@@ -700,6 +692,18 @@ def run_proc_config_import(
                     CAMP_RANGE_NAME,
                 )
             }
+            return frame, frames
+
+        # Only the read collection can retry, and only after verified settlement.
+        # No SQL connection, writer admission or business side effect has begun.
+        df, collected_frames = read_configuration(collect_inputs)
+        if df.empty or "KVK_NO" not in df.columns:
+            msg = "ProcConfig tab empty or missing KVK_NO. Aborting import"
+            logger.error(msg)
+            report["errors"].append(msg)
+            _set_last_import_report(report)
+            return False, report
+        df = df[df["KVK_NO"].notna()]
         admission = writer_scope("scan_data")
         admission.__enter__()
         conn = _get_import_connection_with_retry()

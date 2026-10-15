@@ -44,7 +44,9 @@ def incident_embed(row):
         color=0x2ECC71 if row["State"] == "resolved" else 0xF1C40F,
     )
     embed.add_field(name="Recovery status", value=row["State"], inline=True)
-    embed.add_field(name="SQL outcome", value=str(evidence.get("outcome", "unproven")), inline=True)
+    embed.add_field(
+        name="Operation outcome", value=str(evidence.get("outcome", "unproven")), inline=True
+    )
     if evidence.get("scan") is not None:
         embed.add_field(name="Committed scan", value=str(evidence["scan"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
@@ -164,7 +166,7 @@ class RecoveryIncidentView(discord.ui.View):
                     )
                     embed.add_field(
                         name="Verification",
-                        value="The bot rechecks ownership and SQL evidence before applying this repair and verifies settlement afterwards.",
+                        value="The bot rechecks ownership and the required execution evidence before applying this repair and verifies settlement afterwards.",
                         inline=False,
                     )
                     await interaction.followup.send(

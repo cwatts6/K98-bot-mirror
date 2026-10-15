@@ -184,6 +184,10 @@ class ExportExecutionAuthority:
             budget = self.budget_factory(stream.account)
             dispatched = False
             durable_success = False
+            prepared = False
+            intent_attempted = False
+            intent_confirmed = False
+            outcome_attempted = False
             try:
                 payload = self.store.put(encode(request.message()))
                 self._event(
@@ -197,13 +201,16 @@ class ExportExecutionAuthority:
                     PayloadHash=bytes.fromhex(payload.sha256),
                     PayloadReference=str(UUID(payload.key)),
                 )
+                prepared = True
                 budget()
                 if self.dispatch_guard is not None:
                     self.dispatch_guard()
                 # Procedure checks current owner/fence/version AFTER the wait.
                 # Any commit exception prevents send. A lost acknowledgment may
                 # still leave dispatch_intent in SQL and therefore retains claims.
+                intent_attempted = True
                 self._event(stream, request, "dispatch_intent", {"request_id": request.request_id})
+                intent_confirmed = True
                 if self.dispatch_guard is not None:
                     self.dispatch_guard()
                 dispatched = True
@@ -216,6 +223,7 @@ class ExportExecutionAuthority:
                     budget.rejected(exc)
                     raise
                 validate_response(request, response)
+                outcome_attempted = True
                 self._event(
                     stream,
                     request,
@@ -227,6 +235,26 @@ class ExportExecutionAuthority:
                 return response
             except BaseException as exc:
                 stream.uncertain = True
+                # A read may fail without leaving a permanent account blockage.
+                # Seal only an acknowledged prefix. Unknown journal commits are
+                # never repaired by guessing a version or retrying an event.
+                if stream.purpose == "probe" and not request.mutation:
+                    terminal = (
+                        "not_sent"
+                        if prepared and not intent_attempted
+                        else "unknown" if intent_confirmed and not outcome_attempted else None
+                    )
+                    if terminal is not None:
+                        try:
+                            self._event(
+                                stream, request, terminal, {"request_id": request.request_id}
+                            )
+                        except BaseException as terminal_error:
+                            logger.warning(
+                                "Read terminal checkpoint unresolved stream=%s error_type=%s",
+                                stream.stream_id,
+                                type(terminal_error).__name__,
+                            )
                 # Never attempt another event when persistence itself is unknown:
                 # a retained dispatch_intent is already sufficient to block reuse.
                 logger.warning(

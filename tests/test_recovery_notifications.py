@@ -133,14 +133,14 @@ def test_failed_check_remains_degraded_across_pages_and_empty_reset(monkeypatch)
         check_failed=lambda key, error: failed.add(key),
         has_failed_checks=lambda: bool(failed),
     )
-    adapter = SimpleNamespace(dal=SimpleNamespace(pending_recovery=lambda **kwargs: []))
+    adapter = SimpleNamespace(pending_recovery=lambda **kwargs: [])
 
     @contextmanager
     def service():
         yield SimpleNamespace(store=store, adapters={"stats_import": adapter}, refresh=refresh)
 
     monkeypatch.setattr(module, "recovery_service", service)
-    monkeypatch.setattr(module, "_cursor", None)
+    monkeypatch.setattr(module, "_cursors", {})
     monkeypatch.setattr(module, "_incident_cursor", None)
     assert module.observe_recovery()
     assert module.observe_recovery()

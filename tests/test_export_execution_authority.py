@@ -280,6 +280,47 @@ def test_interruption_retains_stream_and_never_guesses_absence(runtime, location
         assert dal.calls[-1][1]["State"] == "succeeded"
 
 
+@pytest.mark.parametrize("failure,terminal", [("provider", "unknown"), ("budget", "not_sent")])
+def test_failed_read_records_terminal_evidence_without_retrying(runtime, failure, terminal):
+    authority, dal, store, child, budget, request = runtime
+    authority._streams[request["stream_id"]].purpose = "probe"
+    request.update(operation="sheets.get", arguments={})
+    child.fail = failure == "provider"
+    budget.fail_reserve = failure == "budget"
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert dal.calls[-1][1]["State"] == terminal
+    assert len(child.calls) == (failure == "provider")
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    authority.close_stream(request["stream_id"])
+    assert child.terminated
+
+
+@pytest.mark.parametrize("failure", ["prepared", "dispatch_intent", "succeeded"])
+def test_read_unknown_journal_commit_never_invents_terminal_evidence(runtime, failure):
+    authority, dal, store, child, budget, request = runtime
+    authority._streams[request["stream_id"]].purpose = "probe"
+    request.update(operation="sheets.get", arguments={})
+    dal.fail = failure
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert not any(v.get("State") in {"not_sent", "unknown"} for _, v in dal.calls)
+
+
+def test_read_guard_failure_after_acknowledged_intent_can_close(runtime):
+    authority, dal, store, child, budget, request = runtime
+    authority._streams[request["stream_id"]].purpose = "probe"
+    request.update(operation="sheets.get", arguments={})
+    authority.dispatch_guard = Mock(side_effect=[None, ValueError("stopped")])
+    with pytest.raises(ExecutionUncertain):
+        authority.execute(request)
+    assert dal.calls[-1][1]["State"] == "unknown"
+    assert child.calls == []
+    authority.close_stream(request["stream_id"])
+    assert child.terminated
+
+
 def test_close_freezes_before_observing_child_then_closes_sql(runtime):
     authority, dal, store, child, budget, request = runtime
     authority.execute(request)

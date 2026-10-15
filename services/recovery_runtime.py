@@ -10,7 +10,7 @@ from services.recovery_service import RecoveryService
 from services.stats_import_outcome_dal import ImportExecutionActive
 
 logger = logging.getLogger(__name__)
-_cursor = None
+_cursors = {}
 _incident_cursor = None
 
 
@@ -32,9 +32,21 @@ def recovery_service():
             guild_id=bot_config.GUILD_ID,
         )
         adapter = ImportRecoveryAdapter(outcome_dal(runtime))
+        adapters = {adapter.kind: adapter}
+        if runtime.recovery_client is not None:
+            from services.config_preparation_recovery_dal import ConfigPreparationRecoveryDAL
+            from services.config_read_recovery_adapter import ConfigReadRecoveryAdapter
+
+            read_adapter = ConfigReadRecoveryAdapter(
+                ConfigPreparationRecoveryDAL(runtime.dal.connect),
+                runtime.recovery_client,
+                account=runtime.account,
+                storage_owner=runtime.store.storage_owner,
+            )
+            adapters[read_adapter.kind] = read_adapter
         yield RecoveryService(
             store,
-            {adapter.kind: adapter},
+            adapters,
             admin_id=bot_config.ADMIN_USER_ID,
             guild_id=bot_config.GUILD_ID,
             channel_id=bot_config.NOTIFY_CHANNEL_ID,
@@ -47,20 +59,23 @@ def call_recovery(method, *args):
 
 
 def observe_recovery():
-    global _cursor, _incident_cursor
+    global _incident_cursor
     failures = []
     with recovery_service() as service:
-        adapter = service.adapters["stats_import"]
         scope = service.store.scope
-        after = _cursor[1] if _cursor and _cursor[0] == scope else None
-        for source_id in adapter.dal.pending_recovery(after=after):
-            _cursor = (scope, source_id)
+        for kind, adapter in service.adapters.items():
             try:
-                evidence, token, resolved = adapter.inspect(source_id)
-                service.store.observe(adapter.kind, source_id, evidence, token, resolved=resolved)
-            except ImportExecutionActive:
-                # An active execution lock is not an abandoned writer.
-                continue
+                after = _cursors.get((scope, kind))
+                for source_id in adapter.pending_recovery(after=after):
+                    _cursors[(scope, kind)] = source_id
+                    try:
+                        evidence, token, resolved = adapter.inspect(source_id)
+                        service.store.observe(kind, source_id, evidence, token, resolved=resolved)
+                    except ImportExecutionActive:
+                        # An active execution lock is not an abandoned writer.
+                        continue
+                    except Exception as exc:
+                        failures.append(type(exc).__name__)
             except Exception as exc:
                 failures.append(type(exc).__name__)
         after = _incident_cursor[1] if _incident_cursor and _incident_cursor[0] == scope else None
