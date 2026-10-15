@@ -2,7 +2,7 @@
   "version": 1,
   "transitions": [
     {
-      "id": "reader_workbook_v1",
+      "id": "reader_workbook_and_failed_read_history_v1",
       "members": [
         {
           "path": "services/export_execution_protocol.py",
@@ -17,7 +17,17 @@
         {
           "path": "services/export_reconciliation_service.py",
           "before_sha256": "ae176cdc541a4df2d82cad4b1c36db35efd2ec32f7c9926056b8157ef786cb75",
-          "after_sha256": "932261c58ee2cc092c9642db569c12145f569140b5780ba088cf7fe666b8d44b"
+          "after_sha256": "d113effbd427007aa8788c3fe2745c1dd4055cd1c38cecf3afdd63216ee47ec4"
+        }
+      ]
+    },
+    {
+      "id": "failed_read_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "932261c58ee2cc092c9642db569c12145f569140b5780ba088cf7fe666b8d44b",
+          "after_sha256": "d113effbd427007aa8788c3fe2745c1dd4055cd1c38cecf3afdd63216ee47ec4"
         }
       ]
     }
