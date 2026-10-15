@@ -162,15 +162,22 @@ class RecoveryIncidentView(discord.ui.View):
         blockers = row["evidence"].get("blocking_job_ids", [])
         if blockers:
             links_to_jobs.append(("Review blocking recovery", blockers[0]))
-        for label, linked_job in links_to_jobs if row["State"] != "resolved" else []:
+        recovery_links = [(label, "export_job", job) for label, job in links_to_jobs]
+        recovery_links.extend(
+            (link["label"], link["kind"], link["source_id"])
+            for link in row["evidence"].get("recovery_links", [])[:3]
+        )
+        for label, linked_kind, linked_job in recovery_links if row["State"] != "resolved" else []:
             linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
 
-            async def review_replacement(interaction, linked_job=linked_job):
+            async def review_replacement(
+                interaction, linked_job=linked_job, linked_kind=linked_kind
+            ):
                 try:
                     actor = actor_for(interaction)
                     if not await safe_defer(interaction, ephemeral=True):
                         return
-                    current = await call("review_source", actor, "export_job", linked_job)
+                    current = await call("review_source", actor, linked_kind, linked_job)
                     await interaction.followup.send(
                         embed=incident_embed(current),
                         view=RecoveryIncidentView(current),

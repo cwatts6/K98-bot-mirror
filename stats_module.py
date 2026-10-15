@@ -315,6 +315,9 @@ async def run_sql_procedure(
     timeout_seconds: int = 600,
     import_metadata: dict | None = None,
 ):
+    from services.producer_recovery_intent import current_intent
+
+    recovering = bool((current_intent() or {}).get("parent"))
     if not is_completed_filename(completed_filename):
         return False, "[ERROR] SQL execution refused an invalid completed filename.", None
     logger.info(
@@ -323,7 +326,7 @@ async def run_sql_procedure(
         seed,
         completed_filename,
     )
-    if isinstance(import_metadata, dict):
+    if isinstance(import_metadata, dict) and not recovering:
         _set_import_metadata_state(import_metadata, "sql_owned")
 
     from services.legacy_export_snapshot_service import admitted_writer, record_writer_completion
@@ -470,16 +473,21 @@ async def run_sql_procedure(
                 completed_filename=completed_filename,
                 phases=_completion_phase_evidence(result.get("phase_results") or []),
             )
-            if import_metadata:
+            if import_metadata and not recovering:
                 _delete_import_metadata()
                 metadata_consumed = True
             return expected_counter
 
     # Offload the blocking DB work via python-callable offload helper
     try:
-        expected_counter = await _offload_callable_py(
-            _proc_and_get_expected_counter, name="sql_proc_exec", meta={"task": TASK_NAME}
-        )
+        from services.producer_recovery_intent import stats_inputs, stats_intent
+
+        with stats_intent(
+            stats_inputs(rank, seed, completed_filename, timeout_seconds, import_metadata)
+        ):
+            expected_counter = await _offload_callable_py(
+                _proc_and_get_expected_counter, name="sql_proc_exec", meta={"task": TASK_NAME}
+            )
     except asyncio.CancelledError:
         raise
     except Exception as e:
@@ -508,7 +516,7 @@ async def run_sql_procedure(
                     and preparation["Fence"] == execution_owner.claim.fence
                 ):
                     runtime.collect_capture(execution_owner)
-                    if import_metadata and not metadata_consumed:
+                    if import_metadata and not metadata_consumed and not recovering:
                         _delete_import_metadata()
                     event(
                         preparation_id,
@@ -553,7 +561,8 @@ async def run_sql_procedure(
                 completed_filename,
             )
         if outcome is not None and outcome.is_terminal:
-            _delete_import_metadata()
+            if not recovering:
+                _delete_import_metadata()
             if outcome.is_duplicate:
                 return (
                     False,

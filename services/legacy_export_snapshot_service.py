@@ -832,13 +832,21 @@ class LegacyExportRuntime:
     def begin_writer(self, kind):
         from uuid import uuid4
 
+        from services.producer_recovery_intent import current_intent
+
         configuration = json.loads(self.configuration)
         scope = configuration[kind]
+        producer = current_intent()
+        request = {"operation": str(uuid4()), "kind": kind, "config": scope}
+        if producer is not None:
+            if kind != "scan_data" or producer["kind"] != "stats_import":
+                raise SnapshotUnavailable("Producer intent differs from writer scope.")
+            request.update(operation=producer["operation"], producer=producer)
         identifier = self.dal.request(
             account=self.account,
             consumer=scope["consumer"],
             kvk_no=scope.get("kvk_no"),
-            request={"operation": str(uuid4()), "kind": kind, "config": scope},
+            request=request,
             storage_owner=self.store.storage_owner,
             actor="system:legacy_writer",
             reason=kind,
