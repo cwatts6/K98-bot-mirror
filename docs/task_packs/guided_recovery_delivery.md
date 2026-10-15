@@ -68,7 +68,12 @@ replacement slice is published as Bot PR #347 / SQL PR #116. The next focused
   The selector's unrelated UI-import fixture fails because its constants stub
   omits `PLAYER_STATS_LAST_CACHE`; this slice does not change that import path.
   Synthetic-config import smoke, command registration, architecture, deferred-item,
-  security-routing and log-noise checks pass. The broader suite is still running.
+  security-routing and log-noise checks pass. The broader suite at `6f2189f6`
+  passes 8,115 tests with 465 skips, one deselection and eight subtest passes.
+  It excludes the scrubbed command-governance workflow fixture and unchanged
+  Windows atomic-writer concurrency test already documented above. The final
+  correction is covered by the focused runs; code trees match the reviewed
+  `f27b7496` correction after cherry-pick.
   Loss of every valid copy, registration-checkpoint recovery, earlier rollover
   phases and refused-stage continuation are still required implementation, not
   deferred optimisations. This slice does not close those acceptance gates.
