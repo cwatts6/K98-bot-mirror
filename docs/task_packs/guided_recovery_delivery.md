@@ -195,3 +195,19 @@ No persistent SQL installation or provider operation is part of these tests.
 This closes the read-prefix SQL/verifier mismatch only. Whole-authority process loss,
 unverifiable evidence, unknown-write containment and the other required P0/P1 workflows
 remain active programme obligations, with guided actions and verification required throughout.
+
+## Failed-publication probe request admission
+
+The follow-through review found that request prepare/dispatch still used the older job-state
+allowlist after stream-open admitted a failed-job probe. Migration
+`20261015_006_failed_probe_request_events.sql` aligns that read-only probe gate with stream-open.
+Mutation admission remains running-only; probe preparation still rejects mutation requests.
+Both gates retain exact owner, account, fence, version, epoch, nested action and membership
+checks. The migration pins the actual manual-public-viewer predecessor, not an earlier
+installation body, and refreshes the paired Bot source pins.
+
+Temporary SQL tests now exercise both admission gates across the same state matrix and all
+job-ownership dimensions, plus probe mutation rejection and exact compiled postimages.
+Separate Changes reviews cover the focused Bot and SQL `guided-probe-events` branches.
+This is required completion of the verified-absence button's probe path, not a new recovery
+policy or permission to replay unknown writes. All remaining P0/P1 obligations stay active.
