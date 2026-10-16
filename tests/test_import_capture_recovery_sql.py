@@ -66,12 +66,17 @@ def recovery(tmp_path, request):
                     "dbo.ExportContainedTarget",
                     "dbo.ExportJobResource",
                     "KVK.SourceOutputOperation",
+                    "dbo.ExportAttempt",
+                    "KVK.SourceDelivery",
+                    "KVK.SourceExportIntent",
                 )
             }
         )
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
 
     def rewrite(sql):
+        # Correlated references may use the unqualified base table name.
+        sql = re.sub(r"(?<![\w.])ExportJob\.", names["dbo.ExportJob"] + ".", sql)
         for source in sorted(names, key=len, reverse=True):
             sql = sql.replace(source, names[source])
         return sql
@@ -258,6 +263,7 @@ def recovery(tmp_path, request):
             owner=owner,
             rewrite=rewrite,
             parameter=parameter,
+            connect=Connection,
         )
     finally:
         owner.close()
