@@ -602,3 +602,25 @@ Remaining P0a gates stay open: complete application/legacy startup qualification
 successful capture-to-provider acceptance, composed installed-package interruption
 and forward recovery, and final private promotion/operator handoff. P0b retains all
 six required workstreams. The maintenance window is not yet authorized by readiness.
+
+## Full-size seed replay found and corrected evidence-version mismatch
+
+The 292-member offline package reached all three startup comparators but failed
+when refreshing the SQL evidence record: the helper required version 1, while the
+actual automatic-startup record is version 5 with the reviewed trust model. The
+helper now retains exactly version 5 for that shared process model, rejects a
+foreign/missing model or version, and requires Bot/authority agreement. Historical
+version-1 records retain their original unshared shape. It does not upgrade trust,
+change deployment/review identity or adopt observed SQL as its expected contract.
+
+The full-size replay now passes against the fixed expected contracts: 451
+application objects, 39 legacy modules and 48 export objects. Twenty-seven missing
+evidence-category cases fail closed; repeated derivation produces identical seed
+bytes (13 members, 775,650 bytes). Focused helper tests passed 38 cases with
+operational logs unchanged. The application/legacy replay combines the retained
+reviewed baseline with the disposable changed catalogue; the export catalogue is
+from the fresh restricted-login rehearsal with explicit fixture identity translation.
+This is offline comparator/packet qualification, not fresh production SQL proof.
+The installed updater must still collect and verify all three complete live SQL
+observations before publishing a seed or allowing startup. Synthetic replay proof
+is not retained as deployable input. The old installer must be rebuilt for this fix.
