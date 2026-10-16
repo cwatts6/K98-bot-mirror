@@ -1,5 +1,28 @@
 # Guided recovery delivery
 
+## Rollover evidence-loss routing — 2026-10-16
+
+Lost unactivated rollover proposals and read-check evidence now retain their
+explicit rollover owner throughout inventory, authenticated workflow composition
+and admin links. The private incident opens the correct rollover recovery with
+**Run fresh read check**, or guided read discard and paginated replacement re-entry.
+A fresh verified check supersedes the unavailable read/proposal dependency; the
+original lost receipt is never reconstructed or accepted as successful evidence.
+Activation and the original rollover incident remain separate verified outcomes.
+
+Nine disposable SQL tests passed, including real alert/confirmation callbacks,
+lost receipt/closure/payload/event, wrong-account rejection, restart, unfinished
+proposal-read discard, new approval, fresh verification, activation and durable
+rollover continuation. The original operation stays uncertain. Neither ambiguous
+owner identity nor a job-only fallback can authorize recovery. Shared export-job
+regression passed 44 tests; the log-isolation check confirmed operational logs
+unchanged. Changes scan `ac36e188-2384-4401-beab-25b23c53e31b` now completes and seals
+`1261fafd..1cc629da`, all three changed source files, no findings or coverage gaps.
+The sealed result was read back. The previous finalization error was malformed
+coverage entries, corrected through the semantic draft tool before completion;
+no review was skipped. Tool-reported usage: 1,750,191 tokens. This slice does not close
+all-copy containment/active-history recovery or the remaining P0 programme.
+
 ## Interrupted rollover replacement — implementation checkpoint, 2026-10-16
 
 P0 is still active. The saved `codex/guided-rollover-replacement` Bot and SQL
