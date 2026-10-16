@@ -134,6 +134,11 @@ class ProducerRefusalRecovery:
                         "scan_data": "stats_import",
                         "all_kvk": "all_kvk_capture",
                     }.get(blocker["ConsumerKind"])
+                    if (
+                        blocker["ConsumerKind"] == "scan_data"
+                        and blocker.get("ProducerKind") == "player_stats_report"
+                    ):
+                        kind = "player_report"
                     if kind:
                         links.append(
                             dict(

@@ -224,6 +224,7 @@ class StatsImportOutcomeDAL:
                 "WHERE p.AccountKey=? AND p.StorageOwner=? AND p.ConsumerKind='scan_data' "
                 "AND p.State IN ('writing','committed','uncertain','captured') AND p.JobID IS NULL "
                 "AND e.Resolution IS NULL AND p.UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
+                "AND COALESCE(JSON_VALUE(p.RequestJson,'$.request.producer.kind'),'')<>'player_stats_report' "
                 "ORDER BY CASE WHEN p.PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,p.PreparationID",
                 limit,
                 self.account,

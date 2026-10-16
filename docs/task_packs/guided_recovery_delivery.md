@@ -1,5 +1,41 @@
 # Guided recovery delivery
 
+## Atomic player-report recovery checkpoint — 2026-10-16
+
+The `codex/guided-producer-checkpoints` slice commits player-stat report output
+and its completion checkpoint together. The actual producer transaction holds
+the exact ownership locks, so a lost independent guard cannot permit recovery
+to release a running write. Proactive discovery provides guided **Finish capture
+& queue export**, **Keep SQL; skip this export**, or **Close failed report &
+release** decisions. Every repair verifies its checkpoint or durable closure;
+lost replies reconcile the original action and late old claims are fenced.
+Admission-blocker buttons now select the report workflow instead of incorrectly
+opening import recovery. Imported scan data is never replayed by these actions.
+
+294 focused tests passed, including isolated temporary SQL commit/rollback,
+lost-guard exclusion, lost acknowledgements, interrupted admissions, stale
+confirmations, capture failure, real Discord button routing and eligible saved
+stage availability after release. The 161-test log-isolation run left operational
+logs unchanged. Architecture (173 files), deferred-item/security-routing checks,
+test selection, synthetic smoke imports and command registration passed. Ruff
+passed; two final formatting-only corrections apply Black's required layout.
+Authoritative SQL confirms SP_Stats_for_Upload preserves its caller transaction;
+no new schema, persistent SQL installation or production/provider operation ran.
+
+Changes reviews `417190bc-0807-4935-a30f-49099be9e692` (`340490bf..1f5d773e`,
+11 source files) and `e993daee-d4cb-4ec8-b04e-ee2fd7fb8af0`
+(`1f5d773e..3bede450`, two source files) both sealed successfully with no reported
+security findings. Final semantic drafts were accepted before completion and
+sealed artifacts were read back. The ordinary blocker-link issue identified in
+the first review is corrected and covered by the second. Subsequent changes are
+formatting and this evidence record only, with no behavioral security impact.
+
+P0 remains active: this closes the report transaction/capture/release gap, while
+guided remaining-stage continuation, configuration/other producer checkpoints,
+historical and changed-registration admissions, queue contention, earlier
+rollover phases and all-copy containment/active-history repair still require
+implementation and integrated acceptance. None is deferred optimisation.
+
 ## Interrupted original admission checkpoint — 2026-10-16
 
 Draft PR #352 provides confirmed-refusal continuation. The next focused

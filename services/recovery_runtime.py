@@ -67,6 +67,19 @@ def recovery_service():
             kvk_outcomes, AllKvkCaptureRecovery(runtime, kvk_outcomes)
         )
         adapters[kvk_adapter.kind] = kvk_adapter
+        from services.player_report_recovery_dal import PlayerReportRecoveryDAL
+        from services.player_report_recovery_service import (
+            PlayerReportCaptureRecovery,
+            PlayerReportRecoveryAdapter,
+        )
+
+        report_outcomes = PlayerReportRecoveryDAL(
+            runtime.dal.connect, account=runtime.account, storage_owner=runtime.store.storage_owner
+        )
+        report_adapter = PlayerReportRecoveryAdapter(
+            report_outcomes, PlayerReportCaptureRecovery(runtime, report_outcomes)
+        )
+        adapters[report_adapter.kind] = report_adapter
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:

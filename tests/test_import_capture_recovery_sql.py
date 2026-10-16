@@ -24,6 +24,11 @@ from services.legacy_export_snapshot_service import (
     OutputSection,
     SnapshotUnavailable,
 )
+from services.player_report_recovery_dal import PlayerReportRecoveryDAL
+from services.player_report_recovery_service import (
+    PlayerReportCaptureRecovery,
+    PlayerReportRecoveryAdapter,
+)
 from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 from tests.test_import_capture_recovery import fixture
 
@@ -33,7 +38,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(params=["scan_data", "all_kvk"])
+@pytest.fixture(params=["scan_data", "all_kvk", "player_report"])
 def recovery(tmp_path, request):
     import pyodbc
 
@@ -56,7 +61,7 @@ def recovery(tmp_path, request):
 
     def parameter(value):
         if isinstance(value, str) and value.startswith(
-            ("S11:stats-import:", "k98-legacy-output-snapshot", "export:account:")
+            ("S11:stats-import:", "k98-legacy-output-snapshot", "export:account:", "k98-export:")
         ):
             return "test:" + namespace + ":" + value
         return value
@@ -110,12 +115,15 @@ def recovery(tmp_path, request):
             from tests.test_all_kvk_capture_recovery import fixture as kvk_fixture
 
             base, preview, resources = kvk_fixture()
+        elif request.param == "player_report":
+            from tests.test_player_report_recovery import fixture as report_fixture
+
+            base, preview, resources = report_fixture()
         else:
             base, preview, resources = fixture()
         prep, execution = preview["preparation"], preview["execution"]
-        prep.update(
-            RequestHash=b"r" * 32, EnqueueSequence=1, Actor="test", Reason="isolated recovery test"
-        )
+        prep.update(EnqueueSequence=1, Actor="test", Reason="isolated recovery test")
+        prep.setdefault("RequestHash", b"r" * 32)
         for table, row in (
             ("ExportPreparation", prep),
             ("StatsImportExecution", execution),
@@ -137,9 +145,11 @@ def recovery(tmp_path, request):
                 *(values[c] for c in columns),
             )
 
-        outcome_type = (
-            AllKvkCaptureRecoveryDAL if request.param == "all_kvk" else StatsImportOutcomeDAL
-        )
+        outcome_type = {
+            "all_kvk": AllKvkCaptureRecoveryDAL,
+            "scan_data": StatsImportOutcomeDAL,
+            "player_report": PlayerReportRecoveryDAL,
+        }[request.param]
         outcomes = outcome_type(Connection, account="a", storage_owner="disk-a")
         state = SimpleNamespace(sections=(OutputSection("output", ("value",), ((7,),)),), fail=None)
         store = ExportSnapshotStore(tmp_path, "disk-a")
@@ -149,7 +159,7 @@ def recovery(tmp_path, request):
             dal=LegacySnapshotDAL(Connection),
             capture=lambda *_: (
                 state.sections,
-                dict(consumer=request.param, destinations=["registered"]),
+                dict(consumer=base.consumer, destinations=["registered"]),
             ),
         )
 
@@ -182,9 +192,11 @@ def recovery(tmp_path, request):
             return str(outcomes.inspect(preparation_id)["preparation"]["JobID"])
 
         runtime.enqueue_snapshot = enqueue
-        service_type = (
-            AllKvkCaptureRecovery if request.param == "all_kvk" else ImportCaptureRecovery
-        )
+        service_type = {
+            "all_kvk": AllKvkCaptureRecovery,
+            "scan_data": ImportCaptureRecovery,
+            "player_report": PlayerReportCaptureRecovery,
+        }[request.param]
         service = service_type(runtime, outcomes)
         runtime.verified_snapshot = verified_snapshot
         yield SimpleNamespace(
@@ -234,9 +246,13 @@ def test_restart_at_each_acknowledgement_finishes_capture_once(recovery, monkeyp
     # New service instances resume only the original persisted action identity.
     restarted = type(r.service)(r.runtime, r.outcomes)
     adapter_type = (
-        AllKvkCaptureRecoveryAdapter
-        if isinstance(restarted, AllKvkCaptureRecovery)
-        else ImportRecoveryAdapter
+        PlayerReportRecoveryAdapter
+        if isinstance(restarted, PlayerReportCaptureRecovery)
+        else (
+            AllKvkCaptureRecoveryAdapter
+            if isinstance(restarted, AllKvkCaptureRecovery)
+            else ImportRecoveryAdapter
+        )
     )
     adapter = adapter_type(r.outcomes, restarted)
     assert adapter.reconcile(r.source, action) == "verified"
@@ -252,7 +268,7 @@ def test_restart_at_each_acknowledgement_finishes_capture_once(recovery, monkeyp
 @pytest.mark.parametrize("lock", ["k98-legacy-output-snapshot", "S11:stats-import:"])
 def test_live_original_session_prevents_capture(recovery, lock):
     r = recovery
-    if isinstance(r.service, AllKvkCaptureRecovery) and lock == "S11:stats-import:":
+    if not r.service.dal.stats_execution and lock == "S11:stats-import:":
         # This receipt/guard belongs only to scan-data, not the all-KVK producer.
         return
     token = r.outcomes.inspect(r.source)["token"]
@@ -325,9 +341,13 @@ def test_normal_capture_queue_gap_is_discovered_and_confirmed_once(recovery, mon
     )
     assert r.source in r.outcomes.pending_recovery()
     adapter_type = (
-        AllKvkCaptureRecoveryAdapter
-        if isinstance(r.service, AllKvkCaptureRecovery)
-        else ImportRecoveryAdapter
+        PlayerReportRecoveryAdapter
+        if isinstance(r.service, PlayerReportCaptureRecovery)
+        else (
+            AllKvkCaptureRecoveryAdapter
+            if isinstance(r.service, AllKvkCaptureRecovery)
+            else ImportRecoveryAdapter
+        )
     )
     adapter = adapter_type(r.outcomes, r.service)
     evidence, token, resolved = adapter.inspect(r.source)

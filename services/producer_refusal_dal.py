@@ -81,7 +81,8 @@ class ProducerRefusalDAL:
             attempts = rows(cursor)
             cursor.execute(
                 "SELECT r.ResourceKey,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID,r.BlockedReason,"
-                "p.ConsumerKind,p.State AS PreparationState,j.State AS JobState,"
+                "p.ConsumerKind,JSON_VALUE(p.RequestJson,'$.request.producer.kind') AS ProducerKind,"
+                "p.State AS PreparationState,j.State AS JobState,"
                 "p.AccountKey AS PreparationAccount,j.AccountKey AS JobAccount,o.AccountKey AS OperationAccount "
                 "FROM dbo.ExportResource r LEFT JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
                 "LEFT JOIN dbo.ExportJob j ON j.JobID=r.ActiveJobID "

@@ -104,6 +104,76 @@ def test_refused_stage_is_discovered_with_exact_blocker_and_no_release(refused):
     assert "resume_sql_stage" in adapter.inspect(r.source)[0]["actions"]
 
 
+@pytest.mark.asyncio
+async def test_report_blocker_button_opens_guided_report_release(refused, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from services.player_report_recovery_dal import PlayerReportRecoveryDAL
+    from services.player_report_recovery_service import (
+        PlayerReportCaptureRecovery,
+        PlayerReportRecoveryAdapter,
+    )
+    from tests.test_guided_recovery import ACTOR
+    from ui.views import recovery_view as view
+
+    r = refused
+    unblock(r)
+    # This case replaces the fixture's synthetic provider blocker with a report.
+    r.f.sql.execute("DELETE #ExportExecutionStream")
+    r.f.sql.commit()
+    operation = str(uuid4())
+    scope = json.loads(r.runtime.configuration)["scan_data"]
+    report = r.runtime.dal.request(
+        account=r.runtime.account,
+        consumer="scan_data",
+        kvk_no=None,
+        request=dict(
+            operation=operation,
+            kind="scan_data",
+            config=scope,
+            producer=dict(kind="player_stats_report", operation=operation, atomic_checkpoint=1),
+        ),
+        storage_owner="disk",
+        actor="test",
+        reason="interrupted report",
+    )
+    r.runtime.dal.claim(
+        report,
+        account=r.runtime.account,
+        storage_owner="disk",
+        stage="preflight",
+        resource_keys=("account:" + r.runtime.account,),
+    )
+    adapter, _, _, _ = setup(r)
+    evidence, _, _ = adapter.inspect(r.source)
+    assert evidence["recovery_links"] == [
+        dict(label="Review blocking stage", kind="player_report", source_id=report)
+    ]
+    outcomes = PlayerReportRecoveryDAL(r.f.connect, account=r.runtime.account, storage_owner="disk")
+    report_adapter = PlayerReportRecoveryAdapter(
+        outcomes, PlayerReportCaptureRecovery(r.runtime, outcomes)
+    )
+    service = RecoveryService(
+        Store(), {"player_report": report_adapter}, admin_id=1, guild_id=2, channel_id=3
+    )
+    report_row = service.review_source(ACTOR, "player_report", report)
+    assert "cancel_report" in report_row["evidence"]["actions"]
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "call", AsyncMock(return_value=report_row))
+    row = dict(report_row, evidence=evidence)
+    button = next(
+        b for b in view.RecoveryIncidentView(row).children if b.label == "Review blocking stage"
+    )
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    await button.callback(interaction)
+    view.call.assert_awaited_once_with("review_source", ACTOR, "player_report", report)
+    assert interaction.followup.send.call_args.kwargs["ephemeral"]
+    closed = execute(service, report_row, action="cancel_report")
+    assert closed["State"] == "resolved"
+    assert "resume_sql_stage" in adapter.inspect(r.source)[0]["actions"]
+
+
 def test_lost_intent_reply_leaves_tombstone_and_late_callback_cannot_execute(refused):
     r = refused
     unblock(r)
