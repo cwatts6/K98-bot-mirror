@@ -92,20 +92,24 @@ class ReplacementDelivery:
                 )
         failed = job["State"] in {"failed", "uncertain", "cancelled", "coalesced"}
         return dict(
-            stage="replacement_delivered"
-            if resolved
-            else "replacement_needs_attention"
-            if failed
-            else "replacement_queued",
+            stage=(
+                "replacement_delivered"
+                if resolved
+                else "replacement_needs_attention" if failed else "replacement_queued"
+            ),
             resolved=resolved,
             job_id=job["JobID"],
             job_state=job["State"],
             actions={},
-            explanation="Replacement delivery and execution evidence verified. The original uncertain history remains preserved."
-            if resolved
-            else "The replacement export needs attention. Open its linked recovery here; the original incident remains open until that delivery is resolved."
-            if failed
-            else "The retained export is queued or running on the replacement files. This incident will close only after delivery and execution evidence verify.",
+            explanation=(
+                "Replacement delivery and execution evidence verified. The original uncertain history remains preserved."
+                if resolved
+                else (
+                    "The replacement export needs attention. Open its linked recovery here; the original incident remains open until that delivery is resolved."
+                    if failed
+                    else "The retained export is queued or running on the replacement files. This incident will close only after delivery and execution evidence verify."
+                )
+            ),
         )
 
     def execute(self, job_id, activation, action, *, actor, reason):

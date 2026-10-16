@@ -57,12 +57,14 @@ class WaitingReplacementWorkflow:
         evidence = dict(
             title="Queued export replacement recovery",
             outcome=delivery["stage"] if delivery else "waiting_for_output_replacement",
-            explanation=delivery["explanation"]
-            if delivery
-            else (
-                "This export never started, but its output files were retired by another recovery. "
-                "Open the linked blocking recovery below to verify replacement files, then return here "
-                "to publish this export's retained data. Its SQL import will not run again."
+            explanation=(
+                delivery["explanation"]
+                if delivery
+                else (
+                    "This export never started, but its output files were retired by another recovery. "
+                    "Open the linked blocking recovery below to verify replacement files, then return here "
+                    "to publish this export's retained data. Its SQL import will not run again."
+                )
             ),
             targets=state["targets"],
             replacements=state["activation"]["mapping"] if state["activation"] else {},

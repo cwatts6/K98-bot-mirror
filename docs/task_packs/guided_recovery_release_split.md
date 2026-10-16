@@ -686,3 +686,19 @@ whole-application startup qualification and a composed installed-package rehears
 Fresh production SQL observation and live Discord/provider acceptance belong to
 the controlled deployment itself. None of these gaps is transferred to P0b, whose
 six required workstreams above remain unchanged. Do not enable maintenance yet.
+
+## Promotion validation correction
+
+The first isolated private promotion applied the mirror patch cleanly, then its
+mandatory pre-commit gate found formatting and typing errors. The promotion runner
+restored its clean private baseline without pushing a branch. The mirror follow-up
+uses the repository-pinned Black 26.3.1, removes one trailing blank line, annotates
+the optional replacement authority and gives the qualification snapshot an explicit
+dictionary type. Fifteen formatting-only Python files have identical parsed syntax
+trees before/after. The other two Python edits are typing-only. Exactly five protected
+source postimage hashes are rebound; predecessor images and all SQL contracts stay
+unchanged. All pinned pre-commit hooks now pass, including Pyright; 177 focused
+authority, release, seed and SQL-source compatibility tests pass with operational
+logs unchanged. Retain a Changes review for the exact source/hash follow-up before
+retrying the private promotion. The prior installer bundle is superseded again by
+this reviewed postimage, so the final operator bundle must be rebuilt from it.

@@ -117,7 +117,9 @@ def test_foreign_scope_or_changed_owner_cannot_be_adopted(change):
                 "operation": "ActiveOutputOperationID",
                 "resource": "ResourceKey",
             }[change]
-        ] = 999 if change == "fence" else "11111111-1111-1111-1111-111111111111"
+        ] = (
+            999 if change == "fence" else "11111111-1111-1111-1111-111111111111"
+        )
         with pytest.raises(SourceConflict):
             dal.action(prep, None, resources)
 

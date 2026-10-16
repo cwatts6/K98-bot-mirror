@@ -133,9 +133,11 @@ def test_failed_probe_exact_job_guards(migration, sql, mismatch):
     ]
     guard = guard.replace("dbo.ExportJobResource", "#JobResource").replace("dbo.ExportJob", "#Job")
     job_id, owner = str(uuid.uuid4()), str(uuid.uuid4())
-    sql.execute("""CREATE TABLE #Job(JobID uniqueidentifier,AccountKey varchar(128),OwnerID uniqueidentifier,
+    sql.execute(
+        """CREATE TABLE #Job(JobID uniqueidentifier,AccountKey varchar(128),OwnerID uniqueidentifier,
         Fence bigint,Version bigint,State varchar(16),PoolEpoch bigint,ProvenanceJson nvarchar(max));
-        CREATE TABLE #JobResource(JobID uniqueidentifier,ResourceKey varchar(256));""")
+        CREATE TABLE #JobResource(JobID uniqueidentifier,ResourceKey varchar(256));"""
+    )
     sql.execute("INSERT #Job VALUES (?,'account',?,7,5,'failed',3,N'{}')", job_id, owner)
     sql.execute("INSERT #JobResource VALUES (?,'account:account')", job_id)
     args = [owner, "account", 7, 5, 3, None, "account:account"]
@@ -153,14 +155,11 @@ def test_failed_probe_exact_job_guards(migration, sql, mismatch):
         args[5] = str(uuid.uuid4())
     if mismatch == "membership":
         args[6] = "account:foreign"
-    query = (
-        """SET NOCOUNT ON; DECLARE @OwnerKind varchar(16)='job',@Purpose varchar(16)='probe',
+    query = """SET NOCOUNT ON; DECLARE @OwnerKind varchar(16)='job',@Purpose varchar(16)='probe',
         @ObjectID uniqueidentifier=?,@OwnerID uniqueidentifier=?,@AccountKey varchar(128)=?,
         @Fence bigint=?,@ClaimVersion bigint=?,@Epoch bigint=?,@NestedToken uniqueidentifier=?;
         DECLARE @Resources TABLE(ResourceKey varchar(256)); INSERT @Resources VALUES (?);
-    """
-        + guard
-    )
+    """ + guard
     if mismatch:
         with pytest.raises(
             pyodbc.Error, match=r"Job/nested owner CAS conflict|Job membership conflict"

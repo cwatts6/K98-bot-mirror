@@ -1288,9 +1288,9 @@ def _render_run_all_exports(
     Returns a tuple (success: bool, log_messages: str) for the run. The second element is a single string
     (joined lines) to remain compatible with callers expecting to call .strip().
     """
-    assert all([server, database, username, password, credentials_file]), (
-        "One or more required parameters are missing"
-    )
+    assert all(
+        [server, database, username, password, credentials_file]
+    ), "One or more required parameters are missing"
     engine = get_sql_engine(server, database, username, password)
     client = get_gsheet_client(credentials_file)
     service = get_sort_service(credentials_file)
@@ -1530,9 +1530,9 @@ def run_single_export(
 def _render_run_single_export(
     server, database, username, password, config_path, credentials_file=CREDENTIALS_FILE
 ):
-    assert all([server, database, username, password, credentials_file]), (
-        "One or more required parameters are missing"
-    )
+    assert all(
+        [server, database, username, password, credentials_file]
+    ), "One or more required parameters are missing"
     engine = get_sql_engine(server, database, username, password)
     client = get_gsheet_client(credentials_file)
     service = get_sort_service(credentials_file)

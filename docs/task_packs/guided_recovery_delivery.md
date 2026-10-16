@@ -1104,4 +1104,3 @@ path works. No persistent SQL installation or production/provider operation ran.
 P0 remains open. Lost proposal, containment and active registration-history
 evidence, earlier rollover phases, producer checkpoints and admission-refused
 continuation remain required implementation work, not deferred optimisations.
-

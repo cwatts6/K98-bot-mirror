@@ -16,7 +16,11 @@ from pathlib import Path
 import re
 import socket
 import sys
+from typing import TYPE_CHECKING
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from services.export_replacement_authority import ReplacementAuthority
 
 
 class AuthorityStartupError(RuntimeError):
@@ -432,7 +436,7 @@ class AuthorityBroker:
         self.registration_history = (registration,)
         self.boundary = boundary
         self.issuer = None
-        self.replacements = None
+        self.replacements: ReplacementAuthority | None = None
 
     def dispatch(self, message):
         from services.export_execution_protocol import ProviderRequest, uuid_text
@@ -658,9 +662,9 @@ class AuthorityBroker:
                 message["token"],
                 message["actor"],
                 message["reason"],
-                action="contain_read"
-                if action == "contain_configuration_recovery"
-                else "release_read",
+                action=(
+                    "contain_read" if action == "contain_configuration_recovery" else "release_read"
+                ),
             )
         if action in {"inspect_target_recovery", "isolate_export_targets"}:
             expected = {"version", "action", "job_id"}
