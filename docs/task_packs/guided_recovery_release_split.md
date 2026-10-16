@@ -408,3 +408,26 @@ grant-aware images, protected successor contracts, the actual coordinated source
 packet, representative business output and complete enabled-action acceptance,
 and installed-package interruption/restart/forward-recovery rehearsal. These are
 required P0a work, not deferred optimisations. All P0b work remains in scope.
+
+## Startup permission qualification — 16 October
+
+The application startup contract now expects the immutable rollover procedure's
+explicit `DENY ALTER`. The previous direct-profile expectation incorrectly required
+ALTER and would reject the correctly installed procedure. No SQL right is granted
+or widened. Neighboring legacy and evidence expectations remain unchanged.
+
+The source-pinned disposable qualification checked 313 actual object and column
+permissions across all sixteen new recovery objects, under the application user.
+All matched. The retained database is `K98_P0a_Migrations_0241337766c2`; this is local
+fixture evidence, not a production observation or whole-startup acceptance.
+The focused suite passed 346 tests with one opt-in SQL migration case skipped;
+production operational logs remained unchanged. Architecture (213 files), deferred
+items, security routing, test selection, Ruff, Black and whitespace checks passed.
+
+Changes scan `5c214e1b-3891-4b01-9eab-ba0a7e3e5254` covered the frozen runtime patch
+and supporting tests against `c2d9a961`, snapshot
+`5dc3f8f6f2666e90e628af3fc0549caca387a18b8b6cc27541864555f117c9bd`.
+Finalization succeeded with complete coverage and no findings; sealed documents
+were read back at `2026-10-16T10:24:36.740937Z`. Tool-reported usage: 2,019,577 tokens.
+This subsequent evidence-only entry changes no executable behavior. The package
+and final rehearsal gates above remain open; no maintenance window is requested.

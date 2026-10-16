@@ -378,6 +378,9 @@ def installation_permissions(profile, *, direct=False):
                 and permission == "ALTER"
                 and name.startswith("dbo.")
                 and name not in EVIDENCE_TABLES
+                # The rollover recovery migration explicitly denies alteration
+                # to both execution roles, overriding the legacy schema grant.
+                and name != "dbo.usp_ExportRolloverContainTargets"
             )
             or permission in writes.get(name, ())
             or (
