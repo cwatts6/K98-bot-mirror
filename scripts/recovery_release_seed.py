@@ -27,6 +27,7 @@ def checksum(value):
 
 
 def sql_observation(bot, prior_record, collected):
+    from core.export_process_identity import TRUST_MODEL
     from kvk.dal.new_source_import_dal import digest
     from services.export_runtime_composition import (
         verify_application_installation_contract,
@@ -63,8 +64,17 @@ def sql_observation(bot, prior_record, collected):
     if actual_contract != approved:
         raise ValueError("Collected SQL contract differs from reviewed expected contract.")
     record = deepcopy(prior_record)
-    if set(record) != {"version", "kind", "deployment_id", "review_id", "observations"} or (
-        record["version"] != 1 or record["kind"] != "sql_installation"
+    shared = bot.get("trust_model") == TRUST_MODEL
+    fields = {"version", "kind", "deployment_id", "review_id", "observations"}
+    if shared:
+        fields.add("trust_model")
+    if (
+        set(record) != fields
+        or type(record["version"]) is not int
+        or record["version"] != (5 if shared else 1)
+        or record["kind"] != "sql_installation"
+        or (shared and record["trust_model"] != TRUST_MODEL)
+        or (not shared and bot.get("trust_model") is not None)
     ):
         raise ValueError("Exact deployment SQL observation record required.")
     record["observations"] = [
@@ -84,7 +94,9 @@ def verified_seed(candidate, collected):
     values = {n: json.loads(b) for n, b in candidate.items() if n.endswith(".json")}
     bot = values["bot-template.json"]
     authority = values["authority-template.json"]
-    if authority["sql_contract"] != bot["sql_contract"]:
+    if authority["sql_contract"] != bot["sql_contract"] or authority.get("trust_model") != bot.get(
+        "trust_model"
+    ):
         raise ValueError("Candidate bot/authority SQL contracts differ.")
     record = sql_observation(bot, values["sql_installation.json"], collected)
     values["sql_installation.json"] = record

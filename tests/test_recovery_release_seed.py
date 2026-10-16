@@ -9,6 +9,7 @@ from test_export_runtime_composition import (
     legacy_permission_fixture,
 )
 
+from core.export_process_identity import TRUST_MODEL
 from kvk.dal.new_source_import_dal import digest
 from scripts.recovery_release_seed import checksum, encode, sql_observation, verified_seed
 
@@ -18,12 +19,14 @@ def evidence(monkeypatch):
     legacy, legacy_contract = legacy_permission_fixture(monkeypatch)
     application, application_contract = application_installation_fixture(monkeypatch)
     bot = dict(
+        trust_model=TRUST_MODEL,
         sql_contract=contract,
         legacy_sql_contract=legacy_contract,
         application_sql_contract=application_contract,
     )
     record = dict(
-        version=1,
+        version=5,
+        trust_model=TRUST_MODEL,
         kind="sql_installation",
         deployment_id=str(uuid4()),
         review_id=str(uuid4()),
@@ -109,6 +112,7 @@ def test_no_observation_is_emitted_for_incomplete_or_changed_sql(monkeypatch, da
 def seed_fixture(monkeypatch):
     bot, prior, collected = evidence(monkeypatch)
     authority = dict(
+        trust_model=TRUST_MODEL,
         sql_contract=deepcopy(bot["sql_contract"]),
         deployment_boundary=dict(
             sql_contract_hash="a" * 64,
@@ -145,6 +149,56 @@ def seed_fixture(monkeypatch):
     }
     candidate["Start-ReviewedAutomaticStartup.ps1"] = ("verify " + checksum(policy)).encode()
     return candidate, collected, bot, policy
+
+
+def test_historical_single_identity_record_retains_version_one(monkeypatch):
+    bot, prior, collected = evidence(monkeypatch)
+    del bot["trust_model"]
+    del prior["trust_model"]
+    prior["version"] = 1
+    result = sql_observation(bot, prior, collected)
+    assert result["version"] == 1 and "trust_model" not in result
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "old_version",
+        "future_version",
+        "boolean_version",
+        "missing_trust",
+        "wrong_trust",
+        "wrong_bot_trust",
+        "extra_field",
+    ],
+)
+def test_record_version_and_trust_must_match_the_reviewed_template(monkeypatch, damage):
+    bot, prior, collected = evidence(monkeypatch)
+    if damage == "old_version":
+        prior["version"] = 1
+    elif damage == "future_version":
+        prior["version"] = 6
+    elif damage == "boolean_version":
+        prior["version"] = True
+    elif damage == "missing_trust":
+        del prior["trust_model"]
+    elif damage == "wrong_trust":
+        prior["trust_model"] = "foreign"
+    elif damage == "wrong_bot_trust":
+        bot["trust_model"] = "foreign"
+    else:
+        prior["unexpected"] = True
+    with pytest.raises(ValueError, match="Exact deployment SQL observation"):
+        sql_observation(bot, prior, collected)
+
+
+def test_authority_and_bot_trust_must_agree_before_seed_rebinding(monkeypatch):
+    candidate, collected, _, _ = seed_fixture(monkeypatch)
+    authority = json.loads(candidate["authority-template.json"])
+    authority["trust_model"] = "foreign"
+    candidate["authority-template.json"] = encode(authority)
+    with pytest.raises(ValueError, match="bot/authority"):
+        verified_seed(candidate, collected)
 
 
 def test_seed_rebinds_actual_observation_without_changing_flags_or_source(monkeypatch):
