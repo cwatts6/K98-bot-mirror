@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "24cbca0c4b86bbe4a0859c364e88655bdf51ab26",
+  "sql_revision": "f5ecc3e0f445bbc7619c91669a2da7889ecd95ce",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -2020,6 +2020,8 @@
     ],
     "dbo.sp_TARGETS_MASTER": [
       "dbo.CREATE_DELTA_TABLES",
+      "dbo.ExportPreparation",
+      "dbo.ExportResource",
       "dbo.KVK_Target_Publication",
       "dbo.KVK_Target_Publication_Row",
       "dbo.KingdomScanData4",

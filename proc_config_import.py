@@ -36,6 +36,7 @@ from gsheet_module import (
     _safe_execute,
 )
 from services.legacy_export_snapshot_service import bound_runtime
+from services.producer_recovery_intent import atomic_producer_intent
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -608,6 +609,7 @@ def _validate_sheet_schemas(sheet) -> tuple[bool, list[str]]:
 # Main import entrypoint (modified to use write_df_to_staging_and_upsert)
 # ---------------------------------------------------------------------------
 @bound_runtime
+@atomic_producer_intent("configuration_import")
 def run_proc_config_import(
     dry_run: bool = False, *, source_actor: str | None = None, source_provenance: dict | None = None
 ) -> tuple[bool, dict]:
@@ -751,7 +753,7 @@ def run_proc_config_import(
         log_before = None
         log_after = None
         try:
-            if IMPORT_TRANSACTIONAL:
+            if IMPORT_TRANSACTIONAL or coordinated:
                 logger.info("[IMPORT][TX] Starting transactional import for config tables")
                 try:
                     conn.autocommit = False
@@ -767,6 +769,11 @@ def run_proc_config_import(
                         logger.debug("Failed to capture logspace before transaction", exc_info=True)
 
                 tx_start = time.time()
+
+                if coordinated:
+                    from services.legacy_export_snapshot_service import begin_writer_transaction
+
+                    begin_writer_transaction(cursor)
 
                 # === REPLACED: use centralized write_df_to_staging_and_upsert for ProcConfig staging + upsert
                 try:
@@ -1008,8 +1015,9 @@ def run_proc_config_import(
 
                 # Commit transaction
                 try:
-                    conn.commit()
-                    report["config_import_committed"] = True
+                    if not coordinated:
+                        conn.commit()
+                        report["config_import_committed"] = True
                 except Exception:
                     logger.exception("Commit failed after transactional writes")
                     raise
@@ -1081,113 +1089,146 @@ def run_proc_config_import(
 
             return False, report
 
-        # Determine the latest KVK from SQL (more robust than parsing imported DataFrame)
-        latest_kvk = None
-        try:
-            # Use existing kvk_meta helper to get latest KVK from dbo.KVK_Details
-            from stats_alerts.kvk_meta import get_latest_kvk_metadata_sql
+        if coordinated:
+            from services.configuration_producer import latest_season, publish
 
-            kvk_meta = get_latest_kvk_metadata_sql()
-            if kvk_meta and kvk_meta.get("kvk_no"):
-                latest_kvk = int(kvk_meta["kvk_no"])
-                logger.info(
-                    "[IMPORT] Latest KVK from SQL metadata: %s (%s)",
-                    latest_kvk,
-                    kvk_meta.get("kvk_name", "Unknown"),
+            report["targets_master_executed"] = False
+            report["targets_master_outcome"] = "uncertain"
+            try:
+                latest_kvk = latest_season(cursor)
+                if latest_kvk is None:
+                    values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
+                    latest_kvk = int(values.max()) if len(values) else None
+                publish(cursor, latest_kvk)
+                conn.commit()
+                report["config_import_committed"] = True
+                report["targets_master_executed"] = True
+                report["targets_master_outcome"] = "completed"
+                report["targets_master_mode"] = "incremental" if latest_kvk else "full"
+                report["targets_master_kvk"] = latest_kvk
+                report["transaction_duration_sec"] = time.time() - tx_start
+            except Exception:
+                logger.exception("Atomic configuration publication did not acknowledge completion")
+                # A commit reply may be lost. Rollback is cleanup only; recovery
+                # determines the outcome from the durable atomic checkpoint.
+                try:
+                    conn.rollback()
+                except Exception:
+                    logger.exception("Atomic configuration rollback cleanup failed")
+                report["errors"].append(
+                    "Configuration publication outcome requires guided recovery verification."
                 )
-            else:
+        else:
+            # Determine the latest KVK from SQL (more robust than parsing imported DataFrame)
+            latest_kvk = None
+            try:
+                # Use existing kvk_meta helper to get latest KVK from dbo.KVK_Details
+                from stats_alerts.kvk_meta import get_latest_kvk_metadata_sql
+
+                kvk_meta = get_latest_kvk_metadata_sql()
+                if kvk_meta and kvk_meta.get("kvk_no"):
+                    latest_kvk = int(kvk_meta["kvk_no"])
+                    logger.info(
+                        "[IMPORT] Latest KVK from SQL metadata: %s (%s)",
+                        latest_kvk,
+                        kvk_meta.get("kvk_name", "Unknown"),
+                    )
+                else:
+                    logger.warning(
+                        "[IMPORT] get_latest_kvk_metadata_sql returned None or missing kvk_no; "
+                        "falling back to DataFrame parsing"
+                    )
+                    # Fallback: parse from imported DataFrame
+                    if not df.empty and "KVK_NO" in df.columns:
+                        kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
+                        if len(kvk_values) > 0:
+                            latest_kvk = int(kvk_values.max())
+                            logger.info(
+                                "[IMPORT] Latest KVK from imported DataFrame (fallback): %s",
+                                latest_kvk,
+                            )
+            except ImportError:
                 logger.warning(
-                    "[IMPORT] get_latest_kvk_metadata_sql returned None or missing kvk_no; "
-                    "falling back to DataFrame parsing"
+                    "[IMPORT] kvk_meta module not available; falling back to DataFrame parsing",
+                    exc_info=True,
                 )
                 # Fallback: parse from imported DataFrame
-                if not df.empty and "KVK_NO" in df.columns:
-                    kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
-                    if len(kvk_values) > 0:
-                        latest_kvk = int(kvk_values.max())
-                        logger.info(
-                            "[IMPORT] Latest KVK from imported DataFrame (fallback): %s", latest_kvk
-                        )
-        except ImportError:
-            logger.warning(
-                "[IMPORT] kvk_meta module not available; falling back to DataFrame parsing",
-                exc_info=True,
-            )
-            # Fallback: parse from imported DataFrame
-            try:
-                if not df.empty and "KVK_NO" in df.columns:
-                    kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
-                    if len(kvk_values) > 0:
-                        latest_kvk = int(kvk_values.max())
-                        logger.info(
-                            "[IMPORT] Latest KVK from imported DataFrame (fallback): %s", latest_kvk
-                        )
+                try:
+                    if not df.empty and "KVK_NO" in df.columns:
+                        kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
+                        if len(kvk_values) > 0:
+                            latest_kvk = int(kvk_values.max())
+                            logger.info(
+                                "[IMPORT] Latest KVK from imported DataFrame (fallback): %s",
+                                latest_kvk,
+                            )
+                except Exception:
+                    logger.exception("[IMPORT] DataFrame fallback also failed")
             except Exception:
-                logger.exception("[IMPORT] DataFrame fallback also failed")
-        except Exception:
-            logger.warning(
-                "[IMPORT] get_latest_kvk_metadata_sql failed; falling back to DataFrame parsing",
-                exc_info=True,
-            )
-            # Fallback: parse from imported DataFrame
+                logger.warning(
+                    "[IMPORT] get_latest_kvk_metadata_sql failed; falling back to DataFrame parsing",
+                    exc_info=True,
+                )
+                # Fallback: parse from imported DataFrame
+                try:
+                    if not df.empty and "KVK_NO" in df.columns:
+                        kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
+                        if len(kvk_values) > 0:
+                            latest_kvk = int(kvk_values.max())
+                            logger.info(
+                                "[IMPORT] Latest KVK from imported DataFrame (fallback): %s",
+                                latest_kvk,
+                            )
+                except Exception:
+                    logger.exception("[IMPORT] DataFrame fallback also failed")
+
+            # Post-transaction stored proc
+            previous_autocommit = conn.autocommit
+            report["partial_commits"] = committed_tables.copy()
+            report["targets_master_executed"] = False
+            report["targets_master_outcome"] = "uncertain"
             try:
-                if not df.empty and "KVK_NO" in df.columns:
-                    kvk_values = pd.to_numeric(df["KVK_NO"], errors="coerce").dropna()
-                    if len(kvk_values) > 0:
-                        latest_kvk = int(kvk_values.max())
-                        logger.info(
-                            "[IMPORT] Latest KVK from imported DataFrame (fallback): %s", latest_kvk
-                        )
+                # sp_TARGETS_MASTER owns its internal publication transactions and
+                # deliberately rejects ambient caller transactions. With pyodbc,
+                # autocommit=False starts a new transaction for the EXEC itself even
+                # after the import commit above, so this post-import call must run in
+                # autocommit mode.
+                conn.autocommit = True
+                if latest_kvk is not None:
+                    logger.info(
+                        "Running sp_TARGETS_MASTER for KVK %s (incremental refresh)", latest_kvk
+                    )
+                    cursor.execute("EXEC dbo.sp_TARGETS_MASTER @KVK = ?", (latest_kvk,))
+                    report["targets_master_mode"] = "incremental"
+                    report["targets_master_kvk"] = latest_kvk
+                else:
+                    logger.info(
+                        "Running sp_TARGETS_MASTER (full refresh - no KVK determined from SQL or data)"
+                    )
+                    cursor.execute("EXEC dbo.sp_TARGETS_MASTER")
+                    report["targets_master_mode"] = "full"
+                    report["targets_master_kvk"] = None
+
+                # Advance through every result before changing connection attributes.
+                # nextset discards unread rows without materializing them and surfaces
+                # late SQL errors. execute() returning is not completion evidence.
+                while cursor.nextset():
+                    pass
+                report["targets_master_executed"] = True
+                report["targets_master_outcome"] = "completed"
+                conn.autocommit = previous_autocommit
             except Exception:
-                logger.exception("[IMPORT] DataFrame fallback also failed")
-
-        # Post-transaction stored proc
-        previous_autocommit = conn.autocommit
-        report["partial_commits"] = committed_tables.copy()
-        report["targets_master_executed"] = False
-        report["targets_master_outcome"] = "uncertain"
-        try:
-            # sp_TARGETS_MASTER owns its internal publication transactions and
-            # deliberately rejects ambient caller transactions. With pyodbc,
-            # autocommit=False starts a new transaction for the EXEC itself even
-            # after the import commit above, so this post-import call must run in
-            # autocommit mode.
-            conn.autocommit = True
-            if latest_kvk is not None:
-                logger.info(
-                    "Running sp_TARGETS_MASTER for KVK %s (incremental refresh)", latest_kvk
+                logger.exception("sp_TARGETS_MASTER completion or connection cleanup failed")
+                report["errors"].append(
+                    "sp_TARGETS_MASTER completion or connection cleanup failed; "
+                    "inspect durable state before retrying"
                 )
-                cursor.execute("EXEC dbo.sp_TARGETS_MASTER @KVK = ?", (latest_kvk,))
-                report["targets_master_mode"] = "incremental"
-                report["targets_master_kvk"] = latest_kvk
-            else:
-                logger.info(
-                    "Running sp_TARGETS_MASTER (full refresh - no KVK determined from SQL or data)"
-                )
-                cursor.execute("EXEC dbo.sp_TARGETS_MASTER")
-                report["targets_master_mode"] = "full"
-                report["targets_master_kvk"] = None
-
-            # Advance through every result before changing connection attributes.
-            # nextset discards unread rows without materializing them and surfaces
-            # late SQL errors. execute() returning is not completion evidence.
-            while cursor.nextset():
-                pass
-            report["targets_master_executed"] = True
-            report["targets_master_outcome"] = "completed"
-            conn.autocommit = previous_autocommit
-        except Exception:
-            logger.exception("sp_TARGETS_MASTER completion or connection cleanup failed")
-            report["errors"].append(
-                "sp_TARGETS_MASTER completion or connection cleanup failed; "
-                "inspect durable state before retrying"
-            )
-            # On a drain failure do not restore autocommit on a busy connection.
-            # The outer finally closes it; no second execution or blind retry.
+                # On a drain failure do not restore autocommit on a busy connection.
+                # The outer finally closes it; no second execution or blind retry.
 
         report["duration_sec"] = time.time() - report["start_time"]
         success = len(report.get("errors", [])) == 0
-        if success:
+        if success and not coordinated:
             from services.legacy_export_snapshot_service import record_writer_completion
 
             record_writer_completion(

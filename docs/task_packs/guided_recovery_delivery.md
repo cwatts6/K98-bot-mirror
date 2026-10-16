@@ -1,5 +1,51 @@
 # Guided recovery delivery
 
+## Atomic configuration producer and guided outcomes — 2026-10-16
+
+Coordinated configuration imports now reserve a typed producer and hold the actual
+business transaction's ownership locks across configuration writes, target
+publication and the completion checkpoint. No intermediate commit occurs, even
+when the legacy non-transactional setting is selected. The target procedure allows
+the ambient transaction only for the exact typed writing reservation; ordinary
+standalone calls preserve their existing transaction policy. Latest-season lookup
+uses the same business connection to avoid waiting on its own configuration locks.
+
+Independent discovery creates a private configuration-publication incident.
+**Close rolled-back config & release** presents a separate checklist/confirmation,
+then excludes live execution, verifies the absent atomic receipt, fences the old
+attempt and verifies the exact release. A committed result instead offers
+**Finish capture & queue export** or the explicit verified export-skip action.
+The existing admin permission, audit and durable action framework is reused.
+Lost replies reconcile the saved receipt; stale confirmation cannot cancel a
+later commit. Neither closure nor export queueing claims a cache refresh.
+
+Validation: 280 affected tests passed, including disposable SQL and actual admin
+button callbacks. The final migration/source-pin and operational-log checks passed
+60 tests. Seven literal target-procedure/migration cases cover transaction gates,
+nested commit behavior, rollback and exact source images (delta work is a synthetic
+callee; this does not claim full production-data publication). Architecture (196
+files), deferred-item, security routing, test selection, synthetic import smoke,
+command registration (36/102), Ruff, Black and whitespace checks passed.
+Final pin correction: 28 activation/configuration tests passed, including seven
+disposable SQL target-contract cases. The reviewed activation scope digest now
+matches the canonical document; unchanged fail-closed validation remains enforced.
+Bot Changes review `5c606dd0-f193-48fe-ac3f-cf7f7e912713` covers
+`d933b94e..c0f8a248` (14 source files), and correction review
+`f4e554ed-b12c-4cec-afd0-c7530c5485a4` covers `c0f8a248..5842ec5d`
+(one source file). SQL review `c018f01b-44ec-4983-bfa2-8a6b135dd03e`
+covers the two SQL source files. All completed, sealed and read back with no
+findings or coverage gaps. Tool-reported token usage: 3,502,958, 1,098,856 and
+2,734,772 respectively. SQL companion: PR #119. Focused tests cover this slice;
+the inherited full-suite result remains qualified as recorded below.
+SQL changes install before the
+paired Bot and protected contract reissue. Only the target procedure source pin and
+its new coordination dependencies changed; unrelated historical pins are preserved.
+
+This is an active P0 slice, not programme completion. Existing partial configuration
+commits, guided fresh continuation, UPDATE_ALL2 partial reporting, durable remaining
+pipeline stages, all-copy custody/history loss and integrated rollover completion
+remain required implementation/acceptance work. None is deferred optimisation.
+
 ## Replacement-read admission guidance — 2026-10-16
 
 Replacement verification now identifies an exact account-scoped blocking owner

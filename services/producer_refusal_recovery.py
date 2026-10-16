@@ -139,6 +139,11 @@ class ProducerRefusalRecovery:
                         and blocker.get("ProducerKind") == "player_stats_report"
                     ):
                         kind = "player_report"
+                    elif (
+                        blocker["ConsumerKind"] == "scan_data"
+                        and blocker.get("ProducerKind") == "configuration_import"
+                    ):
+                        kind = "configuration_producer"
                     if kind:
                         links.append(
                             dict(

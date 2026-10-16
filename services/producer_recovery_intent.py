@@ -58,25 +58,30 @@ def current_intent():
 def player_report_intent(function):
     """Identify the atomic report producer before its writer request is saved."""
 
-    @wraps(function)
-    def run(*args, **kwargs):
-        current = _intent.get()
-        if current is not None:
-            if (
-                current.get("kind") != "player_stats_report"
-                or current.get("atomic_checkpoint") != 1
-            ):
-                raise SourceConflict("Report execution cannot inherit a different producer intent.")
-            return function(*args, **kwargs)
-        token = _intent.set(
-            dict(kind="player_stats_report", atomic_checkpoint=1, operation=str(uuid4()))
-        )
-        try:
-            return function(*args, **kwargs)
-        finally:
-            _intent.reset(token)
+    return atomic_producer_intent("player_stats_report")(function)
 
-    return run
+
+def atomic_producer_intent(kind):
+    if kind not in {"player_stats_report", "configuration_import"}:
+        raise ValueError("Unsupported atomic producer.")
+
+    def decorate(function):
+        @wraps(function)
+        def run(*args, **kwargs):
+            current = _intent.get()
+            if current is not None:
+                if current.get("kind") != kind or current.get("atomic_checkpoint") != 1:
+                    raise SourceConflict("Execution cannot inherit a different producer intent.")
+                return function(*args, **kwargs)
+            token = _intent.set(dict(kind=kind, atomic_checkpoint=1, operation=str(uuid4())))
+            try:
+                return function(*args, **kwargs)
+            finally:
+                _intent.reset(token)
+
+        return run
+
+    return decorate
 
 
 @contextmanager

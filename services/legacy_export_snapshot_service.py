@@ -848,7 +848,11 @@ class LegacyExportRuntime:
         producer = current_intent()
         request = {"operation": str(uuid4()), "kind": kind, "config": scope}
         if producer is not None:
-            if kind != "scan_data" or producer["kind"] not in {"stats_import", "player_stats_report"}:
+            if kind != "scan_data" or producer["kind"] not in {
+                "stats_import",
+                "player_stats_report",
+                "configuration_import",
+            }:
                 raise SnapshotUnavailable("Producer intent differs from writer scope.")
             request.update(operation=producer["operation"], producer=producer)
         identifier = self.dal.request(

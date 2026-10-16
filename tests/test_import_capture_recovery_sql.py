@@ -115,10 +115,29 @@ def recovery(tmp_path, request):
             from tests.test_all_kvk_capture_recovery import fixture as kvk_fixture
 
             base, preview, resources = kvk_fixture()
-        elif request.param == "player_report":
+        elif request.param in {"player_report", "configuration_producer"}:
             from tests.test_player_report_recovery import fixture as report_fixture
 
             base, preview, resources = report_fixture()
+            if request.param == "configuration_producer":
+                import json
+
+                from kvk.dal.new_source_import_dal import digest
+                from services.configuration_producer_recovery import (
+                    ConfigurationProducerCapture,
+                    ConfigurationProducerDAL,
+                )
+
+                prep = preview["preparation"]
+                document = json.loads(prep["RequestJson"])
+                document["request"]["producer"]["kind"] = "configuration_import"
+                generation = json.loads(prep["GenerationJson"])
+                generation["producer"]["procedure"] = "ProcConfig and sp_TARGETS_MASTER"
+                prep.update(
+                    RequestJson=json.dumps(document),
+                    RequestHash=digest(document),
+                    GenerationJson=json.dumps(generation),
+                )
         else:
             base, preview, resources = fixture()
         prep, execution = preview["preparation"], preview["execution"]
@@ -149,7 +168,9 @@ def recovery(tmp_path, request):
             "all_kvk": AllKvkCaptureRecoveryDAL,
             "scan_data": StatsImportOutcomeDAL,
             "player_report": PlayerReportRecoveryDAL,
-        }[request.param]
+        }.get(request.param)
+        if request.param == "configuration_producer":
+            outcome_type = ConfigurationProducerDAL
         outcomes = outcome_type(Connection, account="a", storage_owner="disk-a")
         state = SimpleNamespace(sections=(OutputSection("output", ("value",), ((7,),)),), fail=None)
         store = ExportSnapshotStore(tmp_path, "disk-a")
@@ -196,7 +217,9 @@ def recovery(tmp_path, request):
             "all_kvk": AllKvkCaptureRecovery,
             "scan_data": ImportCaptureRecovery,
             "player_report": PlayerReportCaptureRecovery,
-        }[request.param]
+        }.get(request.param)
+        if request.param == "configuration_producer":
+            service_type = ConfigurationProducerCapture
         service = service_type(runtime, outcomes)
         runtime.verified_snapshot = verified_snapshot
         yield SimpleNamespace(
