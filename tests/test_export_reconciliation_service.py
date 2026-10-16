@@ -37,9 +37,9 @@ class ProofCursor:
 
     def execute(self, statement, *values):
         self.statements.append((statement, values))
-        assert statement.startswith(("SELECT", "WITH catalogue_scope")), (
-            "Unexpected mutation before proof validation"
-        )
+        assert statement.startswith(
+            ("SELECT", "WITH catalogue_scope")
+        ), "Unexpected mutation before proof validation"
         if "SELECT o.*" in statement:
             self.description = tuple((k,) for k in self.origins[0]) if self.origins else ()
             self.batch = [tuple(r.values()) for r in self.origins]

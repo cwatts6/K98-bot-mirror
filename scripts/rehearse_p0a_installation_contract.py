@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+from typing import Any, cast
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,8 +132,11 @@ def main():
                 raise
             return c
 
-        observed = ExportExecutionDAL(restricted).installation_snapshot(
-            migrations=installation_migrations(approved)
+        observed = cast(
+            dict[str, Any],
+            ExportExecutionDAL(restricted).installation_snapshot(
+                migrations=installation_migrations(approved)
+            ),
         )
         (output / "actual-installation.json").write_text(
             json.dumps(observed, indent=2), encoding="utf-8"

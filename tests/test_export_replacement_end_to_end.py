@@ -57,9 +57,9 @@ def prepare_publication(r):
     class Child(FakeChild):
         def execute(self, message):
             typed = ProviderRequest.parse(message)
-            assert typed.target in r.activated["mapping"].values(), (
-                "Old unknown-write output must never be touched"
-            )
+            assert (
+                typed.target in r.activated["mapping"].values()
+            ), "Old unknown-write output must never be touched"
             r.provider.sent.append(typed)
             if r.provider.failure == typed.operation:
                 raise TimeoutError("Injected lost publication response")

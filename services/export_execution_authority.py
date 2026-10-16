@@ -287,9 +287,7 @@ class ExportExecutionAuthority:
                     terminal = (
                         "not_sent"
                         if prepared and not intent_attempted
-                        else "unknown"
-                        if intent_confirmed and not outcome_attempted
-                        else None
+                        else "unknown" if intent_confirmed and not outcome_attempted else None
                     )
                     if terminal is not None:
                         try:

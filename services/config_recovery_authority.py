@@ -97,9 +97,11 @@ def _inspect(authority, registration, preparation_id):
             explanation=(
                 "The read was cancelled before execution and its exact reservations released. No provider request was dispatched."
                 if audit.get("kind") == "config_read_containment/1" and not data["stream_ids"]
-                else "The read was isolated from further dispatch and its exact reservations released. Its result was discarded; no child termination or provider health is asserted."
-                if audit.get("kind") == "config_read_containment/1"
-                else "The abandoned read was safely closed and its reservations released. This does not assert that the provider is healthy."
+                else (
+                    "The read was isolated from further dispatch and its exact reservations released. Its result was discarded; no child termination or provider health is asserted."
+                    if audit.get("kind") == "config_read_containment/1"
+                    else "The abandoned read was safely closed and its reservations released. This does not assert that the provider is healthy."
+                )
             ),
         )
         return result, None

@@ -1129,9 +1129,9 @@ class WindowsExecutionHost:
         process = thread = None
         try:
             limits = win32job.QueryInformationJobObject(job, 9)
-            limits["BasicLimitInformation"]["LimitFlags"] = (
-                0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
-            )
+            limits["BasicLimitInformation"][
+                "LimitFlags"
+            ] = 0x2000  # KILL_ON_JOB_CLOSE; no breakaway.
             win32job.SetInformationJobObject(job, 9, limits)
             command = subprocess.list2cmdline(
                 [

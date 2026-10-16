@@ -223,8 +223,12 @@ def test_real_private_store_failure_offers_confirmed_containment(monkeypatch, tm
     assert service.recover_automatic(row["IncidentID"])["State"] == "open"
     dal.settle.assert_not_called()
     result = service.execute(
-        ACTOR, row["IncidentID"], row["Revision"], row["EvidenceHash"],
-        "contain_read", "Discard failed read",
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "contain_read",
+        "Discard failed read",
     )
     assert result["State"] == "resolved" and store.actions[0]["State"] == "verified"
     assert private._store.read(original) == b"unreadable historical evidence"
