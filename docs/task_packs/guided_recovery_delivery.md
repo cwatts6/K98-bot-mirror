@@ -1,5 +1,36 @@
 # Guided recovery delivery
 
+## Replacement-read admission guidance — 2026-10-16
+
+Replacement verification now identifies an exact account-scoped blocking owner
+before offering a read check. The private incident provides **Review blocking
+operation**, using the existing authorised guided recovery for queued/held exports,
+rollovers, configuration reads, report producers, SQL stages and replacement reads.
+After verified settlement, **Recheck** restores **Check replacement files** and its
+separate confirmation. SQL still enforces admission at execution time; this read-only
+explanation cannot release resources or override healthy work's priority. Changed
+ownership invalidates the old confirmation. Other-account identities and private
+request/configuration data never enter the incident. Unattributed resources remain
+open for the separate required evidence/custody recovery; this is not P0 completion.
+
+The queued/held ownership and stale-click cases use disposable SQL. The restart
+case invokes the actual confirmation button and verifies a complete new read before
+activation, while the original job remains uncertain. This slice also rechecks the
+existing output/source/rollover paths. Twelve disposable SQL tests pass, including
+the actual reserved continuation linking to its validated original recovery and
+foreign-account rejection. Architecture (191 files), deferred items, security
+routing and test selection pass; synthetic imports, command registration, Ruff,
+Black and whitespace checks also passed. The parent suite result below remains
+qualified; this slice uses focused coverage rather than claiming a full green suite.
+Changes review `90aec1d2-f77d-46d8-8d68-59c6e1825426` sealed `a2f4ad5a..eb6e464a`
+(two source files); correction review `4b63629d-a406-42ff-8119-3e2bc7bf860d`
+sealed `eb6e464a..3cf8fb3a` (one source file). Both have complete coverage and no
+findings; sealed results were read back. Tool-reported usage respectively:
+1,525,221 and 1,738,105 tokens. The correction validates parent account, storage,
+both request hashes, producer type, non-nested lineage and matching retained inputs.
+No provider writes, persistent SQL installation or
+production deployment are authorised by this slice.
+
 ## Rollover evidence-loss routing — 2026-10-16
 
 Lost unactivated rollover proposals and read-check evidence now retain their
