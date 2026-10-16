@@ -49,7 +49,10 @@ def targets(recovery):
 
 
 def test_migration_and_source_pin_match_literal_compiled_procedure(targets):
-    from services.export_execution_dal import CURRENT_INSTALLATION_MIGRATIONS
+    from services.export_execution_dal import (
+        CURRENT_INSTALLATION_MIGRATIONS,
+        application_activation_scope,
+    )
 
     root = Path(os.environ["K98_RECOVERY_SQL_SCHEMA"]).parent
     migration = (root / "migrations/20261016_002_atomic_configuration_publication.sql").read_text(
@@ -68,6 +71,9 @@ def test_migration_and_source_pin_match_literal_compiled_procedure(targets):
     )
     assert "sys.crypt_properties" in migration and "IF XACT_STATE()<>0 ROLLBACK" in migration
     assert "20261016_002_atomic_configuration_publication" in CURRENT_INSTALLATION_MIGRATIONS
+    assert {"dbo.sp_TARGETS_MASTER", "dbo.ExportPreparation", "dbo.ExportResource"} <= set(
+        application_activation_scope()
+    )
     manifest = json.loads(
         (
             Path(__file__).resolve().parents[1] / "deploy/export_application_schema_source.json"

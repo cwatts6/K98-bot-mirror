@@ -83,11 +83,12 @@ def _patch_import_credentials(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("failure", [None, "drain", "cleanup"])
 @pytest.mark.parametrize("coordinated", [False, True])
-def test_transactional_success(monkeypatch, tmp_path, failure, coordinated):
+@pytest.mark.parametrize("transactional", [False, True])
+def test_transactional_success(monkeypatch, tmp_path, failure, coordinated, transactional):
     # Prepare environment and monkeypatches
     monkeypatch.setattr(pci, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
-    monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", True)
+    monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", transactional)
     import services.legacy_export_snapshot_service as legacy
 
     monkeypatch.setattr(legacy, "has_runtime_context", lambda: coordinated)
