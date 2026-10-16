@@ -13,6 +13,12 @@ Bot `c66b0d81` (the source-pin correction on draft PR #361's `34cdb5c5`, includi
 `71c6cedcdc317b49df5a312a938759c5a6183a93` (draft PR #119 and predecessors).
 These are development candidates, not private-production deployment commits.
 
+Remote `main` heads were read back on 16 October and still match the audit
+baselines: Bot mirror `02b57ac682e988c5fefece5669f40de31936a756`, private Bot
+`ded19ccda7c3c7ebeeb9379b15a72ae39cb935a4`, and SQL
+`b3480656e3454fbe713905460177f8d038c2bd5f`. These Git observations do not establish
+which versions or updater are installed on the bot machine.
+
 The initial pilot must provide complete alert-to-verification workflows for:
 
 1. Verified abandoned configuration reads, including the approved automatic
@@ -140,6 +146,23 @@ incorrect. P0a needs an explicitly reviewed, tested deployment path for the exac
 twelve recovery migrations, including interrupted apply/verification and receipt
 handling. This is a P0a blocker, not a P0b deferral.
 
+The historical arbitrary-SQL runner is not an automatic fallback: it applies a
+migration and writes the migration-history receipt in separate calls. A lost reply
+between them needs independent postimage verification, and its `ValidationOnly`
+path writes a deployment audit row. The P0a preparer must supply a genuinely
+read-only preflight and an exact reviewed reconciliation path; it must not treat
+missing history as permission to replay a migration or call that legacy validation
+mode a read-only observation.
+
+The existing updater classifier was applied offline to the exact mirror source
+delta `02b57ac6..b55cb730` (209 changed files). It reports
+`COORDINATED_RELEASE_REQUIRED`: 48 protected source changes are outside its current
+routine policy, and the transition registry is an updater-package member change.
+This is source-capability evidence only; no installed-tool manifest was supplied.
+P0a must use a reviewed coordinated release package or an explicitly reviewed
+bounded updater extension. Do not bypass guards, add a generic force exemption,
+or describe the current ordinary updater as capable of deploying this stack.
+
 The current runtime composes ten recovery adapter kinds, with no P0a-specific
 action filter. In addition to the initial three pilot families, it exposes
 `stats_import`, `all_kvk_capture`, `player_report`, `export_job`,
@@ -187,3 +210,18 @@ scan completed, sealed and was read back at `2026-10-16T07:59:57.442351Z`.
 Tool-reported scan usage: 1,692,981 tokens. Release documentation added after that
 scan changes no runtime, permission, input, deployment execution or persistence
 behavior and needs no additional Changes scan. It does not certify deployment.
+
+Broader candidate validation completed with **8,178 passed, 624 skipped,
+8 subtests passed and one failure** in 908.85 seconds. The sole failure is
+`test_command_governance_config.py::test_command_governance_workflow_runs_validator_and_focused_tests`:
+the repository lacks `.github/workflows/command-governance.yml`. Git tree checks
+confirm it is also absent at the immediate base `34cdb5c5` and mirror main
+`02b57ac6`; this patch does not change it. Per repository rules, the unrelated
+baseline failure is documented rather than expanded into this PR. No fully green
+suite is claimed. Opt-in SQL tests were skipped in this run; the earlier feature
+PRs retain their separately approved disposable-SQL evidence.
+
+The full-suite log wrapper exits on pytest failure before comparing operational
+logs. A separate focused wrapper run completed with 12 tests passed and explicitly
+verified that production operational logs were unchanged. This is focused log
+evidence, not an assertion that the failed full wrapper completed its comparison.
