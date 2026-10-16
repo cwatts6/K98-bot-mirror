@@ -14,7 +14,7 @@ import sys
 import tempfile
 
 BOT_ROOT = Path(__file__).resolve().parents[1]
-SQL_FIXTURE_COMMIT = "fc6d8b63f6d42346a2183108ac24ee9e50f273f8"
+SQL_FIXTURE_COMMIT = "5e5fdb8151c539d8bd12b8df17753526218b5987"
 
 
 def load_fixture(root, name):

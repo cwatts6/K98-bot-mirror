@@ -98,6 +98,37 @@ function Invoke-UpdateSql([string]$Operation,[string]$Id) {
  }
  return 0
 }
+function Resolve-RecoverySeed([switch]$Create) {
+ if($null -eq $c.PSObject.Properties['recovery_seed']){return 0}
+ if($c.recovery_seed -cne 'live_sql_observation_v1'){throw 'Unknown recovery seed protocol'}
+ Assert-Source $c.new_pins $c.target
+ $member=@($c.extra_members|Where-Object {$_.name -ceq 'Verify-RecoverySeed.py'})
+ if($member.Count -ne 1){throw 'Pinned recovery seed verifier required'}
+ $helper=Join-Path $PSScriptRoot $member[0].name
+ $null=Read-Bytes $helper $member[0].sha256
+ $null=Read-Bytes $c.venv.path $c.venv.sha256 4MB
+ $arguments=@('-I','-B',$helper,'--bindings',(Join-Path $PSScriptRoot 'ReleaseBindings.json'),'--sha256',$ExpectedBindingsSHA256)
+ if($Create){$arguments+='--create'}
+ & $c.venv.path @arguments | Out-Host
+ $code=$LASTEXITCODE
+ if($code -in @(10,11)){return $code}
+ if($code -ne 0){throw 'Recovery seed SQL observation is unverified; preserve evidence'}
+ $directory=Join-Path $PSScriptRoot 'verified-seed'
+ $binding=Join-Path $directory 'bindings.json'
+ $raw=Read-Bytes $binding
+ $derived=[Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
+ # The helper rechecks all three live SQL contracts and recomputes this file
+ # from protected collected rows. No operational binding may be changed by it.
+ if(@($derived.PSObject.Properties).Count -ne @($c.PSObject.Properties).Count){throw 'Derived binding fields differ'}
+ foreach($property in $c.PSObject.Properties) {
+  if($property.Name -notin @('seed_members','new_policy','new_policy_sha256') -and -not(Same $derived.($property.Name) $property.Value)){throw ('Derived operational binding differs: '+$property.Name)}
+ }
+ $script:c=$derived
+ $script:seedPayloadRoot=$directory
+ $script:activeBindingsPath=$binding
+ $script:activeBindingsHash=Hash $raw
+ return 0
+}
 function Same($Actual,$Expected) {
  if($null -eq $Actual -or $null -eq $Expected){return ($null -eq $Actual -and $null -eq $Expected)}
  if($Expected -is [array]) {
@@ -668,7 +699,10 @@ function Verify-Native([switch]$Preflight) {
  $script=Join-Path $PSScriptRoot $member[0].name
  $null=Read-Bytes $script $member[0].sha256
  $null=Read-Bytes $c.venv.path $c.venv.sha256 4MB
- $verifyArguments=@('-I','-B',$script,'--bindings',(Join-Path $PSScriptRoot 'ReleaseBindings.json'),'--sha256',$ExpectedBindingsSHA256)
+ $derived=(-not $Preflight -and $null -ne $c.PSObject.Properties['recovery_seed'])
+ $bindingPath=if($derived){$script:activeBindingsPath}else{Join-Path $PSScriptRoot 'ReleaseBindings.json'}
+ $bindingHash=if($derived){$script:activeBindingsHash}else{$ExpectedBindingsSHA256}
+ $verifyArguments=@('-I','-B',$script,'--bindings',$bindingPath,'--sha256',$bindingHash)
  if($Preflight){$verifyArguments+='--preflight'}
  if($null -ne $c.PSObject.Properties['sql']){$verifyArguments+='--sql-contracts'}
  & $c.venv.path @verifyArguments | Out-Host
@@ -725,11 +759,25 @@ try {
  if($ExpectedBindingsSHA256 -cnotmatch '^[a-f0-9]{64}$'){throw 'Exact bindings hash required'}
  Assert-Protected $PSScriptRoot
  $c=Read-Json (Join-Path $PSScriptRoot 'ReleaseBindings.json') $ExpectedBindingsSHA256
+ $script:seedPayloadRoot=$PSScriptRoot
+ $script:activeBindingsPath=Join-Path $PSScriptRoot 'ReleaseBindings.json'
+ $script:activeBindingsHash=$ExpectedBindingsSHA256
  $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
  if($env:COMPUTERNAME -cne $c.host -or $identity.User.Value -cne $c.sid -or -not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Release identity differs'}
  if($identity.Owner.Value -cne 'S-1-5-32-544'){throw 'Administrative default object owner required before Git can create source or metadata'}
  $drainPath=Join-Path $c.old_policy.StateDirectory ('deployment-drained-'+$c.release_id+'.json')
  $newGate=Join-Path $c.new_seed_directory 'Start-ReviewedAutomaticStartup.ps1'
+ if($null -ne $c.PSObject.Properties['recovery_seed'] -and (
+  $Action -in @('VerifySeed','ApplySeed','VerifyStart','ApplyStart','VerifyReadiness','AwaitReadiness') -or
+  ($Action -ceq 'Preflight' -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json')))
+ )) {
+  if($Action -ceq 'ApplySeed'){Assert-ContinuationIntent 'seed'}
+  $seedCode=Resolve-RecoverySeed -Create:($Action -ceq 'ApplySeed')
+  if($seedCode -ne 0) {
+   if($Action -ceq 'VerifySeed' -and -not(Test-Path -LiteralPath $c.new_seed_directory) -and -not(Test-Path -LiteralPath $c.new_state_directory)){exit $seedCode}
+   throw 'Verified recovery seed required before installation or startup'
+  }
+ }
  switch($Action) {
   'VerifySql' {exit (Invoke-UpdateSql 'Verify' $MigrationId)}
   'ApplySql' {Assert-Drained;$null=Assert-Task $c.old_gate.Path $true;exit (Invoke-UpdateSql 'Apply' $MigrationId)}
@@ -810,7 +858,7 @@ try {
    foreach($m in $c.seed_members){
     $target=Join-Path $c.new_seed_directory $m.name
     if(Test-Path -LiteralPath $target){$null=Read-Bytes $target $m.sha256;continue}
-    $bytes=Read-Bytes (Join-Path $PSScriptRoot $m.name) $m.sha256
+    $bytes=Read-Bytes (Join-Path $script:seedPayloadRoot $m.name) $m.sha256
     # Scratch stays outside the seed, so a killed write is retained evidence,
     # never mistaken for a completed member on the next invocation.
     $pending=Join-Path $PSScriptRoot ('pending-'+[guid]::NewGuid().ToString('N'))

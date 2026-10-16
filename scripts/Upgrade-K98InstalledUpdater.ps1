@@ -34,6 +34,10 @@ function Assert-UpgradeTool([string]$Path,[string]$ManifestHash) {
   if($null -eq $manifest.files.PSObject.Properties['prepare_k98_release.py']){throw 'Unsupported intermediate updater inventory'}
   $names+=@('k98_update_transitions.json')
  }
+ if($null -ne $manifest.files.PSObject.Properties['p0a_release.py']){
+  if($null -eq $manifest.files.PSObject.Properties['k98_update_transitions.json']){throw 'Recovery updater requires the complete predecessor inventory'}
+  $names+=@('p0a_release.py','p0a_release_spec.json','recovery_release_seed.py')
+ }
  if($manifest.version -ne 1 -or @($manifest.files.PSObject.Properties).Count -ne $names.Count){throw 'Tool manifest shape differs'}
  foreach($name in $names){if($null -eq $manifest.files.PSObject.Properties[$name]){throw 'Tool member missing from manifest'}}
  $items=@(Get-ChildItem -LiteralPath $Path -Force)

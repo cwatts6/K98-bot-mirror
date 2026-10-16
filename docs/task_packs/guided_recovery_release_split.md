@@ -431,3 +431,74 @@ Finalization succeeded with complete coverage and no findings; sealed documents
 were read back at `2026-10-16T10:24:36.740937Z`. Tool-reported usage: 2,019,577 tokens.
 This subsequent evidence-only entry changes no executable behavior. The package
 and final rehearsal gates above remain open; no maintenance window is requested.
+
+## Coordinated seed evidence integration — work in progress
+
+Bot mirror PR 367 contains the reviewed startup-permission correction. SQL PR 124
+adds the existing evidence-role grants to the disposable fixture, with another
+successful 22-call real SQL fault rehearsal and a completed Changes review.
+The startup permission qualification was then repeated against SQL fixture commit
+`5e5fdb8151c539d8bd12b8df17753526218b5987`: all 313 checks passed in retained local
+database `K98_P0a_Migrations_f5e053c4d98e`. No production state changed.
+
+The coordinated package cannot relabel a predecessor SQL observation as proof of
+the successor installation. The saved implementation now collects complete actual
+installation, legacy and application SQL snapshots, requires all three existing
+startup comparators to pass, retains those rows and their collection time, and
+derives the existing SQL observation record from the actual installed identity,
+metadata and migration checksums. No expected fingerprint is adopted from live SQL.
+The existing deployment admission record format and checks remain unchanged.
+
+The saved helper has 29 passing focused tests, including collected-row provenance,
+verification failure, incomplete evidence, schema/permission drift, interrupted
+publication, restart, foreign release, altered seed and corrupted evidence. The
+preceding broader run passed 496 tests with operational logs unchanged; the four
+subsequent collector cases passed separately. Architecture (216 files), deferred,
+security-routing and test-selection gates passed. This is not a native installed
+package rehearsal or security approval of the unfinished integration.
+
+Automatic approval review rejected two earlier proposals: accepting a reviewed
+migration expectation instead of an actual installation observation, and creating
+the observation summary from expected values after a verification call. Neither
+proposal was applied. The saved implementation instead retains and rechecks the
+complete actual SQL rows before constructing the observation.
+
+The remaining native integration was also rejected pending exact operator approval.
+Its proposed sequence is: after the immutable SQL chain and target source verify,
+collect and retain the actual SQL evidence; derive and protect the successor seed;
+verify its enclosing hashes; install it; perform the existing single-start and
+readiness checks. Only seed member hashes, the policy's enclosing plan checksum and
+its checksum may be rebound. Source pins, activation flags, deployment identities,
+paths, expected SQL contracts and admission checks remain immutable. Partial
+observation/seed writes must resume deterministically, with drift rejected.
+
+The operator explicitly approved that isolated implementation and disposable
+testing. The approved native integration is now applied; production deployment
+remains separate. It selects derived seed bindings only after complete live SQL
+verification and retains the immutable base bindings for every resume. Native
+checks reject changes to source, flags, paths and release identity. Missing or
+partial evidence cannot reach startup; the helper resumes deterministic publication
+without replacing the original collected evidence.
+
+The installed updater now carries the finite P0a policy: 49 exact protected source
+pairs from private predecessor `ded19ccda7c3c7ebeeb9379b15a72ae39cb935a4`, three
+reviewed before/after SQL contracts and 15 SQL source members at
+`5e5fdb8151c539d8bd12b8df17753526218b5987`. The 12-migration atomic profile retains
+26 independently derived object images and eleven predecessor receipts. Fresh
+read-only environment discovery supplies server/database, collations and SQL
+compatibility; it never supplies expected object images or permissions.
+
+The offline private-history overlay assembled 256 changed source files into 286
+authenticated members, with a 32,566-byte manifest. All member hashes, SQL revision,
+contract expectations, stage ordering and preserved flags passed. Evidence is in
+the retained development fixture `K98_P0a_Package_m4gyfh8r`; this is explicitly
+non-deployable (synthetic target label and ambient fixture values). The host updater
+must acquire reviewed private main and fresh installed observations independently.
+The rehearsal preserves private-only files and refuses differing private/mirror
+preimages instead of copying the scrubbed mirror tree into production history.
+
+Required P0a gates still include final changes review, complete startup-contract
+qualification, representative business/worker and enabled-action acceptance, and
+the installed-package interruption/restart/forward-recovery rehearsal. No
+maintenance window is requested yet. All six P0b recovery workstreams remain
+required; none has been deferred or marked complete.
