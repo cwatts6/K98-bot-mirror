@@ -58,6 +58,9 @@ def button(view, label):
         "capture_lost_queue_reply",
         "capture_unknown_request",
         "capture_corrupt_spool",
+        "capture_delivered",
+        "capture_write_reply_lost",
+        "capture_readback_mismatch",
     ],
 )
 async def test_monitor_alert_to_verified_configuration_disposition(
@@ -89,7 +92,10 @@ async def test_monitor_alert_to_verified_configuration_disposition(
                 rows = tuple(tuple(row) for row in cursor.fetchall())
             finally:
                 cursor.close()
-            return (OutputSection("output", ("value",), rows),), dict(scope)
+            return (OutputSection("output", ("value",), rows),), dict(
+                scope,
+                outputs=[dict(section="output", file_id="registered", tab="Report", grid_id=42)],
+            )
 
         def enqueue(source):
             job_id = LegacyExportRuntime.enqueue_snapshot(r.runtime, source)
@@ -257,26 +263,87 @@ async def test_monitor_alert_to_verified_configuration_disposition(
 
             # Reconstruction represents process restart. Execute real discovery,
             # account/target admission, spool verification and terminal CAS.
+            provider = None
+            if choice in {
+                "capture_delivered",
+                "capture_write_reply_lost",
+                "capture_readback_mismatch",
+            }:
+                from tests.p0a_provider_fixture import provider_fixture
+
+                provider = provider_fixture(
+                    r,
+                    configuration,
+                    failure={
+                        "capture_delivered": None,
+                        "capture_write_reply_lost": "write_reply",
+                        "capture_readback_mismatch": "readback",
+                    }[choice],
+                )
             worker = ExportCoordinator(
                 ExportCoordinationDAL(
                     r.connect, preparations=True, output_operations=True, execution_evidence=True
                 ),
-                adapters={"scan_data": before_dispatch},
+                adapters={"scan_data": provider.adapter if provider else before_dispatch},
                 storage=r.runtime.store,
                 output_planner=lambda *_: pytest.fail("No new-source work belongs to this fixture"),
             )
             worker.run_batch(threading.Event())
-            expected_deliveries = [] if choice == "capture_corrupt_spool" else [actual_id]
+            expected_deliveries = (
+                [] if choice == "capture_corrupt_spool" or provider else [actual_id]
+            )
             assert deliveries == expected_deliveries
-            uncertain = choice == "capture_unknown_request"
+            uncertain = choice in {
+                "capture_unknown_request",
+                "capture_write_reply_lost",
+                "capture_readback_mismatch",
+            }
             assert r.owner.execute(
                 r.rewrite("SELECT State FROM dbo.ExportJob WHERE JobID=?"), actual_id
-            ).fetchval() == ("uncertain" if uncertain else "failed")
+            ).fetchval() == (
+                "confirmed"
+                if choice == "capture_delivered"
+                else "uncertain" if uncertain else "failed"
+            )
             assert r.owner.execute(
                 r.rewrite("SELECT COUNT(*) FROM dbo.ExportResource WHERE ActiveJobID=?"), actual_id
             ).fetchval() == (2 if uncertain else 0)
             worker.run_batch(threading.Event())
             assert deliveries == expected_deliveries
+            if provider:
+                provider.http.request.assert_not_called()
+                assert provider.rows == dict(values=[["value"], [7]])
+                assert sum(q.operation == "sheets.values.update" for q in provider.sent) == 1
+                assert all(c.terminated for c in provider.children)
+                assert provider.documents
+                stream_state = r.owner.execute(
+                    r.rewrite("SELECT State FROM dbo.ExportExecutionStream WHERE JobID=?"),
+                    actual_id,
+                ).fetchval()
+                assert stream_state == (
+                    "frozen" if choice == "capture_write_reply_lost" else "closed"
+                )
+                if choice == "capture_delivered":
+                    from services.export_execution_dal import ExportExecutionDAL
+                    from services.export_reconciliation_service import ClosedStreamVerifier
+
+                    # Reconstruct the independent reader: a completed job label
+                    # alone is not proof of intact request/response membership.
+                    stream_id, registration_hash = r.owner.execute(
+                        r.rewrite(
+                            "SELECT StreamID,RegistrationHash FROM dbo.ExportExecutionStream WHERE JobID=?"
+                        ),
+                        actual_id,
+                    ).fetchone()
+                    proof = ClosedStreamVerifier(
+                        dal=ExportExecutionDAL(r.connect), store=provider.authority.store
+                    ).verify(
+                        str(stream_id).lower(),
+                        account="a",
+                        registration_hash=bytes(registration_hash),
+                    )
+                    assert proof.dispatched_mutations > 0 and proof.successful_reads > 0
+                    assert proof.request_count == len(provider.sent)
         else:
             assert current_view().row["State"] == "resolved"
             assert current_view().row["evidence"]["outcome"] == "export_skipped"

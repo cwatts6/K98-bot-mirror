@@ -7,12 +7,11 @@ This authorizes preparation and validation, not a live deployment or SQL install
 
 ## P0a — first release
 
-Status: **preparing; not deployment-ready**. Candidate implementation heads are
-Bot `3a1851e2` (the P0a action boundary and legacy-command correction, stacked
-on draft PR #364, including the guided handoff/rehearsal) and SQL
-`9a59efbf3a7c31a6d83d1913307cdeee71c3346b` (draft PR #120, migration-chain
-corrections and retained rehearsal, stacked on draft PR #119 and predecessors).
-These are development candidates, not private-production deployment commits.
+Status: **preparing; not deployment-ready**. The current runtime candidate is
+Bot `e5d4dd90` (PR #371, stacked through #370) and SQL `72b1af55` (PR #125,
+stacked through #124). The following delivery-qualification change adds tests
+and this evidence record only. The final entries below supersede historical
+blocker lists; these remain development candidates, not deployment commits.
 
 Remote `main` heads were read back on 16 October and still match the audit
 baselines: Bot mirror `02b57ac682e988c5fefece5669f40de31936a756`, private Bot
@@ -96,7 +95,7 @@ the shared alert, private review, confirmation, audit and verification requireme
 | Unattributed held access | Proactively surface the hold, guide the required ownership checks, then execute and independently verify the permitted disposition. Unproven live ownership remains protected and visibly unresolved. |
 | Rollover completion | A single integrated test chain drives actual admin callbacks, authority journal, disposable SQL and worker through final independent verification. Cover restart, concurrent/stale confirmation and interruption at each effect boundary. |
 
-## Immediate release blockers
+## Historical release blockers at the initial split
 
 - `deploy/k98-release.json` still describes the earlier October 13 release, not
   this recovery stack. Twelve additional SQL migration files are in the candidate
@@ -624,3 +623,66 @@ This is offline comparator/packet qualification, not fresh production SQL proof.
 The installed updater must still collect and verify all three complete live SQL
 observations before publishing a seed or allowing startup. Synthetic replay proof
 is not retained as deployable input. The old installer must be rebuilt for this fix.
+
+## Delivery acceptance and native rehearsal — 16 October, final candidate
+
+The evidence-version fix is reviewed in PR #371. Changes scan
+`87247afc-5260-4e8b-9bcb-24e85c0fbdda` finalized successfully with zero findings,
+complete bounded coverage and sealed readback; reported usage 1,285,613 tokens.
+The updater installer was rebuilt from `e5d4dd90`. The rebuilt 292-member offline
+packet and all 27 full-size seed refusal cases pass. This remains synthetic
+offline qualification, not deployable SQL proof.
+
+The guided acceptance chain now reaches successful provider delivery through
+actual admin callbacks, capture, immutable spool, SQL queue, worker coordinator,
+runtime registration, authority, complete SQL stream/request/event procedures,
+SDK adapter, readback, stream closure and exact claim release. A reconstructed
+ClosedStreamVerifier independently checks every retained private journal member.
+Two additional cases apply the provider write and lose its reply, or return a
+mismatched readback. Both retain the uncertain job/claims and do not repeat the
+write on the next worker run. Ten guided cases and 55 related capture/continuation
+regressions pass, with production operational logs unchanged.
+
+Fixture boundaries are explicit: Discord transport, the atomic producer receipt
+helper, provider child/process observations, private journal storage and request
+pacing are simulated. Provider HTTP is forbidden. SQL uses uniquely named global
+temporary objects; source procedure bodies retain all transaction and ownership
+checks, with only their role lookup substituted. Disposable procedures are removed
+in fixture cleanup. These tests do not claim live Google or production ACL proof.
+
+The separately elevated Windows rehearsal passed actual administrative ACLs,
+immutable controls, retained native process identity and a uniquely named disabled
+scheduled task; the scratch task was removed. No bot start or SQL connection occurred.
+The current deterministic Windows suite also passed: release orchestration 11,
+combined interruption/resume 15, recovery seed 30, partial source/seed recovery 9,
+source custody/index 39, final closeout 6 and installed-updater upgrade 30 checks.
+Their task/SQL/process substitutions remain explicit; this is component evidence,
+not a complete installed bot-process deployment rehearsal.
+
+Security routing for the delivery qualification: the three changed Python files
+are isolated opt-in test fixtures; there is no deployed code, permission, config,
+dependency or installer change. Provider HTTP is prohibited and temporary SQL names
+are generated internally. The narrow test/documentation diff is documented as a
+skip; preceding runtime/deployment/SQL Changes reviews remain required and retained.
+
+Enabled fresh actions are exactly the 15 entries in `P0A_ACTIONS`:
+
+| Family | Guided actions | Acceptance evidence |
+| --- | --- | --- |
+| Configuration read | release_read, contain_read | test_config_recovery_guided; test_config_read_containment; real SQL containment/closure tests; automatic policy uses the same verified receipt |
+| Producer refusal | close_unstarted_admission, resume_sql_stage, resume_current_registration | test_producer_admission_recovery_sql; test_producer_refusal_sql; test_producer_refusal_view; registration and live-owner races refuse stale confirmation |
+| Configuration producer | cancel_configuration, resume_capture, queue_capture, abandon_capture | test_configuration_producer_recovery_sql; test_p0a_guided_rehearsal_sql; lost capture/queue acknowledgements reconcile without producer replay |
+| Configuration continuation | retry_configuration, keep_prior | test_configuration_continuation_sql; actual paginated private review and separate confirmation in test_p0a_guided_rehearsal_sql |
+| Committed/rolled-back stats dependency | release_failure, resume_capture, queue_capture, abandon_capture | test_stats_import_outcomes; test_import_capture_recovery_sql; test_import_resolution_command; incomplete reporting acceptance is withheld by test_recovery_release_policy |
+
+Common authorization, stale/duplicate interaction, private pagination, proactive
+notification and exposure checks remain in the guided recovery/view/notification
+tests. Every other adapter still discovers and explains incidents with the P0b
+release notice. Existing accepted actions still reconcile before presentation
+filtering. Unknown writes do not acquire a timeout-based release path.
+
+Remaining pre-window gates are the final private promotion/CI and operator packet,
+whole-application startup qualification and a composed installed-package rehearsal.
+Fresh production SQL observation and live Discord/provider acceptance belong to
+the controlled deployment itself. None of these gaps is transferred to P0b, whose
+six required workstreams above remain unchanged. Do not enable maintenance yet.
