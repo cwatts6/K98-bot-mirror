@@ -502,3 +502,53 @@ qualification, representative business/worker and enabled-action acceptance, and
 the installed-package interruption/restart/forward-recovery rehearsal. No
 maintenance window is requested yet. All six P0b recovery workstreams remain
 required; none has been deferred or marked complete.
+
+## Coordinated package and populated rehearsal — 16 October
+
+Mirror PR 368 publishes the coordinated package at `84b19f54`. Changes scan
+`3744b7f9-d812-4715-9430-e8053e74c930` covers `1f6e0c47..84b19f54`: all thirteen
+source-like files reviewed, no candidates/findings, complete coverage. Finalization
+succeeded and sealed documents were read back at `2026-10-16T11:40:20.158819Z`.
+Tool-reported usage was 3,581,109 tokens. The 591 focused tests and native suites
+of 76, 15, 30 and 30 checks passed. The exact predecessor updater upgrade and
+installer were built locally; their presence does not authorize installation.
+
+The complete export installation comparator now passes against actual restricted
+login observations in a fresh local database: 48 objects, 503 columns and 1,311
+effective permission checks, preserving reviewed metadata hash
+`2dece9329be54dfb031c07f3c61903fd52835d83e3bf29d0ad70af18ac7e881f`.
+The fixture reconstructs historical column ordering, executes the twelve literal
+migrations, and uses explicitly synthetic baseline receipts. It changes only
+the local server/database identity in the reviewed contract. Temporary login
+creation is paired with cleanup even when the rehearsal fails, and connection
+pooling is disabled before the first connection. Existing databases are untouched.
+
+The populated business rehearsal invokes all nine real nested target procedures,
+using three synthetic governors across two power bands and one exemption. It
+checks exact target and DKP values, two exported target rows, three final report
+rows, outer-transaction rollback, draft publication, promotion to official and
+preservation of the existing official publication identity. All four cases passed
+in `K98_P0a_Migrations_4fbfc5a88afe`. No nested business procedure is stubbed.
+The SQL repository references but does not export the `KS4_UNO_SEQ` definition;
+this fixture supplies an unused sequence dependency and provides every SCAN_UNO
+explicitly. This is not sequence installation evidence or provider delivery proof.
+
+The current native adapter also passed seven elevated Windows custody checks in
+a unique protected disposable directory: CreateNew/readback, atomic directory
+publication, preserved ACLs and bytes, overwrite refusal, changed-hash refusal and
+exclusive operator locking. Production state was not changed.
+
+The full-suite investigation found the SQL repository's current outcome manifest
+still described the predecessor `sp_TARGETS_MASTER`, while the bot already pinned
+the atomic successor. The focused SQL follow-up aligns that exact module entry
+and verifies both its immutable forward migration and the inverse historical
+source. Historical signing/direct-permission manifests and migration files remain
+unchanged; old bodies are not admitted to the runtime allowlist. Python source
+compatibility checks passed 23 cases against the paired SQL checkout. SQL checks
+passed for atomic configuration, stats outcomes, 863 historical source assertions,
+80 direct-permission assertions and target publication.
+
+P0a is still **not deployment-ready**. Whole-application/legacy startup qualification,
+complete capture/worker acceptance, installed-package interruption/restart
+qualification and final promotion/handoff checks remain open release gates. This
+does not defer any of the six P0b workstreams or authorize the maintenance window.

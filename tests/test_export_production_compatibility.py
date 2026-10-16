@@ -70,6 +70,31 @@ def historical_source_bytes(module, raw, outcome_source):
         )
         assert "@ExportPreparationID" not in text and "StatsImportExecution" not in text
         raw = text.replace("\n", "\r\n").encode("utf-8")
+    elif name == "dbo.sp_TARGETS_MASTER":
+        validate_legacy_permission_source(outcome_source)
+        current = next(m for m in outcome_source["modules"] if m["name"] == name)
+        text = raw.decode("utf-8").replace("\r\n", "\n")
+        assert (
+            hashlib.sha256(text.encode()).hexdigest() == current["source_sha256"]
+        ), "Atomic configuration source drift"
+        assert (
+            legacy_definition_hash(source_definition(raw)) == current["definition_sha256"]
+        ), "Atomic configuration definition drift"
+        text = text.replace(
+            "    @RepublishReason [nvarchar](400) = NULL,\n    @ExportPreparationID uniqueidentifier = NULL",
+            "    @RepublishReason [nvarchar](400) = NULL",
+        ).replace("IF @ExportPreparationID IS NULL AND @@TRANCOUNT <> 0", "IF @@TRANCOUNT <> 0")
+        text = re.sub(
+            r"(?ms)^    -- Only the typed configuration producer.*?(?=^    DECLARE @RequestedKVK int = @KVK;)",
+            "",
+            text,
+        )
+        text = text.replace(
+            "        IF @ExportPreparationID IS NOT NULL AND (@@TRANCOUNT <> 1 OR XACT_STATE() <> 1)\n            THROW 52626, 'Atomic configuration publication lost its caller transaction.', 1;\n",
+            "",
+        )
+        assert "@ExportPreparationID" not in text
+        raw = text.replace("\n", "\r\n").encode()
     elif name in FILE_VISIBILITY_MODULE_HASHES:
         assert (
             legacy_definition_hash(source_definition(raw)) == FILE_VISIBILITY_MODULE_HASHES[name]
@@ -213,7 +238,9 @@ def test_all_finite_forms_are_reconstructed_from_authoritative_source(permission
             ).read_text(encoding="utf-8-sig")
 
 
-@pytest.mark.parametrize("name", ["dbo.UPDATE_ALL2", *FILE_VISIBILITY_MODULE_HASHES])
+@pytest.mark.parametrize(
+    "name", ["dbo.UPDATE_ALL2", "dbo.sp_TARGETS_MASTER", *FILE_VISIBILITY_MODULE_HASHES]
+)
 def test_amendment_reconstruction_rejects_changed_forward_image(permission_sources, name):
     manifest, outcome = permission_sources
     module = next(m for m in manifest["modules"] if m["name"] == name)
@@ -224,9 +251,12 @@ def test_amendment_reconstruction_rejects_changed_forward_image(permission_sourc
         if name == "dbo.UPDATE_ALL2"
         else (b"SELECT file_exists FROM", b"SELECT file_is_a_directory FROM")
     )
+    if name == "dbo.sp_TARGETS_MASTER":
+        before, after = b"THROW 52625", b"PRINT 52625"
     assert before in raw
     with pytest.raises(
-        AssertionError, match=r"Outcome source drift|File visibility definition drift"
+        AssertionError,
+        match=r"Outcome source drift|File visibility definition drift|Atomic configuration source drift",
     ):
         historical_source_bytes(module, raw.replace(before, after, 1), outcome)
 
@@ -249,7 +279,9 @@ def test_amendment_reconstruction_rejects_resealed_outcome_manifest(permission_s
         historical_source_bytes(module, raw, changed)
 
 
-@pytest.mark.parametrize("name", ["dbo.UPDATE_ALL2", *FILE_VISIBILITY_MODULE_HASHES])
+@pytest.mark.parametrize(
+    "name", ["dbo.UPDATE_ALL2", "dbo.sp_TARGETS_MASTER", *FILE_VISIBILITY_MODULE_HASHES]
+)
 def test_amendment_reconstruction_preserves_exact_historical_byte_pin(permission_sources, name):
     manifest, outcome = permission_sources
     module = next(m for m in manifest["modules"] if m["name"] == name)
