@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 
 import pytest
 
@@ -348,14 +349,23 @@ def test_migration_contains_exact_compiled_modules_and_source_pins(containment_s
         expected = body.replace("CREATE OR ALTER PROCEDURE", "CREATE PROCEDURE", 1)
         assert actual == expected
         assert "0x" + hashlib.sha256(actual.encode("utf-16-le")).hexdigest() in text
-        source = (containment_schema / ("sql_schema/" + name + ".StoredProcedure.sql")).read_text(
-            encoding="utf-8-sig"
+        path = "sql_schema/" + name + ".StoredProcedure.sql"
+        # This migration's literal postimages remain immutable when later
+        # migrations extend the same procedures. Check its own reviewed commit.
+        source = (
+            subprocess.check_output(
+                ["git", "show", "79987f7bd5e40aaecc66a36bcbd8ecdc93522667:" + path],
+                cwd=containment_schema,
+            )
+            .decode("utf-8-sig")
+            .replace("\r\n", "\n")
         )
+        current = (containment_schema / path).read_text(encoding="utf-8-sig")
         assert (
             source[source.index("CREATE PROCEDURE") :].strip().removesuffix("GO").strip()
             == expected.strip()
         )
         assert (
             next(item["sha256"] for item in manifest if item["name"] == name)
-            == hashlib.sha256(source.encode()).hexdigest()
+            == hashlib.sha256(current.encode()).hexdigest()
         )
