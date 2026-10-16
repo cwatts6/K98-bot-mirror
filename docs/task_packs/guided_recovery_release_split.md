@@ -740,3 +740,32 @@ by this ordering correction. Its focused SQL ordering/release/seed validation
 passes 66 cases; final Changes review, corrected private promotion/package and
 composed installed-package rehearsal remain required before the maintenance window.
 The six P0b workstreams remain mandatory; none of these P0a gates is transferred.
+
+## Complete predecessor grants in the SQL migration image profile
+
+The composed rehearsal found six missing existing direct EXECUTE grants in the
+SQL image reference fixture. The predecessor application plan and retained
+October 14 permission evidence both require them. Its seven-grant fixture subset
+had omitted the session transition, stream transition, manual enrollment, output
+enrollment, request-event append and reconciliation-proof procedures. That caused
+the migration profile and whole-application startup contract to disagree.
+
+An independent fresh reference at `K98_P0a_Migrations_2a2a929256f8` now authenticates
+the exact predecessor grant-plan bytes and installs all 13 existing affected
+grants before deriving before/after images from immutable SQL source. Only those
+six procedure image pairs change. The migration scripts, adapter, permission delta,
+startup contracts, protected source pins and SQL commit remain unchanged. This
+does not grant new production permissions or learn expectations from a live target.
+
+The corrected packet passed real backup/preflight, unstarted verification, apply,
+verification and completed repeat on fresh full-schema development database
+`K98_P0a_Migrations_a20ef634e525`. Its actual application comparator passes for 451
+objects. Local tempdb collation is explicitly rebound in the disposable profile;
+all expected object images remain identical to the packet. Historical prerequisite
+receipts are synthetic and source-hash checked; every new migration actually ran.
+Focused validation passes 68 tests with production operational logs unchanged.
+
+The previous private promotion passed 8,288 tests, 642 skips and eight subtests,
+but its installer is superseded by this correction. The final complete-grant
+candidate still requires its own Changes review, promotion and completed composed
+rehearsal. Do not deploy a previous candidate. P0b remains fully required.
