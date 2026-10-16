@@ -145,6 +145,7 @@ class ConfigurationContinuation:
     def reconcile(self, source_id, action):
         if action["ActionKind"] not in {"retry_configuration", "keep_prior"}:
             raise SourceConflict("Unsupported configuration continuation action.")
+        choice = "keep_prior" if action["ActionKind"] == "keep_prior" else "retry"
         with self.dal.serialized(source_id):
             state = self.dal.snapshot(source_id)
             marker = state["marker"]
@@ -157,7 +158,7 @@ class ConfigurationContinuation:
                         dict(
                             action=identity(action["ActionID"]),
                             token=action["EvidenceHash"],
-                            choice="retry",
+                            choice=choice,
                             configuration=state["current"],
                             reason="Dispatch not acknowledged; never replay automatically",
                         ),
@@ -168,8 +169,12 @@ class ConfigurationContinuation:
                     return "not_applied"
             if marker.get("token") != action["EvidenceHash"]:
                 raise SourceConflict("Action does not match its saved configuration approval.")
-            if marker["choice"] == "keep_prior":
-                return "verified" if action["ActionKind"] == "keep_prior" else "not_applied"
+            if marker.get("choice") != choice:
+                raise SourceConflict(
+                    "Saved configuration choice differs from the confirmed action."
+                )
+            if choice == "keep_prior":
+                return "verified"
             identifier = self.dal.reserve_for_reconciliation(source_id, marker)
             if self.dal.close_uncommitted(identifier, marker):
                 return "not_applied"

@@ -90,6 +90,46 @@ def test_no_dispatch_reply_creates_terminal_tombstone_and_allows_new_decision(re
         )
 
 
+def test_claimed_keep_prior_survives_restart_without_creating_continuation(recovery):
+    calls = []
+    adapter, service = setup(recovery, lambda: calls.append(1))
+    row = service.review_source(ACTOR, adapter.kind, recovery.source)
+    action_id, _ = service.store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "keep_prior",
+        "discord:1",
+        "Confirmed prior configuration",
+    )
+    # The process stopped after the durable claim, before the callback recorded a marker.
+    assert adapter.dal.snapshot(recovery.source)["marker"] is None
+    restarted = ConfigurationContinuation(
+        ConfigurationContinuationDAL(recovery.runtime, recovery.outcomes),
+        adapter.producer,
+        lambda: calls.append(1),
+    )
+    service.adapters[adapter.kind] = restarted
+    for _ in range(2):
+        final = service.refresh(row["IncidentID"])
+        assert final["State"] == "resolved"
+        assert service.store.actions[0]["State"] == "verified"
+        state = restarted.dal.snapshot(recovery.source)
+        assert state["marker"]["choice"] == "keep_prior"
+        assert state["marker"]["action"] == action_id
+        assert state["child"] is None
+        assert calls == []
+    assert recovery.source not in restarted.pending_recovery()
+    with pytest.raises(SourceConflict):
+        restarted.execute(
+            recovery.source,
+            "keep_prior",
+            row["EvidenceHash"],
+            "recovery:" + action_id,
+            "Late callback",
+        )
+
+
 @pytest.mark.asyncio
 async def test_actual_admin_buttons_review_sources_and_keep_prior(recovery, monkeypatch):
     from ui.views import recovery_view as view
