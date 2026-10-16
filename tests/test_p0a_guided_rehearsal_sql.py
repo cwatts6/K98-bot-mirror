@@ -1,13 +1,16 @@
 """Alert-to-disposition rehearsal with real SQL incidents and admin callbacks.
 
-Only Discord transport and the configuration producer body are simulated. The
-producer helper commits a real atomic receipt (optionally losing its reply).
-This is not installed-package, provider-delivery or business-publication proof.
+Discord transport and the configuration producer body are simulated. The producer
+helper commits a real atomic receipt (optionally losing its reply). Capture cases
+use actual SQL rows, immutable spool files, queue admission and worker execution,
+with controlled transport failures. This is not installed-package or provider-
+delivery proof; real business-publication checks live in the separate rehearsal.
 """
 
 from contextlib import contextmanager
 import json
 import os
+import threading
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -16,6 +19,14 @@ import pytest
 from services.configuration_continuation import ConfigurationContinuation
 from services.configuration_continuation_dal import ConfigurationContinuationDAL
 from services.configuration_producer_recovery import ConfigurationProducerRecovery
+from services.export_coordination_dal import ExportCoordinationDAL
+from services.export_coordination_service import ExportCoordinator
+from services.export_request_budget import BudgetCompletionUnknown
+from services.legacy_export_snapshot_service import (
+    LegacyExportRuntime,
+    LegacySnapshot,
+    OutputSection,
+)
 from services.recovery_dal import RecoveryDAL
 from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
@@ -37,7 +48,18 @@ def button(view, label):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("choice", ["keep_prior", "skip_export", "skip_export_lost_reply"])
+@pytest.mark.parametrize(
+    "choice",
+    [
+        "keep_prior",
+        "skip_export",
+        "skip_export_lost_reply",
+        "capture",
+        "capture_lost_queue_reply",
+        "capture_unknown_request",
+        "capture_corrupt_spool",
+    ],
+)
 async def test_monitor_alert_to_verified_configuration_disposition(
     recovery, store, monkeypatch, choice
 ):
@@ -47,6 +69,37 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     from ui.views import recovery_review_view, recovery_view
 
     r = recovery
+    queue_calls = []
+    if choice.startswith("capture"):
+        # Real durable admission, snapshot verification and coordinator. Only
+        # the input rows and eventual external transport are synthetic.
+        coordinator = ExportCoordinationDAL(
+            r.connect, preparations=True, output_operations=True, execution_evidence=True
+        )
+        r.runtime.account = "a"
+        r.runtime.coordinator = coordinator
+        r.runtime.verified_snapshot = lambda source: LegacyExportRuntime.verified_snapshot(
+            r.runtime, source
+        )
+
+        def capture_sql(connection, scope):
+            cursor = connection.cursor()
+            try:
+                cursor.execute("SELECT CAST(7 AS int) AS value")
+                rows = tuple(tuple(row) for row in cursor.fetchall())
+            finally:
+                cursor.close()
+            return (OutputSection("output", ("value",), rows),), dict(scope)
+
+        def enqueue(source):
+            job_id = LegacyExportRuntime.enqueue_snapshot(r.runtime, source)
+            queue_calls.append(job_id)
+            if choice.endswith("lost_queue_reply") and len(queue_calls) == 1:
+                raise TimeoutError("Queue commit succeeded; acknowledgement lost")
+            return job_id
+
+        r.runtime.capture = capture_sql
+        r.runtime.enqueue_snapshot = enqueue
     generation = json.loads(r.outcomes.inspect(r.source)["preparation"]["GenerationJson"])
     uncommitted(r)
     r.runtime.account = "a"
@@ -115,6 +168,7 @@ async def test_monitor_alert_to_verified_configuration_disposition(
         guild_id=2,
         channel_id=3,
         message=message,
+        response=SimpleNamespace(is_done=lambda: True),
         followup=SimpleNamespace(send=AsyncMock()),
     )
 
@@ -165,12 +219,67 @@ async def test_monitor_alert_to_verified_configuration_disposition(
         await click("Review configuration result")
         child_id = current_view().row["SourceID"]
         child_row = current_view().row
-        label = child_row["evidence"]["actions"]["abandon_capture"]["label"]
+        selected_action = "resume_capture" if choice.startswith("capture") else "abandon_capture"
+        label = child_row["evidence"]["actions"][selected_action]["label"]
         await click(label)
         assert r.outcomes.inspect(child_id)["resources"]
         await click("Confirm & apply repair")
-        assert current_view().row["State"] == "resolved"
-        assert current_view().row["evidence"]["outcome"] == "export_skipped"
+        if choice.startswith("capture"):
+            with service_scope() as service:
+                # A fresh service reconciles a lost commit response without
+                # repeating capture, creating another job or releasing by age.
+                final_child = service.refresh(child_row["IncidentID"])
+                assert final_child["State"] == "resolved"
+                assert not service.store.pending_actions(child_row["IncidentID"])
+            queued = r.outcomes.inspect(child_id)["preparation"]
+            assert queued["State"] == "materialized"
+            actual_id = str(queued["JobID"]).lower()
+            assert queue_calls and set(queue_calls) == {actual_id}
+            jobs = r.owner.execute(
+                r.rewrite(
+                    "SELECT JobID,State,SpoolHash FROM dbo.ExportPreparation WHERE PreparationID=?"
+                ),
+                child_id,
+            ).fetchall()
+            assert len(jobs) == 1 and bytes(jobs[0][2])
+            assert r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.ExportJob")).fetchval() == 1
+            deliveries = []
+            if choice == "capture_corrupt_spool":
+                (r.runtime.store.root / queued["SpoolKey"]).write_bytes(b"corrupt fixture")
+
+            def before_dispatch(job, claim, dal, budget, stop, snapshot):
+                assert str(job["JobID"]).lower() == actual_id
+                assert LegacySnapshot.load(snapshot).metadata()["preparation_id"] == child_id
+                deliveries.append(actual_id)
+                if choice == "capture_unknown_request":
+                    raise BudgetCompletionUnknown("Request checkpoint acknowledgement lost")
+                raise RuntimeError("Controlled stop before external provider dispatch")
+
+            # Reconstruction represents process restart. Execute real discovery,
+            # account/target admission, spool verification and terminal CAS.
+            worker = ExportCoordinator(
+                ExportCoordinationDAL(
+                    r.connect, preparations=True, output_operations=True, execution_evidence=True
+                ),
+                adapters={"scan_data": before_dispatch},
+                storage=r.runtime.store,
+                output_planner=lambda *_: pytest.fail("No new-source work belongs to this fixture"),
+            )
+            worker.run_batch(threading.Event())
+            expected_deliveries = [] if choice == "capture_corrupt_spool" else [actual_id]
+            assert deliveries == expected_deliveries
+            uncertain = choice == "capture_unknown_request"
+            assert r.owner.execute(
+                r.rewrite("SELECT State FROM dbo.ExportJob WHERE JobID=?"), actual_id
+            ).fetchval() == ("uncertain" if uncertain else "failed")
+            assert r.owner.execute(
+                r.rewrite("SELECT COUNT(*) FROM dbo.ExportResource WHERE ActiveJobID=?"), actual_id
+            ).fetchval() == (2 if uncertain else 0)
+            worker.run_batch(threading.Event())
+            assert deliveries == expected_deliveries
+        else:
+            assert current_view().row["State"] == "resolved"
+            assert current_view().row["evidence"]["outcome"] == "export_skipped"
         assert not r.outcomes.inspect(child_id)["resources"]
         # A replayed old confirmation cannot republish, even after new services.
         await button(publication_confirmation, "Confirm & apply repair").callback(interaction)
@@ -179,8 +288,12 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     await button(close_confirmation, "Confirm & apply repair").callback(interaction)
     with service_scope() as service:
         final = service.refresh(continuation_id)
-        assert final["State"] == "resolved"
+        assert final["State"] == ("open" if choice == "capture_corrupt_spool" else "resolved")
         assert not service.store.pending_actions(incident_id)
         assert not service.store.pending_actions(continuation_id)
-        assert not service.store.list_open()
+        if choice == "capture_corrupt_spool":
+            assert service.store.list_open()
+            assert calls == [1]
+        else:
+            assert not service.store.list_open()
         assert not r.outcomes.inspect(r.source)["resources"]

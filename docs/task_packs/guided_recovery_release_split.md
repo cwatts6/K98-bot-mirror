@@ -552,3 +552,53 @@ P0a is still **not deployment-ready**. Whole-application/legacy startup qualific
 complete capture/worker acceptance, installed-package interruption/restart
 qualification and final promotion/handoff checks remain open release gates. This
 does not defer any of the six P0b workstreams or authorize the maintenance window.
+
+## Final qualification reviews and queue/worker acceptance — 16 October
+
+Bot PR #369 (`99ae0243`, stacked on #368) and SQL PR #125 (`72b1af55`, stacked
+on #124) retain the populated qualification and exact source alignment. Their
+Changes reviews both finalized successfully and sealed documents were read back:
+`b53aebc1-5e54-408a-87a5-0b522df1bba3` (three source items plus supporting test
+and documentation; 1,324,653 reported tokens) and
+`bec56188-9843-4dc8-97d0-b28d2a2d453c` (all six files; 981,734 reported tokens).
+Both have complete bounded coverage and zero findings. No finalization error or
+approval request remains for those reviews.
+
+The frozen export/business rehearsal passed again in
+`K98_P0a_Migrations_5361cbbc4e3e`: 48 objects, 503 columns, 1,311 permissions and
+all four populated target-publication cases. Current smoke imports and command
+registration passed: 36 primary commands and 102 grouped subcommands.
+
+Guided capture acceptance now uses the actual queue DAL and worker coordinator
+with preparation, output-operation and execution-evidence gates enabled. Admin
+buttons drive capture and one durable job; a lost queue acknowledgement is
+reconciled through a newly constructed service. Actual spool bytes reach worker
+admission after reconstruction. A controlled pre-dispatch failure releases only
+the job's exact claims; a corrupt spool prevents dispatch and reopens recovery;
+an unknown request checkpoint retains claims and never automatically retries.
+The related disposable SQL set passed 62 tests with production logs unchanged.
+Discord transport, the producer receipt helper and provider failure injection
+remain explicit fixture boundaries; this is not successful provider-delivery proof.
+
+The narrow follow-up changes only two test files and this evidence record. Security
+routing: documented skip for this diff, because it adds isolated, opt-in synthetic
+test coverage without changing deployed runtime, permissions, configuration,
+dependencies or deployment tools. The SQL table names and shapes are read from the
+paired authoritative source. Architecture, deferred-item, security-routing,
+test-selection, formatting, lint and whitespace checks pass.
+
+The grant provenance audit resolved all ten apparent historical pin differences.
+Of 115 distinct annotated sources, 20 match Git bytes and 85 match the current
+CRLF checkout form. Ten match exact earlier reviewed revisions: three table shapes
+at `93acb69f`, UPDATE_ALL2 at `6072697b`, sp_TARGETS_MASTER at `64bc2975`, two
+enrollment transitions at `9dc3e42b`, replacement activate/plan at `2dd649bf`, and
+replacement verification at `95b4e91b`. These annotations record grant provenance;
+runtime validates the complete grant-plan digest and actual effective permissions,
+while current SQL definitions have their separate source/metadata pins. No runtime
+allowlist or unrelated source hash was relaxed. The exact audit is retained in
+`p0a-grant-provenance-20261016.json` in the local task artifacts.
+
+Remaining P0a gates stay open: complete application/legacy startup qualification,
+successful capture-to-provider acceptance, composed installed-package interruption
+and forward recovery, and final private promotion/operator handoff. P0b retains all
+six required workstreams. The maintenance window is not yet authorized by readiness.
