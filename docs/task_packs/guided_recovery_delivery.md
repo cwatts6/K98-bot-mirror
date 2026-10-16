@@ -19,13 +19,21 @@ queries were checked against authoritative table definitions and reviewed SQL
 PR #119's dependency stack. No schema change is introduced. State remains in
 the scoped preparation and recovery-action journals; UI contains no SQL.
 
-Validation so far: 99 recovery tests passed, including 11 disposable SQL
+Validation: 99 recovery tests passed, including 11 disposable SQL
 configuration continuation cases and actual review/confirmation callbacks.
 Cases cover lost dispatch/marker/commit replies, restart, stale registration,
 authorization, exact capture handoff, live dispatcher exclusion and held-read
 guidance. Architecture (203 files), deferred items, security routing, test selection,
-synthetic smoke imports and command registration passed. Shared integration tests
-and a Changes security review remain pending. No production/provider operations.
+synthetic smoke imports and command registration passed. Another 97 shared admission,
+configuration, notification and SQL-journal regression tests passed. The first
+combined invocation stopped after 33 passes because its required schema environment
+variable was omitted; the remaining 64 passed with the explicit disposable schema.
+Ruff, Black and whitespace checks passed. Focused coverage was selected for this
+slice; the qualified inherited full-suite result below is not claimed green.
+Changes scan `3d5c8dfc-3721-4f04-9c4e-d074120a5c08` completed and sealed
+`375b639e..d063937a`, all 13 source files, no findings or incomplete coverage.
+The sealed result was read back. Tool-reported usage: 2,384,673 tokens.
+No production/provider operations or persistent installation occurred.
 
 This completes neither P0 nor the full programme. Historical partial configuration,
 UPDATE_ALL2 reporting continuation, durable pipeline/cache remainder, all-copy
