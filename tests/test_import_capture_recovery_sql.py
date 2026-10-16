@@ -69,16 +69,33 @@ def recovery(tmp_path, request):
                     "dbo.ExportAttempt",
                     "KVK.SourceDelivery",
                     "KVK.SourceExportIntent",
+                    "dbo.ExportAttemptPart",
+                    "dbo.ExportExecutionSession",
+                    "dbo.ExportProviderRequest",
+                    "dbo.ExportProviderRequestEvent",
+                    "KVK.SourceOutputPool",
+                    "KVK.SourceOutputOperationResource",
                 )
             }
         )
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
+    procedures = {}
+    if request.param == "configuration_continuation":
+        procedures = {
+            "dbo." + name: "##Capture_" + namespace + "_" + name
+            for name in (
+                "usp_ExportExecutionStreamTransition",
+                "usp_ExportProviderRequestEventAppend",
+            )
+        }
 
     def rewrite(sql):
         # Correlated references may use the unqualified base table name.
         sql = re.sub(r"(?<![\w.])ExportJob\.", names["dbo.ExportJob"] + ".", sql)
         for source in sorted(names, key=len, reverse=True):
             sql = sql.replace(source, names[source])
+        for source, destination in procedures.items():
+            sql = sql.replace(source, destination)
         return sql
 
     def parameter(value):
@@ -95,6 +112,7 @@ def recovery(tmp_path, request):
         return value
 
     owner = pyodbc.connect(cs, autocommit=True, timeout=5)
+    created_procedures = []
     schema = Path(os.getenv("K98_CAPTURE_SQL_SCHEMA", "C:/K98-bot-SQL-Server/sql_schema"))
     try:
         for source in names:
@@ -103,6 +121,17 @@ def recovery(tmp_path, request):
             raw = re.sub(r",\s*\);", "\n);", raw)
             raw = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + namespace, raw)
             owner.execute(rewrite(raw))
+
+        for source in procedures:
+            from tests.test_export_target_containment_sql import ROLE_CHECK
+
+            raw = (schema / (source + ".StoredProcedure.sql")).read_text(encoding="utf-8-sig")
+            body = raw[raw.index("CREATE PROCEDURE") :].strip().removesuffix("GO").strip()
+            assert body.count(ROLE_CHECK) == 1
+            body = rewrite(body.replace(ROLE_CHECK, "IF 1=0", 1))
+            assert not re.search(r"\b(?:dbo|KVK)\.[A-Za-z_]", body)
+            owner.execute(body)
+            created_procedures.append(procedures[source])
 
         class Cursor:
             def __init__(self, inner):
@@ -266,7 +295,11 @@ def recovery(tmp_path, request):
             connect=Connection,
         )
     finally:
-        owner.close()
+        try:
+            for name in reversed(created_procedures):
+                owner.execute("DROP PROCEDURE " + name)
+        finally:
+            owner.close()
 
 
 @pytest.mark.parametrize("failure", [None, "adopt", "proof", "spool", "receipt", "queue"])
