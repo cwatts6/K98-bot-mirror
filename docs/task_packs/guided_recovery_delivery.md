@@ -1,5 +1,41 @@
 # Guided recovery delivery
 
+## Guided admission decisions — 2026-10-16
+
+The operator approved private admin comparisons of retained scan inputs and old/current
+destinations. `codex/guided-admission-decisions` implements complete bounded review pages
+before the separate **Confirm & apply repair** action. Every page reauthorizes the
+configured admin/guild/channel and rechecks exact evidence. All destinations are linked;
+retained inputs and output settings are paginated without truncation. These details
+are ephemeral and are not copied into the proactive incident alert. Reopening after
+restart reconstructs the current checks from persisted state.
+
+A changed registration requires the explicit **Continue with current destinations**
+decision, bound to both registration fingerprints. Continuation keeps original scan
+inputs and history, reserves one durable action, verifies admission/receipt after a
+lost reply, and never replays a committed import. Healthy older queued work is shown
+as a blocker before it owns a resource. Player-report and receipt-free scan blockers
+link to their correct recovery flow. Attempt history is streamed and hashed without
+a fixed 100-attempt cutoff; exact original action identities remain reconcilable.
+
+Validation: 57 focused tests passed; a subsequent five-test SQL rerun exercised actual
+private review/confirmation callbacks through the saved-input dispatch and lost-reply
+receipt. Coverage includes wrong actor/guild/channel, stale evidence, 37 destinations,
+long metadata, restart, changed registration after preview, 105 prior refusals and
+queue blockers. Only session-local SQL objects and mocked Discord/provider calls ran.
+Changes review `5c2fed15-a694-40cb-a512-adae66accea1` completed and sealed for
+`ec87ffed..323f227f`, seven source files, no findings or incomplete coverage, Deep
+off. Its sealed results were read back; tool-reported usage was 1,615,383 tokens.
+Architecture, deferred-item/security-routing checks, test selection, Black, Ruff,
+synthetic smoke imports and command registration passed. The earlier full-suite
+checkpoint is unchanged; this bounded admission slice uses its 57 affected tests.
+No schema installation or deployment ran.
+
+P0 remains active: full pipeline continuation and producer checkpoints, historical
+missing-input/pre-request cases, all-copy containment/active-history evidence loss,
+replacement admission blocker guidance, and integrated verified completion remain
+required acceptance work. None is classified as deferred optimisation.
+
 ## Atomic player-report recovery checkpoint — 2026-10-16
 
 The `codex/guided-producer-checkpoints` slice commits player-stat report output
