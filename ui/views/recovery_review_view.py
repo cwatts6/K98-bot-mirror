@@ -24,9 +24,13 @@ async def show_review_page(interaction, row, action, page, *, deferred=False):
         if not deferred and not await safe_defer(interaction, ephemeral=True):
             return
         result = await reviewed_page(interaction, row, action, page)
+        details = result["row"]["evidence"]["actions"][action]
         embed = discord.Embed(
-            title="Review retained scan and destinations",
-            description="Check the retained scan inputs, original outputs and current output settings. Follow the pages, then confirm only if this scan should use the current destinations.",
+            title=details.get("review_title", "Review retained scan and destinations"),
+            description=details.get(
+                "review_description",
+                "Check the retained scan inputs, original outputs and current output settings. Follow the pages, then confirm only if this scan should use the current destinations.",
+            ),
             color=0xF1C40F,
         )
         for field in result["fields"]:

@@ -85,6 +85,23 @@ def atomic_producer_intent(kind):
 
 
 @contextmanager
+def configuration_retry_intent(action_id, parent):
+    if _intent.get() is not None:
+        raise SourceConflict("Configuration continuation requires its own producer context.")
+    value = dict(
+        kind="configuration_import",
+        atomic_checkpoint=1,
+        operation=identity(action_id),
+        parent=identity(parent),
+    )
+    token = _intent.set(value)
+    try:
+        yield value
+    finally:
+        _intent.reset(token)
+
+
+@contextmanager
 def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=None):
     validate_inputs(inputs)
     current = _intent.get()

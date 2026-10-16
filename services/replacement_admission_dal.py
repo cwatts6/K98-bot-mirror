@@ -94,28 +94,30 @@ def _owner(cursor, account, kind, key):
     )
 
 
-def admission_blocker(connect, *, account, replacement_id):
+def admission_blocker(connect, *, account, replacement_id=None):
     """Return one exact blocker at a time; final SQL admission remains authoritative.
 
     No age-based release, mutations or private request data. Rechecking advances
     to the next owner after settlement, keeping Discord's button count bounded.
     """
     with transaction(connect) as cursor:
-        cursor.execute(
-            "SELECT ReplacementID FROM dbo.ExportReplacementPlan WHERE ReplacementID=? AND AccountKey=?",
-            identity(replacement_id),
-            account,
-        )
-        if one(cursor) is None:
-            raise SourceConflict("Replacement proposal is outside registered custody.")
+        if replacement_id is not None:
+            cursor.execute(
+                "SELECT ReplacementID FROM dbo.ExportReplacementPlan WHERE ReplacementID=? AND AccountKey=?",
+                identity(replacement_id),
+                account,
+            )
+            if one(cursor) is None:
+                raise SourceConflict("Replacement proposal is outside registered custody.")
         cursor.execute(
             "SELECT TOP (1) r.ResourceKey,r.Version,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID "
-            "FROM dbo.ExportResource r WHERE (r.ResourceKey=? OR r.ResourceKey IN "
+            "FROM dbo.ExportResource r WHERE (r.ResourceKey=? OR (? IS NULL AND r.ResourceKey='sql_snapshot:legacy_outputs') OR r.ResourceKey IN "
             "(SELECT 'destination:'+NewFileID FROM dbo.ExportReplacementTarget WHERE ReplacementID=?)) "
             "AND (r.OwnerID IS NOT NULL OR r.ActiveJobID IS NOT NULL OR r.ActivePreparationID IS NOT NULL "
             "OR r.ActiveOutputOperationID IS NOT NULL OR r.BlockedReason IS NOT NULL) ORDER BY r.ResourceKey",
             "account:" + account,
-            identity(replacement_id),
+            identity(replacement_id) if replacement_id is not None else None,
+            identity(replacement_id) if replacement_id is not None else None,
         )
         resource = one(cursor)
         if resource:

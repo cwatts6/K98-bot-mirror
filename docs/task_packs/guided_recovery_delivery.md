@@ -1,5 +1,37 @@
 # Guided recovery delivery
 
+## Guided fresh configuration continuation — 2026-10-16
+
+After verified atomic rollback and exact release, proactive discovery opens a
+separate configuration continuation decision. **Read & publish current config**
+shows complete private source/output pages and a separate confirmation;
+**Keep prior configuration** records an explicit verified decision. The bot saves
+the confirmed registration and action before reading. It does not reserve a writer
+ahead of its own configuration read. Reconciliation creates/fences the exact writer
+request only after the dispatcher ends, so an absent dispatch or lost read reply
+cannot permit a late duplicate write. Committed attempts link to the existing
+guided capture/queue/skip workflow. Unknown outcomes never authorize replay.
+Held account/SQL access links to its existing guided recovery before retry is offered.
+
+The already reviewed PR #356 admission decision branch is integrated here, with
+both configuration-producer and stats-refusal blocker routes retained. SQL-facing
+queries were checked against authoritative table definitions and reviewed SQL
+PR #119's dependency stack. No schema change is introduced. State remains in
+the scoped preparation and recovery-action journals; UI contains no SQL.
+
+Validation so far: 99 recovery tests passed, including 11 disposable SQL
+configuration continuation cases and actual review/confirmation callbacks.
+Cases cover lost dispatch/marker/commit replies, restart, stale registration,
+authorization, exact capture handoff, live dispatcher exclusion and held-read
+guidance. Architecture (203 files), deferred items, security routing, test selection,
+synthetic smoke imports and command registration passed. Shared integration tests
+and a Changes security review remain pending. No production/provider operations.
+
+This completes neither P0 nor the full programme. Historical partial configuration,
+UPDATE_ALL2 reporting continuation, durable pipeline/cache remainder, all-copy
+custody/history recovery, unattributed holds and integrated rollover acceptance
+remain required active work, not deferred optimisation.
+
 ## Atomic configuration producer and guided outcomes — 2026-10-16
 
 Coordinated configuration imports now reserve a typed producer and hold the actual

@@ -46,22 +46,45 @@ def recovery(tmp_path, request):
     names = {
         "dbo." + name: "##Capture_" + namespace + "_" + name
         for name in (
+            "ExportJob",
             "ExportPreparation",
+            "ExportPreparationResource",
             "ExportResource",
             "StatsImportExecution",
             "ExportExecutionStream",
         )
     }
+    if request.param == "configuration_continuation":
+        names.update(
+            {
+                name: "##Capture_" + namespace + "_" + name.split(".")[1]
+                for name in (
+                    "dbo.ExportReplacementVerification",
+                    "dbo.ExportReplacementPlan",
+                    "dbo.ExportReplacementTarget",
+                    "dbo.ExportTargetContainment",
+                    "dbo.ExportContainedTarget",
+                    "dbo.ExportJobResource",
+                    "KVK.SourceOutputOperation",
+                )
+            }
+        )
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
 
     def rewrite(sql):
-        for source, target in names.items():
-            sql = sql.replace(source, target)
+        for source in sorted(names, key=len, reverse=True):
+            sql = sql.replace(source, names[source])
         return sql
 
     def parameter(value):
         if isinstance(value, str) and value.startswith(
-            ("S11:stats-import:", "k98-legacy-output-snapshot", "export:account:", "k98-export:")
+            (
+                "S11:stats-import:",
+                "k98-legacy-output-snapshot",
+                "export:account:",
+                "k98-export:",
+                "k98-producer-recovery:",
+            )
         ):
             return "test:" + namespace + ":" + value
         return value
@@ -115,11 +138,15 @@ def recovery(tmp_path, request):
             from tests.test_all_kvk_capture_recovery import fixture as kvk_fixture
 
             base, preview, resources = kvk_fixture()
-        elif request.param in {"player_report", "configuration_producer"}:
+        elif request.param in {
+            "player_report",
+            "configuration_producer",
+            "configuration_continuation",
+        }:
             from tests.test_player_report_recovery import fixture as report_fixture
 
             base, preview, resources = report_fixture()
-            if request.param == "configuration_producer":
+            if request.param in {"configuration_producer", "configuration_continuation"}:
                 import json
 
                 from kvk.dal.new_source_import_dal import digest
@@ -169,7 +196,7 @@ def recovery(tmp_path, request):
             "scan_data": StatsImportOutcomeDAL,
             "player_report": PlayerReportRecoveryDAL,
         }.get(request.param)
-        if request.param == "configuration_producer":
+        if request.param in {"configuration_producer", "configuration_continuation"}:
             outcome_type = ConfigurationProducerDAL
         outcomes = outcome_type(Connection, account="a", storage_owner="disk-a")
         state = SimpleNamespace(sections=(OutputSection("output", ("value",), ((7,),)),), fail=None)
@@ -218,7 +245,7 @@ def recovery(tmp_path, request):
             "scan_data": ImportCaptureRecovery,
             "player_report": PlayerReportCaptureRecovery,
         }.get(request.param)
-        if request.param == "configuration_producer":
+        if request.param in {"configuration_producer", "configuration_continuation"}:
             service_type = ConfigurationProducerCapture
         service = service_type(runtime, outcomes)
         runtime.verified_snapshot = verified_snapshot

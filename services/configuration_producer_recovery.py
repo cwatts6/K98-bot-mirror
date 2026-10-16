@@ -12,6 +12,16 @@ class ConfigurationProducerDAL(PlayerReportRecoveryDAL):
     closure_key = "configuration_cancelled"
     cancel_action = "cancel_configuration"
 
+    @classmethod
+    def producer_fields(cls, producer):
+        from services.export_coordination_dal import identity
+
+        fields = super().producer_fields(producer)
+        if "parent" in producer:
+            identity(producer["parent"])
+            fields |= {"parent"}
+        return fields
+
 
 class ConfigurationProducerCapture(PlayerReportCaptureRecovery):
     request_dal = ConfigurationProducerDAL
@@ -35,6 +45,15 @@ class ConfigurationProducerRecovery(PlayerReportRecoveryAdapter):
                 "The prior configuration and target publication are preserved. "
                 "This does not claim a new configuration import or cache refresh completed."
             )
+            request = self.dal.request(self.dal.inspect(source_id)["preparation"])
+            if "parent" not in request["request"]["producer"]:
+                evidence["recovery_links"] = [
+                    dict(
+                        label="Choose configuration continuation",
+                        kind="configuration_continuation",
+                        source_id=source_id,
+                    )
+                ]
         elif self.cancel_action in evidence["actions"]:
             evidence["explanation"] = (
                 "The typed atomic contract and SQL locks verify that this attempt did not "
