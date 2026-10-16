@@ -7,16 +7,15 @@ import discord
 from core.interaction_safety import safe_command, safe_defer
 from core.operator_diagnostic_payloads import safe_diagnostic_content
 from decoraters import is_admin_and_notify_channel, track_usage
-from services.import_resolution_service import operate_import_resolution
 from versioning import versioned
 
 
 def attach_import_resolution(group):
     @group.command(
         name="import_resolution",
-        description="Inspect, preview or resolve an exact held stats import",
+        description="Open guided review for an exact held stats import",
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     @is_admin_and_notify_channel()
@@ -37,33 +36,32 @@ def attach_import_resolution(group):
         if not await safe_defer(ctx, ephemeral=True):
             return
         try:
-            if action in {"status", "preview"}:
-                from services.recovery_runtime import call_recovery
-                from ui.views.recovery_view import RecoveryIncidentView, actor_for, incident_embed
+            from services.recovery_runtime import call_recovery
+            from ui.views.recovery_view import RecoveryIncidentView, actor_for, incident_embed
 
-                row = await drain_thread(
-                    call_recovery,
-                    "review_source",
-                    actor_for(ctx.interaction),
-                    "stats_import",
-                    preparation_id,
-                )
-                await ctx.respond(
-                    embed=incident_embed(row),
-                    view=RecoveryIncidentView(row),
-                    ephemeral=True,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                return
-            text = await drain_thread(
-                operate_import_resolution,
+            # Retain old slash-command arguments for already registered clients,
+            # but never treat a legacy token as a new repair intent. Every action
+            # now goes through current evidence, release policy and guided confirmation.
+            row = await drain_thread(
+                call_recovery,
+                "review_source",
+                actor_for(ctx.interaction),
+                "stats_import",
                 preparation_id,
-                action,
-                confirmation,
-                reason,
-                accept_partial,
-                f"discord:{ctx.author.id}",
             )
+            await ctx.respond(
+                content=(
+                    "Legacy resolution now opens guided review. Review the current checks "
+                    "and use its confirmation button; the old token has not applied a repair."
+                    if action == "resolve"
+                    else None
+                ),
+                embed=incident_embed(row),
+                view=RecoveryIncidentView(row),
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
         except asyncio.CancelledError:
             raise
         except Exception as exc:
