@@ -1,7 +1,7 @@
 """Opt-in real SQL, exclusively session-local #tables in the approved fixture.
 
 No permanent DDL/DML, provider calls, retained-data changes or database creation.
-The six authoritative column/check definitions are reused; FKs to absent fixture
+The authoritative column/check definitions are reused; FKs to absent fixture
 dependencies are omitted. This proves queries/CAS/rollback, not production rights
 or multi-session contention on permanent objects.
 """
@@ -31,6 +31,7 @@ TABLES = (
     "ExportExecutionStream",
     "ExportProviderRequest",
     "ExportProviderRequestEvent",
+    "ExportContainedTarget",
 )
 SERVER = r"localhost\K98DEV"
 DATABASE = "master"
@@ -209,7 +210,17 @@ def test_real_sql_settlement_preserves_stream_and_membership(sql_fixture):
         ("mutation", "mutation", "unknown", False, True),
         ("probe", "mutation", "unknown", False, True),
         ("mutation", "read", "unknown", False, True),
-        ("probe", "read", "dispatch_intent", False, True),
+        # Historical read-only prefixes are admissible after the separate closed
+        # membership gate; they never substitute for a successful fresh probe.
+        ("probe", "read", "prepared", False, False),
+        ("probe", "read", "dispatch_intent", False, False),
+        ("probe", "read", "prepared", True, True),
+        ("probe", "read", "dispatch_intent", True, True),
+        ("probe", "read", None, False, True),
+        ("probe", "mutation", "prepared", False, True),
+        ("probe", "mutation", "dispatch_intent", False, True),
+        ("mutation", "read", "prepared", False, True),
+        ("mutation", "read", "dispatch_intent", False, True),
         ("probe", "read", "succeeded", True, False),
         ("mutation", "mutation", "not_sent", False, False),
     ],

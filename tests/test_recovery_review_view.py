@@ -13,6 +13,43 @@ from services.recovery_service import RecoveryActor, RecoveryService
 from tests.test_guided_recovery import ACTOR, Store
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["user", "guild_id", "channel_id"])
+async def test_closed_configuration_handoff_keeps_private_authorization(monkeypatch, field):
+    import bot_config
+    from ui.views import recovery_view as view
+
+    for key, value in (("ADMIN_USER_ID", 1), ("GUILD_ID", 2), ("NOTIFY_CHANNEL_ID", 3)):
+        monkeypatch.setattr(bot_config, key, value)
+    call = AsyncMock()
+    error = AsyncMock()
+    monkeypatch.setattr(view, "call", call)
+    monkeypatch.setattr(view, "report_error", error)
+    row = dict(
+        State="resolved",
+        evidence=dict(
+            actions={},
+            recovery_links=[
+                dict(
+                    label="Continue configuration",
+                    kind="configuration_continuation",
+                    source_id="root",
+                ),
+                dict(label="Old export", kind="export_job", source_id="old"),
+            ],
+        ),
+    )
+    incident = view.RecoveryIncidentView(row)
+    assert [b.label for b in incident.children] == ["Recheck", "Continue configuration"]
+    interaction = SimpleNamespace(user=SimpleNamespace(id=1), guild_id=2, channel_id=3)
+    setattr(interaction, field, SimpleNamespace(id=9) if field == "user" else 9)
+    await next(b for b in incident.children if b.label == "Continue configuration").callback(
+        interaction
+    )
+    call.assert_not_called()
+    assert isinstance(error.call_args.args[1], SourceConflict)
+
+
 def review_fixture():
     original = dict(consumer="scan_data", outputs=["old-output"], destinations=["original-file"])
     state = dict(

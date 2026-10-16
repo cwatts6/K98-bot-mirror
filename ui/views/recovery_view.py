@@ -167,7 +167,12 @@ class RecoveryIncidentView(discord.ui.View):
             (link["label"], link["kind"], link["source_id"])
             for link in row["evidence"].get("recovery_links", [])[:3]
         )
-        for label, linked_kind, linked_job in recovery_links if row["State"] != "resolved" else []:
+        for label, linked_kind, linked_job in recovery_links:
+            # A verified rollback closes the old attempt, but the admin still
+            # needs the separate fresh-publication/keep-prior decision. Opening
+            # that linked incident rechecks authorization and current evidence.
+            if row["State"] == "resolved" and linked_kind != "configuration_continuation":
+                continue
             linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
 
             async def review_replacement(
