@@ -169,6 +169,10 @@ try {
   $sessions=Sessions
   if($sessions.Count -ne 1 -or $sessions[0].ManifestHash.ToLowerInvariant() -cne $journal.publication.manifests.authority){throw 'Installed SQL session differs'}
   $retained=Retained-Preparations
+  # Ambient environment only. Object images and permission expectations come
+  # from the installed reviewed policy, never from these observed values.
+  $sqlEnvironment=@(Rows "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS server,DB_NAME() AS [database],CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) AS database_collation,CONVERT(nvarchar(128),DATABASEPROPERTYEX('tempdb','Collation')) AS tempdb_collation,(SELECT compatibility_level FROM sys.databases WHERE database_id=DB_ID()) AS compatibility_level;")
+  if($sqlEnvironment.Count -ne 1){throw 'Complete SQL environment observation required before preparation'}
   $resources=Rows ("SELECT TOP (129) r.ResourceKey,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID,r.OwnerID,r.Fence,r.BlockedReason,r.Version FROM dbo.ExportResource r JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID WHERE p.AccountKey='"+$account+"' AND p.State IN ('captured','materialized','uncertain') ORDER BY r.ResourceKey;")
   $bindings=@{
    root=$root;host=$env:COMPUTERNAME;sid=$c.sid;account=$account;before=$before;target=$target
@@ -178,6 +182,7 @@ try {
    old_gate=@{Path=$gatePath;SHA256=(Hash $gateBytes)}
    old_journal=@{Path=$journalPath;SHA256=(Hash $journalRaw);Record=$journal}
    old_native=@($native);old_session=$sessions[0];expected_preparation=@($retained);expected_resources=@($resources)
+   sql_environment=$sqlEnvironment[0]
   }
   $work=Join-Path $updates ([guid]::NewGuid().ToString())
   $observation=Join-Path $updates ('observation-'+[guid]::NewGuid().ToString()+'.json')
@@ -189,7 +194,7 @@ try {
    # the live checkout. They can prepare the first release containing the tool.
    $toolManifest=Read-Json $toolManifestPath
    if($toolManifest.version -ne 1){throw 'Unsupported installed update tool'}
-   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','k98_update_transitions.json','EmptyGitConfig.txt')
+   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','k98_update_transitions.json','p0a_release.py','p0a_release_spec.json','recovery_release_seed.py','EmptyGitConfig.txt')
    if(@($toolManifest.files.PSObject.Properties).Count -ne $required.Count){throw 'Exact update tool inventory required'}
    foreach($name in $required){$null=Read-Bytes (Join-Path $PSScriptRoot $name) $toolManifest.files.$name 2MB}
   } else {

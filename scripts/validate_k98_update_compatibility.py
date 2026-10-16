@@ -15,6 +15,7 @@ from scripts.prepare_k98_update import (
     TOOL_SOURCE_PATHS,
     check_case_aliases,
     check_source_only,
+    coordinated_policy,
     sha256,
 )
 
@@ -33,6 +34,13 @@ def classify(
     registry_sha256=None,
 ):
     blockers, tool_changes = [], []
+    recovery = None
+    try:
+        policy = coordinated_policy()
+        recovery = policy.selected(before, target, paths, read_blob) if policy else None
+    except ValueError as exc:
+        blockers.append(str(exc))
+    admitted = {r["path"] for r in recovery["sources"]} if recovery else set()
     try:
         if len(paths) > 4096 or len(set(paths)) != len(paths):
             raise ValueError("Bounded unique changed paths required.")
@@ -41,7 +49,12 @@ def classify(
         blockers.append(str(exc))
     if installed_tool is not None:
         expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
-        prior = expected - {"k98_update_transitions.json"}
+        registry = expected - {
+            "p0a_release.py",
+            "p0a_release_spec.json",
+            "recovery_release_seed.py",
+        }
+        prior = registry - {"k98_update_transitions.json"}
         legacy = prior - {"prepare_k98_release.py"}
         if (
             not isinstance(installed_tool, dict)
@@ -49,7 +62,7 @@ def classify(
             or type(installed_tool["version"]) is not int
             or installed_tool["version"] != 1
             or not isinstance(installed_tool["files"], dict)
-            or set(installed_tool["files"]) not in (expected, prior, legacy)
+            or set(installed_tool["files"]) not in (expected, registry, prior, legacy)
             or any(
                 not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in installed_tool["files"].values()
@@ -58,6 +71,18 @@ def classify(
             raise ValueError("Exact version-1 supported installed-tool manifest required.")
         for missing in expected - set(installed_tool["files"]):
             tool_changes.append("scripts/" + missing)
+    if recovery:
+        # The exception belongs to the installed package, never the target tree.
+        # Require its complete executable policy inventory, including unchanged
+        # helper files that would not appear in the Git delta.
+        for path in TOOL_SOURCE_PATHS:
+            name = Path(path).name
+            expected_hash = sha256(
+                Path(__file__).with_name(name).read_bytes().replace(b"\r\n", b"\n")
+            )
+            if installed_tool is None or installed_tool["files"].get(name) != expected_hash:
+                if path not in tool_changes:
+                    tool_changes.append(path)
     if installed_tool is not None and policy_sha256 is not None:
         if installed_tool.get("files", {}).get("prepare_k98_update.py") != policy_sha256:
             tool_changes.append("scripts/prepare_k98_update.py")
@@ -80,7 +105,7 @@ def classify(
                     if path not in tool_changes:
                         tool_changes.append(path)
             check_source_only(
-                [path],
+                [] if path in admitted else [path],
                 tool_copies=TOOL_SOURCE_PATHS,
                 read_blob=read_blob,
                 before=before,
@@ -94,7 +119,11 @@ def classify(
         classification=(
             "COORDINATED_RELEASE_REQUIRED"
             if blockers
-            else "UPDATER_UPGRADE_REQUIRED" if tool_changes else "ROUTINE_COMPATIBLE"
+            else (
+                "UPDATER_UPGRADE_REQUIRED"
+                if tool_changes
+                else "COORDINATED_COMPATIBLE" if recovery else "ROUTINE_COMPATIBLE"
+            )
         ),
         changed_files=len(paths),
         updater_members=tool_changes,

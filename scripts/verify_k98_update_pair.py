@@ -6,6 +6,7 @@ read-only SQL observations are checked by the complete existing startup comparat
 """
 
 import argparse
+from datetime import UTC
 import hashlib
 import json
 from pathlib import Path
@@ -144,9 +145,26 @@ def main():
 
 def verify_sql_contracts(config, policy):
     """Reuse complete startup comparators without constructing the runtime/IPC."""
+    from core.export_startup_windows import administrative_path
+
+    plan = json.loads(
+        read(
+            administrative_path(policy["seed_plan"]["path"], private=True),
+            policy["seed_plan"]["sha256"],
+        )
+    )
+    ref = plan["templates"]["bot"]
+    bot = json.loads(
+        read(administrative_path(ref["path"], private=True), ref["sha256"], 4 * 1024 * 1024)
+    )
+    verify_bot_sql_contracts(bot)
+
+
+def verify_bot_sql_contracts(bot):
+    """Check all three reviewed contracts against actual SQL before recording proof."""
+    from datetime import datetime
     from functools import partial
 
-    from core.export_startup_windows import administrative_path
     from kvk.dal.new_source_admin_dal import configured_connection
     from services.export_execution_dal import (
         ExportExecutionDAL,
@@ -160,47 +178,39 @@ def verify_sql_contracts(config, policy):
         verify_legacy_installation_contract,
     )
 
-    plan = json.loads(
-        read(
-            administrative_path(policy["seed_plan"]["path"], private=True),
-            policy["seed_plan"]["sha256"],
-        )
-    )
-    ref = plan["templates"]["bot"]
-    bot = json.loads(
-        read(administrative_path(ref["path"], private=True), ref["sha256"], 4 * 1024 * 1024)
-    )
     approved = bot["sql_contract"]
     factory = partial(configured_connection, sql_profile=approved["profile"])
-    verify_installation_contract(
-        ExportExecutionDAL(factory).installation_snapshot(
-            **(
-                {"migrations": installation_migrations(approved)}
-                if approved["version"] == 4
-                else {}
-            )
-        ),
-        approved,
+    installation = ExportExecutionDAL(factory).installation_snapshot(
+        **({"migrations": installation_migrations(approved)} if approved["version"] == 4 else {})
     )
+    verify_installation_contract(installation, approved)
     connection = factory()
     try:
         connection.autocommit = True
         cursor = connection.cursor()
         try:
+            legacy = legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"])
             verify_legacy_installation_contract(
-                legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"]),
+                legacy,
                 bot["legacy_sql_contract"],
                 profile=approved["profile"],
             )
-            verify_application_installation_contract(
-                application_snapshot_for_contract(cursor, bot["application_sql_contract"]),
-                bot["application_sql_contract"],
-            )
+            application = application_snapshot_for_contract(cursor, bot["application_sql_contract"])
+            verify_application_installation_contract(application, bot["application_sql_contract"])
         finally:
             cursor.close()
     finally:
         connection.close()
     print(json.dumps(dict(stage="UNCHANGED_STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
+    # Return the complete actual catalog evidence, not expected contract fields.
+    # Callers can retain and reverify this observation; no expectation is adopted
+    # from it, and a failed comparator prevents any successful return.
+    return dict(
+        observed_utc=datetime.now(UTC).isoformat(),
+        installation=installation,
+        legacy=legacy,
+        application=application,
+    )
 
 
 if __name__ == "__main__":

@@ -34,11 +34,27 @@ TOOL_SOURCE_PATHS = frozenset(
         "verify_k98_update_pair.py",
         "package_k98_update_tool.py",
         "k98_update_transitions.json",
+        "p0a_release.py",
+        "p0a_release_spec.json",
+        "recovery_release_seed.py",
     )
 )
 
 RELEASE_DESCRIPTION = "deploy/k98-release.json"
 SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
+
+
+def coordinated_policy():
+    """Load only the installed authenticated companion, never acquired source."""
+    import importlib.util
+
+    path = Path(__file__).with_name("p0a_release.py")
+    if not path.exists():
+        return None  # Older tools retain all ordinary protected-path refusals.
+    spec = importlib.util.spec_from_file_location("installed_p0a_release", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def reviewed_transitions():
@@ -489,12 +505,19 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     if not changes or len(changes) > 4096 or len(set(changes)) != len(changes):
         raise ValueError("Bounded unique changed paths required.")
     tool_sources = tool_sources or {}
-    for path in set(changes) & transition_paths():
+    policy = coordinated_policy()
+    coordinated = policy.selected(before, target, changes, read_blob) if policy else None
+    admitted = {r["path"] for r in coordinated["sources"]} if coordinated else set()
+    for path in (set(changes) & transition_paths()) - admitted:
         bundle = check_protocol_transition(path, read_blob, before, target)
         if not bundle <= set(changes):
             raise ValueError("Incomplete reviewed protocol transition inventory.")
     check_source_only(
-        changes, tool_copies=tool_sources, read_blob=read_blob, before=before, target=target
+        [p for p in changes if p not in admitted],
+        tool_copies=tool_sources,
+        read_blob=read_blob,
+        before=before,
+        target=target,
     )
     folded = [path.casefold() for path in changes]
     if len(set(folded)) != len(folded):
@@ -695,10 +718,25 @@ def prepare_update(
         tool_sources=tool_sources,
     )
     config.update(plan)
+    recovery_policy = coordinated_policy()
+    recovery = (
+        recovery_policy.selected(config["before"], config["target"], changes, read_blob)
+        if recovery_policy
+        else None
+    )
     description_raw = read_blob(config["target"], RELEASE_DESCRIPTION)
     previous_description = read_blob(config["before"], RELEASE_DESCRIPTION)
     sql_files = {}
-    if description_raw != previous_description:
+    if recovery:
+        if description_raw != previous_description:
+            raise ValueError("Coordinated recovery cannot combine another SQL descriptor.")
+        if read_sql_blob is None:
+            raise ValueError("Exact recovery SQL acquisition required before drain.")
+        config["sql"], sql_files = recovery_policy.sql_payload(
+            recovery, config["sql_environment"], read_sql_blob
+        )
+        config["recovery_seed"] = "live_sql_observation_v1"
+    elif description_raw != previous_description:
         if description_raw is None:
             raise ValueError("Removing a combined release description requires review.")
         description = combined_description(description_raw, config["before"])
@@ -732,6 +770,8 @@ def prepare_update(
         policy_path=config["old_policy"]["Path"],
         policy_sha256=config["old_policy"]["SHA256"],
     )
+    if recovery:
+        seed = recovery_policy.adapt_candidate(seed, recovery)
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
         dict(name=name, sha256=sha256(raw)) for name, raw in sorted(seed.items())
@@ -752,6 +792,11 @@ def prepare_update(
     config["extra_members"] = [
         dict(name="Verify-NewPair.py", sha256=sha256(files["Verify-NewPair.py"]))
     ]
+    if recovery:
+        files["Verify-RecoverySeed.py"] = (tools / "recovery_release_seed.py").read_bytes()
+        config["extra_members"].append(
+            dict(name="Verify-RecoverySeed.py", sha256=sha256(files["Verify-RecoverySeed.py"]))
+        )
     # Flat payload names keep the runner's bounded inventory and avoid archive
     # extraction. Every target path is separately validated by the adapter.
     for index, member in enumerate(config["source_members"]):
@@ -947,6 +992,10 @@ def main():
         .rstrip("\0")
         .split("\0")
     )
+    recovery_policy = coordinated_policy()
+    possible_recovery = (
+        recovery_policy.possible_paths(before, changes) if recovery_policy else set()
+    )
     # Known mixed modules require authenticated before/target blobs below. All
     # other forbidden paths still fail before acquisition. source_plan performs
     # the mandatory structural comparison before creating a release package.
@@ -954,7 +1003,9 @@ def main():
         [
             path
             for path in changes
-            if path not in APPLICATION_METHODS and path not in transition_paths()
+            if path not in APPLICATION_METHODS
+            and path not in transition_paths()
+            and path not in possible_recovery
         ],
         tool_copies=TOOL_SOURCE_PATHS,
     )
@@ -1014,10 +1065,23 @@ def main():
         raise ValueError("Unexpected Git object stream suffix.")
     read_sql_blob: Callable[[str], bytes] | None = None
     description_raw = blobs.get((target, RELEASE_DESCRIPTION))
-    if description_raw != blobs.get((before, RELEASE_DESCRIPTION)):
+    recovery = (
+        recovery_policy.selected(
+            before, target, changes, lambda commit, path: blobs.get((commit, path))
+        )
+        if recovery_policy
+        else None
+    )
+    description = None
+    if recovery:
+        if description_raw != blobs.get((before, RELEASE_DESCRIPTION)):
+            raise ValueError("Recovery cannot combine a separate SQL descriptor.")
+        description = dict(sql_commit=recovery["sql"]["commit"])
+    elif description_raw != blobs.get((before, RELEASE_DESCRIPTION)):
         if description_raw is None:
             raise ValueError("Removing a combined release description requires review.")
         description = combined_description(description_raw, before)
+    if description is not None:
         # Acquire SQL into a separate Git database, never merge its history into
         # Bot or select SQL main as the release target. The exact pin must be on main.
         sql_root = Path(args.output + "-sql")
