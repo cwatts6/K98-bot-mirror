@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scripts.prepare_k98_release import prepare, validate_manifest
+from scripts.prepare_k98_release import prepare, validate_manifest, validate_updater_manifest
 
 
 def specification():
@@ -24,6 +24,53 @@ def specification():
             for kind in ("sql", "source", "seed", "start", "readiness")
         ],
     )
+
+
+def updater_specification(count):
+    value = specification()
+    value["version"] = 4
+    value["members"] = [
+        dict(name="Release-Step.ps1", sha256="c" * 64),
+        dict(name="ReleaseBindings.json", sha256="d" * 64),
+    ] + [dict(name=f"source-{i:04d}.bin", sha256="e" * 64) for i in range(count - 2)]
+
+    def invocation(action):
+        return dict(
+            file="Release-Step.ps1", arguments=dict(Action=action, ExpectedBindingsSHA256="d" * 64)
+        )
+
+    value["preflight"] = invocation("Preflight")
+    value["steps"] = [
+        dict(id=kind, kind=kind, apply=invocation(apply), verify=invocation(verify))
+        for kind, apply, verify in (
+            ("source", "ApplySource", "VerifySource"),
+            ("seed", "ApplySeed", "VerifySeed"),
+            ("start", "ApplyStart", "VerifyStart"),
+            ("readiness", "AwaitReadiness", "VerifyReadiness"),
+        )
+    ]
+    return value
+
+
+@pytest.mark.parametrize("count", [243, 512])
+def test_coordinated_source_inventory_fits_fixed_adapter_packet(count):
+    value = updater_specification(count)
+    validate_updater_manifest(value)
+    assert len(json.dumps(value, separators=(",", ":")).encode()) <= 65536
+    with pytest.raises(ValueError, match="Unsupported release version"):
+        validate_manifest(value)
+    value["steps"][0]["apply"]["arguments"]["Action"] = "ArbitraryCommand"
+    with pytest.raises(ValueError, match="exact normal-updater"):
+        validate_updater_manifest(value)
+
+
+def test_oversized_fixed_adapter_and_generic_inventory_remain_refused():
+    with pytest.raises(ValueError, match="Bounded release inventory"):
+        validate_updater_manifest(updater_specification(513))
+    value = specification()
+    value["members"] += [dict(name=f"extra-{i}.bin", sha256="e" * 64) for i in range(128)]
+    with pytest.raises(ValueError, match="Bounded release inventory"):
+        validate_manifest(value)
 
 
 def test_packet_preserves_exact_steps_and_calculates_pins_without_execution(tmp_path):

@@ -24,6 +24,10 @@ function Get-BytesHash([byte[]]$Bytes) {
     try { ([BitConverter]::ToString($hash.ComputeHash($Bytes))).Replace('-','').ToLowerInvariant() }
     finally { $hash.Dispose() }
 }
+function Assert-ReleaseMemberCount([int]$Version,[int]$Count) {
+    $limit=if($Version -eq 4){512}else{128}
+    if($Version -notin @(1,2,3,4) -or $Count -lt 1 -or $Count -gt $limit){throw 'Bounded release member inventory required'}
+}
 function Read-Pinned([string]$Path,[string]$Hash,[long]$Limit) {
     $item=Get-Item -LiteralPath $Path -Force
     if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt $Limit){throw 'Invalid bounded release member'}
@@ -240,7 +244,7 @@ if($manifest.version -in @(2,3)) {
 }
 Assert-OriginalReleaseUnselected $manifest $staged
 $members=@($manifest.members)
-if($members.Count -lt 1 -or $members.Count -gt 128){throw 'Bounded release member inventory required'}
+Assert-ReleaseMemberCount $manifest.version $members.Count
 $seen=@{}
 foreach($member in $members) {
     if($member.name -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$' -or $member.name.EndsWith('.') -or $member.name -match '^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\.|$)' -or $seen.ContainsKey($member.name)){throw 'Unique flat release member required'}

@@ -120,7 +120,11 @@ def _validate_manifest(value, *, versions):
         if not isinstance(ref["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", ref["sha256"]):
             raise ValueError("Installed reference checksum required.")
     members = value["members"]
-    if not isinstance(members, list) or not 1 <= len(members) <= 128:
+    # Coordinated source updates include tests/docs as exact Git members too.
+    # Keep generic packets at their original bound; v4 retains fixed adapters,
+    # individual hashes and the independent 64 KiB manifest limit.
+    member_limit = 512 if value["version"] == 4 else 128
+    if not isinstance(members, list) or not 1 <= len(members) <= member_limit:
         raise ValueError("Bounded release inventory required.")
     names = set()
     for member in members:

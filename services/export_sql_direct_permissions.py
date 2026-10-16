@@ -6,9 +6,9 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 
-DIRECT_SOURCE_HASH = "2ce7de151a8c65f5c39ecc7aadc7a56bd4547920621d5a60af18c2f593a7bb72"
+DIRECT_SOURCE_HASH = "fa9a3182dd10e58f428738c31ac8515fa44d3bf6b040b6f77cbd2f1e66588f0f"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "2cd8a9e1fea28f4fe10fe338acf589cf7fd3009e2e8205889c18cbfb20c8b767"
+APPLICATION_GRANT_PLAN_HASH = "e81b0a808d114abe41b94371994ed5ebe0c4d1ac3cf2c3de78deeda750848abf"
 FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
 FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
 STATS_OUTCOME_MIGRATION = "20261009_001_stats_import_outcomes"
