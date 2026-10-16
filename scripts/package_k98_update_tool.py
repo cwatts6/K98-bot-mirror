@@ -127,8 +127,20 @@ def package(output, source=None, *, previous_manifest=None):
         }
         prior = registry - {"k98_update_transitions.json"}
         required = prior - {"prepare_k98_release.py"}
+        reader = registry | {
+            "reader_activation_release.py",
+            "reader_activation_spec.json",
+            "reader_history_permissions.sql",
+            "Reader-ActivationState.sql",
+        }
         inventory = set(previous.get("files", {})) - {"EmptyGitConfig.txt"}
-        if previous.get("version") != 1 or inventory not in (required, prior, registry, set(names)):
+        if previous.get("version") != 1 or inventory not in (
+            required,
+            prior,
+            registry,
+            reader,
+            set(names),
+        ):
             raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
         old_hash = hashlib.sha256(previous_raw).hexdigest()
         new_hash = hashlib.sha256(files["update-tool.json"]).hexdigest()

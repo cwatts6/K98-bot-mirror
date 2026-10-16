@@ -168,7 +168,7 @@ def test_protected_sql_module_and_principal_changes_are_refused():
         combined_payload(d, files.get, protected_principals=["bot"])
 
 
-@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("installed", [False, True, "reader"])
 def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path, installed):
     import base64
     import re
@@ -180,12 +180,19 @@ def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path, ins
     payload = json.loads(base64.b64decode(re.search(r"\$encoded='([^']+)'", text)[1]))
     manifest = tmp_path / "installed.json"
     manifest.write_bytes(base64.b64decode(payload["update-tool.json"]))
-    if installed:
+    if installed is True:
         manifest.write_bytes(
             (Path(__file__).parent / "fixtures" / "updater_installed_20261009.json").read_bytes()
         )
         assert sha256(manifest.read_bytes()) == (
             "6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b"
+        )
+    elif installed == "reader":
+        manifest.write_bytes(
+            (Path(__file__).parent / "fixtures" / "updater_reader_20261014.json").read_bytes()
+        )
+        assert sha256(manifest.read_bytes()) == (
+            "09a92c6bdee8b8bd2e11af33f481b3223799a50901a159008b2c4a7eb47d725e"
         )
     second = package(tmp_path / "second", previous_manifest=manifest)
     upgrade = Path(second["upgrade"]).read_text()
@@ -200,6 +207,37 @@ def test_reusable_upgrade_package_binds_previous_and_new_manifests(tmp_path, ins
     assert f"-Name TargetManifestSHA256 -Value '{new_hash}' -Option Constant" in upgrade
     assert "updater-before-'+$PreviousManifestSHA256" in upgrade
     assert "Active release exists; tool replacement refused" in upgrade
+
+
+@pytest.mark.parametrize(
+    "missing,extra",
+    [
+        (name, None)
+        for name in (
+            "reader_activation_release.py",
+            "reader_activation_spec.json",
+            "reader_history_permissions.sql",
+            "Reader-ActivationState.sql",
+            "k98_update_transitions.json",
+            "prepare_k98_release.py",
+        )
+    ]
+    + [(None, "unexpected.py"), (None, "p0a_release.py")],
+)
+def test_reader_upgrade_rejects_incomplete_or_mixed_inventory(tmp_path, missing, extra):
+    from scripts.package_k98_update_tool import package
+
+    previous = json.loads(
+        (Path(__file__).parent / "fixtures" / "updater_reader_20261014.json").read_bytes()
+    )
+    if missing:
+        previous["files"].pop(missing)
+    if extra:
+        previous["files"][extra] = "0" * 64
+    manifest = tmp_path / "previous.json"
+    manifest.write_text(json.dumps(previous))
+    with pytest.raises(ValueError, match="Exact installed predecessor"):
+        package(tmp_path / "output", previous_manifest=manifest)
 
 
 def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(

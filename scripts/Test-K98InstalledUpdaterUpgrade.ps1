@@ -58,6 +58,30 @@ Reject {Write-UpgradeMember $candidate $work '../outside' ([byte[]]@(1))} '*Inva
 Write-UpgradeMember $candidate $work 'next.txt' ([Text.Encoding]::UTF8.GetBytes('next'))
 Check (Test-Path -LiteralPath (Join-Path $work 'pending-fixture')) 'partial staging evidence lost'
 # Exercise the actual swap orchestration without accessing production paths.
+# The separately installed reader profile has thirteen exact members.
+$readerFixture=Join-Path $fixture 'reader';$null=[IO.Directory]::CreateDirectory($readerFixture)
+$readerNames=$names+@('prepare_k98_release.py','k98_update_transitions.json','reader_activation_release.py','reader_activation_spec.json','reader_history_permissions.sql','Reader-ActivationState.sql')
+$readerFiles=[ordered]@{}
+foreach($name in $readerNames){$bytes=[Text.Encoding]::UTF8.GetBytes($name);[IO.File]::WriteAllBytes((Join-Path $readerFixture $name),$bytes);$readerFiles[$name]=Upgrade-Hash $bytes}
+$readerManifest=[Text.Encoding]::UTF8.GetBytes((@{version=1;files=$readerFiles}|ConvertTo-Json -Depth 5 -Compress))
+$readerManifestPath=Join-Path $readerFixture 'update-tool.json'
+[IO.File]::WriteAllBytes($readerManifestPath,$readerManifest)
+$readerHash=Upgrade-Hash $readerManifest
+Assert-UpgradeTool $readerFixture $readerHash;Check $true 'complete reader profile refused'
+Reject {Assert-UpgradeTool $readerFixture $hash} '*manifest identity*'
+foreach($name in @('reader_activation_release.py','reader_activation_spec.json','reader_history_permissions.sql','Reader-ActivationState.sql')) {
+ $memberPath=Join-Path $readerFixture $name
+ [IO.File]::WriteAllText($memberPath,'tampered')
+ Reject {Assert-UpgradeTool $readerFixture $readerHash} '*checksum differs*'
+ Remove-Item -LiteralPath $memberPath
+ Reject {Assert-UpgradeTool $readerFixture $readerHash} '*Incomplete tool*'
+ [IO.File]::WriteAllBytes($memberPath,[Text.Encoding]::UTF8.GetBytes($name))
+}
+$readerFiles['p0a_release.py']='0'*64
+$mixed=[Text.Encoding]::UTF8.GetBytes((@{version=1;files=$readerFiles}|ConvertTo-Json -Depth 5 -Compress))
+[IO.File]::WriteAllBytes($readerManifestPath,$mixed)
+Reject {Assert-UpgradeTool $readerFixture (Upgrade-Hash $mixed)} '*Mixed reader and recovery*'
+[IO.File]::WriteAllBytes($readerManifestPath,$readerManifest)
 $body=$ast.EndBlock.Statements[-1].Extent.Text
 $PreviousManifestSHA256='a'*64;$TargetManifestSHA256='b'*64
 $root='C:\ProgramData\K98\S11';$tool=Join-Path $root 'updater';$archive=Join-Path $root ('updater-before-'+$PreviousManifestSHA256);$updates=Join-Path $root 'updates'

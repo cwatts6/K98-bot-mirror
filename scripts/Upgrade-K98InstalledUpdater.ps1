@@ -34,6 +34,11 @@ function Assert-UpgradeTool([string]$Path,[string]$ManifestHash) {
   if($null -eq $manifest.files.PSObject.Properties['prepare_k98_release.py']){throw 'Unsupported intermediate updater inventory'}
   $names+=@('k98_update_transitions.json')
  }
+ if($null -ne $manifest.files.PSObject.Properties['reader_activation_release.py']){
+  if($null -eq $manifest.files.PSObject.Properties['k98_update_transitions.json']){throw 'Reader profile requires the complete predecessor inventory'}
+  if($null -ne $manifest.files.PSObject.Properties['p0a_release.py']){throw 'Mixed reader and recovery updater inventory'}
+  $names+=@('reader_activation_release.py','reader_activation_spec.json','reader_history_permissions.sql','Reader-ActivationState.sql')
+ }
  if($null -ne $manifest.files.PSObject.Properties['p0a_release.py']){
   if($null -eq $manifest.files.PSObject.Properties['k98_update_transitions.json']){throw 'Recovery updater requires the complete predecessor inventory'}
   $names+=@('p0a_release.py','p0a_release_spec.json','recovery_release_seed.py')
