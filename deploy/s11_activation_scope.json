@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "f5ecc3e0f445bbc7619c91669a2da7889ecd95ce",
+  "sql_revision": "71c6cedcdc317b49df5a312a938759c5a6183a93",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -1677,7 +1677,8 @@
     "dbo.SUMMARY_PROC_STATE": [],
     "dbo.SchemaMigrationHistory": [],
     "dbo.StatsImportExecution": [
-      "dbo.ExportPreparation"
+      "dbo.ExportPreparation",
+      "dbo.STATS"
     ],
     "dbo.T4KillDelta": [],
     "dbo.T4T5KillDelta": [],
@@ -2102,7 +2103,8 @@
       "dbo.ExportJobResource",
       "dbo.ExportProviderRequest",
       "dbo.ExportResource",
-      "dbo.ExportTargetContainment"
+      "dbo.ExportTargetContainment",
+      "dbo.TARGETS"
     ],
     "dbo.usp_ExportManualOutputEnrollmentTransition": [
       "KVK.SourceOutputOperation",
@@ -2363,6 +2365,7 @@
     "dbo.usp_S11RunStatsImport": [
       "dbo.ExportPreparation",
       "dbo.ExportResource",
+      "dbo.STATS",
       "dbo.StatsImportExecution",
       "dbo.UPDATE_ALL2"
     ],
