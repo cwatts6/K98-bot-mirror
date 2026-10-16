@@ -1,5 +1,10 @@
 # Guided recovery delivery
 
+Current delivery priority: **P0a first release**, followed by **P0b full release**,
+as approved by the operator on 16 October. See
+[the release split and acceptance gates](guided_recovery_release_split.md).
+P0a is being qualified, not yet deployment-ready; no P0b work is deferred.
+
 ## Guided fresh configuration continuation — 2026-10-16
 
 After verified atomic rollback and exact release, proactive discovery opens a

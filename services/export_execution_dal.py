@@ -534,7 +534,7 @@ def _proof_acknowledgment(values, result, columns):
 # S11 source-manifest pin is generated from the separately reviewed SQL delivery.
 # It is not learned from the installed database or accepted from a Bot IPC caller.
 LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc6141eddc9b7fc0dbaf68"
-# Canonical JSON digest of deploy/export_application_schema_source.json: 542
+# Canonical JSON digest of deploy/export_application_schema_source.json: 560
 # Base SQL Git blobs at 4cd1554dc3d063e323f22350c88df1444cd0ed4b plus the four
 # LF-normalized manual-registration snapshots; logical names follow SQL declarations,
 # including names whose exported filenames are sanitized. Installed metadata is separate.
@@ -544,10 +544,13 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "d1dfb35408f2c67531abe6d26bfa70589e0ec93fe8789a35fa005c32e95e86a2"
+# P0a aligns only the four stale sources with SQL 1159e824/0cc5f529;
+# exact predecessor/postimage provenance is retained in the release task pack.
+# Historical signing profiles and independent installed-metadata checks stay separate.
+APPLICATION_SCHEMA_SOURCE_HASH = "095af1af6ceb5910d88581877c6c06314348c08ee808825bfd8fc7e1e1723e49"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "418816872c67d3c795dfe0412223638935705e07aa7f26e2b5b5e4263394fba6"
+    "6bf0996d9085a35126c9f2e6927e318dceeba2614e7480213836c8703d8017fa"
 )
 
 
