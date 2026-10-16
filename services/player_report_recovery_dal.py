@@ -11,9 +11,12 @@ from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
 class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
     consumer = "scan_data"
+    producer_kind = "player_stats_report"
+    closure_key = "report_cancelled"
+    cancel_action = "cancel_report"
 
-    @staticmethod
-    def request(prep):
+    @classmethod
+    def request(cls, prep):
         request = json.loads(prep["RequestJson"])
         inner = request.get("request", {})
         producer = inner.get("producer", {})
@@ -26,7 +29,7 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
             or inner.get("kind") != "scan_data"
             or not isinstance(producer, dict)
             or set(producer) != {"kind", "atomic_checkpoint", "operation"}
-            or producer.get("kind") != "player_stats_report"
+            or producer.get("kind") != cls.producer_kind
             or type(producer.get("atomic_checkpoint")) is not int
             or producer["atomic_checkpoint"] != 1
             or identity(producer["operation"]) != inner.get("operation")
@@ -49,7 +52,7 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
         if execution:
             raise SourceConflict("An import receipt cannot be treated as a report-only attempt.")
         generation = json.loads(prep["GenerationJson"] or "{}")
-        if generation.get("report_cancelled"):
+        if generation.get(cls.closure_key):
             if prep["State"] != "unavailable" or resources or prep["JobID"] or prep["SpoolKey"]:
                 raise SourceConflict("The report closure has not verified its release.")
             return "cancelled"
@@ -75,7 +78,7 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
                 resource["ActiveOutputOperationID"],
             ) != (identity(prep["OwnerID"]), prep["Fence"], None, None):
                 raise SourceConflict("Report reservation ownership changed.")
-        return "cancel_report"
+        return cls.cancel_action
 
     def pending_recovery(self, *, after=None, limit=20):
         if type(limit) is not int or not 1 <= limit <= 25:
@@ -84,14 +87,16 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
             cursor.execute(
                 "SELECT TOP (?) PreparationID FROM dbo.ExportPreparation "
                 "WHERE AccountKey=? AND StorageOwner=? AND ConsumerKind='scan_data' "
-                "AND JSON_VALUE(RequestJson,'$.request.producer.kind')='player_stats_report' "
+                "AND JSON_VALUE(RequestJson,'$.request.producer.kind')=? "
                 "AND State IN ('pending','preflight','sql_pending','writing','committed','uncertain','captured','unavailable') "
-                "AND JobID IS NULL AND JSON_VALUE(GenerationJson,'$.report_cancelled.actor') IS NULL "
+                "AND JobID IS NULL AND JSON_VALUE(GenerationJson,?) IS NULL "
                 "AND UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
                 "ORDER BY CASE WHEN PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,PreparationID",
                 limit,
                 self.account,
                 self.storage_owner,
+                self.producer_kind,
+                "$." + self.closure_key + ".actor",
                 identity(after) if after else None,
             )
             return [identity(r["PreparationID"]) for r in rows(cursor)]
@@ -118,11 +123,11 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
                 action = self.action(prep, execution, resources)
                 if (
                     action == "cancelled"
-                    and json.loads(prep["GenerationJson"])["report_cancelled"] == marker
+                    and json.loads(prep["GenerationJson"])[self.closure_key] == marker
                 ):
                     cursor.execute("COMMIT TRANSACTION")
                     return
-                if action != "cancel_report" or self.token(prep, execution, resources) != token:
+                if action != self.cancel_action or self.token(prep, execution, resources) != token:
                     raise SourceConflict("Report evidence changed; review the current incident.")
                 cursor.execute(
                     "SELECT TOP (1) StreamID FROM dbo.ExportExecutionStream WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
@@ -151,7 +156,7 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
                     "UPDATE dbo.ExportPreparation SET State='unavailable',OwnerID=COALESCE(OwnerID,?),Fence=Fence+1,Version=Version+1,GenerationJson=?,UpdatedUTC=SYSUTCDATETIME() "
                     "OUTPUT inserted.Version WHERE PreparationID=? AND Version=? AND Fence=? AND GenerationJson IS NULL AND JobID IS NULL AND SpoolKey IS NULL",
                     str(uuid4()),
-                    bounded_json(dict(report_cancelled=marker)),
+                    bounded_json({self.closure_key: marker}),
                     source_id,
                     prep["Version"],
                     prep["Fence"],

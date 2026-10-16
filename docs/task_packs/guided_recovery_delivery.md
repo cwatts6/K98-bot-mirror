@@ -1,5 +1,40 @@
 # Guided recovery delivery
 
+## Atomic configuration producer and guided outcomes — 2026-10-16
+
+Coordinated configuration imports now reserve a typed producer and hold the actual
+business transaction's ownership locks across configuration writes, target
+publication and the completion checkpoint. No intermediate commit occurs, even
+when the legacy non-transactional setting is selected. The target procedure allows
+the ambient transaction only for the exact typed writing reservation; ordinary
+standalone calls preserve their existing transaction policy. Latest-season lookup
+uses the same business connection to avoid waiting on its own configuration locks.
+
+Independent discovery creates a private configuration-publication incident.
+**Close rolled-back config & release** presents a separate checklist/confirmation,
+then excludes live execution, verifies the absent atomic receipt, fences the old
+attempt and verifies the exact release. A committed result instead offers
+**Finish capture & queue export** or the explicit verified export-skip action.
+The existing admin permission, audit and durable action framework is reused.
+Lost replies reconcile the saved receipt; stale confirmation cannot cancel a
+later commit. Neither closure nor export queueing claims a cache refresh.
+
+Validation: 280 affected tests passed, including disposable SQL and actual admin
+button callbacks. The final migration/source-pin and operational-log checks passed
+60 tests. Seven literal target-procedure/migration cases cover transaction gates,
+nested commit behavior, rollback and exact source images (delta work is a synthetic
+callee; this does not claim full production-data publication). Architecture (196
+files), deferred-item, security routing, test selection, synthetic import smoke,
+command registration (36/102), Ruff, Black and whitespace checks passed.
+Separate Bot and SQL Changes reviews are pending. SQL changes install before the
+paired Bot and protected contract reissue. Only the target procedure source pin and
+its new coordination dependencies changed; unrelated historical pins are preserved.
+
+This is an active P0 slice, not programme completion. Existing partial configuration
+commits, guided fresh continuation, UPDATE_ALL2 partial reporting, durable remaining
+pipeline stages, all-copy custody/history loss and integrated rollover completion
+remain required implementation/acceptance work. None is deferred optimisation.
+
 ## Replacement-read admission guidance — 2026-10-16
 
 Replacement verification now identifies an exact account-scoped blocking owner

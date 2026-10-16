@@ -80,6 +80,19 @@ def recovery_service():
             report_outcomes, PlayerReportCaptureRecovery(runtime, report_outcomes)
         )
         adapters[report_adapter.kind] = report_adapter
+        from services.configuration_producer_recovery import (
+            ConfigurationProducerCapture,
+            ConfigurationProducerDAL,
+            ConfigurationProducerRecovery,
+        )
+
+        config_outcomes = ConfigurationProducerDAL(
+            runtime.dal.connect, account=runtime.account, storage_owner=runtime.store.storage_owner
+        )
+        config_adapter = ConfigurationProducerRecovery(
+            config_outcomes, ConfigurationProducerCapture(runtime, config_outcomes)
+        )
+        adapters[config_adapter.kind] = config_adapter
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:

@@ -209,6 +209,7 @@ INSTALLATION_MIGRATIONS = (
     "20261015_009_guided_export_replacement",
     "20261015_010_configuration_replacement",
     "20261016_001_rollover_replacement",
+    "20261016_002_atomic_configuration_publication",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -227,6 +228,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261015_009_guided_export_replacement",
     "20261015_010_configuration_replacement",
     "20261016_001_rollover_replacement",
+    "20261016_002_atomic_configuration_publication",
 )
 
 
@@ -542,7 +544,7 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "781b0b262dac5aa1f012063a94ddc781d52c01879443e2eb7c77d95295f72fec"
+APPLICATION_SCHEMA_SOURCE_HASH = "d1dfb35408f2c67531abe6d26bfa70589e0ec93fe8789a35fa005c32e95e86a2"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
     "b1e1855a410034884e9e8f4238d15f8c906a3558cf484991d426ef037ad8b127"

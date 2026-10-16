@@ -11,12 +11,15 @@ from services.player_report_recovery_dal import PlayerReportRecoveryDAL
 
 
 class PlayerReportCaptureRecovery(ImportCaptureRecovery):
+    request_dal = PlayerReportRecoveryDAL
+    procedure = "dbo.SP_Stats_for_Upload"
+
     def __init__(self, runtime, outcomes):
         super().__init__(runtime, outcomes)
         self.dal = ImportCaptureRecoveryDAL(outcomes, stats_execution=False)
 
     def generation(self, prep, execution=None):
-        request = PlayerReportRecoveryDAL.request(prep)
+        request = self.request_dal.request(prep)
         scope = json.loads(self.runtime.configuration)[self.consumer]
         generation = json.loads(prep["GenerationJson"] or "{}")
         if (
@@ -25,8 +28,7 @@ class PlayerReportCaptureRecovery(ImportCaptureRecovery):
             or generation.get("completion") != "committed"
             or generation.get("commit_identity") != str(prep["PreparationID"]).lower()
             or generation.get("registration_sha256") != configuration_digest(scope)
-            or generation.get("producer")
-            != dict(procedure="dbo.SP_Stats_for_Upload", atomic_checkpoint=1)
+            or generation.get("producer") != dict(procedure=self.procedure, atomic_checkpoint=1)
             or generation.get("capture") not in {"pending", "complete"}
         ):
             raise SourceConflict(
@@ -36,19 +38,23 @@ class PlayerReportCaptureRecovery(ImportCaptureRecovery):
 
 
 class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
+    cancel_action = "cancel_report"
+    closure_key = "report_cancelled"
+    open_outcome = "report_not_committed"
+    close_label = "Close failed report & release"
     kind = "player_report"
     title = "Player-stat report recovery"
     output_name = "player-stat report"
 
     def inspect(self, source_id):
         preview = self.dal.inspect(source_id)
-        if preview["action"] not in {"cancel_report", "cancelled"}:
+        if preview["action"] not in {self.cancel_action, "cancelled"}:
             return super().inspect(source_id)
         closed = preview["action"] == "cancelled"
         return (
             dict(
                 title=self.title,
-                outcome="report_cancelled" if closed else "report_not_committed",
+                outcome=self.closure_key if closed else self.open_outcome,
                 explanation=(
                     "The failed report attempt is closed and its exact reservation is released. Existing imported data is preserved. This does not claim the report or cache is current."
                     if closed
@@ -58,8 +64,8 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                     {}
                     if closed
                     else {
-                        "cancel_report": dict(
-                            label="Close failed report & release",
+                        self.cancel_action: dict(
+                            label=self.close_label,
                             check="Confirm you want to close this uncommitted report attempt. Existing imported data is retained; this action does not refresh reports or the cache.",
                             effect="Exclude live report execution, verify the atomic checkpoint is absent, fence the old attempt, release only its exact reservation, then verify the durable closure. No import is replayed.",
                         )
@@ -71,12 +77,12 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
         )
 
     def execute(self, source_id, action, token, actor, reason):
-        if action == "cancel_report":
+        if action == self.cancel_action:
             return self.dal.cancel(source_id, token, actor, reason)
         return super().execute(source_id, action, token, actor, reason)
 
     def reconcile(self, source_id, action):
-        if action["ActionKind"] != "cancel_report":
+        if action["ActionKind"] != self.cancel_action:
             return super().reconcile(source_id, action)
         preview = self.dal.inspect(source_id)
         marker = dict(
@@ -86,7 +92,7 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
         )
         if (
             preview["action"] == "cancelled"
-            and json.loads(preview["preparation"]["GenerationJson"])["report_cancelled"] == marker
+            and json.loads(preview["preparation"]["GenerationJson"])[self.closure_key] == marker
         ):
             return "verified"
         if preview["token"] != action["EvidenceHash"]:

@@ -50,6 +50,8 @@ def _owner(cursor, account, kind, key):
         }.get(row["ConsumerKind"])
         if row["ProducerKind"] == "player_stats_report":
             route = "player_report"
+        elif row["ProducerKind"] == "configuration_import":
+            route = "configuration_producer"
         elif row["ProducerKind"] == "stats_import" and row["ExecutionID"] is None:
             route = "producer_refusal"
             document = json.loads(row["RequestJson"])

@@ -23,13 +23,16 @@ class FakeCursor:
             self.pending = 3
 
     def nextset(self):
-        if self.drain_error:
+        if self.drain_error and self.pending:
             raise RuntimeError("late procedure failure")
         self.pending = max(0, self.pending - 1)
         return bool(self.pending)
 
     def fetchall(self):
         return []
+
+    def fetchone(self):
+        return (2,)
 
     def close(self):
         self.closed = True
@@ -88,6 +91,17 @@ def test_transactional_success(monkeypatch, tmp_path, failure, coordinated):
     import services.legacy_export_snapshot_service as legacy
 
     monkeypatch.setattr(legacy, "has_runtime_context", lambda: coordinated)
+    import services.configuration_producer as producer
+
+    checkpoints = []
+    monkeypatch.setattr(
+        producer,
+        "current_owner",
+        lambda: SimpleNamespace(
+            kind="scan_data", claim=SimpleNamespace(preparation_id="saved-preparation")
+        ),
+    )
+    monkeypatch.setattr(producer, "record_writer_completion", lambda **kw: checkpoints.append(kw))
     _patch_import_credentials(monkeypatch, tmp_path)
 
     # Mock sheet service / read
@@ -129,7 +143,14 @@ def test_transactional_success(monkeypatch, tmp_path, failure, coordinated):
 
     # Run import
     success, report = pci.run_proc_config_import(dry_run=False)
-    if failure:
+    if coordinated and failure == "drain":
+        assert not success and not fake_conn.committed and fake_conn.rolled_back
+        assert not checkpoints
+        assert report["targets_master_outcome"] == "uncertain"
+        assert report.get("config_import_committed") is not True
+        assert "guided recovery" in report["errors"][0]
+        return
+    if failure and not coordinated:
         assert success is False
         assert report["success"] is False
         assert report["targets_master_outcome"] == (
@@ -150,7 +171,12 @@ def test_transactional_success(monkeypatch, tmp_path, failure, coordinated):
     ]
     assert target_exec_indices, "sp_TARGETS_MASTER was not executed"
     target_exec_index = target_exec_indices[0]
-    assert fake_conn._cursor.executed_autocommit[target_exec_index] is True
+    assert fake_conn._cursor.executed_autocommit[target_exec_index] is (not coordinated)
+    if coordinated:
+        assert len(checkpoints) == 1
+        assert checkpoints[0]["cursor"] is fake_conn._cursor
+        assert checkpoints[0]["atomic_checkpoint"] == 1
+        assert "@ExportPreparationID" in fake_conn._cursor.executed[target_exec_index]
     assert fake_conn.autocommit is False
     # persisted report file exists
     assert os.path.exists(os.path.join(str(tmp_path), "last_proc_import_report.json"))
