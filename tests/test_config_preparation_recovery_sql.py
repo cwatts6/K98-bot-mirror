@@ -48,6 +48,7 @@ def local_sql(sql):
 def sql_fixture():
     import pyodbc
 
+    namespace = uuid4().hex
     native = pyodbc.connect(
         "DRIVER={ODBC Driver 18 for SQL Server};SERVER="
         + SERVER
@@ -70,6 +71,9 @@ def sql_fixture():
             )
             raw = "\n".join(line for line in raw.splitlines() if "FOREIGN KEY" not in line)
             raw = re.sub(r",\s*\);", "\n);", raw)
+            # Named temporary constraints occupy tempdb's shared namespace,
+            # including while another pooled test connection is being reset.
+            raw = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + namespace, raw)
             native.execute(local_sql(raw))
 
         class Cursor:

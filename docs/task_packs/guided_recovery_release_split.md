@@ -158,7 +158,9 @@ The existing updater classifier was applied offline to the exact mirror source
 delta `02b57ac6..b55cb730` (209 changed files). It reports
 `COORDINATED_RELEASE_REQUIRED`: 48 protected source changes are outside its current
 routine policy, and the transition registry is an updater-package member change.
-This is source-capability evidence only; no installed-tool manifest was supplied.
+This is source-capability evidence only. Historical October 14 installed-tool
+and host evidence has since been located locally; it does not attest current
+host custody or the new recovery deployment contracts.
 P0a must use a reviewed coordinated release package or an explicitly reviewed
 bounded updater extension. Do not bypass guards, add a generic force exemption,
 or describe the current ordinary updater as capable of deploying this stack.
@@ -225,3 +227,57 @@ The full-suite log wrapper exits on pytest failure before comparing operational
 logs. A separate focused wrapper run completed with 12 tests passed and explicitly
 verified that production operational logs were unchanged. This is focused log
 evidence, not an assertion that the failed full wrapper completed its comparison.
+
+## Guided workflow rehearsal — 16 October
+
+The alert-to-disposition rehearsal found and fixed a real handoff gap: a verified
+rollback closed the original incident, and the view then hid its **Choose
+configuration continuation** link. The view now retains that particular link;
+other obsolete recovery links remain hidden. Opening it checks admin, guild,
+channel, scoped original preparation and current evidence again. Fresh publication
+or keep-prior still requires its own confirmation.
+
+`test_p0a_guided_rehearsal_sql.py` drives proactive monitor discovery, persisted
+SQL incident/alert identity, a newly constructed persistent entry button, private
+review, rollback closure, continuation and final disposition. Each callback
+reconstructs the service/DAL/adapters. Three cases finish with verified settlement:
+keep prior; fresh publication followed by explicitly skipping its export; and
+the same path after losing the publication commit reply. Old confirmations cannot
+dispatch another publication. Additional tests reject wrong admin, guild and
+channel before following the retained link.
+
+These tests use actual disposable SQL storage and actual callbacks. Discord
+transport and the configuration producer body are simulated; the producer helper
+commits the actual durable atomic receipt. They do not prove live Discord delivery,
+representative configuration/target business results, export worker delivery or
+installation of the coordinated package.
+
+Combined validation passed **169 tests, zero skipped**, including the three new
+SQL rehearsal cases, all selected read containment, admission, configuration,
+notification, review and durable incident tests. The log wrapper verified that
+production operational logs were unchanged. Older tests were corrected to compare
+an immutable migration with its own reviewed postimages, include the contained-target
+table in temporary fixtures, and distinguish historical read prefixes from fresh
+probe or write evidence. Unique temporary constraint names prevent collisions
+across pooled fixture connections. No runtime SQL contract was weakened.
+
+Architecture (204 files), deferred items, security routing, test selection,
+synthetic smoke imports, command registration (36 primary / 102 grouped), Ruff,
+Black and whitespace checks passed. The inherited full-suite baseline remains
+qualified by the unrelated missing governance workflow described above; it was
+not repeated for this narrow UI change and disposable test-harness correction.
+
+Changes scan `209d540b-d721-4c09-921a-d779aef68a0f` reviewed the frozen patch
+against `7bee1fc6`, whose runtime change is committed as `5a5256d6`. Its complete
+one-file runtime inventory (`ui/views/recovery_view.py`) has no findings; supporting
+test changes were inspected. Finalization succeeded and the sealed result was read
+back, sealed at `2026-10-16T08:30:03.698675Z`. Tool-reported usage: 1,462,007 tokens.
+The later temporary-constraint namespace fix changes only an opt-in local SQL test
+fixture, with no production runtime, permissions, deployment or persistence effect;
+it does not require another security scan. This documentation also adds no executable
+behavior. There are no deferred findings in this review.
+
+**P0a remains not deployment-ready.** The coordinated migration/apply/verify package,
+protected successor contracts, interruption/forward-recovery rehearsal, complete
+enabled-action matrix and final operator packet are still P0a release gates. All
+six P0b workstreams above remain required. No maintenance window is requested yet.
