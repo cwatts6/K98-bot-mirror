@@ -50,6 +50,7 @@ class ReplacementWorkflow:
             current_registration_sha256=self.proposal_writer.registration.fingerprint,
             configuration_readiness=None,
             lost_proposal=None,
+            admission_blocker=None,
         )
         # The containment inspector contains private ledger details before its
         # decision. Only its opaque review token and bounded target IDs leave it.
@@ -92,6 +93,16 @@ class ReplacementWorkflow:
             ):
                 result["configuration_readiness"] = self.verification.configuration_readiness(
                     result["check"]["verification_id"]
+                )
+            if not activated and (
+                result["check"] is None or result["check"]["state"] in {"discarded", "unverifiable"}
+            ):
+                from services.replacement_admission_dal import admission_blocker
+
+                result["admission_blocker"] = admission_blocker(
+                    self.verification.dal.connect,
+                    account=self.account,
+                    replacement_id=proposals[-1],
                 )
         return result
 
@@ -233,6 +244,26 @@ class ReplacementWorkflow:
             replacements=proposal["mapping"] if proposal else {},
             delivery=state["delivery"],
         )
+        blocker = state["admission_blocker"]
+        if blocker is not None and "verify_replacements" in actions:
+            actions.pop("verify_replacements")
+            evidence.update(
+                outcome="replacement_waiting_for_access",
+                explanation="The replacement read has not started. Another operation owns access or has admission priority. Open its recovery below to review progress and guided repairs. Healthy work may finish normally. Then use Recheck here to continue file verification; no old write is retried or owner released by waiting.",
+            )
+            if blocker["owner"] is not None:
+                owner = blocker["owner"]
+                evidence["recovery_links"] = [
+                    dict(
+                        label="Review blocking operation",
+                        kind=owner["kind"],
+                        source_id=owner["source_id"],
+                    )
+                ]
+            else:
+                evidence["explanation"] = (
+                    "A replacement resource is reserved outside this account or has no attributable owner. This incident remains open and verification is disabled. The bot will recheck admission; it cannot disclose another account's operation or release an unverified reservation."
+                )
         if checked and checked["state"] == "verified":
             evidence["configuration_checks"] = {
                 f["file_id"]: f["configuration_summary"]

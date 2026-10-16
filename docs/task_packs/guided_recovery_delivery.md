@@ -1,5 +1,25 @@
 # Guided recovery delivery
 
+## Replacement-read admission guidance — 2026-10-16
+
+Replacement verification now identifies an exact account-scoped blocking owner
+before offering a read check. The private incident provides **Review blocking
+operation**, using the existing authorised guided recovery for queued/held exports,
+rollovers, configuration reads, report producers, SQL stages and replacement reads.
+After verified settlement, **Recheck** restores **Check replacement files** and its
+separate confirmation. SQL still enforces admission at execution time; this read-only
+explanation cannot release resources or override healthy work's priority. Changed
+ownership invalidates the old confirmation. Other-account identities and private
+request/configuration data never enter the incident. Unattributed resources remain
+open for the separate required evidence/custody recovery; this is not P0 completion.
+
+The queued/held ownership and stale-click cases use disposable SQL. The restart
+case invokes the actual confirmation button and verifies a complete new read before
+activation, while the original job remains uncertain. This slice also rechecks the
+existing output/source/rollover paths. Final validation and Changes review are being
+recorded before publication. No provider writes, persistent SQL installation or
+production deployment are authorised by this slice.
+
 ## Rollover evidence-loss routing — 2026-10-16
 
 Lost unactivated rollover proposals and read-check evidence now retain their
