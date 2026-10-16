@@ -1,6 +1,8 @@
 """Read-only explanation of the exact replacement-verification admission gates."""
 
-from kvk.dal.new_source_import_dal import SourceConflict, one, transaction
+import json
+
+from kvk.dal.new_source_import_dal import SourceConflict, digest, one, transaction
 from services.export_coordination_dal import identity
 
 
@@ -22,6 +24,7 @@ def _owner(cursor, account, kind, key):
         cursor.execute(
             "SELECT p.State,p.Version,p.ConsumerKind,"
             "JSON_VALUE(p.RequestJson,'$.request.producer.kind') AS ProducerKind,"
+            "p.RequestJson,p.RequestHash,p.StorageOwner,"
             "e.PreparationID AS ExecutionID,c.JobID,c.OutputOperationID "
             "FROM dbo.ExportPreparation p "
             "LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
@@ -49,6 +52,37 @@ def _owner(cursor, account, kind, key):
             route = "player_report"
         elif row["ProducerKind"] == "stats_import" and row["ExecutionID"] is None:
             route = "producer_refusal"
+            document = json.loads(row["RequestJson"])
+            producer = document["request"]["producer"]
+            if producer.get("parent") is not None:
+                parent_id = identity(producer["parent"])
+                cursor.execute(
+                    "SELECT RequestJson,RequestHash,StorageOwner,ConsumerKind FROM dbo.ExportPreparation "
+                    "WHERE PreparationID=? AND AccountKey=?",
+                    parent_id,
+                    account,
+                )
+                parent = one(cursor)
+                if parent is None:
+                    raise SourceConflict(
+                        "The blocking continuation's original recovery is unavailable."
+                    )
+                original = json.loads(parent["RequestJson"])
+                original_producer = original.get("request", {}).get("producer", {})
+                if (
+                    parent["ConsumerKind"] != "scan_data"
+                    or parent["StorageOwner"] != row["StorageOwner"]
+                    or bytes(parent["RequestHash"]) != digest(original)
+                    or bytes(row["RequestHash"]) != digest(document)
+                    or original_producer.get("kind") != "stats_import"
+                    or original_producer.get("parent") is not None
+                    or original_producer.get("inputs") != producer.get("inputs")
+                    or not original_producer.get("inputs")
+                ):
+                    raise SourceConflict(
+                        "The blocking continuation differs from its original recovery."
+                    )
+                key = parent_id
         if route is None:
             raise SourceConflict("The blocking preparation has no typed recovery route.")
         return dict(kind=route, source_id=key, state=row["State"], version=row["Version"])

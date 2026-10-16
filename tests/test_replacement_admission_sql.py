@@ -231,3 +231,43 @@ def test_queued_or_held_job_and_rollover_have_exact_links(guided, held, kind):
     )
     assert "verify_replacements" not in row["evidence"]["actions"]
     assert not r.runtime.sent
+
+
+@pytest.mark.asyncio
+async def test_reserved_sql_continuation_button_opens_original_recovery(guided, monkeypatch):
+    from tests.test_producer_refusal_sql import refused, setup
+    from ui.views import recovery_view as view
+
+    r = guided
+    producer = refused.__wrapped__(SimpleNamespace(getfixturevalue=lambda _: r.f), monkeypatch)
+    with producer.dal.serialized(producer.source):
+        child = producer.dal.reserve(producer.source, str(uuid4()))
+    adapter, _, _, _ = setup(producer)
+    r.recovery.adapters[adapter.kind] = adapter
+    row = r.recovery.review(ACTOR, r.row["IncidentID"])
+    assert row["evidence"]["recovery_links"][0]["source_id"] == producer.source
+    assert producer.source != child
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+
+    async def call(method, *args):
+        return getattr(r.recovery, method)(*args)
+
+    monkeypatch.setattr(view, "call", call)
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    button = next(
+        b for b in view.RecoveryIncidentView(row).children if b.label == "Review blocking operation"
+    )
+    await button.callback(interaction)
+    result = interaction.followup.send.call_args.kwargs
+    assert result["ephemeral"]
+    assert result["view"].row["SourceID"] == producer.source
+    assert result["view"].row["evidence"]["outcome"] == "continuation_checking"
+    r.f.sql.execute(
+        "UPDATE #ExportPreparation SET AccountKey='another-account' WHERE PreparationID=?",
+        producer.source,
+    )
+    with pytest.raises(SourceConflict, match="original recovery is unavailable"):
+        admission_blocker(
+            r.f.connect, account="test-account", replacement_id=r.plan.value()["replacement_id"]
+        )
