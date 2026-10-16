@@ -6,24 +6,7 @@ import json
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
 from services.producer_recovery_intent import stats_intent
-
-
-def unused(attempt):
-    if (
-        attempt["State"] != "unavailable"
-        or attempt["ExecutionState"] is not None
-        or attempt["HeldCount"]
-        or attempt["StreamCount"]
-        or any(attempt[k] is not None for k in ("SpoolKey", "SpoolBytes", "SpoolHash", "JobID"))
-    ):
-        return False
-    request = json.loads(attempt["RequestJson"])["request"]["producer"]
-    marker = dict(
-        producer_refusal_closed=dict(parent=request["parent"], action=request["operation"])
-    )
-    return (attempt["GenerationJson"] is None and attempt["Version"] in {2, 4}) or json.loads(
-        attempt["GenerationJson"] or "{}"
-    ) == marker
+from services.producer_refusal_dal import unused as unused
 
 
 class ProducerRefusalRecovery:
@@ -54,7 +37,7 @@ class ProducerRefusalRecovery:
         )
         resolved = False
         if state["original_phase"] == "execution_registered":
-            if state["attempts"]:
+            if state["attempt_count"]:
                 raise SourceConflict("Original and replacement execution cannot both be admitted.")
             child, _, resolved = self.imports.inspect(source_id)
             evidence.update(outcome=child["outcome"], explanation=child["explanation"])
@@ -93,23 +76,35 @@ class ProducerRefusalRecovery:
                     explanation="A continuation reservation exists. Recovery is checking its execution evidence before offering another action.",
                 )
         elif not state["blockers"]:
-            current = json.loads(self.dal.runtime.configuration)["scan_data"]
+            current = state["current_registration"]
             original = json.loads(state["preparation"]["RequestJson"])["request"]["config"]
             if original != current:
                 evidence.update(
                     outcome="registration_changed",
-                    explanation="The original destination registration changed. The saved import remains unstarted; its original scope must be reviewed before continuation.",
+                    explanation="The original destination registration changed. The saved import remains unstarted. Review the currently registered destinations before confirming continuation with them.",
+                )
+                actions["resume_current_registration"] = dict(
+                    label="Continue with current destinations",
+                    review_details=True,
+                    check="Review the retained scan and old/current destination pages. Confirm this exact scan should be imported using the displayed current registration. The original registration will remain in history.",
+                    effect="Bind this approval to both registration hashes, run the exact retained SQL inputs under fresh admission, then verify its receipt. Excel and archive steps are not repeated. Committed imports cannot be replayed.",
                 )
             else:
                 actions["resume_sql_stage"] = dict(
                     label="Resume saved SQL stage",
+                    review_details=True,
                     check="Confirm this retained scan should still be imported. The bot verified that the original refused attempt never entered SQL. Excel conversion and archive steps will not run again.",
                     effect="Run the exact saved SQL inputs under fresh writer admission. Retain the resulting receipt and output for guided capture and export recovery. An uncertain result will be investigated before any further continuation.",
                 )
         else:
+            queued_only = all(blocker["ResourceKey"] == "queue" for blocker in state["blockers"])
             evidence.update(
-                outcome="waiting_for_access",
-                explanation="The original SQL stage never started. Another operation currently owns or blocks admission. Review its recovery below; healthy work is allowed to finish. Access is never released just because a timeout elapsed.",
+                outcome="waiting_in_queue" if queued_only else "waiting_for_access",
+                explanation=(
+                    "The saved SQL stage never started. Eligible work is ahead in the admission queue; it has not failed merely because this stage timed out. Let it finish, or review its current status below. This incident will offer continuation when access is available."
+                    if queued_only
+                    else "The original SQL stage never started. Another operation currently owns or blocks admission. Review its recovery below; healthy work is allowed to finish. Access is never released just because a timeout elapsed."
+                ),
             )
             for blocker in state["blockers"]:
                 if blocker["ActiveOutputOperationID"]:
@@ -129,6 +124,7 @@ class ProducerRefusalRecovery:
                         )
                     )
                 elif blocker["ActivePreparationID"]:
+                    linked_source = blocker["ActivePreparationID"]
                     kind = {
                         "config": "configuration_read",
                         "scan_data": "stats_import",
@@ -139,20 +135,40 @@ class ProducerRefusalRecovery:
                         and blocker.get("ProducerKind") == "player_stats_report"
                     ):
                         kind = "player_report"
+                    elif (
+                        blocker["ConsumerKind"] == "scan_data"
+                        and blocker.get("ProducerKind") == "stats_import"
+                        and not blocker.get("HasImportReceipt", True)
+                    ):
+                        kind = "producer_refusal"
+                        linked_source = blocker.get("ProducerParent") or linked_source
                     if kind:
                         links.append(
                             dict(
                                 label="Review blocking stage",
                                 kind=kind,
-                                source_id=blocker["ActivePreparationID"],
+                                source_id=linked_source,
                             )
                         )
         return evidence, digest(state).hex(), resolved
 
-    def execute(self, source_id, action, token, actor, reason):
-        if action not in {"resume_sql_stage", "close_unstarted_admission"} or not actor.startswith(
-            "recovery:"
+    def review_details(self, source_id, action, token):
+        from services.producer_recovery_review import registration_review
+
+        state = self.dal.snapshot(source_id)
+        if (
+            action not in {"resume_current_registration", "resume_sql_stage"}
+            or digest(state).hex() != token
         ):
+            raise SourceConflict("Recovery details changed. Reopen the incident before confirming.")
+        return registration_review(state)
+
+    def execute(self, source_id, action, token, actor, reason):
+        if action not in {
+            "resume_sql_stage",
+            "resume_current_registration",
+            "close_unstarted_admission",
+        } or not actor.startswith("recovery:"):
             raise SourceConflict("Exact confirmed continuation action required.")
         action_id = identity(actor.removeprefix("recovery:"))
         with self.dal.serialized(source_id):
@@ -162,7 +178,11 @@ class ProducerRefusalRecovery:
             if action == "close_unstarted_admission":
                 return self.dal.close_admission(source_id, token, action_id)
             state = self.dal.snapshot(source_id)
-            identifier = self.dal.reserve(source_id, action_id)
+            identifier = self.dal.reserve(
+                source_id,
+                action_id,
+                use_current_registration=action == "resume_current_registration",
+            )
             # A prior reconciliation may have left a terminal tombstone. It can
             # never be turned back into a producer request by a late callback.
             preparation = self.dal.runtime.dal.read(identifier)
@@ -172,7 +192,12 @@ class ProducerRefusalRecovery:
 
             with use_runtime(self.dal.runtime):
                 with stats_intent(
-                    state["producer"]["inputs"], action_id=action_id, parent=source_id
+                    state["producer"]["inputs"],
+                    action_id=action_id,
+                    parent=source_id,
+                    registration_recovery=json.loads(preparation["RequestJson"])["request"][
+                        "producer"
+                    ].get("registration_recovery"),
                 ):
                     self.runner(state["producer"]["inputs"])
 
@@ -192,12 +217,16 @@ class ProducerRefusalRecovery:
                     return "not_applied"
                 self.dal.close_admission(source_id, action["EvidenceHash"], action["ActionID"])
                 return None
-        if action["ActionKind"] != "resume_sql_stage":
+        if action["ActionKind"] not in {"resume_sql_stage", "resume_current_registration"}:
             raise SourceConflict("Unsupported producer continuation receipt.")
         with self.dal.serialized(source_id):
             # Reserve even when the dispatch never began: this durable tombstone
             # excludes a late original callback before another action is offered.
-            identifier = self.dal.reserve(source_id, action["ActionID"])
+            identifier = self.dal.reserve(
+                source_id,
+                action["ActionID"],
+                use_current_registration=action["ActionKind"] == "resume_current_registration",
+            )
             if self.dal.close_unused(source_id, action["ActionID"]):
                 return "not_applied"
             state = self.dal.snapshot(source_id)

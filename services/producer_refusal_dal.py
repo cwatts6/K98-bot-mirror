@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+import hashlib
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
@@ -10,6 +11,24 @@ from services.export_coordination_dal import _cas, _mutex, bounded_json, identit
 from services.producer_recovery_intent import validate_inputs
 
 _serialized_source = ContextVar("serialized_refused_producer", default=None)
+
+
+def unused(attempt):
+    if (
+        attempt["State"] != "unavailable"
+        or attempt["ExecutionState"] is not None
+        or attempt["HeldCount"]
+        or attempt["StreamCount"]
+        or any(attempt[k] is not None for k in ("SpoolKey", "SpoolBytes", "SpoolHash", "JobID"))
+    ):
+        return False
+    request = json.loads(attempt["RequestJson"])["request"]["producer"]
+    marker = dict(
+        producer_refusal_closed=dict(parent=request["parent"], action=request["operation"])
+    )
+    return (attempt["GenerationJson"] is None and attempt["Version"] in {2, 4}) or json.loads(
+        attempt["GenerationJson"] or "{}"
+    ) == marker
 
 
 class ProducerRefusalDAL:
@@ -35,7 +54,7 @@ class ProducerRefusalDAL:
             )
             return [identity(r["PreparationID"]) for r in rows(cursor)]
 
-    def snapshot(self, source_id):
+    def snapshot(self, source_id, *, action_id=None):
         source_id = identity(source_id)
         with transaction(self.connect) as cursor:
             cursor.execute(
@@ -68,7 +87,7 @@ class ProducerRefusalDAL:
             )
             execution = one(cursor)
             cursor.execute(
-                "SELECT TOP (101) p.*,e.State AS ExecutionState,e.CompletedFileName,e.Resolution,"
+                "SELECT p.*,e.State AS ExecutionState,e.CompletedFileName,e.Resolution,"
                 "(SELECT COUNT(*) FROM dbo.ExportResource r WHERE r.ActivePreparationID=p.PreparationID) AS HeldCount,"
                 "(SELECT COUNT(*) FROM dbo.ExportExecutionStream s WHERE s.PreparationID=p.PreparationID) AS StreamCount "
                 "FROM dbo.ExportPreparation p LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
@@ -78,13 +97,40 @@ class ProducerRefusalDAL:
                 self.storage_owner,
                 source_id,
             )
-            attempts = rows(cursor)
+            # Stream the entire immutable attempt history into a commitment;
+            # retain active work and the requested/latest closed action only.
+            # Memory stays bounded without making the 101st refusal unrecoverable.
+            attempts, latest_closed, requested = [], None, None
+            history, attempt_count = hashlib.sha256(), 0
+            document = json.loads(prep["RequestJson"])
+            producer = document.get("request", {}).get("producer", {})
+            while (attempt := one(cursor)) is not None:
+                self._validate_attempt(document, producer, source_id, attempt)
+                history.update(digest(_wire(attempt)))
+                attempt_count += 1
+                operation = json.loads(attempt["RequestJson"])["request"]["operation"]
+                if unused(attempt):
+                    latest_closed = attempt
+                    if action_id is not None and operation == identity(action_id):
+                        requested = attempt
+                else:
+                    attempts.append(attempt)
+                    if len(attempts) > 1:
+                        raise SourceConflict(
+                            "Multiple active continuations require exact receipt recovery."
+                        )
+            for closed in (latest_closed, requested):
+                if closed is not None and closed not in attempts:
+                    attempts.append(closed)
             cursor.execute(
                 "SELECT r.ResourceKey,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID,r.BlockedReason,"
                 "p.ConsumerKind,JSON_VALUE(p.RequestJson,'$.request.producer.kind') AS ProducerKind,"
+                "JSON_VALUE(p.RequestJson,'$.request.producer.parent') AS ProducerParent,"
+                "CASE WHEN e.PreparationID IS NULL THEN 0 ELSE 1 END AS HasImportReceipt,"
                 "p.State AS PreparationState,j.State AS JobState,"
                 "p.AccountKey AS PreparationAccount,j.AccountKey AS JobAccount,o.AccountKey AS OperationAccount "
                 "FROM dbo.ExportResource r LEFT JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID "
+                "LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
                 "LEFT JOIN dbo.ExportJob j ON j.JobID=r.ActiveJobID "
                 "LEFT JOIN KVK.SourceOutputOperation o ON o.OperationID=r.ActiveOutputOperationID "
                 "WHERE r.ResourceKey IN (?,?) AND (r.OwnerID IS NOT NULL OR r.BlockedReason IS NOT NULL)",
@@ -92,6 +138,9 @@ class ProducerRefusalDAL:
                 "sql_snapshot:legacy_outputs",
             )
             blockers = rows(cursor)
+            queued = self._queued_blocker(cursor, source_id)
+            if queued:
+                blockers.append(queued)
         document = json.loads(prep["RequestJson"])
         producer = document.get("request", {}).get("producer", {})
         validate_inputs(producer.get("inputs"))
@@ -120,28 +169,6 @@ class ProducerRefusalDAL:
         else:
             phase = self._original_phase(prep, membership, held)
         identity(producer["operation"])
-        if len(attempts) > 100:
-            raise SourceConflict("Refused-stage attempt history exceeds its verification bound.")
-        for attempt in attempts:
-            child = json.loads(attempt["RequestJson"])
-            expected = dict(document)
-            expected["request"] = dict(document["request"])
-            operation = identity(child["request"]["operation"])
-            expected["request"].update(
-                operation=operation,
-                producer=dict(producer, parent=source_id, operation=operation),
-            )
-            if (
-                child != expected
-                or bytes(attempt["RequestHash"]) != digest(child)
-                or attempt["ConsumerKind"] != "scan_data"
-                or attempt["KVK_NO"] is not None
-                or (
-                    attempt["ExecutionState"] is not None
-                    and attempt["CompletedFileName"] != producer["inputs"]["completed_filename"]
-                )
-            ):
-                raise SourceConflict("Recovery attempt differs from the retained producer inputs.")
         # Global SQL contention may belong to another registered account. Do not
         # turn it into a link that adopts another account's recovery authority.
         for blocker in blockers:
@@ -156,12 +183,115 @@ class ProducerRefusalDAL:
                 preparation=prep,
                 producer=producer,
                 attempts=attempts,
+                attempt_count=attempt_count,
+                attempt_history_sha256=history.hexdigest(),
+                current_registration=json.loads(self.runtime.configuration)["scan_data"],
                 blockers=blockers,
                 original_phase=phase,
                 original_resources=held,
                 original_execution=execution,
             )
         )
+
+    @staticmethod
+    def _validate_attempt(document, producer, source_id, attempt):
+        child = json.loads(attempt["RequestJson"])
+        expected = dict(document)
+        expected["request"] = dict(document["request"])
+        operation = identity(child["request"]["operation"])
+        child_producer = dict(producer, parent=source_id, operation=operation)
+        registration = child["request"]["producer"].get("registration_recovery")
+        if registration is not None:
+            expected_registration = dict(
+                original_sha256=digest(document["request"]["config"]).hex(),
+                approved_sha256=digest(child["request"]["config"]).hex(),
+            )
+            if registration != expected_registration:
+                raise SourceConflict("The confirmed registration transition does not verify.")
+            child_producer["registration_recovery"] = registration
+            expected["request"]["config"] = child["request"]["config"]
+        expected["request"].update(operation=operation, producer=child_producer)
+        if (
+            child != expected
+            or bytes(attempt["RequestHash"]) != digest(child)
+            or attempt["ConsumerKind"] != "scan_data"
+            or attempt["KVK_NO"] is not None
+            or (
+                attempt["ExecutionState"] is not None
+                and attempt["CompletedFileName"] != producer["inputs"]["completed_filename"]
+            )
+        ):
+            raise SourceConflict("Recovery attempt differs from the retained producer inputs.")
+
+    def _queued_blocker(self, cursor, source_id):
+        from services.export_target_admission_dal import AVAILABLE_JOB_TARGETS_SQL
+
+        # A resumed stage receives a fresh ticket. Show the oldest eligible
+        # queued owner even while it has no resource claim, matching admission.
+        cursor.execute(
+            "SELECT TOP (1) * FROM ("
+            "SELECT EnqueueSequence AS Ticket,'job' AS Kind,JobID AS QueuedID FROM dbo.ExportJob WHERE AccountKey=? AND State='ready' "
+            + (AVAILABLE_JOB_TARGETS_SQL if self.runtime.dal.execution_evidence else "")
+            + "UNION ALL SELECT EnqueueSequence,'preparation',PreparationID FROM dbo.ExportPreparation "
+            "WHERE AccountKey=? AND State IN ('pending','sql_pending') AND PreparationID<>? "
+            + (
+                "UNION ALL SELECT EnqueueSequence,'output_operation',OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready') "
+                if self.runtime.dal.output_operations
+                else ""
+            )
+            + ") q ORDER BY Ticket,Kind,QueuedID",
+            self.account,
+            self.account,
+            source_id,
+            *((self.account,) if self.runtime.dal.output_operations else ()),
+        )
+        queued = one(cursor)
+        if not queued:
+            return None
+        result = dict(
+            ResourceKey="queue",
+            ActiveJobID=None,
+            ActivePreparationID=None,
+            ActiveOutputOperationID=None,
+            BlockedReason=None,
+            ConsumerKind=None,
+            ProducerKind=None,
+            ProducerParent=None,
+            HasImportReceipt=0,
+            PreparationState=None,
+            JobState=None,
+            PreparationAccount=None,
+            JobAccount=None,
+            OperationAccount=None,
+            QueueTicket=queued["Ticket"],
+        )
+        if queued["Kind"] == "preparation":
+            cursor.execute(
+                "SELECT p.ConsumerKind,p.State,JSON_VALUE(p.RequestJson,'$.request.producer.kind') AS ProducerKind,"
+                "JSON_VALUE(p.RequestJson,'$.request.producer.parent') AS ProducerParent,"
+                "CASE WHEN e.PreparationID IS NULL THEN 0 ELSE 1 END AS HasImportReceipt "
+                "FROM dbo.ExportPreparation p LEFT JOIN dbo.StatsImportExecution e ON e.PreparationID=p.PreparationID "
+                "WHERE p.PreparationID=? AND p.AccountKey=?",
+                queued["QueuedID"],
+                self.account,
+            )
+            preparation = one(cursor)
+            if not preparation:
+                return None
+            result.update(
+                ActivePreparationID=queued["QueuedID"],
+                PreparationAccount=self.account,
+                ConsumerKind=preparation["ConsumerKind"],
+                PreparationState=preparation["State"],
+                ProducerKind=preparation["ProducerKind"],
+                ProducerParent=preparation["ProducerParent"],
+                HasImportReceipt=preparation["HasImportReceipt"],
+            )
+        elif queued["Kind"] == "job":
+            result.update(ActiveJobID=queued["QueuedID"], JobAccount=self.account, JobState="ready")
+        else:
+            result.update(ActiveOutputOperationID=queued["QueuedID"], OperationAccount=self.account)
+        return result
 
     def _original_phase(self, prep, membership, resources):
         account, sql = "account:" + self.account, "sql_snapshot:legacy_outputs"
@@ -342,10 +472,13 @@ class ProducerRefusalDAL:
                 cursor.close()
                 connection.close()
 
-    def reserve(self, source_id, action_id):
+    def reserve(self, source_id, action_id, *, use_current_registration=False):
         """A stable request is also a tombstone against late action dispatch."""
         self._require_serialized(source_id)
-        state = self.snapshot(source_id)
+        state = self.snapshot(source_id, action_id=action_id)
+        for attempt in state["attempts"]:
+            if json.loads(attempt["RequestJson"])["request"]["operation"] == identity(action_id):
+                return identity(attempt["PreparationID"])
         document = json.loads(state["preparation"]["RequestJson"])
         request = dict(document["request"])
         request.update(
@@ -354,6 +487,12 @@ class ProducerRefusalDAL:
                 state["producer"], parent=identity(source_id), operation=identity(action_id)
             ),
         )
+        if use_current_registration:
+            request["config"] = state["current_registration"]
+            request["producer"]["registration_recovery"] = dict(
+                original_sha256=digest(document["request"]["config"]).hex(),
+                approved_sha256=digest(request["config"]).hex(),
+            )
         return self.runtime.dal.request(
             account=self.account,
             consumer="scan_data",
@@ -372,7 +511,7 @@ class ProducerRefusalDAL:
         The durable marker prevents a late dispatcher from reusing this action.
         """
         self._require_serialized(source_id)
-        state = self.snapshot(source_id)
+        state = self.snapshot(source_id, action_id=action_id)
         candidates = [
             p
             for p in state["attempts"]

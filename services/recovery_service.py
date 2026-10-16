@@ -65,6 +65,25 @@ class RecoveryService:
         self.authorize(actor)
         return self.store.list_open(after=after)
 
+    def review_details_page(self, actor, incident_id, action, revision, token, page=0):
+        self.authorize(actor)
+        row = self.refresh(incident_id)
+        if (
+            (row["Revision"], row["EvidenceHash"]) != (revision, token)
+            or row["State"] != "open"
+            or row["pending_action"]
+            or row["evidence"].get("check_unavailable")
+            or row["evidence"]["actions"].get(action, {}).get("review_details") is not True
+        ):
+            raise SourceConflict("Recovery details changed. Reopen the incident before confirming.")
+        fields = self.adapters[row["SourceKind"]].review_details(row["SourceID"], action, token)
+        pages = max(1, (len(fields) + 4) // 5)
+        if type(page) is not int or not 0 <= page < pages:
+            raise SourceConflict("Choose a current recovery review page.")
+        return dict(
+            row=row, action=action, page=page, pages=pages, fields=fields[page * 5 : (page + 1) * 5]
+        )
+
     def review_source(self, actor, kind, source_id):
         self.authorize(actor)
         evidence, token, resolved = self.adapters[kind].inspect(source_id)
