@@ -374,3 +374,37 @@ behavior. There are no deferred findings in this review.
 protected successor contracts, interruption/forward-recovery rehearsal, complete
 enabled-action acceptance and final operator packet are still P0a release gates. All
 six P0b workstreams above remain required. No maintenance window is requested yet.
+
+## Coordinated deployment qualification — 16 October
+
+SQL PR 121 adds the coordinated twelve-migration adapter and independently derived
+schema images. Its disposable Windows PowerShell / SQL Server rehearsal passed
+thirteen adapter calls covering unstarted, competing ownership, process death,
+rollback, lost commit acknowledgement, repeat apply, receipt corruption and module
+drift. All migrations and thirteen receipts share one transaction. This proves the
+adapter protocol; its fixture profile is not a production deployment profile.
+Production application grants and successor startup contracts still need binding.
+
+The bot's fixed-adapter v4 packet now permits up to 512 authenticated members,
+enough for the observed 243-member candidate. Generic packets retain their 128-member
+limit, action layouts remain fixed, and preparation rejects a manifest larger than
+64 KiB before writing outputs. Native orchestration and 133 focused preparation
+tests passed. A stale legacy source pin would have rejected the migrated atomic
+`sp_TARGETS_MASTER` at startup; it now accepts the immutable reviewed SQL postimage
+and rejects the prior body. Its linked unchanged grant plan was repinned. All 100
+selected source, contract and grant tests passed, with operational logs unchanged.
+
+Architecture (211 files), deferred-item, test-selection and security-routing gates
+passed. Changes scan `51a40104-8ca9-415b-a56c-a2539bfa5d74` covered all seven changed
+source files and inspected both test files at snapshot
+`de63b5dba6a958844fea461ef5542443e362a3dbc3ebad40a63f3b9043bb8e2d` against
+`cb5d439c`. It completed with no findings and its sealed documents were read back;
+sealed at `2026-10-16T09:48:59.456163Z`, tool-reported usage 1,667,747 tokens.
+This subsequent evidence-only documentation adds no executable behavior and does
+not require another scan. No full-suite rerun is claimed for this narrow change.
+
+P0a remains **not deployment-ready**. Remaining release gates include production
+grant-aware images, protected successor contracts, the actual coordinated source
+packet, representative business output and complete enabled-action acceptance,
+and installed-package interruption/restart/forward-recovery rehearsal. These are
+required P0a work, not deferred optimisations. All P0b work remains in scope.

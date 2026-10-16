@@ -466,8 +466,8 @@
     {
       "name": "dbo.sp_TARGETS_MASTER",
       "path": "sql_schema/dbo.sp_TARGETS_MASTER.StoredProcedure.sql",
-      "source_sha256": "2ea82ec000c3e4d578c45871e3b107869ac885a3ad41af961a41292db7f31705",
-      "definition_sha256": "d20e2dc29c7d6455a17ebfcb59e78210e1c10aa20145974293ac5f417822ec20",
+      "source_sha256": "340bc1e888bec8638791b889d128a31c4028ae7546d6e8331093acd66a062b75",
+      "definition_sha256": "59f759eec2f7dd042e6f75ab235583d6addd0f9268ff290d8a517f4ca0ff85ff",
       "object_type": "P",
       "execute_as": null,
       "calls": [
@@ -481,7 +481,7 @@
         "sys.sp_releaseapplock"
       ],
       "compatible_definition_sha256": [
-        "f298271b8e7a57e5cce55bca88cd2aa21a1243ebce0a5c0a9559fce1fd600a3e"
+        "51e16f219eaf3967509bff8f730cce22783aab6838272595794af1e327667375"
       ]
     },
     {

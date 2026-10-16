@@ -805,7 +805,7 @@ def prepare_update(
             )
             for index, item in enumerate(config["sql"]["profiles"])
         ]
-    # Validate before writing anything, including the runner's 128-member bound.
+    # Validate before writing anything, including the fixed-adapter member bound.
     # The installed companion is authenticated by Update-K98. Loading that copy
     # also supports upgrading from a predecessor whose validator lacks v4.
     import importlib.util
@@ -817,6 +817,9 @@ def prepare_update(
     spec.loader.exec_module(validator)
 
     validator.validate_updater_manifest(manifest)
+    manifest_raw = encode(manifest)
+    if len(manifest_raw) > 65536:
+        raise ValueError("Encoded release exceeds runner's 64 KiB bound.")
     destination = Path(destination)
     mkdir, write = output_writers(config["sid"], secure_output=secure_output)
     mkdir(destination)
@@ -826,7 +829,6 @@ def prepare_update(
     mkdir(package)
     for name, raw in files.items():
         write(package / name, raw)
-    manifest_raw = encode(manifest)
     runner_raw = (tools / "Deploy-K98Release.ps1").read_bytes()
     write(package / "release.json", manifest_raw)
     write(package / "Deploy-K98Release.ps1", runner_raw)
