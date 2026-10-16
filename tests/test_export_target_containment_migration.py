@@ -26,10 +26,18 @@ def test_replacement_document_bounds_match_reviewed_preimages_and_restrict_other
     root = Path(os.environ["K98_TARGET_CONTAINMENT_SQL_SOURCE"])
     migration = (root / "migrations/20261015_009_guided_export_replacement.sql").read_text()
     blocks = re.findall(
-        r"CREATE TABLE #K98BoundBefore.*?DROP TABLE #K98BoundAfter;", migration, re.S
+        r"CREATE TABLE #K98(?:Request|Stream|Evidence)BoundBefore.*?DROP TABLE #K98(?:Request|Stream|Evidence)BoundAfter;",
+        migration,
+        re.S,
     )
     assert len(blocks) == 3
     sql = contained_job.sql
+    # SQL Server compiles the complete migration as one batch. Reusing a temp
+    # table name after DROP still fails compilation, invisible to block tests.
+    declarations = [block[: block.index("IF NOT EXISTS")] for block in blocks]
+    temporary_names = re.findall(r"CREATE TABLE (#[A-Za-z0-9_]+)", "".join(declarations))
+    assert len(temporary_names) == len(set(temporary_names)) == 6
+    sql.execute("\n".join(declarations + [f"DROP TABLE {name};" for name in temporary_names]))
     for index, (block, table, name, columns, value, allowed, denied) in enumerate(
         zip(
             blocks,
@@ -55,7 +63,8 @@ def test_replacement_document_bounds_match_reviewed_preimages_and_restrict_other
         )
     ):
         sql.execute(block[: block.index("IF NOT EXISTS")])
-        for old, temporary in ((True, "#K98BoundBefore"), (False, "#K98BoundAfter")):
+        before, after = re.findall(r"CREATE TABLE (#[A-Za-z0-9_]+)", block)
+        for old, temporary in ((True, before), (False, after)):
             path = f"sql_schema/{table}.Table.sql"
             source = (
                 subprocess.check_output(
@@ -74,17 +83,17 @@ def test_replacement_document_bounds_match_reviewed_preimages_and_restrict_other
             ).fetchval()
             assert definition(temporary) == definition(independent)
         raw = json.dumps(value)
-        sql.execute("INSERT #K98BoundAfter VALUES (?,?)", raw, allowed)
+        sql.execute(f"INSERT {after} VALUES (?,?)", raw, allowed)
         with pytest.raises(pyodbc.Error):
-            sql.execute("INSERT #K98BoundAfter VALUES (?,?)", raw, denied)
+            sql.execute(f"INSERT {after} VALUES (?,?)", raw, denied)
         if index == 0:
             with pytest.raises(pyodbc.Error):
                 sql.execute(
-                    "INSERT #K98BoundAfter VALUES (?,?)",
+                    f"INSERT {after} VALUES (?,?)",
                     json.dumps(dict(value, version=3)),
                     allowed,
                 )
-        sql.execute("DROP TABLE #K98BoundBefore;DROP TABLE #K98BoundAfter")
+        sql.execute(f"DROP TABLE {before};DROP TABLE {after}")
 
 
 @pytest.mark.parametrize("replacement", [False, True])

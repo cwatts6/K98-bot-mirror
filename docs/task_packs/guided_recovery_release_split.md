@@ -8,9 +8,10 @@ This authorizes preparation and validation, not a live deployment or SQL install
 ## P0a — first release
 
 Status: **preparing; not deployment-ready**. Candidate implementation heads are
-Bot `c66b0d81` (the source-pin correction on draft PR #361's `34cdb5c5`, including
-#360 and the merged #356 work) and SQL
-`71c6cedcdc317b49df5a312a938759c5a6183a93` (draft PR #119 and predecessors).
+Bot `064149b6` (draft PR #363, including the source-pin correction, guided
+continuation handoff and disposable guided rehearsal) and SQL
+`662f58c61bdc5ea329bf5406695049a376a128ae` (migration-chain corrections and
+retained rehearsal, stacked on draft PR #119 and predecessors).
 These are development candidates, not private-production deployment commits.
 
 Remote `main` heads were read back on 16 October and still match the audit
@@ -102,6 +103,41 @@ the shared alert, private review, confirmation, audit and verification requireme
   approve the installed database.
 - The pilot exposure matrix, final release-candidate suite and updater/rollback
   rehearsal have not yet been completed. No maintenance window is requested yet.
+
+## Complete SQL migration-chain rehearsal
+
+The twelve recovery migrations now pass in sequence on a fresh disposable SQL
+database built from 58 baseline tables and seven predecessor procedures. Running
+the complete files exposed three real migration 009 deployment failures: repeated
+temporary-table names within a batch, references to newly added columns being
+compiled too early, and constraint comparisons across different collations.
+SQL candidate `21de1988` corrects those failures while retaining the transaction,
+exact preimage checks, procedure payloads and permissions. Candidate `662f58c6`
+also retains the reproducible local-only opt-in rehearsal helper.
+
+A failure injected immediately before migration 009's commit restored the captured
+object, column, index and permission metadata; the original migration then applied
+successfully. The retained run is `K98_P0a_Migrations_8e954346a854`. Companion Bot
+regressions compile all six temporary declarations together and check the reviewed
+constraint definitions; these and rollover migration checks passed (4 tests).
+Architecture, deferred-item validation, security routing, test selection, Black,
+Ruff and whitespace pass for the Bot companion change. The full suite is not
+repeated for this test-only delta; the preceding integrated-suite qualification
+below remains explicit. Smoke imports and command registration are unchanged by
+the test and documentation files and are covered by PR #363's retained checks.
+
+SQL Changes scan `c5434566-e65e-427b-8198-c3b1e9c10a26`, Deep off, covered
+`71c6cedc..662f58c6` and completed with zero findings and complete coverage. Its
+sealed result was read back at `2026-10-16T08:55:08.279104Z`; reported usage was
+953,337 tokens. The Bot companion changes only the migration regression and this
+document; no Bot runtime, permission, configuration or deployment execution changes,
+so a separate Bot scan is skipped for that narrow delta. The actual migration
+and SQL rehearsal helper are covered by the separate SQL scan.
+
+These checks establish migration-chain execution and precommit rollback. They do
+not establish lost-commit receipt recovery, representative configuration business
+output, host activation or final coordinated-package readiness. Those remain P0a
+release gates; none are transferred to P0b.
 
 ## SQL source-pin qualification
 
