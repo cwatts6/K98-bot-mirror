@@ -138,11 +138,15 @@ class ExportRecoveryAdapter:
         return (
             dict(
                 title="Spreadsheet export recovery",
-                outcome="replacement_required"
-                if replacement_required
-                else "export_skipped"
-                if provenance.get("export_skipped") and resolved
-                else job["State"],
+                outcome=(
+                    "replacement_required"
+                    if replacement_required
+                    else (
+                        "export_skipped"
+                        if provenance.get("export_skipped") and resolved
+                        else job["State"]
+                    )
+                ),
                 scan=job.get("KVK_NO"),
                 explanation=explanation,
                 actions=actions,
@@ -265,8 +269,9 @@ class ExportRecoveryAdapter:
 class RolloverRecoveryAdapter:
     kind = "export_rollover"
 
-    def __init__(self, discovery, pools, reconciler):
+    def __init__(self, discovery, pools, reconciler, *, rollover=None):
         self.discovery, self.pools, self.reconciler = discovery, pools, reconciler
+        self.rollover = rollover
 
     def pending_recovery(self, *, after=None):
         return self.discovery.pending_rollovers(after=after)
@@ -276,6 +281,33 @@ class RolloverRecoveryAdapter:
         operation = snapshot["operation"]
         request = json.loads(operation["ProgressJson"]).get("request", {})
         actions = {}
+        links = []
+        context = snapshot.get("pool", {})
+        pending = [
+            job
+            for job in context.get("jobs", [])
+            if job["State"] in {"running", "uncertain", "ready", "waiting"}
+        ]
+        if operation["State"] == "closing":
+            links = [
+                dict(label="Review old-season export", kind="export_job", source_id=j["JobID"])
+                for j in pending[:3]
+            ]
+        if (
+            self.rollover is not None
+            and operation["State"] in {"closing", "ready"}
+            and operation.get("OwnerID") is None
+            and not pending
+            and not any(
+                row["DeliveryState"] in {"claimed", "uncertain"}
+                for row in context.get("legacy_receipts", [])
+            )
+        ):
+            actions["continue_unstarted_rollover"] = dict(
+                label="Continue waiting rollover",
+                check=f"Confirm the original season {operation['OldKVK']} to {operation['NewKVK']} rollover should proceed. Its registered old-season files will be made private and cleared, then prepared for the new season. Preserve any copies you still need before confirming.",
+                effect="Verify the old writers and their outcomes, then use the original queued operation and exact registered files. Account admission and ownership are checked again. Each provider phase is recorded; an uncertain phase stops for its own recovery rather than being repeated.",
+            )
         if operation["State"] in {"running", "uncertain"} and request.get("phase") in {
             "setup_pending",
             "setup_verified",
@@ -291,12 +323,19 @@ class RolloverRecoveryAdapter:
                 outcome=operation["State"],
                 explanation=f"Season {operation['OldKVK']} to {operation['NewKVK']}; retained phase: {operation['Phase']}. Completion requires the recorded phase journal and fresh authority verification.",
                 actions=actions,
+                recovery_links=links,
             ),
             digest(snapshot).hex(),
             operation["State"] == "completed",
         )
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == "continue_unstarted_rollover":
+            evidence, current, resolved = self.inspect(source_id)
+            _unchanged(current, token)
+            if resolved or action not in evidence["actions"]:
+                raise SourceConflict("The original rollover is no longer waiting for admission.")
+            return self.rollover.advance(source_id)
         if action != "verify_rollover":
             raise SourceConflict("Unknown rollover recovery action.")
         snapshot = self.discovery.rollover(source_id, self.pools)
@@ -309,6 +348,18 @@ class RolloverRecoveryAdapter:
         operation = snapshot["operation"]
         progress = json.loads(operation["ProgressJson"])
         actor = f"recovery:{action['ActionID']}"
+        if action["ActionKind"] == "continue_unstarted_rollover":
+            # The immutable operation is the idempotency identity. Admission
+            # CAS permits one owner; advance refuses all already-owned states.
+            # A lost intent/queue reply may resume only its still-unowned entry.
+            if operation["State"] in {"completed", "running", "uncertain"}:
+                # Admission is verified; incident resolution still requires
+                # completed. An uncertain phase receives its own repair choice.
+                return "verified"
+            if operation["State"] in {"closing", "ready"} and operation.get("OwnerID") is None:
+                self.rollover.advance(source_id)
+                return None
+            return "not_applied"
         if (
             operation["State"] == "completed"
             and progress.get("reconciliation", {}).get("actor") == actor

@@ -1,5 +1,38 @@
 # Guided recovery delivery
 
+## Waiting rollover admission — 2026-10-16
+
+The `codex/guided-rollover-admission` slice adds **Continue waiting rollover**
+to the recovery centre for the original unowned `closing`/`ready` operation.
+Its confirmation states the old/new seasons and that registered old files will
+be made private and cleared. Pending old-season exports link directly to their
+recovery workflows. The existing authority drain proof, queue admission,
+ownership CAS and phase journal remain mandatory.
+
+Lost intent replies and queue waits retain one recovery action and the original
+operation. Reconciliation may enter only an unowned operation; it never repeats
+an already-owned provider phase. Admission handoff may verify while the incident
+remains open; only completed rollover resolves it. This does not yet cover
+interrupted private/clear phases or missing historical receipts, which remain
+active P0 acceptance requirements.
+
+Validation: 194 focused tests passed, including confirmation, stale preview,
+restart, queue waiting, lost provider replies and existing rollover ownership
+regressions. Log-noise validation kept operational logs unchanged. Architecture
+(174 files), deferred-item and security-routing validators, test selection,
+synthetic smoke imports, command registration, Ruff and Black passed. The broader
+standard-suite baseline remains the previous 8,115-pass run; it was not repeated
+for this two-source-file adapter/composition change. SQL object/state contracts
+were checked against the authoritative SQL repository; no SQL schema changed.
+
+Changes security review `497afa0a-5d6c-4de8-a2fa-ec749dfc4a5e` completed and sealed
+for `ec87ffedd70d9cc63696fa4465d7e5c15d1aeb54` through
+`df6032d046840dd6920845ca9bf189553f0feec6`: both runtime source files reviewed,
+zero findings, no deferred security coverage. No measured token usage was
+returned. This subsequent documentation-only checkpoint has no runtime effect
+and does not require another Changes scan. No deployment or live provider or
+Discord execution occurred. P0 remains active with no recovery gaps deferred.
+
 ## Atomic player-report recovery checkpoint — 2026-10-16
 
 The `codex/guided-producer-checkpoints` slice commits player-stat report output
