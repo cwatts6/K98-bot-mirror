@@ -23,8 +23,13 @@ private review/confirmation callbacks through the saved-input dispatch and lost-
 receipt. Coverage includes wrong actor/guild/channel, stale evidence, 37 destinations,
 long metadata, restart, changed registration after preview, 105 prior refusals and
 queue blockers. Only session-local SQL objects and mocked Discord/provider calls ran.
-The security Changes review and final gates are pending for this slice. No schema
-installation or deployment ran.
+Changes review `5c2fed15-a694-40cb-a512-adae66accea1` completed and sealed for
+`ec87ffed..323f227f`, seven source files, no findings or incomplete coverage, Deep
+off. Its sealed results were read back; tool-reported usage was 1,615,383 tokens.
+Architecture, deferred-item/security-routing checks, test selection, Black, Ruff,
+synthetic smoke imports and command registration passed. The earlier full-suite
+checkpoint is unchanged; this bounded admission slice uses its 57 affected tests.
+No schema installation or deployment ran.
 
 P0 remains active: full pipeline continuation and producer checkpoints, historical
 missing-input/pre-request cases, all-copy containment/active-history evidence loss,
