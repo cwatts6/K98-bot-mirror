@@ -23,7 +23,9 @@ def _original_workflow(broker, workflow, replacement_id):
     if base is None:
         raise SourceConflict("The original proposal registration is unauthenticated.")
     original = copy(workflow)
-    service = broker.replacements.services(base, history=registrations)
+    service = broker.replacements.services(
+        base, history=registrations, owner_kind=workflow.proposals.dal.owner_kind
+    )
     original.registration = base
     original.proposals, original.verification, original.activation = (
         service.proposals,
@@ -33,10 +35,18 @@ def _original_workflow(broker, workflow, replacement_id):
     return original
 
 
+def _workflow(broker, bound):
+    if bound.get("owner_kind", "job") == "rollover":
+        from services.rollover_replacement_authority import workflow
+
+        return workflow(broker.replacements, bound["JobID"])
+    return broker.replacements.workflow(bound["JobID"])
+
+
 def replacement_proposal_recovery(broker, catalog, reference):
     bound = catalog.replacement_proposal(reference)
     job_id, replacement_id = bound["JobID"], bound["ReplacementID"]
-    workflow = broker.replacements.workflow(job_id)
+    workflow = _workflow(broker, bound)
     old = inspect_lost_proposal(
         _original_workflow(broker, workflow, replacement_id), replacement_id
     )
@@ -55,6 +65,7 @@ def replacement_proposal_recovery(broker, catalog, reference):
     )
     return dict(
         job_id=job_id,
+        owner_kind=bound.get("owner_kind", "job"),
         lost_proposal_id=replacement_id,
         successor_check_id=successor,
         token=digest(dict(original=old, current=state)).hex(),
@@ -64,7 +75,7 @@ def replacement_proposal_recovery(broker, catalog, reference):
 def replacement_check_recovery(broker, catalog, reference):
     bound = catalog.replacement_check(reference)
     job_id, check_id = bound["JobID"], bound["VerificationID"]
-    workflow = broker.replacements.workflow(job_id)
+    workflow = _workflow(broker, bound)
     snapshot = workflow.verification.dal.snapshot(check_id, account=workflow.account)
     if snapshot is None:
         raise SourceConflict("The original replacement check is missing.")
@@ -91,6 +102,7 @@ def replacement_check_recovery(broker, catalog, reference):
     )
     return dict(
         job_id=job_id,
+        owner_kind=bound.get("owner_kind", "job"),
         lost_check_id=check_id,
         successor_check_id=successor,
         token=digest(dict(original=old, current=state)).hex(),

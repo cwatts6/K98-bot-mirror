@@ -97,6 +97,15 @@ class EvidenceRecovery:
             if "lost_proposal_id" in replacement:
                 evidence["lost_proposal_id"] = replacement["lost_proposal_id"]
                 evidence["evidence_recovery_label"] = "Recover replacement"
+            if replacement.get("owner_kind") == "rollover":
+                evidence.pop("evidence_recovery_job_id")
+                evidence["recovery_links"] = [
+                    dict(
+                        label=evidence.get("evidence_recovery_label", "Recover replacement check"),
+                        kind="export_rollover",
+                        source_id=replacement["job_id"],
+                    )
+                ]
         return dict(
             evidence=evidence,
             token=digest(dict(binding=binding, copies=copies, replacement=replacement)).hex(),

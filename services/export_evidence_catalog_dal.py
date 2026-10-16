@@ -103,11 +103,24 @@ class EvidenceCatalogDAL:
     def _parameters(self):
         return [self.account] * CATALOG.count("?")
 
+    @staticmethod
+    def _replacement_owner(row):
+        job, operation = row.pop("JobID"), row.pop("OutputOperationID")
+        if (job is None) == (operation is None):
+            raise SourceConflict("One exact replacement owner is required.")
+        result = {key: identity(value) for key, value in row.items()}
+        # Preserve the existing job wire contract. Rollover identifiers use an
+        # explicit discriminator so the recovery UI cannot open a job by mistake.
+        result["JobID"] = identity(job if job is not None else operation)
+        if operation is not None:
+            result["owner_kind"] = "rollover"
+        return result
+
     def replacement_check(self, reference):
         """Locate a check from its terminal receipt or private read journal."""
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT DISTINCT v.VerificationID,c.JobID FROM dbo.ExportReplacementVerification v "
+                "SELECT DISTINCT v.VerificationID,c.JobID,c.OutputOperationID FROM dbo.ExportReplacementVerification v "
                 "JOIN dbo.ExportReplacementPlan p ON p.ReplacementID=v.ReplacementID "
                 "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
                 "AND c.AccountKey=p.AccountKey "
@@ -123,12 +136,12 @@ class EvidenceCatalogDAL:
             found = rows(cursor)
         if len(found) != 1:
             raise SourceConflict("One exact replacement check is required for fresh verification.")
-        return {key: identity(value) for key, value in found[0].items()}
+        return self._replacement_owner(found[0])
 
     def replacement_proposal(self, reference):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT p.ReplacementID,c.JobID FROM dbo.ExportReplacementPlan p "
+                "SELECT p.ReplacementID,c.JobID,c.OutputOperationID FROM dbo.ExportReplacementPlan p "
                 "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
                 "AND c.AccountKey=p.AccountKey WHERE p.AccountKey=? AND p.ReceiptReference=?",
                 self.account,
@@ -137,7 +150,7 @@ class EvidenceCatalogDAL:
             found = rows(cursor)
         if len(found) != 1:
             raise SourceConflict("One exact replacement proposal is required for recovery.")
-        return {key: identity(value) for key, value in found[0].items()}
+        return self._replacement_owner(found[0])
 
     def page(self, after=None):
         after = identity(after) if after is not None else None
