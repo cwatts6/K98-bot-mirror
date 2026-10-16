@@ -1,5 +1,79 @@
 # Guided recovery delivery
 
+## Interrupted rollover replacement — implementation checkpoint, 2026-10-16
+
+P0 is still active. The saved `codex/guided-rollover-replacement` Bot and SQL
+changes now implement complete old-pool isolation, the existing paginated admin
+replacement form, fresh file verification, registration activation, one durable
+replacement rollover and independent completion verification. The original
+operation stays uncertain and its files remain permanently isolated. Replacement
+workers stop after setup for the guided final verification; neither a timeout nor
+activation alone resolves the incident. Repeated failures link to the next
+replacement's recovery and preserve the original season choices.
+
+The existing private confirmation views are exercised through actual button
+callbacks for file checking, activation and queueing. Saved form pages survive
+restart. Final verification requires the original sealed phase journals and the
+final probe's private receipt, even if that probe is absent from a catalogue
+listing. Evidence changes between an admin confirmation and the replacement
+snapshot reject the action rather than adopting newer evidence.
+
+Validation: the final affected regression run passed 664 tests, including the
+literal migration compilation, both enrollment admission paths, stale-click and
+explicit-probe checks. The earlier focused run proved operational logs unchanged.
+The actual-button temporary-SQL integration passed.
+Ruff, Black and whitespace checks pass. Earlier architecture, deferred-item,
+security-routing, test selection, synthetic import and command-registration
+checks also passed for this slice. These are synthetic provider/Discord and
+disposable temporary-SQL results, not production acceptance.
+
+The previous security finalization error is resolved: scan
+`91eb0a8b-2355-45a8-9087-9b36b37d8fba` is completed and sealed, and its existing
+result was read back successfully. It covers its original proposal-loss range;
+it does not cover the new rollover replacement implementation. This new Bot/SQL
+Bot Changes review `d6352ffc-680f-4185-ba50-6fae6b1d5318` completed and sealed for
+`133d1007..cadc0299`: all 19 source files, no findings or incomplete coverage,
+Deep off. Its sealed result was read back; tool-reported usage was 1,362,807 tokens.
+The full standard suite finished: 8,159 passed, 572 skipped, eight subtests passed,
+four failures. Two stale recovery test assumptions were corrected (560 pinned
+objects and an accepted integer timeout); the affected tests plus the transient
+Windows diagnostic-file failure passed on a focused rerun: 82 passed. The fourth
+failure is the pre-existing absent `.github/workflows/command-governance.yml`,
+also absent at the base commit. No unrelated workflow was introduced. These
+test-only changes do not alter the reviewed runtime. The 664 affected tests and
+five historical/current migration tests passed. Architecture (187 files), deferred
+items, security routing, test selection, synthetic imports and command registration
+passed. SQL Changes review
+`38c1fffa-fc9f-4c92-8104-f5dbbfa89ac3` completed and sealed for
+`95b4e91b..24cbca0c`: seven source files, no findings or incomplete coverage,
+Deep off. The sealed result was read back. Tool-reported usage: 3,800,664 tokens.
+
+The operator explicitly approved both previously rejected changes for implementation
+and disposable testing. Private admin comparison pages are implemented in the
+separate admission-decisions branch. Enrollment now excludes only receipt-verified
+isolated rollovers; the original uncertain operation stays retained. Migration
+`20261016_001_rollover_replacement` guards five exact predecessors and installs six
+reviewed definitions atomically, with authority-only execution for containment.
+The Bot installation contract includes this migration and procedure.
+
+Source pins were updated only for the six affected procedures and two existing
+required history tables absent from the prior manifest. The activation scope
+retains unrelated source hashes and dependency edges, updates the eight affected
+objects, and binds SQL revision `24cbca0c`. A broad regeneration exposed pre-existing
+unrelated source-hash mismatches and was rejected by automatic approval review;
+no broad rebaseline was applied. This is an installation qualification requiring
+separate evidence before deployment, not proof that unrelated definitions match.
+No live provider/Discord action, persistent SQL installation or deployment ran.
+
+Remaining P0 acceptance is not deferred: finish both focused reviews and PRs;
+verify the full replacement completion and
+failure-during-repair paths together; complete historical/changed-registration
+admissions, all producer atomic checkpoints and durable remaining-pipeline
+continuation; implement guided recovery for all-copy containment/active-history
+evidence loss; and pass integrated proactive-alert-to-guided-repair acceptance.
+Every remaining recovery must expose its checks and executable admin actions,
+retain interrupted decisions, and resolve only after verified settlement.
+
 ## Waiting rollover admission — 2026-10-16
 
 The `codex/guided-rollover-admission` slice adds **Continue waiting rollover**

@@ -1175,6 +1175,10 @@ class SourceOutputPoolDAL:
                 raise SourceConflict("Preview is stale; preview the current exact pool again.")
             if pool["PoolState"] != "active" or pool["OwnerID"] is not None:
                 raise SourceConflict("Pool admission is already closed.")
+            if "replacement_rollover" in plan:
+                from services.rollover_replacement_dal import validate_replacement
+
+                validate_replacement(cursor, operation_id, plan)
             target = plan["new_choice"]
             cursor.execute(
                 "SELECT KVK_NO,SourceKey,ChoiceID FROM KVK.SeasonSource WHERE KVK_NO=?",

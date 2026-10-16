@@ -462,7 +462,7 @@ class AuthorityBroker:
                 raise ValueError("Provisioned replacement registration authority required.")
             self.boundary.recheck()
             return self.replacements.current()
-        if action == "replacement_recovery":
+        if action in {"replacement_recovery", "rollover_replacement_recovery"}:
             if self.replacements is None:
                 raise ValueError("Provisioned replacement recovery authority required.")
             return self.replacements.dispatch(message)

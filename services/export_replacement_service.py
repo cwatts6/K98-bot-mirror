@@ -85,6 +85,8 @@ class ExportReplacementService:
             registration_activated=False,
             business_resolved=False,
         )
+        if self.dal.owner_kind != "job":
+            audit["owner_kind"] = self.dal.owner_kind
         raw = encode(audit)
         receipt = self.store.put(raw)
         reference = identity(receipt.key)
@@ -125,6 +127,7 @@ class ExportReplacementService:
 
         if (
             audit.get("kind") != "export_replacement_plan/1"
+            or audit.get("owner_kind", "job") != self.dal.owner_kind
             or any(
                 audit.get(k) is not False
                 for k in ("files_verified", "registration_activated", "business_resolved")

@@ -144,6 +144,18 @@
     "sha256": "ee947b217a22d760e0c3e7333253fd2e150f14ecb82791b0fcbdd7dc59d3bc1a"
   },
   {
+    "name": "KVK.SourceExportHistory",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceExportHistory.Table.sql",
+    "sha256": "482554fc7318df26cf189c0f579aaeaadc2f6079cdbd6af074be0ea80862bad8"
+  },
+  {
+    "name": "KVK.SourceExportHistoryRow",
+    "type": "U",
+    "path": "sql_schema/KVK.SourceExportHistoryRow.Table.sql",
+    "sha256": "d14bedb93a9c0be44b2b5b9826311eebca79d42425344d8d4210a91b920934c2"
+  },
+  {
     "name": "KVK.SourceExportIntent",
     "type": "U",
     "path": "sql_schema/KVK.SourceExportIntent.Table.sql",
@@ -2883,13 +2895,13 @@
     "name": "dbo.usp_ExportManualOutputEnrollmentTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportManualOutputEnrollmentTransition.StoredProcedure.sql",
-    "sha256": "3ebd0dd60b06c50040c917e2414a848c0bb75f8e4ed32665b1db22ac5d3156ad"
+    "sha256": "53c3b995e88ced41916a5312c6d9f9655d02bf624197cab982f1bee96b203360"
   },
   {
     "name": "dbo.usp_ExportOutputEnrollmentTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
-    "sha256": "4146d6fc8f6b23b4f034ef696b470ab36077573754d78b0c7ac3770f91818487"
+    "sha256": "6d8e2e82663ea228a789444b56e3fb3625eb78a27e6c6b744a0d21646d2e564d"
   },
   {
     "name": "dbo.usp_ExportProviderRequestEventAppend",
@@ -2907,19 +2919,25 @@
     "name": "dbo.usp_ExportReplacementActivate",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportReplacementActivate.StoredProcedure.sql",
-    "sha256": "0a4f8b9d522886ebe7101a64047b2e23cd0e9c3c99300b0125de7ab0c688302c"
+    "sha256": "5dab00d236d6cf425d8c973c2cc3f37fab7186dfd523210f543f535f374b0702"
   },
   {
     "name": "dbo.usp_ExportReplacementPlanCreate",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportReplacementPlanCreate.StoredProcedure.sql",
-    "sha256": "3b244f93bd532cdaed7208d80cbb21f0be7a061061d11892b4d18f5f1cfe9b35"
+    "sha256": "6781baeeb4d866df017ebafecc4ed032d086c17f988ca3dd05be9c2aefb39237"
   },
   {
     "name": "dbo.usp_ExportReplacementVerificationTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportReplacementVerificationTransition.StoredProcedure.sql",
-    "sha256": "5439571b3381fce8355358aaa64e722394f445648a598dadf0b5bc5986243d9f"
+    "sha256": "141b4a00b2dc9845191172bce522844fa309fd9c979a9f54f6b6d35a13cb59e9"
+  },
+  {
+    "name": "dbo.usp_ExportRolloverContainTargets",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportRolloverContainTargets.StoredProcedure.sql",
+    "sha256": "4113fd18555f2e85490ae727fdcc6694da2f646459584e7b182eef685b2e84ee"
   },
   {
     "name": "dbo.usp_GetKvkHistorySummaryMetricRanks",

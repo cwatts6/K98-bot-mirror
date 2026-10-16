@@ -75,7 +75,9 @@ class ReplacementActivationService:
                     account=self.proposals.registration.value()["account"],
                     pool_id=pool_document["previous_pool_id"],
                 )
-                before_pool = snapshot["pool"]
+                before_pool = (
+                    snapshot["pool"]["pool"] if "operation" in snapshot else snapshot["pool"]
+                )
             audit = dict(
                 kind="export_replacement_activation/1",
                 activation_id=action_id,

@@ -49,6 +49,7 @@ PROCEDURES = (
     "dbo.usp_ExportProviderRequestEventAppend",
 )
 ROLE_CHECK = "IF IS_ROLEMEMBER(N'ExportExecutionAuthority')<>1 OR IS_ROLEMEMBER(N'ExportExecutionAuthority') IS NULL"
+TEMP_TABLE_PARAMETER_METADATA = False
 
 
 def local_sql(text):
@@ -64,7 +65,8 @@ def contained_job():
     root = Path(os.environ["K98_TARGET_CONTAINMENT_SQL_SOURCE"]) / "sql_schema"
     sql = pyodbc.connect(
         "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;"
-        "Trusted_Connection=yes;TrustServerCertificate=yes",
+        "Trusted_Connection=yes;TrustServerCertificate=yes"
+        + (";UseFMTONLY=Yes" if TEMP_TABLE_PARAMETER_METADATA else ""),
         autocommit=True,
         timeout=5,
     )
@@ -107,6 +109,22 @@ def contained_job():
             def execute(self, statement, *args):
                 rewritten = local_sql(statement)
                 assert not re.search(r"\b(?:dbo|KVK)\.[A-Za-z_]", rewritten)
+                # FMTONLY avoids failed metadata discovery on local temp tables.
+                # Its procedure NULL hashes still need explicit binary binding.
+                names = re.findall(r"@(\w+)=\?", statement)
+                self.inner.setinputsizes(
+                    [
+                        (
+                            (pyodbc.SQL_BINARY, 32, 0)
+                            if TEMP_TABLE_PARAMETER_METADATA
+                            and value is None
+                            and len(names) == len(args)
+                            and names[i].endswith(("Hash", "Digest"))
+                            else None
+                        )
+                        for i, value in enumerate(args)
+                    ]
+                )
                 self.inner.execute(rewritten, *args)
                 return self
 

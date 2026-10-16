@@ -120,6 +120,7 @@ _PROCEDURES = {
     "enrollment": "dbo.usp_ExportOutputEnrollmentTransition",
     "manual_enrollment": "dbo.usp_ExportManualOutputEnrollmentTransition",
     "target_containment": "dbo.usp_ExportJobContainTargets",
+    "rollover_containment": "dbo.usp_ExportRolloverContainTargets",
     "replacement_plan": "dbo.usp_ExportReplacementPlanCreate",
     "replacement_verification": "dbo.usp_ExportReplacementVerificationTransition",
     "replacement_activation": "dbo.usp_ExportReplacementActivate",
@@ -189,6 +190,11 @@ _PARAMETERS["target_containment"] = (
     "PoolID",
     "PoolVersion",
 )
+_PARAMETERS["rollover_containment"] = tuple(
+    "OperationID" if p == "JobID" else p
+    for p in _PARAMETERS["target_containment"]
+    if p != "StorageOwner"
+)
 
 # Source-of-truth: the S10A/C/D/E migrations and the additive S11 migration in
 # K98-bot-SQL-Server. An approved contract may not omit one of these dependencies.
@@ -202,6 +208,7 @@ INSTALLATION_MIGRATIONS = (
     "20261015_008_export_target_containment",
     "20261015_009_guided_export_replacement",
     "20261015_010_configuration_replacement",
+    "20261016_001_rollover_replacement",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -219,6 +226,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261015_008_export_target_containment",
     "20261015_009_guided_export_replacement",
     "20261015_010_configuration_replacement",
+    "20261016_001_rollover_replacement",
 )
 
 
@@ -534,9 +542,11 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # UPDATE_ALL2 from migration 20261009_001; independently approved installed
 # metadata and effective privileges are still mandatory before admission.
 # Failed historical read admission follows SQL migration 20261015_001.
-APPLICATION_SCHEMA_SOURCE_HASH = "4662d142be840e2ae7ff94df48443c314d42c66cf311b763489f0c7387370b8b"
+APPLICATION_SCHEMA_SOURCE_HASH = "781b0b262dac5aa1f012063a94ddc781d52c01879443e2eb7c77d95295f72fec"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
-APPLICATION_ACTIVATION_SCOPE_HASH = "d6b4c875891c197266203c26ee2e59e9067e2cd175d96b1ffd538f514ad8765d"
+APPLICATION_ACTIVATION_SCOPE_HASH = (
+    "b1e1855a410034884e9e8f4238d15f8c906a3558cf484991d426ef037ad8b127"
+)
 
 
 def application_activation_scope():
