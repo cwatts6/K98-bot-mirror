@@ -26,7 +26,18 @@ nested commit behavior, rollback and exact source images (delta work is a synthe
 callee; this does not claim full production-data publication). Architecture (196
 files), deferred-item, security routing, test selection, synthetic import smoke,
 command registration (36/102), Ruff, Black and whitespace checks passed.
-Separate Bot and SQL Changes reviews are pending. SQL changes install before the
+Final pin correction: 28 activation/configuration tests passed, including seven
+disposable SQL target-contract cases. The reviewed activation scope digest now
+matches the canonical document; unchanged fail-closed validation remains enforced.
+Bot Changes review `5c606dd0-f193-48fe-ac3f-cf7f7e912713` covers
+`d933b94e..c0f8a248` (14 source files), and correction review
+`f4e554ed-b12c-4cec-afd0-c7530c5485a4` covers `c0f8a248..5842ec5d`
+(one source file). SQL review `c018f01b-44ec-4983-bfa2-8a6b135dd03e`
+covers the two SQL source files. All completed, sealed and read back with no
+findings or coverage gaps. Tool-reported token usage: 3,502,958, 1,098,856 and
+2,734,772 respectively. SQL companion: PR #119. Focused tests cover this slice;
+the inherited full-suite result remains qualified as recorded below.
+SQL changes install before the
 paired Bot and protected contract reissue. Only the target procedure source pin and
 its new coordination dependencies changed; unrelated historical pins are preserved.
 
