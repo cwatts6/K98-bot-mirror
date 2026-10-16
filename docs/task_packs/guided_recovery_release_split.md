@@ -8,10 +8,10 @@ This authorizes preparation and validation, not a live deployment or SQL install
 ## P0a — first release
 
 Status: **preparing; not deployment-ready**. Candidate implementation heads are
-Bot `064149b6` (draft PR #363, including the source-pin correction, guided
-continuation handoff and disposable guided rehearsal) and SQL
-`662f58c61bdc5ea329bf5406695049a376a128ae` (migration-chain corrections and
-retained rehearsal, stacked on draft PR #119 and predecessors).
+Bot `3a1851e2` (the P0a action boundary and legacy-command correction, stacked
+on draft PR #364, including the guided handoff/rehearsal) and SQL
+`9a59efbf3a7c31a6d83d1913307cdeee71c3346b` (draft PR #120, migration-chain
+corrections and retained rehearsal, stacked on draft PR #119 and predecessors).
 These are development candidates, not private-production deployment commits.
 
 Remote `main` heads were read back on 16 October and still match the audit
@@ -79,6 +79,10 @@ These remain required acceptance work, not deferred optimisation:
 P0b incorporates P0a feedback and passes the full original recovery coverage matrix.
 P0 is complete only after P0b acceptance; P0a deployment is an interim milestone.
 The broader bot recovery programme outside P0 remains in scope as previously agreed.
+The P0a action boundary does not remove existing export replacement, private-evidence,
+all-KVK or player-report recovery work. Every withheld family needs explicit full-release
+qualification and guided completion; none may disappear from the acceptance matrix
+because its backend already exists or its first-release buttons are disabled.
 
 Each remaining workflow must meet these specific acceptance outcomes as well as
 the shared alert, private review, confirmation, audit and verification requirements:
@@ -101,8 +105,9 @@ the shared alert, private review, confirmation, audit and verification requireme
   corrected in the candidate (details below). Exact-diff review and installation
   contract/updater qualification remain release gates; source pins alone do not
   approve the installed database.
-- The pilot exposure matrix, final release-candidate suite and updater/rollback
-  rehearsal have not yet been completed. No maintenance window is requested yet.
+- The pilot exposure boundary is enforced in the candidate; complete acceptance
+  of every enabled path, the final release-candidate suite and updater/rollback
+  rehearsal remain required. No maintenance window is requested yet.
 
 ## Complete SQL migration-chain rehearsal
 
@@ -201,17 +206,69 @@ P0a must use a reviewed coordinated release package or an explicitly reviewed
 bounded updater extension. Do not bypass guards, add a generic force exemption,
 or describe the current ordinary updater as capable of deploying this stack.
 
-The current runtime composes ten recovery adapter kinds, with no P0a-specific
-action filter. In addition to the initial three pilot families, it exposes
-`stats_import`, `all_kvk_capture`, `player_report`, `export_job`,
-`export_rollover`, and `private_evidence` workflows. The three pilot families
-use `configuration_read`, `producer_refusal`, `configuration_producer`, and
-`configuration_continuation` (ten kinds in total). Therefore the three-family
-description above is a proposed acceptance boundary, not an assertion that the
-current candidate already enforces it. Before release, each reachable action must
-either receive complete P0a acceptance evidence or be withheld consistently at
-presentation and execution while retaining honest discovery and open incidents.
-In-flight action reconciliation must remain safe across any release gating.
+The runtime retains all ten recovery adapter kinds for discovery and diagnosis.
+Candidate `3a1851e2` enforces the explicit P0a action matrix below in both runtime
+composition paths. The service filters fresh dispatch, automatic actions and input
+forms as well as the displayed buttons. It preserves original durable evidence,
+its token, blocker links and reconciliation of previously accepted repair intents.
+Unsupported incidents stay open and show a release-coverage explanation, rather
+than suggesting that repeated Recheck will unlock an unavailable repair.
+
+| Incident family | Fresh actions enabled in P0a | Boundary |
+| --- | --- | --- |
+| Configuration read | Release abandoned read; cancel unstarted read; isolate verified read and release | Requires the authority's exact read-only/ownership proof. Timeout alone never authorizes release. |
+| Producer admission refusal | Cancel unstarted reservation; resume saved SQL stage; continue with reviewed current registration | Only verified non-execution admits a fresh attempt. A blocker outside P0a remains visible and requires its P0b workflow. |
+| Atomic configuration producer | Close verified rollback; finish capture; queue verified capture; explicitly skip export | No claim that skipped spreadsheets or caches are current. Historical partial writes remain P0b. |
+| Configuration continuation | Read and atomically publish current registered config; keep prior config | Separate current-source/destination review and confirmation; no scan import replay. |
+| Stats-import dependency of admission continuation | Release verified failed import; finish capture; queue verified capture; explicitly skip export | Completed SQL output only. Accepting unfinished reports and partial-report continuation are not enabled in P0a. |
+| Export job, rollover, private evidence, all-KVK, player report | Diagnosis, blocker links and monitoring; no new repair dispatch | Required P0b qualification/work remains. Already accepted repair intents continue reconciling. |
+
+New action names default to withheld. The legacy `/ops import_resolution`
+status/preview/resolve entry point now opens the same current guided page; old
+confirmation tokens do not apply repairs. Its unused direct-settlement helper is
+removed. This closes the alternate dispatch path found during boundary review.
+
+The matrix is an enforced candidate boundary, not completed acceptance evidence
+for every enabled action. Admission-to-capture/worker delivery, representative
+configuration business output and final installed-package qualification remain
+required P0a work. Detection of a P0b blocker is not described as its recovery.
+
+## P0a boundary verification
+
+The initial policy patch passed 58 focused service, UI, notification and form
+tests. All three disposable SQL alert-to-confirmation configuration rehearsals
+pass with the actual policy enabled. The legacy-path correction passed 57 selected
+command, policy and command-registration tests, including all fifteen combinations
+of status/preview/resolve and admin, channel, guild and expired-interaction checks.
+The log-isolation wrapper verified production operational logs were unchanged in
+each passing run. These counts overlap and must not be added as unique tests.
+
+Architecture, deferred-item validation, routing, selected smoke imports, command
+registration (36 primary / 102 grouped), Black, Ruff and whitespace checks pass.
+The isolated `test_ui_imports.py` fails because its constants stub omits
+`PLAYER_STATS_LAST_CACHE`. This reproduces on unchanged prior worktree `34cdb5c5`;
+the failing test and its registry/target/cache import chain are unchanged. It is an
+unrelated baseline test-fixture failure, not a passing gate or a recovery deferral.
+
+The integrated full suite on the frozen policy candidate completed with **8,189
+passed, 635 skipped, eight subtests passed and one unrelated failure** in 797.71
+seconds. The failure is the previously documented missing
+`.github/workflows/command-governance.yml`; it is absent from the unchanged prior
+candidate and mirror main. The narrow legacy-command correction was validated
+separately by the 57 selected tests above after collection of that full run.
+Therefore this is integrated policy evidence plus targeted command evidence, not
+a claim of a clean full suite on the eventual deployment package. SQL opt-in cases
+skipped by this run retain their separate actual-engine rehearsal evidence.
+
+Changes scan `10b13b25-a35c-45d7-b0b2-fae45ac20f91` reviewed the four policy/runtime/UI
+files committed in `695b0336`: complete coverage, zero security findings, sealed
+at `2026-10-16T09:05:59.788220Z`, usage 1,566,969 tokens. It identified the ordinary
+legacy-entry-point consistency blocker described above. Follow-up Changes scan
+`d21684f5-2326-47b4-b4a7-82eba605fd17` reviewed both the command modification and
+deleted service baseline committed in `3a1851e2`, confirmed that blocker closed,
+and completed with zero findings and complete coverage. Its sealed result was
+read back at `2026-10-16T09:10:06.894054Z`; usage 783,307 tokens. Deep was off for
+both scans. This evidence document adds no executable or permission changes.
 
 ## Initial pilot acceptance evidence map
 
@@ -315,5 +372,5 @@ behavior. There are no deferred findings in this review.
 
 **P0a remains not deployment-ready.** The coordinated migration/apply/verify package,
 protected successor contracts, interruption/forward-recovery rehearsal, complete
-enabled-action matrix and final operator packet are still P0a release gates. All
+enabled-action acceptance and final operator packet are still P0a release gates. All
 six P0b workstreams above remain required. No maintenance window is requested yet.

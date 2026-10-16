@@ -76,7 +76,9 @@ def incident_embed(row):
             value=f"The accepted repair is {row['pending_action']['state']}. The bot will reconcile its existing receipt on the next monitor cycle. No second repair will be dispatched. Use Recheck for current progress.",
             inline=False,
         )
-    if row["State"] != "resolved" and not evidence["actions"]:
+    if row.get("release_notice"):
+        embed.add_field(name="Release coverage", value=row["release_notice"], inline=False)
+    elif row["State"] != "resolved" and not evidence["actions"]:
         embed.add_field(
             name="Recovery checks",
             value="No repair is currently authorised by the evidence. Recheck to refresh the diagnosis. This incident remains open.",
