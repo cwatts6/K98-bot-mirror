@@ -137,7 +137,7 @@ def selected(before, target, changes, read_blob):
 
 def sql_payload(spec, environment, read_blob):
     sql = spec["sql"]
-    if set(environment) != {
+    if not isinstance(environment, dict) or set(environment) != {
         "server",
         "database",
         "database_collation",
@@ -145,6 +145,11 @@ def sql_payload(spec, environment, read_blob):
         "compatibility_level",
     }:
         raise ValueError("Complete fresh SQL environment observation required.")
+    if any(
+        not isinstance(environment[key], str)
+        for key in ("server", "database", "database_collation", "tempdb_collation")
+    ):
+        raise ValueError("SQL environment identity and collations must be strings.")
     before = spec["contracts"]["sql_contract"]["before"]
     if (
         environment["server"].casefold() != before["server"].casefold()

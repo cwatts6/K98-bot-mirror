@@ -171,7 +171,8 @@ try {
   $retained=Retained-Preparations
   # Ambient environment only. Object images and permission expectations come
   # from the installed reviewed policy, never from these observed values.
-  $sqlEnvironment=@(Rows "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS server,DB_NAME() AS [database],CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) AS database_collation,CONVERT(nvarchar(128),DATABASEPROPERTYEX('tempdb','Collation')) AS tempdb_collation,(SELECT compatibility_level FROM sys.databases WHERE database_id=DB_ID()) AS compatibility_level;")
+  # Rows preserves its array, including zero/one rows. Do not nest it in @(...).
+  $sqlEnvironment=Rows "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS server,DB_NAME() AS [database],CONVERT(nvarchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation')) AS database_collation,CONVERT(nvarchar(128),DATABASEPROPERTYEX('tempdb','Collation')) AS tempdb_collation,(SELECT compatibility_level FROM sys.databases WHERE database_id=DB_ID()) AS compatibility_level;"
   if($sqlEnvironment.Count -ne 1){throw 'Complete SQL environment observation required before preparation'}
   $resources=Rows ("SELECT TOP (129) r.ResourceKey,r.ActiveJobID,r.ActivePreparationID,r.ActiveOutputOperationID,r.OwnerID,r.Fence,r.BlockedReason,r.Version FROM dbo.ExportResource r JOIN dbo.ExportPreparation p ON p.PreparationID=r.ActivePreparationID WHERE p.AccountKey='"+$account+"' AND p.State IN ('captured','materialized','uncertain') ORDER BY r.ResourceKey;")
   $bindings=@{

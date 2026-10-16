@@ -3,6 +3,7 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -110,6 +111,63 @@ def test_sql_package_binds_ambient_environment_without_learning_images():
     assert profile["requires"] == spec["sql"]["profile"]["requires"]
     assert all(recovery.sha(payload[row["name"]]) == row["sha256"] for row in bindings["members"])
     assert profile["compatibility_level"] == environment["compatibility_level"]
+
+
+@pytest.mark.parametrize("row_count", [0, 1, 2])
+def test_native_updater_environment_serialization(tmp_path, row_count):
+    powershell = Path("C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
+    if not powershell.exists():
+        pytest.skip("Windows PowerShell 5.1 observation boundary qualification")
+    spec, environment, files = payload_fixture()
+    fixture = tmp_path / "environment.json"
+    fixture.write_text(json.dumps({"rows": [environment] * row_count}), encoding="utf-8")
+    result = subprocess.run(
+        [
+            str(powershell),
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(Path(__file__).resolve().parents[1] / "scripts/Test-K98SqlEnvironment.ps1"),
+            "-FixturePath",
+            str(fixture),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if row_count != 1:
+        assert result.returncode != 0
+        assert "Complete SQL environment observation required" in result.stderr
+        return
+    assert result.returncode == 0, result.stderr
+    observed = json.loads(result.stdout)["bindings"]["sql_environment"]
+    assert observed == environment
+    bindings, payload = recovery.sql_payload(spec, observed, files.get)
+    profile = json.loads(payload[bindings["profiles"][0]["file"]])
+    assert profile["compatibility_level"] == environment["compatibility_level"]
+
+
+@pytest.mark.parametrize("shape", [None, [], [{}], "environment", 1])
+def test_sql_package_rejects_non_object_environment_before_reading_payload(shape):
+    spec, _, _ = payload_fixture()
+
+    def unexpected_read(path):
+        pytest.fail("Malformed environment must be refused before reading SQL payload")
+
+    with pytest.raises(ValueError, match="Complete fresh SQL environment observation"):
+        recovery.sql_payload(spec, shape, unexpected_read)
+
+
+@pytest.mark.parametrize("key", ["server", "database", "database_collation", "tempdb_collation"])
+@pytest.mark.parametrize("value", [None, 1, [], {}])
+def test_sql_package_rejects_non_string_environment_values(key, value):
+    spec, environment, files = payload_fixture()
+    environment[key] = value
+    with pytest.raises(ValueError, match="must be strings"):
+        recovery.sql_payload(spec, environment, files.get)
 
 
 @pytest.mark.parametrize(
