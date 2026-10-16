@@ -34,8 +34,14 @@ it does not cover the new rollover replacement implementation. This new Bot/SQL
 Bot Changes review `d6352ffc-680f-4185-ba50-6fae6b1d5318` completed and sealed for
 `133d1007..cadc0299`: all 19 source files, no findings or incomplete coverage,
 Deep off. Its sealed result was read back; tool-reported usage was 1,362,807 tokens.
-The full standard regression suite is running; the 664 affected tests and five
-historical/current migration tests passed. Architecture (187 files), deferred
+The full standard suite finished: 8,159 passed, 572 skipped, eight subtests passed,
+four failures. Two stale recovery test assumptions were corrected (560 pinned
+objects and an accepted integer timeout); the affected tests plus the transient
+Windows diagnostic-file failure passed on a focused rerun: 82 passed. The fourth
+failure is the pre-existing absent `.github/workflows/command-governance.yml`,
+also absent at the base commit. No unrelated workflow was introduced. These
+test-only changes do not alter the reviewed runtime. The 664 affected tests and
+five historical/current migration tests passed. Architecture (187 files), deferred
 items, security routing, test selection, synthetic imports and command registration
 passed. SQL Changes review
 `38c1fffa-fc9f-4c92-8104-f5dbbfa89ac3` completed and sealed for

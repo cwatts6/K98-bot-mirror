@@ -63,7 +63,7 @@ async def test_run_sql_procedure_cancelled_propagates(caplog):
                 rank=1,
                 seed=2,
                 completed_filename=COMPLETED_FILENAME,
-                timeout_seconds=0.5,
+                timeout_seconds=1,
             )
 
         # Ensure no telemetry sql_proc timeout/failed payload was emitted
