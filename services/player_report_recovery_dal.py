@@ -16,6 +16,10 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
     cancel_action = "cancel_report"
 
     @classmethod
+    def producer_fields(cls, producer):
+        return {"kind", "atomic_checkpoint", "operation"}
+
+    @classmethod
     def request(cls, prep):
         request = json.loads(prep["RequestJson"])
         inner = request.get("request", {})
@@ -28,7 +32,7 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
             or prep["KVK_NO"] is not None
             or inner.get("kind") != "scan_data"
             or not isinstance(producer, dict)
-            or set(producer) != {"kind", "atomic_checkpoint", "operation"}
+            or set(producer) != cls.producer_fields(producer)
             or producer.get("kind") != cls.producer_kind
             or type(producer.get("atomic_checkpoint")) is not int
             or producer["atomic_checkpoint"] != 1

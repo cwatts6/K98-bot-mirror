@@ -85,7 +85,24 @@ def atomic_producer_intent(kind):
 
 
 @contextmanager
-def stats_intent(inputs, *, action_id=None, parent=None):
+def configuration_retry_intent(action_id, parent):
+    if _intent.get() is not None:
+        raise SourceConflict("Configuration continuation requires its own producer context.")
+    value = dict(
+        kind="configuration_import",
+        atomic_checkpoint=1,
+        operation=identity(action_id),
+        parent=identity(parent),
+    )
+    token = _intent.set(value)
+    try:
+        yield value
+    finally:
+        _intent.reset(token)
+
+
+@contextmanager
+def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=None):
     validate_inputs(inputs)
     current = _intent.get()
     if current is not None and action_id is None:
@@ -96,6 +113,10 @@ def stats_intent(inputs, *, action_id=None, parent=None):
     value = dict(kind="stats_import", inputs=inputs, operation=identity(action_id or str(uuid4())))
     if parent is not None:
         value["parent"] = identity(parent)
+    if registration_recovery is not None:
+        if parent is None or action_id is None:
+            raise SourceConflict("Registration recovery requires a confirmed parent action.")
+        value["registration_recovery"] = dict(registration_recovery)
     token = _intent.set(value)
     try:
         yield value

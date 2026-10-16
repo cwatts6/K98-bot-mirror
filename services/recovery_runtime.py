@@ -93,6 +93,13 @@ def recovery_service():
             config_outcomes, ConfigurationProducerCapture(runtime, config_outcomes)
         )
         adapters[config_adapter.kind] = config_adapter
+        from services.configuration_continuation import ConfigurationContinuation
+        from services.configuration_continuation_dal import ConfigurationContinuationDAL
+
+        config_continuation = ConfigurationContinuation(
+            ConfigurationContinuationDAL(runtime, config_outcomes), config_adapter
+        )
+        adapters[config_continuation.kind] = config_continuation
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:

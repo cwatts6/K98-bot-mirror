@@ -230,6 +230,11 @@ class RecoveryIncidentView(discord.ui.View):
                         page = await call("input_page", actor, current["IncidentID"], action, 0)
                         await show_input_page(interaction, page)
                         return
+                    if detail.get("review_details") is True:
+                        from ui.views.recovery_review_view import show_review_page
+
+                        await show_review_page(interaction, current, action, 0, deferred=True)
+                        return
                     embed = discord.Embed(title=detail["label"], color=0xF1C40F)
                     embed.add_field(
                         name="Check before confirming", value=detail["check"], inline=False

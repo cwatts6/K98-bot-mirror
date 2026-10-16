@@ -320,7 +320,7 @@ def test_changed_registration_and_wrong_actor_cannot_resume(refused):
     r.runtime.configuration = json.dumps(
         dict(scan_data=dict(consumer="scan_data", outputs=["changed"]))
     )
-    assert adapter.inspect(r.source)[0]["actions"] == {}
+    assert set(adapter.inspect(r.source)[0]["actions"]) == {"resume_current_registration"}
     with pytest.raises(SourceConflict, match=r"evidence changed|not permitted"):
         execute(service, row, action="resume_sql_stage")
     adapter.runner.assert_not_called()

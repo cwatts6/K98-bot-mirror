@@ -1,5 +1,45 @@
 # Guided recovery delivery
 
+## Guided fresh configuration continuation — 2026-10-16
+
+After verified atomic rollback and exact release, proactive discovery opens a
+separate configuration continuation decision. **Read & publish current config**
+shows complete private source/output pages and a separate confirmation;
+**Keep prior configuration** records an explicit verified decision. The bot saves
+the confirmed registration and action before reading. It does not reserve a writer
+ahead of its own configuration read. Reconciliation creates/fences the exact writer
+request only after the dispatcher ends, so an absent dispatch or lost read reply
+cannot permit a late duplicate write. Committed attempts link to the existing
+guided capture/queue/skip workflow. Unknown outcomes never authorize replay.
+Held account/SQL access links to its existing guided recovery before retry is offered.
+
+The already reviewed PR #356 admission decision branch is integrated here, with
+both configuration-producer and stats-refusal blocker routes retained. SQL-facing
+queries were checked against authoritative table definitions and reviewed SQL
+PR #119's dependency stack. No schema change is introduced. State remains in
+the scoped preparation and recovery-action journals; UI contains no SQL.
+
+Validation: 99 recovery tests passed, including 11 disposable SQL
+configuration continuation cases and actual review/confirmation callbacks.
+Cases cover lost dispatch/marker/commit replies, restart, stale registration,
+authorization, exact capture handoff, live dispatcher exclusion and held-read
+guidance. Architecture (203 files), deferred items, security routing, test selection,
+synthetic smoke imports and command registration passed. Another 97 shared admission,
+configuration, notification and SQL-journal regression tests passed. The first
+combined invocation stopped after 33 passes because its required schema environment
+variable was omitted; the remaining 64 passed with the explicit disposable schema.
+Ruff, Black and whitespace checks passed. Focused coverage was selected for this
+slice; the qualified inherited full-suite result below is not claimed green.
+Changes scan `3d5c8dfc-3721-4f04-9c4e-d074120a5c08` completed and sealed
+`375b639e..d063937a`, all 13 source files, no findings or incomplete coverage.
+The sealed result was read back. Tool-reported usage: 2,384,673 tokens.
+No production/provider operations or persistent installation occurred.
+
+This completes neither P0 nor the full programme. Historical partial configuration,
+UPDATE_ALL2 reporting continuation, durable pipeline/cache remainder, all-copy
+custody/history recovery, unattributed holds and integrated rollover acceptance
+remain required active work, not deferred optimisation.
+
 ## Atomic configuration producer and guided outcomes — 2026-10-16
 
 Coordinated configuration imports now reserve a typed producer and hold the actual
@@ -206,6 +246,42 @@ zero findings, no deferred security coverage. No measured token usage was
 returned. This subsequent documentation-only checkpoint has no runtime effect
 and does not require another Changes scan. No deployment or live provider or
 Discord execution occurred. P0 remains active with no recovery gaps deferred.
+
+## Guided admission decisions — 2026-10-16
+
+The operator approved private admin comparisons of retained scan inputs and old/current
+destinations. `codex/guided-admission-decisions` implements complete bounded review pages
+before the separate **Confirm & apply repair** action. Every page reauthorizes the
+configured admin/guild/channel and rechecks exact evidence. All destinations are linked;
+retained inputs and output settings are paginated without truncation. These details
+are ephemeral and are not copied into the proactive incident alert. Reopening after
+restart reconstructs the current checks from persisted state.
+
+A changed registration requires the explicit **Continue with current destinations**
+decision, bound to both registration fingerprints. Continuation keeps original scan
+inputs and history, reserves one durable action, verifies admission/receipt after a
+lost reply, and never replays a committed import. Healthy older queued work is shown
+as a blocker before it owns a resource. Player-report and receipt-free scan blockers
+link to their correct recovery flow. Attempt history is streamed and hashed without
+a fixed 100-attempt cutoff; exact original action identities remain reconcilable.
+
+Validation: 57 focused tests passed; a subsequent five-test SQL rerun exercised actual
+private review/confirmation callbacks through the saved-input dispatch and lost-reply
+receipt. Coverage includes wrong actor/guild/channel, stale evidence, 37 destinations,
+long metadata, restart, changed registration after preview, 105 prior refusals and
+queue blockers. Only session-local SQL objects and mocked Discord/provider calls ran.
+Changes review `5c2fed15-a694-40cb-a512-adae66accea1` completed and sealed for
+`ec87ffed..323f227f`, seven source files, no findings or incomplete coverage, Deep
+off. Its sealed results were read back; tool-reported usage was 1,615,383 tokens.
+Architecture, deferred-item/security-routing checks, test selection, Black, Ruff,
+synthetic smoke imports and command registration passed. The earlier full-suite
+checkpoint is unchanged; this bounded admission slice uses its 57 affected tests.
+No schema installation or deployment ran.
+
+P0 remains active: full pipeline continuation and producer checkpoints, historical
+missing-input/pre-request cases, all-copy containment/active-history evidence loss,
+replacement admission blocker guidance, and integrated verified completion remain
+required acceptance work. None is classified as deferred optimisation.
 
 ## Atomic player-report recovery checkpoint — 2026-10-16
 
