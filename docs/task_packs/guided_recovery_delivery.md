@@ -31,7 +31,13 @@ The previous security finalization error is resolved: scan
 `91eb0a8b-2355-45a8-9087-9b36b37d8fba` is completed and sealed, and its existing
 result was read back successfully. It covers its original proposal-loss range;
 it does not cover the new rollover replacement implementation. This new Bot/SQL
-Bot patch still requires its Changes review before PR handoff. SQL Changes review
+Bot Changes review `d6352ffc-680f-4185-ba50-6fae6b1d5318` completed and sealed for
+`133d1007..cadc0299`: all 19 source files, no findings or incomplete coverage,
+Deep off. Its sealed result was read back; tool-reported usage was 1,362,807 tokens.
+The full standard regression suite is running; the 664 affected tests and five
+historical/current migration tests passed. Architecture (187 files), deferred
+items, security routing, test selection, synthetic imports and command registration
+passed. SQL Changes review
 `38c1fffa-fc9f-4c92-8104-f5dbbfa89ac3` completed and sealed for
 `95b4e91b..24cbca0c`: seven source files, no findings or incomplete coverage,
 Deep off. The sealed result was read back. Tool-reported usage: 3,800,664 tokens.
