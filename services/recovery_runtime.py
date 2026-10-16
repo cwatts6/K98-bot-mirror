@@ -6,6 +6,7 @@ import logging
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.recovery_dal import RecoveryDAL
+from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
 from services.stats_import_outcome_dal import ImportExecutionActive
 
@@ -42,6 +43,7 @@ def recovery_service():
                 admin_id=bot_config.ADMIN_USER_ID,
                 guild_id=bot_config.GUILD_ID,
                 channel_id=bot_config.NOTIFY_CHANNEL_ID,
+                presentation_policy=p0a_presentation,
             )
             return
         outcomes = outcome_dal(runtime)
@@ -119,6 +121,7 @@ def recovery_service():
             admin_id=bot_config.ADMIN_USER_ID,
             guild_id=bot_config.GUILD_ID,
             channel_id=bot_config.NOTIFY_CHANNEL_ID,
+            presentation_policy=p0a_presentation,
         )
 
 

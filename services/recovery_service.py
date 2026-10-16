@@ -16,9 +16,12 @@ class RecoveryActor:
 
 
 class RecoveryService:
-    def __init__(self, store, adapters, *, admin_id, guild_id, channel_id):
+    def __init__(
+        self, store, adapters, *, admin_id, guild_id, channel_id, presentation_policy=None
+    ):
         self.store, self.adapters = store, adapters
         self.admin_id, self.guild_id, self.channel_id = map(int, (admin_id, guild_id, channel_id))
+        self.presentation_policy = presentation_policy
 
     def authorize(self, actor):
         if (actor.user_id, actor.guild_id, actor.channel_id) != (
@@ -55,7 +58,7 @@ class RecoveryService:
         row["pending_action"] = (
             {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
         )
-        return row
+        return self.presentation_policy(row) if self.presentation_policy else row
 
     def review(self, actor, incident_id):
         self.authorize(actor)
@@ -223,6 +226,8 @@ class RecoveryService:
             )
         adapter = self.adapters[row["SourceKind"]]
         if action not in row["evidence"]["actions"]:
+            if row.get("release_notice"):
+                raise SourceConflict(row["release_notice"])
             raise SourceConflict("This action is not permitted by the current evidence.")
         if row["evidence"]["actions"][action].get("input") is True and payload is None:
             raise SourceConflict("Complete the guided recovery form before confirming.")

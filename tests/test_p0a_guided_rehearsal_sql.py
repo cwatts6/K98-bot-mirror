@@ -17,6 +17,7 @@ from services.configuration_continuation import ConfigurationContinuation
 from services.configuration_continuation_dal import ConfigurationContinuationDAL
 from services.configuration_producer_recovery import ConfigurationProducerRecovery
 from services.recovery_dal import RecoveryDAL
+from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
 from tests.test_configuration_continuation_sql import commit_child
 from tests.test_import_capture_recovery_sql import recovery as recovery
@@ -72,6 +73,7 @@ async def test_monitor_alert_to_verified_configuration_disposition(
             admin_id=1,
             guild_id=2,
             channel_id=3,
+            presentation_policy=p0a_presentation,
         )
 
     for name, value in (("ADMIN_USER_ID", 1), ("GUILD_ID", 2), ("NOTIFY_CHANNEL_ID", 3)):
