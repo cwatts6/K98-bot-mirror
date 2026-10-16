@@ -8,15 +8,24 @@ from services.export_coordination_dal import identity
 
 
 class ExportReplacementDAL:
-    def __init__(self, connect):
+    def __init__(self, connect, *, owner_kind="job"):
+        if owner_kind not in {"job", "rollover"}:
+            raise ValueError("Explicit replacement owner kind required.")
         self.connect = connect
+        self.owner_kind = owner_kind
+
+    @property
+    def owner_column(self):
+        # Closed server-side choice, never caller-authored SQL. JobID remains
+        # the version-one workflow wire key; no synthetic job row is created.
+        return "JobID" if self.owner_kind == "job" else "OutputOperationID"
 
     def read(self, replacement_id, *, account):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT p.*,c.JobID FROM dbo.ExportReplacementPlan p "
+                f"SELECT p.*,c.{self.owner_column} AS JobID FROM dbo.ExportReplacementPlan p "
                 "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
-                "WHERE p.ReplacementID=? AND p.AccountKey=? AND c.AccountKey=p.AccountKey",
+                f"WHERE p.ReplacementID=? AND p.AccountKey=? AND c.AccountKey=p.AccountKey AND c.{self.owner_column} IS NOT NULL",
                 identity(replacement_id),
                 account,
             )
@@ -65,7 +74,7 @@ class ExportReplacementDAL:
             cursor.execute(
                 "SELECT p.ReplacementID FROM dbo.ExportReplacementPlan p "
                 "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID "
-                "WHERE c.JobID=? AND c.AccountKey=? AND p.AccountKey=c.AccountKey ORDER BY p.CreatedUTC,p.ReplacementID",
+                f"WHERE c.{self.owner_column}=? AND c.AccountKey=? AND p.AccountKey=c.AccountKey ORDER BY p.CreatedUTC,p.ReplacementID",
                 identity(job_id),
                 account,
             )

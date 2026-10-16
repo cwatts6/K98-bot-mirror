@@ -43,8 +43,11 @@ class HistoricalRecoveryDiscovery:
 class HistoricalContainment:
     """Verify each original owner against an already authenticated registration."""
 
-    def __init__(self, authority, registrations):
-        self.members = [containment_service(authority, r) for r in registrations]
+    def __init__(self, authority, registrations, *, owner_kind="job"):
+        factory = containment_service
+        if owner_kind == "rollover":
+            from services.rollover_replacement_authority import containment_service as factory
+        self.members = [factory(authority, r) for r in registrations]
         self.dal = self.members[-1].dal
 
     def _member(self, job_id):
@@ -71,10 +74,12 @@ class ReplacementAuthority:
         self.connect = self.authority.dal.connect
         self.activation_dal = ReplacementActivationDAL(self.connect)
 
-    def services(self, registration, *, history=()):
+    def services(self, registration, *, history=(), owner_kind="job"):
         proposals = ExportReplacementService(
-            dal=ExportReplacementDAL(self.connect),
-            containment=HistoricalContainment(self.authority, history or (registration,)),
+            dal=ExportReplacementDAL(self.connect, owner_kind=owner_kind),
+            containment=HistoricalContainment(
+                self.authority, history or (registration,), owner_kind=owner_kind
+            ),
             registration=registration,
             store=self.authority.store,
         )
@@ -93,14 +98,20 @@ class ReplacementAuthority:
     def authenticated_history(self):
         with self.authority._lock:
             authenticated = []
+            records = self.activation_dal.chain(self.base.value()["account"])
 
             def services(registration):
                 authenticated.append(registration)
-                return self.services(registration, history=tuple(authenticated))
+                row = next(
+                    r for r in records if r["BaseRegistrationHash"] == registration.fingerprint
+                )
+                return self.services(
+                    registration,
+                    history=tuple(authenticated),
+                    owner_kind="rollover" if row.get("OutputOperationID") else "job",
+                )
 
-            return effective_registration(
-                self.base, self.activation_dal.chain(self.base.value()["account"]), services
-            )
+            return effective_registration(self.base, records, services)
 
     def registrations(self):
         current, history = self.authenticated_history()
@@ -442,7 +453,12 @@ class ReplacementAuthority:
         job_id = identity(message["job_id"])
         with self.authority._lock:
             self.broker.boundary.recheck()
-            workflow = self.workflow(job_id)
+            if message["action"] == "rollover_replacement_recovery":
+                from services.rollover_replacement_authority import workflow as rollover_workflow
+
+                workflow = rollover_workflow(self, job_id)
+            else:
+                workflow = self.workflow(job_id)
             if operation == "fields":
                 return workflow.input_fields(job_id, message["step"], message["token"])
             if operation == "validate":

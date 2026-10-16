@@ -25,7 +25,15 @@ def test_configuration_migration_literal_modules_and_predecessor_hashes():
         )
         name = module.splitlines()[0].split()[-1]
         relative = "sql_schema/" + name + ".StoredProcedure.sql"
-        source = (root / relative).read_text(encoding="utf-8-sig")
+        # Later migrations deliberately replace these procedures. Verify this
+        # historical migration against its immutable reviewed postimage.
+        source = (
+            subprocess.check_output(
+                ["git", "show", "95b4e91b86adbf66f7ab21fc48d195261bf3b4e3:" + relative], cwd=root
+            )
+            .decode("utf-8-sig")
+            .replace("\r\n", "\n")
+        )
         source = (
             source[source.index("CREATE PROCEDURE") :].strip().removesuffix("GO").rstrip() + "\n"
         )

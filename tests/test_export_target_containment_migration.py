@@ -101,12 +101,13 @@ def test_migration_postimages_match_engine_definitions_and_pinned_sources(
 
     def reviewed_source(name, kind):
         path = f"sql_schema/{name}.{kind}.sql"
-        if replacement:
-            return (root / path).read_text(encoding="utf-8-sig")
+        revision = (
+            "9dc3e42beeed905ba9a3454ba1ad5e197c5db299"
+            if replacement
+            else "4867666888b0cc8031c4494b4d92124dfa8ed2c0"
+        )
         return (
-            subprocess.check_output(
-                ["git", "show", "4867666888b0cc8031c4494b4d92124dfa8ed2c0:" + path], cwd=root
-            )
+            subprocess.check_output(["git", "show", revision + ":" + path], cwd=root)
             .decode("utf-8-sig")
             .replace("\r\n", "\n")
         )

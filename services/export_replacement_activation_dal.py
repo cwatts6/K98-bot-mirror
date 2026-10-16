@@ -34,7 +34,10 @@ class ReplacementActivationDAL:
     def chain(self, account):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT * FROM dbo.ExportReplacementActivation WHERE AccountKey=? ORDER BY CreatedUTC,ActivationID",
+                "SELECT a.*,c.OutputOperationID FROM dbo.ExportReplacementActivation a "
+                "JOIN dbo.ExportReplacementPlan p ON p.ReplacementID=a.ReplacementID "
+                "JOIN dbo.ExportTargetContainment c ON c.ContainmentID=p.ContainmentID AND c.AccountKey=a.AccountKey "
+                "WHERE a.AccountKey=? ORDER BY a.CreatedUTC,a.ActivationID",
                 account,
             )
             return [_wire(r) for r in rows(cursor)]

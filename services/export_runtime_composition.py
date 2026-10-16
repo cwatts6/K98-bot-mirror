@@ -422,10 +422,11 @@ class ExportRuntime(RuntimeLifetime):
         )
         self._legacy_adapter = legacy_adapter
         from services.export_replacement_recovery_adapter import ReplacementRecoveryAdapter
+        from services.rollover_replacement_adapter import RolloverReplacementAdapter
 
         legacy.recovery_adapters = (
             ReplacementRecoveryAdapter(legacy.recovery_adapters[0], runtime=self, store=store),
-            legacy.recovery_adapters[1],
+            RolloverReplacementAdapter(legacy.recovery_adapters[1], runtime=self),
         )
         from services.export_evidence_recovery import EvidenceRecoveryAdapter
 
@@ -2671,12 +2672,18 @@ class AuthorityClient:
             raise ExecutionUncertain("Authenticated replacement registration history differs.")
         return current, history
 
-    def replacement_recovery(self, job_id, operation, **values):
+    def replacement_recovery(self, job_id, operation, *, owner_kind="job", **values):
         uuid_text(job_id)
+        if owner_kind not in {"job", "rollover"}:
+            raise ValueError("Explicit replacement owner kind required.")
         result = self._invoke(
             dict(
                 version=1,
-                action="replacement_recovery",
+                action=(
+                    "replacement_recovery"
+                    if owner_kind == "job"
+                    else "rollover_replacement_recovery"
+                ),
                 job_id=job_id,
                 operation=operation,
                 **values,

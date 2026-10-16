@@ -149,5 +149,15 @@ class ExportRecoveryDAL:
         op = snapshot["operation"]
         if op["AccountKey"] != self.account or op["PoolID"] not in self.pools:
             raise SourceConflict("Rollover is outside this protected recovery registration.")
-        self.registration.sheets(snapshot["pool"])
+        registered = next(
+            (
+                r
+                for r in reversed(self.history)
+                if any(p["pool_id"] == op["PoolID"] for p in r.value()["pools"])
+            ),
+            None,
+        )
+        if registered is None:
+            raise SourceConflict("Original rollover registration is unavailable.")
+        registered.sheets(snapshot["pool"])
         return snapshot

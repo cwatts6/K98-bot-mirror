@@ -217,6 +217,10 @@ class SourceOutputPoolService:
                 )
             )
             claim = self.repository.phase(claim, "setup_verified", index_file_id, setup)
+            if "replacement_rollover" in json.loads(operation["PlanJson"]):
+                # Guided recovery requires independent final verification of the
+                # complete retained phase journal before its incident resolves.
+                return self.repository.operation(operation_id)
             return self.repository.complete(claim)
         except BaseException:
             # Includes request completion/account pacing uncertainty. Never release.
