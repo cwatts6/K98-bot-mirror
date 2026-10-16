@@ -221,12 +221,22 @@ def test_other_host_and_invalid_birth_cannot_query_job(monkeypatch):
     host = object.__new__(WindowsExecutionHost)
     birth = host_birth()
     host.sid = birth["authority_sid"]
+    open_job = Mock(side_effect=AssertionError("Foreign host must not open a job"))
+    query_job = Mock(side_effect=AssertionError("Foreign host must not query a job"))
+    monkeypatch.setitem(sys.modules, "pywintypes", SimpleNamespace(error=Exception))
+    monkeypatch.setitem(
+        sys.modules,
+        "win32job",
+        SimpleNamespace(OpenJobObject=open_job, QueryInformationJobObject=query_job),
+    )
     monkeypatch.setattr(
         "core.export_execution_host.machine_identity",
         lambda: dict(machine_guid=str(uuid4()), hostname="other"),
     )
     with pytest.raises(HostBoundaryError):
         host.observe_retired_child(birth)
+    open_job.assert_not_called()
+    query_job.assert_not_called()
     for key, value in (
         ("limit_flags", 0x2800),
         ("assigned", False),
