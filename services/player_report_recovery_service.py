@@ -54,15 +54,17 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                     if closed
                     else "The atomic report contract and SQL locks show this attempt has no committed report. Existing imports and previous reports are preserved."
                 ),
-                actions={}
-                if closed
-                else {
-                    "cancel_report": dict(
-                        label="Close failed report & release",
-                        check="Confirm you want to close this uncommitted report attempt. Existing imported data is retained; this action does not refresh reports or the cache.",
-                        effect="Exclude live report execution, verify the atomic checkpoint is absent, fence the old attempt, release only its exact reservation, then verify the durable closure. No import is replayed.",
-                    )
-                },
+                actions=(
+                    {}
+                    if closed
+                    else {
+                        "cancel_report": dict(
+                            label="Close failed report & release",
+                            check="Confirm you want to close this uncommitted report attempt. Existing imported data is retained; this action does not refresh reports or the cache.",
+                            effect="Exclude live report execution, verify the atomic checkpoint is absent, fence the old attempt, release only its exact reservation, then verify the durable closure. No import is replayed.",
+                        )
+                    }
+                ),
             ),
             preview["token"],
             closed,

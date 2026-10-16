@@ -146,10 +146,12 @@ def test_abandonment_rejects_unproven_or_foreign_release(recovery, obstacle):
     else:
         p = r.outcomes.inspect(r.source)["preparation"]
         r.owner.execute(
-            r.rewrite("""INSERT dbo.ExportExecutionStream
+            r.rewrite(
+                """INSERT dbo.ExportExecutionStream
             (StreamID,SessionID,AccountKey,ActiveAccountKey,PreparationID,OwnerID,Fence,ClaimVersion,
              RegistrationHash,SnapshotHash,ScopeJson,Purpose,State,Version,LastSequence,ChildIdentity,CreatedUTC)
-            VALUES (NEWID(),NEWID(),?,?,?, ?,?,?,0x01,0x02,N'{}','probe','open',1,0,NEWID(),SYSUTCDATETIME())"""),
+            VALUES (NEWID(),NEWID(),?,?,?, ?,?,?,0x01,0x02,N'{}','probe','open',1,0,NEWID(),SYSUTCDATETIME())"""
+            ),
             p["AccountKey"],
             p["AccountKey"],
             r.source,
