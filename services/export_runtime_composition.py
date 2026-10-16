@@ -411,7 +411,9 @@ class ExportRuntime(RuntimeLifetime):
                 retirement=recovery,
                 rebuild_plan=rebuild_plan,
             ),
-            RolloverRecoveryAdapter(recovery_discovery, self.pools, self.reconciler),
+            RolloverRecoveryAdapter(
+                recovery_discovery, self.pools, self.reconciler, rollover=self.rollover
+            ),
         )
         legacy_adapter = LegacyProviderJob(
             lambda _: recorded_clients(),
