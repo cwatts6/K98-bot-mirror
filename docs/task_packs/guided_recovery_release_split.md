@@ -702,3 +702,41 @@ authority, release, seed and SQL-source compatibility tests pass with operationa
 logs unchanged. Retain a Changes review for the exact source/hash follow-up before
 retrying the private promotion. The prior installer bundle is superseded again by
 this reviewed postimage, so the final operator bundle must be rebuilt from it.
+
+## Fresh whole-application qualification and ordering correction
+
+The complete disposable SQL fixture exposed a release-blocking discrepancy that
+the earlier composed offline observations could not detect. Expected rows were
+Python-sorted, while the actual SQL observer sorts dependency schema/entity names
+and permission subentities using Latin1_General_CI_AS, with a BIN2 override for
+ObjectName. Every row matched, but the ordered hashes did not. The qualification
+helper now orders the independently derived expected rows with those exact SQL
+collations and verifies their multiset is unchanged, including duplicates. It
+never adopts live catalogue rows as expected evidence. Only the successor
+application metadata and permission fingerprints change; predecessor contracts,
+SQL objects, grants and protected source postimages are unchanged.
+
+The actual startup application comparator now passes for all 451 objects on
+`K98_P0a_Migrations_b863e30895f3` on local `9SX2VF4\K98DEV`. Its baseline was cloned
+from the retained read-only/restricted recovery database, supplemented from pinned
+SQL source, and upgraded through the P0a migration chain. The retained baseline
+remains read-only/restricted with Broker disabled. The actual legacy comparator
+also passes for all 39 modules under a temporary non-administrator application
+login using the reviewed grant plan. The temporary master user and server login
+were removed. Five older migration receipts are explicitly synthetic,
+source-hash-checked fixture history. Only checked disposable server/database/login
+identities are translated for comparison; metadata and permissions are unchanged.
+No provider, business procedure or production database was executed.
+
+The native packet rehearsal passed 263 source members and 260 actual atomic file
+replacements with real Windows custody. A lost acknowledgement after the fifth
+replacement resumes safely; a completed repeat performs zero writes. This proves
+the packet's source stage, not the complete installed deployment sequence.
+
+Private promotion of the preceding `56ab521d` candidate passed 8,287 tests, with
+641 skips and eight subtests, plus all pinned pre-commit checks. Operational logs
+remained absent before and after. That candidate and its installer are superseded
+by this ordering correction. Its focused SQL ordering/release/seed validation
+passes 66 cases; final Changes review, corrected private promotion/package and
+composed installed-package rehearsal remain required before the maintenance window.
+The six P0b workstreams remain mandatory; none of these P0a gates is transferred.
