@@ -136,7 +136,8 @@ class RecoveryDAL:
         after = identity(after) if after is not None else None
         with transaction(self.connect) as cursor:
             if through is None:
-                cursor.execute("SELECT SYSUTCDATETIME() AS ThroughUTC")
+                # Match FirstSeenUTC precision, including its millisecond rounding.
+                cursor.execute("SELECT CONVERT(datetime2(3),SYSUTCDATETIME()) AS ThroughUTC")
                 through = one(cursor)["ThroughUTC"]
             cursor.execute(
                 "SELECT COUNT_BIG(*) AS Total FROM dbo.RecoveryIncident "

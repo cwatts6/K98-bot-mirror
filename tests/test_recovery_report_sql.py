@@ -95,3 +95,30 @@ def test_pending_actions_are_loaded_with_the_scoped_page_without_mutation(contai
         map(tuple, f.sql.execute("SELECT * FROM #RecoveryAction ORDER BY ActionID").fetchall())
     )
     assert after == before
+
+
+@pytest.mark.parametrize("fraction", ["1234000", "1236000"])
+def test_report_cutoff_matches_incident_timestamp_precision(contained_job, monkeypatch, fraction):
+    f = contained_job
+    store = RecoveryDAL(f.connect, account="test-account", storage_owner="disk", guild_id=2)
+    evidence = dict(title="Test", explanation="Fixture", outcome="held", actions={})
+    row = store.observe("stats_import", str(uuid4()), evidence, "a" * 64)
+    instant = "2026-10-17T12:00:00." + fraction
+    f.sql.execute(
+        "UPDATE #RecoveryIncident SET FirstSeenUTC=CONVERT(datetime2(7),?) WHERE IncidentID=?",
+        instant,
+        row["IncidentID"],
+    )
+    f.sql.commit()
+    original = fixture.local_sql
+    monkeypatch.setattr(
+        fixture,
+        "local_sql",
+        lambda sql: original(sql).replace(
+            "SYSUTCDATETIME()", "CONVERT(datetime2(7),'" + instant + "')"
+        ),
+    )
+    page = store.report_page()
+    assert page["total"] == 1
+    assert [item["IncidentID"] for item in page["rows"]] == [row["IncidentID"]]
+    assert page["through"] == page["rows"][0]["FirstSeenUTC"]
