@@ -260,9 +260,23 @@ def test_candidate_preserves_old_evidence_until_actual_observation(monkeypatch):
 
 def test_reviewed_source_inventory_matches_current_runtime():
     root = Path(__file__).resolve().parents[1]
+    expected = {row["path"]: row["after"] for row in recovery.specification()["sources"]}
+    # P0a's original pins remain immutable. Later source releases may install a
+    # complete reviewed successor bundle; a partial or unrelated hash cannot
+    # silently replace the historical deployment contract.
+    for transition in updater.reviewed_transitions():
+        members = transition["members"]
+        if all(expected.get(m["path"]) == m["before_sha256"] for m in members) and all(
+            recovery.sha((root / m["path"]).read_bytes().replace(b"\r\n", b"\n"))
+            == m["after_sha256"]
+            for m in members
+        ):
+            expected.update({m["path"]: m["after_sha256"] for m in members})
     for row in recovery.specification()["sources"]:
         path = root / row["path"]
-        assert recovery.sha(path.read_bytes().replace(b"\r\n", b"\n")) == row["after"], row["path"]
+        assert (
+            recovery.sha(path.read_bytes().replace(b"\r\n", b"\n")) == expected[row["path"]]
+        ), row["path"]
 
 
 def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch):
