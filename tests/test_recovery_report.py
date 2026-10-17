@@ -96,6 +96,47 @@ def test_collection_failure_is_exportable_without_false_empty_or_secrets():
     assert b"private credentials" not in result["content"]
 
 
+@pytest.mark.parametrize(
+    "kind,outcome,state,pending,unavailable,expected",
+    [
+        ("evidence_batch", "running", "open", None, None, "approved evidence group is running"),
+        (
+            "private_evidence",
+            "recoverable",
+            "open",
+            {"kind": "protect_evidence", "state": "unknown"},
+            None,
+            "awaiting verification",
+        ),
+        ("export_job", "failed", "open", None, "TimeoutError", "Verification is unavailable"),
+        ("evidence_batch", "verified", "resolved", None, None, "Resolved; no repair required"),
+        (
+            "evidence_batch",
+            "completed_with_exceptions",
+            "resolved",
+            None,
+            None,
+            "finished with exceptions",
+        ),
+        ("stats_import", "partial", "open", None, None, "not enabled in this release"),
+    ],
+)
+def test_report_next_step_distinguishes_active_work_from_unavailable_repairs(
+    kind, outcome, state, pending, unavailable, expected
+):
+    from services.recovery_report import incident_report
+
+    service, _, records = report_service()
+    row = records[0]
+    row.update(SourceKind=kind, State=state, pending_action=pending)
+    row["evidence"].update(outcome=outcome)
+    if kind != "stats_import":
+        row["evidence"]["actions"] = {}
+    if unavailable:
+        row["evidence"]["check_unavailable"] = unavailable
+    assert expected in incident_report(service, row)["next_step"]
+
+
 @pytest.mark.parametrize("text", ["x", "é\n"])
 def test_size_split_resumes_at_last_included_incident_without_omissions(text):
     service, _, records = report_service(10)

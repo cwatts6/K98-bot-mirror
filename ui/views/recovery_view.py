@@ -280,7 +280,7 @@ class RecoveryIncidentView(discord.ui.View):
 
 
 class RecoveryListView(discord.ui.View):
-    def __init__(self, rows, *, individual=False):
+    def __init__(self, rows, *, individual=False, queues_only=False):
         super().__init__(timeout=300)
         select = discord.ui.Select(
             placeholder="Choose an incident",
@@ -290,7 +290,9 @@ class RecoveryListView(discord.ui.View):
                         :100
                     ],
                     value=row["IncidentID"],
-                    description=f"First seen {row['FirstSeenUTC']}"[:100],
+                    description=f"ID {str(row['IncidentID'])[-12:]} | First seen {row['FirstSeenUTC']}"[
+                        :100
+                    ],
                 )
                 for row in rows
             ],
@@ -307,7 +309,12 @@ class RecoveryListView(discord.ui.View):
             )
 
             async def next_page(interaction):
-                await show_centre(interaction, after=rows[-1]["IncidentID"], individual=individual)
+                await show_centre(
+                    interaction,
+                    after=rows[-1]["IncidentID"],
+                    individual=individual,
+                    queues_only=queues_only,
+                )
 
             next_button.callback = next_page
             self.add_item(next_button)
@@ -331,6 +338,10 @@ class RecoveryListView(discord.ui.View):
     @discord.ui.button(label="Browse individual incidents", style=discord.ButtonStyle.secondary)
     async def individual(self, button, interaction):
         await show_centre(interaction, individual=True)
+
+    @discord.ui.button(label="Review queue blockers", style=discord.ButtonStyle.primary)
+    async def queue_blockers(self, button, interaction):
+        await show_centre(interaction, queues_only=True)
 
 
 class RecoveryReportView(discord.ui.View):
@@ -389,20 +400,32 @@ async def show_report(interaction, after=None, through=None, part=1):
         await report_error(interaction, exc)
 
 
-async def show_centre(interaction, after=None, *, individual=False):
+async def show_centre(interaction, after=None, *, individual=False, queues_only=False):
     try:
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
             return
-        page = await call("centre_page", actor, after, individual)
+        page = await call("centre_page", actor, after, individual, *([True] if queues_only else []))
         rows, open_count = page["rows"], page["open_count"]
-        await interaction.followup.send(
-            (
+        if queues_only:
+            content = (
+                "Account queue blockers. Select one, then follow its guided cancellation or execution recovery."
+                if rows
+                else "No further open queue-admission incidents on this page. This does not certify import/export health."
+            )
+        else:
+            content = (
                 f"{open_count} open recovery records. Choose an operational incident or repair group below; evidence copies can be repaired together."
                 if rows
                 else f"{open_count} open recovery records. No further operational incidents on this page. Use Repair evidence group for verified-copy repairs or download the complete report."
+            )
+        await interaction.followup.send(
+            content,
+            view=(
+                RecoveryListView(rows, individual=individual, queues_only=queues_only)
+                if rows
+                else RecoveryEntryView()
             ),
-            view=RecoveryListView(rows, individual=individual) if rows else RecoveryEntryView(),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -473,3 +496,11 @@ class RecoveryEntryView(discord.ui.View):
         from ui.views.recovery_backlog_view import show_complete_report
 
         await show_complete_report(interaction)
+
+    @discord.ui.button(
+        label="Review queue blockers",
+        custom_id="k98:recovery:queues:v1",
+        style=discord.ButtonStyle.primary,
+    )
+    async def queue_blockers(self, button, interaction):
+        await show_centre(interaction, queues_only=True)

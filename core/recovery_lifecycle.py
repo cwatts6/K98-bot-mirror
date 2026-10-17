@@ -20,6 +20,7 @@ async def observe_recovery_outcomes(bot):
     unavailable = False
     outage_message = None
     while True:
+        recovery_health.begin_cycle()
         try:
             failures = await drain_thread(observe_recovery)
             if failures:

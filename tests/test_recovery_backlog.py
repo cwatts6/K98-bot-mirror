@@ -70,6 +70,36 @@ async def test_centre_page_uses_one_service_call_for_count_and_page(monkeypatch,
 
 
 @pytest.mark.asyncio
+async def test_queue_button_and_continuation_keep_queue_filter(monkeypatch):
+    from ui.views import recovery_view as module
+
+    service, _, records = report_service(20)
+    for row in records:
+        row.update(SourceKind="queue_admission", State="open")
+    monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        module, "call", AsyncMock(return_value=dict(rows=records, open_count=17431))
+    )
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    entry = module.RecoveryEntryView()
+    assert entry.is_persistent()
+    await next(b for b in entry.children if b.label == "Review queue blockers").callback(
+        interaction
+    )
+    module.call.assert_awaited_once_with("centre_page", ACTOR, None, False, True)
+    sent = interaction.followup.send.call_args
+    assert sent.kwargs["ephemeral"] and "Account queue blockers" in sent.args[0]
+    module.call.reset_mock()
+    await next(
+        b for b in sent.kwargs["view"].children if getattr(b, "label", None) == "Next incidents"
+    ).callback(interaction)
+    module.call.assert_awaited_once_with(
+        "centre_page", ACTOR, records[-1]["IncidentID"], False, True
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["backup_required", "check_unavailable"])
 async def test_empty_priority_centre_keeps_individual_evidence_navigation(monkeypatch, outcome):
     from ui.views import recovery_view as module
@@ -122,3 +152,20 @@ async def test_group_confirmation_is_deferred_and_requires_configured_actor(monk
     assert sent["view"].preview == preview
     assert "restart" in str(sent["embed"].to_dict())
     module.call.assert_awaited_once_with("review_evidence_group", ACTOR)
+
+
+@pytest.mark.asyncio
+async def test_repeated_incident_labels_include_distinct_footer_ids():
+    from tests.test_guided_recovery import setup as incident_fixture
+    from ui.views.recovery_view import RecoveryListView
+
+    _, _, _, first = incident_fixture()
+    _, _, _, second = incident_fixture()
+    options = next(
+        item for item in RecoveryListView([first, second]).children if hasattr(item, "options")
+    ).options
+    assert options[0].label == options[1].label
+    assert options[0].description != options[1].description
+    for option, row in zip(options, (first, second), strict=True):
+        assert row["IncidentID"][-12:] in option.description
+        assert "First seen" in option.description

@@ -8,6 +8,26 @@ _last_success = None
 _failure = None
 _failure_detail = None
 _notification_failure = None
+_cycle = None
+
+
+def begin_cycle():
+    global _cycle
+    now = datetime.now(UTC).isoformat()
+    _cycle = dict(started_utc=now, progress_utc=now, stage="starting", in_progress=True)
+
+
+def record_progress(stage):
+    """Diagnostic progress only; it never makes an incomplete check healthy."""
+    global _cycle
+    if _cycle and _cycle["in_progress"]:
+        _cycle = dict(_cycle, progress_utc=datetime.now(UTC).isoformat(), stage=stage)
+
+
+def _finish_cycle():
+    global _cycle
+    if _cycle:
+        _cycle = dict(_cycle, finished_utc=datetime.now(UTC).isoformat(), in_progress=False)
 
 
 def failure_detail(error):
@@ -43,12 +63,14 @@ def record_success():
     global _last_success, _failure, _failure_detail
     _last_success, _failure = datetime.now(UTC), None
     _failure_detail = None
+    _finish_cycle()
 
 
 def record_failure(error):
     global _failure, _failure_detail
     _failure = type(error).__name__
     _failure_detail = failure_detail(error)
+    _finish_cycle()
 
 
 def report():
@@ -59,6 +81,7 @@ def report():
         "last_success_utc": _last_success.isoformat() if _last_success else None,
         "check_failure": _failure_detail,
         "notification_failure": _notification_failure,
+        "cycle": dict(_cycle) if _cycle else None,
     }
 
 
@@ -75,6 +98,8 @@ def status():
     )
     if _last_success:
         text += f". Last successful check: {_last_success.isoformat()}"
+    if not healthy and _cycle and _cycle["in_progress"]:
+        text += ". A monitoring cycle is in progress; the downloadable report identifies its latest checkpoint"
     if _notification_failure:
         text += ". Incident notifications need attention; open the recovery centre and download its report"
     return healthy, text

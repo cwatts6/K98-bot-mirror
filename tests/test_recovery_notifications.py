@@ -102,6 +102,35 @@ def test_monitor_health_is_not_healthy_before_first_check_or_after_stall(monkeyp
     assert not health.status()[0]
 
 
+def test_monitor_reports_in_progress_checkpoint_without_certifying_stale_checks(monkeypatch):
+    from services import recovery_health as health
+
+    monkeypatch.setattr(health, "_cycle", None)
+    monkeypatch.setattr(health, "_last_success", datetime.now(UTC) - timedelta(seconds=91))
+    monkeypatch.setattr(health, "_failure", None)
+    monkeypatch.setattr(health, "_failure_detail", None)
+    health.begin_cycle()
+    health.record_progress("accepted_evidence_repairs")
+    report = health.report()
+    assert not report["healthy"]
+    assert report["check_failure"] is None
+    assert report["cycle"]["stage"] == "accepted_evidence_repairs"
+    assert report["cycle"]["in_progress"]
+    assert "cycle is in progress" in report["status"]
+    # Returned report is detached; it cannot rewrite the monitor's observation.
+    report["cycle"]["stage"] = "changed"
+    assert health.report()["cycle"]["stage"] == "accepted_evidence_repairs"
+    health.record_success()
+    assert health.report()["healthy"] and not health.report()["cycle"]["in_progress"]
+    health.begin_cycle()
+    health.record_progress("registration_admission")
+    health.record_failure(TimeoutError())
+    report = health.report()
+    assert not report["healthy"] and not report["cycle"]["in_progress"]
+    assert report["cycle"]["stage"] == "registration_admission"
+    assert report["check_failure"]["error_type"] == "TimeoutError"
+
+
 @pytest.mark.asyncio
 async def test_recovery_registered_independently_and_entry_rehydrated(monkeypatch):
     import bot_config

@@ -72,10 +72,14 @@ class RecoveryService:
         self.authorize(actor)
         return self.store.list_open(after=after, non_evidence=True)
 
-    def centre_page(self, actor, after=None, individual=False):
+    def centre_page(self, actor, after=None, individual=False, queues_only=False):
         self.authorize(actor)
         return dict(
-            rows=self.store.list_open(after=after, non_evidence=not individual),
+            rows=self.store.list_open(
+                after=after,
+                non_evidence=not individual,
+                **(dict(queues_only=True) if queues_only else {}),
+            ),
             open_count=self.store.count_open(),
         )
 

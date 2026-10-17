@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import logging
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services import recovery_health
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.recovery_dal import RecoveryDAL
 from services.recovery_release_policy import p0a_presentation
@@ -156,12 +157,14 @@ def _retry_admission():
 def observe_recovery():
     global _incident_cursor, _priority_incident_cursor
     failures = []
+    recovery_health.record_progress("opening_recovery_scope")
     with recovery_service() as service:
         from services.recovery_backlog_dal import RecoveryBacklogDAL
 
         # Durable accepted copy repairs must not wait behind thousands of
         # untouched incidents. Domain reconciliation retains exact hash checks.
         if "private_evidence" in service.adapters:
+            recovery_health.record_progress("accepted_evidence_repairs")
             for incident_id in RecoveryBacklogDAL(service.store).pending_repairs():
                 try:
                     service.refresh(incident_id)
@@ -170,8 +173,10 @@ def observe_recovery():
                     failures.append(type(exc).__name__)
                 finally:
                     service.store.touch_pending(incident_id)
+                    recovery_health.record_progress("accepted_evidence_repairs")
         scope = service.store.scope
         for kind, adapter in service.adapters.items():
+            recovery_health.record_progress("discovery:" + kind)
             try:
                 after = _cursors.get((scope, kind))
                 for source_id in adapter.pending_recovery(after=after):
@@ -202,6 +207,7 @@ def observe_recovery():
             if _priority_incident_cursor and _priority_incident_cursor[0] == scope
             else None
         )
+        recovery_health.record_progress("existing_incident_checks")
         priority = service.store.list_open(after=priority_after, non_evidence=True)
         _priority_incident_cursor = (scope, priority[-1]["IncidentID"]) if priority else None
         after = _incident_cursor[1] if _incident_cursor and _incident_cursor[0] == scope else None
@@ -228,6 +234,7 @@ def observe_recovery():
                 )
         if service.store.has_failed_checks():
             failures.append("PersistedCheckUnavailable")
+    recovery_health.record_progress("registration_admission")
     if not _retry_admission():
         failures.append("RegistrationUnavailable")
     return failures

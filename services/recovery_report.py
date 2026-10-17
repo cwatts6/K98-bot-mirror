@@ -18,6 +18,31 @@ def _safe(value):
     return redact_diagnostic_text(value)
 
 
+def _next_step(row, evidence, actions, blocked):
+    if row.get("pending_action"):
+        return "A repair is already accepted and awaiting verification. Use Recheck to follow its recorded outcome; do not submit another repair."
+    if evidence.get("check_unavailable"):
+        return "Verification is unavailable. Use Recheck after the check recovers; no repair or healthy outcome is established."
+    if (
+        row["SourceKind"] == "evidence_batch"
+        and evidence.get("outcome") == "completed_with_exceptions"
+    ):
+        return "The group has finished with exceptions. Open the recovery centre and browse individual incidents to review changed or unrepaired evidence. Group completion does not resolve those incidents."
+    if row["State"] == "resolved":
+        return "Resolved; no repair required."
+    if row["SourceKind"] == "evidence_batch" and evidence.get("outcome") == "running":
+        return "The approved evidence group is running. Use Recheck to follow verified, pending and changed counts. Do not repair its members individually; review any exceptions when the group finishes."
+    if actions and not blocked:
+        return (
+            "Open this incident in the recovery centre; review the checks and confirm the repair."
+        )
+    if evidence.get("recovery_links"):
+        return "Open the linked recovery incident for its guided actions."
+    if row.get("release_notice"):
+        return "The required repair is not enabled in this release. The incident remains open; Recheck cannot unlock it."
+    return "No repair is authorized by the saved evidence. The diagnosis and required repairs above identify the blocker."
+
+
 def incident_report(service, row):
     """Allowlist diagnostic fields; never serialize raw evidence or action inputs."""
     # report_page includes pending-action state in the scoped page query. Apply
@@ -87,19 +112,7 @@ def incident_report(service, row):
             pending_verification=current.get("pending_action"),
             release_restriction=current.get("release_notice"),
             adapter_available=row["SourceKind"] in service.adapters,
-            next_step=(
-                "Open this incident in the recovery centre; review the checks and confirm the repair."
-                if actions and not blocked and row["State"] == "open"
-                else (
-                    "Open the linked recovery incident for its guided actions."
-                    if evidence.get("recovery_links")
-                    else (
-                        "No repair is authorized by the saved evidence. The diagnosis and required repairs above identify the blocker."
-                        if row["State"] == "open"
-                        else "Resolved; no repair required."
-                    )
-                )
-            ),
+            next_step=_next_step(current, evidence, actions, blocked),
         )
     )
 

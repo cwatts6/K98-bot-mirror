@@ -54,6 +54,38 @@ verification; local tests do not establish it.
 
 ## Deployment and functional acceptance
 
+### Queue navigation and report clarification follow-up
+
+Use **Review queue blockers** from the status message or recovery centre to show
+only open account-admission incidents. Pagination keeps that filter. Select the
+queue, check its ticket, then use **Review execution and ownership** to reach the
+exact domain repair. Do not choose a similarly named report from an unrelated
+incident page. Dropdown descriptions now include the last twelve characters of
+the incident ID, matching the footer, as well as the first-seen timestamp.
+
+The filter reads recorded incidents; it does not release a queue entry or certify
+that all failures have been discovered. Domain repairs still require their checks,
+confirmation and independent verification. An empty queue page does not establish
+import/export health. Persistent buttons on existing messages remain supported;
+new messages include the additional navigation control.
+
+The complete ZIP and detailed JSON reports now distinguish an accepted repair
+awaiting verification, a running evidence group, a group completed with exceptions,
+an unavailable check and a repair not enabled in the release. A running group does
+not require its members to be repaired individually. Review exceptions separately.
+
+Monitor diagnostics include the current cycle's start, latest checkpoint and
+progress time, plus completion time when available. These are diagnostics, not
+recovery authority. Progress does not refresh the last-success timestamp or turn
+a stale/failed check healthy. If monitoring is stale without an exception, retain
+the report so the active phase can be investigated rather than assuming an outage
+or successful verification.
+
+This follow-up changes no SQL schema, updater package, provider protocol or repair
+capability. The unstarted-export qualification is a separate focused change with
+its own protected-source deployment requirement. All remaining P0b workflows in
+the full-release matrix remain required; this navigation fix is not P0b completion.
+
 Use the installed updater after both recovery PRs are merged. On MINI_AMD, in
 Windows PowerShell 5.1 as administrator, first run:
 

@@ -36,6 +36,28 @@ def evidence(store, token="a" * 64):
     )
 
 
+def test_queue_navigation_is_scoped_paginated_and_excludes_nonblockers(store):
+    from services.recovery_service import RecoveryActor, RecoveryService
+
+    actor = RecoveryActor(1, 2, 3)
+    service = RecoveryService(store, {}, admin_id=1, guild_id=2, channel_id=3)
+    expected = set()
+    for _ in range(21):
+        row = store.observe("queue_admission", str(uuid4()), {"actions": {}}, "a" * 64)
+        expected.add(row["IncidentID"])
+    store.observe("queue_admission", str(uuid4()), {"actions": {}}, "a" * 64, resolved=True)
+    evidence(store)
+    store.observe("player_report", str(uuid4()), {"actions": {}}, "a" * 64)
+    foreign = RecoveryDAL(store.connect, account="other", storage_owner="test-disk", guild_id=2)
+    foreign.observe("queue_admission", str(uuid4()), {"actions": {}}, "a" * 64)
+    first = service.centre_page(actor, queues_only=True)
+    second = service.centre_page(actor, first["rows"][-1]["IncidentID"], queues_only=True)
+    assert len(first["rows"]) == 20 and len(second["rows"]) == 1
+    assert {r["IncidentID"] for r in first["rows"] + second["rows"]} == expected
+    with pytest.raises(SourceConflict):
+        service.centre_page(RecoveryActor(9, 2, 3), queues_only=True)
+
+
 def test_group_approval_persists_every_member_and_survives_restart(store):
     first, second = evidence(store), evidence(store)
     dal = RecoveryBacklogDAL(store)
