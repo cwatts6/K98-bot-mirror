@@ -198,7 +198,7 @@ class RecoveryDAL:
         with transaction(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (1) IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? "
-                "AND SourceKind='recovery_overview' AND AlertedRevision<Revision "
+                "AND SourceKind='recovery_overview' AND (State='open' OR AlertedRevision<Revision) "
                 "AND (AlertCheckedUTC IS NULL OR AlertCheckedUTC<DATEADD(minute,-5,SYSUTCDATETIME())) "
                 "ORDER BY COALESCE(AlertCheckedUTC,CONVERT(datetime2,'19000101')),IncidentID",
                 self.scope,

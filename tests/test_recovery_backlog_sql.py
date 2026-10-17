@@ -104,6 +104,102 @@ def test_quiet_overview_replaces_per_incident_notifications(store):
     assert store.alerts_due() == []  # Changed summaries are coalesced for five minutes.
 
 
+@pytest.mark.asyncio
+async def test_unchanged_open_overview_checks_delivery_and_recreates_deleted_card(
+    store, monkeypatch
+):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import discord
+
+    import bot_config
+    from stats_alerts import recovery_notifications as module
+
+    overview = store.observe(
+        "recovery_overview",
+        str(uuid4()),
+        dict(
+            title="Recovery overview",
+            explanation="Review recovery",
+            actions={},
+            outcome="attention",
+        ),
+        "a" * 64,
+    )
+    incident_id = overview["IncidentID"]
+    store.alert_sent(incident_id, overview["Revision"], 3, 40)
+    message = SimpleNamespace(id=40, edit=AsyncMock())
+
+    async def history(**kwargs):
+        for item in ():
+            yield item
+
+    channel = SimpleNamespace(
+        id=3,
+        guild=SimpleNamespace(id=2),
+        fetch_message=AsyncMock(return_value=message),
+        send=AsyncMock(return_value=SimpleNamespace(id=41)),
+        history=history,
+    )
+    bot = SimpleNamespace(user=SimpleNamespace(id=99), get_channel=lambda _: channel)
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 3)
+    monkeypatch.setattr(bot_config, "GUILD_ID", 2)
+    monkeypatch.setattr(module, "alert_rows", lambda: [store.get(i) for i in store.alerts_due()])
+    monkeypatch.setattr(module, "claim_alert", store.claim_alert)
+    monkeypatch.setattr(module, "record_alert", store.alert_sent)
+
+    async def inline(fn, *args):
+        return fn(*args)
+
+    monkeypatch.setattr(module, "drain_thread", inline)
+
+    def elapse_interval():
+        connection = store.connect()
+        try:
+            connection.cursor().execute(
+                "UPDATE dbo.RecoveryIncident SET AlertCheckedUTC=DATEADD(minute,-6,SYSUTCDATETIME()) "
+                "WHERE IncidentID=?",
+                incident_id,
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    # No unrelated incident change is needed to check the delivered revision.
+    assert store.alerts_due() == []
+    elapse_interval()
+    assert store.alerts_due() == [incident_id]
+    assert await module.publish_recovery_alerts(bot)
+    channel.fetch_message.assert_awaited_once_with(40)
+    message.edit.assert_not_awaited()
+    channel.send.assert_not_awaited()
+    assert store.alerts_due() == []
+
+    elapse_interval()
+    channel.fetch_message.side_effect = discord.NotFound(
+        SimpleNamespace(status=404, reason="deleted"), "deleted"
+    )
+    assert await module.publish_recovery_alerts(bot)
+    channel.send.assert_awaited_once()
+    assert store.get(incident_id)["AlertMessageID"] == 41
+    assert store.alerts_due() == []
+
+    # Resolved overviews receive their final update, then stop periodic delivery checks.
+    resolved = store.observe(
+        "recovery_overview",
+        overview["SourceID"],
+        dict(actions={}, outcome="clear"),
+        "b" * 64,
+        resolved=True,
+    )
+    elapse_interval()
+    assert store.alerts_due() == [incident_id]
+    store.alert_sent(incident_id, resolved["Revision"], 3, 41)
+    elapse_interval()
+    assert store.alerts_due() == []
+
+
 def test_group_reconciles_exact_private_copy_after_restart(store, recovery):
     from services.recovery_service import RecoveryService
     from tests.test_guided_recovery import ACTOR

@@ -244,9 +244,21 @@ if(@(Get-ChildItem -LiteralPath $Fixture -Filter 'pending-*').Count -ne 1){throw
 
 
 @pytest.mark.parametrize(
-    "answer,changed", [("", False), ("CONFIRM ONLINE", False), ("CONFIRM ONLINE", True)]
+    "answer,changed,existing",
+    [
+        ("", False, False),
+        ("CONFIRM ONLINE", False, False),
+        ("CONFIRM ONLINE", True, False),
+        ("", False, True),
+        ("", True, True),
+    ],
 )
-def test_actual_guided_closeout_statements_recheck_after_confirmation(tmp_path, answer, changed):
+def test_actual_guided_closeout_statements_recheck_after_confirmation(
+    tmp_path, answer, changed, existing
+):
+    import hashlib
+    import json
+
     if not shutil.which("powershell.exe"):
         pytest.skip("Windows PowerShell required")
     root = Path(__file__).resolve().parents[1]
@@ -255,7 +267,7 @@ def test_actual_guided_closeout_statements_recheck_after_confirmation(tmp_path, 
     ]
     script = tmp_path / "guided.ps1"
     prelude = r"""
-param([string]$Library,[string]$Fixture,[string]$Answer,[int]$Changed)
+param([string]$Library,[string]$Fixture,[string]$Answer,[int]$Changed,[int]$Existing)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 . $Library -Action Library
 function Assert-Protected([string]$Path){}
@@ -269,12 +281,28 @@ $completePath=Join-Path $Fixture 'verified.json'
 $script:checks=0
 function Verify-Current {
  $script:checks++
- if($script:checks -eq 2 -and $Changed){throw 'Current identity changed'}
+ [IO.File]::AppendAllText((Join-Path $Fixture 'checks.txt'),'checked;')
+ if($Changed -and ($Existing -or $script:checks -eq 2)){throw 'Current identity changed'}
  return [pscustomobject]@{stage='CURRENT_SUCCESSOR_VERIFIED';sequence=23}
 }
 function Assert-HistoricalRecords {}
 function Read-Host([string]$Prompt){return $Answer}
 """
+    acceptance = tmp_path / "verified.json"
+    if existing:
+        acceptance.write_text(
+            json.dumps(
+                dict(
+                    release_id="r",
+                    target="t",
+                    closeout_kind="current_successor_admin_verified_v1",
+                    profile_sha256=hashlib.sha256(bytes([1])).hexdigest(),
+                    helper_sha256=hashlib.sha256(bytes([2])).hexdigest(),
+                )
+            ),
+            encoding="utf-8",
+        )
+        before = acceptance.read_bytes()
     script.write_text(prelude + statements, encoding="utf-8")
     result = subprocess.run(
         [
@@ -291,10 +319,20 @@ function Read-Host([string]$Prompt){return $Answer}
             answer or "DECLINE",
             "-Changed",
             str(int(changed)),
+            "-Existing",
+            str(int(existing)),
         ],
         capture_output=True,
         text=True,
         timeout=30,
     )
     assert (result.returncode != 0) == changed, result.stdout + result.stderr
-    assert (tmp_path / "verified.json").exists() == bool(answer and not changed)
+    assert acceptance.exists() == bool(existing or (answer and not changed))
+    assert (tmp_path / "checks.txt").read_text().count("checked;") == (
+        1 if existing or not answer else 2
+    )
+    if existing:
+        assert acceptance.read_bytes() == before
+        assert (
+            "already recorded and its current successor has been reverified" in result.stdout
+        ) == (not changed)

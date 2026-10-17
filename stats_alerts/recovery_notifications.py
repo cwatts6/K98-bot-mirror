@@ -25,9 +25,11 @@ async def publish_recovery_alerts(bot):
             complete = False
             continue
         message = None
+        delivered_current_revision = False
         if row["AlertMessageID"] and row["AlertChannelID"] == channel.id:
             try:
                 message = await channel.fetch_message(row["AlertMessageID"])
+                delivered_current_revision = row["AlertedRevision"] == row["Revision"]
             except discord.NotFound:
                 pass  # A deleted alert is recreated from durable incident state.
         if message is None:
@@ -48,7 +50,7 @@ async def publish_recovery_alerts(bot):
                 view=RecoveryEntryView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
-        else:
+        elif not delivered_current_revision:
             await message.edit(
                 embed=embed,
                 view=RecoveryEntryView(),

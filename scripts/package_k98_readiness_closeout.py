@@ -45,12 +45,6 @@ try {
  if($manifest.release_id -cne $profile.release_id -or (@($manifest.steps.id) -join ',') -cne 'source,seed,start,readiness'){throw 'Only the reviewed source-only release may close'}
  if(Test-Path -LiteralPath (Join-Path $profile.stage '.amendment-selected.json')){throw 'Amended release needs its own recovery'}
  $completePath=Join-Path $work 'verified.json'
- if(Test-Path -LiteralPath $completePath){
-  $prior=Read-Json $completePath
-  if($prior.release_id -cne $profile.release_id -or $prior.target -cne $profile.target -or $prior.closeout_kind -cne 'current_successor_admin_verified_v1' -or $prior.profile_sha256 -cne (Hash $profileBytes)){throw 'A different closeout exists; preserve it'}
-  Write-Host 'This exact administrative closeout is already recorded. Run the normal updater once to finalize its pointer. No restart is required.'
-  return
- }
  function Assert-HistoricalRecords {
   foreach($item in $profile.receipts){
    $record=Read-Json (Join-Path (Join-Path $profile.stage '.receipts') $item.name) $item.sha256
@@ -88,6 +82,14 @@ try {
   return $proof
  }
  $proof=Verify-Current
+ # An immutable acceptance is historical evidence, not proof of current liveness.
+ # Even an idempotent retry must verify the exact pinned successor first.
+ if(Test-Path -LiteralPath $completePath){
+  $prior=Read-Json $completePath
+  if($prior.release_id -cne $profile.release_id -or $prior.target -cne $profile.target -or $prior.closeout_kind -cne 'current_successor_admin_verified_v1' -or $prior.profile_sha256 -cne (Hash $profileBytes) -or $prior.helper_sha256 -cne (Hash $helperBytes)){throw 'A different closeout exists; preserve it'}
+  Write-Host 'This exact administrative closeout is already recorded and its current successor has been reverified. Run the normal updater once to finalize its pointer. No restart is required.'
+  return
+ }
  Write-Host 'Source, seed, exact restart chain, native identities and SQL sessions verified.'
  Write-Host 'The original readiness intent will remain unconfirmed. This records a separate current-successor acceptance; no business repair, replay or restart occurs.'
  Write-Host 'In Discord run /ops dl_bot_status now. Confirm the bot responds and is online. Import/export warnings and queued recovery may remain; this does not certify them.'

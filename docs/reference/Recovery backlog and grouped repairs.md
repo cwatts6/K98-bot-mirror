@@ -20,6 +20,9 @@ Acceptance requires:
 - Notifications update one persisted overview, coalesce changes over five minutes,
   and do not repost unchanged incidents every minute. Old individual messages retain
   their working review buttons; historical alerts are not deleted.
+  Open overviews are checked for deletion every five minutes even when the backlog
+  is unchanged. Existing unchanged cards are neither edited nor reposted. Deleted
+  cards are recreated; resolved overviews stop delivery checks after their final update.
 - One ZIP includes a complete summary and every recorded incident through a cutoff,
   with diagnoses, required repairs, pending verification and blocker links. It uses
   bounded compressed and uncompressed storage and fails explicitly if incomplete.
@@ -156,7 +159,8 @@ no historical completion receipt or readiness-status file is manufactured.
 Import/export health remains explicitly degraded and provider delivery unverified.
 Failed checks or declining confirmation do not create acceptance. An interrupted
 write retains its evidence; a repeated successful closeout recognizes its exact
-existing acceptance.
+existing acceptance only after rechecking the exact pinned current successor.
+The existing acceptance is never rewritten, including when current verification fails.
 
 After **CLOSEOUT RECORDED AND READ BACK**, run the normal updater once:
 
