@@ -8663,7 +8663,7 @@
     }
   ],
   "sql": {
-    "commit": "5e5fdb8151c539d8bd12b8df17753526218b5987",
+    "commit": "b663308aabe049319e1ce32a50d1bcfd810f9d8f",
     "members": [
       {
         "path": "deploy/Deploy-SqlMigration.ps1",
@@ -8675,7 +8675,7 @@
       },
       {
         "path": "deploy/SqlDeploy.RecoveryRelease.ps1",
-        "sha256": "3f79ddbb2eb3233efaaac6ca0d7d4a1b8ac07a1c8f0b30d72f506b6cf79ebe75"
+        "sha256": "7810c3980937e4692dbd317d7f27b5eeecd210a265a2c25017bf27e387b54cbe"
       },
       {
         "path": "migrations/20261015_001_failed_read_history.sql",
@@ -8799,8 +8799,8 @@
           "name": "dbo.RecoveryInputDraft"
         },
         {
-          "after": "f66dc544bd0f774bd5e36718aa85ada988ce7afec2c1eb0fd4ee603a596a9cc2",
-          "before": "9a0e1ed49d23fad3610ec4ebd8c9159750617a67a32a290a512e85af982a46d0",
+          "after": "fe7fd1151c29eaa073c4c31db193fe1b461874e33f91c9e9abfa236c7071fad5",
+          "before": "53ef66259bc1de50b835f984a4df26ee1c67d6327a64a75d59ca5c6d29fc1c51",
           "name": "dbo.sp_TARGETS_MASTER"
         },
         {
