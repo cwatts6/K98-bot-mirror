@@ -244,7 +244,7 @@ $libraryText=[Text.Encoding]::UTF8.GetString((Read-Bundle 'K98-SourceUpdate.ps1'
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if($env:COMPUTERNAME -cne 'MINI_AMD' -or $identity.User.Value -cne $plan.sid -or $identity.Owner.Value -cne 'S-1-5-32-544' -or -not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Use elevated Windows PowerShell on MINI_AMD with the existing deployment account'}
 $live='C:\discord_file_downloader\docs\task_packs'
-$state='C:\ProgramData\K98\S11\documentation-custody-'+$planHash.Substring(0,16)
+$state='C:\ProgramData\K98\S11\docs-custody-'+$planHash.Substring(0,16)
 $fresh=Join-Path $state 'fresh';$backup=Join-Path $state 'original-task-packs'
 $script:c=[pscustomobject]@{root='C:\discord_file_downloader';sid=$plan.sid}
 $updates='C:\ProgramData\K98\S11\updates'
