@@ -90,6 +90,12 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
             actor=f"recovery:{action['ActionID']}",
             reason=action["Reason"],
         )
+        if preview["token"] == action["EvidenceHash"]:
+            self.dal.cancel(source_id, marker["token"], marker["actor"], marker["reason"])
+            # A lost approval acknowledgement can leave dispatch to this pass.
+            # Verify its durable marker before refresh closes the incident and
+            # removes it from subsequent open-incident discovery.
+            preview = self.dal.inspect(source_id)
         if (
             preview["action"] == "cancelled"
             and json.loads(preview["preparation"]["GenerationJson"])[self.closure_key] == marker
@@ -97,5 +103,4 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
             return "verified"
         if preview["token"] != action["EvidenceHash"]:
             return "not_applied"
-        self.dal.cancel(source_id, marker["token"], marker["actor"], marker["reason"])
         return None

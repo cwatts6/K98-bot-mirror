@@ -10,6 +10,7 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.legacy_export_snapshot_dal import PreparationClaim
 from services.player_report_recovery_service import PlayerReportRecoveryAdapter
 from tests.test_import_capture_recovery_sql import recovery as recovery
+from tests.test_recovery_sql import store as store
 
 pytestmark = [
     pytest.mark.skipif(
@@ -238,6 +239,7 @@ async def test_initial_report_queue_guided_confirmation_and_restart_verification
         presentation_policy=p0a_presentation,
     )
     assert restarted.review(ACTOR, row["IncidentID"])["State"] == "resolved"
+    assert len(store.actions) == 1 and store.actions[0]["State"] == "verified"
     # A second independent read verifies the durable domain receipt.
     assert restarted.review(ACTOR, row["IncidentID"])["State"] == "resolved"
     assert len(store.actions) == 1 and store.actions[0]["State"] == "verified"
@@ -250,3 +252,73 @@ async def test_initial_report_queue_guided_confirmation_and_restart_verification
     restarted_queue = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime), restarted.adapters)
     queue_evidence, _, queue_resolved = restarted_queue.inspect(r.source)
     assert queue_resolved and queue_evidence["outcome"] == "domain_recovery_verified"
+
+
+@pytest.mark.parametrize("lose_cancel_reply", [False, True])
+def test_monitor_finishes_lost_approval_receipt_before_report_disappears(
+    recovery, store, monkeypatch, lose_cancel_reply
+):
+    from contextlib import contextmanager
+
+    from services import recovery_runtime as runtime
+    from services.recovery_service import RecoveryService
+    from tests.test_guided_recovery import ACTOR, execute
+
+    r = recovery
+    uncommitted(r)
+    adapter = PlayerReportRecoveryAdapter(r.outcomes, r.service)
+    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    row = service.review_source(ACTOR, adapter.kind, r.source)
+    original_claim = store.claim
+
+    def lose_approval(*args, **kwargs):
+        original_claim(*args, **kwargs)
+        raise TimeoutError("Approval committed; acknowledgement lost")
+
+    monkeypatch.setattr(store, "claim", lose_approval)
+    with pytest.raises(TimeoutError, match="Approval committed"):
+        execute(service, row, action="cancel_report")
+    assert r.outcomes.inspect(r.source)["action"] == "cancel_report"
+    original_cancel = r.outcomes.cancel
+    cancellations = []
+
+    def cancel(*args):
+        cancellations.append(1)
+        original_cancel(*args)
+        if lose_cancel_reply:
+            raise TimeoutError("Cancellation committed; acknowledgement lost")
+
+    monkeypatch.setattr(r.outcomes, "cancel", cancel)
+
+    @contextmanager
+    def scoped_service():
+        # Reconstruct the service and adapter; durable SQL owns the intent.
+        fresh = PlayerReportRecoveryAdapter(r.outcomes, r.service)
+        yield RecoveryService(store, {fresh.kind: fresh}, admin_id=1, guild_id=2, channel_id=3)
+
+    monkeypatch.setattr(runtime, "recovery_service", scoped_service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    monkeypatch.setattr(runtime, "_cursors", {})
+    monkeypatch.setattr(runtime, "_incident_cursor", None)
+    monkeypatch.setattr(runtime, "_priority_incident_cursor", None)
+    failures = runtime.observe_recovery()
+    if lose_cancel_reply:
+        assert failures and store.get(row["IncidentID"])["State"] == "open"
+        assert store.pending_actions(row["IncidentID"])
+        # Empty end pages reset their cursors; the following pass verifies the
+        # saved marker without another cancellation.
+        for _ in range(2):
+            failures = runtime.observe_recovery()
+        assert failures == []
+    else:
+        assert failures == []
+    assert store.get(row["IncidentID"])["State"] == "resolved"
+    assert not store.pending_actions(row["IncidentID"])
+    from services.recovery_backlog_dal import RecoveryBacklogDAL
+
+    assert RecoveryBacklogDAL(store).summary()["actions"] == [
+        {"State": "verified", "ActionKind": "cancel_report", "Total": 1}
+    ]
+    assert r.source not in adapter.pending_recovery()
+    assert runtime.observe_recovery() == []
+    assert cancellations == [1]
