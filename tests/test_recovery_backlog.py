@@ -69,6 +69,35 @@ async def test_centre_page_uses_one_service_call_for_count_and_page(monkeypatch,
     assert interaction.followup.send.call_args.kwargs["ephemeral"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["backup_required", "check_unavailable"])
+async def test_empty_priority_centre_keeps_individual_evidence_navigation(monkeypatch, outcome):
+    from ui.views import recovery_view as module
+
+    _, _, records = report_service(1)
+    row = records[0]
+    row["evidence"]["outcome"] = outcome
+    monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        module,
+        "call",
+        AsyncMock(side_effect=[dict(rows=[], open_count=1), dict(rows=[row], open_count=1)]),
+    )
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    await module.show_centre(interaction)
+    view = interaction.followup.send.call_args.kwargs["view"]
+    assert view.is_persistent()
+    browse = next(item for item in view.children if item.label == "Browse individual incidents")
+    assert browse.custom_id == "k98:recovery:individual:v1"
+    await browse.callback(interaction)
+    module.call.assert_awaited_with("centre_page", ACTOR, None, True)
+    listed = interaction.followup.send.call_args.kwargs["view"]
+    select = next(item for item in listed.children if hasattr(item, "options"))
+    assert select.options[0].value == row["IncidentID"]
+    assert outcome in select.options[0].label
+
+
 def test_archive_enforces_compressed_attachment_bound():
     from services.recovery_complete_report import BoundedArchive
 

@@ -439,6 +439,14 @@ class RecoveryEntryView(discord.ui.View):
         await show_centre(interaction)
 
     @discord.ui.button(
+        label="Browse individual incidents",
+        custom_id="k98:recovery:individual:v1",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def individual(self, button, interaction):
+        await show_centre(interaction, individual=True)
+
+    @discord.ui.button(
         label="Download recovery report",
         custom_id="k98:recovery:report:v1",
         style=discord.ButtonStyle.secondary,
