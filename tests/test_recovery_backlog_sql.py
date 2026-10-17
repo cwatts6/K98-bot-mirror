@@ -7,6 +7,7 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.recovery_backlog_dal import RecoveryBacklogDAL
 from services.recovery_backlog_service import EvidenceBatchAdapter
 from services.recovery_dal import RecoveryDAL
+from tests.test_export_evidence_recovery import damage, recovery as recovery
 from tests.test_recovery_sql import store as store
 
 pytestmark = pytest.mark.skipif(
@@ -101,3 +102,28 @@ def test_quiet_overview_replaces_per_incident_notifications(store):
         "recovery_overview", overview["SourceID"], dict(actions={}, outcome="changed"), "b" * 64
     )
     assert store.alerts_due() == []  # Changed summaries are coalesced for five minutes.
+
+
+def test_group_reconciles_exact_private_copy_after_restart(store, recovery):
+    from services.recovery_service import RecoveryService
+    from tests.test_guided_recovery import ACTOR
+
+    r = recovery
+    damage(r)
+    service = RecoveryService(
+        store, {"private_evidence": r.adapter}, admin_id=1, guild_id=2, channel_id=3
+    )
+    row = service.review_source(ACTOR, "private_evidence", r.reference)
+    dal = RecoveryBacklogDAL(store)
+    group = dal.approve(dal.preview(), "discord:1")
+    # No filesystem write occurs until the restarted service reconciles the
+    # individually persisted approval through the real protected-copy adapter.
+    assert not (r.tmp_path / r.receipt.key).exists()
+    restarted = RecoveryService(
+        store, {"private_evidence": r.adapter}, admin_id=1, guild_id=2, channel_id=3
+    )
+    result = restarted.refresh(row["IncidentID"])
+    assert result["State"] == "resolved" and not result["pending_action"]
+    assert r.private.read(r.receipt) == r.raw
+    final, _, complete = EvidenceBatchAdapter(store).inspect(group)
+    assert complete and final["verified_count"] == 1

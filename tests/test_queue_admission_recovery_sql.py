@@ -1,4 +1,6 @@
+import json
 import os
+from uuid import uuid4
 
 import pytest
 
@@ -9,7 +11,24 @@ from services.recovery_service import RecoveryService
 from tests.test_export_target_containment_sql import contained_job as contained_job
 from tests.test_guided_recovery import ACTOR, Store, execute
 from tests.test_producer_admission_recovery_sql import unstarted
-from tests.test_producer_refusal_sql import refused as refused
+from tests.test_producer_refusal_sql import refused as refused, unblock
+
+
+def legacy_unstarted(r):
+    unblock(r)
+    request = json.loads(r.runtime.dal.read(r.source)["RequestJson"])["request"]
+    request.pop("producer")
+    request["operation"] = str(uuid4())
+    r.source = r.runtime.dal.request(
+        account=r.runtime.account,
+        consumer="scan_data",
+        kvk_no=None,
+        request=request,
+        storage_owner="disk",
+        actor="test",
+        reason="Legacy queued request",
+    )
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("K98_TARGET_CONTAINMENT_SQL") != "1", reason="Explicit local disposable SQL opt-in"
@@ -26,9 +45,9 @@ def service_for(r):
 
 def test_cancel_initial_queue_entry_fences_late_worker_and_verifies(refused):
     r = refused
-    unstarted(r, "pending")
+    legacy_unstarted(r)
     adapter, store, service, row = service_for(r)
-    assert adapter.pending_recovery() == [r.source]
+    assert r.source in adapter.pending_recovery()
     assert "withdraw_queued" in row["evidence"]["actions"]
     result = execute(service, row, action="withdraw_queued")
     assert result["State"] == "resolved" and store.actions[0]["State"] == "verified"
@@ -55,7 +74,7 @@ def test_admitted_or_uncertain_work_requires_domain_recovery(refused, stage):
 
 def test_admission_race_does_not_release_new_owner(refused):
     r = refused
-    unstarted(r, "pending")
+    legacy_unstarted(r)
     adapter, store, service, row = service_for(r)
     r.runtime.dal.claim(
         r.source,
@@ -72,7 +91,7 @@ def test_admission_race_does_not_release_new_owner(refused):
 
 def test_lost_withdrawal_reply_reconciles_without_repeating(refused, monkeypatch):
     r = refused
-    unstarted(r, "pending")
+    legacy_unstarted(r)
     adapter, store, service, row = service_for(r)
     withdraw = adapter.dal.withdraw
 
@@ -84,3 +103,51 @@ def test_lost_withdrawal_reply_reconciles_without_repeating(refused, monkeypatch
     result = execute(service, row, action="withdraw_queued")
     assert result["State"] == "resolved"
     assert store.actions[0]["State"] == "verified"
+
+
+def test_typed_queue_routes_to_domain_close_and_saved_continuation(refused):
+    from tests.test_producer_refusal_sql import setup
+
+    r = refused
+    unstarted(r, "pending")
+    adapter, _, _, row = service_for(r)
+    assert not row["evidence"]["actions"]
+    assert row["evidence"]["recovery_links"][0]["kind"] == "producer_refusal"
+    with pytest.raises(SourceConflict):
+        adapter.dal.withdraw(r.source, row["EvidenceHash"], str(uuid4()))
+    producer, store, service, row = setup(r)
+    closed = execute(service, row, action="close_unstarted_admission")
+    assert store.actions[0]["State"] == "verified"
+    assert closed["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    execute(service, closed, action="resume_sql_stage")
+    producer.runner.assert_called_once_with(r.inputs)
+
+
+@pytest.mark.parametrize(
+    "producer_kind,linked_kind",
+    [
+        ("configuration_import", "configuration_producer"),
+        ("player_stats_report", "player_report"),
+    ],
+)
+def test_other_typed_producers_preserve_domain_cancellation(refused, producer_kind, linked_kind):
+    r = refused
+    unblock(r)
+    request = json.loads(r.runtime.dal.read(r.source)["RequestJson"])["request"]
+    request["operation"] = str(uuid4())
+    request["producer"]["kind"] = producer_kind
+    r.source = r.runtime.dal.request(
+        account=r.runtime.account,
+        consumer="scan_data",
+        kvk_no=None,
+        request=request,
+        storage_owner="disk",
+        actor="test",
+        reason="Typed queued request",
+    )
+    adapter, _, _, row = service_for(r)
+    assert not row["evidence"]["actions"]
+    assert row["evidence"]["recovery_links"][0]["kind"] == linked_kind
+    with pytest.raises(SourceConflict):
+        adapter.dal.withdraw(r.source, row["EvidenceHash"], str(uuid4()))
+    assert r.runtime.dal.read(r.source)["State"] == "pending"

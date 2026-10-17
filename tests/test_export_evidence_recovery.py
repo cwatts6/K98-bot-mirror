@@ -251,7 +251,9 @@ def test_proactive_monitor_discovers_damage_without_a_new_processing_call(recove
     r.incidents.scope = "test"
     r.incidents.list_open = lambda **_: []
     r.incidents.has_failed_checks = lambda: False
-    monkeypatch.setattr("services.recovery_backlog_dal.RecoveryBacklogDAL.pending_repairs", lambda _: [])
+    monkeypatch.setattr(
+        "services.recovery_backlog_dal.RecoveryBacklogDAL.pending_repairs", lambda _: []
+    )
 
     @contextmanager
     def service():

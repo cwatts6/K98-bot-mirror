@@ -7,7 +7,6 @@ import zipfile
 import pytest
 
 from services.recovery_service import RecoveryActor, SourceConflict
-from tests.test_export_evidence_recovery import recovery as recovery
 from tests.test_guided_recovery import ACTOR
 from tests.test_recovery_report import report_service
 
@@ -78,17 +77,3 @@ async def test_group_confirmation_is_deferred_and_requires_configured_actor(monk
     assert sent["view"].preview == preview
     assert "restart" in str(sent["embed"].to_dict())
     module.call.assert_awaited_once_with("review_evidence_group", ACTOR)
-
-
-def test_metadata_diagnosis_does_not_change_repair_authority(recovery):
-    import os
-
-    r = recovery
-    before = r.adapter.inspect(r.reference)
-    path = r.tmp_path / r.receipt.key
-    stat = path.stat()
-    os.utime(path, (stat.st_atime, stat.st_mtime - 86400))
-    after = r.adapter.inspect(r.reference)
-    assert before[1] == after[1]
-    assert before[0]["replica_diagnostics"] != after[0]["replica_diagnostics"]
-    assert after[2] is True

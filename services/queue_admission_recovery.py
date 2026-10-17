@@ -58,11 +58,9 @@ class QueueAdmissionRecovery:
             title="Account queue admission",
             actions=actions,
             recovery_links=links,
-            outcome="withdrawn"
-            if closed
-            else "unstarted"
-            if actions
-            else "execution_review_required",
+            outcome=(
+                "withdrawn" if closed else "unstarted" if actions else "execution_review_required"
+            ),
             queue_ticket=prep["EnqueueSequence"],
             preparation_state=prep["State"],
             explanation=(

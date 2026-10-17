@@ -61,8 +61,12 @@ class QueueAdmissionDAL:
     @staticmethod
     def eligible(state):
         prep = state["preparation"]
+        request = json.loads(prep["RequestJson"])
         return (
             prep["State"] == "pending"
+            # Typed producers own cancellation and continuation receipts. A
+            # generic tombstone would strand their saved inputs after closure.
+            and not request.get("request", {}).get("producer")
             and prep["Version"] == 1
             and prep["Fence"] == 0
             and all(
@@ -77,7 +81,7 @@ class QueueAdmissionDAL:
                 )
             )
             and not any(state["counts"].values())
-            and prep["RequestHash"].lower() == digest(json.loads(prep["RequestJson"])).hex()
+            and prep["RequestHash"].lower() == digest(request).hex()
         )
 
     def withdraw(self, source_id, token, action_id):

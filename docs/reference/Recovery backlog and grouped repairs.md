@@ -28,6 +28,8 @@ Acceptance requires:
   reservations and captured output are checked under the account lock. Cancellation
   durably fences the old worker. Already-admitted/uncertain work links to its domain
   recovery and cannot use this cancellation.
+  Typed producers always use their domain cancellation/continuation workflow,
+  including requests which have not acquired admission yet.
 
 ## Admin workflow
 
@@ -68,13 +70,13 @@ a new private-evidence receipt. Replica-creation failure prevents that receipt b
 returned for SQL registration. The existing regression suite tests this boundary.
 The sample alone therefore does not establish ongoing replica loss or its cause.
 
-Diagnostics now include copy sizes and UTC modification times without paths or file
-contents. These are investigation hints, never trusted creation/execution proof and
-never part of a repair authorization token. Compare them with deployment timing and
-newly observed incidents to distinguish legacy single-copy files from subsequent loss.
-The obsolete adapter advertisement of automatic evidence repair is removed: both
-individual and grouped copy restoration require admin confirmation. Previously approved
-verified read-only configuration release remains the only automatic release policy.
+Replica file metadata is collected separately by the read-only support diagnostic,
+without changing the installed private-evidence authority or its protected source
+pins. Modification times are investigation hints, never trusted creation/execution
+proof or repair tokens. Compare them with deployment timing and newly observed
+incidents to distinguish legacy single-copy files from subsequent loss. Neither
+individual nor grouped copy restoration is automatic: the service permits automatic
+release only for previously approved verified read-only configuration recovery.
 
 ## Architecture, validation and rollout
 

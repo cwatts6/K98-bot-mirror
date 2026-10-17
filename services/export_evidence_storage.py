@@ -4,7 +4,6 @@ Replicas protect against individual missing/corrupt files, not loss of the disk
 or DPAPI identity. Restoration cannot manufacture a provider result or receipt.
 """
 
-from datetime import UTC, datetime
 import hashlib
 import os
 from uuid import UUID, uuid4
@@ -49,25 +48,6 @@ class EvidenceCopies:
                 # the authority; unavailable copies never count as verified.
                 result[label] = dict(state="unavailable")
         return result
-
-    def diagnostics(self, reference):
-        """Filesystem times help distinguish backlog from later loss, never proof."""
-        result = {}
-        for label, key in zip(("primary", "replica"), self.keys(reference), strict=True):
-            try:
-                stat = self.store._path(key).stat()
-                result[label] = dict(
-                    modified_utc=datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
-                    bytes=stat.st_size,
-                )
-            except FileNotFoundError:
-                result[label] = dict(present=False)
-            except OSError:
-                result[label] = dict(metadata_unavailable=True)
-        return dict(
-            copies=result,
-            interpretation="File modification times are diagnostic hints, not trusted creation or execution evidence. Newly written evidence requires two verified copies before its receipt is returned.",
-        )
 
     def _replace(self, key, encrypted):
         destination = self.store._path(key)

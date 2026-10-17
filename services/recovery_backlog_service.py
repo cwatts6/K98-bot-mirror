@@ -29,9 +29,11 @@ class EvidenceBatchAdapter:
             verified_count=verified,
             changed_count=changed,
             pending_count=pending,
-            outcome=("verified" if verified == approved else "completed_with_exceptions")
-            if complete
-            else "running",
+            outcome=(
+                ("verified" if verified == approved else "completed_with_exceptions")
+                if complete
+                else "running"
+            ),
             explanation=(
                 f"{verified} of {approved} approved evidence repairs verified; {pending} awaiting verification; "
                 f"{changed} changed or no longer applicable. Progress survives restart. "

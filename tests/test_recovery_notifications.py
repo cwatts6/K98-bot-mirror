@@ -11,14 +11,16 @@ from tests.test_guided_recovery import setup
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["stats_import", "recovery_overview"])
 @pytest.mark.parametrize("existing", ["known", "lost_ack", "deleted", "new"])
-async def test_alert_reuses_identity_or_recreates_deleted_message(monkeypatch, existing):
+async def test_alert_reuses_identity_or_recreates_deleted_message(monkeypatch, existing, kind):
     import bot_config
     from stats_alerts import recovery_notifications as module
     from ui.views.recovery_view import incident_embed
 
     _, _, _, row = setup()
     row.update(
+        SourceKind=kind,
         AlertMessageID=40 if existing in {"known", "deleted"} else None,
         AlertChannelID=3,
         AlertedRevision=0,
