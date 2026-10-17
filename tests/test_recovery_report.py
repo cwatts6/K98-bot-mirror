@@ -184,3 +184,25 @@ def test_missing_receipt_links_to_typed_admission_without_authorizing_release():
     assert evidence["recovery_links"][0]["source_id"] == parent
     assert evidence["recovery_links"][0]["kind"] == "producer_refusal"
     assert evidence["receipt_diagnostics"]["receipt_present"] is False
+
+
+@pytest.mark.asyncio
+async def test_report_view_releases_attachment_and_preserves_continuation(monkeypatch):
+    import weakref
+
+    from ui.views import recovery_view as module
+
+    class Attachment:
+        pass
+
+    content = Attachment()
+    retained = weakref.ref(content)
+    report = dict(content=content, next_after="last-incident", through="cutoff", part=4)
+    view = module.RecoveryReportView(report)
+    del report, content
+    assert retained() is None
+    show = AsyncMock()
+    monkeypatch.setattr(module, "show_report", show)
+    interaction = object()
+    await view.children[0].callback(interaction)
+    show.assert_awaited_once_with(interaction, "last-incident", "cutoff", 5)

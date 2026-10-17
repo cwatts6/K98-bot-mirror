@@ -317,7 +317,7 @@ class RecoveryListView(discord.ui.View):
 class RecoveryReportView(discord.ui.View):
     def __init__(self, report):
         super().__init__(timeout=600)
-        self.report = report
+        self.report = {key: report[key] for key in ("next_after", "through", "part")}
 
     @discord.ui.button(label="Download next report part", style=discord.ButtonStyle.primary)
     async def download(self, button, interaction):
