@@ -84,8 +84,7 @@ async def observe_recovery_outcomes(bot):
                 recovery_health.failure_detail(exc),
             )
         # A leased/skipped alert has not verified delivery recovery.
-        if notification_error is not None or notifications_complete:
-            recovery_health.record_notifications(notification_error)
+        recovery_health.record_notifications(notification_error, pending=not notifications_complete)
         await asyncio.sleep(30)
 
 

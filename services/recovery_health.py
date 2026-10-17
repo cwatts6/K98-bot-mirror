@@ -22,9 +22,21 @@ def failure_detail(error):
     }
 
 
-def record_notifications(error=None):
+def record_notifications(error=None, *, pending=False):
     global _notification_failure
-    _notification_failure = failure_detail(error) if error else None
+    if error is not None:
+        _notification_failure = failure_detail(error)
+    elif pending:
+        # The durable lease can outlive this process and its original exception.
+        # Preserve a known cause, or reconstruct a safe pending-delivery signal.
+        if _notification_failure is None:
+            _notification_failure = {
+                "error_type": "DeliveryPendingVerification",
+                "observed_utc": datetime.now(UTC).isoformat(),
+                "frames": [],
+            }
+    else:
+        _notification_failure = None
 
 
 def record_success():

@@ -300,7 +300,8 @@ def test_health_report_uses_one_consistent_status_snapshot(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_delivery_failure_survives_lease_skip_until_verified_retry(monkeypatch):
+@pytest.mark.parametrize("restart", [False, True])
+async def test_delivery_failure_survives_lease_skip_until_verified_retry(monkeypatch, restart):
     import bot_config
     from core import recovery_lifecycle as lifecycle
     from services import recovery_health as health
@@ -322,11 +323,15 @@ async def test_delivery_failure_survives_lease_skip_until_verified_retry(monkeyp
         id=3,
         guild=SimpleNamespace(id=2),
         history=history,
-        send=AsyncMock(side_effect=[TimeoutError(), message]),
+        send=AsyncMock(side_effect=[message] if restart else [TimeoutError(), message]),
     )
     bot = SimpleNamespace(user=SimpleNamespace(id=99), get_channel=lambda _: channel)
     monkeypatch.setattr(notifications, "alert_rows", lambda: [row])
-    monkeypatch.setattr(notifications, "claim_alert", Mock(side_effect=[True, False, True]))
+    monkeypatch.setattr(
+        notifications,
+        "claim_alert",
+        Mock(side_effect=[False, True] if restart else [True, False, True]),
+    )
     recorded = Mock()
     monkeypatch.setattr(notifications, "record_alert", recorded)
 
@@ -339,15 +344,18 @@ async def test_delivery_failure_survives_lease_skip_until_verified_retry(monkeyp
 
     async def next_cycle(_):
         snapshots.append(health.report())
-        if len(snapshots) == 3:
+        if len(snapshots) == (2 if restart else 3):
             raise asyncio.CancelledError()
 
     monkeypatch.setattr(lifecycle.asyncio, "sleep", next_cycle)
     with pytest.raises(asyncio.CancelledError):
         await lifecycle.observe_recovery_outcomes(bot)
     assert all(snapshot["healthy"] for snapshot in snapshots)
-    assert snapshots[0]["notification_failure"]["error_type"] == "TimeoutError"
-    assert snapshots[1]["notification_failure"] == snapshots[0]["notification_failure"]
-    assert snapshots[2]["notification_failure"] is None
-    assert channel.send.await_count == 2
+    assert snapshots[0]["notification_failure"]["error_type"] == (
+        "DeliveryPendingVerification" if restart else "TimeoutError"
+    )
+    if not restart:
+        assert snapshots[1]["notification_failure"] == snapshots[0]["notification_failure"]
+    assert snapshots[-1]["notification_failure"] is None
+    assert channel.send.await_count == (1 if restart else 2)
     recorded.assert_called_once_with(row["IncidentID"], row["Revision"], 3, 40)
