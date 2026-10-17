@@ -1,10 +1,12 @@
 """Report completeness, read-only behavior and configured-admin delivery."""
 
 from copy import deepcopy
+import io
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
+import zipfile
 
 import pytest
 
@@ -135,6 +137,45 @@ def test_report_next_step_distinguishes_active_work_from_unavailable_repairs(
     if unavailable:
         row["evidence"]["check_unavailable"] = unavailable
     assert expected in incident_report(service, row)["next_step"]
+
+
+@pytest.mark.parametrize("complete_archive", [False, True])
+@pytest.mark.parametrize("continuation", [False, True])
+def test_resolved_reports_preserve_configuration_continuation_only(complete_archive, continuation):
+    service, store, records = report_service()
+    row = records[0]
+    row.update(
+        SourceKind="configuration_producer" if continuation else "queue_admission", State="resolved"
+    )
+    row["evidence"].update(
+        actions={},
+        recovery_links=[
+            dict(
+                kind="configuration_continuation" if continuation else "player_report",
+                label=(
+                    "Choose configuration continuation"
+                    if continuation
+                    else "Review execution and ownership"
+                ),
+                source_id=row["SourceID"],
+            )
+        ],
+    )
+    if complete_archive:
+        report = service.download_complete_report(ACTOR)
+        with zipfile.ZipFile(io.BytesIO(report["content"])) as archive:
+            incident = json.loads(archive.read("incidents.jsonl").splitlines()[0])
+    else:
+        report = service.download_report(ACTOR)
+        incident = json.loads(report["content"])["incidents"][0]
+    if continuation:
+        assert "Choose configuration continuation" in incident["next_step"]
+        assert "no repair required" not in incident["next_step"]
+    else:
+        assert incident["next_step"] == "Resolved; no repair required."
+    assert incident["state"] == "resolved" and not incident["required_repairs"]
+    assert not store.actions
+    service.refresh.assert_not_called()
 
 
 @pytest.mark.parametrize("text", ["x", "é\n"])

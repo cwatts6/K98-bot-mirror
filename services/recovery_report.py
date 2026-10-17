@@ -29,6 +29,11 @@ def _next_step(row, evidence, actions, blocked):
     ):
         return "The group has finished with exceptions. Open the recovery centre and browse individual incidents to review changed or unrepaired evidence. Group completion does not resolve those incidents."
     if row["State"] == "resolved":
+        if any(
+            link.get("kind") == "configuration_continuation"
+            for link in evidence.get("recovery_links", [])
+        ):
+            return "This attempt is resolved. Open Choose configuration continuation to review whether to retry publication or keep the prior configuration; that separate decision still requires current verification."
         return "Resolved; no repair required."
     if row["SourceKind"] == "evidence_batch" and evidence.get("outcome") == "running":
         return "The approved evidence group is running. Use Recheck to follow verified, pending and changed counts. Do not repair its members individually; review any exceptions when the group finishes."
