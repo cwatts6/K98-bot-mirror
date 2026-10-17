@@ -15,10 +15,17 @@ from services.export_runtime_composition import RuntimeLifetime
 @pytest.fixture
 def adapter():
     snapshot = dict(
-        job=dict(JobID="job", State="uncertain", ProvenanceJson="{}", Version=1),
+        job=dict(
+            JobID="job",
+            ConsumerKind="new_source",
+            State="uncertain",
+            ProvenanceJson="{}",
+            Version=1,
+        ),
         attempts=[],
         streams=[dict(StreamID="stream")],
         resources=[],
+        season=dict(SourceKey="snapshot_report_v1", SeasonState="open", SeasonVersion=1),
     )
     base = Mock()
     base.discovery.job.side_effect = lambda _: deepcopy(snapshot)
@@ -48,12 +55,16 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
     r.base.execute.assert_called_once_with("job", "verify_publication", original, "actor", "reason")
 
 
-def test_base_action_does_not_adopt_state_changed_during_authority_review(adapter):
+@pytest.mark.parametrize("changed_part", ["job", "season"])
+def test_base_action_does_not_adopt_state_changed_during_authority_review(adapter, changed_part):
     r = adapter
     original = job_token(r.snapshot)
 
     def changed(_):
-        r.snapshot["job"]["Version"] += 1
+        if changed_part == "job":
+            r.snapshot["job"]["Version"] += 1
+        else:
+            r.snapshot["season"].update(SeasonState="closing", SeasonVersion=2)
         return dict(actions=dict(verify_publication={})), "authority-token", False
 
     r.adapter.inspect = changed
