@@ -55,7 +55,7 @@ def recovery_service():
         from services.queue_admission_recovery import QueueAdmissionRecovery
         from services.queue_admission_recovery_dal import QueueAdmissionDAL
 
-        queued = QueueAdmissionRecovery(QueueAdmissionDAL(runtime))
+        queued = QueueAdmissionRecovery(QueueAdmissionDAL(runtime), adapters)
         adapters[queued.kind] = queued
         from services.producer_refusal_dal import ProducerRefusalDAL
         from services.producer_refusal_recovery import ProducerRefusalRecovery

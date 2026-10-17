@@ -244,4 +244,9 @@ async def test_initial_report_queue_guided_confirmation_and_restart_verification
     final = r.outcomes.inspect(r.source)["preparation"]
     assert final["State"] == "unavailable" and final["Fence"] == 1 and final["Version"] == 2
     assert r.source not in queue.pending_recovery()
-    assert queue.inspect(r.source)[2]
+    # Terminal metadata alone cannot resolve the queue; a fresh runtime must
+    # verify the owning report's durable closure before hiding its handoff.
+    assert not queue.inspect(r.source)[2]
+    restarted_queue = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime), restarted.adapters)
+    queue_evidence, _, queue_resolved = restarted_queue.inspect(r.source)
+    assert queue_resolved and queue_evidence["outcome"] == "domain_recovery_verified"

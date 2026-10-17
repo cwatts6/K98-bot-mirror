@@ -21,9 +21,10 @@ class QueueAdmissionDAL:
             cursor.execute(
                 "SELECT TOP (20) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? "
                 "AND StorageOwner=? AND State IN ('pending','sql_pending') "
-                "ORDER BY EnqueueSequence,PreparationID",
+                "ORDER BY CASE WHEN PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,PreparationID",
                 self.account,
                 self.storage_owner,
+                identity(after) if after else None,
             )
             return [identity(r["PreparationID"]) for r in rows(cursor)]
 

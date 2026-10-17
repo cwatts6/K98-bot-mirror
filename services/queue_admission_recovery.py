@@ -10,8 +10,9 @@ class QueueAdmissionRecovery:
     kind = "queue_admission"
     observe_healthy = False
 
-    def __init__(self, dal):
+    def __init__(self, dal, domains=None):
         self.dal = dal
+        self.domains = domains if domains is not None else {}
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending(after)
@@ -54,25 +55,46 @@ class QueueAdmissionRecovery:
                         source_id=producer.get("parent") or source_id,
                     )
                 )
+        domain_proof, domain_resolved = None, False
+        # Admission alone is not resolution. Preserve the guided handoff while
+        # execution is active/uncertain; terminal metadata also needs the owning
+        # domain's verification before this queue incident can close.
+        if links and prep["State"] in {"completed", "materialized", "unavailable"}:
+            link = links[0]
+            domain = self.domains.get(link["kind"])
+            if domain is not None:
+                _, domain_token, verified = domain.inspect(link["source_id"])
+                domain_resolved = verified is True
+                domain_proof = dict(link=link, token=domain_token, resolved=domain_resolved)
         evidence = dict(
             title="Account queue admission",
             actions=actions,
             recovery_links=links,
             outcome=(
-                "withdrawn" if closed else "unstarted" if actions else "execution_review_required"
+                "withdrawn"
+                if closed
+                else (
+                    "domain_recovery_verified"
+                    if domain_resolved
+                    else "unstarted" if actions else "execution_review_required"
+                )
             ),
             queue_ticket=prep["EnqueueSequence"],
             preparation_state=prep["State"],
             explanation=(
                 "The unstarted ticket was fenced and withdrawn. Other operations retain their own verification requirements."
                 if closed
-                else "This queued request can prevent newer work from entering the account. Review the offered cancellation or follow its execution recovery. A timeout alone never authorizes releasing access."
+                else (
+                    "The owning recovery workflow verified this queue handoff or closure. Provider delivery and other operations retain their own verification requirements."
+                    if domain_resolved
+                    else "This queued request can prevent newer work from entering the account. Review the offered cancellation or follow its execution recovery. A timeout alone never authorizes releasing access."
+                )
             ),
         )
         return (
             evidence,
-            digest(state).hex(),
-            closed or prep["State"] not in {"pending", "sql_pending"},
+            digest(dict(queue=state, domain=domain_proof) if domain_proof else state).hex(),
+            closed or domain_resolved,
         )
 
     def execute(self, source_id, action, token, actor, reason):

@@ -63,12 +63,18 @@ def test_cancel_initial_queue_entry_fences_late_worker_and_verifies(refused):
 
 
 @pytest.mark.parametrize("stage", ["preflight", "sql_pending", "writing", "uncertain"])
-def test_admitted_or_uncertain_work_requires_domain_recovery(refused, stage):
+@pytest.mark.asyncio
+async def test_admitted_or_uncertain_work_requires_domain_recovery(refused, stage):
+    from ui.views.recovery_view import RecoveryIncidentView
+
     r = refused
     unstarted(r, stage)
     _, _, _, row = service_for(r)
     assert not row["evidence"]["actions"]
+    assert row["State"] == "open"
     assert row["evidence"]["recovery_links"][0]["kind"] == "producer_refusal"
+    view = RecoveryIncidentView(row)
+    assert "Review execution and ownership" in [item.label for item in view.children]
     assert r.runtime.dal.read(r.source)["State"] == stage
 
 
@@ -83,8 +89,11 @@ def test_admission_race_does_not_release_new_owner(refused):
         stage="preflight",
         resource_keys=("account:" + r.runtime.account,),
     )
-    result = execute(service, row, action="withdraw_queued")
+    with pytest.raises(SourceConflict, match="evidence changed"):
+        execute(service, row, action="withdraw_queued")
+    result = service.review(ACTOR, row["IncidentID"])
     assert result["evidence"]["outcome"] == "execution_review_required"
+    assert result["State"] == "open"
     assert not store.actions
     assert r.runtime.dal.read(r.source)["State"] == "preflight"
 
@@ -151,3 +160,55 @@ def test_other_typed_producers_preserve_domain_cancellation(refused, producer_ki
     with pytest.raises(SourceConflict):
         adapter.dal.withdraw(r.source, row["EvidenceHash"], str(uuid4()))
     assert r.runtime.dal.read(r.source)["State"] == "pending"
+
+
+def test_queue_discovery_covers_more_than_one_page_and_wraps(refused):
+    r = refused
+    expected = set()
+    for _ in range(45):
+        unstarted(r, "pending")
+        expected.add(r.source)
+    dal = QueueAdmissionDAL(r.runtime)
+    first = dal.pending()
+    second = dal.pending(first[-1])
+    third = dal.pending(second[-1])
+    assert len(first) == len(second) == len(third) == 20
+    assert not set(first) & set(second)
+    assert set(first + second + third) == expected
+    assert set(first) & set(third)  # cyclic continuation, with rows still pending
+    # The cursor is an ordering boundary, not a row lookup: deletion/state change
+    # of that preparation must not restart discovery at the first page.
+    r.f.sql.execute(
+        "UPDATE #ExportPreparation SET State='unavailable',OwnerID=?,Fence=1,Version=2 WHERE PreparationID=?",
+        str(uuid4()),
+        first[-1],
+    )
+    assert dal.pending(first[-1]) == second
+
+
+@pytest.mark.parametrize("verified", [False, True])
+def test_terminal_queue_state_requires_owning_domain_verification(refused, verified):
+    from unittest.mock import Mock
+
+    r = refused
+    unstarted(r, "pending")
+    r.f.sql.execute(
+        "UPDATE #ExportPreparation SET State='unavailable',OwnerID=?,Fence=1,Version=2 WHERE PreparationID=?",
+        str(uuid4()),
+        r.source,
+    )
+    dal = QueueAdmissionDAL(r.runtime)
+    assert QueueAdmissionRecovery(dal).inspect(r.source)[2] is False
+    domain = Mock()
+    domain.inspect.return_value = ({}, "d" * 64, verified)
+    adapter = QueueAdmissionRecovery(dal, {"producer_refusal": domain})
+    evidence, _, resolved = adapter.inspect(r.source)
+    assert resolved is verified
+    assert not evidence["actions"]
+    assert evidence["outcome"] == (
+        "domain_recovery_verified" if verified else "execution_review_required"
+    )
+    domain.inspect.assert_called_once_with(r.source)
+    domain.inspect.side_effect = TimeoutError("verification unavailable")
+    with pytest.raises(TimeoutError):
+        adapter.inspect(r.source)
