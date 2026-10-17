@@ -112,16 +112,72 @@ mirror omits authority modules needed by some SQL tests, so those run in the pri
 validation checkout with disposable local SQL objects only.
 
 Merge reviewed mirror and private PRs, then use the installed coordinated updater on
-MINI_AMD. Before a new deployment, finish the prior updater's retained readiness
-verification. The supplied status verifies source, seed and start but leaves readiness
-`intent_outcome_unconfirmed`; preserve receipts and follow same-release verification.
+MINI_AMD. Before a new deployment, close the prior updater's unresolved readiness
+using the exact administrative closeout described below.
 The diagnostic identifies ticket 2907 as a pending player-stat report with no owner,
 generation, job, held resources, provider streams or import receipt. Its initial
 Version=1/Fence=0 shape is covered by SQL-backed guided cancellation and restart
 verification tests. Production confirmation must recheck the live request contract.
 No production cancellation, replica repair or final deployment acceptance is established
-by local tests. The readiness diagnostic also shows log rotation and a later restart;
-the retained startup journals must be verified before a closeout repair is selected.
+by local tests.
+
+## Guided closeout of the 17 October readiness interruption
+
+The readiness diagnostic identifies release `8d368128-2c86-46b3-bee6-6c2a1c7d29d1`
+at private source `471742d76a21f1ab888a6c20741bcba341df80fd`. The first startup's
+log rotated and another supervised startup followed it. The original verifier
+requires exactly one successor and cannot prove its original readiness interval.
+The diagnostic shows sequences 21 and 22 with closed SQL sessions and sequence 23
+with the current open session. It is evidence for a specific recovery, not authority
+to infer success from elapsed time or to retry a write.
+
+`package_k98_readiness_closeout.py` builds `Close-K98Readiness.ps1` for this exact
+release and diagnostic. On MINI_AMD, use an administrator **Windows PowerShell 5.1**
+window under the existing deployment account:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Close-K98Readiness.ps1
+```
+
+The launcher takes the updater's exclusive operator lock and verifies the installed
+library, original bindings, active packet, seven original step receipts and start
+request by their reviewed hashes. It checks the source and seed, both original
+retained-handle termination receipts, the exact successor journals, all three live
+native process identities, SQL contracts and the closed/closed/open session chain.
+Previous sessions must have no open provider streams. No SQL write or business
+repair is performed.
+
+When prompted, run `/ops dl_bot_status` in Discord and check that the bot responds
+and is online. Type **CONFIRM ONLINE** only after that fresh check. The launcher
+repeats machine verification after confirmation, atomically records a separate
+`current_successor_admin_verified_v1` acceptance in the update work directory and
+reads it back. Original `.receipts/readiness.intent.json` stays unconfirmed;
+no historical completion receipt or readiness-status file is manufactured.
+Import/export health remains explicitly degraded and provider delivery unverified.
+Failed checks or declining confirmation do not create acceptance. An interrupted
+write retains its evidence; a repeated successful closeout recognizes its exact
+existing acceptance.
+
+After **CLOSEOUT RECORDED AND READ BACK**, run the normal updater once:
+
+```powershell
+& 'C:\ProgramData\K98\S11\updater\Update-K98.ps1'
+```
+
+That invocation consumes only the completed active pointer and exits; it does not
+restart or deploy. Its legacy wording says the previous release completed. The
+separate acceptance describes what was actually verified. Once the reviewed
+recovery PR is merged and the maintenance window is active, run the updater again
+to deploy it, following its normal drain/restart prompts. Keep the closeout receipt
+and original packet. If the bot restarted again or any pinned evidence changed,
+the exact closeout refuses; preserve the error rather than editing its hashes.
+
+After deployment, verify the recovery centre's report and grouped evidence workflow.
+For queue ticket 2907, incident `7f6a7232-47f0-415a-a19e-796c1efa4f0e` is a typed
+player report: choose **Close failed report & release**, review, confirm and wait
+for verified closure. Grouped replica restoration alone does not clear this queue.
+Check that the summary reports the repaired group, queue outcome and remaining
+blockers, and that unchanged overview notifications no longer repeat each minute.
 
 All remaining P0b recovery work stays in scope. This backlog change does not claim
 completion of historical unknown-write, partial-output or missing-all-copy recovery.
