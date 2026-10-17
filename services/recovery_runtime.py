@@ -13,6 +13,7 @@ from services.stats_import_outcome_dal import ImportExecutionActive
 logger = logging.getLogger(__name__)
 _cursors = {}
 _incident_cursor = None
+_priority_incident_cursor = None
 
 
 @contextmanager
@@ -153,7 +154,7 @@ def _retry_admission():
 
 
 def observe_recovery():
-    global _incident_cursor
+    global _incident_cursor, _priority_incident_cursor
     failures = []
     with recovery_service() as service:
         from services.recovery_backlog_dal import RecoveryBacklogDAL
@@ -193,12 +194,24 @@ def observe_recovery():
                         failures.append(type(exc).__name__)
             except Exception as exc:
                 failures.append(type(exc).__name__)
+        # Existing operational incidents must still be checked after their source
+        # leaves discovery (for example a domain closes a queued preparation).
+        # A separate bounded cursor prevents evidence-copy backlogs delaying them.
+        priority_after = (
+            _priority_incident_cursor[1]
+            if _priority_incident_cursor and _priority_incident_cursor[0] == scope
+            else None
+        )
+        priority = service.store.list_open(after=priority_after, non_evidence=True)
+        _priority_incident_cursor = (scope, priority[-1]["IncidentID"]) if priority else None
         after = _incident_cursor[1] if _incident_cursor and _incident_cursor[0] == scope else None
         incidents = service.store.list_open(after=after)
-        if not incidents:
-            _incident_cursor = None
-        for incident in incidents:
-            _incident_cursor = (scope, incident["IncidentID"])
+        _incident_cursor = (scope, incidents[-1]["IncidentID"]) if incidents else None
+        visited = set()
+        for incident in priority + incidents:
+            if incident["IncidentID"] in visited:
+                continue
+            visited.add(incident["IncidentID"])
             if incident["SourceKind"] not in service.adapters:
                 # Evidence repair remains available while other domain adapters
                 # await authenticated registration. Do not mutate their history.

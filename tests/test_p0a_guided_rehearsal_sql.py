@@ -141,6 +141,7 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     monkeypatch.setattr(recovery_runtime, "_retry_admission", lambda: True)
     monkeypatch.setattr(recovery_runtime, "_cursors", {})
     monkeypatch.setattr(recovery_runtime, "_incident_cursor", None)
+    monkeypatch.setattr(recovery_runtime, "_priority_incident_cursor", None)
     for module in (recovery_view, recovery_review_view):
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
 
@@ -165,9 +166,11 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     alert = channel.send.call_args.kwargs
     message.embeds = [alert["embed"]]
     assert "source_sheet" not in str(alert["embed"].to_dict())
-    incident_id = alert["embed"].footer.text.removeprefix(recovery_view.FOOTER_PREFIX)
+    overview_id = alert["embed"].footer.text.removeprefix("Recovery overview: ")
     with service_scope() as service:
-        assert service.store.get(incident_id)["AlertMessageID"] == 40
+        assert service.store.get(overview_id)["AlertMessageID"] == 40
+        incident = next(row for row in service.store.list_open() if row["SourceID"] == r.source)
+        incident_id = incident["IncidentID"]
 
     interaction = SimpleNamespace(
         user=SimpleNamespace(id=1),
@@ -186,8 +189,15 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     async def click(label):
         await button(current_view(), label).callback(interaction)
 
-    # A newly constructed persistent entry must recover the alert's identity.
+    # A reconstructed persistent overview opens the centre, where the admin
+    # selects the operational incident before its evidence-bound repair.
     await button(recovery_view.RecoveryEntryView(), "Review & fix").callback(interaction)
+    selection = next(item for item in current_view().children if hasattr(item, "options"))
+    assert incident_id in [option.value for option in selection.options]
+    selection._selected_values = [incident_id]
+    interaction.data = {"values": [incident_id]}
+    selection._interaction = interaction
+    await selection.callback(interaction)
     await click("Close rolled-back config & release")
     assert r.outcomes.inspect(r.source)["action"] == "cancel_configuration"
     close_confirmation = current_view()

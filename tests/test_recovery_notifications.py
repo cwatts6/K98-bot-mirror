@@ -141,7 +141,7 @@ def test_failed_check_remains_degraded_across_pages_and_empty_reset(monkeypatch)
 
     store = SimpleNamespace(
         scope="test",
-        list_open=lambda **kwargs: next(pages),
+        list_open=lambda **kwargs: [] if kwargs.get("non_evidence") else next(pages),
         check_failed=lambda key, error: failed.add(key),
         has_failed_checks=lambda: bool(failed),
     )

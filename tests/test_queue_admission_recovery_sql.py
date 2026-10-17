@@ -12,6 +12,7 @@ from tests.test_export_target_containment_sql import contained_job as contained_
 from tests.test_guided_recovery import ACTOR, Store, execute
 from tests.test_producer_admission_recovery_sql import unstarted
 from tests.test_producer_refusal_sql import refused as refused, unblock
+from tests.test_recovery_sql import store as store
 
 
 def legacy_unstarted(r):
@@ -212,3 +213,106 @@ def test_terminal_queue_state_requires_owning_domain_verification(refused, verif
     domain.inspect.side_effect = TimeoutError("verification unavailable")
     with pytest.raises(TimeoutError):
         adapter.inspect(r.source)
+
+
+def test_priority_refresh_pages_and_wraps_independently_with_no_duplicate_checks(
+    store, monkeypatch
+):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from services import recovery_runtime as runtime
+
+    operational = {
+        store.observe("queue_admission", str(uuid4()), dict(actions={}), "a" * 64)["IncidentID"]
+        for _ in range(45)
+    }
+    copies = [
+        store.observe("private_evidence", str(uuid4()), dict(actions={}), "b" * 64)
+        for _ in range(25)
+    ]
+    original_list = store.list_open
+    first = original_list(non_evidence=True)[0]
+    monkeypatch.setattr(
+        store,
+        "list_open",
+        lambda **kwargs: (
+            original_list(**kwargs) if kwargs.get("non_evidence") else copies[:19] + [first]
+        ),
+    )
+    refreshed = Mock()
+
+    @contextmanager
+    def scoped_service():
+        yield SimpleNamespace(
+            store=store,
+            adapters={"queue_admission": SimpleNamespace(pending_recovery=lambda **kwargs: [])},
+            recover_automatic=refreshed,
+        )
+
+    monkeypatch.setattr(runtime, "recovery_service", scoped_service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    monkeypatch.setattr(runtime, "_cursors", {})
+    monkeypatch.setattr(runtime, "_incident_cursor", None)
+    monkeypatch.setattr(runtime, "_priority_incident_cursor", None)
+    seen = set()
+    for expected_count in (20, 21, 6, 1, 20):
+        refreshed.reset_mock()
+        assert runtime.observe_recovery() == []
+        checked = [call.args[0] for call in refreshed.call_args_list]
+        assert len(checked) == len(set(checked)) == expected_count
+        seen.update(checked)
+    assert seen == operational
+
+
+@pytest.mark.parametrize("verified", [False, True])
+def test_terminal_queue_is_refreshed_ahead_of_evidence_backlog(
+    refused, store, monkeypatch, verified
+):
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    from services import recovery_runtime as runtime
+
+    recovery_store = store
+    r = refused
+    unstarted(r, "pending")
+    domain = Mock()
+    domain.inspect.return_value = ({}, "d" * 64, verified)
+    adapter = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime), {"producer_refusal": domain})
+    service = RecoveryService(
+        recovery_store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3
+    )
+    queue = service.review_source(ACTOR, adapter.kind, r.source)
+    backlog = [
+        recovery_store.observe("private_evidence", str(uuid4()), dict(actions={}), "a" * 64)
+        for _ in range(25)
+    ]
+    r.f.sql.execute(
+        "UPDATE #ExportPreparation SET State='unavailable',OwnerID=?,Fence=1,Version=2 WHERE PreparationID=?",
+        str(uuid4()),
+        r.source,
+    )
+    r.f.sql.commit()
+    assert r.source not in adapter.pending_recovery()
+
+    @contextmanager
+    def scoped_service():
+        yield service
+
+    original_list = recovery_store.list_open
+    monkeypatch.setattr(
+        recovery_store,
+        "list_open",
+        lambda **kwargs: original_list(**kwargs) if kwargs.get("non_evidence") else backlog[:20],
+    )
+    monkeypatch.setattr(runtime, "recovery_service", scoped_service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    monkeypatch.setattr(runtime, "_cursors", {})
+    monkeypatch.setattr(runtime, "_incident_cursor", None)
+    monkeypatch.setattr(runtime, "_priority_incident_cursor", None)
+    assert runtime.observe_recovery() == []
+    result = recovery_store.get(queue["IncidentID"])
+    assert result["State"] == ("resolved" if verified else "open")
+    domain.inspect.assert_called_once_with(r.source)
