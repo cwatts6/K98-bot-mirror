@@ -30,6 +30,10 @@ async def test_alert_reuses_identity_or_recreates_deleted_message(monkeypatch, e
     )
 
     async def history(**kwargs):
+        # Pycord 2.7 returns None for a missing footer, not an empty proxy.
+        yield SimpleNamespace(
+            author=SimpleNamespace(id=99), embeds=[discord.Embed(title="Ordinary status")]
+        )
         if existing == "lost_ack":
             yield message
 
@@ -85,6 +89,7 @@ def test_monitor_health_is_not_healthy_before_first_check_or_after_stall(monkeyp
 
     monkeypatch.setattr(health, "_last_success", None)
     monkeypatch.setattr(health, "_failure", None)
+    monkeypatch.setattr(health, "_notification_failure", None)
     assert not health.status()[0]
     health.record_success()
     assert health.status()[0]
@@ -184,3 +189,56 @@ async def test_deleted_outage_alert_does_not_block_monitor_recovery(monkeypatch)
     assert healthy.call_count == 2
     unhealthy.assert_called_once()
     message.edit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_notification_error_does_not_invalidate_incident_checks(monkeypatch):
+    from core import recovery_lifecycle as module
+
+    monkeypatch.setattr(module, "drain_thread", AsyncMock(return_value=[]))
+    monkeypatch.setattr(
+        module, "publish_recovery_alerts", AsyncMock(side_effect=AttributeError("private payload"))
+    )
+    healthy, unhealthy, notifications = Mock(), Mock(), Mock()
+    monkeypatch.setattr(module.recovery_health, "record_success", healthy)
+    monkeypatch.setattr(module.recovery_health, "record_failure", unhealthy)
+    monkeypatch.setattr(module.recovery_health, "record_notifications", notifications)
+    monkeypatch.setattr(module.asyncio, "sleep", AsyncMock(side_effect=asyncio.CancelledError()))
+    with pytest.raises(asyncio.CancelledError):
+        await module.observe_recovery_outcomes(Mock())
+    healthy.assert_called_once()
+    unhealthy.assert_not_called()
+    assert isinstance(notifications.call_args.args[0], AttributeError)
+
+
+def test_monitor_diagnostics_retain_callsite_without_private_exception_text(monkeypatch):
+    from services import recovery_health as health
+
+    monkeypatch.setattr(health, "_notification_failure", None)
+    try:
+        raise ValueError("password=secret-private-data")
+    except ValueError as exc:
+        health.record_notifications(exc)
+    result = health.report()
+    assert (
+        result["notification_failure"]["frames"][-1]["function"]
+        == "test_monitor_diagnostics_retain_callsite_without_private_exception_text"
+    )
+    assert "secret-private-data" not in str(result)
+    health.record_notifications()
+    assert health.report()["notification_failure"] is None
+
+
+@pytest.mark.asyncio
+async def test_review_entry_handles_real_embed_without_footer(monkeypatch):
+    from ui.views import recovery_view as module
+
+    monkeypatch.setattr(module, "actor_for", Mock())
+    centre = AsyncMock()
+    monkeypatch.setattr(module, "show_centre", centre)
+    interaction = SimpleNamespace(message=SimpleNamespace(embeds=[discord.Embed(title="Status")]))
+    view = module.RecoveryEntryView()
+    await next(child for child in view.children if child.label == "Review & fix").callback(
+        interaction
+    )
+    centre.assert_awaited_once_with(interaction)

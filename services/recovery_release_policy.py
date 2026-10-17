@@ -7,6 +7,7 @@ from types import MappingProxyType
 # New adapter actions are withheld until deliberately added with acceptance proof.
 P0A_ACTIONS = MappingProxyType(
     {
+        "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(
             {"close_unstarted_admission", "resume_sql_stage", "resume_current_registration"}

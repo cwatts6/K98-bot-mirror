@@ -1,5 +1,6 @@
 """Persistent recovery entry and disposable evidence-bound confirmation views."""
 
+import io
 import logging
 from uuid import UUID
 
@@ -270,6 +271,10 @@ class RecoveryIncidentView(discord.ui.View):
     async def recheck(self, button, interaction):
         await show_incident(interaction, self.row["IncidentID"])
 
+    @discord.ui.button(label="Download recovery report", style=discord.ButtonStyle.secondary)
+    async def download(self, button, interaction):
+        await show_report(interaction)
+
 
 class RecoveryListView(discord.ui.View):
     def __init__(self, rows):
@@ -304,6 +309,66 @@ class RecoveryListView(discord.ui.View):
             next_button.callback = next_page
             self.add_item(next_button)
 
+    @discord.ui.button(label="Download recovery report", style=discord.ButtonStyle.secondary)
+    async def download(self, button, interaction):
+        await show_report(interaction)
+
+
+class RecoveryReportView(discord.ui.View):
+    def __init__(self, report):
+        super().__init__(timeout=600)
+        self.report = report
+
+    @discord.ui.button(label="Download next report part", style=discord.ButtonStyle.primary)
+    async def download(self, button, interaction):
+        await show_report(
+            interaction, self.report["next_after"], self.report["through"], self.report["part"] + 1
+        )
+
+
+async def show_report(interaction, after=None, through=None, part=1):
+    from core.operator_diagnostic_payloads import resolve_attachment_size_limit
+
+    try:
+        actor = actor_for(interaction)
+        if not await safe_defer(interaction, ephemeral=True):
+            return
+        limit = min(resolve_attachment_size_limit(interaction), 8 * 1024 * 1024)
+        try:
+            report = await call("download_report", actor, after, through, part, limit)
+        except Exception as exc:
+            from services.recovery_report import unavailable_report
+
+            report = unavailable_report(exc)
+        if report.get("unavailable"):
+            await interaction.followup.send(
+                content="The incident store could not be read. This diagnostic report includes monitor and collection failures; it is incomplete and does not mean there are no incidents.",
+                file=discord.File(io.BytesIO(report["content"]), filename=report["filename"]),
+                view=RecoveryEntryView(),
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        more = report["next_after"] is not None
+        await interaction.followup.send(
+            content=(
+                f"Recovery report part {part}: {report['count']} incidents; "
+                f"{report['total']} recorded in this scope. "
+                + (
+                    "More incidents remain: download the next part below."
+                    if more
+                    else "This is the final part. Keep every part for the complete report."
+                )
+                + " Includes resolved incidents and saved repair requirements. No repairs were applied."
+            ),
+            file=discord.File(io.BytesIO(report["content"]), filename=report["filename"]),
+            view=RecoveryReportView(report) if more else RecoveryEntryView(),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+    except Exception as exc:
+        await report_error(interaction, exc)
+
 
 async def show_centre(interaction, after=None):
     try:
@@ -336,7 +401,7 @@ class RecoveryEntryView(discord.ui.View):
         try:
             actor_for(interaction)
             embeds = getattr(interaction.message, "embeds", [])
-            footer = embeds[0].footer.text if embeds else None
+            footer = getattr(embeds[0].footer, "text", None) if embeds else None
             if footer and footer.startswith(FOOTER_PREFIX):
                 incident_id = str(UUID(footer[len(FOOTER_PREFIX) :]))
                 await show_incident(interaction, incident_id)
@@ -352,3 +417,11 @@ class RecoveryEntryView(discord.ui.View):
     )
     async def centre(self, button, interaction):
         await show_centre(interaction)
+
+    @discord.ui.button(
+        label="Download recovery report",
+        custom_id="k98:recovery:report:v1",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def download(self, button, interaction):
+        await show_report(interaction)

@@ -324,11 +324,17 @@ async def test_pending_or_unavailable_verification_hides_repair_buttons():
 
     _, _, _, row = setup()
     row["pending_action"] = {"state": "unknown", "kind": "supersede_partial"}
-    assert [item.label for item in RecoveryIncidentView(row).children] == ["Recheck"]
+    assert [item.label for item in RecoveryIncidentView(row).children] == [
+        "Recheck",
+        "Download recovery report",
+    ]
     assert any(field.name == "Repair being verified" for field in incident_embed(row).fields)
     row["pending_action"] = None
     row["evidence"]["check_unavailable"] = "TimeoutError"
-    assert [item.label for item in RecoveryIncidentView(row).children] == ["Recheck"]
+    assert [item.label for item in RecoveryIncidentView(row).children] == [
+        "Recheck",
+        "Download recovery report",
+    ]
     assert any(field.name == "Verification unavailable" for field in incident_embed(row).fields)
 
 

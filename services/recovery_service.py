@@ -68,6 +68,11 @@ class RecoveryService:
         self.authorize(actor)
         return self.store.list_open(after=after)
 
+    def download_report(self, actor, after=None, through=None, part=1, max_bytes=8388608):
+        from services.recovery_report import build_report
+
+        return build_report(self, actor, after, through, part, max_bytes)
+
     def review_details_page(self, actor, incident_id, action, revision, token, page=0):
         self.authorize(actor)
         row = self.refresh(incident_id)
@@ -100,10 +105,14 @@ class RecoveryService:
         )
 
     def recover_automatic(self, incident_id):
-        """Operator-approved policy: only adapters with a verified safe action opt in."""
+        """Only the explicitly approved verified read release may run automatically."""
         row = self.refresh(incident_id)
         action = getattr(self.adapters[row["SourceKind"]], "automatic_action", None)
-        if row["State"] == "resolved" or action not in row["evidence"]["actions"]:
+        if (
+            (row["SourceKind"], action) != ("configuration_read", "release_read")
+            or row["State"] == "resolved"
+            or action not in row["evidence"]["actions"]
+        ):
             return row
         return self._execute(
             incident_id,

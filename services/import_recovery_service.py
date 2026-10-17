@@ -92,6 +92,44 @@ class ImportRecoveryAdapter:
             ),
             "actions": actions,
         }
+        if not execution:
+            # Missing receipts can also be typed admissions interrupted before
+            # SQL registration. Link to that adapter's stronger proof checks;
+            # never infer a rollback or release from receipt absence alone.
+            document = json.loads(prep.get("RequestJson") or "{}")
+            producer = document.get("request", {}).get("producer", {})
+            held = preview.get("resources", [])
+            evidence["receipt_diagnostics"] = dict(
+                receipt_present=False,
+                preparation_state=prep.get("State"),
+                preparation_version=prep.get("Version"),
+                producer_kind=producer.get("kind"),
+                held_resources=[
+                    dict(
+                        category=str(r["ResourceKey"]).split(":", 1)[0],
+                        fence=r.get("Fence"),
+                        version=r.get("Version"),
+                        blocked=bool(r.get("BlockedReason")),
+                    )
+                    for r in held
+                ],
+                captured=bool(prep.get("SpoolKey")),
+                export_job_id=str(prep["JobID"]) if prep.get("JobID") else None,
+            )
+            if producer.get("kind") == "stats_import":
+                evidence["recovery_links"] = [
+                    dict(
+                        label="Review interrupted admission",
+                        kind="producer_refusal",
+                        source_id=producer.get("parent") or source_id,
+                    )
+                ]
+                evidence["explanation"] = (
+                    "No SQL execution receipt is recorded. The saved request identifies a stats "
+                    "admission: use Review interrupted admission to check whether it stopped before "
+                    "execution and offer its guided cancellation or continuation. This incident "
+                    "does not authorize a release or replay."
+                )
         if self.capture_recovery:
             try:
                 disposition = self.capture_recovery.abandonment(preview)

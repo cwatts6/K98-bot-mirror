@@ -35,7 +35,8 @@ async def publish_recovery_alerts(bot):
                 if (
                     candidate.author.id == bot.user.id
                     and candidate.embeds
-                    and candidate.embeds[0].footer.text == FOOTER_PREFIX + row["IncidentID"]
+                    and getattr(candidate.embeds[0].footer, "text", None)
+                    == FOOTER_PREFIX + row["IncidentID"]
                 ):
                     message = candidate
                     break

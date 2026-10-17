@@ -22,49 +22,55 @@ async def observe_recovery_outcomes(bot):
     while True:
         try:
             failures = await drain_thread(observe_recovery)
-            await publish_recovery_alerts(bot)
             if failures:
                 raise RuntimeError("One or more incident checks are unavailable")
             recovery_health.record_success()
             if unavailable:
                 logger.info("recovery_observer available=true")
             unavailable = False
-            if outage_message:
-                try:
-                    await outage_message.edit(
-                        content="Recovery monitoring has resumed. Review the recovery centre for outstanding incidents.",
-                        view=RecoveryEntryView(),
-                    )
-                except discord.NotFound:
-                    # A deleted diagnostic message cannot invalidate successful checks.
-                    pass
-                outage_message = None
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             recovery_health.record_failure(exc)
             if not unavailable:
                 logger.warning(
-                    "recovery_observer available=false error_type=%s", type(exc).__name__
+                    "recovery_observer available=false diagnostic=%s",
+                    recovery_health.failure_detail(exc),
                 )
             unavailable = True
-            if outage_message is None:
+        # Notification delivery is independent of incident inspection and repair.
+        # A malformed historical message cannot invalidate completed SQL checks.
+        try:
+            if unavailable and outage_message is None:
+                channel = bot.get_channel(bot_config.NOTIFY_CHANNEL_ID) or await bot.fetch_channel(
+                    bot_config.NOTIFY_CHANNEL_ID
+                )
+                if int(channel.guild.id) != int(bot_config.GUILD_ID):
+                    raise ValueError("Recovery notification guild differs.")
+                outage_message = await channel.send(
+                    "Recovery monitoring is unavailable. Existing incidents and reservations are retained. The bot will retry checks automatically; recovery status must not be treated as healthy.",
+                    view=RecoveryEntryView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            elif not unavailable and outage_message:
                 try:
-                    channel = bot.get_channel(
-                        bot_config.NOTIFY_CHANNEL_ID
-                    ) or await bot.fetch_channel(bot_config.NOTIFY_CHANNEL_ID)
-                    if int(channel.guild.id) != int(bot_config.GUILD_ID):
-                        raise ValueError("Recovery notification guild differs.")
-                    outage_message = await channel.send(
-                        "Recovery monitoring is unavailable. Existing incidents and reservations are retained. The bot will retry checks automatically; recovery status must not be treated as healthy.",
+                    await outage_message.edit(
+                        content="Recovery monitoring has resumed. Review the recovery centre for outstanding incidents.",
                         view=RecoveryEntryView(),
-                        allowed_mentions=discord.AllowedMentions.none(),
                     )
-                except Exception as alert_error:
-                    logger.warning(
-                        "recovery_monitor_alert_unavailable error_type=%s",
-                        type(alert_error).__name__,
-                    )
+                except discord.NotFound:
+                    pass
+                outage_message = None
+            await publish_recovery_alerts(bot)
+            recovery_health.record_notifications()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            recovery_health.record_notifications(exc)
+            logger.warning(
+                "recovery_notifications_unavailable diagnostic=%s",
+                recovery_health.failure_detail(exc),
+            )
         await asyncio.sleep(30)
 
 

@@ -131,6 +131,37 @@ class RecoveryDAL:
                 self.scope,
             )
 
+    def report_page(self, *, after=None, through=None):
+        """Read all states in bounded pages; never inspect, reconcile or dispatch."""
+        after = identity(after) if after is not None else None
+        with transaction(self.connect) as cursor:
+            if through is None:
+                cursor.execute("SELECT SYSUTCDATETIME() AS ThroughUTC")
+                through = one(cursor)["ThroughUTC"]
+            cursor.execute(
+                "SELECT COUNT_BIG(*) AS Total FROM dbo.RecoveryIncident "
+                "WHERE ScopeKey=? AND FirstSeenUTC<=?",
+                self.scope,
+                through,
+            )
+            total = one(cursor)["Total"]
+            cursor.execute(
+                "SELECT TOP (101) * FROM dbo.RecoveryIncident WHERE ScopeKey=? "
+                "AND FirstSeenUTC<=? AND (? IS NULL OR IncidentID>CAST(? AS uniqueidentifier)) "
+                "ORDER BY IncidentID",
+                self.scope,
+                through,
+                after,
+                after,
+            )
+            result = rows(cursor)
+            more = len(result) > 100
+            result = result[:100]
+            for row in result:
+                row["IncidentID"] = identity(row["IncidentID"])
+                row["evidence"] = json.loads(row["EvidenceJson"])
+            return dict(rows=result, through=through, total=total, more=more)
+
     def has_failed_checks(self):
         """Include failures outside the current discovery page and across restarts."""
         with transaction(self.connect) as cursor:

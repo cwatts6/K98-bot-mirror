@@ -16,6 +16,7 @@ from services.export_evidence_recovery import EvidenceRecoveryAdapter
 from services.export_evidence_storage import EvidenceCopies
 from services.export_execution_authority import ExecutionUncertain
 from services.export_runtime_composition import LocalAuthorityClient, RuntimeRegistration
+from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
 from tests.test_export_runtime_composition import registration_fixture
 from tests.test_guided_recovery import ACTOR, Store
@@ -54,7 +55,12 @@ def recovery(tmp_path, monkeypatch):
     adapter = EvidenceRecoveryAdapter(client)
     incidents = Store()
     service = RecoveryService(
-        incidents, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3
+        incidents,
+        {adapter.kind: adapter},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
     )
     return SimpleNamespace(**locals())
 
@@ -134,14 +140,31 @@ def test_lost_repair_reply_reconciles_without_second_restoration(recovery, monke
     assert r.incidents.actions[0]["State"] == "verified"
 
 
-def test_original_verified_copy_is_protected_automatically_without_read_release_claim(recovery):
+def test_original_verified_copy_requires_confirmation_and_verifies_both_copies(
+    recovery, monkeypatch
+):
     r = recovery
+    # A legacy adapter's opt-in cannot authorize a new automatic mutation, even
+    # without a presentation policy. Only verified configuration reads may run.
+    monkeypatch.setattr(r.adapter, "automatic_action", "protect_evidence", raising=False)
+    r.service.presentation_policy = None
     (r.tmp_path / ("replica_" + r.receipt.key)).unlink()
     row = r.service.review_source(ACTOR, "private_evidence", r.reference)
     result = r.service.recover_automatic(row["IncidentID"])
+    assert result["State"] == "open"
+    assert r.incidents.actions == []
+    result = r.service.execute(
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "protect_evidence",
+        "Confirm exact-copy restoration",
+    )
     assert result["State"] == "resolved"
-    assert r.incidents.actions[0]["Actor"] == "system:guided_recovery"
-    assert r.incidents.actions[0]["Reason"] == r.adapter.automatic_reason
+    assert set(result["evidence"]["copies"].values()) == {"verified"}
+    assert r.incidents.actions[0]["Actor"] == "discord:1"
+    assert r.incidents.actions[0]["State"] == "verified"
 
 
 def test_primary_damage_requires_admin_confirmation(recovery):
