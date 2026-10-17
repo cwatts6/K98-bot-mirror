@@ -51,3 +51,55 @@ completion and other withheld recovery actions remain required scope. The report
 must identify those restrictions rather than label them repaired. Production
 incident settlement requires current evidence and successful post-repair
 verification; local tests do not establish it.
+
+## Deployment and functional acceptance
+
+Use the installed updater after both recovery PRs are merged. On MINI_AMD, in
+Windows PowerShell 5.1 as administrator, first run:
+
+```powershell
+& 'C:\ProgramData\K98\S11\updater\Update-K98.ps1' -PrepareOnly
+```
+
+Continue only when preparation and preflight pass. During the maintenance window,
+run the same command without `-PrepareOnly`, then use `/ops graceful_restart`
+only when the updater requests it. The updater coordinates source and startup
+policy; no new SQL migration or updater installation is part of this patch.
+
+After the updater confirms the successor is online:
+
+1. Open `/ops dl_bot_status` and **Open recovery centre**. After a successful
+   monitor cycle, monitoring should be active. A notification failure must remain
+   separately visible; active monitoring does not mean all incidents are resolved.
+2. Download the report before repairing incidents and retain every part.
+   Confirm the report includes the open evidence and stats incidents, their
+   blockers, current repair availability and monitor diagnostics.
+3. For the recoverable evidence incident, use **Protect verified evidence** or
+   **Restore verified evidence**, review the checks and confirm. Success requires
+   both copies to verify. Reopen the incident or recheck it and download a second
+   report to verify its resolved state. Do not interpret this as proof that the
+   original SQL or provider write succeeded.
+4. For receipt-less stats work, follow **Review interrupted admission** when
+   available. Review the offered evidence and continuation/cancellation choice
+   before confirming. If no typed admission can be proven, keep the incident open
+   and supply the report for the required historical recovery work.
+5. If a repair remains pending, use **Recheck** to reconcile and verify its saved
+   action. Do not replay an uncertain write or clear a reservation manually.
+   Failed or unavailable verification must stay visible in the next report.
+
+A deployment/startup success alone does not establish import/export health.
+Accept this patch only after the monitor, report download and applicable guided
+repair checks above succeed on MINI_AMD. Retain the updater transcript and
+before/after reports if any check fails.
+
+Rollback uses the normal coordinated updater with a reviewed revert on private
+main; do not overwrite the live checkout. No schema rollback or recovery-record
+deletion is needed. Keep repair receipts, evidence copies and retained work.
+Reverting this patch removes its new report controls and evidence-action exposure,
+but must not be treated as undoing a repair already applied.
+
+All six P0b workstreams and their acceptance criteria remain mandatory in
+[the full-release matrix](../task_packs/guided_recovery_release_split.md#p0b--full-release).
+That includes partial configuration and reporting, whole-pipeline continuation,
+lost evidence/history, unattributed holds and integrated rollover. The unknown-write,
+all-KVK and player-report workflows also retain their full qualification requirements.

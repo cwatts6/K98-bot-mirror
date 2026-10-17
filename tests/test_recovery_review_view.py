@@ -40,7 +40,11 @@ async def test_closed_configuration_handoff_keeps_private_authorization(monkeypa
         ),
     )
     incident = view.RecoveryIncidentView(row)
-    assert [b.label for b in incident.children] == ["Recheck", "Continue configuration"]
+    assert [b.label for b in incident.children] == [
+        "Recheck",
+        "Download recovery report",
+        "Continue configuration",
+    ]
     interaction = SimpleNamespace(user=SimpleNamespace(id=1), guild_id=2, channel_id=3)
     setattr(interaction, field, SimpleNamespace(id=9) if field == "user" else 9)
     await next(b for b in incident.children if b.label == "Continue configuration").callback(
