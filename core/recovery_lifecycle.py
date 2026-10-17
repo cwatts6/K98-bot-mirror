@@ -72,8 +72,9 @@ async def observe_recovery_outcomes(bot):
             )
         # Always publish due incidents, even when the separate outage message
         # cannot be sent or edited. Retain either failure until both succeed.
+        notifications_complete = False
         try:
-            await publish_recovery_alerts(bot)
+            notifications_complete = await publish_recovery_alerts(bot)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -82,7 +83,9 @@ async def observe_recovery_outcomes(bot):
                 "recovery_notifications_unavailable diagnostic=%s",
                 recovery_health.failure_detail(exc),
             )
-        recovery_health.record_notifications(notification_error)
+        # A leased/skipped alert has not verified delivery recovery.
+        if notification_error is not None or notifications_complete:
+            recovery_health.record_notifications(notification_error)
         await asyncio.sleep(30)
 
 

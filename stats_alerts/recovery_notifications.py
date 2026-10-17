@@ -12,14 +12,16 @@ async def publish_recovery_alerts(bot):
 
     rows = await drain_thread(alert_rows)
     if not rows:
-        return
+        return True
     channel = bot.get_channel(bot_config.NOTIFY_CHANNEL_ID) or await bot.fetch_channel(
         bot_config.NOTIFY_CHANNEL_ID
     )
     if int(channel.guild.id) != int(bot_config.GUILD_ID):
         raise ValueError("Recovery notification guild differs from configuration.")
+    complete = True
     for row in rows:
         if not await drain_thread(claim_alert, row["IncidentID"]):
+            complete = False
             continue
         message = None
         if row["AlertMessageID"] and row["AlertChannelID"] == channel.id:
@@ -53,3 +55,4 @@ async def publish_recovery_alerts(bot):
                 allowed_mentions=discord.AllowedMentions.none(),
             )
         await drain_thread(record_alert, row["IncidentID"], row["Revision"], channel.id, message.id)
+    return complete

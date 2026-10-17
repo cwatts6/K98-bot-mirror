@@ -58,7 +58,7 @@ async def test_alert_reuses_identity_or_recreates_deleted_message(monkeypatch, e
         return fn(*args)
 
     monkeypatch.setattr(module, "drain_thread", inline)
-    await module.publish_recovery_alerts(bot)
+    assert await module.publish_recovery_alerts(bot) is True
     assert channel.send.call_count == (1 if existing in {"new", "deleted"} else 0)
     recorded.assert_called_once_with(row["IncidentID"], row["Revision"], 3, 40)
 
@@ -80,7 +80,7 @@ async def test_notification_lease_prevents_second_sender(monkeypatch):
         return fn(*args)
 
     monkeypatch.setattr(module, "drain_thread", inline)
-    await module.publish_recovery_alerts(bot)
+    assert await module.publish_recovery_alerts(bot) is False
     channel.send.assert_not_called()
 
 
@@ -297,3 +297,57 @@ def test_health_report_uses_one_consistent_status_snapshot(monkeypatch):
     report = health.report()
     assert (report["healthy"], report["status"]) == (True, "Monitoring active")
     snapshot.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_delivery_failure_survives_lease_skip_until_verified_retry(monkeypatch):
+    import bot_config
+    from core import recovery_lifecycle as lifecycle
+    from services import recovery_health as health
+    from stats_alerts import recovery_notifications as notifications
+
+    _, _, _, row = setup()
+    row.update(AlertMessageID=None, AlertChannelID=3, AlertedRevision=0)
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 3)
+    monkeypatch.setattr(bot_config, "GUILD_ID", 2)
+    for name in ("_last_success", "_failure", "_failure_detail", "_notification_failure"):
+        monkeypatch.setattr(health, name, None)
+    message = SimpleNamespace(id=40)
+
+    async def history(**kwargs):
+        for item in []:
+            yield item
+
+    channel = SimpleNamespace(
+        id=3,
+        guild=SimpleNamespace(id=2),
+        history=history,
+        send=AsyncMock(side_effect=[TimeoutError(), message]),
+    )
+    bot = SimpleNamespace(user=SimpleNamespace(id=99), get_channel=lambda _: channel)
+    monkeypatch.setattr(notifications, "alert_rows", lambda: [row])
+    monkeypatch.setattr(notifications, "claim_alert", Mock(side_effect=[True, False, True]))
+    recorded = Mock()
+    monkeypatch.setattr(notifications, "record_alert", recorded)
+
+    async def inline(fn, *args):
+        return fn(*args)
+
+    monkeypatch.setattr(notifications, "drain_thread", inline)
+    monkeypatch.setattr(lifecycle, "drain_thread", AsyncMock(return_value=[]))
+    snapshots = []
+
+    async def next_cycle(_):
+        snapshots.append(health.report())
+        if len(snapshots) == 3:
+            raise asyncio.CancelledError()
+
+    monkeypatch.setattr(lifecycle.asyncio, "sleep", next_cycle)
+    with pytest.raises(asyncio.CancelledError):
+        await lifecycle.observe_recovery_outcomes(bot)
+    assert all(snapshot["healthy"] for snapshot in snapshots)
+    assert snapshots[0]["notification_failure"]["error_type"] == "TimeoutError"
+    assert snapshots[1]["notification_failure"] == snapshots[0]["notification_failure"]
+    assert snapshots[2]["notification_failure"] is None
+    assert channel.send.await_count == 2
+    recorded.assert_called_once_with(row["IncidentID"], row["Revision"], 3, 40)
