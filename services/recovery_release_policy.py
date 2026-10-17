@@ -10,6 +10,7 @@ P0A_ACTIONS = MappingProxyType(
         "evidence_batch": frozenset(),
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued"}),
+        "player_report": frozenset({"cancel_report"}),
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(

@@ -30,6 +30,10 @@ Acceptance requires:
   recovery and cannot use this cancellation.
   Typed producers always use their domain cancellation/continuation workflow,
   including requests which have not acquired admission yet.
+- An atomic player-stat report with no committed output exposes **Close failed
+  report & release**. Confirmation rechecks scope, execution locks, the checkpoint,
+  provider streams and exact reservation ownership, then fences the attempt and
+  verifies its durable closure. Report capture actions retain their separate gate.
 
 ## Admin workflow
 
@@ -62,6 +66,11 @@ For **Account queue admission**, review the offered action. **Cancel unstarted q
 entry** cancels only a proven initial pending request. **Review execution and ownership**
 opens the appropriate recovery when admission already happened. Successful cancellation
 removes that ticket from eligibility; subsequent admission still checks every other owner.
+For a player-stat report, follow **Review execution and ownership**, then **Close
+failed report & release** and its confirmation. This preserves imported data and
+does not claim that reports or caches are refreshed. If registration is restricted
+to evidence recovery, finish the verified evidence group first; the monitor retries
+registration before enabling domain recovery. Do not bypass that boundary.
 
 ## Replica investigation
 
@@ -77,6 +86,13 @@ proof or repair tokens. Compare them with deployment timing and newly observed
 incidents to distinguish legacy single-copy files from subsequent loss. Neither
 individual nor grouped copy restoration is automatic: the service permits automatic
 release only for previously approved verified read-only configuration recovery.
+
+The complete MINI_AMD metadata diagnostic supplied on 17 October contains 20,445
+references: 17,342 primary-only and 3,103 paired, with no replica-only references.
+All missing replicas have primary creation dates from 6–15 October. All 3,069
+primaries created since 08:00 UTC on 17 October have replicas. This supports a
+historical backlog rather than observed continuing loss; timestamps alone do not
+prove why the copies were absent. Guided restoration still verifies original hashes.
 
 ## Architecture, validation and rollout
 
@@ -99,8 +115,13 @@ Merge reviewed mirror and private PRs, then use the installed coordinated update
 MINI_AMD. Before a new deployment, finish the prior updater's retained readiness
 verification. The supplied status verifies source, seed and start but leaves readiness
 `intent_outcome_unconfirmed`; preserve receipts and follow same-release verification.
+The diagnostic identifies ticket 2907 as a pending player-stat report with no owner,
+generation, job, held resources, provider streams or import receipt. Its initial
+Version=1/Fence=0 shape is covered by SQL-backed guided cancellation and restart
+verification tests. Production confirmation must recheck the live request contract.
 No production cancellation, replica repair or final deployment acceptance is established
-by local tests. The exact reported blocker requires its current diagnostic evidence.
+by local tests. The readiness diagnostic also shows log rotation and a later restart;
+the retained startup journals must be verified before a closeout repair is selected.
 
 All remaining P0b recovery work stays in scope. This backlog change does not claim
 completion of historical unknown-write, partial-output or missing-all-copy recovery.

@@ -169,7 +169,7 @@ def test_interrupted_admission_can_be_closed_with_exact_scope(recovery, state):
         )
     r.owner.execute(
         r.rewrite(
-            "UPDATE dbo.ExportPreparation SET State=?,OwnerID=CASE WHEN ?='pending' THEN NULL ELSE OwnerID END,Fence=CASE WHEN ?='pending' THEN 0 ELSE Fence END WHERE PreparationID=?"
+            "UPDATE dbo.ExportPreparation SET State=?,OwnerID=CASE WHEN ?='pending' THEN NULL ELSE OwnerID END,Fence=CASE WHEN ?='pending' THEN 0 ELSE Fence END,Version=1 WHERE PreparationID=?"
         ),
         state,
         state,
@@ -181,3 +181,67 @@ def test_interrupted_admission_can_be_closed_with_exact_scope(recovery, state):
     r.outcomes.cancel(r.source, preview["token"], "admin", "close interrupted report")
     final = r.outcomes.inspect(r.source)
     assert final["action"] == "cancelled" and not final["resources"]
+
+
+@pytest.mark.asyncio
+async def test_initial_report_queue_guided_confirmation_and_restart_verification(recovery):
+    from services.queue_admission_recovery import QueueAdmissionRecovery
+    from services.queue_admission_recovery_dal import QueueAdmissionDAL
+    from services.recovery_release_policy import p0a_presentation
+    from services.recovery_service import RecoveryActor, RecoveryService
+    from tests.test_guided_recovery import ACTOR, Store, execute
+    from ui.views.recovery_view import RecoveryIncidentView
+
+    r = recovery
+    uncommitted(r)
+    r.owner.execute(r.rewrite("DELETE dbo.ExportResource WHERE ActivePreparationID=?"), r.source)
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET State='pending',OwnerID=NULL,Fence=0,Version=1 WHERE PreparationID=?"
+        ),
+        r.source,
+    )
+    r.runtime.account = r.outcomes.account
+    queue = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime))
+    evidence, _, resolved = queue.inspect(r.source)
+    assert not resolved and not evidence["actions"]
+    link = evidence["recovery_links"][0]
+    assert (link["kind"], link["source_id"]) == ("player_report", r.source)
+    store = Store()
+    adapter = PlayerReportRecoveryAdapter(r.outcomes, r.service)
+    service = RecoveryService(
+        store,
+        {adapter.kind: adapter},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
+    )
+    row = service.review_source(ACTOR, link["kind"], link["source_id"])
+    assert "release_notice" not in row
+    assert "Close failed report & release" in [b.label for b in RecoveryIncidentView(row).children]
+    for actor in (RecoveryActor(9, 2, 3), RecoveryActor(1, 9, 3), RecoveryActor(1, 2, 9)):
+        with pytest.raises(SourceConflict, match="configured admin"):
+            execute(service, row, actor=actor, action="cancel_report")
+    assert store.actions == []
+    # An acknowledgement lost after durable approval must retain the same action.
+    store.lose_claim_ack = True
+    with pytest.raises(Exception, match="lost intent commit"):
+        execute(service, row, action="cancel_report")
+    store.lose_claim_ack = False
+    restarted = RecoveryService(
+        store,
+        {adapter.kind: PlayerReportRecoveryAdapter(r.outcomes, r.service)},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
+    )
+    assert restarted.review(ACTOR, row["IncidentID"])["State"] == "resolved"
+    # A second independent read verifies the durable domain receipt.
+    assert restarted.review(ACTOR, row["IncidentID"])["State"] == "resolved"
+    assert len(store.actions) == 1 and store.actions[0]["State"] == "verified"
+    final = r.outcomes.inspect(r.source)["preparation"]
+    assert final["State"] == "unavailable" and final["Fence"] == 1 and final["Version"] == 2
+    assert r.source not in queue.pending_recovery()
+    assert queue.inspect(r.source)[2]
