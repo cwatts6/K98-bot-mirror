@@ -33,6 +33,7 @@ def test_complete_report_includes_17431_incidents_in_one_bounded_download():
         "approve_evidence_group",
         "download_complete_report",
         "backlog_summary",
+        "centre_page",
     ],
 )
 @pytest.mark.parametrize(
@@ -51,6 +52,21 @@ def test_incomplete_collection_never_labels_archive_complete():
     store.report_page.side_effect = lambda **kw: dict(original(**kw), total=4)
     with pytest.raises(SourceConflict, match="coverage changed"):
         service.download_complete_report(ACTOR)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("individual", [False, True])
+async def test_centre_page_uses_one_service_call_for_count_and_page(monkeypatch, individual):
+    from ui.views import recovery_view as module
+
+    monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(module, "call", AsyncMock(return_value=dict(rows=[], open_count=17431)))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    await module.show_centre(interaction, after="cursor", individual=individual)
+    module.call.assert_awaited_once_with("centre_page", ACTOR, "cursor", individual)
+    assert "17431 open recovery records" in interaction.followup.send.call_args.args[0]
+    assert interaction.followup.send.call_args.kwargs["ephemeral"]
 
 
 def test_archive_enforces_compressed_attachment_bound():

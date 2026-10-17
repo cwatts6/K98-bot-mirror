@@ -161,6 +161,12 @@ Failed checks or declining confirmation do not create acceptance. An interrupted
 write retains its evidence; a repeated successful closeout recognizes its exact
 existing acceptance only after rechecking the exact pinned current successor.
 The existing acceptance is never rewritten, including when current verification fails.
+Acceptance records the successor observed at `current_successor.observed_utc` and
+the administrator's Discord check. It is not a lease preventing a subsequent crash
+or restart, and keeping process handles open would not prevent either. Consuming
+the completed pointer only clears that update's bookkeeping and returns; it does
+not start a deployment or authorize a repair. A later update performs its own live
+source/startup/SQL preflight and normal drain/restart verification.
 
 After **CLOSEOUT RECORDED AND READ BACK**, run the normal updater once:
 

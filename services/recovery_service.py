@@ -72,6 +72,13 @@ class RecoveryService:
         self.authorize(actor)
         return self.store.list_open(after=after, non_evidence=True)
 
+    def centre_page(self, actor, after=None, individual=False):
+        self.authorize(actor)
+        return dict(
+            rows=self.store.list_open(after=after, non_evidence=not individual),
+            open_count=self.store.count_open(),
+        )
+
     def download_report(self, actor, after=None, through=None, part=1, max_bytes=8388608):
         from services.recovery_report import build_report
 

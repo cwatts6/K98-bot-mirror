@@ -125,6 +125,50 @@ def test_package_uses_reviewed_custody_bootstrap_and_no_apply_or_restart():
     assert "-Resume" not in BODY and "Start-ScheduledTask" not in BODY
 
 
+def test_completed_pointer_consumption_returns_without_entering_deployment(tmp_path):
+    """Administrative acceptance is a recorded observation, not a live startup lease."""
+    import json
+
+    if not shutil.which("powershell.exe"):
+        pytest.skip("Windows PowerShell required")
+    source = (Path(__file__).resolve().parents[1] / "scripts/Update-K98.ps1").read_text()
+    start = source.index("  if(Test-Path -LiteralPath (Join-Path $work 'verified.json')) {")
+    branch = source[start : source.index("  } else {", start)] + "\n  }\n"
+    acceptance = tmp_path / "verified.json"
+    acceptance.write_text(json.dumps(dict(release_id="r", target="t")), encoding="utf-8")
+    original = acceptance.read_bytes()
+    pointer = tmp_path / "active.json"
+    pointer.write_text("retained active pointer", encoding="utf-8")
+    script = tmp_path / "consume.ps1"
+    script.write_text(
+        r"""
+param([string]$Fixture)
+$ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+$work=$Fixture;$active=Join-Path $Fixture 'active.json'
+$prepared=[pscustomobject]@{release_id='r';target='t'}
+function Read-Json([string]$Path){Get-Content -Raw -LiteralPath $Path|ConvertFrom-Json}
+""" + branch + "throw 'Unexpected entry into preparation/deployment'",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-Fixture",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not pointer.exists()
+    assert acceptance.read_bytes() == original
+
+
 def diagnostic():
     from scripts.package_k98_readiness_closeout import RELEASE
 

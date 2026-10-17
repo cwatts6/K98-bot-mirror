@@ -104,6 +104,28 @@ def test_quiet_overview_replaces_per_incident_notifications(store):
     assert store.alerts_due() == []  # Changed summaries are coalesced for five minutes.
 
 
+def test_centre_header_count_is_scoped_and_preserves_priority_and_individual_pages(store):
+    from services.recovery_service import RecoveryService
+    from tests.test_guided_recovery import ACTOR
+
+    evidence_row = evidence(store)
+    operational = store.observe("stats_import", str(uuid4()), dict(actions={}), "a" * 64)
+    store.observe("stats_import", str(uuid4()), dict(actions={}), "a" * 64, resolved=True)
+    store.observe("recovery_overview", str(uuid4()), dict(actions={}), "a" * 64)
+    foreign = RecoveryDAL(store.connect, account="foreign", storage_owner="test-disk", guild_id=2)
+    evidence(foreign)
+    service = RecoveryService(store, {}, admin_id=1, guild_id=2, channel_id=3)
+    priority = service.centre_page(ACTOR)
+    assert priority["open_count"] == 2
+    assert [row["IncidentID"] for row in priority["rows"]] == [operational["IncidentID"]]
+    individual = service.centre_page(ACTOR, individual=True)
+    assert individual["open_count"] == 2
+    assert {row["IncidentID"] for row in individual["rows"]} == {
+        evidence_row["IncidentID"],
+        operational["IncidentID"],
+    }
+
+
 @pytest.mark.asyncio
 async def test_unchanged_open_overview_checks_delivery_and_recreates_deleted_card(
     store, monkeypatch

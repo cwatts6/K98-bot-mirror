@@ -120,6 +120,15 @@ class RecoveryDAL:
                 row["evidence"] = json.loads(row["EvidenceJson"])
             return result
 
+    def count_open(self):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT COUNT_BIG(*) AS Total FROM dbo.RecoveryIncident "
+                "WHERE ScopeKey=? AND State='open' AND SourceKind<>'recovery_overview'",
+                self.scope,
+            )
+            return one(cursor)["Total"]
+
     def check_failed(self, incident_id, error_type):
         with transaction(self.connect) as cursor:
             row = self._get(cursor, incident_id, lock=True)

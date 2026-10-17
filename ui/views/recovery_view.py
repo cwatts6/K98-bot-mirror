@@ -394,9 +394,8 @@ async def show_centre(interaction, after=None, *, individual=False):
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
             return
-        rows = await call("list_open" if individual else "list_priority", actor, after)
-        summary = await call("backlog_summary", actor)
-        open_count = sum(g["Total"] for g in summary["groups"] if g["State"] == "open")
+        page = await call("centre_page", actor, after, individual)
+        rows, open_count = page["rows"], page["open_count"]
         await interaction.followup.send(
             (
                 f"{open_count} open recovery records. Choose an operational incident or repair group below; evidence copies can be repaired together."
