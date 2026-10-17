@@ -146,9 +146,13 @@ class RecoveryDAL:
             )
             total = one(cursor)["Total"]
             cursor.execute(
-                "SELECT TOP (101) * FROM dbo.RecoveryIncident WHERE ScopeKey=? "
-                "AND FirstSeenUTC<=? AND (? IS NULL OR IncidentID>CAST(? AS uniqueidentifier)) "
-                "ORDER BY IncidentID",
+                "SELECT TOP (101) i.*, a.State AS PendingActionState, "
+                "a.ActionKind AS PendingActionKind FROM dbo.RecoveryIncident i "
+                "OUTER APPLY (SELECT TOP (1) State,ActionKind FROM dbo.RecoveryAction "
+                "WHERE IncidentID=i.IncidentID AND State IN ('dispatched','unknown') "
+                "ORDER BY CreatedUTC,ActionID) a WHERE i.ScopeKey=? "
+                "AND i.FirstSeenUTC<=? AND (? IS NULL OR i.IncidentID>CAST(? AS uniqueidentifier)) "
+                "ORDER BY i.IncidentID",
                 self.scope,
                 through,
                 after,
@@ -160,6 +164,11 @@ class RecoveryDAL:
             for row in result:
                 row["IncidentID"] = identity(row["IncidentID"])
                 row["evidence"] = json.loads(row["EvidenceJson"])
+                row["pending_action"] = (
+                    {"state": row["PendingActionState"], "kind": row["PendingActionKind"]}
+                    if row["PendingActionState"] is not None
+                    else None
+                )
             return dict(rows=result, through=through, total=total, more=more)
 
     def has_failed_checks(self):

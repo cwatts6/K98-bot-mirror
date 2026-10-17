@@ -242,3 +242,58 @@ async def test_review_entry_handles_real_embed_without_footer(monkeypatch):
         interaction
     )
     centre.assert_awaited_once_with(interaction)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["edit", "send"])
+async def test_outage_message_failure_never_blocks_due_incident_alerts(monkeypatch, failure):
+    import bot_config
+    from core import recovery_lifecycle as module
+
+    monkeypatch.setattr(bot_config, "NOTIFY_CHANNEL_ID", 3)
+    monkeypatch.setattr(bot_config, "GUILD_ID", 2)
+    error = discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "denied")
+    message = SimpleNamespace(edit=AsyncMock(side_effect=error))
+    channel = SimpleNamespace(
+        guild=SimpleNamespace(id=2),
+        send=AsyncMock(side_effect=error) if failure == "send" else AsyncMock(return_value=message),
+    )
+    checks = [TimeoutError(), [], [], []] if failure == "edit" else [TimeoutError()] * 4
+    monkeypatch.setattr(module, "drain_thread", AsyncMock(side_effect=checks))
+    publish = AsyncMock()
+    notifications = Mock()
+    monkeypatch.setattr(module, "publish_recovery_alerts", publish)
+    monkeypatch.setattr(module.recovery_health, "record_notifications", notifications)
+    monkeypatch.setattr(
+        module.asyncio, "sleep", AsyncMock(side_effect=[None, None, None, asyncio.CancelledError()])
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await module.observe_recovery_outcomes(SimpleNamespace(get_channel=lambda _: channel))
+    assert publish.await_count == 4
+    assert notifications.call_args.args[0] is error
+    assert message.edit.await_count == (3 if failure == "edit" else 0)
+
+
+def test_notification_degradation_preserves_successful_check_health(monkeypatch):
+    from services import recovery_health as health
+
+    monkeypatch.setattr(health, "_last_success", datetime.now(UTC))
+    monkeypatch.setattr(health, "_failure", None)
+    monkeypatch.setattr(health, "_failure_detail", None)
+    monkeypatch.setattr(health, "_notification_failure", None)
+    health.record_notifications(TimeoutError())
+    healthy, text = health.status()
+    assert healthy and text.startswith("Monitoring active")
+    assert "notifications need attention" in text
+    assert health.report()["healthy"] is True
+    assert health.report()["notification_failure"]["error_type"] == "TimeoutError"
+
+
+def test_health_report_uses_one_consistent_status_snapshot(monkeypatch):
+    from services import recovery_health as health
+
+    snapshot = Mock(side_effect=[(True, "Monitoring active"), (False, "Monitoring stale")])
+    monkeypatch.setattr(health, "status", snapshot)
+    report = health.report()
+    assert (report["healthy"], report["status"]) == (True, "Monitoring active")
+    snapshot.assert_called_once_with()

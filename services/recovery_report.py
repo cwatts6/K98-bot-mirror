@@ -20,7 +20,9 @@ def _safe(value):
 
 def incident_report(service, row):
     """Allowlist diagnostic fields; never serialize raw evidence or action inputs."""
-    current = service.present(row)
+    # report_page includes pending-action state in the scoped page query. Apply
+    # only the presentation policy here; present() would query each row again.
+    current = service.presentation_policy(row) if service.presentation_policy else row
     evidence = current["evidence"]
     actions = evidence.get("actions", {})
     blocked = bool(
@@ -141,13 +143,20 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
         incidents=[],
     )
     next_after = after
+    encoded_size = len(encode(document))
     for row in page["rows"]:
-        document["incidents"].append(incident_report(service, row))
-        if len(encode(document)) > max_bytes - 1024:
-            document["incidents"].pop()
+        incident = incident_report(service, row)
+        encoded_incident = encode(incident)
+        # Each line is indented four spaces inside the incidents array. The
+        # first item adds its array newlines/closing indent; later items add ,\n.
+        item_size = len(encoded_incident) + 4 * (encoded_incident.count(b"\n") + 1)
+        addition = item_size + (2 if document["incidents"] else 4)
+        if encoded_size + addition > max_bytes - 1024:
             if not document["incidents"]:
                 raise SourceConflict("One incident exceeds this destination's attachment budget.")
             break
+        document["incidents"].append(incident)
+        encoded_size += addition
         next_after = row["IncidentID"]
     more = page["more"] or len(document["incidents"]) < len(page["rows"])
     document["more_parts"] = more

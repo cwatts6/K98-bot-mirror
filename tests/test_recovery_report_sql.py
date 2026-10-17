@@ -61,3 +61,37 @@ def test_new_incidents_do_not_change_existing_report_membership(contained_job):
     )
     f.sql.commit()
     assert store.report_page(through=first["through"])["total"] == 0
+
+
+def test_pending_actions_are_loaded_with_the_scoped_page_without_mutation(contained_job):
+    f = contained_job
+    store = RecoveryDAL(f.connect, account="test-account", storage_owner="disk", guild_id=2)
+    foreign = RecoveryDAL(f.connect, account="other-account", storage_owner="disk", guild_id=2)
+    evidence = dict(title="Test", explanation="Fixture", outcome="held", actions={})
+    expected = {}
+    for owner, state in (
+        (store, "dispatched"),
+        (store, "unknown"),
+        (store, "verified"),
+        (foreign, "unknown"),
+    ):
+        row = owner.observe("stats_import", str(uuid4()), evidence, "a" * 64)
+        action, acquired = owner.claim(
+            row["IncidentID"], 1, "a" * 64, "release_failure", "discord:1", "fixture"
+        )
+        assert acquired
+        if state != "dispatched":
+            owner.finish(row["IncidentID"], action, state, {"fixture": True})
+        if owner is store:
+            expected[row["IncidentID"]] = (
+                dict(state=state, kind="release_failure") if state != "verified" else None
+            )
+    before = list(
+        map(tuple, f.sql.execute("SELECT * FROM #RecoveryAction ORDER BY ActionID").fetchall())
+    )
+    page = store.report_page()
+    assert {r["IncidentID"]: r["pending_action"] for r in page["rows"]} == expected
+    after = list(
+        map(tuple, f.sql.execute("SELECT * FROM #RecoveryAction ORDER BY ActionID").fetchall())
+    )
+    assert after == before

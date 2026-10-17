@@ -40,6 +40,7 @@ async def observe_recovery_outcomes(bot):
             unavailable = True
         # Notification delivery is independent of incident inspection and repair.
         # A malformed historical message cannot invalidate completed SQL checks.
+        notification_error = None
         try:
             if unavailable and outage_message is None:
                 channel = bot.get_channel(bot_config.NOTIFY_CHANNEL_ID) or await bot.fetch_channel(
@@ -61,16 +62,27 @@ async def observe_recovery_outcomes(bot):
                 except discord.NotFound:
                     pass
                 outage_message = None
-            await publish_recovery_alerts(bot)
-            recovery_health.record_notifications()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            recovery_health.record_notifications(exc)
+            notification_error = exc
+            logger.warning(
+                "recovery_monitor_message_unavailable diagnostic=%s",
+                recovery_health.failure_detail(exc),
+            )
+        # Always publish due incidents, even when the separate outage message
+        # cannot be sent or edited. Retain either failure until both succeed.
+        try:
+            await publish_recovery_alerts(bot)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            notification_error = exc
             logger.warning(
                 "recovery_notifications_unavailable diagnostic=%s",
                 recovery_health.failure_detail(exc),
             )
+        recovery_health.record_notifications(notification_error)
         await asyncio.sleep(30)
 
 

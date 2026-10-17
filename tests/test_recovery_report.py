@@ -21,6 +21,7 @@ def report_service(count=1):
         item = deepcopy(row)
         item["IncidentID"] = str(uuid4())
         item["State"] = "resolved" if index % 2 else "open"
+        item["pending_action"] = None
         item["evidence"]["private_request"] = "NEVER_EXPORT_ME"
         item["evidence"]["explanation"] = "Needs verification; password=DO_NOT_EXPORT"
         records.append(item)
@@ -39,6 +40,7 @@ def report_service(count=1):
         )
 
     store.report_page = Mock(side_effect=page)
+    store.pending_actions = Mock(side_effect=AssertionError("Report must use paged action state"))
     service.refresh = Mock(side_effect=AssertionError("Report must not refresh or reconcile"))
     return service, store, records
 
@@ -94,10 +96,11 @@ def test_collection_failure_is_exportable_without_false_empty_or_secrets():
     assert b"private credentials" not in result["content"]
 
 
-def test_size_split_resumes_at_last_included_incident_without_omissions():
+@pytest.mark.parametrize("text", ["x", "é\n"])
+def test_size_split_resumes_at_last_included_incident_without_omissions(text):
     service, _, records = report_service(10)
     for row in records:
-        row["evidence"]["explanation"] = "x" * 20000
+        row["evidence"]["explanation"] = text * 12000
     identifiers, after, through, part = [], None, None, 1
     while True:
         report = service.download_report(ACTOR, after, through, part, 65536)
@@ -107,6 +110,31 @@ def test_size_split_resumes_at_last_included_incident_without_omissions():
         if after is None:
             break
     assert identifiers == [r["IncidentID"] for r in records]
+
+
+def test_report_serialization_is_linear_and_uses_paged_pending_action(monkeypatch):
+    from services import recovery_report as module
+
+    service, store, records = report_service(100)
+    for row in records:
+        row["evidence"]["explanation"] = "é" * 10000
+    records[0]["pending_action"] = dict(state="unknown", kind="release_failure")
+    calls, serialized_bytes = [], []
+    original_encode = module.encode
+
+    def measured(document):
+        calls.append(len(document["incidents"]) if "incidents" in document else None)
+        content = original_encode(document)
+        serialized_bytes.append(len(content))
+        return content
+
+    monkeypatch.setattr(module, "encode", measured)
+    report = service.download_report(ACTOR)
+    data = json.loads(report["content"])
+    assert data["incidents"][0]["pending_verification"] == records[0]["pending_action"]
+    assert [count for count in calls if count is not None] == [0, 100]
+    assert sum(serialized_bytes) < 3 * len(report["content"])
+    store.pending_actions.assert_not_called()
 
 
 @pytest.mark.asyncio

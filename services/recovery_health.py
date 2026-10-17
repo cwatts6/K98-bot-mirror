@@ -40,9 +40,10 @@ def record_failure(error):
 
 
 def report():
+    healthy, text = status()
     return {
-        "healthy": status()[0],
-        "status": status()[1],
+        "healthy": healthy,
+        "status": text,
         "last_success_utc": _last_success.isoformat() if _last_success else None,
         "check_failure": _failure_detail,
         "notification_failure": _notification_failure,
@@ -64,5 +65,4 @@ def status():
         text += f". Last successful check: {_last_success.isoformat()}"
     if _notification_failure:
         text += ". Incident notifications need attention; open the recovery centre and download its report"
-        healthy = False
     return healthy, text
