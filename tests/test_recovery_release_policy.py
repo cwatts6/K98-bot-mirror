@@ -138,7 +138,7 @@ def test_monitor_still_discovers_and_presents_unqualified_incidents(monkeypatch)
     monkeypatch.setattr(recovery_runtime, "_retry_admission", lambda: True)
     assert recovery_runtime.observe_recovery() == []
     adapter.pending_recovery.assert_called_once_with(after=None)
-    alert = recovery_runtime.alert_rows()[0]
+    alert = service.present(store.get(row["IncidentID"]))
     assert alert["State"] == "open"
     assert alert["release_notice"]
     assert alert["evidence"]["actions"] == {}

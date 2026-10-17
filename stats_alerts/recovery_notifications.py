@@ -4,7 +4,7 @@ import discord
 
 from services.legacy_export_snapshot_service import drain_thread
 from services.recovery_runtime import alert_rows, claim_alert, record_alert
-from ui.views.recovery_view import FOOTER_PREFIX, RecoveryEntryView, incident_embed
+from ui.views.recovery_view import RecoveryEntryView, incident_embed
 
 
 async def publish_recovery_alerts(bot):
@@ -20,6 +20,7 @@ async def publish_recovery_alerts(bot):
         raise ValueError("Recovery notification guild differs from configuration.")
     complete = True
     for row in rows:
+        embed = incident_embed(row)
         if not await drain_thread(claim_alert, row["IncidentID"]):
             complete = False
             continue
@@ -38,19 +39,19 @@ async def publish_recovery_alerts(bot):
                     candidate.author.id == bot.user.id
                     and candidate.embeds
                     and getattr(candidate.embeds[0].footer, "text", None)
-                    == FOOTER_PREFIX + row["IncidentID"]
+                    == embed.footer.text
                 ):
                     message = candidate
                     break
         if message is None:
             message = await channel.send(
-                embed=incident_embed(row),
+                embed=embed,
                 view=RecoveryEntryView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
         else:
             await message.edit(
-                embed=incident_embed(row),
+                embed=embed,
                 view=RecoveryEntryView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )

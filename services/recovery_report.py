@@ -72,6 +72,14 @@ def incident_report(service, row):
                     "blocking_job_ids",
                     "recovery_links",
                     "receipt_diagnostics",
+                    "group_id",
+                    "approved_count",
+                    "verified_count",
+                    "pending_count",
+                    "changed_count",
+                    "queue_ticket",
+                    "preparation_state",
+                    "replica_diagnostics",
                 )
                 if key in evidence
             },

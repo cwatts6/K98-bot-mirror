@@ -85,7 +85,10 @@ def incident_embed(row):
             value="No repair is currently authorised by the evidence. Recheck to refresh the diagnosis. This incident remains open.",
             inline=False,
         )
-    embed.set_footer(text=FOOTER_PREFIX + row["IncidentID"])
+    embed.set_footer(
+        text=("Recovery overview: " if row["SourceKind"] == "recovery_overview" else FOOTER_PREFIX)
+        + row["IncidentID"]
+    )
     return embed
 
 
@@ -277,7 +280,7 @@ class RecoveryIncidentView(discord.ui.View):
 
 
 class RecoveryListView(discord.ui.View):
-    def __init__(self, rows):
+    def __init__(self, rows, *, individual=False):
         super().__init__(timeout=300)
         select = discord.ui.Select(
             placeholder="Choose an incident",
@@ -304,7 +307,7 @@ class RecoveryListView(discord.ui.View):
             )
 
             async def next_page(interaction):
-                await show_centre(interaction, after=rows[-1]["IncidentID"])
+                await show_centre(interaction, after=rows[-1]["IncidentID"], individual=individual)
 
             next_button.callback = next_page
             self.add_item(next_button)
@@ -312,6 +315,22 @@ class RecoveryListView(discord.ui.View):
     @discord.ui.button(label="Download recovery report", style=discord.ButtonStyle.secondary)
     async def download(self, button, interaction):
         await show_report(interaction)
+
+    @discord.ui.button(label="Repair evidence group", style=discord.ButtonStyle.primary)
+    async def group(self, button, interaction):
+        from ui.views.recovery_backlog_view import show_group
+
+        await show_group(interaction)
+
+    @discord.ui.button(label="Download complete report", style=discord.ButtonStyle.secondary)
+    async def complete_report(self, button, interaction):
+        from ui.views.recovery_backlog_view import show_complete_report
+
+        await show_complete_report(interaction)
+
+    @discord.ui.button(label="Browse individual incidents", style=discord.ButtonStyle.secondary)
+    async def individual(self, button, interaction):
+        await show_centre(interaction, individual=True)
 
 
 class RecoveryReportView(discord.ui.View):
@@ -370,19 +389,21 @@ async def show_report(interaction, after=None, through=None, part=1):
         await report_error(interaction, exc)
 
 
-async def show_centre(interaction, after=None):
+async def show_centre(interaction, after=None, *, individual=False):
     try:
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
             return
-        rows = await call("list_open", actor, after)
+        rows = await call("list_open" if individual else "list_priority", actor, after)
+        summary = await call("backlog_summary", actor)
+        open_count = sum(g["Total"] for g in summary["groups"] if g["State"] == "open")
         await interaction.followup.send(
             (
-                "Choose an incident to review its evidence and available repairs."
+                f"{open_count} open recovery records. Choose an operational incident or repair group below; evidence copies can be repaired together."
                 if rows
-                else "No further open incidents in the current recovery scope. Coverage is limited to installed recovery adapters."
+                else f"{open_count} open recovery records. No further operational incidents on this page. Use Repair evidence group for verified-copy repairs or download the complete report."
             ),
-            view=RecoveryListView(rows) if rows else RecoveryEntryView(),
+            view=RecoveryListView(rows, individual=individual) if rows else RecoveryEntryView(),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -425,3 +446,23 @@ class RecoveryEntryView(discord.ui.View):
     )
     async def download(self, button, interaction):
         await show_report(interaction)
+
+    @discord.ui.button(
+        label="Repair evidence group",
+        custom_id="k98:recovery:group:v1",
+        style=discord.ButtonStyle.primary,
+    )
+    async def group(self, button, interaction):
+        from ui.views.recovery_backlog_view import show_group
+
+        await show_group(interaction)
+
+    @discord.ui.button(
+        label="Download complete report",
+        custom_id="k98:recovery:complete:v1",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def complete_report(self, button, interaction):
+        from ui.views.recovery_backlog_view import show_complete_report
+
+        await show_complete_report(interaction)

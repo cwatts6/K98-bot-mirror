@@ -68,10 +68,35 @@ class RecoveryService:
         self.authorize(actor)
         return self.store.list_open(after=after)
 
+    def list_priority(self, actor, after=None):
+        self.authorize(actor)
+        return self.store.list_open(after=after, non_evidence=True)
+
     def download_report(self, actor, after=None, through=None, part=1, max_bytes=8388608):
         from services.recovery_report import build_report
 
         return build_report(self, actor, after, through, part, max_bytes)
+
+    def review_evidence_group(self, actor):
+        from services.recovery_backlog_service import review_group
+
+        return review_group(self, actor)
+
+    def approve_evidence_group(self, actor, preview):
+        from services.recovery_backlog_service import approve_group
+
+        return approve_group(self, actor, preview)
+
+    def download_complete_report(self, actor, max_bytes=8388608):
+        from services.recovery_complete_report import build_complete_report
+
+        return build_complete_report(self, actor, max_bytes)
+
+    def backlog_summary(self, actor):
+        from services.recovery_backlog_dal import RecoveryBacklogDAL
+
+        self.authorize(actor)
+        return RecoveryBacklogDAL(self.store).summary()
 
     def review_details_page(self, actor, incident_id, action, revision, token, page=0):
         self.authorize(actor)

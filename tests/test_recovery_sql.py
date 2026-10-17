@@ -107,7 +107,8 @@ def test_scoped_discovery_revision_and_alert_roundtrip(store):
     assert same["Revision"] == 1
     changed = store.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "b" * 64)
     assert changed["Revision"] == 2
-    assert store.alerts_due() == [row["IncidentID"]]
+    # Individual incident delivery has been replaced by the scoped overview.
+    assert store.alerts_due() == []
     store.alert_sent(row["IncidentID"], 2, 3, 4)
     assert store.get(row["IncidentID"])["AlertMessageID"] == 4
     assert store.alerts_due() == []

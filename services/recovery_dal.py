@@ -100,13 +100,15 @@ class RecoveryDAL:
                 )
             return self._get(cursor, incident_id)
 
-    def list_open(self, *, after=None, limit=20):
+    def list_open(self, *, after=None, limit=20, non_evidence=False):
         if type(limit) is not int or not 1 <= limit <= 25:
             raise ValueError("Bounded incident page required.")
         with transaction(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (?) * FROM dbo.RecoveryIncident WHERE ScopeKey=? AND State='open' "
-                "AND (? IS NULL OR IncidentID>CAST(? AS uniqueidentifier)) ORDER BY IncidentID",
+                "AND SourceKind<>'recovery_overview' "
+                + ("AND SourceKind<>'private_evidence' " if non_evidence else "")
+                + "AND (? IS NULL OR IncidentID>CAST(? AS uniqueidentifier)) ORDER BY IncidentID",
                 limit,
                 self.scope,
                 after,
@@ -182,12 +184,22 @@ class RecoveryDAL:
             )
             return one(cursor) is not None
 
+    def touch_pending(self, incident_id):
+        """Fair retry scheduling only; never marks a repair successful."""
+        with transaction(self.connect) as cursor:
+            row = self._get(cursor, incident_id)
+            cursor.execute(
+                "UPDATE dbo.RecoveryAction SET UpdatedUTC=SYSUTCDATETIME() WHERE IncidentID=? "
+                "AND State IN ('dispatched','unknown')",
+                row["IncidentID"],
+            )
+
     def alerts_due(self):
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT TOP (20) IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? "
-                "AND (State='open' OR AlertedRevision<Revision) "
-                "AND (AlertCheckedUTC IS NULL OR AlertCheckedUTC<DATEADD(second,-60,SYSUTCDATETIME())) "
+                "SELECT TOP (1) IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? "
+                "AND SourceKind='recovery_overview' AND AlertedRevision<Revision "
+                "AND (AlertCheckedUTC IS NULL OR AlertCheckedUTC<DATEADD(minute,-5,SYSUTCDATETIME())) "
                 "ORDER BY COALESCE(AlertCheckedUTC,CONVERT(datetime2,'19000101')),IncidentID",
                 self.scope,
             )

@@ -87,6 +87,7 @@ class EvidenceRecovery:
             evidence_reference=binding["reference"],
             evidence_kinds=binding["kinds"],
             copies={key: value["state"] for key, value in copies.items()},
+            replica_diagnostics=self.copies.diagnostics(reference),
         )
         if replacement is not None:
             evidence.update(
@@ -161,8 +162,6 @@ class EvidenceRecovery:
 class EvidenceRecoveryAdapter:
     kind = "private_evidence"
     observe_healthy = False
-    automatic_action = "protect_evidence"
-    automatic_reason = "Protect the original hash-verified evidence with a second encrypted copy"
 
     def __init__(self, client):
         self.client = client

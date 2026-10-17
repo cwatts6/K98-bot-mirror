@@ -33,13 +33,16 @@ def recovery_service():
             storage_owner=runtime.store.storage_owner,
             guild_id=bot_config.GUILD_ID,
         )
+        from services.recovery_backlog_service import EvidenceBatchAdapter
+
+        batch = EvidenceBatchAdapter(store)
         if getattr(runtime, "recovery_only", False):
             from services.export_evidence_recovery import EvidenceRecoveryAdapter
 
             adapter = EvidenceRecoveryAdapter(runtime.recovery_client)
             yield RecoveryService(
                 store,
-                {adapter.kind: adapter},
+                {adapter.kind: adapter, batch.kind: batch},
                 admin_id=bot_config.ADMIN_USER_ID,
                 guild_id=bot_config.GUILD_ID,
                 channel_id=bot_config.NOTIFY_CHANNEL_ID,
@@ -48,7 +51,12 @@ def recovery_service():
             return
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
-        adapters = {adapter.kind: adapter}
+        adapters = {adapter.kind: adapter, batch.kind: batch}
+        from services.queue_admission_recovery import QueueAdmissionRecovery
+        from services.queue_admission_recovery_dal import QueueAdmissionDAL
+
+        queued = QueueAdmissionRecovery(QueueAdmissionDAL(runtime))
+        adapters[queued.kind] = queued
         from services.producer_refusal_dal import ProducerRefusalDAL
         from services.producer_refusal_recovery import ProducerRefusalRecovery
 
@@ -148,6 +156,19 @@ def observe_recovery():
     global _incident_cursor
     failures = []
     with recovery_service() as service:
+        from services.recovery_backlog_dal import RecoveryBacklogDAL
+
+        # Durable accepted copy repairs must not wait behind thousands of
+        # untouched incidents. Domain reconciliation retains exact hash checks.
+        if "private_evidence" in service.adapters:
+            for incident_id in RecoveryBacklogDAL(service.store).pending_repairs():
+                try:
+                    service.refresh(incident_id)
+                except Exception as exc:
+                    service.store.check_failed(incident_id, type(exc).__name__)
+                    failures.append(type(exc).__name__)
+                finally:
+                    service.store.touch_pending(incident_id)
         scope = service.store.scope
         for kind, adapter in service.adapters.items():
             try:
@@ -200,7 +221,40 @@ def observe_recovery():
 
 
 def alert_rows():
+    from uuid import NAMESPACE_URL, uuid5
+
+    from kvk.dal.new_source_import_dal import digest
+    from kvk.dal.source_output_pool_dal import _wire
+    from services.recovery_backlog_dal import RecoveryBacklogDAL
+
     with recovery_service() as service:
+        summary = RecoveryBacklogDAL(service.store).summary()
+        open_count = sum(g["Total"] for g in summary["groups"] if g["State"] == "open")
+        copies = sum(
+            g["Total"]
+            for g in summary["groups"]
+            if g["State"] == "open" and g["SourceKind"] == "private_evidence"
+        )
+        pending = sum(
+            a["Total"] for a in summary["actions"] if a["State"] in {"dispatched", "unknown"}
+        )
+        evidence = dict(
+            title="Recovery overview",
+            actions={},
+            outcome="attention_required" if open_count else "clear",
+            summary_sha256=digest(_wire(summary)).hex(),
+            explanation=(
+                f"{open_count} open recovery records, including {copies} evidence-copy incidents. "
+                f"{pending} accepted repairs await verification. Open the recovery centre for blocking work, grouped repairs and a complete report."
+            ),
+        )
+        service.store.observe(
+            "recovery_overview",
+            str(uuid5(NAMESPACE_URL, service.store.scope + ":overview")),
+            evidence,
+            digest(evidence).hex(),
+            resolved=open_count == 0,
+        )
         return [service.present(service.store.get(key)) for key in service.store.alerts_due()]
 
 
