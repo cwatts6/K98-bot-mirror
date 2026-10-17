@@ -1066,9 +1066,18 @@ class ExportCoordinationDAL:
                 "failed",
             ):
                 raise SourceConflict("Safe retry scope/version changed.")
-            cursor.execute("SELECT AttemptID FROM dbo.ExportAttempt WHERE JobID=?", job["JobID"])
+            cursor.execute(
+                "SELECT TOP (1) AttemptID FROM dbo.ExportAttempt WITH (UPDLOCK,HOLDLOCK) WHERE JobID=?",
+                job["JobID"],
+            )
             if one(cursor):
                 raise SourceConflict("Attempted work cannot use safe retry.")
+            cursor.execute(
+                "SELECT TOP (1) StreamID FROM dbo.ExportExecutionStream WITH (UPDLOCK,HOLDLOCK) WHERE JobID=?",
+                job["JobID"],
+            )
+            if one(cursor):
+                raise SourceConflict("Execution evidence requires reconciliation before retry.")
             if job["ConsumerKind"] == "new_source":
                 from kvk.dal.season_source_dal import require_source
 

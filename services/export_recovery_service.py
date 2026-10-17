@@ -56,13 +56,15 @@ class ExportRecoveryAdapter:
         repairs = []
         actions = {}
         explanation = "The export has not reached a verified terminal outcome. Its current reservation and attempt evidence are retained."
-        if job["State"] == "failed" and not attempts and not queued:
+        if job["State"] == "failed" and not attempts and not snapshot["streams"] and not queued:
             actions["retry_unstarted"] = dict(
                 label="Queue verified safe retry",
                 check="Confirm that the input/configuration issue has been corrected and this retained export should be retried.",
-                effect="Recheck that no export attempt exists, retain the same queue identity and input, and request normal fenced admission. No attempted provider write is replayed.",
+                effect="Recheck that no export attempt or execution stream exists, retain the same queue identity and input, and request normal fenced admission. This queues work; delivery is verified separately. No attempted provider write is replayed.",
             )
             explanation = "This export failed before creating a provider attempt. A retry can use its retained input after a fresh exact-state check."
+        elif job["State"] == "failed" and not attempts and snapshot["streams"]:
+            explanation = "This export has execution-stream evidence. It cannot use an unstarted retry or skip; its original execution must be reconciled first. No new provider execution is authorized by this incident."
         elif job["ConsumerKind"] == "new_source" and job["State"] in {"running", "uncertain"}:
             actions["verify_publication"] = dict(
                 label="Verify & settle publication",
@@ -86,6 +88,8 @@ class ExportRecoveryAdapter:
                     if absent
                     else "The original export completed but its latest verified publication is damaged. A rebuild needs a fresh authority proof, retained source generation and safe output capacity."
                 )
+        if job["State"] == "confirmed" and not damaged:
+            explanation = "The export has a confirmed delivery outcome. No repair is required for this recorded outcome; this is not a fresh check of the current spreadsheet contents."
         if queued:
             explanation = "The safe retry is recorded. Normal queue admission will take its original turn and acquire a fresh fence. This does not yet confirm delivery."
         resolved = job["State"] in {"confirmed", "cancelled", "coalesced"} or queued

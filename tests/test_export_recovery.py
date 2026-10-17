@@ -174,6 +174,21 @@ def test_failed_retry_reopens_incident_even_with_prior_successful_queue_action()
     assert "retry_unstarted" in adapter.inspect("source")[0]["actions"]
 
 
+def test_execution_stream_requires_reconciliation_even_without_attempt():
+    adapter, snapshot = job_fixture(consumer="scan_data")
+    snapshot["streams"] = [dict(StreamID=str(uuid4()), State="closed")]
+    evidence, _, resolved = adapter.inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert "execution must be reconciled first" in evidence["explanation"]
+
+
+def test_confirmed_export_description_does_not_claim_fresh_provider_check():
+    adapter, _ = job_fixture(state="confirmed", attempted=True)
+    evidence, _, resolved = adapter.inspect("source")
+    assert resolved and "confirmed delivery" in evidence["explanation"]
+    assert "not a fresh check" in evidence["explanation"]
+
+
 def test_guided_retirement_checks_again_after_clear_before_release():
     adapter, snapshot = job_fixture(state="uncertain", attempted=True)
     before = dict(job=deepcopy(snapshot["job"]), pool=dict(slots=[dict(State="retired")]))
