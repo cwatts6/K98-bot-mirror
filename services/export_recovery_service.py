@@ -13,6 +13,8 @@ def job_token(snapshot):
     # falsely retire a pending safe-retry intent whose job CAS can still commit.
     durable = deepcopy({key: snapshot[key] for key in ("job", "attempts", "streams")})
     durable["job"].pop("Stalled", None)
+    if snapshot["job"]["ConsumerKind"] == "new_source":
+        durable["season"] = snapshot.get("season")
     if snapshot.get("isolated_targets"):
         durable["isolated_targets"] = snapshot["isolated_targets"]
     return digest(durable).hex()
@@ -139,6 +141,17 @@ class ExportRecoveryAdapter:
                 "admission. A queued retry does not resolve this incident. Verified replacement files "
                 "and a separately verified publication are required; no delivery is being claimed."
             )
+        if "retry_unstarted" in actions and job["ConsumerKind"] == "new_source":
+            season = snapshot.get("season")
+            if not season or (season["SourceKey"], season["SeasonState"]) != (
+                job["SourceKey"],
+                "open",
+            ):
+                actions.pop("retry_unstarted")
+                explanation = (
+                    "This export's season is not open with its original source. A retry cannot "
+                    "be admitted. Its input and history are retained for season recovery."
+                )
         return (
             dict(
                 title="Spreadsheet export recovery",

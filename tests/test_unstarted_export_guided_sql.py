@@ -219,3 +219,53 @@ def test_registered_source_retry_preserves_scope_and_rechecks_season(scoped_jobs
         with pytest.raises(SourceConflict, match="lifecycle"):
             adapter.coordinator.request_safe_retry(job_id, "account", **arguments)
         assert adapter.discovery.job(job_id)["job"]["ProvenanceJson"] == "{}"
+
+
+@pytest.mark.parametrize("when", ["before_review", "before_confirm", "after_intent"])
+@pytest.mark.parametrize("state", ["closing", "closed"])
+def test_guided_retry_season_closure_does_not_leave_pending_action(
+    scoped_jobs, store, monkeypatch, when, state
+):
+    adapter, _, sql, ids = setup(scoped_jobs)
+    job_id = ids["registered"]
+    service = service_for(store, adapter)
+
+    def close_season(*_):
+        sql.execute("UPDATE #SeasonSource SET SeasonState=?,SeasonVersion=SeasonVersion+1", state)
+        sql.commit()
+
+    if when == "before_review":
+        close_season()
+    row = service.review_source(ACTOR, "export_job", job_id)
+    if when == "before_confirm":
+        close_season()
+    elif when == "after_intent":
+        # Close after fresh adapter/token validation, immediately before the real
+        # retry DAL. Registration itself is covered by scoped discovery tests.
+        monkeypatch.setattr(adapter.discovery, "registered_publication", close_season)
+    if when == "before_review":
+        assert "retry_unstarted" not in row["evidence"]["actions"]
+    elif when == "before_confirm":
+        with pytest.raises(SourceConflict, match="evidence changed"):
+            service.execute(
+                ACTOR,
+                row["IncidentID"],
+                row["Revision"],
+                row["EvidenceHash"],
+                "retry_unstarted",
+                "Reviewed",
+            )
+    else:
+        service.execute(
+            ACTOR,
+            row["IncidentID"],
+            row["Revision"],
+            row["EvidenceHash"],
+            "retry_unstarted",
+            "Reviewed",
+        )
+    current = service_for(store, adapter).review(ACTOR, row["IncidentID"])
+    assert current["State"] == "open" and current["pending_action"] is None
+    assert "retry_unstarted" not in current["evidence"]["actions"]
+    assert not service.store.pending_actions(row["IncidentID"])
+    assert adapter.discovery.job(job_id)["job"]["ProvenanceJson"] == "{}"
