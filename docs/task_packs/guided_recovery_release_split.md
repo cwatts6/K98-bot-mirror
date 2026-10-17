@@ -63,6 +63,35 @@ message accurately describes the verified result and any remaining work.
 
 ## P0b — full release
 
+### Live acceptance and remaining incident coverage — 17 October 2026
+
+The operator deployed private Bot `375f5bd1bb90072fd02d3b59f3148075e17b6952`.
+Release `a7ba472e-eae9-4bfe-a2e2-54e9a1f8b8cc` verified source, startup and
+Discord readiness; import/export health remains degraded pending feature evidence.
+The 22:04 UTC complete report includes 17,436 distinct recorded incidents.
+Monitoring is healthy; recorded queue ticket 2907 is resolved. The queue-only UI,
+group-progress guidance and complete-report download are evidenced by the operator.
+The accepted group survives this restart: 6,355 of 17,340 approved repairs are
+verified, 10,985 pending and zero changed at its last observation. These counts
+are observations, not a transactional snapshot or certification of other work.
+
+Every currently unsupported category is required P0b acceptance work:
+
+| Delivery priority / work item | Observed cases | Required guided outcome and verification |
+| --- | --- | --- |
+| Next focused release: P0B-EXP01 | Two failed exports with retry withheld; one also permits skip in its domain evidence | Review retained inputs and exact execution evidence, confirm retry or eligible skip, execute once and independently verify the durable queue/closure result. Attempts or execution streams prevent an unstarted repair. Retry confirmation means queued, not delivered; delivery keeps its separate verification. Include the exact protected-source updater upgrade and rehearsal. |
+| Next continuation slice: P0B-CAP01 | Six captured scans, 1218–1223, still awaiting export admission; one newly captured player-stat report with queue/skip withheld | Diagnose why admission has not finished. Provide verified queue continuation or an explicit supported keep-SQL/skip disposition with admin confirmation. Preserve committed imports/report output, fence stale execution, release only the matching ownership where permitted, and verify the result. No import or report recomputation replay. Replace indefinite generic “still checking” guidance with the actual blocker and guided next step. |
+| Historical disposition slice: P0B-HIST01 | 44 captured historical preparations without exact execution receipts or typed producers | Collect and validate available evidence through the guided workflow. Where original execution cannot be proven, preserve the unknown outcome and guide an explicitly supported superseding/disposition choice; do not fabricate a receipt or infer nonexecution. Admins must not author SQL or locate a repair command. Prove durable audit, ownership protection and independent final verification. |
+| Pre-request recovery slice: P0B-PRE01 | Startup configuration read failed acquiring the account coordination lock before a preparation was saved | Surface the failure proactively even without a preparation ID. Distinguish a proven before-execution refusal from an unknown acknowledgement. Guide a fresh read/configuration continuation with current ownership checks and confirmation where required; independently verify its result. Later unrelated admission or a successful stats cache does not settle this failure. |
+| Existing grouped repair acceptance: P0B-EVID01 | 10,963 evidence-copy records open during report collection, almost all already claimed by the accepted group | Continue the existing group without another approval or per-member repair. Verify both copies independently, retain failed/changed/unavailable members, and expose guided exception handling. Completion requires zero pending members or explicit actionable exceptions, not merely a completed group label. Lost-all-copy cases remain covered by the full-release workstream below. |
+
+The recovery overview is an aggregate, not a separate repair. An empty recorded
+queue list does not certify output delivery, undiscovered failures, or absence of
+protected capture ownership. The new player-report capture is explicitly included
+in P0B-CAP01; closing previous failed report attempts does not settle this one.
+No row above is a deferred optimisation or optional follow-up. The six original
+full-release workstreams and shared acceptance criteria below remain mandatory.
+
 These remain required acceptance work, not deferred optimisation:
 
 1. Historical partially applied configuration writes and guided superseding repair.
