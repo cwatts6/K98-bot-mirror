@@ -6,7 +6,9 @@ from services.recovery_backlog_dal import RecoveryBacklogDAL
 
 class EvidenceBatchAdapter:
     kind = "evidence_batch"
-    observe_healthy = False
+    # Discovery returns existing open groups only. Persist their terminal state
+    # immediately instead of waiting behind the general incident backlog.
+    observe_healthy = True
 
     def __init__(self, store):
         self.dal = RecoveryBacklogDAL(store)

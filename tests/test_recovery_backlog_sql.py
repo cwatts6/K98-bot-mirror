@@ -59,6 +59,47 @@ def test_group_approval_persists_every_member_and_survives_restart(store):
     assert final["verified_count"] == 1 and final["changed_count"] == 1
 
 
+@pytest.mark.parametrize("outcome", [None, "verified", "not_applied"])
+def test_group_discovery_persists_completion_without_general_backlog_cursor(
+    store, monkeypatch, outcome
+):
+    from contextlib import contextmanager
+
+    from services import recovery_runtime as runtime
+    from services.recovery_service import RecoveryService
+
+    row = evidence(store)
+    dal = RecoveryBacklogDAL(store)
+    group = dal.approve(dal.preview(), "discord:1")
+    if outcome:
+        action = store.pending_actions(row["IncidentID"])[0]
+        store.finish(row["IncidentID"], action["ActionID"], outcome, {"verification": outcome})
+    service = RecoveryService(
+        store, {"evidence_batch": EvidenceBatchAdapter(store)}, admin_id=1, guild_id=2, channel_id=3
+    )
+
+    @contextmanager
+    def scoped_service():
+        yield service
+
+    monkeypatch.setattr(runtime, "recovery_service", scoped_service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    monkeypatch.setattr(runtime, "_cursors", {})
+    monkeypatch.setattr(runtime, "_incident_cursor", None)
+    # Simulate the group being unreachable by the general backlog scan this cycle.
+    monkeypatch.setattr(store, "list_open", lambda **kwargs: [])
+    assert runtime.observe_recovery() == []
+    current = store.get(group)
+    assert current["State"] == ("resolved" if outcome else "open")
+    assert (
+        current["evidence"]["outcome"]
+        == {None: "running", "verified": "verified", "not_applied": "completed_with_exceptions"}[
+            outcome
+        ]
+    )
+    assert dal.pending_groups() == ([] if outcome else [group])
+
+
 def test_stale_group_and_duplicate_confirmation_dispatch_nothing(store):
     row = evidence(store)
     dal = RecoveryBacklogDAL(store)
