@@ -100,6 +100,59 @@ def test_source_names_alone_never_authorize_mixed_modules():
         check_source_only([PATH])
 
 
+@pytest.mark.parametrize(
+    "damage", [None, "before", "after", "missing_peer", "peer", "unregistered"]
+)
+def test_protected_application_change_needs_complete_installed_transition(monkeypatch, damage):
+    from scripts import prepare_k98_update as update
+
+    peer = "services/export_recovery_service.py"
+    changed = OLD.replace(b"value == CONTRACT", b"value != CONTRACT")
+    before = {PATH: OLD, peer: b"old peer\n"}
+    after = {PATH: changed, peer: b"new peer\n"}
+    transitions = [
+        dict(
+            id="fixture",
+            members=[
+                dict(path=p, before_sha256=sha256(before[p]), after_sha256=sha256(after[p]))
+                for p in before
+            ],
+        )
+    ]
+    monkeypatch.setattr(update, "reviewed_transitions", lambda: transitions)
+    if damage == "before":
+        before[PATH] += b"# changed\n"
+    elif damage == "after":
+        after[PATH] += b"# changed\n"
+    elif damage == "missing_peer":
+        after.pop(peer)
+    elif damage == "peer":
+        after[peer] = before[peer]
+    elif damage == "unregistered":
+        transitions.clear()
+    read = lambda commit, path: (before if commit == BEFORE else after).get(path)
+    if damage:
+        with pytest.raises(ValueError):
+            check_source_only([PATH, peer], read_blob=read, before=BEFORE, target=AFTER)
+    else:
+        check_source_only([PATH, peer], read_blob=read, before=BEFORE, target=AFTER)
+        previous = {
+            "AutomaticStartupPolicy.json": {
+                "source_hashes": {p: sha256(raw) for p, raw in before.items()}
+            }
+        }
+        plan, payload = source_plan(previous, BEFORE, AFTER, [PATH, peer], read)
+        assert payload == after
+        assert plan["new_pins"][PATH] == sha256(changed)
+        with pytest.raises(ValueError, match="Incomplete reviewed protocol transition"):
+            source_plan(previous, BEFORE, AFTER, [PATH], read)
+        # Registering an exact protected transition does not disable subsequent
+        # ordinary enqueue-body edits under the existing application policy.
+        check_source_only(
+            [PATH], read_blob=lambda c, p: OLD if c == BEFORE else NEW, before=BEFORE, target=AFTER
+        )
+
+
 def test_application_compatibility_does_not_bypass_predecessor_authentication():
     previous = {"AutomaticStartupPolicy.json": {"source_hashes": {PATH: "f" * 64}}}
     with pytest.raises(ValueError, match="Installed policy does not match"):

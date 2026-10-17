@@ -403,7 +403,14 @@ def check_source_only(paths, *, tool_copies=(), read_blob=None, before=None, tar
         if path in TOOL_SOURCE_PATHS and path in tool_copies:
             continue  # source_plan must compare the target with installed bytes.
         if path in APPLICATION_METHODS and read_blob is not None:
-            check_application_change(path, read_blob(before, path), read_blob(target, path))
+            try:
+                check_application_change(path, read_blob(before, path), read_blob(target, path))
+            except ValueError:
+                if path not in protocols:
+                    raise
+                # A protected method may change only through a complete exact
+                # bundle authenticated by the installed updater registry.
+                check_protocol_transition(path, read_blob, before, target)
             continue
         if path in protocols and read_blob is not None:
             check_protocol_transition(path, read_blob, before, target)
@@ -509,6 +516,13 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     coordinated = policy.selected(before, target, changes, read_blob) if policy else None
     admitted = {r["path"] for r in coordinated["sources"]} if coordinated else set()
     for path in (set(changes) & transition_paths()) - admitted:
+        if path in APPLICATION_METHODS:
+            try:
+                check_application_change(path, read_blob(before, path), read_blob(target, path))
+            except ValueError:
+                pass  # The complete exact transition must authorize this change.
+            else:
+                continue
         bundle = check_protocol_transition(path, read_blob, before, target)
         if not bundle <= set(changes):
             raise ValueError("Incomplete reviewed protocol transition inventory.")

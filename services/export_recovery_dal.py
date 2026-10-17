@@ -111,6 +111,13 @@ class ExportRecoveryDAL:
                 r["ResourceKey"] for r in resources
             ) != self.destinations.get(bytes(job["DestinationSetHash"])):
                 raise SourceConflict("Export resource membership differs from its registered pool.")
+            season = None
+            if job["ConsumerKind"] == "new_source":
+                cursor.execute(
+                    "SELECT SourceKey,SeasonState,SeasonVersion FROM KVK.SeasonSource WHERE KVK_NO=?",
+                    job["KVK_NO"],
+                )
+                season = one(cursor)
             return _wire(
                 dict(
                     job=job,
@@ -118,6 +125,7 @@ class ExportRecoveryDAL:
                     streams=streams,
                     resources=resources,
                     isolated_targets=isolated_targets,
+                    season=season,
                 )
             )
 

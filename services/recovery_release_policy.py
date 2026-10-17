@@ -11,6 +11,7 @@ P0A_ACTIONS = MappingProxyType(
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued"}),
         "player_report": frozenset({"cancel_report"}),
+        "export_job": frozenset({"retry_unstarted", "skip_unstarted"}),
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(

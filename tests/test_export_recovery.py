@@ -26,10 +26,12 @@ def job_fixture(*, consumer="new_source", state="failed", attempted=False):
             ProvenanceJson="{}",
             Stalled=1,
             KVK_NO=1,
+            SourceKey="snapshot_report_v1",
         ),
         attempts=[{}] if attempted else [],
         streams=[],
         resources=[],
+        season=dict(SourceKey="snapshot_report_v1", SeasonState="open", SeasonVersion=1),
     )
     discovery, coordinator, reconciler = Mock(account="account"), Mock(), Mock()
     discovery.job.side_effect = lambda _: deepcopy(snapshot)
@@ -172,6 +174,43 @@ def test_failed_retry_reopens_incident_even_with_prior_successful_queue_action()
     )
     assert not adapter.inspect("source")[2]
     assert "retry_unstarted" in adapter.inspect("source")[0]["actions"]
+
+
+def test_execution_stream_requires_reconciliation_even_without_attempt():
+    adapter, snapshot = job_fixture(consumer="scan_data")
+    snapshot["streams"] = [dict(StreamID=str(uuid4()), State="closed")]
+    evidence, _, resolved = adapter.inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert "execution must be reconciled first" in evidence["explanation"]
+
+
+@pytest.mark.parametrize("state", ["planned", "closing", "closed", None])
+def test_season_lifecycle_withholds_retry_and_changes_reviewed_evidence(state):
+    adapter, snapshot = job_fixture()
+    token = job_token(snapshot)
+    if state is None:
+        snapshot["season"] = None
+    else:
+        snapshot["season"]["SeasonState"] = state
+        snapshot["season"]["SeasonVersion"] += 1
+    evidence, current, resolved = adapter.inspect("source")
+    assert current != token and not resolved
+    assert "retry_unstarted" not in evidence["actions"]
+    assert "season is not open" in evidence["explanation"]
+    assert (
+        adapter.reconcile(
+            "source", dict(ActionID="action", ActionKind="retry_unstarted", EvidenceHash=token)
+        )
+        == "not_applied"
+    )
+    adapter.coordinator.request_safe_retry.assert_not_called()
+
+
+def test_confirmed_export_description_does_not_claim_fresh_provider_check():
+    adapter, _ = job_fixture(state="confirmed", attempted=True)
+    evidence, _, resolved = adapter.inspect("source")
+    assert resolved and "confirmed delivery" in evidence["explanation"]
+    assert "not a fresh check" in evidence["explanation"]
 
 
 def test_guided_retirement_checks_again_after_clear_before_release():

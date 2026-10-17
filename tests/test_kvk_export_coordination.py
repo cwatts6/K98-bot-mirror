@@ -570,7 +570,7 @@ def test_safe_retry_is_audited_without_replacing_identity_or_ticket(monkeypatch)
         OwnerID=str(uuid4()),
         Fence=3,
     )
-    cursor = Cursor(singles=[job, None, {"NowUTC": "2026-09-14T12:00:00"}, {"Version": 5}])
+    cursor = Cursor(singles=[job, None, None, {"NowUTC": "2026-09-14T12:00:00"}, {"Version": 5}])
     dal = scripted(monkeypatch, cursor)
     dal.request_safe_retry(
         job_id,

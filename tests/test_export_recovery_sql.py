@@ -40,6 +40,7 @@ def scoped_jobs():
         for name in names:
             text = re.sub(r"\bdbo\." + name + r"\b", "#" + name, text)
         text = text.replace("KVK.SourceDelivery", "#SourceDelivery")
+        text = text.replace("KVK.SeasonSource", "#SeasonSource")
         return text
 
     try:
@@ -51,10 +52,23 @@ def scoped_jobs():
             text = (schema / f"dbo.{name}.Table.sql").read_text(encoding="utf-8-sig")
             text = "\n".join(line for line in text.splitlines() if "FOREIGN KEY" not in line)
             text = re.sub(r",\s*\);", "\n);", text)
+            text = re.sub(
+                r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + uuid4().hex, text
+            )
             sql.execute(rewrite(text))
         text = (schema / "KVK.SourceDelivery.Table.sql").read_text(encoding="utf-8-sig")
         text = "\n".join(line for line in text.splitlines() if "FOREIGN KEY" not in line)
+        text = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + uuid4().hex, text)
         sql.execute(rewrite(text))
+
+        text = (schema / "KVK.SeasonSource.Table.sql").read_text(encoding="utf-8-sig")
+        text = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + uuid4().hex, text)
+        sql.execute(rewrite(text))
+        sql.execute(
+            "INSERT #SeasonSource(KVK_NO,SourceKey,ChoiceID,ChosenBy,ChosenUTC,Reason,ProvenanceJson,SeasonState,SeasonVersion) "
+            "VALUES (1,'snapshot_report_v1',?,'test',SYSUTCDATETIME(),'temp fixture','{}','open',1)",
+            str(uuid4()),
+        )
 
         class Cursor:
             def __init__(self):
