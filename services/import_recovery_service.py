@@ -4,15 +4,26 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.capture_recovery_context import add_capture_context, capture_review
+from services.historical_import_recovery_service import ACTION, HistoricalImportRecovery
+from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 
 
 class ImportRecoveryAdapter:
     kind = "stats_import"
-    review_details = capture_review
 
     def __init__(self, dal, capture_recovery=None):
         self.dal = dal
         self.capture_recovery = capture_recovery
+        self.historical = (
+            HistoricalImportRecovery(dal, capture_recovery.runtime)
+            if capture_recovery and isinstance(dal, StatsImportOutcomeDAL)
+            else None
+        )
+
+    def review_details(self, source_id, action, token):
+        if action == ACTION and self.historical:
+            return self.historical.review_details(source_id, action, token)
+        return capture_review(self, source_id, action, token)
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(after=after)
@@ -23,6 +34,8 @@ class ImportRecoveryAdapter:
         decision = preview["action"]
         captured = preview.get("captured", False)
         prep = preview.get("preparation") or {}
+        if not execution and self.historical and prep.get("SpoolKey"):
+            return self.historical.inspect(source_id)
         capture_pending_queue = captured and not prep.get("JobID")
         if capture_pending_queue:
             captured = False
@@ -170,6 +183,8 @@ class ImportRecoveryAdapter:
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == ACTION and self.historical:
+            return self.historical.execute(source_id, token, actor, reason)
         if action == "abandon_capture" and self.capture_recovery:
             return self.capture_recovery.abandon(source_id, token, actor, reason)
         if action == "queue_capture" and self.capture_recovery:
@@ -187,6 +202,8 @@ class ImportRecoveryAdapter:
         )
 
     def reconcile(self, source_id, action):
+        if action["ActionKind"] == ACTION and self.historical:
+            return self.historical.reconcile(source_id, action)
         if action["ActionKind"] in {"resume_capture", "queue_capture"} and self.capture_recovery:
             return self.capture_recovery.reconcile_capture(source_id, action)
         if action["ActionKind"] == "abandon_capture" and self.capture_recovery:

@@ -27,7 +27,13 @@ P0A_ACTIONS = MappingProxyType(
         # A resumed admission hands off here. Only proven rollback or completed
         # SQL output is included; accepting incomplete reports is not completion.
         "stats_import": frozenset(
-            {"release_failure", "resume_capture", "queue_capture", "abandon_capture"}
+            {
+                "release_failure",
+                "resume_capture",
+                "queue_capture",
+                "abandon_capture",
+                "retire_historical_export",
+            }
         ),
     }
 )

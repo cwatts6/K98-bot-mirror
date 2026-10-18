@@ -7,6 +7,54 @@ This authorizes preparation and validation, not a live deployment or SQL install
 
 ## P0a — first release
 
+### Historical captured exports: P0B-HIST01 — 18 October 2026
+
+The operator confirms private `3017482455beaa8aaffab833606534eddbdd25a0`
+deployed and Discord online. Its attached startup log records recovery monitoring
+available again at 08:48:58 UTC after temporary contention. This does not certify
+provider delivery or resolve the historical SQL outcomes.
+
+This focused follow-on implements **Retire historical export** for untyped,
+captured scan-data preparations without execution receipts, queue jobs, held
+resources or provider streams. It targets the 44 historical preparations in the
+last complete report; their current eligibility and operator decisions remain
+live acceptance, not a promised automatic reduction of 44 incidents.
+
+The existing private paginated review shows the saved canonical input identity
+and producer procedure where recorded, the preparation timestamp, capture hash
+and length, original/current registration fingerprints, destination links and
+complete output settings. Input details are explicitly retained checkpoint
+assertions, not an execution receipt. The original upload name and original
+exception are not reconstructed from timing or nearby records when no exact
+association exists. Configuration differences are observations, not an invented
+root cause. The complete report includes this bounded failure context and the
+required guided action; raw output cells and settings stay in the private review.
+
+Admin confirms only if this old export is no longer needed. The DAL checks both
+producer guards, exact account/storage scope, original capture hash and canonical
+payload, provenance, generation, original registration, absence of held resources,
+receipt, job and provider streams, plus the evidence/version and current settings
+reviewed. It atomically makes this capture unavailable for future queueing and
+adds the exact recovery-action disposition to its generation document. Original
+generation fields, request, captured bytes and SQL data remain preserved. No
+receipt is invented, import rerun, resource released or provider write performed.
+Independent readback resolves the export decision with **SQL outcome unproven**.
+Restart, lost replies and duplicate confirmations reconcile the same durable
+decision. Missing bytes after application keep verification pending, not failed.
+
+Operator validation after merge/deployment: select **Historical import / captured
+export**, choose **Retire historical export**, review all pages, confirm only if
+obsolete, then Recheck. Download the complete report and verify the record is
+resolved with `resolution=historical_export_retired`, `outcome=unproven`, no pending
+verification and no new job. If the old export is still required, leave it open;
+this decision does not establish a safe replay or a current spreadsheet.
+
+No schema migration, new slash command or provider integration is introduced.
+Remaining P0b unknown-write replacement, partial-report continuation, pre-request
+failures, all-copy loss, unattributed holds and whole-pipeline/rollover acceptance
+remain mandatory below. Historical records that fail verification remain visible
+with their blocker. This focused disposition is not completion of all P0b work.
+
 Status: **preparing; not deployment-ready**. The current runtime candidate is
 Bot `e5d4dd90` (PR #371, stacked through #370) and SQL `72b1af55` (PR #125,
 stacked through #124). The following delivery-qualification change adds tests
