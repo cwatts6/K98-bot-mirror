@@ -673,11 +673,23 @@ class LegacyExportRuntime:
             raise SnapshotUnavailable("Authority probe requires the matching SQL evidence gate.")
 
         scope = json.loads(self.configuration)["config"]
+        from services.producer_recovery_intent import current_intent
+
+        request: dict = {"read_configuration": str(uuid4())}
+        producer = current_intent()
+        if producer and producer.get("kind") == "configuration_import" and "parent" not in producer:
+            # Persist the caller association before admission. Health probes and
+            # already-linked recovery children must not create duplicate incidents.
+            request["configuration_import"] = dict(
+                producer=producer,
+                sources=scope,
+                outputs=json.loads(self.configuration)["scan_data"],
+            )
         identifier = self.dal.request(
             account=self.account,
             consumer="config",
             kvk_no=None,
-            request={"read_configuration": str(uuid4())},
+            request=request,
             storage_owner=self.store.storage_owner,
             actor="system:configuration",
             reason="Read immutable configuration inputs",

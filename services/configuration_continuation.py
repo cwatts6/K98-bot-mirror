@@ -10,6 +10,8 @@ from services.producer_recovery_intent import configuration_retry_intent
 class ConfigurationContinuation:
     kind = "configuration_continuation"
     observe_healthy = False
+    title = "Configuration continuation"
+    initial_explanation = "The original atomic configuration attempt rolled back and its reservation is verified released. Choose whether to read current registered configuration and publish it, or retain the prior configuration."
 
     def __init__(self, dal, producer, runner=None):
         self.dal, self.producer = dal, producer
@@ -23,12 +25,14 @@ class ConfigurationContinuation:
         marker, child = state["marker"], state["child"]
         actions, links = {}, []
         evidence = dict(
-            title="Configuration continuation",
+            title=self.title,
             outcome="choose_continuation",
-            explanation="The original atomic configuration attempt rolled back and its reservation is verified released. Choose whether to read current registered configuration and publish it, or retain the prior configuration.",
+            explanation=self.initial_explanation,
             actions=actions,
             recovery_links=links,
         )
+        if "failure_context" in state:
+            evidence["failure_context"] = dict(state["failure_context"])
         resolved = bool(marker and marker.get("choice") == "keep_prior")
         if resolved:
             evidence.update(
@@ -87,6 +91,10 @@ class ConfigurationContinuation:
                             source_id=owner["source_id"],
                         )
                     )
+        if "failure_context" in evidence:
+            evidence["failure_context"]["current_blocker"] = (
+                None if resolved else evidence["outcome"]
+            )
         return evidence, digest(state).hex(), resolved
 
     def review_details(self, source_id, action, token):
@@ -98,7 +106,7 @@ class ConfigurationContinuation:
             raise SourceConflict("Configuration review changed; reopen the incident.")
         fields = registration_review(
             dict(
-                preparation=state["root"],
+                preparation=state.get("review_root", state["root"]),
                 current_registration=state["current"]["scan_data"],
                 producer=dict(
                     inputs={"operation": "Fresh configuration read; no scan import replay"}
@@ -110,7 +118,11 @@ class ConfigurationContinuation:
         fields.extend(
             registration_review(
                 dict(
-                    preparation={"RequestJson": json.dumps({"request": {"config": source}})},
+                    preparation={
+                        "RequestJson": json.dumps(
+                            {"request": {"config": state.get("original_sources", source)}}
+                        )
+                    },
                     current_registration=source,
                     producer=dict(inputs={"operation": "Configuration source registration"}),
                 )

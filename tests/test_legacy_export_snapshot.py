@@ -607,6 +607,37 @@ def test_health_probe_refusal_does_not_wait(tmp_path, monkeypatch):
     sleep.assert_not_called()
     dal.claim.assert_called_once()
     dal.withdraw_unstarted.assert_called_once()
+    assert set(dal.request.call_args.kwargs["request"]) == {"read_configuration"}
+
+
+@pytest.mark.parametrize("recovery_child", [False, True])
+def test_configuration_import_association_is_saved_before_read_admission(tmp_path, recovery_child):
+    from services.producer_recovery_intent import atomic_producer_intent, configuration_retry_intent
+
+    configuration = {
+        "config": {"destinations": ["source"]},
+        "scan_data": {"destinations": ["output"]},
+    }
+    runtime, dal = producer_runtime(tmp_path, configuration=configuration)
+    dal.claim.return_value = None
+
+    @atomic_producer_intent("configuration_import")
+    def attempt():
+        with runtime.configuration_requests():
+            pytest.fail("Refused read cannot collect inputs")
+
+    with pytest.raises(SnapshotUnavailable, match="admission refused"):
+        if recovery_child:
+            with configuration_retry_intent(str(uuid4()), str(uuid4())):
+                attempt()
+        else:
+            attempt()
+    saved = dal.request.call_args.kwargs["request"]
+    assert ("configuration_import" in saved) is not recovery_child
+    if not recovery_child:
+        assert saved["configuration_import"]["sources"] == configuration["config"]
+        assert saved["configuration_import"]["outputs"] == configuration["scan_data"]
+        assert saved["configuration_import"]["producer"]["kind"] == "configuration_import"
 
 
 def test_admission_deadline_withdraws_before_any_execution(tmp_path, monkeypatch):

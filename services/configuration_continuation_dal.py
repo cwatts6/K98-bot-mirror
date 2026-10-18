@@ -29,15 +29,22 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
             )
             return [identity(row["PreparationID"]) for row in rows(cursor)]
 
-    def snapshot(self, source_id):
-        from services.replacement_admission_dal import admission_blocker
-
+    def original(self, source_id):
         preview = self.outcomes.inspect(source_id)
         root = preview["preparation"]
         request = self.outcomes.request(root)
         if preview["action"] != "cancelled" or "parent" in request["request"]["producer"]:
             raise SourceConflict("A verified closed original configuration attempt is required.")
-        marker = json.loads(root["GenerationJson"]).get("configuration_continuation")
+        return root
+
+    def review_context(self, root):
+        return {}
+
+    def snapshot(self, source_id):
+        from services.replacement_admission_dal import admission_blocker
+
+        root = self.original(source_id)
+        marker = json.loads(root["GenerationJson"] or "{}").get("configuration_continuation")
         child = None
         if marker and marker.get("action"):
             operation = identity(marker["action"])
@@ -72,6 +79,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
                 child=child,
                 blocker=blocker,
                 current=json.loads(self.runtime.configuration),
+                **self.review_context(root),
             )
         )
 
@@ -95,7 +103,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
         state = self.snapshot(source_id)
         if digest(state).hex() != expected_token:
             raise SourceConflict("Configuration continuation evidence changed.")
-        generation = json.loads(state["root"]["GenerationJson"])
+        generation = json.loads(state["root"]["GenerationJson"] or "{}")
         generation["configuration_continuation"] = marker
         encoded = bounded_json(generation)
         with transaction(self.connect) as cursor:

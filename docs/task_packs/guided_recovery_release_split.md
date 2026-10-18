@@ -7,6 +7,43 @@ This authorizes preparation and validation, not a live deployment or SQL install
 
 ## P0a — first release
 
+### Identified configuration read refusals: P0B-PRE01a — 18 October 2026
+
+The operator confirms historical-export PRs #388/#645 are merged and private
+`3b76e125a3148c93faf578fa95f7abd50541fd21` is deployed. The supplied updater log
+verifies source/startup and Discord readiness, with import/export still degraded.
+Historical acceptance remains operator-owned: review one obsolete capture, use
+**Retire historical export**, Recheck, then download the complete report. Expect
+`historical_export_retired`, outcome `unproven`, and no pending verification.
+Repeat only for exports the admin has reviewed and no longer needs; this is not
+proof that the original imports succeeded or that all 44 are eligible.
+
+The new startup log also shows configuration read admission exhausting its wait
+behind a stats writer. This slice retains an original configuration-import
+association and original source/output registrations before read admission.
+Health probes and already-linked recovery children do not acquire that marker.
+The monitor discovers an exactly withdrawn, never-admitted identified read and
+presents **Read & publish current config** and **Keep prior configuration**.
+The existing private paginated source/output review, separate confirmation,
+serialized durable intent, atomic publication, output-capture handoff and
+independent verification are reused. The report includes original operation/read
+identity, timestamp, request hash and the verified before-execution failure stage;
+raw settings remain in the private review. Held access links to its exact owner.
+
+Acceptance covers restart, late/duplicate confirmation, lost dispatch/commit
+replies, changed registration, denied actors, malformed/tampered request evidence,
+held access, successful publication/capture and keep-prior readback. No provider
+requests or business imports are replayed automatically. Existing schema objects
+are reused; no SQL migration or new command is required.
+
+This association cannot be reconstructed for older untyped reads from timestamps
+alone. Those cases, failures before a durable request can be saved, and failures
+after read admission remain required P0B-PRE01 work, alongside the other full-release
+workstreams below. This slice does not certify the older startup failure as fixed,
+erase its uncertainty, or complete P0b. It prevents newly identified refusals from
+being silently lost between startup and the recovery centre. Final validation,
+Changes reviews, private promotion and deployment compatibility remain gates.
+
 ### Historical captured exports: P0B-HIST01 — 18 October 2026
 
 The operator confirms private `3017482455beaa8aaffab833606534eddbdd25a0`

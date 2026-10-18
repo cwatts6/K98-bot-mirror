@@ -112,6 +112,13 @@ def recovery_service():
             ConfigurationContinuationDAL(runtime, config_outcomes), config_adapter
         )
         adapters[config_continuation.kind] = config_continuation
+        from services.configuration_read_continuation import ConfigurationReadContinuation
+        from services.configuration_read_continuation_dal import ConfigurationReadContinuationDAL
+
+        read_continuation = ConfigurationReadContinuation(
+            ConfigurationReadContinuationDAL(runtime, config_outcomes), config_adapter
+        )
+        adapters[read_continuation.kind] = read_continuation
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:
