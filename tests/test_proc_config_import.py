@@ -36,6 +36,12 @@ def test_admission_refusal_is_actionable_but_unexpected_failure_stays_critical(
     if deferred:
         assert report["recovery_status"] == "configuration_read_admission_deferred"
         assert "recovery centre" in report["errors"][0]
+        if dry_run:
+            assert "Review queue blockers" in report["errors"][0]
+            assert "run the dry-run again" in report["errors"][0]
+            assert "Configuration import read not started" not in report["errors"][0]
+        else:
+            assert "Configuration import read not started" in report["errors"][0]
         assert "critical failure" not in caplog.text
         assert "Unexpected error" not in caplog.text
     else:
