@@ -43,9 +43,12 @@ pagination remains independently bounded by its existing export snapshot.
 3. Recheck: the queue incident must resolve with no pending action. Download
    the complete report to retain the decision and missing-input explanation.
 4. Open the incident list: first-seen timestamps must increase across pages.
-5. A new refused ProcConfig read uses **Configuration import read not started**:
+5. A new refused ProcConfig publication read uses **Configuration import read not started**:
    **Read & publish current config** or **Keep prior configuration**, as already
    delivered by PRs 389/646. Its blocking writer has its own recovery requirements.
+6. A refused schema-only dry-run has no saved publication. Use **Review queue
+   blockers** to inspect blocking work, then rerun the dry-run when account access
+   is available. Do not look for a publication-continuation incident for that dry-run.
 
 This closes only the proven withdrawn read; it does not certify import/export
 health, retire the current SQL writer, or infer success from a timeout.
@@ -63,6 +66,15 @@ Security routing: Changes review of the focused Bot diff, Deep off, separate
 private promotion target. This touches SQL persistence and admin interactions.
 Architecture/deferred/security routing validators, focused tests, formatting,
 lint, smoke imports and command registration are required before handoff.
+
+Review followup: the schema-only dry-run instruction now points to the existing
+queue-blocker entry point and an explicit fresh dry-run. Twenty ProcConfig tests
+passed, including distinct dry-run/publication instructions. A repeated full suite
+is unnecessary for this text-only increment after the completed full promotion
+suite. Incremental security scan skipped: inspected the message literals in
+proc_config_import.py, their test assertions and this operator guide; no control
+flow, permissions, data access, persistence or configuration behavior changes.
+The preceding queue and promoted Changes reviews remain applicable.
 
 ## Remaining required P0b work
 
