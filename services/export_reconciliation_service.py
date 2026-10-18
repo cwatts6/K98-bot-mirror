@@ -55,6 +55,7 @@ class ClosedStreamVerifier:
         registration_hash,
         require_observation=True,
         allow_failed_reads=False,
+        require_no_writes=False,
     ):
         uuid_text(stream_id)
         stream = self.dal.read_stream(stream_id)
@@ -91,7 +92,13 @@ class ClosedStreamVerifier:
             or stream["Purpose"] not in {"mutation", "probe", "enrollment"}
         ):
             raise SourceConflict("Exact registered closed stream required.")
-        if allow_failed_reads and (stream["Purpose"] != "probe" or require_observation):
+        if allow_failed_reads and (
+            require_observation
+            or (
+                stream["Purpose"] != "probe"
+                and not (require_no_writes and stream["Purpose"] == "mutation")
+            )
+        ):
             raise SourceConflict("Failed-read verification is only for abandoned read-only probes.")
         sequence, event_digest = self.dal.stream_digest(stream_id)
         if sequence != stream["LastSequence"] or event_digest != bytes(stream["EventDigest"]):
@@ -184,6 +191,8 @@ class ClosedStreamVerifier:
                     reads += int(not typed.mutation)
         if count != sequence:
             raise SourceConflict("Closed request membership was truncated.")
+        if require_no_writes and mutations:
+            raise SourceConflict("A dispatched provider write prevents no-write closeout.")
         if require_observation and stream["Purpose"] == "probe" and reads == 0:
             raise SourceConflict("An empty probe establishes no provider observation.")
         return ClosedStreamEvidence(

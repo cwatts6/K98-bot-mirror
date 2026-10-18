@@ -2672,6 +2672,35 @@ class AuthorityClient:
             raise ExecutionUncertain("Authenticated replacement registration history differs.")
         return current, history
 
+    def failed_export_recovery(self, job_id, operation, **values):
+        uuid_text(job_id)
+        if operation not in {"inspect", "execute", "reconcile"}:
+            raise ValueError("Fixed failed-export operation required.")
+        result = self._invoke(
+            dict(
+                version=1,
+                action="failed_export_recovery",
+                job_id=job_id,
+                operation=operation,
+                **values,
+            )
+        )
+        if operation in {"inspect", "execute"}:
+            if (
+                not isinstance(result, dict)
+                or set(result) != {"evidence", "token", "resolved"}
+                or type(result["resolved"]) is not bool
+                or not isinstance(result["token"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
+                or not isinstance(result["evidence"], dict)
+            ):
+                raise ExecutionUncertain("Failed-export recovery acknowledgement differs.")
+        elif result is not None and (
+            not isinstance(result, str) or result not in {"verified", "not_applied"}
+        ):
+            raise ExecutionUncertain("Failed-export verification acknowledgement differs.")
+        return result
+
     def replacement_recovery(self, job_id, operation, *, owner_kind="job", **values):
         uuid_text(job_id)
         if owner_kind not in {"job", "rollover"}:

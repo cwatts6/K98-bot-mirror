@@ -900,7 +900,8 @@ class ExportCoordinationDAL:
                     )
                     if one(cursor):
                         continue
-                if json.loads(job["ProvenanceJson"]).get("export_skipped"):
+                retirement = json.loads(job["ProvenanceJson"])
+                if retirement.get("export_skipped") or retirement.get("failed_export_retired"):
                     raise SourceConflict("This export was closed by a verified recovery decision.")
                 retry = (
                     job["State"] == "failed"
@@ -1083,7 +1084,7 @@ class ExportCoordinationDAL:
 
                 require_source(cursor, job["KVK_NO"], job["SourceKey"])
             evidence = json.loads(job["ProvenanceJson"])
-            if evidence.get("export_skipped"):
+            if evidence.get("export_skipped") or evidence.get("failed_export_retired"):
                 raise SourceConflict("A skipped export cannot be retried.")
             history = evidence.setdefault("safe_retry_history", [])
             cursor.execute("SELECT CONVERT(varchar(33),SYSUTCDATETIME(),126) AS NowUTC")
