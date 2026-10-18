@@ -139,11 +139,14 @@ class FailedExportCloseout:
             return None
         if not isinstance(marker, dict) or set(marker) != {"reference", "sha256"}:
             raise SourceConflict("The saved failed-export decision is malformed.")
-        body = decode(
-            self.store.read_reference(
-                identity(marker["reference"]), bytes.fromhex(marker["sha256"])
+        try:
+            body = decode(
+                self.store.read_reference(
+                    identity(marker["reference"]), bytes.fromhex(marker["sha256"])
+                )
             )
-        )
+        except Exception as exc:
+            raise SourceConflict("Private failed-export decision is unavailable.") from exc
         original = body["original_job"]
         expected = dict(original)
         original_provenance = json.loads(original["ProvenanceJson"])
