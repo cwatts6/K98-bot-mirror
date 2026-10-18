@@ -135,6 +135,61 @@
           "after_sha256": "a87544310865543c3fa3961ce4bd899c61dc5cb1ec47bbc6b8312fc81742cb52"
         }
       ]
+    },
+    {
+      "id": "failed_export_closeout_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "a1ba9ca87f0293e075fb5e179bf6df4b2b93e2ec669e5244d4a676f7211f3575",
+          "after_sha256": "8a6983cdeb973493640eb456ee3219c8247e2350d9f41fda367343b319624a68"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "0fbb83a499875d0dad6798a6a9c351df3d0151ed4774d3b5cc957230b6637ff0",
+          "after_sha256": "2f54321518916478368a674b2a0b5e2a8e9950982ef012f3d18d262c42ea34de"
+        },
+        {
+          "path": "services/export_evidence_catalog_dal.py",
+          "before_sha256": "f7ec62042b65b6543a2e9a0cc2114282b8dfae0d553f0e9d486b481487aaf0b2",
+          "after_sha256": "b847742c214981af86d6b34a0fe4d7cd7b5bb4260c41b3f5f27d5b475edf25c7"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3",
+          "after_sha256": "49ae41ef0f44621dadfebb2fc2facc599c66c17d2faa160297693f3552721cdd"
+        },
+        {
+          "path": "services/export_replacement_recovery_adapter.py",
+          "before_sha256": "40136c5a4dac02cf47587995ac75201f2e2d4ad4c73902e7fc9b6ff2020fab25",
+          "after_sha256": "aca25f7d7349e7c8d99bf23b38a0899b96837dd94398bafdf08bc2a8a66924b6"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "before_sha256": "6135908d7ce892641f64356cf2e9a7472216b35030f379c746b7a0218b29379d",
+          "after_sha256": "11558c4ea37d79b829f36a905b84c9b8461cb0b032a96b8b3a6be523504f3318"
+        },
+        {
+          "path": "services/failed_export_closeout.py",
+          "before_sha256": null,
+          "after_sha256": "93dbfe9c241c4aaf02d86bda9adb9fd9229d1818c775bcd97d00cacde217e670"
+        },
+        {
+          "path": "services/failed_export_closeout_dal.py",
+          "before_sha256": null,
+          "after_sha256": "454fc233b7a8c061ee4ba7f860856a3eab4840a6dd23a3c1d8ccc96e084c65dc"
+        },
+        {
+          "path": "services/failed_export_recovery_authority.py",
+          "before_sha256": null,
+          "after_sha256": "353abefbceb8bdf078a51b0c4537244e659aefea3e7425d7a4e53b81af5d2f13"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "3e7c7aa9a05e22bf7c1d4949257fc06159c88cb1cf858d86cdf976c9fc3fc08c",
+          "after_sha256": "a902c2b717a3a79ceac5fd7fa9b50bba4a5b7708eb32ecc817e62ec2c8c75db1"
+        }
+      ]
     }
   ]
 }

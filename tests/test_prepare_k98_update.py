@@ -201,7 +201,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
 @pytest.mark.parametrize(
     "path",
     [
-        "scripts/run_export_authority.py",
         "Scripts/RUN_EXPORT_AUTHORITY.PY",
         "core/export_release_seed.py",
         "core/export_process_pair.py",

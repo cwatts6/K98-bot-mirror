@@ -57,6 +57,22 @@ def coordinated_policy():
     return module
 
 
+FAILED_EXPORT_TRANSITION_PATHS = frozenset(
+    {
+        "scripts/run_export_authority.py",
+        "services/export_coordination_dal.py",
+        "services/export_evidence_catalog_dal.py",
+        "services/export_reconciliation_service.py",
+        "services/export_replacement_recovery_adapter.py",
+        "services/export_runtime_composition.py",
+        "services/failed_export_closeout.py",
+        "services/failed_export_closeout_dal.py",
+        "services/failed_export_recovery_authority.py",
+        "services/recovery_release_policy.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -83,7 +99,14 @@ def reviewed_transitions():
             if set(member) != {"path", "before_sha256", "after_sha256"}:
                 raise ValueError("Exact transition member required.")
             path = ordinary_path(member["path"])
-            if not path.startswith("services/export_") or not path.endswith(".py") or path in paths:
+            fixed_closeout = (
+                item["id"] == "failed_export_closeout_v1" and path in FAILED_EXPORT_TRANSITION_PATHS
+            )
+            if (
+                not (path.startswith("services/export_") or fixed_closeout)
+                or not path.endswith(".py")
+                or path in paths
+            ):
                 raise ValueError("Unique export protocol source member required.")
             paths.add(path)
             for field in ("before_sha256", "after_sha256"):
@@ -92,6 +115,8 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if item["id"] == "failed_export_closeout_v1" and paths != FAILED_EXPORT_TRANSITION_PATHS:
+            raise ValueError("Complete fixed failed-export transition required.")
     return value["transitions"]
 
 
