@@ -11,8 +11,9 @@ import proc_config_import as pci
 
 
 @pytest.mark.parametrize("deferred", [True, False])
+@pytest.mark.parametrize("dry_run", [True, False])
 def test_admission_refusal_is_actionable_but_unexpected_failure_stays_critical(
-    monkeypatch, caplog, deferred
+    monkeypatch, caplog, deferred, dry_run
 ):
     from unittest.mock import Mock
 
@@ -27,15 +28,18 @@ def test_admission_refusal_is_actionable_but_unexpected_failure_stays_critical(
     monkeypatch.setattr(snapshots, "read_configuration", Mock(side_effect=error))
     connection = Mock(side_effect=AssertionError("SQL must not start"))
     monkeypatch.setattr(pci, "_get_import_connection_with_retry", connection)
-    success, report = pci.run_proc_config_import.__wrapped__.__wrapped__()
-    assert not success and report["success"] is False
+    success, report = pci.run_proc_config_import.__wrapped__.__wrapped__(dry_run=dry_run)
+    assert not success
+    if deferred or not dry_run:
+        assert report["success"] is False
     connection.assert_not_called()
     if deferred:
         assert report["recovery_status"] == "configuration_read_admission_deferred"
         assert "recovery centre" in report["errors"][0]
         assert "critical failure" not in caplog.text
+        assert "Unexpected error" not in caplog.text
     else:
-        assert "critical failure" in caplog.text
+        assert ("Unexpected error" if dry_run else "critical failure") in caplog.text
         assert "recovery_status" not in report
 
 

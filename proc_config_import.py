@@ -656,6 +656,18 @@ def run_proc_config_import(
             report["sheets_ok"] = True
             _set_last_import_report(report)
             return True, report
+        except ConfigurationAdmissionDeferred:
+            message = (
+                "Configuration dry-run deferred before reading inputs: account admission unavailable. "
+                "Open the recovery centre and review Configuration import read not started. "
+                "No schema check or configuration publication occurred."
+            )
+            logger.warning("[IMPORT][DRYRUN][ADMISSION] %s", message)
+            report["errors"].append(message)
+            report["success"] = False
+            report["recovery_status"] = "configuration_read_admission_deferred"
+            _set_last_import_report(report)
+            return False, report
         except Exception:
             logger.exception("[IMPORT][DRYRUN] Unexpected error during dry-run schema checks")
             report["errors"].append("Unexpected error during dry-run schema checks")
