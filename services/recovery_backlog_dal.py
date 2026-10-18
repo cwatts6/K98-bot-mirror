@@ -150,7 +150,7 @@ class RecoveryBacklogDAL:
         # Scope is checked even for a guessed group ID.
         row = self.store.get(group)
         if row["SourceKind"] != self.group_kind:
-            raise SourceConflict("This is not an evidence repair group.")
+            raise SourceConflict("This recovery group does not match the requested repair.")
         with transaction(self.store.connect) as cursor:
             cursor.execute(
                 "SELECT a.State,COUNT_BIG(*) AS Total FROM dbo.RecoveryAction a "
