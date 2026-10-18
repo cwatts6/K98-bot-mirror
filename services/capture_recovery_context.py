@@ -7,13 +7,19 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.producer_recovery_review import registration_review
 
 
+def _diagnostic_document(value):
+    try:
+        result = json.loads(value or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return result if isinstance(result, dict) else {}
+
+
 def capture_context(prep, execution, recovery):
     """Describe observations, not an invented historical exception or success."""
     execution = execution or {}
-    request = json.loads(prep.get("RequestJson") or "{}")
-    generation = json.loads(prep.get("GenerationJson") or "{}")
-    request = request if isinstance(request, dict) else {}
-    generation = generation if isinstance(generation, dict) else {}
+    request = _diagnostic_document(prep.get("RequestJson"))
+    generation = _diagnostic_document(prep.get("GenerationJson"))
     producer = generation.get("producer") or {}
     current = json.loads(recovery.runtime.configuration)[recovery.consumer]
     inner = request.get("request")
@@ -55,7 +61,17 @@ def capture_context(prep, execution, recovery):
         context["sql_error_procedure"] = procedure
     if context["sql_error_number"] is not None:
         context["original_fault"] = "sql_receipt"
-    if not generation and execution.get("State") != "completed":
+    if generation.get("capture_abandoned"):
+        context["current_blocker"] = None
+        context["summary"] = (
+            "Admin chose to skip this export. The retained SQL result and original evidence are preserved; no capture or queue repair remains for this incident. This does not certify spreadsheet delivery."
+        )
+    elif prep.get("JobID") and prep.get("State") == "materialized":
+        context["current_blocker"] = None
+        context["summary"] = (
+            "The retained output has a durable queue admission. Provider delivery is verified separately; no original exception message was saved for the capture stage."
+        )
+    elif not generation and execution.get("State") != "completed":
         context["current_blocker"] = "completion_unproven"
         context["summary"] = (
             "No exact SQL completion receipt or producer checkpoint is available. The original execution outcome is unproven; the saved preparation alone does not establish a successful import or a safe replay."

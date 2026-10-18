@@ -24,7 +24,9 @@ class ImportCaptureRecovery:
         scope = json.loads(self.runtime.configuration)["scan_data"]
         request = json.loads(prep["RequestJson"])
         if (
-            request.get("consumer") != "scan_data"
+            not isinstance(request, dict)
+            or not isinstance(request.get("request"), dict)
+            or request.get("consumer") != "scan_data"
             or request.get("storage_owner") != self.runtime.store.storage_owner
             or request.get("request", {}).get("kind") != "scan_data"
             or request.get("request", {}).get("config") != scope
@@ -45,6 +47,8 @@ class ImportCaptureRecovery:
         if not prep["GenerationJson"]:
             return dict(expected, capture="pending")
         generation = json.loads(prep["GenerationJson"])
+        if not isinstance(generation, dict):
+            raise SourceConflict("The retained generation document is malformed.")
         producer = generation.get("producer")
         # Normal completion predates the timeout-recovery producer shape. Both
         # refer to this exact preparation and the independently completed SQL

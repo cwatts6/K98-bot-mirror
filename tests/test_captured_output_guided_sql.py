@@ -151,3 +151,7 @@ async def test_review_confirm_verify_retained_output(
         assert r.runtime.enqueue_snapshot(r.source) == str(after["preparation"]["JobID"]).lower()
     else:
         assert final["evidence"]["outcome"] == "export_skipped"
+        context = final["evidence"]["failure_context"]
+        assert context["current_blocker"] is None
+        assert "skip this export" in context["summary"]
+        assert context["original_fault"] == "not_recorded"

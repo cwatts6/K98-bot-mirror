@@ -147,6 +147,7 @@ class ImportRecoveryAdapter:
                     outcome="export_skipped",
                     explanation="The committed SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current.",
                 )
+                add_capture_context(evidence, prep, execution, self.capture_recovery)
                 return evidence, preview["token"], True
             if disposition in {"available", "failed"}:
                 from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION

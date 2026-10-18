@@ -169,3 +169,15 @@ def test_captured_registration_blocker_is_not_overwritten_by_still_checking():
     assert not resolved and not evidence["actions"]
     assert "still checking" not in evidence["explanation"]
     assert evidence["failure_context"]["current_blocker"] == "registration_changed"
+
+
+@pytest.mark.parametrize("field", ["RequestJson", "GenerationJson"])
+@pytest.mark.parametrize("value", ["{broken", "[]", "null"])
+def test_malformed_diagnostic_documents_preserve_nonactionable_incident(field, value):
+    service, preview, _ = fixture()
+    preview.update(captured=True, action="hold")
+    preview["preparation"]["SpoolKey"] = "retained"
+    preview["preparation"][field] = value
+    evidence, _, resolved = ImportRecoveryAdapter(service.outcomes, service).inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert evidence["failure_context"]["summary"]
