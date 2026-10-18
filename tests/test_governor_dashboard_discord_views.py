@@ -1136,7 +1136,8 @@ async def test_real_timeout_cancels_blocked_dashboard_fallback_send() -> None:
         resolution=GovernorDashboardResolution(state="requires_selection", options=(main, alt)),
         context_resolver=resolver,
         payload_loader=payload_loader,
-        timeout=0.01,
+        # Leave time for both failed edits before exercising the blocked send.
+        timeout=1,
     )
     interaction = _Interaction()
     message = _EditableMessage()
@@ -1153,9 +1154,9 @@ async def test_real_timeout_cancels_blocked_dashboard_fallback_send() -> None:
     interaction.edit_original_response = broken_edit
     interaction.followup.send = slow_fallback
     selection_task = asyncio.create_task(view.select_governor(interaction, "222"))
-    await fallback_started.wait()
-    await asyncio.sleep(0.05)
-    await selection_task
+    await asyncio.wait_for(fallback_started.wait(), timeout=5)
+    await asyncio.wait_for(selection_task, timeout=5)
+    await asyncio.wait_for(view.wait(), timeout=5)
 
     assert view._timed_out is True
     assert interaction.original_edits == []
