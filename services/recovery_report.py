@@ -24,7 +24,7 @@ def _next_step(row, evidence, actions, blocked):
     if evidence.get("check_unavailable"):
         return "Verification is unavailable. Use Recheck after the check recovers; no repair or healthy outcome is established."
     if (
-        row["SourceKind"] == "evidence_batch"
+        row["SourceKind"] in {"evidence_batch", "historical_batch"}
         and evidence.get("outcome") == "completed_with_exceptions"
     ):
         return "The group has finished with exceptions. Open the recovery centre and browse individual incidents to review changed or unrepaired evidence. Group completion does not resolve those incidents."
@@ -35,8 +35,11 @@ def _next_step(row, evidence, actions, blocked):
         ):
             return "This attempt is resolved. Open Choose configuration continuation to review whether to retry publication or keep the prior configuration; that separate decision still requires current verification."
         return "Resolved; no repair required."
-    if row["SourceKind"] == "evidence_batch" and evidence.get("outcome") == "running":
-        return "The approved evidence group is running. Use Recheck to follow verified, pending and changed counts. Do not repair its members individually; review any exceptions when the group finishes."
+    if (
+        row["SourceKind"] in {"evidence_batch", "historical_batch"}
+        and evidence.get("outcome") == "running"
+    ):
+        return "The approved group is running. Use Recheck to follow verified, pending and changed counts. Do not submit another decision for pending members; review any exceptions when the group finishes."
     if actions and not blocked:
         return (
             "Open this incident in the recovery centre; review the checks and confirm the repair."
@@ -113,7 +116,20 @@ def incident_report(service, row):
                     "replica_diagnostics",
                 )
                 if key in evidence
-            },
+            }
+            | (
+                dict(
+                    members=[
+                        {k: m[k] for k in ("id", "created", "input", "procedure") if k in m}
+                        for m in evidence.get("members", [])
+                    ],
+                    configuration_fingerprints={
+                        k: evidence.get("configuration", {}).get(k) for k in ("original", "current")
+                    },
+                )
+                if row["SourceKind"] == "historical_batch"
+                else {}
+            ),
             required_repairs=required,
             pending_verification=current.get("pending_action"),
             release_restriction=current.get("release_notice"),

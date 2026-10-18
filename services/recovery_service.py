@@ -98,6 +98,21 @@ class RecoveryService:
 
         return approve_group(self, actor, preview)
 
+    def review_historical_groups(self, actor, after=None):
+        from services.historical_retirement_group_service import review_groups
+
+        return review_groups(self, actor, after)
+
+    def review_historical_group(self, actor, group, selected=None):
+        from services.historical_retirement_group_service import review_group
+
+        return review_group(self, actor, group, selected)
+
+    def approve_historical_group(self, actor, group, selected):
+        from services.historical_retirement_group_service import approve_group
+
+        return approve_group(self, actor, group, selected)
+
     def download_complete_report(self, actor, max_bytes=8388608):
         from services.recovery_complete_report import build_complete_report
 
@@ -109,7 +124,7 @@ class RecoveryService:
         self.authorize(actor)
         return RecoveryBacklogDAL(self.store).summary()
 
-    def review_details_page(self, actor, incident_id, action, revision, token, page=0):
+    def _review_action(self, actor, incident_id, action, revision, token):
         self.authorize(actor)
         row = self.refresh(incident_id)
         if (
@@ -120,6 +135,17 @@ class RecoveryService:
             or row["evidence"]["actions"].get(action, {}).get("review_details") is not True
         ):
             raise SourceConflict("Recovery details changed. Reopen the incident before confirming.")
+        return row
+
+    def review_decision_summary(self, actor, incident_id, action, revision, token):
+        row = self._review_action(actor, incident_id, action, revision, token)
+        if row["evidence"]["actions"][action].get("review_summary") is not True:
+            raise SourceConflict("This repair requires its full guided checks.")
+        fields = self.adapters[row["SourceKind"]].review_summary(row["SourceID"], action, token)
+        return dict(row=row, action=action, fields=fields)
+
+    def review_details_page(self, actor, incident_id, action, revision, token, page=0):
+        row = self._review_action(actor, incident_id, action, revision, token)
         fields = self.adapters[row["SourceKind"]].review_details(row["SourceID"], action, token)
         pages = max(1, (len(fields) + 4) // 5)
         if type(page) is not int or not 0 <= page < pages:

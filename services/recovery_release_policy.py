@@ -8,6 +8,7 @@ from types import MappingProxyType
 P0A_ACTIONS = MappingProxyType(
     {
         "evidence_batch": frozenset(),
+        "historical_batch": frozenset(),
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued", "close_withdrawn_read"}),
         "player_report": frozenset(

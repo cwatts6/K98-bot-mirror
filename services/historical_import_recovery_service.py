@@ -112,6 +112,7 @@ class HistoricalImportRecovery:
                 check="Confirm you have reviewed the original input and destinations and this old export is no longer needed. Its SQL outcome remains unknown.",
                 effect="Prevent future queueing of this exact capture, preserve its input references, captured bytes and unknown SQL history, and record your decision. No SQL replay, provider write or resource release occurs.",
                 review_details=True,
+                review_summary=True,
                 review_title="Review historical input and configuration",
                 review_description=SUMMARY,
             )
@@ -153,6 +154,7 @@ class HistoricalImportRecovery:
         procedure = producer.get("procedure")
         current = json.loads(self.runtime.configuration)["scan_data"]
         return dict(
+            original_created_utc=str(prep["CreatedUTC"]),
             input_file=(
                 filename
                 if isinstance(filename, str)
@@ -189,6 +191,50 @@ class HistoricalImportRecovery:
                 else SUMMARY
             ),
         )
+
+    def review_summary(self, source_id, action, token):
+        state = self.dal.inspect(source_id)
+        if action != ACTION or self.evidence_token(state) != token or self.verify(state):
+            raise SourceConflict("Historical evidence changed. Reopen this incident.")
+        prep = state["preparation"]
+        context = self.context(prep, eligible=True)
+        original = json.loads(prep["RequestJson"])["request"]["config"]
+        current = json.loads(self.runtime.configuration)["scan_data"]
+        return [
+            dict(
+                label="Which work?",
+                text=(
+                    f"Created {prep['CreatedUTC']} UTC\n"
+                    f"Input: {context['input_file'] or 'not recorded'}\n"
+                    f"Procedure: {context['producer_procedure'] or 'not recorded'}\n"
+                    "Original upload name: not recorded."
+                ),
+            ),
+            dict(
+                label="What is known?",
+                text="Captured output verifies against its saved hash. No exact SQL execution receipt exists; the SQL outcome and original fault remain unknown.",
+            ),
+            dict(
+                label="Configuration",
+                text=(
+                    (
+                        "Original and installed settings match. "
+                        if original == current
+                        else "Original and installed settings DIFFER. "
+                    )
+                    + f"Original: {len(original.get('destinations', []))} destinations; installed: {len(current.get('destinations', []))}. "
+                    "Retirement does not publish to or change either configuration. Full settings and links are optional technical details."
+                ),
+            ),
+            dict(
+                label="Your decision",
+                text="Retire only if this old captured export is no longer needed. If you still need its output or cannot identify it, leave it open. You are not confirming that the import succeeded.",
+            ),
+            dict(
+                label="What happens next?",
+                text="The bot rechecks this exact capture, prevents future queueing, preserves its bytes and unknown SQL history, and verifies the saved decision. No import replay, provider write or release of held access.",
+            ),
+        ]
 
     def review_details(self, source_id, action, token):
         state = self.dal.inspect(source_id)

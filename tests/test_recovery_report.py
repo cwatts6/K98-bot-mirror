@@ -116,7 +116,16 @@ def test_collection_failure_is_exportable_without_false_empty_or_secrets():
 @pytest.mark.parametrize(
     "kind,outcome,state,pending,unavailable,expected",
     [
-        ("evidence_batch", "running", "open", None, None, "approved evidence group is running"),
+        ("evidence_batch", "running", "open", None, None, "approved group is running"),
+        ("historical_batch", "running", "open", None, None, "approved group is running"),
+        (
+            "historical_batch",
+            "completed_with_exceptions",
+            "resolved",
+            None,
+            None,
+            "finished with exceptions",
+        ),
         (
             "private_evidence",
             "recoverable",

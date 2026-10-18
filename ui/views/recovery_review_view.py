@@ -18,12 +18,13 @@ async def reviewed_page(interaction, row, action, page):
     )
 
 
-async def show_review_page(interaction, row, action, page, *, deferred=False):
+async def show_review_page(interaction, row, action, page, *, deferred=False, read_only=False):
     try:
         actor_for(interaction)
         if not deferred and not await safe_defer(interaction, ephemeral=True):
             return
         result = await reviewed_page(interaction, row, action, page)
+        result["read_only"] = read_only
         details = result["row"]["evidence"]["actions"][action]
         embed = discord.Embed(
             title=details.get("review_title", "Review retained scan and destinations"),
@@ -60,16 +61,22 @@ class RecoveryReviewView(discord.ui.View):
         self.previous.disabled = result["page"] == 0
         self.next.disabled = result["page"] + 1 == result["pages"]
         self.confirm.disabled = not self.next.disabled
+        if result.get("read_only"):
+            self.remove_item(self.confirm)
 
     @discord.ui.button(label="Previous checks", style=discord.ButtonStyle.secondary)
     async def previous(self, button, interaction):
         p = self.result
-        await show_review_page(interaction, p["row"], p["action"], p["page"] - 1)
+        await show_review_page(
+            interaction, p["row"], p["action"], p["page"] - 1, read_only=p.get("read_only", False)
+        )
 
     @discord.ui.button(label="Next checks", style=discord.ButtonStyle.secondary)
     async def next(self, button, interaction):
         p = self.result
-        await show_review_page(interaction, p["row"], p["action"], p["page"] + 1)
+        await show_review_page(
+            interaction, p["row"], p["action"], p["page"] + 1, read_only=p.get("read_only", False)
+        )
 
     @discord.ui.button(label="Continue to confirmation", style=discord.ButtonStyle.primary)
     async def confirm(self, button, interaction):
@@ -78,6 +85,8 @@ class RecoveryReviewView(discord.ui.View):
             if not await safe_defer(interaction, ephemeral=True):
                 return
             p = self.result
+            if p.get("read_only"):
+                return
             current = await reviewed_page(interaction, p["row"], p["action"], p["page"])
             if current["page"] + 1 != current["pages"]:
                 return

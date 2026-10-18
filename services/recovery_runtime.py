@@ -54,6 +54,10 @@ def recovery_service():
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter, batch.kind: batch}
+        from services.historical_retirement_group_service import HistoricalBatchAdapter
+
+        historical_batch = HistoricalBatchAdapter(store)
+        adapters[historical_batch.kind] = historical_batch
         from services.queue_admission_recovery import QueueAdmissionRecovery
         from services.queue_admission_recovery_dal import QueueAdmissionDAL
 
@@ -183,6 +187,17 @@ def observe_recovery():
                     service.store.touch_pending(incident_id)
                     recovery_health.record_progress("accepted_evidence_repairs")
         scope = service.store.scope
+        if "historical_batch" in service.adapters:
+            recovery_health.record_progress("accepted_historical_retirements")
+            for incident_id in RecoveryBacklogDAL(service.store).pending_repairs("stats_import"):
+                try:
+                    service.refresh(incident_id)
+                except Exception as exc:
+                    service.store.check_failed(incident_id, type(exc).__name__)
+                    failures.append(type(exc).__name__)
+                finally:
+                    service.store.touch_pending(incident_id)
+                    recovery_health.record_progress("accepted_historical_retirements")
         for kind, adapter in service.adapters.items():
             recovery_health.record_progress("discovery:" + kind)
             try:

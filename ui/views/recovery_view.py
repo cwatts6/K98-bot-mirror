@@ -86,6 +86,12 @@ def incident_embed(row):
         )
     if row.get("release_notice"):
         embed.add_field(name="Release coverage", value=row["release_notice"], inline=False)
+    elif row["SourceKind"] in {"evidence_batch", "historical_batch"} and row["State"] != "resolved":
+        embed.add_field(
+            name="Group verification",
+            value="Your approvals are saved. Verification continues in the background and survives restart. Use Recheck for progress; members that change keep their own incidents.",
+            inline=False,
+        )
     elif row["State"] != "resolved" and not evidence["actions"]:
         embed.add_field(
             name="Recovery checks",
@@ -248,6 +254,11 @@ class RecoveryIncidentView(discord.ui.View):
                         page = await call("input_page", actor, current["IncidentID"], action, 0)
                         await show_input_page(interaction, page)
                         return
+                    if detail.get("review_summary") is True:
+                        from ui.views.recovery_summary_view import show_summary
+
+                        await show_summary(interaction, current, action, deferred=True)
+                        return
                     if detail.get("review_details") is True:
                         from ui.views.recovery_review_view import show_review_page
 
@@ -335,6 +346,12 @@ class RecoveryListView(discord.ui.View):
         from ui.views.recovery_backlog_view import show_group
 
         await show_group(interaction)
+
+    @discord.ui.button(label="Retire historical group", style=discord.ButtonStyle.primary)
+    async def historical_group(self, button, interaction):
+        from ui.views.historical_retirement_view import show_batches
+
+        await show_batches(interaction)
 
     @discord.ui.button(label="Download complete report", style=discord.ButtonStyle.secondary)
     async def complete_report(self, button, interaction):
@@ -503,6 +520,16 @@ class RecoveryEntryView(discord.ui.View):
         from ui.views.recovery_backlog_view import show_complete_report
 
         await show_complete_report(interaction)
+
+    @discord.ui.button(
+        label="Retire historical group",
+        custom_id="k98:recovery:historical-group:v1",
+        style=discord.ButtonStyle.primary,
+    )
+    async def historical_group(self, button, interaction):
+        from ui.views.historical_retirement_view import show_batches
+
+        await show_batches(interaction)
 
     @discord.ui.button(
         label="Review queue blockers",

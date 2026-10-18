@@ -56,11 +56,16 @@ def historical(recovery, monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("lost_reply", [False, True])
+@pytest.mark.parametrize("technical_review", [False, True])
 async def test_private_review_confirm_restart_and_no_replay(
-    historical, store, monkeypatch, lost_reply
+    historical, store, monkeypatch, lost_reply, technical_review
 ):
     from services.recovery_report import incident_report
-    from ui.views import recovery_review_view as review, recovery_view as view
+    from ui.views import (
+        recovery_review_view as review,
+        recovery_summary_view as summary,
+        recovery_view as view,
+    )
 
     r = historical
     service = RecoveryService(
@@ -84,7 +89,7 @@ async def test_private_review_confirm_restart_and_no_replay(
     async def call(name, *args):
         return getattr(service, name)(*args)
 
-    for module in (view, review):
+    for module in (view, review, summary):
         monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
         monkeypatch.setattr(module, "call", call)
@@ -94,6 +99,11 @@ async def test_private_review_confirm_restart_and_no_replay(
     )
     before = r.outcomes.inspect(r.source)
     await button.callback(interaction)
+    short = interaction.followup.send.call_args.kwargs
+    assert len(short["embed"].fields) == 5
+    assert not short["view"].confirm.disabled
+    if technical_review:
+        await short["view"].technical.callback(interaction)
     labels, text = [], []
     while True:
         payload = interaction.followup.send.call_args.kwargs
@@ -101,13 +111,16 @@ async def test_private_review_confirm_restart_and_no_replay(
         labels.extend(f.name for f in payload["embed"].fields)
         text.extend(f.value for f in payload["embed"].fields)
         page = payload["view"]
-        if page.next.disabled:
+        if not technical_review or page.next.disabled:
             break
         assert page.confirm.disabled
         await page.next.callback(interaction)
-    assert {"Historical SQL outcome", "Original destination 1", "Current destination 1"} <= set(
-        labels
-    )
+    if technical_review:
+        assert {"Historical SQL outcome", "Original destination 1", "Current destination 1"} <= set(
+            labels
+        )
+    else:
+        assert {"Which work?", "What is known?", "Your decision"} <= set(labels)
     assert "stats\\_" in "".join(text)
     assert r.outcomes.inspect(r.source) == before
     await page.confirm.callback(interaction)

@@ -25,6 +25,11 @@ class ImportRecoveryAdapter:
             return self.historical.review_details(source_id, action, token)
         return capture_review(self, source_id, action, token)
 
+    def review_summary(self, source_id, action, token):
+        if action != ACTION or self.historical is None:
+            raise SourceConflict("This action requires its own guided review.")
+        return self.historical.review_summary(source_id, action, token)
+
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(after=after)
 

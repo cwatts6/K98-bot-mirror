@@ -13,13 +13,22 @@ from services.export_coordination_dal import identity
 GROUP_REASON = "Evidence group "
 
 
-def group_reason(identifier):
+def group_reason(identifier, kind="evidence_batch"):
+    if kind == "historical_batch":
+        return (
+            "Historical group "
+            + identity(identifier)
+            + ": admin retired selected obsolete exports; SQL outcome unproven"
+        )
     return GROUP_REASON + identity(identifier) + ": admin approved exact verified-copy repairs"
 
 
 class RecoveryBacklogDAL:
-    def __init__(self, store):
+    def __init__(self, store, *, group_kind="evidence_batch"):
+        if group_kind not in {"evidence_batch", "historical_batch"}:
+            raise ValueError("Supported recovery group required.")
         self.store = store
+        self.group_kind = group_kind
 
     def summary(self):
         with transaction(self.store.connect) as cursor:
@@ -140,7 +149,7 @@ class RecoveryBacklogDAL:
     def group_progress(self, group):
         # Scope is checked even for a guessed group ID.
         row = self.store.get(group)
-        if row["SourceKind"] != "evidence_batch":
+        if row["SourceKind"] != self.group_kind:
             raise SourceConflict("This is not an evidence repair group.")
         with transaction(self.store.connect) as cursor:
             cursor.execute(
@@ -148,7 +157,7 @@ class RecoveryBacklogDAL:
                 "JOIN dbo.RecoveryIncident i ON i.IncidentID=a.IncidentID WHERE i.ScopeKey=? AND a.Reason=? "
                 "GROUP BY a.State ORDER BY a.State",
                 self.store.scope,
-                group_reason(group),
+                group_reason(group, self.group_kind),
             )
             counts = {r["State"]: r["Total"] for r in rows(cursor)}
         return row, counts
@@ -156,18 +165,20 @@ class RecoveryBacklogDAL:
     def pending_groups(self):
         with transaction(self.store.connect) as cursor:
             cursor.execute(
-                "SELECT IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? AND SourceKind='evidence_batch' AND State='open'",
+                "SELECT IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? AND SourceKind=? AND State='open'",
                 self.store.scope,
+                self.group_kind,
             )
             return [identity(r["IncidentID"]) for r in rows(cursor)]
 
-    def pending_repairs(self):
+    def pending_repairs(self, source_kind="private_evidence"):
         with transaction(self.store.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (50) i.IncidentID FROM dbo.RecoveryIncident i JOIN dbo.RecoveryAction a "
-                "ON a.IncidentID=i.IncidentID WHERE i.ScopeKey=? AND i.SourceKind='private_evidence' "
+                "ON a.IncidentID=i.IncidentID WHERE i.ScopeKey=? AND i.SourceKind=? "
                 "AND a.State IN ('dispatched','unknown') "
                 "ORDER BY a.UpdatedUTC,a.CreatedUTC,a.ActionID",
                 self.store.scope,
+                source_kind,
             )
             return [identity(r["IncidentID"]) for r in rows(cursor)]
