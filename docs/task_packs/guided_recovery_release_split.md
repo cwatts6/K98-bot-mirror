@@ -20,8 +20,10 @@ proof that the original imports succeeded or that all 44 are eligible.
 
 The new startup log also shows configuration read admission exhausting its wait
 behind a stats writer. This slice retains an original configuration-import
-association and original source/output registrations before read admission.
-Health probes and already-linked recovery children do not acquire that marker.
+association, explicit publication mode and original source/output registrations
+before read admission. Dry-run schema checks, health probes and already-linked
+recovery children do not acquire that marker. Records with missing or non-publish
+mode cannot be adopted as publication attempts, even with a valid request hash.
 The monitor discovers an exactly withdrawn, never-admitted identified read and
 presents **Read & publish current config** and **Keep prior configuration**.
 The existing private paginated source/output review, separate confirmation,
@@ -32,7 +34,8 @@ raw settings remain in the private review. Held access links to its exact owner.
 
 Acceptance covers restart, late/duplicate confirmation, lost dispatch/commit
 replies, changed registration, denied actors, malformed/tampered request evidence,
-held access, successful publication/capture and keep-prior readback. No provider
+held access, successful publication/capture, keep-prior readback, and actual import
+entrypoint dry-run (positional/keyword) versus publication refusals. No provider
 requests or business imports are replayed automatically. Existing schema objects
 are reused; no SQL migration or new command is required.
 

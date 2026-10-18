@@ -17,6 +17,7 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
                 "AND Fence=1 AND (GenerationJson IS NULL OR "
                 "JSON_VALUE(GenerationJson,'$.configuration_continuation.action') IS NOT NULL) "
                 "AND JSON_VALUE(RequestJson,'$.request.configuration_import.producer.kind')='configuration_import' "
+                "AND JSON_VALUE(RequestJson,'$.request.configuration_import.invocation_mode')='publish' "
                 "AND ISNULL(JSON_VALUE(GenerationJson,'$.configuration_continuation.choice'),'')<>'keep_prior' "
                 "ORDER BY CASE WHEN PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,PreparationID",
                 self.account,
@@ -61,7 +62,8 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             or document.get("kvk_no") is not None
             or root["KVK_NO"] is not None
             or set(inner) != {"read_configuration", "configuration_import"}
-            or set(association) != {"producer", "sources", "outputs"}
+            or set(association) != {"producer", "sources", "outputs", "invocation_mode"}
+            or association.get("invocation_mode") != "publish"
             or set(producer) != {"kind", "atomic_checkpoint", "operation"}
             or producer.get("kind") != "configuration_import"
             or type(producer.get("atomic_checkpoint")) is not int

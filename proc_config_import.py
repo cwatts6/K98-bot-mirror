@@ -704,7 +704,7 @@ def run_proc_config_import(
 
         # Only the read collection can retry, and only after verified settlement.
         # No SQL connection, writer admission or business side effect has begun.
-        df, collected_frames = read_configuration(collect_inputs)
+        df, collected_frames = read_configuration(collect_inputs, publication_intent=True)
         if df.empty or "KVK_NO" not in df.columns:
             msg = "ProcConfig tab empty or missing KVK_NO. Aborting import"
             logger.error(msg)

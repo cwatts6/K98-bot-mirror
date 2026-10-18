@@ -31,6 +31,7 @@ def setup(r, runner=None, *, associated=True):
     request = dict(read_configuration=str(uuid4()))
     if associated:
         request["configuration_import"] = dict(
+            invocation_mode="publish",
             producer=dict(kind="configuration_import", atomic_checkpoint=1, operation=str(uuid4())),
             sources=config["config"],
             outputs=config["scan_data"],
@@ -140,7 +141,17 @@ def test_confirmed_keep_prior_reconciles_after_restart_and_rejects_late_callback
 
 
 @pytest.mark.parametrize(
-    "change", ["hash", "scope", "fence", "membership", "typed_parent", "unknown_origin"]
+    "change",
+    [
+        "hash",
+        "scope",
+        "fence",
+        "membership",
+        "typed_parent",
+        "unknown_origin",
+        "dry_run",
+        "no_mode",
+    ],
 )
 def test_uncertain_or_unassociated_reads_cannot_be_adopted(recovery, change):
     r = recovery
@@ -163,9 +174,15 @@ def test_uncertain_or_unassociated_reads_cannot_be_adopted(recovery, change):
             source,
             "account:a",
         )
-    elif change == "typed_parent":
+    elif change in {"typed_parent", "dry_run", "no_mode"}:
         document = json.loads(r.runtime.dal.read(source)["RequestJson"])
-        document["request"]["configuration_import"]["producer"]["parent"] = str(uuid4())
+        association = document["request"]["configuration_import"]
+        if change == "typed_parent":
+            association["producer"]["parent"] = str(uuid4())
+        elif change == "dry_run":
+            association["invocation_mode"] = "dry_run"
+        else:
+            del association["invocation_mode"]
         cursor.execute(
             "UPDATE dbo.ExportPreparation SET RequestJson=?,RequestHash=? WHERE PreparationID=?",
             json.dumps(document),
@@ -176,7 +193,7 @@ def test_uncertain_or_unassociated_reads_cannot_be_adopted(recovery, change):
     connection.close()
     with pytest.raises(SourceConflict):
         adapter.inspect(source)
-    if change == "unknown_origin":
+    if change in {"unknown_origin", "dry_run", "no_mode"}:
         assert source not in adapter.pending_recovery()
 
 

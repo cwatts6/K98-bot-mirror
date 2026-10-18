@@ -336,18 +336,20 @@ def record_writer_stage(stage):
 
 
 @contextmanager
-def configuration_requests(*, wait_for_admission=False):
+def configuration_requests(*, wait_for_admission=False, publication_intent=False):
     runtime = _writer_runtime()
     if runtime is None:
         yield
     else:
         if current_owner() is not None and not current_owner().closed:
             raise SnapshotUnavailable("Collect provider configuration before SQL writer admission.")
-        with runtime.configuration_requests(wait_for_admission=wait_for_admission):
+        with runtime.configuration_requests(
+            wait_for_admission=wait_for_admission, publication_intent=publication_intent
+        ):
             yield
 
 
-def read_configuration(read, *, wait_for_admission=True, attempts=3):
+def read_configuration(read, *, wait_for_admission=True, attempts=3, publication_intent=False):
     """Retry only after authority-proven read-only settlement, with fresh admission.
 
     The callback must collect provider inputs only, before SQL/business writes.
@@ -357,11 +359,10 @@ def read_configuration(read, *, wait_for_admission=True, attempts=3):
         raise ValueError("Configuration retry bound must be between one and three.")
     for attempt in range(attempts):
         try:
-            scope = (
-                configuration_requests(wait_for_admission=True)
-                if wait_for_admission
-                else configuration_requests()
-            )
+            options = {"wait_for_admission": True} if wait_for_admission else {}
+            if publication_intent is True:
+                options["publication_intent"] = True
+            scope = configuration_requests(**options)
             with scope:
                 return read()
         except ConfigurationReadRecovered:
@@ -658,7 +659,7 @@ class LegacyExportRuntime:
         return preferred if preferred in destinations else min(destinations)
 
     @contextmanager
-    def configuration_requests(self, *, wait_for_admission=False):
+    def configuration_requests(self, *, wait_for_admission=False, publication_intent=False):
         from uuid import uuid4
 
         from services.export_provider_adapter import ProviderAdapter, use_provider
@@ -677,10 +678,16 @@ class LegacyExportRuntime:
 
         request: dict = {"read_configuration": str(uuid4())}
         producer = current_intent()
-        if producer and producer.get("kind") == "configuration_import" and "parent" not in producer:
-            # Persist the caller association before admission. Health probes and
+        if (
+            publication_intent is True
+            and producer
+            and producer.get("kind") == "configuration_import"
+            and "parent" not in producer
+        ):
+            # Persist explicit publication intent before admission. Dry runs, probes and
             # already-linked recovery children must not create duplicate incidents.
             request["configuration_import"] = dict(
+                invocation_mode="publish",
                 producer=producer,
                 sources=scope,
                 outputs=json.loads(self.configuration)["scan_data"],

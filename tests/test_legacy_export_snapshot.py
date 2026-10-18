@@ -611,7 +611,10 @@ def test_health_probe_refusal_does_not_wait(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("recovery_child", [False, True])
-def test_configuration_import_association_is_saved_before_read_admission(tmp_path, recovery_child):
+@pytest.mark.parametrize("publication_intent", [False, True])
+def test_configuration_import_association_is_saved_before_read_admission(
+    tmp_path, recovery_child, publication_intent
+):
     from services.producer_recovery_intent import atomic_producer_intent, configuration_retry_intent
 
     configuration = {
@@ -623,7 +626,7 @@ def test_configuration_import_association_is_saved_before_read_admission(tmp_pat
 
     @atomic_producer_intent("configuration_import")
     def attempt():
-        with runtime.configuration_requests():
+        with runtime.configuration_requests(publication_intent=publication_intent):
             pytest.fail("Refused read cannot collect inputs")
 
     with pytest.raises(SnapshotUnavailable, match="admission refused"):
@@ -633,11 +636,52 @@ def test_configuration_import_association_is_saved_before_read_admission(tmp_pat
         else:
             attempt()
     saved = dal.request.call_args.kwargs["request"]
-    assert ("configuration_import" in saved) is not recovery_child
-    if not recovery_child:
+    assert ("configuration_import" in saved) is (publication_intent and not recovery_child)
+    if publication_intent and not recovery_child:
+        assert saved["configuration_import"]["invocation_mode"] == "publish"
         assert saved["configuration_import"]["sources"] == configuration["config"]
         assert saved["configuration_import"]["outputs"] == configuration["scan_data"]
         assert saved["configuration_import"]["producer"]["kind"] == "configuration_import"
+
+
+@pytest.mark.parametrize("mode", ["default", "publish", "dry_keyword", "dry_positional"])
+def test_import_entrypoint_preserves_invocation_mode_on_read_refusal(tmp_path, monkeypatch, mode):
+    from unittest.mock import Mock
+
+    import proc_config_import as pci
+    import services.legacy_export_snapshot_service as module
+
+    runtime, dal = producer_runtime(
+        tmp_path,
+        configuration={
+            "config": {"destinations": ["source"]},
+            "scan_data": {"destinations": ["output"]},
+        },
+    )
+    dal.claim.return_value = None
+    clock = iter([100.0, 161.0])
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(pci, "_validate_import_config", lambda: (True, []))
+    monkeypatch.setattr(pci, "IMPORT_REQUIRE_PREFLIGHT", False)
+    monkeypatch.setattr(pci, "_set_last_import_report", lambda report: None)
+    provider = Mock(side_effect=AssertionError("A refused read must not reach the provider"))
+    monkeypatch.setattr(pci, "_get_sheet_service", provider)
+    with module.use_runtime(runtime):
+        if mode == "default":
+            success, report = pci.run_proc_config_import()
+        elif mode == "dry_positional":
+            success, report = pci.run_proc_config_import(True)
+        else:
+            success, report = pci.run_proc_config_import(dry_run=mode == "dry_keyword")
+    assert not success and report["errors"]
+    provider.assert_not_called()
+    dal.request.assert_called_once()
+    dal.withdraw_unstarted.assert_called_once()
+    association = dal.request.call_args.kwargs["request"].get("configuration_import")
+    if mode in {"default", "publish"}:
+        assert association["invocation_mode"] == "publish"
+    else:
+        assert association is None
 
 
 def test_admission_deadline_withdraws_before_any_execution(tmp_path, monkeypatch):
