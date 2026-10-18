@@ -37,6 +37,8 @@ class HistoricalImportRecovery:
         generation = json.loads(prep["GenerationJson"] or "{}")
         if not isinstance(request, dict) or not isinstance(generation, dict):
             raise SourceConflict("Historical request or generation is malformed.")
+        if bytes(prep["RequestHash"]) != digest(request):
+            raise SourceConflict("The saved request no longer matches its original hash.")
         inner = request.get("request")
         if (
             not isinstance(inner, dict)
@@ -234,9 +236,11 @@ class HistoricalImportRecovery:
             # pending; loss of its bytes cannot turn an applied action into failure.
             if marker == expected:
                 return None
-            if self.evidence_token(state) != action["EvidenceHash"]:
-                return "not_applied"
-            raise
+            # The guarded snapshot contains no marker for this action. The
+            # atomic disposition therefore did not apply, even if lost/corrupt
+            # spool bytes leave the database evidence token unchanged. Settle
+            # the intent so inspect can keep showing its verification blocker.
+            return "not_applied"
         if closed:
             marker = json.loads(state["preparation"]["GenerationJson"])["historical_disposition"]
             return "verified" if marker == expected else "not_applied"

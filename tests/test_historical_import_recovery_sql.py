@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from kvk.dal.new_source_import_dal import digest
 from services.export_coordination_dal import ExportCoordinationDAL
 from services.historical_import_recovery_service import ACTION
 from services.import_recovery_service import ImportRecoveryAdapter
@@ -38,6 +39,13 @@ def historical(recovery, monkeypatch):
         r.service.run(r.source, r.outcomes.inspect(r.source)["token"], "original_capture")
     # Reconstruct a pre-receipt captured preparation in isolated temporary tables.
     r.owner.execute(r.rewrite("DELETE dbo.StatsImportExecution WHERE PreparationID=?"), r.source)
+    prep = r.outcomes.inspect(r.source)["preparation"]
+    # Replace the shared fixture's placeholder with the canonical production hash.
+    r.owner.execute(
+        r.rewrite("UPDATE dbo.ExportPreparation SET RequestHash=? WHERE PreparationID=?"),
+        digest(json.loads(prep["RequestJson"])),
+        r.source,
+    )
     r.runtime.account = "a"
     r.runtime.coordinator = ExportCoordinationDAL(r.connect, preparations=True)
     r.runtime.verified_snapshot = MethodType(LegacyExportRuntime.verified_snapshot, r.runtime)
@@ -251,3 +259,64 @@ def test_live_producer_guard_prevents_retirement(historical):
             "k98-legacy-output-snapshot",
         )
         guard.close()
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_precommit_spool_failure_remains_reviewable(historical, store, monkeypatch, damage):
+    r = historical
+    service = RecoveryService(
+        store,
+        {"stats_import": r.adapter},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
+    )
+    row = service.review_source(ACTOR, "stats_import", r.source)
+    original_execute = r.adapter.execute
+    prep = r.outcomes.inspect(r.source)["preparation"]
+
+    def fail_before_commit(*args):
+        spool = r.runtime.store.root / prep["SpoolKey"]
+        if damage == "missing":
+            spool.unlink()
+        else:
+            spool.write_bytes(b"corrupt")
+        original_execute(*args)
+
+    monkeypatch.setattr(r.adapter, "execute", fail_before_commit)
+    final = service.execute(
+        ACTOR,
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        ACTION,
+        "Old export is obsolete",
+    )
+    for current in (final, service.review(ACTOR, row["IncidentID"])):
+        assert current["State"] == "open" and not current["pending_action"]
+        assert not current["evidence"]["actions"]
+        assert current["evidence"]["failure_context"]["verification_blocker"]
+    after = r.outcomes.inspect(r.source)["preparation"]
+    assert after["State"] == "captured"
+    assert after["Version"] == prep["Version"]
+    assert "historical_disposition" not in json.loads(after["GenerationJson"])
+
+
+def test_request_hash_mismatch_blocks_discovery_and_dispatch(historical):
+    r = historical
+    _, token, _ = r.adapter.inspect(r.source)
+    prep = r.outcomes.inspect(r.source)["preparation"]
+    original = json.loads(prep["RequestJson"])
+    original["request"]["producer"] = dict(kind="stats_import")
+    r.owner.execute(
+        r.rewrite("UPDATE dbo.ExportPreparation SET RequestHash=? WHERE PreparationID=?"),
+        digest(original),
+        r.source,
+    )
+    evidence, _, resolved = r.adapter.inspect(r.source)
+    assert not resolved and not evidence["actions"]
+    assert "original hash" in evidence["failure_context"]["verification_blocker"]
+    with pytest.raises(SourceConflict, match="original hash"):
+        r.adapter.execute(r.source, ACTION, token, "recovery:" + str(uuid4()), "Obsolete")
+    assert r.outcomes.inspect(r.source)["preparation"]["State"] == "captured"

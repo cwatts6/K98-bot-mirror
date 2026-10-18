@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from kvk.dal.new_source_import_dal import digest
 from services.historical_import_recovery_service import ACTION, HistoricalImportRecovery
 from services.legacy_export_snapshot_service import (
     LegacySnapshot,
@@ -41,6 +42,7 @@ def history():
     )
     prep.update(
         State="captured",
+        RequestHash=digest(json.loads(prep["RequestJson"])),
         GenerationJson=json.dumps(generation),
         SpoolKey="capture",
         SpoolHash=hashlib.sha256(snapshot.payload).digest(),
@@ -175,3 +177,14 @@ def test_applied_decision_with_missing_bytes_remains_pending(history):
     service.runtime.store.read.side_effect = FileNotFoundError("private")
     assert service.reconcile("source", action) is None
     assert service.inspect("source")[2] is False
+
+
+def test_changed_original_request_cannot_become_historical(history):
+    service, state = history
+    request = json.loads(state["preparation"]["RequestJson"])
+    request["request"]["producer"] = dict(kind="stats_import")
+    state["preparation"]["RequestHash"] = digest(request)
+    # A removed producer leaves the original typed-request hash behind.
+    evidence, _, resolved = service.inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert "original hash" in evidence["failure_context"]["verification_blocker"]
