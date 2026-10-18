@@ -339,7 +339,9 @@ def test_shutdown_drain_still_retains_unknown_completion():
     storage = SimpleNamespace(storage_owner="local", read=Mock(return_value=payload))
     ExportCoordinator(dal, adapters={"scan_data": worker}, storage=storage).run_batch(stop)
     assert events == ["GET", "GET", "POST", "POST"]
-    dal.fail.assert_called_once_with(claim, retain_claims=True)
+    dal.fail.assert_called_once_with(
+        claim, retain_claims=True, diagnostic=dal.fail.call_args.kwargs["diagnostic"]
+    )
     dal.confirm.assert_not_called()
     dal.claim_next.assert_called_once()
 

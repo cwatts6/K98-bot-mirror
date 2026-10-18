@@ -40,7 +40,7 @@ def test_worker_records_original_and_terminal_failure_without_changing_retention
     adapter.side_effect = pyodbc.ProgrammingError("42000", "private SQL (156)")
     dal.fail.side_effect = pyodbc.OperationalError("08S01", "private connection (10054)")
     ExportCoordinator(dal, adapters={"new_source": adapter}).run_batch(Event())
-    dal.fail.assert_called_once_with(claim)
+    dal.fail.assert_called_once_with(claim, diagnostic=dal.fail.call_args.kwargs["diagnostic"])
     records = [
         json.loads(r.message.split(" ", 1)[1])
         for r in caplog.records
@@ -52,3 +52,29 @@ def test_worker_records_original_and_terminal_failure_without_changing_retention
     assert records[1]["job_id"] == job_id
     assert any(f["function"] == "run_batch" for f in records[1]["code_locations"])
     assert "private" not in caplog.text
+
+
+def test_saved_diagnostic_projection_rejects_prose_and_keeps_original_identity():
+    from services.export_failure_diagnostics import recovery_failure_context, safe_failure_record
+
+    job = str(uuid4())
+    first = failure_record(ValueError("PASSWORD=secret"), job_id=job, stage="snapshot")
+    first["message"] = "private cells"
+    first["code_locations"] = [dict(file="private-secret.py", function="leak", line=1)]
+    safe = safe_failure_record(first)
+    assert "secret" not in json.dumps(safe) and "private" not in json.dumps(safe)
+    assert safe["code_locations"] == []
+    context = recovery_failure_context(dict(JobID=job), dict(first_failure=first))
+    assert context["original_fault"] == "recorded"
+    assert "retained input" in context["summary"]
+    assert context["original"]["diagnostic_id"] == first["diagnostic_id"]
+    other = recovery_failure_context(dict(JobID=str(uuid4())), dict(first_failure=first))
+    assert other["original_fault"] == "not_recorded"
+
+
+def test_historical_failure_is_not_invented_or_treated_as_corrected():
+    from services.export_failure_diagnostics import recovery_failure_context
+
+    context = recovery_failure_context(dict(JobID=str(uuid4())), {})
+    assert context["original_fault"] == "not_recorded"
+    assert "does not identify" in context["summary"]

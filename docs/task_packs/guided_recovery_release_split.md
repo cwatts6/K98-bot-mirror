@@ -63,6 +63,45 @@ message accurately describes the verified result and any remaining work.
 
 ## P0b — full release
 
+### Captured-output continuation batch — 18 October 2026
+
+The operator deployed private `ac7da0f599dd1378c1dd9380caeb24d0a460c3e7`.
+The 06:33 UTC complete report contains 17,443 distinct records: 17,383 resolved
+and 59 open operational incidents plus the aggregate overview. Monitoring is
+healthy. All 17,340 members of the approved evidence group are independently
+verified, with zero pending or changed members. The operator subsequently reports
+58 remaining; that newer count has not yet been reconciled to an exported report.
+
+This focused P0B-CAP01 batch covers the seven captured scans 1218–1224 and five
+captured player reports in that export, subject to fresh ownership and output
+verification. Normal successful imports saved a different documented producer
+format from recovered SQL executions; recovery previously rejected that normal
+format and obscured the error with generic queue-checking guidance. Accept both
+formats only against the exact preparation, completed SQL receipt, filename and
+registered output contract. Preserve the immutable historical generation.
+
+The private guided review must show retained input/scan identity, original and
+current output settings and destination links, the actual current blocker, and
+available original failure evidence. Queue continues the saved output exactly
+once; skip retains SQL and explicitly accepts no spreadsheet update. Neither
+repeats the import/report calculation. Confirmation requires the authorized actor,
+guild and channel; independent verification must survive restart, lost replies,
+stale evidence and duplicate clicks. A queued result does not certify delivery.
+
+New export failures retain bounded first/latest stage, exception type, SQL codes
+and code locations with the failed job transaction. Exclude exception prose,
+credentials, SQL text and payload data from reports. If the original diagnostic
+was never stored, say so; a later retry must not manufacture an original cause.
+Existing custody, conservative unknown-outcome handling and ownership protections
+remain mandatory. Include the exact updater transition and offline package test.
+
+After this batch, required P0b work still includes the 44 historical preparations
+without exact receipts, the stream-backed failed export and unknown-write repairs,
+pre-request failures, all-copy loss, unattributed holds and the integrated
+continuation/rollover workstreams below. The unstarted-export actions and grouped
+evidence repairs already released do not settle those cases. No unsupported
+incident is dismissed, hidden or reclassified as a deferred optimisation.
+
 ### Live acceptance and remaining incident coverage — 17 October 2026
 
 The operator deployed private Bot `375f5bd1bb90072fd02d3b59f3148075e17b6952`.

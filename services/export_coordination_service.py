@@ -162,11 +162,12 @@ class ExportCoordinator:
                     snapshot,
                 )
             except BaseException as exc:
+                diagnostic = failure_record(exc, job_id=claim.job_id, stage=stage)
                 try:
                     if isinstance(exc, BudgetCompletionUnknown):
-                        self.dal.fail(claim, retain_claims=True)
+                        self.dal.fail(claim, retain_claims=True, diagnostic=diagnostic)
                     else:
-                        self.dal.fail(claim)
+                        self.dal.fail(claim, diagnostic=diagnostic)
                 except Exception as terminal_error:
                     # Commit acknowledgment loss or newer durable state: retain it.
                     # Never release independently after a failed terminal write.
@@ -184,7 +185,7 @@ class ExportCoordinator:
                 )
                 logger.warning(
                     "export_worker_failed %s",
-                    json.dumps(failure_record(exc, job_id=claim.job_id, stage=stage)),
+                    json.dumps(diagnostic),
                 )
                 if not isinstance(exc, Exception):
                     raise

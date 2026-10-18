@@ -1414,9 +1414,30 @@ class ExportCoordinationDAL:
                 finish_export_parts(cursor, claim, attempt_id)
             self._finish(cursor, claim, job, "confirmed", release=True)
 
-    def fail(self, claim, *, retain_claims=False):
+    def fail(self, claim, *, retain_claims=False, diagnostic=None):
         """Conservative stop. An attempt means mutations may have escaped; keep claims."""
         with self._owned(claim) as (cursor, job):
+            from services.export_failure_diagnostics import safe_failure_record
+
+            record = safe_failure_record(diagnostic)
+            if record and record["job_id"] == identity(claim.job_id):
+                provenance = json.loads(job["ProvenanceJson"])
+                if not provenance.get("safe_retry_history"):
+                    provenance.setdefault("first_failure", record)
+                provenance["latest_failure"] = record
+                # Diagnostic capacity must never prevent conservative failure
+                # settlement. Existing retained provenance is not discarded.
+                try:
+                    encoded = bounded_json(provenance)
+                except ValueError:
+                    encoded = None
+                if encoded is not None:
+                    cursor.execute(
+                        "UPDATE dbo.ExportJob SET ProvenanceJson=? WHERE JobID=? AND Version=?",
+                        encoded,
+                        claim.job_id,
+                        job["Version"],
+                    )
             cursor.execute("SELECT AttemptID FROM dbo.ExportAttempt WHERE JobID=?", claim.job_id)
             attempted = rows(cursor)
             for item in attempted:

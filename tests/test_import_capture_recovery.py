@@ -111,3 +111,61 @@ def test_mismatched_registration_still_produces_a_durable_incident():
     assert not resolved
     assert display["actions"] == {}
     assert "does not match" in display["explanation"]
+
+
+def test_normal_producer_completion_is_accepted_without_rewriting_history():
+    service, preview, _ = fixture()
+    prep, execution = preview["preparation"], preview["execution"]
+    generation = service.generation(prep, execution)
+    generation["producer"] = dict(
+        procedure="dbo.UPDATE_ALL2",
+        completed_filename=execution["CompletedFileName"],
+        phases=[dict(phase="reports", status="complete")],
+    )
+    prep["GenerationJson"] = json.dumps(generation)
+    preview.update(captured=True, action="hold")
+    prep["SpoolKey"] = "saved-output"
+    adapter = ImportRecoveryAdapter(service.outcomes, service)
+    evidence, _, resolved = adapter.inspect("source")
+    assert not resolved
+    assert set(evidence["actions"]) == {"queue_capture", "abandon_capture"}
+    assert evidence["actions"]["queue_capture"]["review_details"]
+    assert service.generation(prep, execution) == generation
+    assert evidence["failure_context"]["producer_format"] == "normal_completion"
+    assert evidence["failure_context"]["input_file"] == execution["CompletedFileName"]
+    assert "No original exception" in evidence["failure_context"]["summary"]
+
+
+@pytest.mark.parametrize("change", ["filename", "receipt", "phase_type", "unknown_field", "commit"])
+def test_normal_completion_cannot_bypass_receipt_or_identity(change):
+    service, preview, _ = fixture()
+    prep, execution = preview["preparation"], preview["execution"]
+    generation = service.generation(prep, execution)
+    producer = dict(
+        procedure="dbo.UPDATE_ALL2", completed_filename=execution["CompletedFileName"], phases=[]
+    )
+    generation["producer"] = producer
+    if change == "filename":
+        producer["completed_filename"] = "other"
+    if change == "receipt":
+        execution["State"] = "partial"
+    if change == "phase_type":
+        producer["phases"] = "complete"
+    if change == "unknown_field":
+        producer["unknown"] = True
+    if change == "commit":
+        generation["commit_identity"] = "other"
+    prep["GenerationJson"] = json.dumps(generation)
+    with pytest.raises(SourceConflict):
+        service.generation(prep, execution)
+
+
+def test_captured_registration_blocker_is_not_overwritten_by_still_checking():
+    service, preview, _ = fixture()
+    preview.update(captured=True, action="hold")
+    preview["preparation"]["SpoolKey"] = "retained"
+    preview["preparation"]["RequestJson"] = "{}"
+    evidence, _, resolved = ImportRecoveryAdapter(service.outcomes, service).inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert "still checking" not in evidence["explanation"]
+    assert evidence["failure_context"]["current_blocker"] == "registration_changed"

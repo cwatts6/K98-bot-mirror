@@ -45,8 +45,25 @@ class ImportCaptureRecovery:
         if not prep["GenerationJson"]:
             return dict(expected, capture="pending")
         generation = json.loads(prep["GenerationJson"])
-        if generation.get("capture") not in {"pending", "complete"} or any(
-            generation.get(key) != value for key, value in expected.items()
+        producer = generation.get("producer")
+        # Normal completion predates the timeout-recovery producer shape. Both
+        # refer to this exact preparation and the independently completed SQL
+        # receipt; phase prose is never used as proof of completion.
+        normal_producer = (
+            isinstance(producer, dict)
+            and set(producer) == {"procedure", "completed_filename", "phases"}
+            and producer.get("procedure") == "dbo.UPDATE_ALL2"
+            and producer.get("completed_filename") == execution["CompletedFileName"]
+            and isinstance(producer.get("phases"), list)
+            and execution.get("State") == "completed"
+            and execution.get("Resolution") is None
+        )
+        if (
+            generation.get("capture") not in {"pending", "complete"}
+            or any(
+                generation.get(key) != value for key, value in expected.items() if key != "producer"
+            )
+            or not (producer == expected["producer"] or normal_producer)
         ):
             raise SourceConflict(
                 "Retained generation or output registration differs. Preserve the evidence."

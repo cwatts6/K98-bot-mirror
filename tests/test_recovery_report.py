@@ -47,6 +47,21 @@ def report_service(count=1):
     return service, store, records
 
 
+def test_complete_fault_context_is_exported_without_raw_request():
+    service, _, records = report_service()
+    records[0]["evidence"]["failure_context"] = dict(
+        original_fault="not_recorded",
+        current_blocker="registration_changed",
+        summary="Output registration differs",
+    )
+    result = json.loads(service.download_report(ACTOR)["content"])
+    assert (
+        result["incidents"][0]["diagnosis"]["failure_context"]
+        == records[0]["evidence"]["failure_context"]
+    )
+    assert "NEVER_EXPORT_ME" not in json.dumps(result)
+
+
 def test_report_includes_all_states_across_pages_and_preserves_withheld_repairs():
     service, store, records = report_service(105)
     first = service.download_report(ACTOR)

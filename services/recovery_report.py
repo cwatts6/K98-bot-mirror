@@ -102,6 +102,7 @@ def incident_report(service, row):
                     "blocking_job_ids",
                     "recovery_links",
                     "receipt_diagnostics",
+                    "failure_context",
                     "group_id",
                     "approved_count",
                     "verified_count",

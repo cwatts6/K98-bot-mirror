@@ -53,6 +53,13 @@ def incident_embed(row):
     if evidence.get("season") is not None:
         embed.add_field(name="KVK season", value=str(evidence["season"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
+    if evidence.get("failure_context"):
+        context = evidence["failure_context"]
+        embed.add_field(
+            name="Failure details",
+            value=discord.utils.escape_markdown(context["summary"])[:1024],
+            inline=False,
+        )
     if evidence.get("evidence_reference"):
         embed.add_field(
             name="Affected evidence", value=evidence["evidence_reference"], inline=False

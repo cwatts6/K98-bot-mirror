@@ -4,6 +4,7 @@ import json
 import re
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.capture_recovery_context import add_capture_context
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 from services.import_capture_recovery_service import ImportCaptureRecovery
 from services.import_recovery_service import ImportRecoveryAdapter
@@ -111,19 +112,21 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
                 actions.clear()
                 explanation = "The capture repair could not verify its output. SQL data and retained evidence are preserved. Review the option to skip this export and unblock later work."
             actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
+        evidence = {
+            "title": self.title,
+            "season": prep["KVK_NO"],
+            "outcome": "export_skipped" if disposition == "abandoned" else prep["State"],
+            "explanation": explanation
+            or (
+                "Retained output and queue admission are verified. Export delivery is monitored separately."
+                if resolved
+                else "SQL output is retained. Review and confirm its capture or queue recovery."
+            ),
+            "actions": {key: dict(value) for key, value in actions.items()},
+        }
+        add_capture_context(evidence, prep, preview["execution"], self.capture_recovery)
         return (
-            {
-                "title": self.title,
-                "season": prep["KVK_NO"],
-                "outcome": "export_skipped" if disposition == "abandoned" else prep["State"],
-                "explanation": explanation
-                or (
-                    "Retained output and queue admission are verified. Export delivery is monitored separately."
-                    if resolved
-                    else "SQL output is retained. Review and confirm its capture or queue recovery."
-                ),
-                "actions": actions,
-            },
+            evidence,
             preview["token"],
             resolved,
         )

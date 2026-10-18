@@ -3,10 +3,12 @@
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.capture_recovery_context import add_capture_context, capture_review
 
 
 class ImportRecoveryAdapter:
     kind = "stats_import"
+    review_details = capture_review
 
     def __init__(self, dal, capture_recovery=None):
         self.dal = dal
@@ -33,11 +35,15 @@ class ImportRecoveryAdapter:
                     "The queued capture could not be verified. The incident remains open."
                 )
         actions = {}
+        capture_blocked = False
         if capture_pending_queue and self.capture_recovery:
             try:
                 self.capture_recovery.generation(prep, execution)
             except (SourceConflict, ValueError, KeyError, TypeError):
-                preview["explanation"] = "The retained capture registration does not verify."
+                capture_blocked = True
+                preview["explanation"] = (
+                    "The retained capture registration or completion record does not verify. Review the failure details; no queue or release is authorised."
+                )
             else:
                 actions["queue_capture"] = {
                     "label": "Queue verified capture",
@@ -78,7 +84,7 @@ class ImportRecoveryAdapter:
             "resolution": execution.get("Resolution"),
             "explanation": (
                 "Output capture is verified; recovery is still checking its export queue admission."
-                if capture_pending_queue
+                if capture_pending_queue and not capture_blocked
                 else (
                     "SQL processing completed and its output was captured; the snapshot reservation is released. Export delivery is a separate outcome."
                     if captured
@@ -151,6 +157,9 @@ class ImportRecoveryAdapter:
                         "The capture repair could not verify its output. SQL data and retained evidence are preserved. Review the option to skip this export and unblock later work."
                     )
                 actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
+            # Do not mutate the shared action definition while adding review UI.
+            evidence["actions"] = {key: dict(value) for key, value in actions.items()}
+            add_capture_context(evidence, prep, execution, self.capture_recovery)
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):

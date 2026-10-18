@@ -412,7 +412,7 @@ def test_worker_checks_spool_before_adapter_and_preserves_failed_evidence():
     store.read.side_effect = ValueError("corrupt")
     ExportCoordinator(dal, adapters={"scan_data": adapter}, storage=store).run_batch(Event())
     adapter.assert_not_called()
-    dal.fail.assert_called_once_with(claim)
+    dal.fail.assert_called_once_with(claim, diagnostic=dal.fail.call_args.kwargs["diagnostic"])
 
 
 @pytest.mark.asyncio
@@ -692,7 +692,9 @@ def test_uncertain_budget_completion_retains_claims_without_mutation(monkeypatch
     dal.authorize.return_value = dict(ConsumerKind="new_source", SpoolKey=None)
     adapter = Mock(side_effect=BudgetCompletionUnknown())
     ExportCoordinator(dal, adapters={"new_source": adapter}).run_batch(Event())
-    dal.fail.assert_called_once_with(claim, retain_claims=True)
+    dal.fail.assert_called_once_with(
+        claim, retain_claims=True, diagnostic=dal.fail.call_args.kwargs["diagnostic"]
+    )
 
 
 def test_budget_uncertainty_blocks_resources_without_attempt(monkeypatch):

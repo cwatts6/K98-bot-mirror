@@ -5,6 +5,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
+from services.export_failure_diagnostics import recovery_failure_context
 
 
 def job_token(snapshot):
@@ -165,6 +166,7 @@ class ExportRecoveryAdapter:
                     )
                 ),
                 scan=job.get("KVK_NO"),
+                failure_context=recovery_failure_context(job, provenance),
                 explanation=explanation,
                 actions=actions,
             ),

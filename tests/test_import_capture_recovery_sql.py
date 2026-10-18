@@ -47,6 +47,8 @@ def recovery(tmp_path, request):
         "dbo." + name: "##Capture_" + namespace + "_" + name
         for name in (
             "ExportJob",
+            "ExportJobResource",
+            "ExportAttempt",
             "ExportPreparation",
             "ExportPreparationResource",
             "ExportResource",
