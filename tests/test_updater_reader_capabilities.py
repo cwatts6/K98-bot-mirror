@@ -72,12 +72,17 @@ def test_unreviewed_or_partial_protocol_bundle_is_refused(transition, damage):
 
 def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
+    expected = {}
     for transition in update.reviewed_transitions():
         for member in transition["members"]:
-            assert (
-                update.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-                == member["after_sha256"]
-            )
+            path = member["path"]
+            if path in expected:
+                # Alternate predecessors may converge on the same image; later
+                # releases must continue from that image, not replace it blindly.
+                assert expected[path] in {member["before_sha256"], member["after_sha256"]}
+            expected[path] = member["after_sha256"]
+    for path, checksum in expected.items():
+        assert update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n")) == checksum
     with pytest.raises(ValueError, match="contract change"):
         update.check_source_only(["scripts/k98_update_transitions.json"])
 
