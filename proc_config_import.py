@@ -35,7 +35,7 @@ from gsheet_module import (
     _normalize_headers,
     _safe_execute,
 )
-from services.legacy_export_snapshot_service import bound_runtime
+from services.legacy_export_snapshot_service import ConfigurationAdmissionDeferred, bound_runtime
 from services.producer_recovery_intent import atomic_producer_intent
 
 logger = logging.getLogger(__name__)
@@ -1277,6 +1277,18 @@ def run_proc_config_import(
             logger.info("[IMPORT] Import completed successfully in %.1fs", report["duration_sec"])
         return success, report
 
+    except ConfigurationAdmissionDeferred:
+        message = (
+            "Configuration import deferred before reading inputs: account admission unavailable. "
+            "Open the recovery centre and review Configuration import read not started. "
+            "This attempt did not publish configuration changes."
+        )
+        logger.warning("[IMPORT][ADMISSION] %s", message)
+        report["errors"].append(message)
+        report["success"] = False
+        report["recovery_status"] = "configuration_read_admission_deferred"
+        _set_last_import_report(report)
+        return False, report
     except (pyodbc.OperationalError, HttpError) as e:
         logger.exception("Transient failure (will have been retried as applicable): %s", e)
         report["errors"].append(str(e))

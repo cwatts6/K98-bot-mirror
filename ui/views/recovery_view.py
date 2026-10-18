@@ -290,7 +290,7 @@ class RecoveryListView(discord.ui.View):
     def __init__(self, rows, *, individual=False, queues_only=False):
         super().__init__(timeout=300)
         select = discord.ui.Select(
-            placeholder="Choose an incident",
+            placeholder="Choose an incident — oldest first (UTC)",
             options=[
                 discord.SelectOption(
                     label=f"{row['evidence']['title']} — {row['evidence'].get('outcome', 'unknown')}"[

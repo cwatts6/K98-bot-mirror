@@ -10,6 +10,35 @@ import gsheet_module as gm
 import proc_config_import as pci
 
 
+@pytest.mark.parametrize("deferred", [True, False])
+def test_admission_refusal_is_actionable_but_unexpected_failure_stays_critical(
+    monkeypatch, caplog, deferred
+):
+    from unittest.mock import Mock
+
+    from services import legacy_export_snapshot_service as snapshots
+
+    monkeypatch.setattr(pci, "_validate_import_config", lambda: (True, []))
+    error = (
+        snapshots.ConfigurationAdmissionDeferred("refused")
+        if deferred
+        else RuntimeError("unexpected")
+    )
+    monkeypatch.setattr(snapshots, "read_configuration", Mock(side_effect=error))
+    connection = Mock(side_effect=AssertionError("SQL must not start"))
+    monkeypatch.setattr(pci, "_get_import_connection_with_retry", connection)
+    success, report = pci.run_proc_config_import.__wrapped__.__wrapped__()
+    assert not success and report["success"] is False
+    connection.assert_not_called()
+    if deferred:
+        assert report["recovery_status"] == "configuration_read_admission_deferred"
+        assert "recovery centre" in report["errors"][0]
+        assert "critical failure" not in caplog.text
+    else:
+        assert "critical failure" in caplog.text
+        assert "recovery_status" not in report
+
+
 def test_recorded_config_validation_does_not_require_bot_provider_credentials(monkeypatch):
     from types import SimpleNamespace
 

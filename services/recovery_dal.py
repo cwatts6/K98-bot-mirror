@@ -104,16 +104,26 @@ class RecoveryDAL:
         if type(limit) is not int or not 1 <= limit <= 25:
             raise ValueError("Bounded incident page required.")
         with transaction(self.connect) as cursor:
+            boundary = self._get(cursor, after) if after else None
+            # A repaired cursor remains valid; ordering uses immutable first-seen time.
             cursor.execute(
                 "SELECT TOP (?) * FROM dbo.RecoveryIncident WHERE ScopeKey=? AND State='open' "
                 "AND SourceKind<>'recovery_overview' "
                 + ("AND SourceKind<>'private_evidence' " if non_evidence else "")
                 + ("AND SourceKind='queue_admission' " if queues_only else "")
-                + "AND (? IS NULL OR IncidentID>CAST(? AS uniqueidentifier)) ORDER BY IncidentID",
+                + (
+                    "AND (FirstSeenUTC>? OR (FirstSeenUTC=? AND IncidentID>CAST(? AS uniqueidentifier))) "
+                    if boundary
+                    else ""
+                )
+                + "ORDER BY FirstSeenUTC,IncidentID",
                 limit,
                 self.scope,
-                after,
-                after,
+                *(
+                    (boundary["FirstSeenUTC"], boundary["FirstSeenUTC"], boundary["IncidentID"])
+                    if boundary
+                    else ()
+                ),
             )
             result = rows(cursor)
             for row in result:

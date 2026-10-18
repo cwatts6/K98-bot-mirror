@@ -101,6 +101,35 @@ def incident(store):
     return store.observe("stats_import", str(uuid4()), {"actions": {}}, "a" * 64)
 
 
+def test_incident_pages_are_chronological_with_ties_and_resolved_cursor(store):
+    from kvk.dal.new_source_import_dal import transaction
+
+    created = [incident(store) for _ in range(47)]
+    with transaction(store.connect) as cursor:
+        for index, row in enumerate(reversed(created)):
+            cursor.execute(
+                "UPDATE dbo.RecoveryIncident SET FirstSeenUTC=DATEADD(second,?,CAST('20261001' AS datetime2)) WHERE IncidentID=?",
+                index // 3,
+                row["IncidentID"],
+            )
+    first = store.list_open(limit=20)
+    boundary = first[-1]
+    store.observe(
+        boundary["SourceKind"], boundary["SourceID"], {"actions": {}}, "a" * 64, resolved=True
+    )
+    second = store.list_open(after=boundary["IncidentID"], limit=20)
+    third = store.list_open(after=second[-1]["IncidentID"], limit=20)
+    all_rows = first + second + third
+    assert len(all_rows) == len({r["IncidentID"] for r in all_rows}) == 47
+    dates = [r["FirstSeenUTC"] for r in all_rows]
+    assert dates == sorted(dates)
+    foreign = RecoveryDAL(store.connect, account="foreign", storage_owner="disk", guild_id=2)
+    with pytest.raises(SourceConflict):
+        foreign.list_open(after=boundary["IncidentID"])
+    with pytest.raises(SourceConflict):
+        store.list_open(after=str(uuid4()))
+
+
 def test_scoped_discovery_revision_and_alert_roundtrip(store):
     row = incident(store)
     same = store.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "a" * 64)

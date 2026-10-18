@@ -44,6 +44,101 @@ def service_for(r):
     return adapter, store, service, row
 
 
+def withdrawn_configuration_read(r, *, associated=False):
+    request = dict(read_configuration=str(uuid4()))
+    if associated:
+        request["configuration_import"] = dict(invocation_mode="publish")
+    r.source = r.runtime.dal.request(
+        account=r.runtime.account,
+        consumer="config",
+        kvk_no=None,
+        request=request,
+        storage_owner=r.runtime.store.storage_owner,
+        actor="system:configuration",
+        reason="Read immutable configuration inputs",
+    )
+    r.runtime.dal.withdraw_unstarted(r.source)
+
+
+@pytest.mark.asyncio
+async def test_close_withdrawn_read_guided_confirmation_report_and_lost_reply(refused, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from services.recovery_release_policy import p0a_presentation
+    from services.recovery_report import incident_report
+    from ui.views import recovery_view as view
+
+    r = refused
+    withdrawn_configuration_read(r)
+    adapter, store, service, row = service_for(r)
+    service.presentation_policy = p0a_presentation
+    original = r.runtime.dal.read(r.source)
+    assert set(row["evidence"]["actions"]) == {"close_withdrawn_read"}
+    assert not row["evidence"]["recovery_links"]
+    close = adapter.dal.close_withdrawn_read
+
+    def lost(*args):
+        close(*args)
+        raise TimeoutError("lost acknowledgement")
+
+    monkeypatch.setattr(adapter.dal, "close_withdrawn_read", lost)
+
+    async def call(method, *args):
+        return getattr(service, method)(*args)
+
+    monkeypatch.setattr(view, "call", call)
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    await next(
+        b for b in view.RecoveryIncidentView(row).children if b.label == "Close withdrawn read"
+    ).callback(interaction)
+    assert not store.actions
+    confirmation = interaction.followup.send.call_args.kwargs["view"]
+    await next(b for b in confirmation.children if b.label.startswith("Confirm")).callback(
+        interaction
+    )
+    final = service.refresh(row["IncidentID"])
+    assert final["State"] == "resolved" and store.actions[0]["State"] == "verified"
+    assert not final["pending_action"]
+    after = r.runtime.dal.read(r.source)
+    for key in ("RequestJson", "RequestHash", "OwnerID", "Fence", "State"):
+        assert after[key] == original[key]
+    assert (
+        incident_report(service, final)["diagnosis"]["failure_context"]["input_identity"]
+        == "not_recorded"
+    )
+    assert service.refresh(row["IncidentID"])["State"] == "resolved"
+
+
+@pytest.mark.parametrize(
+    "change", ["version", "hash", "generation", "consumer", "association", "membership"]
+)
+def test_withdrawn_read_refuses_changed_or_typed_evidence(refused, change):
+    from kvk.dal.new_source_import_dal import digest
+
+    r = refused
+    withdrawn_configuration_read(r, associated=change == "association")
+    dal = QueueAdmissionDAL(r.runtime)
+    state = dal.snapshot(r.source)
+    if change == "version":
+        state["preparation"]["Version"] += 1
+    elif change == "hash":
+        state["preparation"]["RequestHash"] = "0" * 64
+    elif change == "generation":
+        state["preparation"]["GenerationJson"] = "{}"
+    elif change == "consumer":
+        state["preparation"]["ConsumerKind"] = "scan_data"
+    elif change == "membership":
+        state["counts"]["ExportPreparationResource"] = 1
+    assert not dal.withdrawn_read(state)
+    with pytest.raises(SourceConflict):
+        dal.close_withdrawn_read(
+            r.source, digest(state).hex() if change == "association" else "0" * 64, str(uuid4())
+        )
+
+
 def test_cancel_initial_queue_entry_fences_late_worker_and_verifies(refused):
     r = refused
     legacy_unstarted(r)
