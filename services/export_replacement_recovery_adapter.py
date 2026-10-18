@@ -14,6 +14,7 @@ STEPS = frozenset(
         "discard_replacement_check",
         "activate_replacements",
         "publish_replacement",
+        "retire_failed_export",
     )
 )
 
@@ -32,6 +33,14 @@ class ReplacementRecoveryAdapter:
         snapshot = self.base.discovery.job(job_id)
         if skipped_export_verified(snapshot):
             return self.base.inspect(job_id)
+        if (
+            snapshot["job"]["State"] == "failed"
+            and snapshot["streams"]
+            and snapshot["job"]["ConsumerKind"] in {"scan_data", "all_kvk"}
+            and not snapshot.get("isolated_targets")
+        ):
+            result = self.client.failed_export_recovery(job_id, "inspect")
+            return result["evidence"], result["token"], result["resolved"]
         if snapshot.get("isolated_targets") or (
             snapshot["job"]["State"] in {"running", "uncertain"} and snapshot["streams"]
         ):
@@ -68,6 +77,16 @@ class ReplacementRecoveryAdapter:
         )
 
     def execute(self, job_id, action, token, actor, reason, *, payload=None):
+        if action == "retire_failed_export":
+            return self.client.failed_export_recovery(
+                job_id,
+                "execute",
+                step=action,
+                token=token,
+                actor=actor,
+                reason=reason,
+                payload=payload,
+            )
         if action not in STEPS:
             if action in {"verify_publication", "skip_unstarted"}:
                 original_token = job_token(self.base.discovery.job(job_id))
@@ -125,6 +144,8 @@ class ReplacementRecoveryAdapter:
             k: action.get(k)
             for k in ("ActionID", "ActionKind", "EvidenceHash", "Reason", "InputJson")
         }
+        if action["ActionKind"] == "retire_failed_export":
+            return self.client.failed_export_recovery(job_id, "reconcile", recovery_action=document)
         if action["ActionKind"] == "publish_replacement":
             # Reconciliation on the authority reads the atomic queue receipt.
             # If none exists, only the Bot's registered spool owner may retry

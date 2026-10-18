@@ -455,6 +455,10 @@ class AuthorityBroker:
         ):
             raise ValueError("Versioned authority action required.")
         action = message.get("action")
+        if action == "failed_export_recovery":
+            from services.failed_export_recovery_authority import dispatch
+
+            return dispatch(self, message)
         if action == "evidence_recovery":
             from services.export_evidence_recovery import EvidenceRecovery
 
