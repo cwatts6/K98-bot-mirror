@@ -147,7 +147,7 @@ class ImportRecoveryAdapter:
                     outcome="export_skipped",
                     explanation="The committed SQL result is preserved. Admin chose to skip this export; the capture reservation is released. This does not claim the spreadsheet is current.",
                 )
-                add_capture_context(evidence, prep, execution, self.capture_recovery)
+                add_capture_context(evidence, prep, execution, self.capture_recovery, resolved=True)
                 return evidence, preview["token"], True
             if disposition in {"available", "failed"}:
                 from services.import_capture_recovery_service import ABANDON_CAPTURE_ACTION
@@ -160,7 +160,13 @@ class ImportRecoveryAdapter:
                 actions["abandon_capture"] = ABANDON_CAPTURE_ACTION
             # Do not mutate the shared action definition while adding review UI.
             evidence["actions"] = {key: dict(value) for key, value in actions.items()}
-            add_capture_context(evidence, prep, execution, self.capture_recovery)
+            add_capture_context(
+                evidence,
+                prep,
+                execution,
+                self.capture_recovery,
+                resolved=decision == "resolved" or captured,
+            )
         return evidence, preview["token"], decision == "resolved" or captured
 
     def execute(self, source_id, action, token, actor, reason):

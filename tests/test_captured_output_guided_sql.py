@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from services.all_kvk_capture_recovery_service import AllKvkCaptureRecoveryAdapter
 from services.export_coordination_dal import ExportCoordinationDAL
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.legacy_export_snapshot_service import LegacyExportRuntime
@@ -21,7 +22,7 @@ pytestmark = [
     pytest.mark.skipif(
         os.getenv("K98_RECOVERY_SQL_TEMP_TESTS") != "1", reason="Disposable SQL opt-in"
     ),
-    pytest.mark.parametrize("recovery", ["scan_data", "player_report"], indirect=True),
+    pytest.mark.parametrize("recovery", ["scan_data", "player_report", "all_kvk"], indirect=True),
 ]
 
 
@@ -60,7 +61,11 @@ async def test_review_confirm_verify_retained_output(
     r.runtime.coordinator = ExportCoordinationDAL(r.connect, preparations=True)
     r.runtime.verified_snapshot = MethodType(LegacyExportRuntime.verified_snapshot, r.runtime)
     r.runtime.enqueue_snapshot = MethodType(LegacyExportRuntime.enqueue_snapshot, r.runtime)
-    adapter_type = ImportRecoveryAdapter if before["execution"] else PlayerReportRecoveryAdapter
+    adapter_type = {
+        "scan_data": ImportRecoveryAdapter,
+        "player_report": PlayerReportRecoveryAdapter,
+        "all_kvk": AllKvkCaptureRecoveryAdapter,
+    }[r.service.consumer]
     adapter = adapter_type(r.outcomes, r.service)
     service = RecoveryService(
         store,

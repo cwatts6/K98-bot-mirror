@@ -124,7 +124,9 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
             ),
             "actions": {key: dict(value) for key, value in actions.items()},
         }
-        add_capture_context(evidence, prep, preview["execution"], self.capture_recovery)
+        add_capture_context(
+            evidence, prep, preview["execution"], self.capture_recovery, resolved=resolved
+        )
         return (
             evidence,
             preview["token"],

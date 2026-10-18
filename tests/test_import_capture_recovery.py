@@ -181,3 +181,19 @@ def test_malformed_diagnostic_documents_preserve_nonactionable_incident(field, v
     evidence, _, resolved = ImportRecoveryAdapter(service.outcomes, service).inspect("source")
     assert not resolved and not evidence["actions"]
     assert evidence["failure_context"]["summary"]
+
+
+@pytest.mark.parametrize("registration_changed", [False, True])
+def test_materialized_job_does_not_hide_failed_verification(registration_changed):
+    service, preview, _ = fixture()
+    preview.update(captured=True, action="hold")
+    prep = preview["preparation"]
+    prep.update(State="materialized", JobID="retained-job", SpoolKey="retained")
+    service.verify_queued = Mock(side_effect=SourceConflict("Snapshot differs"))
+    if registration_changed:
+        prep["RequestJson"] = "{}"
+    evidence, _, resolved = ImportRecoveryAdapter(service.outcomes, service).inspect("source")
+    assert not resolved and not evidence["actions"]
+    assert evidence["failure_context"]["current_blocker"] == (
+        "registration_changed" if registration_changed else "capture_or_queue_verification"
+    )

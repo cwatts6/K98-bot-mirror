@@ -80,6 +80,12 @@ format and obscured the error with generic queue-checking guidance. Accept both
 formats only against the exact preparation, completed SQL receipt, filename and
 registered output contract. Preserve the immutable historical generation.
 
+The same release also enables the existing all-KVK capture/queue/skip actions,
+qualified through the actual private review and confirmation buttons against
+disposable SQL. No all-KVK incident was present in the supplied export. Across
+all three families, a materialized job identifier alone must not clear the
+displayed blocker: only independently verified settlement does so.
+
 The private guided review must show retained input/scan identity, original and
 current output settings and destination links, the actual current blocker, and
 available original failure evidence. Queue continues the saved output exactly

@@ -15,7 +15,7 @@ def _diagnostic_document(value):
     return result if isinstance(result, dict) else {}
 
 
-def capture_context(prep, execution, recovery):
+def capture_context(prep, execution, recovery, *, resolved=False):
     """Describe observations, not an invented historical exception or success."""
     execution = execution or {}
     request = _diagnostic_document(prep.get("RequestJson"))
@@ -61,12 +61,12 @@ def capture_context(prep, execution, recovery):
         context["sql_error_procedure"] = procedure
     if context["sql_error_number"] is not None:
         context["original_fault"] = "sql_receipt"
-    if generation.get("capture_abandoned"):
+    if resolved and generation.get("capture_abandoned"):
         context["current_blocker"] = None
         context["summary"] = (
             "Admin chose to skip this export. The retained SQL result and original evidence are preserved; no capture or queue repair remains for this incident. This does not certify spreadsheet delivery."
         )
-    elif prep.get("JobID") and prep.get("State") == "materialized":
+    elif resolved and prep.get("JobID") and prep.get("State") == "materialized":
         context["current_blocker"] = None
         context["summary"] = (
             "The retained output has a durable queue admission. Provider delivery is verified separately; no original exception message was saved for the capture stage."
@@ -137,8 +137,8 @@ def capture_review(adapter, source_id, action, token):
     return fields
 
 
-def add_capture_context(evidence, prep, execution, recovery):
-    context = capture_context(prep, execution, recovery)
+def add_capture_context(evidence, prep, execution, recovery, *, resolved=False):
+    context = capture_context(prep, execution, recovery, resolved=resolved)
     evidence["failure_context"] = context
     for name, action in evidence["actions"].items():
         if name in {"resume_capture", "queue_capture", "abandon_capture"}:

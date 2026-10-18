@@ -13,6 +13,7 @@ P0A_ACTIONS = MappingProxyType(
         "player_report": frozenset(
             {"cancel_report", "resume_capture", "queue_capture", "abandon_capture"}
         ),
+        "all_kvk_capture": frozenset({"resume_capture", "queue_capture", "abandon_capture"}),
         "export_job": frozenset({"retry_unstarted", "skip_unstarted"}),
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
