@@ -659,7 +659,9 @@ def run_proc_config_import(
         except ConfigurationAdmissionDeferred:
             message = (
                 "Configuration dry-run deferred before reading inputs: account admission unavailable. "
-                "Open the recovery centre and review Configuration import read not started. "
+                "Open the recovery centre and select Review queue blockers to inspect blocking work. "
+                "Once account access is available, run the dry-run again. "
+                "This dry-run has no saved configuration publication to resume. "
                 "No schema check or configuration publication occurred."
             )
             logger.warning("[IMPORT][DRYRUN][ADMISSION] %s", message)
