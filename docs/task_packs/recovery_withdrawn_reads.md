@@ -16,6 +16,21 @@ decision without changing owner, fence, request or state, then reads it back.
 Typed configuration-import reads retain their separate continuation workflow.
 Unavailable original input files and publication intent are stated explicitly.
 
+If the same withdrawn read also has a configuration-read incident, that incident
+links to the queue closeout and independently verifies its final receipt. An
+empty reservation set in this exact case is not reported as configuration drift.
+Real reservation mismatches still require authority verification; their guided
+diagnosis and original-registration recovery remain mandatory P0b work.
+
+Tracked production example: incident
+`bff228ee-0df1-4ad9-bdf3-47b7d65375e6`, checked 2026-10-18 19:02:02 UTC,
+reports reservation membership differing from installed configuration. Its
+classification must come from fresh scoped evidence, not the screenshot.
+Acceptance requires either verified withdrawn-read closeout through the queue
+link, or a guided comparison of original/current configuration and reservations,
+an evidence-authorized repair, and independent readback. A remaining Recheck-only
+incident does not satisfy completion of this P0b requirement.
+
 Incident browsing uses ascending FirstSeenUTC and an IncidentID tie-breaker.
 A scoped cursor remains usable after its incident resolves. Complete report
 pagination remains independently bounded by its existing export snapshot.

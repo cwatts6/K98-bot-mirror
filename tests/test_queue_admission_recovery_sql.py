@@ -112,6 +112,65 @@ async def test_close_withdrawn_read_guided_confirmation_report_and_lost_reply(re
     assert service.refresh(row["IncidentID"])["State"] == "resolved"
 
 
+def test_withdrawn_read_alias_routes_to_one_decision_then_verifies_closure(refused, store):
+    from unittest.mock import Mock
+
+    from services.config_read_recovery_adapter import ConfigReadRecoveryAdapter
+
+    r = refused
+    withdrawn_configuration_read(r)
+    queue = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime))
+    service = RecoveryService(store, {queue.kind: queue}, admin_id=1, guild_id=2, channel_id=3)
+    row = service.review_source(ACTOR, queue.kind, r.source)
+    client = Mock()
+    alias = ConfigReadRecoveryAdapter(
+        Mock(),
+        client,
+        account=r.runtime.account,
+        storage_owner=r.runtime.store.storage_owner,
+        queue_dal=queue.dal,
+    )
+    service.adapters[alias.kind] = alias
+    read_row = service.review_source(ACTOR, alias.kind, r.source)
+    assert not read_row["evidence"]["actions"]
+    assert read_row["evidence"]["recovery_links"] == [
+        dict(label="Review withdrawn queue entry", kind="queue_admission", source_id=r.source)
+    ]
+    execute(service, row, action="close_withdrawn_read")
+    assert service.refresh(read_row["IncidentID"])["State"] == "resolved"
+    client.inspect_configuration_recovery.assert_not_called()
+
+
+def test_admitted_read_still_uses_authority_membership_verification(refused):
+    from unittest.mock import Mock
+
+    from services.config_read_recovery_adapter import ConfigReadRecoveryAdapter
+
+    r = refused
+    withdrawn_configuration_read(r)
+    r.f.sql.execute(
+        "UPDATE #ExportPreparation SET Version=4,Fence=2,State='uncertain' WHERE PreparationID=?",
+        r.source,
+    )
+    client = Mock()
+    client.inspect_configuration_recovery.return_value = dict(
+        eligible=False,
+        outcome="held",
+        token="a" * 64,
+        explanation="Reservation membership differs from the installed configuration.",
+    )
+    adapter = ConfigReadRecoveryAdapter(
+        Mock(),
+        client,
+        account=r.runtime.account,
+        storage_owner=r.runtime.store.storage_owner,
+        queue_dal=QueueAdmissionDAL(r.runtime),
+    )
+    evidence, _, resolved = adapter.inspect(r.source)
+    assert not resolved and not evidence["actions"]
+    client.inspect_configuration_recovery.assert_called_once_with(r.source)
+
+
 @pytest.mark.parametrize(
     "change", ["version", "hash", "generation", "consumer", "association", "membership"]
 )

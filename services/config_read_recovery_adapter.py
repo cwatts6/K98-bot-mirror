@@ -5,9 +5,10 @@ class ConfigReadRecoveryAdapter:
     kind = "configuration_read"
     automatic_action = "release_read"
 
-    def __init__(self, dal, client, *, account, storage_owner):
+    def __init__(self, dal, client, *, account, storage_owner, queue_dal=None):
         self.dal, self.client = dal, client
         self.account, self.storage_owner = account, storage_owner
+        self.queue_dal = queue_dal
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(
@@ -15,6 +16,32 @@ class ConfigReadRecoveryAdapter:
         )
 
     def inspect(self, source_id):
+        if self.queue_dal is not None:
+            state = self.queue_dal.snapshot(source_id)
+            if self.queue_dal.withdrawn_read(state) or self.queue_dal.withdrawn_read(
+                state, closed=True
+            ):
+                from services.queue_admission_recovery import QueueAdmissionRecovery
+
+                evidence, token, resolved = QueueAdmissionRecovery(self.queue_dal).inspect(
+                    source_id
+                )
+                # An empty reservation set from a proven withdrawal is not a
+                # mismatch with today's configuration. Keep one decision owner.
+                evidence["title"] = "Configuration read recovery"
+                evidence["actions"] = {}
+                evidence["recovery_links"] = (
+                    []
+                    if resolved
+                    else [
+                        dict(
+                            label="Review withdrawn queue entry",
+                            kind="queue_admission",
+                            source_id=source_id,
+                        )
+                    ]
+                )
+                return evidence, token, resolved
         result = self.client.inspect_configuration_recovery(source_id)
         actions = {}
         if result["eligible"] and result["outcome"] == "unstarted_read":
