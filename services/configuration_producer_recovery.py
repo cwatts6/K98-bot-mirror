@@ -11,6 +11,7 @@ class ConfigurationProducerDAL(PlayerReportRecoveryDAL):
     producer_kind = "configuration_import"
     closure_key = "configuration_cancelled"
     cancel_action = "cancel_configuration"
+    export_dispositions = frozenset({"configuration_only_v1", "pipeline_export_v1"})
 
     @classmethod
     def producer_fields(cls, producer):
@@ -36,6 +37,24 @@ class ConfigurationProducerRecovery(PlayerReportRecoveryAdapter):
     closure_key = "configuration_cancelled"
     close_label = "Close rolled-back config & release"
     open_outcome = "configuration_not_committed"
+    automatic_action = "complete_configuration_only"
+    automatic_reason = (
+        "Original SQL-only configuration intent and committed retained output verified"
+    )
+    no_export_outcome = "configuration_only_completed"
+    no_export_label = "Verify configuration-only completion"
+    no_export_pending = "This SQL-only configuration refresh needs no export decision. Automatic verification is pending."
+    no_export_explanation = (
+        "This invocation requested SQL configuration and target refresh only. "
+        "Its atomic SQL checkpoint and retained captured bytes are verified, "
+        "and the original no-export disposition is closed. This does not certify "
+        "spreadsheet delivery or subsequent cache freshness."
+    )
+
+    def _no_export(self, preview):
+        """Use the shared no-export closeout only for this producer's explicit intent."""
+        request = self.dal.request(preview["preparation"])
+        return request["request"]["producer"].get("export_disposition") == "configuration_only_v1"
 
     def inspect(self, source_id):
         evidence, token, resolved = super().inspect(source_id)

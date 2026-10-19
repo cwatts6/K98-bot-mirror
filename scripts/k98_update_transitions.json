@@ -235,6 +235,61 @@
           "after_sha256": "04063844585b1103d053a002933a9046a471c99f57a76e5e35594218af298d56"
         }
       ]
+    },
+    {
+      "id": "configuration_only_completion_v1",
+      "members": [
+        {
+          "path": "proc_config_import.py",
+          "before_sha256": "ced6b0cafe4204e2a090f63be30042b3ad0e957870c1d6bd0308408d5ae91c66",
+          "after_sha256": "f892587be3236900e88fbf3a2898c93c4b4d66a8a7ff3c7494c68ef7da4fa343"
+        },
+        {
+          "path": "services/capture_recovery_context.py",
+          "before_sha256": "e09d0ef7b355fb32fbdf1bcafb30738466b7ffcf9b3e072025ba7a770e07f9c1",
+          "after_sha256": "55ab6286326ced7834c20f31438769c5a3b6385c3c607ce1b4bd87f78107978c"
+        },
+        {
+          "path": "services/configuration_producer_recovery.py",
+          "before_sha256": "53cb367255314d032b34e1a2fbdd58dd94c238106e7ca45091f074a5cca6bcdf",
+          "after_sha256": "b5a91facb79b6cfc9ff1414e620bfafe21e309161285a30d80d0973a4bc83fc0"
+        },
+        {
+          "path": "services/configuration_read_continuation_dal.py",
+          "before_sha256": "7235cdb0f41b533ec0def4b3841928682f52d5d3b066687b98fa3f23e6e58667",
+          "after_sha256": "7778816e83d49167c28f96b6d098c26d65e463939a2148b17bcd694691c2881f"
+        },
+        {
+          "path": "services/player_report_recovery_dal.py",
+          "before_sha256": "6bc7ff8a7482884182cd79c77da6b35d504a9db6c0753b1dd3cfa130f338669b",
+          "after_sha256": "52ee45f096b070be968fed2bf3e72bfddc7b706e6bf2023cdebefef759be0bab"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "2a63b98f20dfcab8bd0e3db717963ec96002d4f47f22089cd50dc00aff1caafd",
+          "after_sha256": "7c65505318f0819ac46c95edc98e8ccdb5c065c9164a6ec3a06e1f4a49e55aaf"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "bff562c62d4c2ad9a0745daba5a8406093b082391d12899cdfde4ee0f45e6d4b",
+          "after_sha256": "95ff38e51d3b2f10df115d81b7a70a0c2fcf0479e11c963bc8cd30a3f1c8336b"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "62074fa62d0240c368f651ff97c78a96e30c25745734abd86eb53363bc6b8c1a",
+          "after_sha256": "2b1baba7305b9d18b6cb0ae92198397d9d13ccdc9ed17592dcf7e96be64fa067"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "654801e38dac0a4195d6cb64ea41af13bdf57474ff5df233f85294b0a1a817f8",
+          "after_sha256": "1460749b81579aae28910dd154abac932894e75c7d875ce17e243c1f96b41e18"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "04063844585b1103d053a002933a9046a471c99f57a76e5e35594218af298d56",
+          "after_sha256": "e8bbf2017a438e160694829f4fe16dab9bba1716202d950af5a087ba1c41fa8e"
+        }
+      ]
     }
   ]
 }

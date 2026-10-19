@@ -26,7 +26,7 @@ pytestmark = [
 ]
 
 
-def setup(r, runner=None, *, associated=True):
+def setup(r, runner=None, *, associated=True, disposition=None):
     prior, service = prior_setup(r)
     config = json.loads(r.runtime.configuration)
     request = dict(read_configuration=str(uuid4()))
@@ -37,6 +37,8 @@ def setup(r, runner=None, *, associated=True):
             sources=config["config"],
             outputs=config["scan_data"],
         )
+        if disposition is not None:
+            request["configuration_import"]["producer"]["export_disposition"] = disposition
     source = r.runtime.dal.request(
         account="a",
         consumer="config",
@@ -78,13 +80,16 @@ def add_linked_views(recovery, continuation, service):
     return queue, read, client
 
 
-def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(recovery, store):
+@pytest.mark.parametrize("disposition", [None, "configuration_only_v1", "pipeline_export_v1"])
+def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(
+    recovery, store, disposition
+):
     import io
     import zipfile
 
     from services.recovery_report import incident_report
 
-    source, continuation, service = setup(recovery)
+    source, continuation, service = setup(recovery, disposition=disposition)
     service.store = store
     queue, read, client = add_linked_views(recovery, continuation, service)
     aliases = [service.review_source(ACTOR, a.kind, source) for a in (queue, read)]
@@ -94,6 +99,9 @@ def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(reco
         assert row["evidence"]["recovery_links"][0]["source_id"] == source
     decision = service.review_source(ACTOR, continuation.kind, source)
     assert set(decision["evidence"]["actions"]) == {"keep_prior", "retry_configuration"}
+    assert decision["evidence"]["failure_context"]["original_export_intent"] == (
+        disposition or "not_recorded"
+    )
     run(service, decision, "keep_prior")
     before = recovery.runtime.dal.read(source)
     # Recreate adapters: no cached incident state is supplied as closure proof.

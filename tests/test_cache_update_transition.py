@@ -16,9 +16,15 @@ def test_cache_transition_pins_every_runtime_member():
     assert {m["path"] for m in bundle["members"]} == updater.CACHE_ONLY_TRANSITION_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in bundle["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
+        assert updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == next(
+            (
+                m["after_sha256"]
+                for t in updater.reviewed_transitions()
+                if t["id"] == "configuration_only_completion_v1"
+                for m in t["members"]
+                if m["path"] == member["path"]
+            ),
+            member["after_sha256"],
         )
         assert member["before_sha256"] != member["after_sha256"]
 

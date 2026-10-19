@@ -14,15 +14,15 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
     producer_kind = "player_stats_report"
     closure_key = "report_cancelled"
     cancel_action = "cancel_report"
+    export_dispositions = frozenset({"cache_only_v1", "pipeline_export_v1"})
 
     @classmethod
     def producer_fields(cls, producer):
         fields = {"kind", "atomic_checkpoint", "operation"}
         if "export_disposition" in producer:
             if (
-                cls.producer_kind != "player_stats_report"
-                or type(producer["export_disposition"]) is not str
-                or producer["export_disposition"] not in {"cache_only_v1", "pipeline_export_v1"}
+                type(producer["export_disposition"]) is not str
+                or producer["export_disposition"] not in cls.export_dispositions
             ):
                 raise SourceConflict("The original report export intent is invalid.")
             fields |= {"export_disposition"}

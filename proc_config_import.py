@@ -36,7 +36,7 @@ from gsheet_module import (
     _safe_execute,
 )
 from services.legacy_export_snapshot_service import ConfigurationAdmissionDeferred, bound_runtime
-from services.producer_recovery_intent import atomic_producer_intent
+from services.producer_recovery_intent import configuration_import_intent
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -609,7 +609,7 @@ def _validate_sheet_schemas(sheet) -> tuple[bool, list[str]]:
 # Main import entrypoint (modified to use write_df_to_staging_and_upsert)
 # ---------------------------------------------------------------------------
 @bound_runtime
-@atomic_producer_intent("configuration_import")
+@configuration_import_intent
 def run_proc_config_import(
     dry_run: bool = False, *, source_actor: str | None = None, source_provenance: dict | None = None
 ) -> tuple[bool, dict]:

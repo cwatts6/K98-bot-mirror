@@ -28,7 +28,13 @@ P0A_ACTIONS = MappingProxyType(
             {"close_unstarted_admission", "resume_sql_stage", "resume_current_registration"}
         ),
         "configuration_producer": frozenset(
-            {"cancel_configuration", "resume_capture", "queue_capture", "abandon_capture"}
+            {
+                "cancel_configuration",
+                "resume_capture",
+                "queue_capture",
+                "abandon_capture",
+                "complete_configuration_only",
+            }
         ),
         "configuration_continuation": frozenset({"retry_configuration", "keep_prior"}),
         "configuration_read_continuation": frozenset({"retry_configuration", "keep_prior"}),

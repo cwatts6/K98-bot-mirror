@@ -66,24 +66,35 @@ def player_cache_intent(function):
     return atomic_producer_intent("player_stats_report", cache_refresh=True)(function)
 
 
-def atomic_producer_intent(kind, *, cache_refresh=False):
+def configuration_import_intent(function):
+    """Record standalone SQL refresh versus collected pipeline output before admission."""
+    return atomic_producer_intent("configuration_import", configuration_refresh=True)(function)
+
+
+def atomic_producer_intent(kind, *, cache_refresh=False, configuration_refresh=False):
     if kind not in {"player_stats_report", "configuration_import"}:
         raise ValueError("Unsupported atomic producer.")
 
     def decorate(function):
         @wraps(function)
         def run(*args, **kwargs):
+            current = _intent.get()
             disposition = None
-            if cache_refresh:
+            if cache_refresh or configuration_refresh:
                 from services.legacy_export_snapshot_service import producer_captures_requested
 
                 disposition = (
-                    "pipeline_export_v1" if producer_captures_requested() else "cache_only_v1"
+                    "pipeline_export_v1"
+                    if producer_captures_requested()
+                    else ("configuration_only_v1" if configuration_refresh else "cache_only_v1")
                 )
-            current = _intent.get()
             if current is not None:
                 if current.get("kind") != kind or current.get("atomic_checkpoint") != 1:
                     raise SourceConflict("Execution cannot inherit a different producer intent.")
+                # Guided continuations already have a durable approved request.
+                # Do not reinterpret its missing disposition at execution time.
+                if configuration_refresh and "export_disposition" not in current:
+                    return function(*args, **kwargs)
                 if disposition and current.get("export_disposition") != disposition:
                     raise SourceConflict("Execution cannot change its original export intent.")
                 return function(*args, **kwargs)

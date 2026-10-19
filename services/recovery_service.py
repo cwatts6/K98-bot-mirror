@@ -175,6 +175,7 @@ class RecoveryService:
             not in {
                 ("configuration_read", "release_read"),
                 ("player_report", "complete_cache_only"),
+                ("configuration_producer", "complete_configuration_only"),
             }
             or row["State"] == "resolved"
             or action not in row["evidence"]["actions"]

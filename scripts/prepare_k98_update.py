@@ -85,6 +85,21 @@ CACHE_ONLY_TRANSITION_PATHS = frozenset(
     }
 )
 
+CONFIGURATION_ONLY_TRANSITION_PATHS = frozenset(
+    {
+        "proc_config_import.py",
+        "services/capture_recovery_context.py",
+        "services/configuration_producer_recovery.py",
+        "services/configuration_read_continuation_dal.py",
+        "services/player_report_recovery_dal.py",
+        "services/player_report_recovery_service.py",
+        "services/producer_recovery_intent.py",
+        "services/recovery_release_policy.py",
+        "services/recovery_report.py",
+        "services/recovery_service.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -118,8 +133,17 @@ def reviewed_transitions():
             fixed_cache = (
                 item["id"] == "cache_only_completion_v1" and path in CACHE_ONLY_TRANSITION_PATHS
             )
+            fixed_configuration = (
+                item["id"] == "configuration_only_completion_v1"
+                and path in CONFIGURATION_ONLY_TRANSITION_PATHS
+            )
             if (
-                not (path.startswith("services/export_") or fixed_closeout or fixed_cache)
+                not (
+                    path.startswith("services/export_")
+                    or fixed_closeout
+                    or fixed_cache
+                    or fixed_configuration
+                )
                 or not path.endswith(".py")
                 or path in paths
             ):
@@ -135,6 +159,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed failed-export transition required.")
         if item["id"] == "cache_only_completion_v1" and paths != CACHE_ONLY_TRANSITION_PATHS:
             raise ValueError("Complete fixed cache-only transition required.")
+        if (
+            item["id"] == "configuration_only_completion_v1"
+            and paths != CONFIGURATION_ONLY_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed configuration-only transition required.")
     return value["transitions"]
 
 
@@ -240,7 +269,10 @@ def validate_combined_description(raw):
         "migrations",
     }:
         raise ValueError("Exact combined release fields required.")
-    if value["version"] != 1 or value["profile"] not in {"module_grants_v1", "additive_tables_v1"}:
+    if value["version"] != 1 or value["profile"] not in {
+        "module_grants_v1",
+        "additive_tables_v1",
+    }:
         raise ValueError("Unsupported combined SQL profile; no drain requested.")
     predecessors = value["bot_predecessors"]
     if (

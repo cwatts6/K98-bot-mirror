@@ -47,23 +47,34 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
     kind = "player_report"
     title = "Player-stat report recovery"
     output_name = "player-stat report"
+    no_export_outcome = "cache_only_completed"
+    no_export_label = "Verify cache-only completion"
+    no_export_pending = (
+        "This cache-only refresh needs no export decision. Automatic verification is pending."
+    )
+    no_export_explanation = (
+        "This invocation requested a local cache refresh, not a spreadsheet export. "
+        "Its committed SQL output and captured evidence are preserved; "
+        "the recorded no-export disposition is verified. Cache freshness and "
+        "spreadsheet delivery are separate checks."
+    )
 
-    def _cache_only(self, preview):
+    def _no_export(self, preview):
         if self.kind != "player_report":
             return False
         request = self.dal.request(preview["preparation"])
         return request["request"]["producer"].get("export_disposition") == "cache_only_v1"
 
-    def _verify_cache_only(self, source_id, preview):
+    def _verify_no_export(self, source_id, preview):
         prep = preview["preparation"]
         if (
-            not self._cache_only(preview)
+            not self._no_export(preview)
             or preview["action"] != "queue_capture"
             or preview.get("resources")
             or not preview["captured"]
             or prep["JobID"]
         ):
-            raise SourceConflict("Exact unqueued cache-only output is required.")
+            raise SourceConflict("Exact unqueued no-export output is required.")
         self.capture_recovery.generation(prep, preview["execution"])
         self.capture_recovery.runtime.verified_snapshot(source_id)
 
@@ -72,31 +83,24 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
         if preview["action"] not in {self.cancel_action, "cancelled"}:
             evidence, token, resolved = super().inspect(source_id)
             try:
-                cache_only = self._cache_only(preview)
+                cache_only = self._no_export(preview)
                 if cache_only and resolved and evidence["outcome"] == "export_skipped":
-                    evidence["outcome"] = "cache_only_completed"
-                    evidence["explanation"] = (
-                        "This invocation requested a local cache refresh, not a spreadsheet export. "
-                        "Its committed SQL output and captured evidence are preserved; "
-                        "the recorded no-export disposition is verified. Cache freshness and "
-                        "spreadsheet delivery are separate checks."
-                    )
+                    evidence["outcome"] = self.no_export_outcome
+                    evidence["explanation"] = self.no_export_explanation
                     evidence["failure_context"]["summary"] = evidence["explanation"]
                 elif cache_only and not resolved:
-                    self._verify_cache_only(source_id, preview)
+                    self._verify_no_export(source_id, preview)
                     evidence["actions"] = {
                         self.automatic_action: dict(
-                            label="Verify cache-only completion",
+                            label=self.no_export_label,
                             check="The original request explicitly required no spreadsheet export. Verify and close this retained capture.",
                             effect="Recheck original intent, committed output, exact ownership and absence of provider execution; preserve SQL and captured bytes, record and verify no-export completion. No report or provider write is replayed.",
                         )
                     }
-                    evidence["explanation"] = (
-                        "This cache-only refresh needs no export decision. Automatic verification is pending."
-                    )
+                    evidence["explanation"] = self.no_export_pending
                     evidence["failure_context"].update(
                         summary=evidence["explanation"],
-                        current_blocker="cache_only_verification_pending",
+                        current_blocker=f"{self.no_export_outcome.removesuffix('_completed')}_verification_pending",
                     )
             except (
                 SourceConflict,
@@ -140,8 +144,8 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
         if action == self.automatic_action:
             preview = self.dal.inspect(source_id)
             if preview["token"] != token:
-                raise SourceConflict("Cache-only evidence changed; recheck the incident.")
-            self._verify_cache_only(source_id, preview)
+                raise SourceConflict("No-export evidence changed; recheck the incident.")
+            self._verify_no_export(source_id, preview)
             return self.capture_recovery.abandon(source_id, token, actor, reason)
         if action == self.cancel_action:
             return self.dal.cancel(source_id, token, actor, reason)
@@ -150,7 +154,7 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
     def reconcile(self, source_id, action):
         if action["ActionKind"] == self.automatic_action:
             preview = self.dal.inspect(source_id)
-            if not self._cache_only(preview):
+            if not self._no_export(preview):
                 return "not_applied"
             if preview["token"] == action["EvidenceHash"]:
                 self.execute(

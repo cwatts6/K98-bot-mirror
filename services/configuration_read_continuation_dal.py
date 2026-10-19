@@ -4,6 +4,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
 from services.configuration_continuation_dal import ConfigurationContinuationDAL
+from services.configuration_producer_recovery import ConfigurationProducerDAL
 from services.export_coordination_dal import identity
 
 
@@ -64,7 +65,9 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             or set(inner) != {"read_configuration", "configuration_import"}
             or set(association) != {"producer", "sources", "outputs", "invocation_mode"}
             or association.get("invocation_mode") != "publish"
-            or set(producer) != {"kind", "atomic_checkpoint", "operation"}
+            or not isinstance(producer, dict)
+            or "parent" in producer
+            or set(producer) != ConfigurationProducerDAL.producer_fields(producer)
             or producer.get("kind") != "configuration_import"
             or type(producer.get("atomic_checkpoint")) is not int
             or producer["atomic_checkpoint"] != 1
@@ -113,6 +116,9 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             original_sources=association["sources"],
             failure_context=dict(
                 operation="configuration_import",
+                original_export_intent=association["producer"].get(
+                    "export_disposition", "not_recorded"
+                ),
                 operation_id=association["producer"]["operation"],
                 input_kind="registered_configuration_sheets",
                 original_fault="configuration_read_admission_not_obtained",
