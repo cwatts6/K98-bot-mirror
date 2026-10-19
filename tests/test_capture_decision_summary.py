@@ -8,6 +8,7 @@ import pytest
 
 from services.capture_recovery_context import capture_context, capture_summary
 from services.import_recovery_service import ImportRecoveryAdapter
+from services.legacy_export_snapshot_service import configuration_digest
 from services.recovery_service import SourceConflict
 from tests.test_import_capture_recovery import fixture
 
@@ -89,3 +90,24 @@ def test_adapter_routes_capture_summary_without_historical_retirement():
     assert len(fields) == 5
     evidence, _, _ = adapter.inspect("source")
     assert evidence["actions"]["resume_capture"]["review_summary"] is True
+
+
+def test_configuration_fingerprints_match_retained_unicode_registration():
+    recovery, preview, _ = setup()
+    prep = preview["preparation"]
+    request = json.loads(prep["RequestJson"])
+    registration = request["request"]["config"]
+    registration["label"] = "Époque · 王国"
+    prep["RequestJson"] = json.dumps(request)
+    recovery.runtime.configuration = json.dumps({"scan_data": registration})
+    saved_registration_sha256 = configuration_digest(registration)
+    context = capture_context(prep, preview["execution"], recovery)
+    assert context["registration_matches"] is True
+    assert context["original_configuration_sha256"] == saved_registration_sha256
+    assert context["current_configuration_sha256"] == saved_registration_sha256
+    installed = dict(registration, label="Époque suivante")
+    recovery.runtime.configuration = json.dumps({"scan_data": installed})
+    context = capture_context(prep, preview["execution"], recovery)
+    assert context["registration_matches"] is False
+    assert context["original_configuration_sha256"] == saved_registration_sha256
+    assert context["current_configuration_sha256"] == configuration_digest(installed)

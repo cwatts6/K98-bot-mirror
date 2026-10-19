@@ -4,7 +4,8 @@ from datetime import datetime
 import json
 import re
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest
+from kvk.dal.new_source_import_dal import SourceConflict
+from services.legacy_export_snapshot_service import configuration_digest
 from services.producer_recovery_review import registration_review
 
 
@@ -38,9 +39,9 @@ def capture_context(prep, execution, recovery, *, resolved=False):
         original_created_utc=created.isoformat(sep=" ") if isinstance(created, datetime) else None,
         producer_procedure=saved_procedure if procedure_known else None,
         original_configuration_sha256=(
-            digest(original).hex() if isinstance(original, dict) else None
+            configuration_digest(original) if isinstance(original, dict) else None
         ),
-        current_configuration_sha256=digest(current).hex(),
+        current_configuration_sha256=configuration_digest(current),
         original_destination_count=(
             len(original.get("destinations", []))
             if isinstance(original, dict) and isinstance(original.get("destinations"), list)
