@@ -45,8 +45,9 @@ async def _drain_cancel(task):
 async def run(coro, seconds, label):
     """Keep cancellation/drain semantics; distinguish a deadline from a failure.
 
-    No timed-out task is detached or automatically replayed. A SQL worker may
-    finish during cancellation, so cancelled coroutine results remain unproven.
+    The coroutine is awaited after cancellation and is never replayed. Executor
+    callers must track their actual workers: cancelling a proxy future alone
+    does not stop its thread. Cancelled business outcomes remain unproven.
     """
     task = asyncio.ensure_future(coro)
     _record(label, "running", seconds)
@@ -64,7 +65,7 @@ async def run(coro, seconds, label):
             if task.cancelled():
                 _record(label, "deadline_elapsed_outcome_unconfirmed", seconds)
                 logger.warning(
-                    "[BOOT] %s drain finished; verify the feature receipt. The deadline does not establish failure or schedule a retry.",
+                    "[BOOT] %s startup coroutine cancelled; underlying worker outcome remains unconfirmed. Verify the feature receipt. The deadline does not establish failure or schedule a retry.",
                     label,
                 )
                 return None

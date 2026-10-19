@@ -297,12 +297,12 @@
         {
           "path": "bot_instance.py",
           "before_sha256": "c03f7121b71ede87ecabde46ee0ce628a881ae48881778ecf856fe99ec9551bb",
-          "after_sha256": "2317ca1bd1b9ecd045945a5b5a2571dcf310d868c7d366aff497f0044f8c9f9c"
+          "after_sha256": "141d606ea061659dbb4b82c0bc24cd3b571b4778733965338f6f06cf6e40f06e"
         },
         {
           "path": "core/startup_diagnostics.py",
           "before_sha256": null,
-          "after_sha256": "9ed5f17a59f643bf7cb6339291d05c73f8c858eae95e5aec64c40f1e2ea0d156"
+          "after_sha256": "d2a71770de53e48a7226922f79729f267d45e86a84832bfb9b1d1c9911393d5a"
         },
         {
           "path": "services/producer_recovery_review.py",

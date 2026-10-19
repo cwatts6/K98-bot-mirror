@@ -1,5 +1,8 @@
+import ast
 import asyncio
 from contextlib import contextmanager
+from pathlib import Path
+import threading
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -34,6 +37,42 @@ async def test_deadline_drains_worker_without_retry_or_false_failure(caplog):
     assert startup.report()[0]["state"] == "deadline_elapsed_outcome_unconfirmed"
     assert "deferring" not in caplog.text
     assert "does not establish failure" in caplog.text
+    assert "drain finished" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_startup_blocking_worker_is_drained_before_timeout_returns():
+    # Exercise the actual startup helper without starting the Discord bot.
+    source = Path(__file__).resolve().parents[1] / "bot_instance.py"
+    definition = next(
+        node
+        for node in ast.parse(source.read_text(encoding="utf-8")).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "run_blocking"
+    )
+    namespace = {}
+    exec(compile(ast.Module(body=[definition], type_ignores=[]), str(source), "exec"), namespace)
+    entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+    def worker():
+        entered.set()
+        release.wait(timeout=5)
+        finished.set()
+
+    task = asyncio.create_task(startup.run(namespace["run_blocking"](worker), 0.001, "cache"))
+    try:
+        for _ in range(100):
+            if entered.is_set() and startup.report()[0]["state"] == "deadline_elapsed_draining":
+                break
+            await asyncio.sleep(0.001)
+        assert entered.is_set()
+        await asyncio.sleep(0.01)
+        assert not task.done()
+        assert not finished.is_set()
+    finally:
+        release.set()
+        await task
+    assert finished.is_set()
+    assert startup.report()[0]["state"] == "deadline_elapsed_outcome_unconfirmed"
 
 
 @pytest.mark.asyncio

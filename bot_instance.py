@@ -4,7 +4,6 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 import csv
 from datetime import datetime, timedelta
-from functools import partial
 import json
 import logging
 import logging.handlers
@@ -338,8 +337,9 @@ async def _start_event_scheduler_tasks():
 
 # wrap blockers
 async def run_blocking(func, *args, **kwargs):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(func, *args, **kwargs))
+    from services.legacy_export_snapshot_service import drain_thread
+
+    return await drain_thread(func, *args, **kwargs)
 
 
 # --- Global asyncio loop exception handler (install once per process) ---
