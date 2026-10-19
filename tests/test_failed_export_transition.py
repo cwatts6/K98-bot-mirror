@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pytest
 
@@ -36,15 +35,16 @@ def test_authority_exception_requires_exact_complete_named_bundle(monkeypatch, t
 @pytest.mark.parametrize("damage", [None, "changed_target", "changed_predecessor", "missing_peer"])
 def test_exact_bundle_checks_every_reviewed_source_member(monkeypatch, damage):
     transition = policy()
-    root = Path(update.__file__).resolve().parents[1]
-    target = {m["path"]: (root / m["path"]).read_bytes() for m in transition["members"]}
-    # Synthetic preimages exercise matching without relying on mirror Git history
-    # in private or shallow CI checkouts. Real target pins remain independently
-    # checked by the existing registry/current-runtime contract tests.
+    # This historical bundle's installed image can have a reviewed successor.
+    # Use synthetic pre/post images to test matching in shallow CI without
+    # incorrectly treating today's checkout as the historical target image.
+    # Real registry/current-runtime pins are checked independently.
+    target = {m["path"]: b"new\n" for m in transition["members"]}
     before = {m["path"]: b"old\n" if m["before_sha256"] else None for m in transition["members"]}
     for member in transition["members"]:
         raw = before[member["path"]]
         member["before_sha256"] = update.sha256(raw) if raw else None
+        member["after_sha256"] = update.sha256(target[member["path"]])
     monkeypatch.setattr(update, "reviewed_transitions", lambda: [transition])
     if damage == "changed_target":
         target["scripts/run_export_authority.py"] += b"\n# unreviewed\n"

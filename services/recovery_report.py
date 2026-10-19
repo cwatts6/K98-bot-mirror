@@ -40,6 +40,8 @@ def _next_step(row, evidence, actions, blocked):
         and evidence.get("outcome") == "running"
     ):
         return "The approved group is running. Use Recheck to follow verified, pending and changed counts. Do not submit another decision for pending members; review any exceptions when the group finishes."
+    if row["SourceKind"] == "player_report" and "complete_cache_only" in actions and not blocked:
+        return "The bot will verify the original cache-only intent and close this capture automatically. Use Recheck to follow verification; no spreadsheet export is requested."
     if actions and not blocked:
         return (
             "Open this incident in the recovery centre; review the checks and confirm the repair."

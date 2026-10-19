@@ -61,19 +61,36 @@ def player_report_intent(function):
     return atomic_producer_intent("player_stats_report")(function)
 
 
-def atomic_producer_intent(kind):
+def player_cache_intent(function):
+    """Record cache-only versus pipeline output intent before writer admission."""
+    return atomic_producer_intent("player_stats_report", cache_refresh=True)(function)
+
+
+def atomic_producer_intent(kind, *, cache_refresh=False):
     if kind not in {"player_stats_report", "configuration_import"}:
         raise ValueError("Unsupported atomic producer.")
 
     def decorate(function):
         @wraps(function)
         def run(*args, **kwargs):
+            disposition = None
+            if cache_refresh:
+                from services.legacy_export_snapshot_service import producer_captures_requested
+
+                disposition = (
+                    "pipeline_export_v1" if producer_captures_requested() else "cache_only_v1"
+                )
             current = _intent.get()
             if current is not None:
                 if current.get("kind") != kind or current.get("atomic_checkpoint") != 1:
                     raise SourceConflict("Execution cannot inherit a different producer intent.")
+                if disposition and current.get("export_disposition") != disposition:
+                    raise SourceConflict("Execution cannot change its original export intent.")
                 return function(*args, **kwargs)
-            token = _intent.set(dict(kind=kind, atomic_checkpoint=1, operation=str(uuid4())))
+            value = dict(kind=kind, atomic_checkpoint=1, operation=str(uuid4()))
+            if disposition:
+                value["export_disposition"] = disposition
+            token = _intent.set(value)
             try:
                 return function(*args, **kwargs)
             finally:

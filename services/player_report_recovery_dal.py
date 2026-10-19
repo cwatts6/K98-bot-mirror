@@ -17,7 +17,16 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
 
     @classmethod
     def producer_fields(cls, producer):
-        return {"kind", "atomic_checkpoint", "operation"}
+        fields = {"kind", "atomic_checkpoint", "operation"}
+        if "export_disposition" in producer:
+            if (
+                cls.producer_kind != "player_stats_report"
+                or type(producer["export_disposition"]) is not str
+                or producer["export_disposition"] not in {"cache_only_v1", "pipeline_export_v1"}
+            ):
+                raise SourceConflict("The original report export intent is invalid.")
+            fields |= {"export_disposition"}
+        return fields
 
     @classmethod
     def request(cls, prep):
