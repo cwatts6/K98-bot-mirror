@@ -135,6 +135,7 @@ def recovery_service():
                 account=runtime.account,
                 storage_owner=runtime.store.storage_owner,
                 queue_dal=queued.dal,
+                continuation=read_continuation,
             )
             adapters[read_adapter.kind] = read_adapter
         yield RecoveryService(
