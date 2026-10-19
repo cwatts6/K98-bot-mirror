@@ -190,6 +190,51 @@
           "after_sha256": "a902c2b717a3a79ceac5fd7fa9b50bba4a5b7708eb32ecc817e62ec2c8c75db1"
         }
       ]
+    },
+    {
+      "id": "cache_only_completion_v1",
+      "members": [
+        {
+          "path": "player_stats_cache.py",
+          "before_sha256": "39b8d0dcc86520d265eb50acf54c22cbaf636755b40347da85170877607c2ab1",
+          "after_sha256": "72b2a778eca0c50d1cb5e95e19f33409c8034401806623781b9ed1f497c51156"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "f37c7d482c9bc5beba376c3136b88f6b77660e62b4cf8c8b1953960bd77ab97d",
+          "after_sha256": "b4b21a1e63374a5465dc5ac865b6338aa7594945e2963e601d6b17e68b72fdcc"
+        },
+        {
+          "path": "services/player_report_recovery_dal.py",
+          "before_sha256": "489d228eb00ca99b8118d51e1d4ccb558242ab48ac48de73b2d79426a9f8ae48",
+          "after_sha256": "69c388cb56868f4ba0e16641440511e6185da81d23cf84275ce3e0978e7ff6d3"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "5c01ed30bb58b8b7a6916c639b4f4f9c19e6536babe56b8b551313eba5f6333c",
+          "after_sha256": "2a63b98f20dfcab8bd0e3db717963ec96002d4f47f22089cd50dc00aff1caafd"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "af846a4a47455a468e7d7929bde4acb613da813c6563a0895cc7537ded1fcbbd",
+          "after_sha256": "bff562c62d4c2ad9a0745daba5a8406093b082391d12899cdfde4ee0f45e6d4b"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "a902c2b717a3a79ceac5fd7fa9b50bba4a5b7708eb32ecc817e62ec2c8c75db1",
+          "after_sha256": "62074fa62d0240c368f651ff97c78a96e30c25745734abd86eb53363bc6b8c1a"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "7c097990952c52696133ea8e1040f3721d7322ad9946e1c67431ea5f535bcbfc",
+          "after_sha256": "654801e38dac0a4195d6cb64ea41af13bdf57474ff5df233f85294b0a1a817f8"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "9285eb24700c3f704189f3a6a872330f727f02673609e07ad853881c1cc71d7a",
+          "after_sha256": "04063844585b1103d053a002933a9046a471c99f57a76e5e35594218af298d56"
+        }
+      ]
     }
   ]
 }

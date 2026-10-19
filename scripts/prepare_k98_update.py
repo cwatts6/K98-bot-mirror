@@ -72,6 +72,19 @@ FAILED_EXPORT_TRANSITION_PATHS = frozenset(
     }
 )
 
+CACHE_ONLY_TRANSITION_PATHS = frozenset(
+    {
+        "player_stats_cache.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/player_report_recovery_dal.py",
+        "services/player_report_recovery_service.py",
+        "services/producer_recovery_intent.py",
+        "services/recovery_release_policy.py",
+        "services/recovery_report.py",
+        "services/recovery_service.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -102,8 +115,11 @@ def reviewed_transitions():
             fixed_closeout = (
                 item["id"] == "failed_export_closeout_v1" and path in FAILED_EXPORT_TRANSITION_PATHS
             )
+            fixed_cache = (
+                item["id"] == "cache_only_completion_v1" and path in CACHE_ONLY_TRANSITION_PATHS
+            )
             if (
-                not (path.startswith("services/export_") or fixed_closeout)
+                not (path.startswith("services/export_") or fixed_closeout or fixed_cache)
                 or not path.endswith(".py")
                 or path in paths
             ):
@@ -117,6 +133,8 @@ def reviewed_transitions():
                     raise ValueError("Exact reviewed protocol hashes required.")
         if item["id"] == "failed_export_closeout_v1" and paths != FAILED_EXPORT_TRANSITION_PATHS:
             raise ValueError("Complete fixed failed-export transition required.")
+        if item["id"] == "cache_only_completion_v1" and paths != CACHE_ONLY_TRANSITION_PATHS:
+            raise ValueError("Complete fixed cache-only transition required.")
     return value["transitions"]
 
 
