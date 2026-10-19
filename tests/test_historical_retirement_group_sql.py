@@ -141,8 +141,10 @@ async def test_group_selection_confirmation_restart_and_complete_report(
     saved = next(x for x in rows if x["source_kind"] == "historical_batch")
     assert saved["diagnosis"]["members"][0]["id"] == incidents[0]["IncidentID"]
     assert saved["diagnosis"]["verified_count"] == 1
-    with pytest.raises(SourceConflict):
-        service.approve_historical_group(ACTOR, confirm.group, confirm.selected)
+    repeated = service.approve_historical_group(ACTOR, confirm.group, confirm.selected)
+    assert repeated["IncidentID"] == group["IncidentID"]
+    assert repeated["State"] == "resolved"
+    assert not store.pending_actions(incidents[0]["IncidentID"])
 
 
 def test_changed_member_after_approval_does_not_block_other_retirements(historical, store):
@@ -223,14 +225,50 @@ def test_lost_group_reply_resumes_saved_approvals_without_duplicate(historical, 
         raise TimeoutError("lost group commit acknowledgement")
 
     monkeypatch.setattr(HistoricalRetirementGroupDAL, "approve_selected", lost)
-    with pytest.raises(TimeoutError):
-        service.approve_historical_group(ACTOR, group, [incidents[0]["IncidentID"]])
+    accepted = service.approve_historical_group(ACTOR, group, [incidents[0]["IncidentID"]])
     restarted, _ = setup(historical, store, [])
     assert not restarted.review_historical_groups(ACTOR)["groups"]
     pending = HistoricalRetirementGroupDAL(store).pending_groups()
     assert len(pending) == 1
+    assert pending == [accepted["IncidentID"]]
+    repeated = restarted.approve_historical_group(ACTOR, group, [incidents[0]["IncidentID"]])
+    assert repeated["IncidentID"] == accepted["IncidentID"]
     assert restarted.refresh(incidents[0]["IncidentID"])["State"] == "resolved"
     assert restarted.refresh(pending[0])["evidence"]["verified_count"] == 1
+
+
+def test_repeated_selection_matches_only_exact_actor_members_and_configuration(historical, store):
+    from copy import deepcopy
+
+    other = clone_capture(historical)
+    service, incidents = setup(historical, store, [historical.source, other])
+    group = service.review_historical_groups(ACTOR)["groups"][0]
+    selected = [r["IncidentID"] for r in incidents]
+    accepted = service.approve_historical_group(ACTOR, group, selected)
+    repeated = service.approve_historical_group(ACTOR, group, list(reversed(selected)))
+    assert repeated["IncidentID"] == accepted["IncidentID"]
+    dal = HistoricalRetirementGroupDAL(store)
+    assert dal.existing_approval(group, group["members"], "discord:9") is None
+    assert dal.existing_approval(group, group["members"][:1], "discord:1") is None
+    changed = deepcopy(group)
+    changed["configuration"]["current"] = "a" * 64
+    assert dal.existing_approval(changed, changed["members"], "discord:1") is None
+    changed = deepcopy(group)
+    changed["members"][0]["token"] = "b" * 64
+    assert dal.existing_approval(changed, changed["members"], "discord:1") is None
+    with pytest.raises(SourceConflict):
+        service.approve_historical_group(RecoveryActor(9, 2, 3), group, selected)
+    assert len(dal.pending_groups()) == 1
+
+
+def test_duplicate_atomic_approval_returns_original_without_new_intents(historical, store):
+    service, _ = setup(historical, store, [historical.source])
+    group = service.review_historical_groups(ACTOR)["groups"][0]
+    dal = HistoricalRetirementGroupDAL(store)
+    first = dal.approve_selected(group, group["members"], "discord:1")
+    assert dal.approve_selected(group, group["members"], "discord:1") == first
+    assert dal.pending_groups() == [first]
+    assert len(store.pending_actions(group["members"][0]["id"])) == 1
 
 
 def test_batch_pagination_and_maximum_group_fit_existing_sql_contract(historical, store):
