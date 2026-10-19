@@ -117,6 +117,15 @@ MONITOR_ADMISSION_TRANSITION_PATHS = frozenset(
 )
 
 
+REPLACEMENT_WORKFLOW_TRANSITION_PATHS = frozenset(
+    {
+        "services/export_failure_diagnostics.py",
+        "services/export_replacement_recovery_adapter.py",
+        "services/recovery_release_policy.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -157,6 +166,10 @@ def reviewed_transitions():
                 item["id"] == "monitor_admission_closeout_v1"
                 and path in MONITOR_ADMISSION_TRANSITION_PATHS
             )
+            fixed_replacement = (
+                item["id"] == "guided_replacement_release_v1"
+                and path in REPLACEMENT_WORKFLOW_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -164,6 +177,7 @@ def reviewed_transitions():
                     or fixed_cache
                     or fixed_configuration
                     or fixed_monitor
+                    or fixed_replacement
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -190,6 +204,11 @@ def reviewed_transitions():
             and paths != MONITOR_ADMISSION_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed monitor/admission transition required.")
+        if (
+            item["id"] == "guided_replacement_release_v1"
+            and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed replacement workflow transition required.")
     return value["transitions"]
 
 

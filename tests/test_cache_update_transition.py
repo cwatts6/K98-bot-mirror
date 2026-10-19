@@ -20,7 +20,12 @@ def test_cache_transition_pins_every_runtime_member():
             (
                 m["after_sha256"]
                 for t in reversed(updater.reviewed_transitions())
-                if t["id"] in {"configuration_only_completion_v1", "monitor_admission_closeout_v1"}
+                if t["id"]
+                in {
+                    "configuration_only_completion_v1",
+                    "monitor_admission_closeout_v1",
+                    "guided_replacement_release_v1",
+                }
                 for m in t["members"]
                 if m["path"] == member["path"]
             ),

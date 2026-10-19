@@ -63,6 +63,24 @@ def test_pilot_allows_verified_rollback_settlement():
     assert len(dal.calls) == 1
 
 
+def test_partially_released_export_explains_available_and_withheld_choices():
+    row = dict(
+        SourceKind="export_job",
+        State="open",
+        evidence=dict(
+            actions={
+                "isolate_targets": {"label": "Retire affected outputs"},
+                "verify_publication": {"label": "Verify publication"},
+            }
+        ),
+    )
+    current = p0a_presentation(row)
+    assert set(current["evidence"]["actions"]) == {"isolate_targets"}
+    assert "buttons shown here are available" in current["release_notice"]
+    assert "Additional repairs" in current["release_notice"]
+    assert set(row["evidence"]["actions"]) == {"isolate_targets", "verify_publication"}
+
+
 def withheld(kind="export_rollover"):
     store = Store()
     evidence = dict(

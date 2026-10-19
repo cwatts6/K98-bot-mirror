@@ -3,6 +3,7 @@
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.export_failure_diagnostics import replacement_decision_context
 from services.export_recovery_service import job_token, skipped_export_verified
 from services.export_replacement_delivery import ReplacementDelivery
 from services.export_replacement_delivery_dal import ReplacementDeliveryDAL
@@ -53,6 +54,9 @@ class ReplacementRecoveryAdapter:
             snapshot["job"]["State"] in {"running", "uncertain"} and snapshot["streams"]
         ):
             result = self.client.replacement_recovery(job_id, "inspect")
+            result["evidence"]["failure_context"] = replacement_decision_context(
+                snapshot["job"], self.runtime.registration.value()
+            )
             original, _, _ = self.base.inspect(job_id)
             for action in ("verify_publication", "skip_unstarted"):
                 if (

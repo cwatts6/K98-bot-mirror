@@ -35,6 +35,7 @@ def adapter():
         False,
     )
     runtime = RuntimeLifetime(object())
+    runtime.registration = SimpleNamespace(value=lambda: {"legacy_configuration": {}})
     runtime.client = Mock()
     runtime.client.replacement_recovery.side_effect = lambda *_args, **_kw: dict(
         evidence=dict(actions=dict(isolate_targets=dict(label="Retire"))),

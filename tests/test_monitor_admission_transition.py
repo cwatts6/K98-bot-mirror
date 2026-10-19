@@ -19,8 +19,8 @@ def test_monitor_admission_transition_pins_every_runtime_member():
         assert updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == next(
             (
                 m["after_sha256"]
-                for t in updater.reviewed_transitions()
-                if t["id"] == "monitor_admission_closeout_v1"
+                for t in reversed(updater.reviewed_transitions())
+                if t["id"] in {"monitor_admission_closeout_v1", "guided_replacement_release_v1"}
                 for m in t["members"]
                 if m["path"] == member["path"]
             ),

@@ -147,3 +147,45 @@ def recovery_failure_context(job, provenance):
         latest=latest,
         summary=f"The original failure occurred while {stage} ({types}). SQL codes and code locations are included in the complete report. These facts identify where it failed; they do not by themselves prove the cause or its correction.",
     )
+
+
+def replacement_decision_context(job, registration):
+    """Bounded job-linked facts for an admin decision; never infer an old fault."""
+    import json
+
+    from services.legacy_export_snapshot_service import configuration_digest
+
+    provenance = json.loads(job["ProvenanceJson"])
+    context = recovery_failure_context(job, provenance)
+    producer = provenance.get("producer")
+    filename = producer.get("completed_filename") if isinstance(producer, dict) else None
+    filename = (
+        filename
+        if isinstance(filename, str) and re.fullmatch(r"stats_[0-9a-f]{32}\.ready\.csv", filename)
+        else "not recorded"
+    )
+    created = job.get("CreatedUTC")
+    created = created.isoformat(sep=" ") if isinstance(created, datetime) else "not recorded"
+    original = provenance.get("registration_sha256")
+    original = (
+        original if isinstance(original, str) and re.fullmatch(r"[0-9a-f]{64}", original) else None
+    )
+    current = registration.get("legacy_configuration", {}).get(job["ConsumerKind"])
+    current_hash = configuration_digest(current) if isinstance(current, dict) else None
+    comparison = (
+        "matches current"
+        if original and original == current_hash
+        else "differs from current" if original and current_hash else "comparison unavailable"
+    )
+    context.update(
+        original_created_utc=created,
+        input_file=filename,
+        original_registration_sha256=original,
+        current_registration_sha256=current_hash,
+        configuration_comparison=comparison,
+    )
+    context["summary"] = (
+        f"Created: {created} (UTC). Input: {filename}. Configuration: {comparison}. "
+        + context["summary"]
+    )
+    return context

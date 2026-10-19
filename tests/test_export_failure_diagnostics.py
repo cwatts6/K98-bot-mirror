@@ -6,6 +6,7 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 import pyodbc
+import pytest
 
 from services.export_coordination_service import ExportCoordinator
 from services.export_failure_diagnostics import failure_record
@@ -78,3 +79,60 @@ def test_historical_failure_is_not_invented_or_treated_as_corrected():
     context = recovery_failure_context(dict(JobID=str(uuid4())), {})
     assert context["original_fault"] == "not_recorded"
     assert "does not identify" in context["summary"]
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_replacement_decision_identifies_saved_input_and_configuration_without_inventing_fault(
+    changed,
+):
+    from datetime import datetime
+    import json
+
+    from services.export_failure_diagnostics import replacement_decision_context
+    from services.legacy_export_snapshot_service import configuration_digest
+
+    original = {"consumer": "scan_data", "destinations": ["original"]}
+    current = {**original, "destinations": ["new"]} if changed else original
+    filename = "stats_" + "a" * 32 + ".ready.csv"
+    job = dict(
+        JobID=str(uuid4()),
+        ConsumerKind="scan_data",
+        CreatedUTC=datetime(2026, 10, 19),
+        ProvenanceJson=json.dumps(
+            dict(
+                producer=dict(completed_filename=filename),
+                registration_sha256=configuration_digest(original),
+            )
+        ),
+    )
+    context = replacement_decision_context(job, {"legacy_configuration": {"scan_data": current}})
+    assert context["input_file"] == filename
+    assert context["original_created_utc"] == "2026-10-19 00:00:00"
+    assert context["configuration_comparison"] == (
+        "differs from current" if changed else "matches current"
+    )
+    assert context["original_fault"] == "not_recorded"
+    assert "does not identify" in context["summary"]
+
+
+def test_replacement_summary_does_not_expose_unvalidated_names_or_configuration_values():
+    import json
+
+    from services.export_failure_diagnostics import replacement_decision_context
+
+    job = dict(
+        JobID=str(uuid4()),
+        ConsumerKind="scan_data",
+        CreatedUTC="untrusted-secret-date",
+        ProvenanceJson=json.dumps(
+            dict(
+                producer=dict(completed_filename="C:/private/secret.csv"),
+                registration_sha256="secret-config",
+                first_failure={"raw": "secret-fault"},
+            )
+        ),
+    )
+    context = replacement_decision_context(job, {"legacy_configuration": {}})
+    assert context["input_file"] == "not recorded"
+    assert context["configuration_comparison"] == "comparison unavailable"
+    assert "secret" not in json.dumps(context)

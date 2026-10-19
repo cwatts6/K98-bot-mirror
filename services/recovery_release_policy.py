@@ -21,7 +21,20 @@ P0A_ACTIONS = MappingProxyType(
             }
         ),
         "all_kvk_capture": frozenset({"resume_capture", "queue_capture", "abandon_capture"}),
-        "export_job": frozenset({"retry_unstarted", "skip_unstarted", "retire_failed_export"}),
+        "export_job": frozenset(
+            {
+                "retry_unstarted",
+                "skip_unstarted",
+                "retire_failed_export",
+                "isolate_targets",
+                "choose_replacements",
+                "verify_replacements",
+                "finish_replacement_check",
+                "discard_replacement_check",
+                "activate_replacements",
+                "publish_replacement",
+            }
+        ),
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(
@@ -73,6 +86,12 @@ def p0a_presentation(row):
             "Its evidence and access protection are retained. Recheck updates the diagnosis; "
             "it does not unlock a repair that this release cannot perform."
         )
+        if evidence["actions"]:
+            result["release_notice"] = (
+                "The repair buttons shown here are available after their displayed checks. "
+                "Additional repairs for this incident remain required P0b work and are not "
+                "enabled yet. Recheck refreshes the diagnosis; it does not enable those repairs."
+            )
         if row.get("pending_action"):
             result["release_notice"] += (
                 " The previously accepted repair will still be reconciled and verified; "

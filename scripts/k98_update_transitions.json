@@ -345,6 +345,26 @@
           "after_sha256": "fb607bb6e11fe6255bcc9bdb03a3c2098c38aa488ccdc0ee6f8f35b7eae83923"
         }
       ]
+    },
+    {
+      "id": "guided_replacement_release_v1",
+      "members": [
+        {
+          "path": "services/export_failure_diagnostics.py",
+          "before_sha256": "a87544310865543c3fa3961ce4bd899c61dc5cb1ec47bbc6b8312fc81742cb52",
+          "after_sha256": "e9d4d44a37f4c7a0411c77c7a03ace1a9cb8bd72114b7384cb83b57a55b37dec"
+        },
+        {
+          "path": "services/export_replacement_recovery_adapter.py",
+          "before_sha256": "9e98681bf71ac5466702db02857180b97a830616917ae76a3a056649b74cdd9d",
+          "after_sha256": "45666a1da52ab472ea1558171379b4f623c00495dc2538ff7e139292951c77b5"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "b90f3f9292c371958e4aaa7dd9222ed59671b74cff0364a67ebac5d527385cc8",
+          "after_sha256": "375165520d91648b30a0dca579a67a6481a0f3a300dc0d12a2db8a71a1d97138"
+        }
+      ]
     }
   ]
 }

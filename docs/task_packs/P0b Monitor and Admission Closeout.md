@@ -64,6 +64,10 @@ package; an old recovery adapter must not reinterpret a cancellation as a refusa
 
 ## Required remaining P0b work
 
+The current finite completion checklist and original P1 boundary are in
+[P0 Final Recovery Acceptance](P0%20Final%20Recovery%20Acceptance.md). The cleared
+production backlog does not close those workflow and acceptance requirements.
+
 These remain mandatory delivery/acceptance work, not deferred optimisations:
 
 - Genuine configuration/ownership conflicts: show original and installed membership,
