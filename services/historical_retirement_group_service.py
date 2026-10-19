@@ -60,8 +60,7 @@ def review_groups(service, actor, after=None):
     return dict(groups=list(groups.values()), next_after=ids[-1] if len(ids) == 25 else None)
 
 
-def verify_members(service, actor, group, selected=None):
-    historical = _adapter(service, actor)
+def selected_members(group, selected=None):
     members = group["members"]
     if not 1 <= len(members) <= 25 or len({m["id"] for m in members}) != len(members):
         raise SourceConflict("Reopen a current historical review group.")
@@ -72,10 +71,13 @@ def verify_members(service, actor, group, selected=None):
         or not set(chosen) <= {m["id"] for m in members}
     ):
         raise SourceConflict("Select only distinct exports from this review group.")
+    return [m for m in members if m["id"] in chosen]
+
+
+def verify_members(service, actor, group, selected=None):
+    historical = _adapter(service, actor)
     reviewed = []
-    for member in members:
-        if member["id"] not in chosen:
-            continue
+    for member in selected_members(group, selected):
         row = service.refresh(member["id"])
         if (
             not _eligible(row)
@@ -98,12 +100,22 @@ def review_group(service, actor, group, selected=None):
 
 
 def approve_group(service, actor, group, selected):
-    _, reviewed = verify_members(service, actor, group, selected)
-    identifier = HistoricalRetirementGroupDAL(service.store).approve_selected(
-        group,
-        [m for m, _ in reviewed],
-        f"discord:{actor.user_id}",
-    )
+    _adapter(service, actor)
+    members = selected_members(group, selected)
+    dal = HistoricalRetirementGroupDAL(service.store)
+    author = f"discord:{actor.user_id}"
+    identifier = dal.existing_approval(group, members, author)
+    if identifier:
+        return service.review(actor, identifier)
+    try:
+        _, reviewed = verify_members(service, actor, group, selected)
+        identifier = dal.approve_selected(group, [m for m, _ in reviewed], author)
+    except Exception:
+        # A concurrent confirmation or a lost commit reply may already have
+        # saved this exact decision. Read it back; never redispatch its members.
+        identifier = dal.existing_approval(group, members, author)
+        if identifier is None:
+            raise
     return service.review(actor, identifier)
 
 

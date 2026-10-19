@@ -13,6 +13,33 @@ class HistoricalRetirementGroupDAL(RecoveryBacklogDAL):
     def __init__(self, store):
         super().__init__(store, group_kind="historical_batch")
 
+    @staticmethod
+    def selection_key(preview, members, actor):
+        return digest(
+            dict(
+                actor=actor,
+                configuration=preview["configuration"],
+                members=sorted(members, key=lambda m: m["id"]),
+            )
+        ).hex()
+
+    def _existing(self, cursor, selection_key):
+        cursor.execute(
+            "SELECT IncidentID FROM dbo.RecoveryIncident WHERE ScopeKey=? "
+            "AND SourceKind='historical_batch' "
+            "AND JSON_VALUE(EvidenceJson,'$.selection_key')=?",
+            self.store.scope,
+            selection_key,
+        )
+        found = rows(cursor)
+        if len(found) > 1:
+            raise SourceConflict("The saved group approval is ambiguous; retain it for review.")
+        return identity(found[0]["IncidentID"]) if found else None
+
+    def existing_approval(self, preview, members, actor):
+        with transaction(self.store.connect) as cursor:
+            return self._existing(cursor, self.selection_key(preview, members, actor))
+
     def candidates(self, after=None):
         with transaction(self.store.connect) as cursor:
             boundary = self.store._get(cursor, after) if after else None
@@ -42,6 +69,7 @@ class HistoricalRetirementGroupDAL(RecoveryBacklogDAL):
         if not 1 <= len(members) <= 25 or len({m["id"] for m in members}) != len(members):
             raise SourceConflict("Select between one and 25 distinct historical exports.")
         group = str(uuid4())
+        selection_key = self.selection_key(preview, members, actor)
         with transaction(self.store.connect) as cursor:
             cursor.execute(
                 "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,@LockMode='Exclusive',"
@@ -52,6 +80,9 @@ class HistoricalRetirementGroupDAL(RecoveryBacklogDAL):
                 raise SourceConflict(
                     "Another historical approval is in progress. Reopen the group."
                 )
+            existing = self._existing(cursor, selection_key)
+            if existing:
+                return existing
             for member in sorted(members, key=lambda m: m["id"]):
                 row = self.store._get(cursor, member["id"], lock=True)
                 if (
@@ -76,6 +107,7 @@ class HistoricalRetirementGroupDAL(RecoveryBacklogDAL):
                         "A selected export already has a decision. Reopen the group."
                     )
             evidence = dict(
+                selection_key=selection_key,
                 title="Grouped historical retirement",
                 actions={},
                 outcome="queued",
