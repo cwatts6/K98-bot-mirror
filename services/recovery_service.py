@@ -167,11 +167,15 @@ class RecoveryService:
         )
 
     def recover_automatic(self, incident_id):
-        """Only the explicitly approved verified read release may run automatically."""
+        """Only named evidence-bound read release and original cache-only intent."""
         row = self.refresh(incident_id)
         action = getattr(self.adapters[row["SourceKind"]], "automatic_action", None)
         if (
-            (row["SourceKind"], action) != ("configuration_read", "release_read")
+            (row["SourceKind"], action)
+            not in {
+                ("configuration_read", "release_read"),
+                ("player_report", "complete_cache_only"),
+            }
             or row["State"] == "resolved"
             or action not in row["evidence"]["actions"]
         ):

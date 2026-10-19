@@ -6,7 +6,7 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.all_kvk_capture_recovery_service import AllKvkCaptureRecoveryAdapter
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 from services.import_capture_recovery_service import ImportCaptureRecovery
-from services.legacy_export_snapshot_service import configuration_digest
+from services.legacy_export_snapshot_service import SnapshotUnavailable, configuration_digest
 from services.player_report_recovery_dal import PlayerReportRecoveryDAL
 
 
@@ -38,6 +38,8 @@ class PlayerReportCaptureRecovery(ImportCaptureRecovery):
 
 
 class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
+    automatic_action = "complete_cache_only"
+    automatic_reason = "Original cache-only intent and committed retained output verified"
     cancel_action = "cancel_report"
     closure_key = "report_cancelled"
     open_outcome = "report_not_committed"
@@ -46,10 +48,68 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
     title = "Player-stat report recovery"
     output_name = "player-stat report"
 
+    def _cache_only(self, preview):
+        if self.kind != "player_report":
+            return False
+        request = self.dal.request(preview["preparation"])
+        return request["request"]["producer"].get("export_disposition") == "cache_only_v1"
+
+    def _verify_cache_only(self, source_id, preview):
+        prep = preview["preparation"]
+        if (
+            not self._cache_only(preview)
+            or preview["action"] != "queue_capture"
+            or preview.get("resources")
+            or not preview["captured"]
+            or prep["JobID"]
+        ):
+            raise SourceConflict("Exact unqueued cache-only output is required.")
+        self.capture_recovery.generation(prep, preview["execution"])
+        self.capture_recovery.runtime.verified_snapshot(source_id)
+
     def inspect(self, source_id):
         preview = self.dal.inspect(source_id)
         if preview["action"] not in {self.cancel_action, "cancelled"}:
-            return super().inspect(source_id)
+            evidence, token, resolved = super().inspect(source_id)
+            try:
+                cache_only = self._cache_only(preview)
+                if cache_only and resolved and evidence["outcome"] == "export_skipped":
+                    evidence["outcome"] = "cache_only_completed"
+                    evidence["explanation"] = (
+                        "This invocation requested a local cache refresh, not a spreadsheet export. "
+                        "Its committed SQL output and captured evidence are preserved; "
+                        "the recorded no-export disposition is verified. Cache freshness and "
+                        "spreadsheet delivery are separate checks."
+                    )
+                    evidence["failure_context"]["summary"] = evidence["explanation"]
+                elif cache_only and not resolved:
+                    self._verify_cache_only(source_id, preview)
+                    evidence["actions"] = {
+                        self.automatic_action: dict(
+                            label="Verify cache-only completion",
+                            check="The original request explicitly required no spreadsheet export. Verify and close this retained capture.",
+                            effect="Recheck original intent, committed output, exact ownership and absence of provider execution; preserve SQL and captured bytes, record and verify no-export completion. No report or provider write is replayed.",
+                        )
+                    }
+                    evidence["explanation"] = (
+                        "This cache-only refresh needs no export decision. Automatic verification is pending."
+                    )
+                    evidence["failure_context"].update(
+                        summary=evidence["explanation"],
+                        current_blocker="cache_only_verification_pending",
+                    )
+            except (
+                SourceConflict,
+                SnapshotUnavailable,
+                ValueError,
+                KeyError,
+                TypeError,
+                OSError,
+            ) as exc:
+                # Missing or changed evidence keeps the existing guided actions;
+                # never infer a cache-only decision for historical requests.
+                evidence["failure_context"]["automatic_completion_check"] = type(exc).__name__
+            return evidence, token, resolved
         closed = preview["action"] == "cancelled"
         return (
             dict(
@@ -77,11 +137,31 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
         )
 
     def execute(self, source_id, action, token, actor, reason):
+        if action == self.automatic_action:
+            preview = self.dal.inspect(source_id)
+            if preview["token"] != token:
+                raise SourceConflict("Cache-only evidence changed; recheck the incident.")
+            self._verify_cache_only(source_id, preview)
+            return self.capture_recovery.abandon(source_id, token, actor, reason)
         if action == self.cancel_action:
             return self.dal.cancel(source_id, token, actor, reason)
         return super().execute(source_id, action, token, actor, reason)
 
     def reconcile(self, source_id, action):
+        if action["ActionKind"] == self.automatic_action:
+            preview = self.dal.inspect(source_id)
+            if not self._cache_only(preview):
+                return "not_applied"
+            if preview["token"] == action["EvidenceHash"]:
+                self.execute(
+                    source_id,
+                    self.automatic_action,
+                    action["EvidenceHash"],
+                    f"recovery:{action['ActionID']}",
+                    action["Reason"],
+                )
+            # Reuse the durable exact-action abandonment receipt for lost replies.
+            return super().reconcile(source_id, dict(action, ActionKind="abandon_capture"))
         if action["ActionKind"] != self.cancel_action:
             return super().reconcile(source_id, action)
         preview = self.dal.inspect(source_id)

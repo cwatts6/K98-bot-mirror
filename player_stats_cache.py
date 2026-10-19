@@ -19,7 +19,7 @@ from services.legacy_export_snapshot_service import (
     current_owner,
     record_writer_completion,
 )
-from services.producer_recovery_intent import player_report_intent
+from services.producer_recovery_intent import player_cache_intent
 
 logger = logging.getLogger(__name__)
 
@@ -438,7 +438,7 @@ def _validate_last_refresh(value: str) -> str:
     return parsed.isoformat()
 
 
-@player_report_intent
+@player_cache_intent
 @admitted_writer("scan_data")
 def _execute_sp_with_retries(
     cn: pyodbc.Connection,

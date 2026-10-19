@@ -12,7 +12,13 @@ P0A_ACTIONS = MappingProxyType(
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued", "close_withdrawn_read"}),
         "player_report": frozenset(
-            {"cancel_report", "resume_capture", "queue_capture", "abandon_capture"}
+            {
+                "cancel_report",
+                "resume_capture",
+                "queue_capture",
+                "abandon_capture",
+                "complete_cache_only",
+            }
         ),
         "all_kvk_capture": frozenset({"resume_capture", "queue_capture", "abandon_capture"}),
         "export_job": frozenset({"retry_unstarted", "skip_unstarted", "retire_failed_export"}),

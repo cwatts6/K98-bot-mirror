@@ -505,6 +505,11 @@ def admitted_writer(kind):
     return decorate
 
 
+def producer_captures_requested():
+    """The active processing pipeline explicitly collects output for export."""
+    return _captures.get() is not None
+
+
 def collect_producer_captures(function):
     @wraps(function)
     async def run(*args, **kwargs):

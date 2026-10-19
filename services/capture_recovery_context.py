@@ -35,7 +35,14 @@ def capture_context(prep, execution, recovery, *, resolved=False):
         or re.fullmatch(r"(?:dbo|KVK)\.[A-Za-z_][A-Za-z0-9_]{0,100}", saved_procedure)
     )
     created = prep.get("CreatedUTC")
+    intent = inner.get("producer", {}) if isinstance(inner, dict) else {}
+    disposition = intent.get("export_disposition") if isinstance(intent, dict) else None
     context = dict(
+        original_export_intent=(
+            disposition
+            if type(disposition) is str and disposition in {"cache_only_v1", "pipeline_export_v1"}
+            else "not_recorded"
+        ),
         original_created_utc=created.isoformat(sep=" ") if isinstance(created, datetime) else None,
         producer_procedure=saved_procedure if procedure_known else None,
         original_configuration_sha256=(
