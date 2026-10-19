@@ -79,6 +79,11 @@ def add_linked_views(recovery, continuation, service):
 
 
 def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(recovery, store):
+    import io
+    import zipfile
+
+    from services.recovery_report import incident_report
+
     source, continuation, service = setup(recovery)
     service.store = store
     queue, read, client = add_linked_views(recovery, continuation, service)
@@ -98,6 +103,14 @@ def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(reco
     for row in aliases:
         final = service.refresh(row["IncidentID"])
         assert final["State"] == "resolved" and not final["evidence"]["actions"]
+        report = incident_report(service, final)
+        assert not report["diagnosis"].get("recovery_links")
+        assert report["next_step"] == "Resolved; no repair required."
+    archive = service.download_complete_report(ACTOR)
+    with zipfile.ZipFile(io.BytesIO(archive["content"])) as exported:
+        summary = json.loads(exported.read("summary.json"))
+        assert summary["linked_recovery"] == []
+        assert summary["required_repairs"] == []
     evidence, _, resolved = read.inspect(source)
     assert resolved and evidence["outcome"] == "prior_configuration_retained"
     assert evidence["failure_context"]["original_read_id"] == source
@@ -340,6 +353,11 @@ def test_fresh_publication_and_capture_are_verified_without_replaying(recovery, 
         child, "resume_capture", result[1], "recovery:" + str(uuid4()), "Capture committed output"
     )
     assert service.refresh(row["IncidentID"])["State"] == "resolved"
+    queue, read, client = add_linked_views(r, adapter, service)
+    for linked in (queue, read):
+        evidence, _, resolved = linked.inspect(source)
+        assert resolved and not evidence["recovery_links"]
+    client.inspect_configuration_recovery.assert_not_called()
     run(service, row, "retry_configuration")
     assert calls == [1]
 

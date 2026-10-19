@@ -78,6 +78,10 @@ class QueueAdmissionRecovery:
                 _, domain_token, verified = domain.inspect(link["source_id"])
                 domain_resolved = verified is True
                 domain_proof = dict(link=link, token=domain_token, resolved=domain_resolved)
+                if domain_resolved and link["kind"] == "configuration_read_continuation":
+                    # Preserve the verified handoff in the token, but do not
+                    # advertise a completed decision as a remaining blocker.
+                    links = []
         evidence = dict(
             title="Account queue admission",
             actions=actions,
