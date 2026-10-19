@@ -113,7 +113,6 @@ MONITOR_ADMISSION_TRANSITION_PATHS = frozenset(
         "services/producer_refusal_recovery.py",
         "services/producer_recovery_review.py",
         "services/recovery_release_policy.py",
-        "scripts/verify_k98_update_pair.py",
     }
 )
 

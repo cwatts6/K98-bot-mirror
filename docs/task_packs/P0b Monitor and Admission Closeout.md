@@ -56,8 +56,8 @@ No SQL migration, dependencies, activation flags or runtime configuration change
 Existing ExportPreparation generation JSON and counters and RecoveryIncident
 evidence store the new records. Validate their contracts against the SQL repository.
 Install the matching updater upgrade before deploying the reviewed private-main
-source. The exact eleven-member `monitor_admission_closeout_v1` transition is
-required; arbitrary subsets or hash substitutions are refused. Use the normal
+source. The exact ten-member `monitor_admission_closeout_v1` transition is
+required; the startup verifier separately requires exact installed-tool byte identity. Arbitrary subsets or hash substitutions are refused. Use the normal
 protected updater and one coordinated restart. Keep receipts and the old updater.
 Rollback must preserve cancellation markers and use a reviewed forward-compatible
 package; an old recovery adapter must not reinterpret a cancellation as a refusal.

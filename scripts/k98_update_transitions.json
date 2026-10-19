@@ -305,11 +305,6 @@
           "after_sha256": "9ed5f17a59f643bf7cb6339291d05c73f8c858eae95e5aec64c40f1e2ea0d156"
         },
         {
-          "path": "scripts/verify_k98_update_pair.py",
-          "before_sha256": "ef91502e91464e56e309a5b81bd5c2c862e37b93d55fd587433fa1a704158f40",
-          "after_sha256": "6a7249dadb9fabdd0747d406bd2b071581cbdd8f0874574d9d1e4b27a35334e6"
-        },
-        {
           "path": "services/producer_recovery_review.py",
           "before_sha256": "0275be2171915f060bfb0cda79dcde9ebc8cd0316f045d8e40b639273dabd6e5",
           "after_sha256": "afb3ad204d2842fe61de9e4d78e48b9967de4dfb9f414ae1f99e2f6bae179b55"
