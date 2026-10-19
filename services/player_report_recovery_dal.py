@@ -98,11 +98,19 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
             raise ValueError("Bounded recovery discovery required.")
         with transaction(self.connect) as cursor:
             cursor.execute(
-                "SELECT TOP (?) PreparationID FROM dbo.ExportPreparation "
+                "SELECT TOP (?) PreparationID FROM dbo.ExportPreparation p "
                 "WHERE AccountKey=? AND StorageOwner=? AND ConsumerKind='scan_data' "
                 "AND JSON_VALUE(RequestJson,'$.request.producer.kind')=? "
                 "AND State IN ('pending','preflight','sql_pending','writing','committed','uncertain','captured','unavailable') "
                 "AND JobID IS NULL AND JSON_VALUE(GenerationJson,?) IS NULL "
+                # A completed no-export decision is reconciled through its durable
+                # incident/action. Do not keep rediscovering routine cache history.
+                # Inconsistent state, missing receipt or retained ownership stays visible.
+                "AND NOT (State='unavailable' "
+                "AND JSON_VALUE(GenerationJson,'$.capture_abandoned.actor') IS NOT NULL "
+                "AND JSON_VALUE(GenerationJson,'$.capture_abandoned.token') IS NOT NULL "
+                "AND NOT EXISTS (SELECT 1 FROM dbo.ExportResource r "
+                "WHERE r.ActivePreparationID=p.PreparationID)) "
                 "AND UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
                 "ORDER BY CASE WHEN PreparationID>CAST(? AS uniqueidentifier) THEN 0 ELSE 1 END,PreparationID",
                 limit,

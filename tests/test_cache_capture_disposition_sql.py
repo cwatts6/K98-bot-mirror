@@ -43,6 +43,17 @@ def captured(r, monkeypatch, disposition):
     return enqueue
 
 
+def discover(r):
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET UpdatedUTC=DATEADD(second,-180,SYSUTCDATETIME()) "
+            "WHERE PreparationID=?"
+        ),
+        r.source,
+    )
+    return r.outcomes.pending_recovery()
+
+
 @pytest.mark.parametrize("recovery", ["player_report"], indirect=True)
 @pytest.mark.parametrize("lost_reply", [None, "approval", "closeout"])
 def test_automatic_closeout_survives_restart_and_never_queues(recovery, monkeypatch, lost_reply):
@@ -59,6 +70,7 @@ def test_automatic_closeout_survives_restart_and_never_queues(recovery, monkeypa
         presentation_policy=p0a_presentation,
     )
     row = service.review_source(ACTOR, adapter.kind, r.source)
+    assert r.source in discover(r)
     assert set(row["evidence"]["actions"]) == {"complete_cache_only"}
     from services.recovery_report import incident_report
 
@@ -80,6 +92,10 @@ def test_automatic_closeout_survives_restart_and_never_queues(recovery, monkeypa
         service.recover_automatic(row["IncidentID"])
     except Exception:
         assert lost_reply
+    if lost_reply != "approval":
+        # Even a lost closeout reply must not rediscover completed cache history.
+        # The persisted incident below still reconciles the same saved action.
+        assert r.source not in discover(r)
     restarted = PlayerReportRecoveryAdapter(r.outcomes, type(r.service)(r.runtime, r.outcomes))
     service = RecoveryService(
         store,
@@ -95,9 +111,39 @@ def test_automatic_closeout_survives_restart_and_never_queues(recovery, monkeypa
     assert store.actions[0]["State"] == "verified" and len(store.actions) == 1
     after = r.outcomes.inspect(r.source)
     assert after["preparation"]["JobID"] is None and not after["resources"]
+    assert r.source not in discover(r)
     for field in ("SpoolKey", "SpoolHash", "SpoolBytes", "RequestJson"):
         assert after["preparation"][field] == before[field]
     enqueue.assert_not_called()
+
+
+@pytest.mark.parametrize("recovery", ["player_report"], indirect=True)
+@pytest.mark.parametrize(
+    "state,marker",
+    [
+        ("unavailable", None),
+        ("unavailable", {"actor": "fixture"}),
+        ("unavailable", {"token": "0" * 64}),
+        ("captured", {"actor": "fixture", "token": "0" * 64}),
+    ],
+)
+def test_unavailable_without_complete_closeout_receipt_remains_discoverable(
+    recovery, monkeypatch, state, marker
+):
+    r = recovery
+    captured(r, monkeypatch, "cache_only_v1")
+    generation = json.loads(r.outcomes.inspect(r.source)["preparation"]["GenerationJson"])
+    if marker is not None:
+        generation["capture_abandoned"] = marker
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET State=?,GenerationJson=? " "WHERE PreparationID=?"
+        ),
+        state,
+        json.dumps(generation),
+        r.source,
+    )
+    assert r.source in discover(r)
 
 
 @pytest.mark.parametrize("recovery", ["player_report"], indirect=True)
