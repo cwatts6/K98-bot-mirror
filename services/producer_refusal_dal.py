@@ -168,6 +168,10 @@ class ProducerRefusalDAL:
             phase = "execution_registered"
         else:
             phase = self._original_phase(prep, membership, held)
+            if phase == "cancelled" and any(not unused(a) for a in attempts):
+                raise SourceConflict(
+                    "Cancelled input has an active continuation; investigate its receipt."
+                )
         identity(producer["operation"])
         # Global SQL contention may belong to another registered account. Do not
         # turn it into a link that adopts another account's recovery authority.
@@ -293,7 +297,39 @@ class ProducerRefusalDAL:
             result.update(ActiveOutputOperationID=queued["QueuedID"], OperationAccount=self.account)
         return result
 
-    def _original_phase(self, prep, membership, resources):
+    def _original_phase(self, prep, membership, resources, *, allow_cancel=True):
+        generation = json.loads(prep["GenerationJson"] or "{}")
+        cancelled = generation.get("producer_stage_cancelled")
+        if cancelled is not None:
+            if (
+                not allow_cancel
+                or set(generation) != {"producer_stage_cancelled"}
+                or not isinstance(cancelled, dict)
+                or set(cancelled) != {"action", "token", "version", "fence", "prior"}
+                or type(cancelled["version"]) is not int
+                or type(cancelled["fence"]) is not int
+                or prep["Version"] != cancelled["version"] + 1
+                or prep["Fence"] != cancelled["fence"] + 1
+                or prep["State"] != "unavailable"
+                or resources
+                or not isinstance(cancelled["token"], str)
+                or len(cancelled["token"]) != 64
+                or any(c not in "0123456789abcdef" for c in cancelled["token"])
+            ):
+                raise SourceConflict("Saved-stage cancellation receipt differs.")
+            identity(cancelled["action"])
+            previous = dict(
+                prep,
+                Version=cancelled["version"],
+                Fence=cancelled["fence"],
+                GenerationJson=cancelled["prior"],
+            )
+            if (
+                self._original_phase(previous, membership, resources, allow_cancel=False)
+                != "refused"
+            ):
+                raise SourceConflict("Cancellation requires a proven refused stage.")
+            return "cancelled"
         account, sql = "account:" + self.account, "sql_snapshot:legacy_outputs"
         states = {
             "pending": (1, [], []),
@@ -349,6 +385,63 @@ class ProducerRefusalDAL:
         ):
             raise SourceConflict("Exact unstarted admission ownership is required.")
         return "unstarted"
+
+    def cancel_saved_stage(self, source_id, token, action_id):
+        """Close an unwanted, proven refused input; never release other work."""
+        self._require_serialized(source_id)
+        state = self.snapshot(source_id)
+        if (
+            digest(state).hex() != token
+            or state["original_phase"] != "refused"
+            or any(not unused(a) for a in state["attempts"])
+        ):
+            raise SourceConflict("Only a proven unstarted input can be cancelled.")
+        from services.stats_import_outcome_dal import StatsImportOutcomeDAL
+
+        with transaction(self.connect) as cursor:
+            StatsImportOutcomeDAL._idle(cursor, source_id)
+            _mutex(cursor, "account:" + self.account)
+            _mutex(cursor, "sql_snapshot:legacy_outputs")
+            prep, execution, resources = StatsImportOutcomeDAL._snapshot(cursor, source_id)
+            before = state["preparation"]
+            if (
+                execution
+                or resources
+                or not prep
+                or prep["State"] != "unavailable"
+                or prep["Version"] != before["Version"]
+                or prep["Fence"] != before["Fence"]
+                or prep["RequestJson"] != before["RequestJson"]
+                or prep["GenerationJson"] != before["GenerationJson"]
+                or (prep["AccountKey"], prep["StorageOwner"]) != (self.account, self.storage_owner)
+                or any(
+                    prep[k] is not None for k in ("SpoolKey", "SpoolBytes", "SpoolHash", "JobID")
+                )
+            ):
+                raise SourceConflict("Saved stage changed; review its current execution evidence.")
+            cursor.execute(
+                "SELECT COUNT(*) AS n FROM dbo.ExportExecutionStream WHERE PreparationID=?",
+                source_id,
+            )
+            if one(cursor)["n"]:
+                raise SourceConflict("Provider stream prevents cancellation.")
+            marker = dict(
+                producer_stage_cancelled=dict(
+                    action=identity(action_id),
+                    token=token,
+                    version=prep["Version"],
+                    fence=prep["Fence"],
+                    prior=prep["GenerationJson"],
+                )
+            )
+            _cas(
+                cursor,
+                "UPDATE dbo.ExportPreparation SET GenerationJson=?,Version=Version+1,Fence=Fence+1,"
+                "UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND Version=? AND State='unavailable'",
+                bounded_json(marker),
+                identity(source_id),
+                prep["Version"],
+            )
 
     def close_admission(self, source_id, token, action_id):
         """Fence an original typed stats admission only before SQL registration."""
@@ -479,6 +572,8 @@ class ProducerRefusalDAL:
         for attempt in state["attempts"]:
             if json.loads(attempt["RequestJson"])["request"]["operation"] == identity(action_id):
                 return identity(attempt["PreparationID"])
+        if state["original_phase"] == "cancelled":
+            raise SourceConflict("This saved input was permanently cancelled; it cannot resume.")
         document = json.loads(state["preparation"]["RequestJson"])
         request = dict(document["request"])
         request.update(

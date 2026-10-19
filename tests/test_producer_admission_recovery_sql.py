@@ -65,7 +65,7 @@ def test_interrupted_original_requires_close_then_separate_resume_confirmation(r
     result = execute(service, row, action="close_unstarted_admission")
     assert result["State"] == "open"
     assert store.actions[0]["State"] == "verified"
-    assert result["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    assert result["evidence"]["actions"].keys() == {"resume_sql_stage", "cancel_saved_stage"}
     adapter.runner.assert_not_called()
     assert (
         r.f.sql.execute(
@@ -94,7 +94,7 @@ def test_lost_close_reply_reconciles_original_marker(refused, monkeypatch):
     monkeypatch.setattr(r.dal, "close_admission", lose_reply)
     result = execute(service, row, action="close_unstarted_admission")
     assert store.actions[0]["State"] == "verified"
-    assert result["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    assert result["evidence"]["actions"].keys() == {"resume_sql_stage", "cancel_saved_stage"}
     assert service.refresh(row["IncidentID"])["pending_action"] is None
 
 
@@ -174,7 +174,7 @@ def test_lost_close_intent_is_safe_to_finish_after_restart(refused):
     service.refresh(row["IncidentID"])
     result = service.refresh(row["IncidentID"])
     assert store.actions[0]["State"] == "verified"
-    assert result["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    assert result["evidence"]["actions"].keys() == {"resume_sql_stage", "cancel_saved_stage"}
     adapter.runner.assert_not_called()
 
 

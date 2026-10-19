@@ -141,11 +141,19 @@ class RecoveryDAL:
             return one(cursor)["Total"]
 
     def check_failed(self, incident_id, error_type):
+        detail = error_type if isinstance(error_type, dict) else None
+        error_type = detail["error_type"] if detail else error_type
         with transaction(self.connect) as cursor:
             row = self._get(cursor, incident_id, lock=True)
-            if row["evidence"].get("check_unavailable") == error_type:
+            previous = row["evidence"].get("check_diagnostic") or {}
+            if row["evidence"].get("check_unavailable") == error_type and (
+                detail is None
+                or all(previous.get(k) == detail.get(k) for k in ("error_type", "frames", "stage"))
+            ):
                 return
             evidence = dict(row["evidence"], check_unavailable=error_type)
+            if detail:
+                evidence["check_diagnostic"] = detail
             cursor.execute(
                 "UPDATE dbo.RecoveryIncident SET EvidenceJson=?,Revision=Revision+1 WHERE IncidentID=? AND ScopeKey=?",
                 document(evidence, export_incident=row["SourceKind"] == "export_job"),

@@ -1,5 +1,6 @@
 """Process-local monitor health, never authority for any recovery mutation."""
 
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import PurePath
 import traceback
@@ -9,12 +10,25 @@ _failure = None
 _failure_detail = None
 _notification_failure = None
 _cycle = None
+_checks = []
 
 
 def begin_cycle():
-    global _cycle
+    global _cycle, _checks
+    _checks = []
     now = datetime.now(UTC).isoformat()
     _cycle = dict(started_utc=now, progress_utc=now, stage="starting", in_progress=True)
+
+
+def record_check(stage, error, *, waiting=False):
+    """Bounded original call sites; never exception messages or mutation authority."""
+    detail = dict(failure_detail(error), stage=stage, waiting=waiting)
+    if len(_checks) < 100:
+        _checks.append(detail)
+    if _cycle:
+        key = "waiting_checks" if waiting else "failed_checks"
+        _cycle[key] = _cycle.get(key, 0) + 1
+    return detail
 
 
 def record_progress(stage):
@@ -74,6 +88,8 @@ def record_failure(error):
 
 
 def report():
+    from core.startup_diagnostics import report as startup_report
+
     healthy, text = status()
     return {
         "healthy": healthy,
@@ -82,6 +98,8 @@ def report():
         "check_failure": _failure_detail,
         "notification_failure": _notification_failure,
         "cycle": dict(_cycle) if _cycle else None,
+        "checks": deepcopy(_checks),
+        "startup": startup_report(),
     }
 
 
@@ -98,6 +116,8 @@ def status():
     )
     if _last_success:
         text += f". Last successful check: {_last_success.isoformat()}"
+    if _cycle and _cycle.get("waiting_checks"):
+        text += ". Active SQL work is still running; its recovery checks will retry automatically. No completion or release is inferred"
     if not healthy and _cycle and _cycle["in_progress"]:
         text += ". A monitoring cycle is in progress; the downloadable report identifies its latest checkpoint"
     if _notification_failure:

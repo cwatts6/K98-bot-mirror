@@ -25,7 +25,12 @@ P0A_ACTIONS = MappingProxyType(
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(
-            {"close_unstarted_admission", "resume_sql_stage", "resume_current_registration"}
+            {
+                "close_unstarted_admission",
+                "resume_sql_stage",
+                "resume_current_registration",
+                "cancel_saved_stage",
+            }
         ),
         "configuration_producer": frozenset(
             {

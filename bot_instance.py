@@ -148,39 +148,9 @@ START_TIME = _aware(utcnow())
 
 
 async def _with_timeout(coro, seconds: float, label: str):
-    try:
-        return await asyncio.wait_for(coro, timeout=seconds)
-    except TimeoutError:
-        logger.warning("[BOOT] %s timed out after %.1fs; deferring.", label, seconds)
-        # Emit telemetry so operators can track boot-time timeouts
-        try:
-            emit_telemetry_event(
-                {
-                    "event": "boot_step_timeout",
-                    "label": label,
-                    "status": "timeout",
-                    "timeout_seconds": seconds,
-                    "orphaned_offload_possible": False,
-                }
-            )
-        except Exception:
-            logger.debug("[TELEMETRY] Failed to emit boot_step_timeout telemetry", exc_info=True)
-        return None
-    except Exception as e:
-        logger.exception("[BOOT] %s failed: %s", label, e)
-        try:
-            emit_telemetry_event(
-                {
-                    "event": "boot_step_failed",
-                    "label": label,
-                    "status": "failed",
-                    "error": str(e),
-                    "orphaned_offload_possible": False,
-                }
-            )
-        except Exception:
-            logger.debug("[TELEMETRY] Failed to emit boot_step_failed telemetry", exc_info=True)
-        return None
+    from core.startup_diagnostics import run
+
+    return await run(coro, seconds, label)
 
 
 async def _jittered(min_s=0.4, max_s=1.2):

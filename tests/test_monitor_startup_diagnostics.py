@@ -1,0 +1,145 @@
+import asyncio
+from contextlib import contextmanager
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
+from core import startup_diagnostics as startup
+from services import recovery_health as health, recovery_runtime as runtime
+from services.stats_import_outcome_dal import ImportExecutionActive
+
+
+@pytest.fixture(autouse=True)
+def isolated(monkeypatch):
+    monkeypatch.setattr(startup, "_steps", {})
+    monkeypatch.setattr(health, "_checks", [])
+    monkeypatch.setattr(health, "_cycle", None)
+
+
+@pytest.mark.asyncio
+async def test_deadline_drains_worker_without_retry_or_false_failure(caplog):
+    finished = asyncio.Event()
+
+    async def work():
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.01)
+            finished.set()
+            raise
+
+    await startup.run(work(), 0.001, "cache")
+    assert finished.is_set()
+    assert startup.report()[0]["state"] == "deadline_elapsed_outcome_unconfirmed"
+    assert "deferring" not in caplog.text
+    assert "does not establish failure" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_completed_after_deadline_keeps_actual_result():
+    async def work():
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            return "completed"
+
+    assert await startup.run(work(), 0.001, "cache") == "completed"
+    assert startup.report()[0]["state"] == "completed_after_deadline"
+
+
+@pytest.mark.asyncio
+async def test_worker_timeout_is_failure_not_wrapper_deadline():
+    async def work():
+        raise TimeoutError("password=private")
+
+    await startup.run(work(), 10, "cache")
+    row = startup.report()[0]
+    assert row["state"] == "failed"
+    assert row["diagnostic"]["frames"][-1]["function"] == "work"
+    assert "password" not in str(row)
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cancellation_drains_and_propagates():
+    started, finished = asyncio.Event(), asyncio.Event()
+
+    async def work():
+        started.set()
+        try:
+            await asyncio.sleep(10)
+        finally:
+            await asyncio.sleep(0.01)
+            finished.set()
+
+    task = asyncio.create_task(startup.run(work(), 10, "cache"))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert finished.is_set()
+    assert startup.report()[0]["state"] == "cancelled_outcome_unconfirmed"
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_existing_incident_distinguishes_busy_and_original_failure(monkeypatch, active):
+    def refresh(_):
+        if active:
+            raise ImportExecutionActive("private input")
+        raise ValueError("private input")
+
+    store = SimpleNamespace(
+        scope="scope",
+        list_open=lambda **_: [dict(IncidentID="one", SourceKind="stats_import")],
+        check_failed=Mock(),
+        has_failed_checks=lambda: False,
+    )
+    adapter = SimpleNamespace(pending_recovery=lambda **_: [])
+
+    @contextmanager
+    def service():
+        yield SimpleNamespace(
+            store=store, adapters={"stats_import": adapter}, recover_automatic=refresh
+        )
+
+    monkeypatch.setattr(runtime, "recovery_service", service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    health.begin_cycle()
+    failures = runtime.observe_recovery()
+    assert bool(failures) is not active
+    assert store.check_failed.called is not active
+    result = health.report()["checks"]
+    assert result[0]["waiting"] is active
+    assert result[0]["frames"][-1]["function"] == "refresh"
+    assert "private input" not in str(result)
+    # The aggregate wrapper cannot destroy the original check diagnostics.
+    health.record_failure(RuntimeError()) if failures else health.record_success()
+    assert health.report()["checks"] == result
+
+
+def test_absent_successor_is_pending_only_after_parent_custody(tmp_path):
+    from scripts.verify_k98_update_pair import PairPublicationPending, successor_path
+
+    validate = Mock(side_effect=lambda path, **_: path)
+    missing = tmp_path / "future.json"
+    with pytest.raises(PairPublicationPending):
+        successor_path(missing, validate=validate)
+    validate.assert_called_once_with(tmp_path, private=True)
+    validate.side_effect = PermissionError()
+    with pytest.raises(PermissionError):
+        successor_path(missing, validate=validate)
+    existing = tmp_path / "present.json"
+    existing.write_text("bad data")
+    with pytest.raises(PermissionError):
+        successor_path(existing, validate=validate)
+
+
+def test_diagnostic_observations_are_bounded_and_detached():
+    health.begin_cycle()
+    for _ in range(130):
+        health.record_check("check", ValueError())
+    result = health.report()
+    assert len(result["checks"]) == 100
+    assert result["cycle"]["failed_checks"] == 130
+    result["checks"][0]["frames"].append("modified")
+    assert health.report()["checks"][0]["frames"] == []

@@ -101,6 +101,23 @@ CONFIGURATION_ONLY_TRANSITION_PATHS = frozenset(
 )
 
 
+MONITOR_ADMISSION_TRANSITION_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "core/startup_diagnostics.py",
+        "services/recovery_health.py",
+        "services/recovery_runtime.py",
+        "services/recovery_dal.py",
+        "services/recovery_report.py",
+        "services/producer_refusal_dal.py",
+        "services/producer_refusal_recovery.py",
+        "services/producer_recovery_review.py",
+        "services/recovery_release_policy.py",
+        "scripts/verify_k98_update_pair.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -137,12 +154,17 @@ def reviewed_transitions():
                 item["id"] == "configuration_only_completion_v1"
                 and path in CONFIGURATION_ONLY_TRANSITION_PATHS
             )
+            fixed_monitor = (
+                item["id"] == "monitor_admission_closeout_v1"
+                and path in MONITOR_ADMISSION_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
                     or fixed_closeout
                     or fixed_cache
                     or fixed_configuration
+                    or fixed_monitor
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -164,6 +186,11 @@ def reviewed_transitions():
             and paths != CONFIGURATION_ONLY_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed configuration-only transition required.")
+        if (
+            item["id"] == "monitor_admission_closeout_v1"
+            and paths != MONITOR_ADMISSION_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed monitor/admission transition required.")
     return value["transitions"]
 
 

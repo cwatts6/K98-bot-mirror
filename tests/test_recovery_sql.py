@@ -101,6 +101,26 @@ def incident(store):
     return store.observe("stats_import", str(uuid4()), {"actions": {}}, "a" * 64)
 
 
+def test_bounded_check_diagnostic_survives_restart_without_revision_churn(store):
+    row = incident(store)
+    detail = dict(
+        error_type="ValueError",
+        stage="incident:stats_import",
+        frames=[dict(file="adapter.py", line=42, function="inspect")],
+        observed_utc="first",
+    )
+    store.check_failed(row["IncidentID"], detail)
+    restarted = RecoveryDAL(
+        store.connect, account="test-account", storage_owner="test-disk", guild_id=2
+    )
+    failed = restarted.get(row["IncidentID"])
+    assert failed["evidence"]["check_diagnostic"] == detail
+    restarted.check_failed(row["IncidentID"], dict(detail, observed_utc="later"))
+    assert restarted.get(row["IncidentID"])["Revision"] == failed["Revision"]
+    restarted.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "a" * 64)
+    assert "check_diagnostic" not in restarted.get(row["IncidentID"])["evidence"]
+
+
 def test_incident_pages_are_chronological_with_ties_and_resolved_cursor(store):
     from kvk.dal.new_source_import_dal import transaction
 

@@ -88,7 +88,7 @@ def test_refused_stage_is_discovered_with_exact_blocker_and_no_release(refused):
     adapter, _, _, _ = setup(r)
     assert adapter.pending_recovery() == [r.source]
     evidence, _, resolved = adapter.inspect(r.source)
-    assert not resolved and evidence["actions"] == {}
+    assert not resolved and evidence["actions"].keys() == {"cancel_saved_stage"}
     assert evidence["recovery_links"] == [
         dict(label="Review blocking export", kind="export_job", source_id=r.f.job)
     ]
@@ -190,7 +190,7 @@ def test_lost_intent_reply_leaves_tombstone_and_late_callback_cannot_execute(ref
     assert store.actions[0]["State"] == "not_applied"
     child = r.dal.snapshot(r.source)["attempts"][0]
     assert unused(child)
-    assert refreshed["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    assert refreshed["evidence"]["actions"].keys() == {"resume_sql_stage", "cancel_saved_stage"}
     with pytest.raises(SourceConflict, match="evidence changed"):
         adapter.execute(
             r.source,
@@ -320,7 +320,10 @@ def test_changed_registration_and_wrong_actor_cannot_resume(refused):
     r.runtime.configuration = json.dumps(
         dict(scan_data=dict(consumer="scan_data", outputs=["changed"]))
     )
-    assert set(adapter.inspect(r.source)[0]["actions"]) == {"resume_current_registration"}
+    assert set(adapter.inspect(r.source)[0]["actions"]) == {
+        "resume_current_registration",
+        "cancel_saved_stage",
+    }
     with pytest.raises(SourceConflict, match=r"evidence changed|not permitted"):
         execute(service, row, action="resume_sql_stage")
     adapter.runner.assert_not_called()

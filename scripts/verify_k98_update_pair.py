@@ -15,6 +15,23 @@ import runpy
 import sys
 
 
+class PairPublicationPending(Exception):
+    """A future successor artifact is absent under verified administrative custody."""
+
+
+def successor_path(path, *, validate):
+    candidate = Path(path)
+    if candidate.is_absolute() and not candidate.exists():
+        # Only the exact successor paths derived from the pinned policy qualify.
+        # Missing parents, bad custody, malformed paths and existing corrupt files
+        # remain hard verification failures, never a successful startup signal.
+        validate(candidate.parent, private=True)
+        raise PairPublicationPending(
+            "Awaiting protected successor publication; no second start requested."
+        )
+    return validate(candidate, private=True)
+
+
 def read(path, expected=None, limit=1048576):
     with Path(path).open("rb") as stream:
         raw = stream.read(limit + 1)
@@ -73,13 +90,22 @@ def main():
     from core.export_process_identity import open_pinned_process
     from core.export_startup_windows import administrative_path
 
-    def protected(path, expected=None):
-        return read(administrative_path(path, private=True), expected)
+    def protected(path, expected=None, *, successor=False):
+        checked = (
+            successor_path(path, validate=administrative_path)
+            if successor
+            else administrative_path(path, private=True)
+        )
+        return read(checked, expected)
 
     protected(args.bindings, args.sha256)
     protected(policy_path, config["new_policy_sha256"])
-    state = administrative_path(policy["state_directory"], private=True)
+    state = successor_path(policy["state_directory"], validate=administrative_path)
     journals = list(Path(state).glob("incarnation-*.json"))
+    if not journals:
+        raise PairPublicationPending(
+            "Awaiting the first protected successor journal; no second start requested."
+        )
     if len(journals) != 1:
         raise ValueError("Exactly one first successor required; no second start")
     path = journals[0]
@@ -103,11 +129,15 @@ def main():
         raise ValueError("Successor sequence or policy differs")
     seed = json.loads(protected(policy["seed_plan"]["path"], policy["seed_plan"]["sha256"]))
     live = Path(seed["commit_file"]).parent.parent / match[2]
-    publication = json.loads(protected(live / "commit.json"))
+    publication = json.loads(protected(live / "commit.json", successor=True))
     if publication != journal["publication"]:
         raise ValueError("Published commit differs from protected history")
     plan = json.loads(
-        protected(live / "ManualProcessPairPlan-CANDIDATE.json", publication["plan_sha256"])
+        protected(
+            live / "ManualProcessPairPlan-CANDIDATE.json",
+            publication["plan_sha256"],
+            successor=True,
+        )
     )
     if set(publication["manifests"]) != {"authority", "bot"} or set(journal["bindings"]) != {
         "authority",
@@ -115,8 +145,8 @@ def main():
     }:
         raise ValueError("Exact supervised pair required")
     for role, digest in publication["manifests"].items():
-        protected(plan["manifests"][role], digest)
-    issuer = json.loads(protected(live / "AutomaticIssuer.json"))
+        protected(plan["manifests"][role], digest, successor=True)
+    issuer = json.loads(protected(live / "AutomaticIssuer.json", successor=True))
     if issuer["plan_sha256"] != publication["plan_sha256"]:
         raise ValueError("Issuer plan differs from protected publication")
     bindings = [*journal["bindings"].values(), issuer["issuer"]]
@@ -216,6 +246,14 @@ def verify_bot_sql_contracts(bot):
 if __name__ == "__main__":
     try:
         main()
+    except PairPublicationPending as exc:
+        print(
+            json.dumps(
+                dict(stage="WAITING_FOR_FIRST_PAIR_PUBLICATION", detail=str(exc), verified=False)
+            ),
+            flush=True,
+        )
+        raise SystemExit(1)
     except Exception as exc:
         print(
             json.dumps(

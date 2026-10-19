@@ -61,7 +61,10 @@ def review_fixture():
         attempt_count=0,
         original_phase="refused",
         blockers=[],
-        preparation=dict(RequestJson=json.dumps(dict(request=dict(config=original)))),
+        preparation=dict(
+            CreatedUTC="2026-10-19 12:00:00",
+            RequestJson=json.dumps(dict(request=dict(config=original))),
+        ),
         current_registration=dict(
             consumer="scan_data",
             outputs=["current-output"],
@@ -113,7 +116,8 @@ def test_complete_pages_survive_restart_without_public_alert_disclosure():
     assert json.loads(retained) == state["producer"]["inputs"]
     assert all(len(f.get("text", "")) <= 400 for f in fields)
     alert = json.dumps(row["evidence"])
-    assert "scan.xlsx" not in alert and "current-file-" not in alert
+    assert row["evidence"]["failure_context"]["input_file"] == "scan.xlsx"
+    assert "columns_present" not in alert and "current-file-" not in alert
 
 
 @pytest.mark.parametrize(
@@ -142,15 +146,19 @@ def test_invalid_pages_do_not_hide_or_wrap_checks(number):
 
 
 @pytest.mark.asyncio
-async def test_actual_button_pages_lead_to_separate_confirmation(monkeypatch):
-    from ui.views import recovery_review_view as pages, recovery_view as view
+async def test_actual_button_summary_leads_to_separate_confirmation(monkeypatch):
+    from ui.views import (
+        recovery_review_view as pages,
+        recovery_summary_view as summaries,
+        recovery_view as view,
+    )
 
     service, row, _, _ = review_fixture()
 
     async def call(method, *args):
         return getattr(service, method)(*args)
 
-    for module in (view, pages):
+    for module in (view, pages, summaries):
         monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
         monkeypatch.setattr(module, "call", call)
@@ -162,13 +170,9 @@ async def test_actual_button_pages_lead_to_separate_confirmation(monkeypatch):
     )
     await button.callback(interaction)
     result = interaction.followup.send.call_args.kwargs
-    assert result["ephemeral"] and isinstance(result["view"], pages.RecoveryReviewView)
-    while not result["view"].next.disabled:
-        assert result["view"].confirm.disabled
-        assert all(len(f.value) <= 1024 for f in result["embed"].fields)
-        await result["view"].next.callback(interaction)
-        result = interaction.followup.send.call_args.kwargs
-        assert result["ephemeral"]
+    assert result["ephemeral"] and isinstance(result["view"], summaries.RecoverySummaryView)
+    assert len(result["embed"].fields) == 5
+    assert all(len(f.value) <= 1024 for f in result["embed"].fields)
     assert not service.store.actions
     await result["view"].confirm.callback(interaction)
     confirmation = interaction.followup.send.call_args.kwargs

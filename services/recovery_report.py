@@ -110,6 +110,7 @@ def incident_report(service, row):
                     "evidence_kinds",
                     "copies",
                     "check_unavailable",
+                    "check_diagnostic",
                     "blocking_job_ids",
                     "recovery_links",
                     "receipt_diagnostics",

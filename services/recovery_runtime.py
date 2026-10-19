@@ -163,6 +163,7 @@ def _retry_admission():
         retry_recovery_admission()
         return True
     except Exception as exc:
+        recovery_health.record_check("registration_admission", exc)
         logger.warning("recovery_admission_unavailable error_type=%s", type(exc).__name__)
         return False
 
@@ -181,8 +182,11 @@ def observe_recovery():
             for incident_id in RecoveryBacklogDAL(service.store).pending_repairs():
                 try:
                     service.refresh(incident_id)
+                except ImportExecutionActive as exc:
+                    recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
-                    service.store.check_failed(incident_id, type(exc).__name__)
+                    detail = recovery_health.record_check("accepted_repairs", exc)
+                    service.store.check_failed(incident_id, detail)
                     failures.append(type(exc).__name__)
                 finally:
                     service.store.touch_pending(incident_id)
@@ -193,8 +197,11 @@ def observe_recovery():
             for incident_id in RecoveryBacklogDAL(service.store).pending_repairs("stats_import"):
                 try:
                     service.refresh(incident_id)
+                except ImportExecutionActive as exc:
+                    recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
-                    service.store.check_failed(incident_id, type(exc).__name__)
+                    detail = recovery_health.record_check("accepted_repairs", exc)
+                    service.store.check_failed(incident_id, detail)
                     failures.append(type(exc).__name__)
                 finally:
                     service.store.touch_pending(incident_id)
@@ -216,12 +223,16 @@ def observe_recovery():
                         )
                         if getattr(adapter, "automatic_action", None):
                             service.recover_automatic(row["IncidentID"])
-                    except ImportExecutionActive:
-                        # An active execution lock is not an abandoned writer.
+                    except ImportExecutionActive as exc:
+                        recovery_health.record_check("discovery:" + kind, exc, waiting=True)
                         continue
                     except Exception as exc:
+                        recovery_health.record_check("discovery:" + kind, exc)
                         failures.append(type(exc).__name__)
+            except ImportExecutionActive as exc:
+                recovery_health.record_check("discovery:" + kind, exc, waiting=True)
             except Exception as exc:
+                recovery_health.record_check("discovery:" + kind, exc)
                 failures.append(type(exc).__name__)
         # Existing operational incidents must still be checked after their source
         # leaves discovery (for example a domain closes a queued preparation).
@@ -248,8 +259,15 @@ def observe_recovery():
                 continue
             try:
                 service.recover_automatic(incident["IncidentID"])
+            except ImportExecutionActive as exc:
+                recovery_health.record_check(
+                    "existing_incident_checks:" + incident["SourceKind"], exc, waiting=True
+                )
             except Exception as exc:
-                service.store.check_failed(incident["IncidentID"], type(exc).__name__)
+                detail = recovery_health.record_check(
+                    "existing_incident_checks:" + incident["SourceKind"], exc
+                )
+                service.store.check_failed(incident["IncidentID"], detail)
                 failures.append(type(exc).__name__)
                 logger.warning(
                     "recovery_recheck_unavailable incident=%s error_type=%s",

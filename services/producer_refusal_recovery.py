@@ -36,7 +36,13 @@ class ProducerRefusalRecovery:
             recovery_links=links,
         )
         resolved = False
-        if state["original_phase"] == "execution_registered":
+        if state["original_phase"] == "cancelled":
+            evidence.update(
+                outcome="saved_stage_cancelled",
+                explanation="Admin cancelled this saved input before SQL execution. The original inputs and refusal history are retained. No import or export was performed and no other operation was released.",
+            )
+            resolved = True
+        elif state["original_phase"] == "execution_registered":
             if state["attempt_count"]:
                 raise SourceConflict("Original and replacement execution cannot both be admitted.")
             child, _, resolved = self.imports.inspect(source_id)
@@ -86,7 +92,7 @@ class ProducerRefusalRecovery:
                 actions["resume_current_registration"] = dict(
                     label="Continue with current destinations",
                     review_details=True,
-                    check="Review the retained scan and old/current destination pages. Confirm this exact scan should be imported using the displayed current registration. The original registration will remain in history.",
+                    check="Confirm this exact retained scan should be imported using the current registration. If settings differ, review the changed settings and destination links in technical details before confirming. The original registration remains in history.",
                     effect="Bind this approval to both registration hashes, run the exact retained SQL inputs under fresh admission, then verify its receipt. Excel and archive steps are not repeated. Committed imports cannot be replayed.",
                 )
             else:
@@ -155,6 +161,21 @@ class ProducerRefusalRecovery:
                                 source_id=linked_source,
                             )
                         )
+        if state["original_phase"] == "refused" and not active:
+            actions["cancel_saved_stage"] = dict(
+                label="Cancel saved import",
+                check="Confirm this retained input is no longer needed. The bot must prove that neither the original nor any continuation entered SQL. Leave it open if you still need this import.",
+                effect="Record and verify a permanent cancellation for this exact saved input. Preserve the original input and refusal history. No SQL import, provider write or release of another operation occurs.",
+            )
+        from services.producer_recovery_review import admission_context
+
+        evidence["failure_context"] = admission_context(state)
+        for detail in actions.values():
+            detail.update(
+                review_details=True,
+                review_summary=True,
+                review_summary_title="Review saved SQL admission",
+            )
         return evidence, digest(state).hex(), resolved
 
     def review_details(self, source_id, action, token):
@@ -162,17 +183,32 @@ class ProducerRefusalRecovery:
 
         state = self.dal.snapshot(source_id)
         if (
-            action not in {"resume_current_registration", "resume_sql_stage"}
+            action
+            not in {
+                "resume_current_registration",
+                "resume_sql_stage",
+                "close_unstarted_admission",
+                "cancel_saved_stage",
+            }
             or digest(state).hex() != token
         ):
             raise SourceConflict("Recovery details changed. Reopen the incident before confirming.")
         return registration_review(state)
+
+    def review_summary(self, source_id, action, token):
+        from services.producer_recovery_review import admission_summary
+
+        evidence, current, resolved = self.inspect(source_id)
+        if resolved or current != token or action not in evidence["actions"]:
+            raise SourceConflict("Admission evidence changed. Reopen the incident.")
+        return admission_summary(evidence, action)
 
     def execute(self, source_id, action, token, actor, reason):
         if action not in {
             "resume_sql_stage",
             "resume_current_registration",
             "close_unstarted_admission",
+            "cancel_saved_stage",
         } or not actor.startswith("recovery:"):
             raise SourceConflict("Exact confirmed continuation action required.")
         action_id = identity(actor.removeprefix("recovery:"))
@@ -180,6 +216,8 @@ class ProducerRefusalRecovery:
             evidence, current, resolved = self.inspect(source_id)
             if resolved or current != token or action not in evidence["actions"]:
                 raise SourceConflict("Continuation evidence changed. Review the current incident.")
+            if action == "cancel_saved_stage":
+                return self.dal.cancel_saved_stage(source_id, token, action_id)
             if action == "close_unstarted_admission":
                 return self.dal.close_admission(source_id, token, action_id)
             state = self.dal.snapshot(source_id)
@@ -207,6 +245,22 @@ class ProducerRefusalRecovery:
                     self.runner(state["producer"]["inputs"])
 
     def reconcile(self, source_id, action):
+        if action["ActionKind"] == "cancel_saved_stage":
+            with self.dal.serialized(source_id):
+                state = self.dal.snapshot(source_id)
+                marker = json.loads(state["preparation"]["GenerationJson"] or "{}").get(
+                    "producer_stage_cancelled", {}
+                )
+                if (
+                    state["original_phase"] == "cancelled"
+                    and marker.get("action") == identity(action["ActionID"])
+                    and marker.get("token") == action["EvidenceHash"]
+                ):
+                    return "verified"
+                if digest(state).hex() != action["EvidenceHash"]:
+                    return "not_applied"
+                self.dal.cancel_saved_stage(source_id, action["EvidenceHash"], action["ActionID"])
+                return None
         if action["ActionKind"] == "close_unstarted_admission":
             with self.dal.serialized(source_id):
                 state = self.dal.snapshot(source_id)
