@@ -131,6 +131,7 @@ class LegacySnapshotDAL:
 
             ExportExecutionDAL.assert_no_active_stream(cursor, account, probe_only=probe_only)
 
+    @retry_coordination
     def request(self, *, account, consumer, kvk_no, request, storage_owner, actor, reason):
         if consumer not in {"all_kvk", "scan_data", "config"}:
             raise ValueError("Unknown preparation consumer.")
