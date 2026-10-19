@@ -13,6 +13,12 @@ Services retain authorization and selection validation. The DAL stores a canonic
 selection digest in the existing group EvidenceJson and queries it within the
 existing recovery scope. The serialized approval transaction also checks for an
 existing decision. No SQL schema migration or permission change is required.
+Groups saved before selection digests existed are recovered by matching their
+original member/configuration evidence and every member action's exact author,
+revision and hash. This readback does not backfill or rewrite old decisions.
+Readback and approval share the same account-scoped transaction lock, with a
+three-second bounded wait for an overlapping approval to commit. If that wait
+expires, the admin is told to retry the same confirmation to check progress.
 The deployed RecoveryIncident and RecoveryAction contracts were checked against
 the reviewed SQL source checkout; tests use disposable local temporary tables.
 
@@ -21,6 +27,10 @@ the reviewed SQL source checkout; tests use disposable local temporary tables.
 - Repeated confirmation returns the original group while pending and after verified
   completion, including from a fresh service instance after restart.
 - Lost commit acknowledgement reads back the same approval without duplicate intents.
+- Pre-upgrade pending and completed approvals remain discoverable; mixed-author,
+  missing or different member receipts cannot be adopted.
+- Overlapping approvals and readback wait for the original SQL transaction and
+  return one group with one intent per member.
 - Selection order does not matter; a changed subset, actor, configuration or token
   cannot adopt another approval.
 - Unselected inputs remain untouched; changed selected evidence still refuses a new

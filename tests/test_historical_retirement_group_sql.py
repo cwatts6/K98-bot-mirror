@@ -310,3 +310,84 @@ def test_different_original_configurations_are_separate_review_groups(historical
     assert len(groups) == 2 and all(len(g["members"]) == 1 for g in groups)
     assert len({g["configuration"]["original"] for g in groups}) == 2
     assert len({g["configuration"]["current"] for g in groups}) == 1
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_pre_upgrade_group_is_recovered_from_original_members_and_action_actor(
+    historical, store, completed
+):
+    from kvk.dal.new_source_import_dal import transaction
+    from services.recovery_dal import document
+
+    other = clone_capture(historical)
+    service, incidents = setup(historical, store, [historical.source, other])
+    preview = service.review_historical_groups(ACTOR)["groups"][0]
+    selected = [m["id"] for m in preview["members"]]
+    group = service.approve_historical_group(ACTOR, preview, selected)
+    legacy = dict(group["evidence"])
+    legacy.pop("selection_key")
+    with transaction(store.connect) as cursor:
+        cursor.execute(
+            "UPDATE dbo.RecoveryIncident SET EvidenceJson=?,EvidenceHash=? WHERE IncidentID=?",
+            document(legacy),
+            digest(legacy).hex(),
+            group["IncidentID"],
+        )
+    if completed:
+        for incident in incidents:
+            assert service.refresh(incident["IncidentID"])["State"] == "resolved"
+    restarted, _ = setup(historical, store, [])
+    repeated = restarted.approve_historical_group(ACTOR, preview, list(reversed(selected)))
+    assert repeated["IncidentID"] == group["IncidentID"]
+    assert repeated["State"] == ("resolved" if completed else "open")
+    dal = HistoricalRetirementGroupDAL(store)
+    assert dal.existing_approval(preview, preview["members"], "discord:9") is None
+    assert dal.existing_approval(preview, preview["members"][:1], "discord:1") is None
+    with transaction(store.connect) as cursor:
+        assert cursor.execute("SELECT COUNT(*) FROM dbo.RecoveryAction").fetchval() == 2
+        # A mixed-author or missing action must not be adopted from group JSON alone.
+        cursor.execute(
+            "UPDATE dbo.RecoveryAction SET Actor='discord:9' WHERE IncidentID=?", selected[1]
+        )
+    assert dal.existing_approval(preview, preview["members"], "discord:1") is None
+
+
+@pytest.mark.parametrize("readback", [False, True])
+def test_overlapping_approval_waits_for_original_transaction(
+    historical, store, monkeypatch, readback
+):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event, current_thread
+
+    service, _ = setup(historical, store, [historical.source])
+    preview = service.review_historical_groups(ACTOR)["groups"][0]
+    dal = HistoricalRetirementGroupDAL(store)
+    entered, release, second_entered = Event(), Event(), Event()
+    original_get = store._get
+    original_lock = dal._lock
+
+    def pause(cursor, identifier, **kwargs):
+        if current_thread().name.endswith("_0") and kwargs.get("lock"):
+            entered.set()
+            assert release.wait(4)
+        return original_get(cursor, identifier, **kwargs)
+
+    def lock(cursor):
+        if current_thread().name.endswith("_1"):
+            second_entered.set()
+        return original_lock(cursor)
+
+    monkeypatch.setattr(store, "_get", pause)
+    monkeypatch.setattr(dal, "_lock", lock)
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="overlap") as pool:
+        first = pool.submit(dal.approve_selected, preview, preview["members"], "discord:1")
+        assert entered.wait(3)
+        method = dal.existing_approval if readback else dal.approve_selected
+        second = pool.submit(method, preview, preview["members"], "discord:1")
+        try:
+            assert second_entered.wait(3)
+            assert not second.done()
+        finally:
+            release.set()
+        assert first.result(timeout=5) == second.result(timeout=5)
+    assert len(store.pending_actions(preview["members"][0]["id"])) == 1
