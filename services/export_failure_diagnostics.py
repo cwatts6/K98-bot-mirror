@@ -165,6 +165,21 @@ def replacement_decision_context(job, registration):
         else "not recorded"
     )
     created = job.get("CreatedUTC")
+    if isinstance(created, str):
+        try:
+            created = (
+                datetime.fromisoformat(created)
+                if re.fullmatch(
+                    r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}"
+                    r"(?:\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})?",
+                    created,
+                )
+                else None
+            )
+        except ValueError:
+            created = None
+    if isinstance(created, datetime) and created.tzinfo is not None:
+        created = created.astimezone(UTC).replace(tzinfo=None)
     created = created.isoformat(sep=" ") if isinstance(created, datetime) else "not recorded"
     original = provenance.get("registration_sha256")
     original = (

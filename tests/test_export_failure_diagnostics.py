@@ -82,8 +82,10 @@ def test_historical_failure_is_not_invented_or_treated_as_corrected():
 
 
 @pytest.mark.parametrize("changed", [False, True])
+@pytest.mark.parametrize("serialized", [False, True])
 def test_replacement_decision_identifies_saved_input_and_configuration_without_inventing_fault(
     changed,
+    serialized,
 ):
     from datetime import datetime
     import json
@@ -105,6 +107,10 @@ def test_replacement_decision_identifies_saved_input_and_configuration_without_i
             )
         ),
     )
+    if serialized:
+        from kvk.dal.source_output_pool_dal import _wire
+
+        job = _wire(job)
     context = replacement_decision_context(job, {"legacy_configuration": {"scan_data": current}})
     assert context["input_file"] == filename
     assert context["original_created_utc"] == "2026-10-19 00:00:00"
@@ -113,6 +119,30 @@ def test_replacement_decision_identifies_saved_input_and_configuration_without_i
     )
     assert context["original_fault"] == "not_recorded"
     assert "does not identify" in context["summary"]
+
+
+@pytest.mark.parametrize(
+    "created, expected",
+    [
+        ("2026-10-19T12:34:56.123456", "2026-10-19 12:34:56.123456"),
+        ("2026-10-19T12:34:56Z", "2026-10-19 12:34:56"),
+        ("2026-10-19T13:34:56+01:00", "2026-10-19 12:34:56"),
+        ("2026-02-30T12:34:56", "not recorded"),
+        ("2026-10-19", "not recorded"),
+        ("2026-10-19X12:34:56", "not recorded"),
+        ("secret-date", "not recorded"),
+        (None, "not recorded"),
+    ],
+)
+def test_replacement_creation_date_validates_serialized_timestamp(created, expected):
+    from services.export_failure_diagnostics import replacement_decision_context
+
+    job = dict(
+        JobID=str(uuid4()), ConsumerKind="scan_data", CreatedUTC=created, ProvenanceJson="{}"
+    )
+    context = replacement_decision_context(job, {"legacy_configuration": {}})
+    assert context["original_created_utc"] == expected
+    assert f"Created: {expected} (UTC)" in context["summary"]
 
 
 def test_replacement_summary_does_not_expose_unvalidated_names_or_configuration_values():
