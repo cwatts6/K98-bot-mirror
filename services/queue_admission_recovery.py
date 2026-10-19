@@ -88,9 +88,7 @@ class QueueAdmissionRecovery:
                 else (
                     "domain_recovery_verified"
                     if domain_resolved
-                    else "unstarted"
-                    if actions
-                    else "execution_review_required"
+                    else "unstarted" if actions else "execution_review_required"
                 )
             ),
             queue_ticket=prep["EnqueueSequence"],
