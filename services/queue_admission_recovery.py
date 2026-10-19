@@ -55,12 +55,16 @@ class QueueAdmissionRecovery:
                 "configuration_import": "configuration_producer",
                 "player_stats_report": "player_report",
             }.get(producer.get("kind"), kind)
+            linked_source = producer.get("parent") or source_id
+            if self.dal.configuration_read_continuation_candidate(state):
+                kind = "configuration_read_continuation"
+                linked_source = source_id
             if kind:
                 links.append(
                     dict(
                         label="Review execution and ownership",
                         kind=kind,
-                        source_id=producer.get("parent") or source_id,
+                        source_id=linked_source,
                     )
                 )
         domain_proof, domain_resolved = None, False
@@ -84,7 +88,9 @@ class QueueAdmissionRecovery:
                 else (
                     "domain_recovery_verified"
                     if domain_resolved
-                    else "unstarted" if actions else "execution_review_required"
+                    else "unstarted"
+                    if actions
+                    else "execution_review_required"
                 )
             ),
             queue_ticket=prep["EnqueueSequence"],

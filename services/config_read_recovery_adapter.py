@@ -5,10 +5,11 @@ class ConfigReadRecoveryAdapter:
     kind = "configuration_read"
     automatic_action = "release_read"
 
-    def __init__(self, dal, client, *, account, storage_owner, queue_dal=None):
+    def __init__(self, dal, client, *, account, storage_owner, queue_dal=None, continuation=None):
         self.dal, self.client = dal, client
         self.account, self.storage_owner = account, storage_owner
         self.queue_dal = queue_dal
+        self.continuation = continuation
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(
@@ -18,6 +19,30 @@ class ConfigReadRecoveryAdapter:
     def inspect(self, source_id):
         if self.queue_dal is not None:
             state = self.queue_dal.snapshot(source_id)
+            if (
+                self.continuation is not None
+                and self.queue_dal.configuration_read_continuation_candidate(state)
+            ):
+                # Reverify the original withdrawal and durable decision through
+                # their owner. A cached incident or empty membership is no proof.
+                evidence, token, resolved = self.continuation.inspect(source_id)
+                evidence = dict(evidence)
+                evidence.update(
+                    title="Configuration read recovery",
+                    actions={},
+                    recovery_links=(
+                        []
+                        if resolved
+                        else [
+                            dict(
+                                label="Review configuration decision",
+                                kind=self.continuation.kind,
+                                source_id=source_id,
+                            )
+                        ]
+                    ),
+                )
+                return evidence, token, resolved
             if self.queue_dal.withdrawn_read(state) or self.queue_dal.withdrawn_read(
                 state, closed=True
             ):

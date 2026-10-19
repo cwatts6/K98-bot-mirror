@@ -84,6 +84,24 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             )
         identity(inner["read_configuration"])
         identity(producer["operation"])
+        if generation:
+            marker = generation["configuration_continuation"]
+            if (
+                not isinstance(marker, dict)
+                or set(marker) != {"action", "token", "reason", "choice", "configuration"}
+                or marker["choice"] not in {"keep_prior", "retry"}
+                or not isinstance(marker["reason"], str)
+                or not isinstance(marker["token"], str)
+                or len(marker["token"]) != 64
+                or any(c not in "0123456789abcdef" for c in marker["token"])
+                or not isinstance(marker["configuration"], dict)
+                or not all(
+                    isinstance(marker["configuration"].get(k), dict)
+                    for k in ("config", "scan_data")
+                )
+            ):
+                raise SourceConflict("Complete saved configuration decision required.")
+            identity(marker["action"])
         return root
 
     def review_context(self, root):

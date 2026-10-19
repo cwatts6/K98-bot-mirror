@@ -106,6 +106,21 @@ class QueueAdmissionDAL:
             )
 
     @staticmethod
+    def configuration_read_continuation_candidate(state):
+        """Select the typed read's decision owner; this is not closure proof."""
+        prep = state["preparation"]
+        inner = json.loads(prep["RequestJson"]).get("request", {})
+        association = inner.get("configuration_import")
+        return (
+            prep["ConsumerKind"] == "config"
+            and prep["State"] == "unavailable"
+            and "read_configuration" in inner
+            and isinstance(association, dict)
+            and association.get("invocation_mode") == "publish"
+            and not any(state["counts"].values())
+        )
+
+    @staticmethod
     def withdrawn_read(state, *, closed=False):
         """Prove the initial read was withdrawn before ever acquiring admission.
 

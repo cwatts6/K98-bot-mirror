@@ -16,6 +16,7 @@ from services.recovery_release_policy import p0a_presentation
 from tests.test_configuration_continuation_sql import commit_child, run, setup as prior_setup
 from tests.test_guided_recovery import ACTOR
 from tests.test_import_capture_recovery_sql import recovery as recovery
+from tests.test_recovery_sql import store as store
 
 pytestmark = [
     pytest.mark.skipif(
@@ -54,6 +55,109 @@ def setup(r, runner=None, *, associated=True):
     service.adapters[adapter.kind] = adapter
     service.presentation_policy = p0a_presentation
     return source, adapter, service
+
+
+def add_linked_views(recovery, continuation, service):
+    from unittest.mock import Mock
+
+    from services.config_read_recovery_adapter import ConfigReadRecoveryAdapter
+    from services.queue_admission_recovery import QueueAdmissionRecovery
+    from services.queue_admission_recovery_dal import QueueAdmissionDAL
+
+    queue = QueueAdmissionRecovery(QueueAdmissionDAL(recovery.runtime), service.adapters)
+    client = Mock()
+    read = ConfigReadRecoveryAdapter(
+        Mock(),
+        client,
+        account=recovery.runtime.account,
+        storage_owner=recovery.runtime.store.storage_owner,
+        queue_dal=queue.dal,
+        continuation=continuation,
+    )
+    service.adapters.update({queue.kind: queue, read.kind: read})
+    return queue, read, client
+
+
+def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(recovery, store):
+    source, continuation, service = setup(recovery)
+    service.store = store
+    queue, read, client = add_linked_views(recovery, continuation, service)
+    aliases = [service.review_source(ACTOR, a.kind, source) for a in (queue, read)]
+    for row in aliases:
+        assert row["State"] == "open" and not row["evidence"]["actions"]
+        assert row["evidence"]["recovery_links"][0]["kind"] == continuation.kind
+        assert row["evidence"]["recovery_links"][0]["source_id"] == source
+    decision = service.review_source(ACTOR, continuation.kind, source)
+    assert set(decision["evidence"]["actions"]) == {"keep_prior", "retry_configuration"}
+    run(service, decision, "keep_prior")
+    before = recovery.runtime.dal.read(source)
+    # Recreate adapters: no cached incident state is supplied as closure proof.
+    continuation = ConfigurationReadContinuation(continuation.dal, continuation.producer)
+    service.adapters[continuation.kind] = continuation
+    queue, read, restarted_client = add_linked_views(recovery, continuation, service)
+    for row in aliases:
+        final = service.refresh(row["IncidentID"])
+        assert final["State"] == "resolved" and not final["evidence"]["actions"]
+    evidence, _, resolved = read.inspect(source)
+    assert resolved and evidence["outcome"] == "prior_configuration_retained"
+    assert evidence["failure_context"]["original_read_id"] == source
+    assert recovery.runtime.dal.read(source) == before
+    assert not service.store.pending_actions(decision["IncidentID"])
+    client.inspect_configuration_recovery.assert_not_called()
+    restarted_client.inspect_configuration_recovery.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["hash", "fence", "marker"])
+def test_linked_views_require_fresh_valid_evidence_even_after_resolved_decision(recovery, change):
+    source, continuation, service = setup(recovery)
+    queue, read, client = add_linked_views(recovery, continuation, service)
+    row = service.review_source(ACTOR, continuation.kind, source)
+    assert run(service, row, "keep_prior")["State"] == "resolved"
+    connection = recovery.connect()
+    cursor = connection.cursor()
+    if change == "hash":
+        cursor.execute(
+            "UPDATE dbo.ExportPreparation SET RequestHash=? WHERE PreparationID=?",
+            b"x" * 32,
+            source,
+        )
+    elif change == "fence":
+        cursor.execute("UPDATE dbo.ExportPreparation SET Fence=2 WHERE PreparationID=?", source)
+    else:
+        cursor.execute(
+            "UPDATE dbo.ExportPreparation SET GenerationJson=? WHERE PreparationID=?",
+            json.dumps({"configuration_continuation": {"choice": "keep_prior"}}),
+            source,
+        )
+    connection.commit()
+    connection.close()
+    for adapter in (queue, read):
+        with pytest.raises(SourceConflict):
+            adapter.inspect(source)
+    client.inspect_configuration_recovery.assert_not_called()
+
+
+def test_read_with_membership_still_requires_authority_instead_of_old_decision(recovery):
+    source, continuation, service = setup(recovery)
+    queue, read, client = add_linked_views(recovery, continuation, service)
+    row = service.review_source(ACTOR, continuation.kind, source)
+    run(service, row, "keep_prior")
+    connection = recovery.connect()
+    connection.cursor().execute(
+        "INSERT dbo.ExportPreparationResource(PreparationID,ResourceKey) VALUES (?,?)",
+        source,
+        "account:a",
+    )
+    connection.commit()
+    connection.close()
+    client.inspect_configuration_recovery.return_value = dict(
+        eligible=False, outcome="held", token="a" * 64, explanation="Membership differs."
+    )
+    assert not read.inspect(source)[2]
+    evidence, _, resolved = queue.inspect(source)
+    assert not resolved
+    assert evidence["recovery_links"][0]["kind"] == read.kind
+    assert client.inspect_configuration_recovery.call_count == 2
 
 
 @pytest.mark.asyncio
