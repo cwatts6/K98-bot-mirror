@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "profile": "additive_tables_v1",
+  "bot_predecessors": [
+    "ce754d15c4d71c234835ca5ac23635ce353f21bd"
+  ],
+  "sql_commit": "544b401a657246522d295bbc2644bed64a448fbd",
+  "migrations": [
+    {
+      "id": "20261013_001_kvk_export_history",
+      "sha256": "f3d68e961de313d1c516674e7e84cf93b14549d36cd53143ac2eb0a63184c37e"
+    }
+  ]
+}
