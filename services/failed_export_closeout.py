@@ -205,7 +205,9 @@ class FailedExportCloseout:
         )
         actions, resolved = {}, False
         try:
-            state, proofs = self._read(job_id)
+            verified_state, proofs = self._read(job_id)
+            if verified_state != state:
+                raise SourceConflict("Export identity changed during review. Reopen this incident.")
             receipt = self._receipt(state, proofs)
             resolved = receipt is not None
             explanation = (

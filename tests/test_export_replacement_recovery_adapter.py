@@ -46,6 +46,30 @@ def adapter():
     return SimpleNamespace(adapter=result, base=base, runtime=runtime, snapshot=snapshot)
 
 
+@pytest.mark.parametrize("marker", [{"reference": "receipt", "sha256": "a" * 64}, None])
+@pytest.mark.parametrize("verified", [True, False])
+def test_retired_export_cannot_reenter_replacement_after_destination_isolation(
+    adapter, marker, verified
+):
+    import json
+
+    r = adapter
+    r.snapshot["job"].update(
+        State="failed",
+        ConsumerKind="scan_data",
+        ProvenanceJson=json.dumps({"failed_export_retired": marker}),
+    )
+    r.snapshot["isolated_targets"] = [dict(FileID="old-file")]
+    expected = dict(actions={}, outcome="retired" if verified else "failed")
+    r.runtime.client.failed_export_recovery.return_value = dict(
+        evidence=expected, token="receipt-token", resolved=verified
+    )
+    assert r.adapter.inspect("job") == (expected, "receipt-token", verified)
+    r.runtime.client.failed_export_recovery.assert_called_once_with("job", "inspect")
+    r.runtime.client.replacement_recovery.assert_not_called()
+    r.base.inspect.assert_not_called()
+
+
 def test_original_publication_verification_remains_guided_before_isolation(adapter):
     r = adapter
     evidence, token, _ = r.adapter.inspect("job")

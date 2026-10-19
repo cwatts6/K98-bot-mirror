@@ -1,5 +1,7 @@
 """Discord recovery adapter: private decisions via authority; retained spool via Bot."""
 
+import json
+
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_recovery_service import job_token, skipped_export_verified
 from services.export_replacement_delivery import ReplacementDelivery
@@ -31,6 +33,12 @@ class ReplacementRecoveryAdapter:
 
     def inspect(self, job_id):
         snapshot = self.base.discovery.job(job_id)
+        # A saved retirement remains authoritative even if shared destinations
+        # are subsequently isolated. Only private receipt verification may
+        # resolve it; a malformed/unverifiable marker must not enable replacement.
+        if "failed_export_retired" in json.loads(snapshot["job"]["ProvenanceJson"]):
+            result = self.client.failed_export_recovery(job_id, "inspect")
+            return result["evidence"], result["token"], result["resolved"]
         if skipped_export_verified(snapshot):
             return self.base.inspect(job_id)
         if (

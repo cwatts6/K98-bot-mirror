@@ -148,6 +148,24 @@ def workflow():
     return service, state, docs, events
 
 
+def test_changed_identity_between_preview_and_verification_cannot_be_approved(workflow):
+    service, state, _, _ = workflow
+    old = deepcopy(state)
+    state["job"]["InputHash"] = digest("different input").hex()
+    state["job"]["CreatedUTC"] = "2026-10-02T00:00:00"
+    service.dal.snapshot = Mock(side_effect=[old, deepcopy(state), deepcopy(state)])
+    evidence, token, resolved = service.inspect(state["job"]["JobID"])
+    assert not evidence["actions"] and not resolved
+    assert token == digest(old).hex()
+    assert evidence["failure_context"]["input_sha256"] == old["job"]["InputHash"]
+    service.dal.snapshot = lambda _: deepcopy(state)
+    with pytest.raises(SourceConflict, match="evidence changed"):
+        service.execute(
+            state["job"]["JobID"], ACTION, token, "recovery:" + str(uuid4()), "obsolete"
+        )
+    service.dal.retire.assert_not_called()
+
+
 def test_retirement_reads_back_after_lost_acknowledgement_and_restart(workflow):
     service, state, _, _ = workflow
     job_id = state["job"]["JobID"]
