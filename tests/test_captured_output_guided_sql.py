@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from services.all_kvk_capture_recovery_service import AllKvkCaptureRecoveryAdapter
+from services.configuration_producer_recovery import ConfigurationProducerRecovery
 from services.export_coordination_dal import ExportCoordinationDAL
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.legacy_export_snapshot_service import LegacyExportRuntime
@@ -22,7 +23,11 @@ pytestmark = [
     pytest.mark.skipif(
         os.getenv("K98_RECOVERY_SQL_TEMP_TESTS") != "1", reason="Disposable SQL opt-in"
     ),
-    pytest.mark.parametrize("recovery", ["scan_data", "player_report", "all_kvk"], indirect=True),
+    pytest.mark.parametrize(
+        "recovery",
+        ["scan_data", "player_report", "all_kvk", "configuration_producer"],
+        indirect=True,
+    ),
 ]
 
 
@@ -32,7 +37,11 @@ pytestmark = [
 async def test_review_confirm_verify_retained_output(
     recovery, store, monkeypatch, action, lost_reply
 ):
-    from ui.views import recovery_review_view as review, recovery_view as view
+    from ui.views import (
+        recovery_review_view as review,
+        recovery_summary_view as summary,
+        recovery_view as view,
+    )
 
     r = recovery
     before = r.outcomes.inspect(r.source)
@@ -62,10 +71,11 @@ async def test_review_confirm_verify_retained_output(
     r.runtime.verified_snapshot = MethodType(LegacyExportRuntime.verified_snapshot, r.runtime)
     r.runtime.enqueue_snapshot = MethodType(LegacyExportRuntime.enqueue_snapshot, r.runtime)
     adapter_type = {
-        "scan_data": ImportRecoveryAdapter,
-        "player_report": PlayerReportRecoveryAdapter,
-        "all_kvk": AllKvkCaptureRecoveryAdapter,
-    }[r.service.consumer]
+        "ImportCaptureRecovery": ImportRecoveryAdapter,
+        "PlayerReportCaptureRecovery": PlayerReportRecoveryAdapter,
+        "AllKvkCaptureRecovery": AllKvkCaptureRecoveryAdapter,
+        "ConfigurationProducerCapture": ConfigurationProducerRecovery,
+    }[type(r.service).__name__]
     adapter = adapter_type(r.outcomes, r.service)
     service = RecoveryService(
         store,
@@ -77,16 +87,30 @@ async def test_review_confirm_verify_retained_output(
     )
     row = service.review_source(ACTOR, adapter.kind, r.source)
     assert set(row["evidence"]["actions"]) == {"queue_capture", "abandon_capture"}
+    from services.recovery_report import incident_report
+
+    report_context = incident_report(service, row)["diagnosis"]["failure_context"]
+    assert report_context["original_created_utc"]
+    assert report_context["producer_procedure"]
+    assert report_context["registration_matches"]
+    assert (
+        report_context["original_configuration_sha256"]
+        == report_context["current_configuration_sha256"]
+    )
     for actor in (RecoveryActor(9, 2, 3), RecoveryActor(1, 9, 3), RecoveryActor(1, 2, 9)):
         with pytest.raises(SourceConflict):
             service.review_details_page(
+                actor, row["IncidentID"], action, row["Revision"], row["EvidenceHash"]
+            )
+        with pytest.raises(SourceConflict):
+            service.review_decision_summary(
                 actor, row["IncidentID"], action, row["Revision"], row["EvidenceHash"]
             )
 
     async def call(name, *args):
         return getattr(service, name)(*args)
 
-    for module in (view, review):
+    for module in (view, review, summary):
         monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
         monkeypatch.setattr(module, "call", call)
@@ -97,6 +121,15 @@ async def test_review_confirm_verify_retained_output(
         if b.label == row["evidence"]["actions"][action]["label"]
     )
     await button.callback(interaction)
+    payload = interaction.followup.send.call_args.kwargs
+    assert payload["ephemeral"]
+    assert payload["embed"].title == "Review retained output"
+    assert len(payload["embed"].fields) == 5
+    assert "Created:" in payload["embed"].fields[0].value
+    decision_view = payload["view"]
+    assert isinstance(decision_view, summary.RecoverySummaryView)
+    # Full evidence remains available, but is not a prerequisite to confirmation.
+    await decision_view.technical.callback(interaction)
     checked_labels = []
     while True:
         payload = interaction.followup.send.call_args.kwargs
@@ -112,7 +145,7 @@ async def test_review_confirm_verify_retained_output(
     assert "Current destination 1" in checked_labels
     assert r.outcomes.inspect(r.source)["preparation"] == captured["preparation"]
     assert not store.pending_actions(row["IncidentID"])
-    await page.confirm.callback(interaction)
+    await decision_view.confirm.callback(interaction)
     confirm = interaction.followup.send.call_args.kwargs["view"]
     original = adapter.execute
     executions = []

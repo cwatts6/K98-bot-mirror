@@ -23,7 +23,10 @@ async def show_summary(interaction, row, action, *, deferred=False):
         if not deferred and not await safe_defer(interaction, ephemeral=True):
             return
         result = await current_summary(interaction, row, action)
-        embed = discord.Embed(title="Retire this old export?", color=0xF1C40F)
+        detail = result["row"]["evidence"]["actions"][action]
+        embed = discord.Embed(
+            title=detail.get("review_summary_title", "Retire this old export?"), color=0xF1C40F
+        )
         for field in result["fields"]:
             embed.add_field(
                 name=field["label"],

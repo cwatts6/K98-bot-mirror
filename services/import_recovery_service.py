@@ -3,7 +3,7 @@
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
-from services.capture_recovery_context import add_capture_context, capture_review
+from services.capture_recovery_context import add_capture_context, capture_review, capture_summary
 from services.historical_import_recovery_service import ACTION, HistoricalImportRecovery
 from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 
@@ -26,9 +26,9 @@ class ImportRecoveryAdapter:
         return capture_review(self, source_id, action, token)
 
     def review_summary(self, source_id, action, token):
-        if action != ACTION or self.historical is None:
-            raise SourceConflict("This action requires its own guided review.")
-        return self.historical.review_summary(source_id, action, token)
+        if action == ACTION and self.historical:
+            return self.historical.review_summary(source_id, action, token)
+        return capture_summary(self, source_id, action, token)
 
     def pending_recovery(self, *, after=None):
         return self.dal.pending_recovery(after=after)
