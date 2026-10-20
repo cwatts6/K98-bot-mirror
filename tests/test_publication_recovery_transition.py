@@ -20,7 +20,12 @@ def test_publication_recovery_transition_pins_every_runtime_member():
             (
                 m["after_sha256"]
                 for t in reversed(updater.reviewed_transitions())
-                if t["id"] in {"guided_publication_recovery_v1", "publication_progress_v1"}
+                if t["id"]
+                in {
+                    "guided_publication_recovery_v1",
+                    "publication_progress_v1",
+                    "probe_busy_recovery_v1",
+                }
                 for m in t["members"]
                 if m["path"] == member["path"]
             ),

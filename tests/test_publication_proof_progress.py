@@ -290,11 +290,12 @@ def test_claimed_export_waits_for_proof_without_failing_or_repeating_attempt(mon
 
 
 @pytest.mark.parametrize("method", ["open_stream", "execute", "close_stream"])
-def test_owned_mutation_retries_only_authenticated_pre_dispatch_busy(method, monkeypatch):
+@pytest.mark.parametrize("purpose", ["mutation", "probe"])
+def test_owned_stream_retries_only_authenticated_pre_dispatch_busy(method, purpose, monkeypatch):
     from services.export_runtime_composition import AuthorityStream
 
     client = Mock()
-    stream = AuthorityStream(client, {"Purpose": "mutation"})
+    stream = AuthorityStream(client, {"Purpose": purpose})
     operation = getattr(client, method)
     operation.side_effect = [AuthorityProofBusy("busy"), "acknowledged"]
     monkeypatch.setattr("time.sleep", lambda _: None)
@@ -310,7 +311,7 @@ def test_owned_mutation_retries_only_authenticated_pre_dispatch_busy(method, mon
     operation.assert_called_once()
 
 
-def test_probe_busy_returns_without_waiting_or_dispatch(monkeypatch):
+def test_unrecognised_scope_busy_returns_without_dispatch(monkeypatch):
     from services.export_runtime_composition import AuthorityStream
 
     client = Mock()
@@ -318,7 +319,7 @@ def test_probe_busy_returns_without_waiting_or_dispatch(monkeypatch):
     sleep = Mock()
     monkeypatch.setattr("time.sleep", sleep)
     with pytest.raises(AuthorityProofBusy):
-        with AuthorityStream(client, {"Purpose": "probe"}):
+        with AuthorityStream(client, {"Purpose": "unknown"}):
             pytest.fail("Refused probe entered")
     client.open_stream.assert_called_once()
     client.execute.assert_not_called()

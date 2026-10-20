@@ -14,9 +14,15 @@ def test_progress_transition_pins_complete_runtime():
     assert {m["path"] for m in item["members"]} == updater.PUBLICATION_PROGRESS_TRANSITION_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
+        assert updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == next(
+            (
+                m["after_sha256"]
+                for t in reversed(updater.reviewed_transitions())
+                if t["id"] == "probe_busy_recovery_v1"
+                for m in t["members"]
+                if m["path"] == member["path"]
+            ),
+            member["after_sha256"],
         )
 
 

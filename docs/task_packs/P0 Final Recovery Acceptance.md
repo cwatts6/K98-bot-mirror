@@ -30,6 +30,13 @@ The original scope remains in `guided_recovery_delivery.md` and
 history, not separate additional tasks. The remaining obligations below reconcile
 those documents with `P0b Monitor and Admission Closeout.md`; none moves to P1.
 
+The publication progress release is deployed. Its follow-up report contains a held
+configuration read: a probe met authority contention after SQL admission, and the
+guided no-stream cancellation rejected the DAL's stored request envelope.
+`P0 Health Probe Busy Recovery.md` owns the focused prevention and guided closeout.
+The current hold and fresh publication outcome require separate operator
+verification after deployment. This does not close any remaining P0 workstream.
+
 ## Completion workstreams
 
 | ID | Remaining outcome | Current evidence and gap | Acceptance required |

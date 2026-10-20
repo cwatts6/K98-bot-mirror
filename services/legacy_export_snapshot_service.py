@@ -627,6 +627,7 @@ class LegacyExportRuntime:
         authority_stream=None,
         recover_configuration=None,
         recovery_client=None,
+        configuration_admission=None,
     ):
         self.dal, self.coordinator, self.store = dal, coordinator, store
         self.account = account
@@ -635,6 +636,7 @@ class LegacyExportRuntime:
         self.authority_stream = authority_stream
         self.recover_configuration = recover_configuration
         self.recovery_client = recovery_client
+        self.configuration_admission = configuration_admission
         if not coordinator.preparations:
             raise ValueError("S10C preparation-aware coordinator required.")
         if (getattr(dal, "execution_evidence", False) is True) != (
@@ -665,6 +667,24 @@ class LegacyExportRuntime:
 
     @contextmanager
     def configuration_requests(self, *, wait_for_admission=False, publication_intent=False):
+        from contextlib import nullcontext
+
+        admission = (
+            self.configuration_admission(wait_for_admission=wait_for_admission)
+            if self.configuration_admission is not None
+            else nullcontext()
+        )
+        # Acquire before request/claim, not just before opening the stream.
+        # Keep it through closure and settlement so proof and read cannot wait
+        # on one another's reservations.
+        with admission:
+            with self._configuration_requests(
+                wait_for_admission=wait_for_admission, publication_intent=publication_intent
+            ):
+                yield
+
+    @contextmanager
+    def _configuration_requests(self, *, wait_for_admission, publication_intent):
         from uuid import uuid4
 
         from services.export_provider_adapter import ProviderAdapter, use_provider

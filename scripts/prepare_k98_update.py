@@ -159,6 +159,14 @@ PUBLICATION_PROGRESS_TRANSITION_PATHS = frozenset(
     }
 )
 
+PROBE_BUSY_TRANSITION_PATHS = frozenset(
+    {
+        "services/config_preparation_recovery_service.py",
+        "services/export_runtime_composition.py",
+        "services/legacy_export_snapshot_service.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -216,6 +224,9 @@ def reviewed_transitions():
                 item["id"] == "publication_progress_v1"
                 and path in PUBLICATION_PROGRESS_TRANSITION_PATHS
             )
+            fixed_probe_busy = (
+                item["id"] == "probe_busy_recovery_v1" and path in PROBE_BUSY_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -227,6 +238,7 @@ def reviewed_transitions():
                     or fixed_publication
                     or fixed_probe
                     or fixed_progress
+                    or fixed_probe_busy
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -270,6 +282,8 @@ def reviewed_transitions():
             and paths != PUBLICATION_PROGRESS_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed publication progress transition required.")
+        if item["id"] == "probe_busy_recovery_v1" and paths != PROBE_BUSY_TRANSITION_PATHS:
+            raise ValueError("Complete fixed probe busy recovery transition required.")
     return value["transitions"]
 
 

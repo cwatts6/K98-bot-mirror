@@ -70,8 +70,25 @@ def validate_snapshot(
         from services.export_execution_protocol import uuid_text
 
         request = json.loads(p["RequestJson"])
+        # LegacyPreparationDAL hashes and stores the whole envelope. Check its
+        # identity before inspecting the inner request; never discard extra
+        # fields that could describe another operation or publication intent.
+        if isinstance(request, dict) and set(request) == {
+            "consumer",
+            "kvk_no",
+            "request",
+            "storage_owner",
+        }:
+            if (
+                request["consumer"] != "config"
+                or request["kvk_no"] is not None
+                or request["storage_owner"] != storage_owner
+            ):
+                raise SourceConflict("Unstarted configuration request identity differs.")
+            request = request["request"]
         if (
             not containment
+            or not isinstance(request, dict)
             or set(request) != {"read_configuration"}
             or snapshot["request_count"] != 0
             or snapshot["event_count"] != 0

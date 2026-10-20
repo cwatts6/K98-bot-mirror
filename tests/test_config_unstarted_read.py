@@ -13,6 +13,12 @@ from tests.test_guided_recovery import ACTOR
 def unstarted(monkeypatch, *, lost=False):
     client, dal, snapshot, source, _, docs, service, store = setup(monkeypatch)
     request = {"read_configuration": str(uuid4())}
+    request = dict(
+        consumer="config",
+        kvk_no=None,
+        request=request,
+        storage_owner=snapshot["preparation"]["StorageOwner"],
+    )
     snapshot["preparation"].update(
         RequestJson=json.dumps(request), RequestHash=digest(request).hex()
     )
@@ -30,6 +36,76 @@ def unstarted(monkeypatch, *, lost=False):
 
     dal.settle.side_effect = settle
     return client, dal, snapshot, source, docs, service, store
+
+
+def test_cancellation_accepts_the_document_actually_written_by_preparation_dal(monkeypatch):
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    from services import legacy_export_snapshot_dal as module
+
+    _, dal, snapshot, source, _, service, _ = unstarted(monkeypatch)
+    cursor = Mock()
+
+    @contextmanager
+    def transaction(_):
+        yield cursor
+
+    monkeypatch.setattr(module, "transaction", transaction)
+    monkeypatch.setattr(module, "_mutex", lambda *a: None)
+    monkeypatch.setattr(module, "one", Mock(side_effect=[None, {"Ticket": 1}]))
+    module.LegacySnapshotDAL(Mock()).request(
+        account=snapshot["preparation"]["AccountKey"],
+        consumer="config",
+        kvk_no=None,
+        storage_owner=snapshot["preparation"]["StorageOwner"],
+        request={"read_configuration": str(uuid4())},
+        actor="test",
+        reason="Health probe",
+    )
+    insert = next(c for c in cursor.execute.call_args_list if c.args[0].startswith("INSERT"))
+    snapshot["preparation"].update(RequestJson=insert.args[8], RequestHash=insert.args[5].hex())
+    row = service.review_source(ACTOR, "configuration_read", source)
+    assert row["evidence"]["outcome"] == "unstarted_read"
+    assert "contain_read" in row["evidence"]["actions"]
+    dal.settle.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("consumer", "scan_data"),
+        ("kvk_no", 16),
+        ("storage_owner", "other"),
+        ("request", {"purpose": "output_enrollment"}),
+        ("request", {"read_configuration": "invalid"}),
+        ("request", {"read_configuration": str(uuid4()), "configuration_import": {}}),
+        ("request", []),
+        ("extra", "unknown"),
+    ],
+)
+def test_wrapped_request_identity_and_purpose_must_match(monkeypatch, field, value):
+    _, dal, snapshot, source, _, service, _ = unstarted(monkeypatch)
+    request = json.loads(snapshot["preparation"]["RequestJson"])
+    request[field] = value
+    snapshot["preparation"].update(
+        RequestJson=json.dumps(request), RequestHash=digest(request).hex()
+    )
+    row = service.review_source(ACTOR, "configuration_read", source)
+    assert not row["evidence"]["actions"]
+    dal.settle.assert_not_called()
+
+
+def test_legacy_bare_unstarted_request_remains_supported(monkeypatch):
+    _, _, snapshot, source, _, service, _ = unstarted(monkeypatch)
+    request = json.loads(snapshot["preparation"]["RequestJson"])["request"]
+    snapshot["preparation"].update(
+        RequestJson=json.dumps(request), RequestHash=digest(request).hex()
+    )
+    assert (
+        service.review_source(ACTOR, "configuration_read", source)["evidence"]["outcome"]
+        == "unstarted_read"
+    )
 
 
 @pytest.mark.parametrize("lost", [False, True])

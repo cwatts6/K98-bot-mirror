@@ -25,6 +25,9 @@ def empty_preparation(containment):
     repair, sql = containment
     original = repair.execution.read_stream(repair.target.stream_ids[0])
     request = {"read_configuration": str(uuid4())}
+    request = dict(
+        consumer="config", kvk_no=None, request=request, storage_owner=repair.storage_owner
+    )
     sql.execute("DELETE FROM #ExportExecutionStream")
     sql.execute(
         "UPDATE #ExportPreparation SET RequestJson=?,RequestHash=?",

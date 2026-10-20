@@ -21,6 +21,9 @@ _recovery_bundle = None
 _installing = False
 _runtime_stopped = False
 _installation_lock = threading.RLock()
+# Scheduling within the single installed Bot runtime only. This is never
+# evidence of ownership, termination or permission to release SQL reservations.
+_configuration_proof_lock = threading.RLock()
 _caller = ContextVar("export_runtime_caller", default=None)
 
 
@@ -353,6 +356,7 @@ class ExportRuntime(RuntimeLifetime):
             authority_stream=legacy_streams.configuration,
             recover_configuration=legacy_streams.recover_configuration,
             recovery_client=client,
+            configuration_admission=client.configuration_admission,
         )
         super().__init__(legacy)
         self.reconciler = AuthorityReconciler(client)
@@ -2488,6 +2492,19 @@ class LegacyExecutionStreams:
 
 
 class AuthorityClient:
+    @contextmanager
+    def configuration_admission(self, *, wait_for_admission=True):
+        from services.legacy_export_snapshot_service import ConfigurationAdmissionDeferred
+
+        if not _configuration_proof_lock.acquire(blocking=wait_for_admission):
+            raise ConfigurationAdmissionDeferred(
+                "Configuration read deferred while an owned authority check is running."
+            )
+        try:
+            yield
+        finally:
+            _configuration_proof_lock.release()
+
     def __init__(
         self,
         *,
@@ -2841,6 +2858,20 @@ class AuthorityClient:
     def prove(
         self, kind, object_id, snapshot_hash, *, current_attempt_id=None, old_attempt_id=None
     ):
+        # Hold exclusion until the owned call finishes, including progress
+        # polling. A health probe must not claim SQL resources in that interval.
+        with self.configuration_admission():
+            return self._prove(
+                kind,
+                object_id,
+                snapshot_hash,
+                current_attempt_id=current_attempt_id,
+                old_attempt_id=old_attempt_id,
+            )
+
+    def _prove(
+        self, kind, object_id, snapshot_hash, *, current_attempt_id=None, old_attempt_id=None
+    ):
         uuid_text(object_id)
         message = dict(
             version=1,
@@ -2911,6 +2942,12 @@ class LocalAuthorityClient(AuthorityClient):
             raise SourceConflict("Registered normal execution broker required for local probes.")
         self.broker = broker
 
+    @contextmanager
+    def configuration_admission(self, *, wait_for_admission=True):
+        # The authority proof worker performs its own observational reads.
+        # It must not wait for the Bot call that is waiting for that worker.
+        yield
+
     def _invoke(self, message):
         try:
             if self.broker.boundary is not None:
@@ -2953,11 +2990,12 @@ class AuthorityStream(AbstractContextManager):
             try:
                 return method(*args)
             except AuthorityProofBusy:
-                if self.scope.get("Purpose") != "mutation":
+                if self.scope.get("Purpose") not in {"mutation", "probe"}:
                     raise
                 # The authenticated response proves this message was refused
                 # before dispatch. Keep the existing owned delivery/attempt and
-                # wait; never turn local proof contention into a failed export.
+                # wait; a probe already owns a SQL preparation too. Abandoning
+                # it here would leave a held read with no execution stream.
                 # Lost or malformed acknowledgements are not retried here.
                 sleep(1)
 
