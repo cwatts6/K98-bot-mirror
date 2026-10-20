@@ -1042,6 +1042,9 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
     """
     import hashlib
     import json
+    from pathlib import Path
+    import shutil
+    import tempfile
 
     from file_utils import acquire_lock
 
@@ -1054,11 +1057,57 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
         # cannot fit our bounded verification read.
         if len(json.dumps(output, ensure_ascii=False, indent=2).encode("utf-8")) > 64 * 1024 * 1024:
             raise CacheSnapshotValidationError("cache_snapshot_too_large")
-        _atomic_write_json_with_retries(PLAYER_STATS_CACHE, output)
-        with open(PLAYER_STATS_CACHE, "rb") as source:
-            raw = source.read(64 * 1024 * 1024 + 1)
-        if len(raw) > 64 * 1024 * 1024 or json.loads(raw) != output:
-            raise CacheSnapshotValidationError("cache_readback_differs")
+        target = Path(PLAYER_STATS_CACHE)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staging = Path(tempfile.mkdtemp(prefix=".player-cache-recovery-", dir=target.parent))
+        candidate, backup = staging / "candidate.json", staging / "previous.json"
+        published = False
+        cleanup = True
+
+        def read_bounded(path):
+            with open(path, "rb") as source:
+                data = source.read(64 * 1024 * 1024 + 1)
+            if len(data) > 64 * 1024 * 1024:
+                raise CacheSnapshotValidationError("cache_snapshot_too_large")
+            return data
+
+        try:
+            try:
+                previous = read_bounded(target)
+            except FileNotFoundError:
+                previous = None
+            if previous is not None:
+                with backup.open("xb") as saved:
+                    saved.write(previous)
+                    saved.flush()
+                    os.fsync(saved.fileno())
+                if read_bounded(backup) != previous:
+                    raise CacheSnapshotValidationError("cache_backup_readback_differs")
+            _atomic_write_json_with_retries(str(candidate), output)
+            raw = read_bounded(candidate)
+            if json.loads(raw) != output:
+                raise CacheSnapshotValidationError("cache_readback_differs")
+            os.replace(candidate, target)
+            published = True
+            if read_bounded(target) != raw:
+                raise CacheSnapshotValidationError("cache_readback_differs")
+        except Exception:
+            if published:
+                try:
+                    if previous is None:
+                        os.replace(target, candidate)
+                    else:
+                        os.replace(backup, target)
+                except Exception as restore_error:
+                    # Keep the exact prior bytes if storage will not permit rollback.
+                    cleanup = False
+                    raise CacheSnapshotValidationError(
+                        "cache_restore_failed_prior_bytes_retained"
+                    ) from restore_error
+            raise
+        finally:
+            if cleanup:
+                shutil.rmtree(staging)
         return dict(
             sha256=hashlib.sha256(raw).hexdigest(),
             verified_utc=_utc_now_iso(),

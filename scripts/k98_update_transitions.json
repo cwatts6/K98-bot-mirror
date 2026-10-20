@@ -517,7 +517,7 @@
         {
           "path": "player_stats_cache.py",
           "before_sha256": "72b2a778eca0c50d1cb5e95e19f33409c8034401806623781b9ed1f497c51156",
-          "after_sha256": "50e1a526e1e1e547376983b5c34f73820570806068bf23f5414116affde15c3e"
+          "after_sha256": "0c4bf3950a6e30aa58194ae986c538e410034acff463ce029633230ed614d9d7"
         },
         {
           "path": "scripts/run_export_authority.py",
