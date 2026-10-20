@@ -62,6 +62,7 @@ REPORT_CACHE_HANDOFF_PATHS = frozenset(
         "ui/views/recovery_view.py",
     }
 )
+PUBLICATION_RESULT_HANDOFF_PATHS = PUBLICATION_RESULT_PATHS | REPORT_CACHE_HANDOFF_PATHS
 
 
 def coordinated_policy():
@@ -278,6 +279,10 @@ def reviewed_transitions():
             fixed_publication_result = (
                 item["id"] == "publication_result_v1" and path in PUBLICATION_RESULT_PATHS
             )
+            fixed_publication_handoff = (
+                item["id"] == "publication_result_handoff_v1"
+                and path in PUBLICATION_RESULT_HANDOFF_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -294,6 +299,7 @@ def reviewed_transitions():
                     or fixed_issuer
                     or fixed_report_handoff
                     or fixed_publication_result
+                    or fixed_publication_handoff
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -312,6 +318,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed report/cache handoff transition required.")
         if item["id"] == "publication_result_v1" and paths != PUBLICATION_RESULT_PATHS:
             raise ValueError("Complete fixed publication-result transition required.")
+        if (
+            item["id"] == "publication_result_handoff_v1"
+            and paths != PUBLICATION_RESULT_HANDOFF_PATHS
+        ):
+            raise ValueError("Complete fixed publication-result handoff transition required.")
         if (
             item["id"] == "fresh_report_cache_diagnostics_v1"
             and paths != REPORT_CACHE_TRANSITION_PATHS

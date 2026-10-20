@@ -41,6 +41,20 @@ def job_fixture(*, consumer="new_source", state="failed", attempted=False):
     return ExportRecoveryAdapter(discovery, coordinator, reconciler), snapshot
 
 
+def test_publication_observation_preserves_receipt_for_each_saved_action():
+    adapter, snapshot = job_fixture(state="confirmed", attempted=True)
+    history = [
+        dict(actor="recovery:prior", proof=dict(proof_id=str(uuid4()), state="confirmed")),
+        dict(actor="direct-operator", proof=dict(proof_id=str(uuid4()), state="confirmed")),
+    ]
+    snapshot["job"]["ProvenanceJson"] = json.dumps(dict(reconciliations=history))
+    evidence, _, _ = adapter.inspect(snapshot["job"]["JobID"])
+    assert evidence["publication_receipts"] == [
+        dict(actor=entry["actor"], **entry["proof"]) for entry in history
+    ]
+    adapter.reconciler.probe.assert_not_called()
+
+
 @pytest.mark.parametrize("consumer", ["new_source", "scan_data", "all_kvk"])
 def test_guided_retry_only_for_proven_pre_attempt_failure(consumer):
     adapter, snapshot = job_fixture(consumer=consumer)

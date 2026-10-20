@@ -68,6 +68,27 @@ async def test_confirmation_explains_wait_before_entering_long_check(monkeypatch
     assert confirmation.confirm.disabled
 
 
+@pytest.mark.asyncio
+async def test_rejected_confirmation_never_announces_an_accepted_check(monkeypatch):
+    from tests.test_guided_recovery import setup
+    from ui.views import recovery_view as module
+
+    _, _, _, row = setup()
+    row["SourceKind"] = "export_job"
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(module, "call", AsyncMock(side_effect=SourceConflict("Stale confirmation")))
+    monkeypatch.setattr(module, "report_error", AsyncMock())
+    confirmation = module.RecoveryConfirmView(row, "verify_publication")
+    await confirmation.confirm.callback(interaction)
+    text = interaction.followup.send.call_args.args[0]
+    assert "Acceptance is not yet established" in text
+    assert "verification requested" not in text
+    module.report_error.assert_awaited_once()
+    assert not confirmation.confirm.disabled
+
+
 def test_running_publication_embed_explains_elapsed_time_and_receipt_boundary():
     from tests.test_guided_recovery import setup
     from ui.views.recovery_view import incident_embed

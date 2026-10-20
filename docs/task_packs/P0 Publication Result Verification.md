@@ -7,6 +7,9 @@ original export delivery. Bind a successful display to the latest scoped recover
 action and that action's settled proof in the export's retained provenance.
 Pending, failed and unmatched actions must never reuse an older successful check.
 Reopening the view after restart reads existing evidence and does not contact Sheets.
+Locate the matching recovery actor throughout retained reconciliation history;
+an unrelated later direct-operator reconciliation must not hide the saved result.
+Before admission completes, the confirmation message must not claim acceptance.
 
 The admin sees **Published output check**, **Publication check outcome**, the
 completion timestamp in UTC, and total elapsed seconds. Confirmed means the
@@ -53,6 +56,9 @@ No SQL migration, configuration flag, dependency, provider write or automatic
 retry is introduced. RecoveryAction columns and scope filtering are checked
 against the authoritative SQL repository definitions and disposable SQL tables.
 The protected updater must include the complete publication-result transition.
+An additional fixed nine-member transition supports the combined report/cache
+handoff and publication-result release directly from its deployed predecessor.
+Both complete before/after bundles are pinned; partial or foreign sets are refused.
 
 This is a focused successor to the report/cache handoff release. Local validation,
 security review, private promotion, protected package rehearsal and production

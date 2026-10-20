@@ -7,9 +7,16 @@ import pytest
 from scripts import prepare_k98_update as updater
 
 
-def test_result_transition_pins_all_runtime_members():
-    item = next(t for t in updater.reviewed_transitions() if t["id"] == "publication_result_v1")
-    assert {m["path"] for m in item["members"]} == updater.PUBLICATION_RESULT_PATHS
+@pytest.mark.parametrize(
+    "transition,paths",
+    [
+        ("publication_result_v1", updater.PUBLICATION_RESULT_PATHS),
+        ("publication_result_handoff_v1", updater.PUBLICATION_RESULT_HANDOFF_PATHS),
+    ],
+)
+def test_result_transition_pins_all_runtime_members(transition, paths):
+    item = next(t for t in updater.reviewed_transitions() if t["id"] == transition)
+    assert {m["path"] for m in item["members"]} == paths
     root = Path(__file__).resolve().parents[1]
     for member in item["members"]:
         assert (
@@ -20,10 +27,11 @@ def test_result_transition_pins_all_runtime_members():
 
 
 @pytest.mark.parametrize("change", ["missing", "extra", "renamed"])
-def test_result_transition_refuses_partial_or_foreign_bundle(tmp_path, monkeypatch, change):
-    item = deepcopy(
-        next(t for t in updater.reviewed_transitions() if t["id"] == "publication_result_v1")
-    )
+@pytest.mark.parametrize("transition", ["publication_result_v1", "publication_result_handoff_v1"])
+def test_result_transition_refuses_partial_or_foreign_bundle(
+    tmp_path, monkeypatch, change, transition
+):
+    item = deepcopy(next(t for t in updater.reviewed_transitions() if t["id"] == transition))
     if change == "missing":
         item["members"].pop()
     elif change == "extra":

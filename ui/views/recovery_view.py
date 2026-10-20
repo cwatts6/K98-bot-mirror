@@ -198,9 +198,10 @@ class RecoveryConfirmView(discord.ui.View):
                 return
             if self.action == "verify_publication":
                 await interaction.followup.send(
-                    "Publication verification requested. This can take several minutes while "
-                    "the bot checks retained history and current output. Use Recheck to follow "
-                    "progress. A slow check does not authorise a retry or restart.",
+                    "Checking this confirmation before accepting publication verification. "
+                    "Acceptance is not yet established. If accepted, checking retained history "
+                    "and current output can take several minutes. Use Recheck for saved progress; "
+                    "do not submit another check or restart while this request is unresolved.",
                     view=RecoveryIncidentView(self.row),
                     ephemeral=True,
                     allowed_mentions=discord.AllowedMentions.none(),

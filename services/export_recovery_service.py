@@ -191,15 +191,14 @@ class ExportRecoveryAdapter:
             )
         evidence = dict(
             title="Spreadsheet export recovery",
-            publication_receipt=(
+            publication_receipts=[
                 dict(
-                    actor=history[-1].get("actor"),
-                    proof_id=history[-1].get("proof", {}).get("proof_id"),
-                    state=history[-1].get("proof", {}).get("state"),
+                    actor=entry.get("actor"),
+                    proof_id=entry.get("proof", {}).get("proof_id"),
+                    state=entry.get("proof", {}).get("state"),
                 )
-                if history
-                else None
-            ),
+                for entry in history
+            ],
             outcome=(
                 "replacement_required"
                 if replacement_required

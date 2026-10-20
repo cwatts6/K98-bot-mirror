@@ -76,6 +76,24 @@ def test_historical_delivery_alone_is_not_a_fresh_check():
     assert publication_result(row, fixture()[1]) is None
 
 
+def test_later_unrelated_reconciliation_does_not_hide_saved_action_result():
+    row, action = fixture()
+    matching = row["evidence"].pop("publication_receipt")
+    row["evidence"]["publication_receipts"] = [
+        matching,
+        dict(actor="direct-operator", proof_id=str(uuid4()), state="damaged"),
+    ]
+    assert publication_result(row, action)["outcome"] == "confirmed"
+    action["ActionID"] = str(uuid4())
+    assert publication_result(row, action)["outcome"] == "unverified"
+
+
+def test_empty_current_receipt_history_does_not_borrow_stale_observation():
+    row, action = fixture()
+    row["evidence"]["publication_receipts"] = []
+    assert publication_result(row, action)["outcome"] == "unverified"
+
+
 def test_reopened_service_uses_saved_latest_action_without_provider_call():
     service, adapter, store, _ = setup()
     row, action = fixture()

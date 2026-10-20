@@ -16,7 +16,12 @@ def publication_result(row, action):
         return None
     started, completed = _utc(action["CreatedUTC"]), _utc(action["UpdatedUTC"])
     state = action["State"]
-    receipt = row["evidence"].get("publication_receipt") or {}
+    actor = f"recovery:{str(action['ActionID']).lower()}"
+    receipts = row["evidence"].get("publication_receipts")
+    if receipts is None:
+        # Previously saved incident observations may contain only the tail entry.
+        receipts = [row["evidence"].get("publication_receipt") or {}]
+    receipt = next((item for item in reversed(receipts) if item.get("actor") == actor), {})
     outcome = "unverified"
     if state in {"dispatched", "unknown"}:
         outcome = "pending"
@@ -24,7 +29,7 @@ def publication_result(row, action):
         outcome = "not_verified"
     elif (
         state == "verified"
-        and receipt.get("actor") == f"recovery:{str(action['ActionID']).lower()}"
+        and receipt.get("actor") == actor
         and receipt.get("proof_id")
         and receipt.get("state") in {"confirmed", "damaged", "absent"}
     ):
