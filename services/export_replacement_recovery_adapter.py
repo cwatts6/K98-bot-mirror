@@ -90,26 +90,30 @@ class ReplacementRecoveryAdapter:
             for link in evidence.get("recovery_links", [])
             if link["label"] == "Review repair export"
         ]
-        if repairs and not resolved:
+        if repairs:
             members = self.base.discovery.repairs(job_id)
             if len(members) > 32:
                 raise SourceConflict(
                     "Repair membership exceeds the verification bound; history is retained."
                 )
             children = [self._inspect(child["JobID"], (*ancestors, job_id)) for child in members]
-            if children and all(
+            resolved = bool(children) and all(
                 done
                 and child.get("outcome")
                 in {"confirmed", "replacement_delivered", "repair_delivered"}
                 for child, _, done in children
-            ):
+            )
+            if resolved:
                 evidence.update(
                     outcome="repair_delivered",
                     explanation="The separate repair and any verified replacement successor have confirmed delivery. The original outcome and receipts remain unchanged.",
                     actions={},
                 )
                 token = digest([token, [value for _, value, _ in children]]).hex()
-                resolved = True
+            else:
+                evidence["explanation"] = (
+                    "A separate recovery export still needs verified delivery or further repair. Use Review repair export; the original incident remains open and its history is unchanged."
+                )
         return evidence, token, resolved
 
     @staticmethod

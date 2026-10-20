@@ -328,6 +328,10 @@ def test_recovery_export_uses_durable_repair_id_and_reads_receipt_after_ack_loss
     assert adapter.inspect(job_id)[0]["recovery_links"][0]["source_id"] == repair["JobID"]
     repair["State"] = "confirmed"
     assert adapter.inspect(job_id)[2]
+    repair["ProvenanceJson"] = json.dumps(
+        dict(repair=plan, reconciliations=[dict(proof=dict(state="damaged"))])
+    )
+    assert not adapter.inspect(job_id)[2]
     adapter.coordinator.repair_receipt.return_value["actor"] = "other"
     with pytest.raises(SourceConflict, match="belong"):
         adapter.reconcile(job_id, action)

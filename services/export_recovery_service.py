@@ -64,6 +64,7 @@ class ExportRecoveryAdapter:
         damaged = bool(history and history[-1].get("proof", {}).get("state") == "damaged")
         absent = bool(history and history[-1].get("proof", {}).get("state") == "absent")
         repairs = []
+        repairs_delivered = False
         actions = {}
         explanation = "The export has not reached a verified terminal outcome. Its current reservation and attempt evidence are retained."
         if job["State"] == "failed" and not attempts and not snapshot["streams"] and not queued:
@@ -85,10 +86,18 @@ class ExportRecoveryAdapter:
             (job["State"] == "confirmed" and damaged) or (job["State"] == "failed" and absent)
         ):
             repairs = self.discovery.repairs(source_id)
+            repairs_delivered = bool(repairs) and all(
+                repair["State"] == "confirmed"
+                and (json.loads(repair["ProvenanceJson"]).get("reconciliations") or [{}])[-1]
+                .get("proof", {})
+                .get("state")
+                != "damaged"
+                for repair in repairs
+            )
             if repairs:
                 explanation = (
                     "The separate recovery export has a confirmed delivery. The original attempt and receipts are preserved."
-                    if all(repair["State"] == "confirmed" for repair in repairs)
+                    if repairs_delivered
                     else "A separate recovery export is awaiting verified delivery. Use Review repair export for progress or any new failure; this original incident stays open until delivery is confirmed. The original attempt and receipts are preserved."
                 )
             elif self.rebuild_plan is not None:
@@ -114,7 +123,7 @@ class ExportRecoveryAdapter:
             explanation = "The safe retry is recorded. Normal queue admission will take its original turn and acquire a fresh fence. This does not yet confirm delivery."
         resolved = job["State"] in {"confirmed", "cancelled", "coalesced"} or queued
         if (job["State"] == "confirmed" and damaged) or (job["State"] == "failed" and absent):
-            resolved = bool(repairs) and all(repair["State"] == "confirmed" for repair in repairs)
+            resolved = repairs_delivered
         if (
             job["State"] == "running"
             and provenance.get("safe_retry_history")

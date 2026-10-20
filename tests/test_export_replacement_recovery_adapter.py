@@ -88,7 +88,10 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
         ("retired", True, False),
     ],
 )
-def test_original_repair_waits_for_verified_successor_delivery(adapter, outcome, done, expected):
+@pytest.mark.parametrize("parent_claims_delivery", [False, True])
+def test_original_repair_waits_for_verified_successor_delivery(
+    adapter, outcome, done, expected, parent_claims_delivery
+):
     import json
 
     r = adapter
@@ -113,7 +116,7 @@ def test_original_repair_waits_for_verified_successor_delivery(adapter, outcome,
             ),
         ),
         "a" * 64,
-        False,
+        parent_claims_delivery if job == "parent" else False,
     )
     r.runtime.client.replacement_recovery.side_effect = lambda *_args, **_kw: dict(
         evidence=dict(actions={}, outcome=outcome), token="b" * 64, resolved=done
