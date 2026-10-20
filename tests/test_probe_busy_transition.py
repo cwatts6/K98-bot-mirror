@@ -23,8 +23,7 @@ def test_probe_busy_transition_pins_complete_runtime():
                     assert changed["before_sha256"] == expected
                     expected = changed["after_sha256"]
         assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == expected
+            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == expected
         )
 
 

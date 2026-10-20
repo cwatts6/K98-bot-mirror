@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_recovery_service import (
     ExportRecoveryAdapter,
     RolloverRecoveryAdapter,
@@ -374,6 +374,8 @@ def test_rollover_confirmation_requires_exact_proof_and_reads_its_audit_after_ac
             OldKVK=1,
             NewKVK=2,
             ProgressJson=json.dumps(dict(request=dict(phase="setup_pending"))),
+            PlanJson="{}",
+            PlanHash=digest({}).hex(),
         ),
         resources=[],
     )

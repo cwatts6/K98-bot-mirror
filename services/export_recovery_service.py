@@ -505,11 +505,11 @@ class RolloverRecoveryAdapter:
 def rollover_parent_link(operation):
     """Reconstruct navigation from the immutable plan after a restart."""
     plan = json.loads(operation.get("PlanJson", "{}"))
+    if digest(plan).hex() != operation.get("PlanHash"):
+        raise SourceConflict("Original rollover linkage cannot be verified.")
     link = plan.get("replacement_rollover")
     if not link:
         return None
-    if digest(plan).hex() != operation.get("PlanHash"):
-        raise SourceConflict("Original rollover linkage cannot be verified.")
     parent = identity(link["operation_id"])
     if parent == operation["OperationID"]:
         raise SourceConflict("Original rollover linkage is cyclic.")
@@ -520,6 +520,8 @@ def rollover_decision_context(snapshot):
     """Original season intent and configuration comparison, without inventing a cause."""
     operation = snapshot["operation"]
     plan = json.loads(operation.get("PlanJson", "{}"))
+    if digest(plan).hex() != operation.get("PlanHash"):
+        raise SourceConflict("Original rollover configuration cannot be verified.")
     original = plan.get("snapshot", {}).get("pool", {})
     installed = snapshot.get("pool", {}).get("pool", {})
     old_hash, current_hash = original.get("RegistrationHash"), installed.get("RegistrationHash")

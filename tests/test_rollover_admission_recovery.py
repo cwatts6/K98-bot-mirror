@@ -26,6 +26,8 @@ def fixture(state="closing"):
             OldKVK=16,
             NewKVK=17,
             ProgressJson="{}",
+            PlanJson="{}",
+            PlanHash=digest({}).hex(),
         ),
         pool=dict(jobs=[], legacy_receipts=[]),
         resources=[],
@@ -175,6 +177,7 @@ def test_original_configuration_summary_preserves_unknown_fault():
     snapshot["operation"]["PlanJson"] = json.dumps(
         dict(snapshot=dict(pool=dict(RegistrationHash="a")))
     )
+    snapshot["operation"]["PlanHash"] = digest(json.loads(snapshot["operation"]["PlanJson"])).hex()
     snapshot["pool"]["pool"] = dict(RegistrationHash="a")
     summary = adapter.inspect("operation")[0]["failure_context"]["summary"]
     assert "16 to 17" in summary and "settings match" in summary
@@ -182,6 +185,21 @@ def test_original_configuration_summary_preserves_unknown_fault():
     snapshot["pool"]["pool"]["RegistrationHash"] = "b"
     summary = adapter.inspect("operation")[0]["failure_context"]["summary"]
     assert "settings differ" in summary and "does not identify the fault" in summary
+
+
+@pytest.mark.parametrize("state", ["closing", "ready", "completed"])
+def test_altered_ordinary_plan_cannot_supply_a_decision_or_confirmation(state):
+    service, adapter, store, row, snapshot = fixture(state)
+    snapshot["operation"]["PlanJson"] = json.dumps(
+        dict(snapshot=dict(pool=dict(RegistrationHash="altered")))
+    )
+    snapshot["pool"]["pool"] = dict(RegistrationHash="altered")
+    with pytest.raises(SourceConflict, match="cannot be verified"):
+        adapter.inspect("operation")
+    with pytest.raises(SourceConflict, match="cannot be verified"):
+        execute(service, row, action=ACTION)
+    adapter.rollover.advance.assert_not_called()
+    assert not store.actions
 
 
 def test_reopened_completed_replacement_retains_verified_original_link():
