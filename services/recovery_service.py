@@ -43,13 +43,23 @@ class RecoveryService:
             )
         adapter = self.adapters[row["SourceKind"]]
         with recovery_execution(incident_id) as acquired:
-            if acquired:
-                for action in self.store.pending_actions(incident_id):
-                    outcome = adapter.reconcile(row["SourceID"], action)
-                    if outcome:
-                        self.store.finish(
-                            incident_id, action["ActionID"], outcome, {"verification": outcome}
-                        )
+            if not acquired:
+                return self.present(row)
+            for action in self.store.pending_actions(incident_id):
+                outcome = adapter.reconcile(row["SourceID"], action)
+                if outcome:
+                    self.store.finish(
+                        incident_id, action["ActionID"], outcome, {"verification": outcome}
+                    )
+            return self._inspect(row)
+
+    def _inspect(self, row):
+        if row["SourceKind"] not in self.adapters:
+            raise SourceConflict(
+                "Repair the private-evidence incident in the recovery centre first. "
+                "Normal recovery checks will resume after registration verifies."
+            )
+        adapter = self.adapters[row["SourceKind"]]
         evidence, token, resolved = adapter.inspect(row["SourceID"])
         current = self.store.observe(
             row["SourceKind"], row["SourceID"], evidence, token, resolved=resolved
@@ -334,7 +344,9 @@ class RecoveryService:
         payload=None,
         draft_version=None,
     ):
-        row = self.refresh(incident_id)
+        # The caller owns this incident's execution guard. Other callers must use
+        # cached progress, but fresh dispatch still needs a fresh domain check.
+        row = self._inspect(self.store.get(incident_id))
         if row["State"] == "resolved" and not (
             row["SourceKind"] == "export_job"
             and action == "verify_publication"

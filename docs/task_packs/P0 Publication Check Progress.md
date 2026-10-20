@@ -24,6 +24,9 @@ A process-shared, nonblocking incident guard excludes receipt reconciliation and
 repeat execution while the original recovery call remains active. Service objects
 are rebuilt per interaction, so an instance-only guard is insufficient. Other
 incidents remain independently available. Exceptions release the local guard.
+Concurrent review returns the stored incident and local progress without entering
+an authority-backed inspection. Fresh dispatch by the guard owner still performs
+its normal domain inspection and evidence check.
 
 This is scheduling, not authority. Durable action claims, actor permissions,
 fresh evidence, domain ownership and receipt verification remain mandatory.
@@ -41,6 +44,11 @@ busy before dispatch, so they cannot block the serial control connection.
 Other actions are also refused as busy before dispatch; local
 observational calls made by the proof itself retain the existing typed broker.
 Authority shutdown joins its owned proof before draining the execution session.
+An already-owned mutation delivery waits on the exact authenticated pre-dispatch
+busy response, retaining its claim and attempt. It retries only the refused
+message, not an unknown acknowledgment or dispatched provider request. Read-only
+probes still return busy promptly. This prevents publication checks from turning
+unrelated queued exports into uncertain failures.
 
 The admin receives an immediate private explanation of the wait. Recheck and the
 downloadable report show the live call's elapsed time without treating that

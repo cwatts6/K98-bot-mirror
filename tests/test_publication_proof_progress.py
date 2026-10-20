@@ -240,3 +240,86 @@ def test_drain_waits_for_owned_proof_and_refuses_new_admission():
     assert drained.is_set()
     assert runner.poll(key, {})["state"] == "unavailable"
     assert runner.poll(key, {})["result"] is None
+
+
+def test_claimed_export_waits_for_proof_without_failing_or_repeating_attempt(monkeypatch):
+    from services.export_coordination_service import ExportCoordinator
+    from services.export_runtime_composition import AuthorityStream
+
+    waiting, available = Event(), Event()
+    client, dal = Mock(), Mock()
+    claim = Mock(job_id=str(uuid4()))
+    dal.pending_intents.return_value = []
+    dal.accounts.return_value = ["account"]
+    dal.claim_next.return_value = claim
+    dal.authorize.return_value = dict(ConsumerKind="new_source", SpoolKey=None)
+    attempts, opened = [], []
+
+    def open_stream(stream_id, scope):
+        if not available.is_set():
+            waiting.set()
+            raise AuthorityProofBusy("Existing publication proof")
+        opened.append(stream_id)
+
+    client.open_stream.side_effect = open_stream
+    monkeypatch.setattr("time.sleep", lambda _: available.wait(0.01))
+
+    def deliver(*args):
+        attempts.append(claim.job_id)
+        with AuthorityStream(client, {"Purpose": "mutation"}) as stream:
+            stream.execute({"stream_id": stream.stream_id})
+
+    coordinator = ExportCoordinator(dal, adapters={"new_source": deliver})
+    worker = Thread(target=coordinator.run_batch, args=(Event(),))
+    worker.start()
+    try:
+        assert waiting.wait(5)
+        dal.fail.assert_not_called()
+        client.execute.assert_not_called()
+        assert attempts == [claim.job_id]
+    finally:
+        available.set()
+        worker.join(5)
+    assert not worker.is_alive()
+    dal.fail.assert_not_called()
+    dal.claim_next.assert_called_once()
+    assert len(opened) == len(attempts) == 1
+    client.execute.assert_called_once()
+    client.close_stream.assert_called_once()
+    assert len({call.args[0] for call in client.open_stream.call_args_list}) == 1
+
+
+@pytest.mark.parametrize("method", ["open_stream", "execute", "close_stream"])
+def test_owned_mutation_retries_only_authenticated_pre_dispatch_busy(method, monkeypatch):
+    from services.export_runtime_composition import AuthorityStream
+
+    client = Mock()
+    stream = AuthorityStream(client, {"Purpose": "mutation"})
+    operation = getattr(client, method)
+    operation.side_effect = [AuthorityProofBusy("busy"), "acknowledged"]
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    assert stream._wait_before_dispatch(operation, "same-message") == "acknowledged"
+    assert [call.args for call in operation.call_args_list] == [
+        ("same-message",),
+        ("same-message",),
+    ]
+    operation.reset_mock(side_effect=True)
+    operation.side_effect = ExecutionUncertain("Lost reply")
+    with pytest.raises(ExecutionUncertain):
+        stream._wait_before_dispatch(operation, "same-message")
+    operation.assert_called_once()
+
+
+def test_probe_busy_returns_without_waiting_or_dispatch(monkeypatch):
+    from services.export_runtime_composition import AuthorityStream
+
+    client = Mock()
+    client.open_stream.side_effect = AuthorityProofBusy("busy")
+    sleep = Mock()
+    monkeypatch.setattr("time.sleep", sleep)
+    with pytest.raises(AuthorityProofBusy):
+        with AuthorityStream(client, {"Purpose": "probe"}):
+            pytest.fail("Refused probe entered")
+    client.open_stream.assert_called_once()
+    client.execute.assert_not_called()
+    sleep.assert_not_called()

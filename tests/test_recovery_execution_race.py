@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from services.export_proof_progress import AuthorityProofBusy
 from services.recovery_execution_guard import recovery_execution
 from services.recovery_service import RecoveryService
 from tests.test_export_recovery import job_fixture
@@ -13,7 +14,7 @@ from tests.test_guided_recovery import ACTOR, Store
 
 
 @pytest.mark.parametrize("stream_visible", [False, True])
-def test_recheck_and_repeat_confirmation_do_not_race_live_publication(stream_visible):
+def test_recheck_and_repeat_confirmation_do_not_race_live_publication(stream_visible, monkeypatch):
     adapter, snapshot = job_fixture(state="confirmed", attempted=True)
     store = Store()
     source = snapshot["job"]["JobID"]
@@ -62,8 +63,17 @@ def test_recheck_and_repeat_confirmation_do_not_race_live_publication(stream_vis
     worker.start()
     try:
         assert entered.wait(5)
+        original_inspect = adapter.inspect
+
+        def inspect(source_id):
+            if not finish.is_set():
+                raise AuthorityProofBusy("Authority-backed inspection is busy")
+            return original_inspect(source_id)
+
+        monkeypatch.setattr(adapter, "inspect", inspect)
         reviewed = service().review(ACTOR, row["IncidentID"])
         assert reviewed["pending_action"] == dict(state="dispatched", kind="verify_publication")
+        assert reviewed["execution_progress"]["state"] == "in_progress"
         assert store.actions[0]["State"] == "dispatched"
         repeated = service().execute(
             ACTOR,

@@ -2941,21 +2941,38 @@ class AuthorityStream(AbstractContextManager):
         if self._entered or self._closed:
             raise ExecutionUncertain("Authority stream cannot be reopened or adopted.")
         self._entered = True
-        self.client.open_stream(self.stream_id, self.scope)
+        self._wait_before_dispatch(self.client.open_stream, self.stream_id, self.scope)
         return self
+
+    def _wait_before_dispatch(self, method, *args):
+        from time import sleep
+
+        from services.export_proof_progress import AuthorityProofBusy
+
+        while True:
+            try:
+                return method(*args)
+            except AuthorityProofBusy:
+                if self.scope.get("Purpose") != "mutation":
+                    raise
+                # The authenticated response proves this message was refused
+                # before dispatch. Keep the existing owned delivery/attempt and
+                # wait; never turn local proof contention into a failed export.
+                # Lost or malformed acknowledgements are not retried here.
+                sleep(1)
 
     def execute(self, message):
         if not self._entered or self._closed:
             raise ExecutionUncertain("Provider stream is not open.")
         if message.get("stream_id") != self.stream_id:
             raise ExecutionUncertain("Provider request belongs to another stream.")
-        return self.client.execute(message)
+        return self._wait_before_dispatch(self.client.execute, message)
 
     def __exit__(self, _type, _value, _traceback):
         if not self._entered or self._closed:
             raise ExecutionUncertain("Stream closure cannot be repeated.")
         self._closed = True  # Even a lost acknowledgment cannot cause a second close.
-        self.closure = self.client.close_stream(self.stream_id)
+        self.closure = self._wait_before_dispatch(self.client.close_stream, self.stream_id)
         return False
 
 
