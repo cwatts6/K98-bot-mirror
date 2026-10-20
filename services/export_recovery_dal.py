@@ -2,7 +2,7 @@
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
 from kvk.dal.source_output_pool_dal import _wire
-from services.export_coordination_dal import identity
+from services.export_coordination_dal import identity, publication_successor
 
 
 class ExportRecoveryDAL:
@@ -143,12 +143,14 @@ class ExportRecoveryDAL:
             ) != self.destinations.get(bytes(job["DestinationSetHash"])):
                 raise SourceConflict("Export resource membership differs from its registered pool.")
             season = None
+            successor = None
             if job["ConsumerKind"] == "new_source":
                 cursor.execute(
                     "SELECT SourceKey,SeasonState,SeasonVersion FROM KVK.SeasonSource WHERE KVK_NO=?",
                     job["KVK_NO"],
                 )
                 season = one(cursor)
+                successor = publication_successor(cursor, job)
             return _wire(
                 dict(
                     job=job,
@@ -157,6 +159,7 @@ class ExportRecoveryDAL:
                     resources=resources,
                     isolated_targets=isolated_targets,
                     season=season,
+                    publication_successor=successor,
                 )
             )
 
@@ -178,7 +181,8 @@ class ExportRecoveryDAL:
         return [self.job(key)["job"] for key in ids]
 
     def registered_publication(self, job_id, coordinator):
-        self.job(job_id)
+        if self.job(job_id).get("publication_successor"):
+            raise SourceConflict("A newer publication exists. Review the current published output.")
         snapshot = coordinator.operator_snapshot(job_id)
         self.registration.sheets(snapshot["pool"])
         return snapshot

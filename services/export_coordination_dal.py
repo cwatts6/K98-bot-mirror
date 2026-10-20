@@ -29,6 +29,31 @@ from services.export_contention import CoordinationLockRefused, sql_error_facts
 logger = logging.getLogger(__name__)
 
 
+def publication_successor(cursor, job):
+    """Read a newer confirmed publication in this exact account/destination epoch."""
+    destination = job["DestinationSetHash"]
+    cursor.execute(
+        "SELECT TOP (1) JobID,Version,CreatedUTC FROM dbo.ExportJob WHERE "
+        "ConsumerKind='new_source' AND State='confirmed' AND AccountKey=? "
+        "AND DestinationSetHash=CAST(? AS binary(32)) AND PoolEpoch=? "
+        "AND (CreatedUTC>CAST(? AS datetime2) OR "
+        "(CreatedUTC=CAST(? AS datetime2) AND JobID>CAST(? AS uniqueidentifier))) "
+        "ORDER BY CreatedUTC DESC,JobID DESC",
+        job["AccountKey"],
+        bytes.fromhex(destination) if isinstance(destination, str) else bytes(destination),
+        job["PoolEpoch"],
+        job["CreatedUTC"],
+        job["CreatedUTC"],
+        job["JobID"],
+    )
+    return one(cursor)
+
+
+def require_current_publication(cursor, job):
+    if publication_successor(cursor, job):
+        raise SourceConflict("A newer publication exists. Review the current published output.")
+
+
 def bounded_json(value):
     json.dumps(value, allow_nan=False)
     result = canonical(value)
@@ -1618,6 +1643,7 @@ class ExportCoordinationDAL:
                 _mutex(cursor, resource["ResourceKey"])
             if self._operator_snapshot(cursor, job["JobID"]) != snapshot:
                 raise SourceConflict("Reconciliation snapshot changed.")
+            require_current_publication(cursor, job)
             if self.execution_evidence:
                 from services.export_execution_dal import ExportExecutionDAL
 
@@ -1808,6 +1834,7 @@ class ExportCoordinationDAL:
                     raise SourceConflict("Repair must wait for every owning writer to drain.")
             if self._operator_snapshot(cursor, original["JobID"]) != snapshot:
                 raise SourceConflict("Damage/registration snapshot changed; preview again.")
+            require_current_publication(cursor, original)
             if self.execution_evidence:
                 from services.export_execution_dal import ExportExecutionDAL
 

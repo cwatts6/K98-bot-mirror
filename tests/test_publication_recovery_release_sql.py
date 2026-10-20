@@ -236,9 +236,15 @@ async def test_publication_confirmation_reads_existing_output_and_settles_exact_
 
 
 @pytest.mark.parametrize("publication", ["damaged"], indirect=True)
-def test_last_publication_remains_discoverable_until_newer_publication_confirms(publication):
+def test_last_publication_remains_discoverable_until_newer_publication_confirms(
+    publication, monkeypatch
+):
+    from kvk.dal.new_source_import_dal import SourceConflict
+
     p = publication
     original, newer = p.r.claim.job_id, str(uuid4())
+    adapter = p.service.adapters["export_job"]
+    _, original_token, _ = adapter.inspect(original)
     sql = p.r.f.sql
     sql.execute(
         "INSERT INTO #ExportJob "
@@ -277,6 +283,23 @@ def test_last_publication_remains_discoverable_until_newer_publication_confirms(
     listed = p.service.published_outputs(ACTOR)
     assert original not in [item["JobID"] for item in listed]
     assert newer in [item["JobID"] for item in listed]
+    with pytest.raises(SourceConflict, match="evidence changed"):
+        adapter.execute(original, "verify_publication", original_token, "admin", "Check output")
+    evidence, _, _ = adapter.inspect(original)
+    assert "verify_publication" not in evidence["actions"]
+    assert any(link["source_id"] == newer for link in evidence["recovery_links"])
+    with pytest.raises(SourceConflict, match="newer publication"):
+        adapter.discovery.registered_publication(original, p.r.coordinator)
+    # The final transaction repeats the guard even if a newer publication
+    # commits after the admin token and provider proof were checked.
+    snapshot = p.r.coordinator.operator_snapshot(original)
+    with pytest.raises(SourceConflict, match="newer publication"):
+        p.r.coordinator.reconcile_operator(snapshot, {}, actor="admin")
+    with pytest.raises(SourceConflict, match="newer publication"):
+        p.r.coordinator.admit_repair(
+            str(uuid4()), {"snapshot": snapshot, "proof": {}, "reason": "Restore output"}
+        )
+    assert sql.execute("SELECT COUNT(*) FROM #ExportReconciliationProof").fetchval() == 0
     assert tuple(p.r.provider.sent) == before
 
 

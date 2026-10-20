@@ -16,6 +16,7 @@ def job_token(snapshot):
     durable["job"].pop("Stalled", None)
     if snapshot["job"]["ConsumerKind"] == "new_source":
         durable["season"] = snapshot.get("season")
+        durable["publication_successor"] = snapshot.get("publication_successor")
     if snapshot.get("isolated_targets"):
         durable["isolated_targets"] = snapshot["isolated_targets"]
     return digest(durable).hex()
@@ -179,6 +180,15 @@ class ExportRecoveryAdapter:
                     "This export's season is not open with its original source. A retry cannot "
                     "be admitted. Its input and history are retained for season recovery."
                 )
+        successor = snapshot.get("publication_successor")
+        if successor:
+            for key in ("verify_publication", "retry_absent", "rebuild_damaged"):
+                actions.pop(key, None)
+            explanation = (
+                "A newer export has published to these destinations. The original history is "
+                "retained; checking or rebuilding this older output is no longer available. "
+                "Use Review current publication to inspect the newer output."
+            )
         evidence = dict(
             title="Spreadsheet export recovery",
             outcome=(
@@ -212,6 +222,15 @@ class ExportRecoveryAdapter:
                 dict(
                     label="Return to original export", kind="export_job", source_id=repair["JobID"]
                 )
+            )
+        if successor:
+            evidence["recovery_links"].insert(
+                0,
+                dict(
+                    label="Review current publication",
+                    kind="export_job",
+                    source_id=successor["JobID"],
+                ),
             )
         return evidence, job_token(snapshot), resolved
 
