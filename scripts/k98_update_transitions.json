@@ -580,6 +580,16 @@
           "after_sha256": "03a56abca63b8eafa84a40868f00877ccaab26cd2e693038f981274fd8f98732"
         }
       ]
+    },
+    {
+      "id": "drained_issuer_exit_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_startup_issuer.py",
+          "before_sha256": "4bc0cc7164bc51ae340755c809536bceb7f371aa5faef89e068346201c422db9",
+          "after_sha256": "9060757926460f24decc5310763d9e818082eef8933e7937bb4059420464342d"
+        }
+      ]
     }
   ]
 }

@@ -208,7 +208,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         "core/export_process_identity.py",
         "core/export_startup_windows.py",
         "services/export_startup_reconciliation.py",
-        "scripts/run_export_startup_issuer.py",
         "scripts/run_export_process_gate.py",
         "scripts/provision_export_process_pair.py",
         "scripts/prepare_k98_release.py",
@@ -234,7 +233,14 @@ def test_startup_contract_changes_are_rejected_before_blob_reads(path):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
 
 
-def test_predecessor_preparer_rejects_target_generator_and_consumer_changes():
+def test_predecessor_preparer_rejects_target_generator_and_consumer_changes(monkeypatch):
+    from scripts import prepare_k98_update as updater
+
+    installed = [
+        item for item in updater.reviewed_transitions() if item["id"] != "drained_issuer_exit_v1"
+    ]
+    monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
+
     def forbidden_read(*_):
         pytest.fail("Target contract code must not run or supply seed inputs")
 

@@ -161,6 +161,34 @@ def acknowledge_role(pipe, created, role, plan, raw):
         raise
 
 
+def record_handoff_failure(directory, deployment, error, write_file):
+    """Best-effort private diagnostic after drain; never substitute for its receipt."""
+    from services.export_execution_protocol import encode
+
+    kind = type(error).__name__
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", kind) is None:
+        kind = "UnclassifiedError"
+    record = dict[str, Any](
+        version=1,
+        stage="deployment_handoff_failed",
+        release_id=deployment["request"]["release_id"],
+        request_sha256=deployment["request_sha256"],
+        error_type=kind,
+        retry=False,
+    )
+    try:
+        write_file(
+            Path(directory) / ("deployment-handoff-failure-" + record["release_id"] + ".json"),
+            encode(record),
+        )
+    except BaseException:
+        # A full/unavailable evidence volume must not re-enter the supervisor
+        # hold after the owned jobs are already empty. Existing evidence stays
+        # unchanged and the updater still requires its exact drain receipt.
+        return False
+    return True
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Protected S11 automatic startup issuer")
     parser.add_argument("--policy", default=r"C:\ProgramData\K98\S11\AutomaticStartupPolicy.json")
@@ -325,6 +353,7 @@ def main(argv=None):
             created = {}
             handles = {}
             bindings = {}
+            handoff_finalizing = False
             try:
                 for role in ("authority", "bot"):
                     pipe = create_private_pipe(
@@ -429,6 +458,10 @@ def main(argv=None):
                 for role in created:
                     release_created_role(created[role])
                 if deployment is not None:
+                    # From here no supervised work remains: native termination,
+                    # SQL reconciliation and empty owned jobs have all passed.
+                    # Receipt/console failures must not retain this issuer.
+                    handoff_finalizing = True
                     acknowledge_deployment(
                         deployment,
                         previous=previous,
@@ -436,15 +469,8 @@ def main(argv=None):
                         state_directory=policy["state_directory"],
                         write_file=lambda path, raw: write_new_protected(path, raw, sid),
                     )
-                    print(
-                        json.dumps(
-                            dict(
-                                stage="DEPLOYMENT_HANDOFF_READY",
-                                release_id=deployment["request"]["release_id"],
-                            )
-                        ),
-                        flush=True,
-                    )
+                    # The protected receipt is the handoff. Console writes can
+                    # block or fail even after that durable handoff succeeded.
                     return 0
                 if exit_code == 0:
                     print(
@@ -479,6 +505,14 @@ def main(argv=None):
                 # Retain their protected observation, never reuse closed handles.
                 termination = previous_termination(policy["state_directory"], previous, inspect)
             except BaseException as error:
+                if handoff_finalizing:
+                    record_handoff_failure(
+                        policy["state_directory"],
+                        deployment,
+                        error,
+                        lambda path, raw: write_new_protected(path, raw, sid),
+                    )
+                    return 12
                 if not (directory / "commit.json").exists():
                     for item in created.values():
                         stop_unadmitted_role(item)

@@ -43,6 +43,8 @@ TOOL_SOURCE_PATHS = frozenset(
 RELEASE_DESCRIPTION = "deploy/k98-release.json"
 SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
 
+DRAINED_ISSUER_TRANSITION_PATHS = frozenset({"scripts/run_export_startup_issuer.py"})
+
 
 def coordinated_policy():
     """Load only the installed authenticated companion, never acquired source."""
@@ -249,6 +251,9 @@ def reviewed_transitions():
                 item["id"] == "fresh_report_cache_diagnostics_v1"
                 and path in REPORT_CACHE_TRANSITION_PATHS
             )
+            fixed_issuer = (
+                item["id"] == "drained_issuer_exit_v1" and path in DRAINED_ISSUER_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -262,6 +267,7 @@ def reviewed_transitions():
                     or fixed_progress
                     or fixed_probe_busy
                     or fixed_report_cache
+                    or fixed_issuer
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -274,6 +280,8 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:
+            raise ValueError("Complete fixed drained-issuer transition required.")
         if (
             item["id"] == "fresh_report_cache_diagnostics_v1"
             and paths != REPORT_CACHE_TRANSITION_PATHS
