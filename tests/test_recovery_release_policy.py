@@ -70,7 +70,7 @@ def test_partially_released_export_explains_available_and_withheld_choices():
         evidence=dict(
             actions={
                 "isolate_targets": {"label": "Retire affected outputs"},
-                "verify_publication": {"label": "Verify publication"},
+                "future_unqualified_repair": {"label": "Future repair"},
             }
         ),
     )
@@ -78,7 +78,7 @@ def test_partially_released_export_explains_available_and_withheld_choices():
     assert set(current["evidence"]["actions"]) == {"isolate_targets"}
     assert "buttons shown here are available" in current["release_notice"]
     assert "Additional repairs" in current["release_notice"]
-    assert set(row["evidence"]["actions"]) == {"isolate_targets", "verify_publication"}
+    assert set(row["evidence"]["actions"]) == {"isolate_targets", "future_unqualified_repair"}
 
 
 def withheld(kind="export_rollover"):

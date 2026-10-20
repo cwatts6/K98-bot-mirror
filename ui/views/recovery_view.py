@@ -190,7 +190,11 @@ class RecoveryIncidentView(discord.ui.View):
             # A verified rollback closes the old attempt, but the admin still
             # needs the separate fresh-publication/keep-prior decision. Opening
             # that linked incident rechecks authorization and current evidence.
-            if row["State"] == "resolved" and linked_kind != "configuration_continuation":
+            if (
+                row["State"] == "resolved"
+                and linked_kind != "configuration_continuation"
+                and label != "Return to original export"
+            ):
                 continue
             linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
 
@@ -367,6 +371,12 @@ class RecoveryListView(discord.ui.View):
     async def queue_blockers(self, button, interaction):
         await show_centre(interaction, queues_only=True)
 
+    @discord.ui.button(label="Check published outputs", style=discord.ButtonStyle.secondary)
+    async def publications(self, button, interaction):
+        from ui.views.recovery_publication_view import show_publications
+
+        await show_publications(interaction)
+
 
 class RecoveryReportView(discord.ui.View):
     def __init__(self, report):
@@ -538,3 +548,13 @@ class RecoveryEntryView(discord.ui.View):
     )
     async def queue_blockers(self, button, interaction):
         await show_centre(interaction, queues_only=True)
+
+    @discord.ui.button(
+        label="Check published outputs",
+        custom_id="k98:recovery:publications:v1",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def publications(self, button, interaction):
+        from ui.views.recovery_publication_view import show_publications
+
+        await show_publications(interaction)

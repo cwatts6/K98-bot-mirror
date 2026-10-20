@@ -18,11 +18,13 @@ async def show_target_page(interaction, incident_id, page):
         page = max(0, min(page, pages - 1))
         embed = discord.Embed(
             title="Recovery output locations",
-            description="Old files may still receive the delayed write. Use the verified replacements after their publication completes.",
+            description=row["evidence"].get("output_location_note")
+            or "Old files may still receive the delayed write. Use the verified replacements after their publication completes.",
             color=0xF1C40F,
         )
         for ordinal, old in enumerate(targets[page * 5 : (page + 1) * 5], page * 5 + 1):
-            text = f"[Old output](https://docs.google.com/spreadsheets/d/{old}/edit)"
+            publication = row["evidence"].get("target_purpose") == "publication"
+            text = f"[{'Registered output' if publication else 'Old output'}](https://docs.google.com/spreadsheets/d/{old}/edit)"
             if old in mapping:
                 text += (
                     f" → [Replacement](https://docs.google.com/spreadsheets/d/{mapping[old]}/edit)"
@@ -41,7 +43,7 @@ async def show_target_page(interaction, incident_id, page):
                             f"selected scan {checked['selected_scan']}, "
                             f"{checked['source_periods_checked']} source periods checked."
                         )
-            else:
+            elif not publication:
                 text += " · Replacement not yet chosen"
             embed.add_field(name=f"Output {ordinal}", value=text, inline=False)
         embed.set_footer(

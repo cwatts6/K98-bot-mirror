@@ -80,6 +80,51 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
     r.base.execute.assert_called_once_with("job", "verify_publication", original, "actor", "reason")
 
 
+@pytest.mark.parametrize(
+    "outcome,done,expected",
+    [
+        ("replacement_delivered", True, True),
+        ("replacement_delivered", False, False),
+        ("retired", True, False),
+    ],
+)
+def test_original_repair_waits_for_verified_successor_delivery(adapter, outcome, done, expected):
+    import json
+
+    r = adapter
+    parent = deepcopy(r.snapshot)
+    parent["job"].update(State="failed", JobID="parent")
+    parent["streams"] = []
+    child = deepcopy(r.snapshot)
+    child["job"].update(
+        JobID="child",
+        ProvenanceJson=json.dumps({"repair": {"snapshot": {"job": {"JobID": "parent"}}}}),
+    )
+    r.base.discovery.job.side_effect = lambda job: deepcopy(parent if job == "parent" else child)
+    r.base.discovery.repairs.return_value = [child["job"]]
+    r.base.inspect.side_effect = lambda job: (
+        dict(
+            actions={},
+            outcome="failed",
+            recovery_links=(
+                [dict(label="Review repair export", kind="export_job", source_id="child")]
+                if job == "parent"
+                else []
+            ),
+        ),
+        "a" * 64,
+        False,
+    )
+    r.runtime.client.replacement_recovery.side_effect = lambda *_args, **_kw: dict(
+        evidence=dict(actions={}, outcome=outcome), token="b" * 64, resolved=done
+    )
+    evidence, _, resolved = r.adapter.inspect("parent")
+    assert resolved is expected
+    assert (evidence["outcome"] == "repair_delivered") is expected
+    child_evidence, _, _ = r.adapter.inspect("child")
+    assert child_evidence["recovery_links"][0]["label"] == "Return to original export"
+
+
 @pytest.mark.parametrize("changed_part", ["job", "season"])
 def test_base_action_does_not_adopt_state_changed_during_authority_review(adapter, changed_part):
     r = adapter

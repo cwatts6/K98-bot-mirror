@@ -101,6 +101,44 @@ def incident(store):
     return store.observe("stats_import", str(uuid4()), {"actions": {}}, "a" * 64)
 
 
+@pytest.mark.parametrize("outcome", ["not_applied", "unknown", "verified"])
+def test_only_verified_nonapplication_opens_one_fresh_admin_decision(store, outcome):
+    row = incident(store)
+    action, acquired = store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "verify_publication",
+        "discord:1",
+        "Check original outcome",
+    )
+    assert acquired
+    store.finish(row["IncidentID"], action, outcome, {"verification": outcome})
+    current = store.get(row["IncidentID"])
+    assert current["Revision"] == row["Revision"] + (outcome == "not_applied")
+    assert current["EvidenceHash"] == row["EvidenceHash"]
+    if outcome == "not_applied":
+        store.finish(row["IncidentID"], action, outcome, {"verification": outcome})
+        assert store.get(row["IncidentID"])["Revision"] == current["Revision"]
+    assert not store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "verify_publication",
+        "discord:1",
+        "Old confirmation",
+    )[1]
+    _, new = store.claim(
+        current["IncidentID"],
+        current["Revision"],
+        current["EvidenceHash"],
+        "isolate_targets",
+        "discord:1",
+        "Reviewed separate disposition",
+    )
+    assert new is (outcome == "not_applied")
+
+
 def test_bounded_check_diagnostic_survives_restart_without_revision_churn(store):
     row = incident(store)
     detail = dict(
@@ -240,6 +278,45 @@ def test_stale_and_cross_scope_claims_cannot_dispatch(store):
     )
     with pytest.raises(SourceConflict):
         other.claim(row["IncidentID"], 1, "a" * 64, "release_failure", "discord:1", "confirmed")
+
+
+@pytest.mark.parametrize(
+    "kind,action,offered,allowed",
+    [
+        ("export_job", "verify_publication", True, True),
+        ("export_job", "verify_publication", False, False),
+        ("export_job", "retry_absent", True, False),
+        ("stats_import", "verify_publication", True, False),
+    ],
+)
+def test_only_explicit_publication_check_can_claim_resolved_incident(
+    store, kind, action, offered, allowed
+):
+    row = store.observe(
+        kind,
+        str(uuid4()),
+        {"actions": {action: {}} if offered else {}},
+        "a" * 64,
+        resolved=True,
+    )
+
+    def claim():
+        return store.claim(
+            row["IncidentID"],
+            row["Revision"],
+            row["EvidenceHash"],
+            action,
+            "discord:1",
+            "Check current output",
+        )
+
+    if allowed:
+        assert claim()[1]
+        assert store.get(row["IncidentID"])["State"] == "open"
+        assert not claim()[1]
+    else:
+        with pytest.raises(SourceConflict):
+            claim()
 
 
 def test_unknown_action_blocks_new_revision_dispatch(store):

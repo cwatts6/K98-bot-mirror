@@ -83,3 +83,19 @@ async def test_configuration_checklist_shows_row_counts_and_review_link(interact
     text = interaction.followup.send.call_args.kwargs["embed"].fields[0].value
     assert "ProcConfig: 2 rows" in text and "/new-file-0/edit" in text
     assert "verify these settings before activation" in text
+
+
+@pytest.mark.asyncio
+async def test_publication_locations_do_not_claim_replacements_or_delayed_writes(interaction):
+    current = row()
+    current["evidence"].update(
+        replacements={},
+        target_purpose="publication",
+        output_location_note="Registered publication; current contents require verification.",
+    )
+    view.call.return_value = current
+    await view.show_target_page(interaction, current["IncidentID"], 0)
+    embed = interaction.followup.send.call_args.kwargs["embed"]
+    assert "Registered publication" in embed.description
+    assert "Registered output" in embed.fields[0].value
+    assert "Replacement not yet chosen" not in embed.fields[0].value

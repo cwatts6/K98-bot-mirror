@@ -26,6 +26,10 @@ def _unchanged(actual, token):
         raise SourceConflict("Export evidence changed. Review the current recovery choices.")
 
 
+class PublicationCheckUnavailable(SourceConflict):
+    """Preparation failed before repair admission, settlement or retirement."""
+
+
 def skipped_export_verified(snapshot):
     job = snapshot["job"]
     return bool(
@@ -47,6 +51,9 @@ class ExportRecoveryAdapter:
 
     def pending_recovery(self, *, after=None):
         return self.discovery.pending_jobs(after=after)
+
+    def published_outputs(self, *, after=None):
+        return self.discovery.published_outputs(after=after)
 
     def inspect(self, source_id):
         snapshot = self.discovery.job(source_id)
@@ -79,7 +86,11 @@ class ExportRecoveryAdapter:
         ):
             repairs = self.discovery.repairs(source_id)
             if repairs:
-                explanation = "A separate recovery export has been queued. Its delivery and any new failure are monitored under that export; the original attempt and receipts are preserved."
+                explanation = (
+                    "The separate recovery export has a confirmed delivery. The original attempt and receipts are preserved."
+                    if all(repair["State"] == "confirmed" for repair in repairs)
+                    else "A separate recovery export is awaiting verified delivery. Use Review repair export for progress or any new failure; this original incident stays open until delivery is confirmed. The original attempt and receipts are preserved."
+                )
             elif self.rebuild_plan is not None:
                 actions["retry_absent" if absent else "rebuild_damaged"] = dict(
                     label="Retry verified absent export" if absent else "Rebuild verified damage",
@@ -93,11 +104,17 @@ class ExportRecoveryAdapter:
                 )
         if job["State"] == "confirmed" and not damaged:
             explanation = "The export has a confirmed delivery outcome. No repair is required for this recorded outcome; this is not a fresh check of the current spreadsheet contents."
+            if job["ConsumerKind"] == "new_source" and attempts:
+                actions["verify_publication"] = dict(
+                    label="Check published output",
+                    check="Confirm this is the retained output you want checked. Keep its registered files unchanged during verification.",
+                    effect="Read the registered publication and compare it with its retained receipt and contents. Record verified content damage for a separate repair decision. Missing ownership, permissions or pointer evidence never authorises a rebuild.",
+                )
         if queued:
             explanation = "The safe retry is recorded. Normal queue admission will take its original turn and acquire a fresh fence. This does not yet confirm delivery."
         resolved = job["State"] in {"confirmed", "cancelled", "coalesced"} or queued
         if (job["State"] == "confirmed" and damaged) or (job["State"] == "failed" and absent):
-            resolved = bool(repairs)
+            resolved = bool(repairs) and all(repair["State"] == "confirmed" for repair in repairs)
         if (
             job["State"] == "running"
             and provenance.get("safe_retry_history")
@@ -153,26 +170,41 @@ class ExportRecoveryAdapter:
                     "This export's season is not open with its original source. A retry cannot "
                     "be admitted. Its input and history are retained for season recovery."
                 )
-        return (
-            dict(
-                title="Spreadsheet export recovery",
-                outcome=(
-                    "replacement_required"
-                    if replacement_required
-                    else (
-                        "export_skipped"
-                        if provenance.get("export_skipped") and resolved
-                        else job["State"]
-                    )
-                ),
-                scan=job.get("KVK_NO"),
-                failure_context=recovery_failure_context(job, provenance),
-                explanation=explanation,
-                actions=actions,
+        evidence = dict(
+            title="Spreadsheet export recovery",
+            outcome=(
+                "replacement_required"
+                if replacement_required
+                else (
+                    "export_skipped"
+                    if provenance.get("export_skipped") and resolved
+                    else job["State"]
+                )
             ),
-            job_token(snapshot),
-            resolved,
+            season=job.get("KVK_NO"),
+            failure_context=recovery_failure_context(job, provenance),
+            recovery_links=[
+                dict(label="Review repair export", kind="export_job", source_id=repair["JobID"])
+                for repair in sorted(
+                    repairs, key=lambda repair: (repair["CreatedUTC"], repair["JobID"])
+                )[:3]
+            ],
+            explanation=explanation,
+            actions=actions,
         )
+        context = getattr(self.discovery, "decision_context", None)
+        if callable(context):
+            details = context(snapshot)
+            if isinstance(details, dict):
+                evidence.update(details)
+        repair = provenance.get("repair", {}).get("snapshot", {}).get("job", {})
+        if repair.get("JobID"):
+            evidence["recovery_links"].append(
+                dict(
+                    label="Return to original export", kind="export_job", source_id=repair["JobID"]
+                )
+            )
+        return evidence, job_token(snapshot), resolved
 
     def execute(self, source_id, action, token, actor, reason):
         snapshot = self.discovery.job(source_id)
@@ -201,18 +233,30 @@ class ExportRecoveryAdapter:
                 reason=reason,
             )
         elif action == "verify_publication" and job["ConsumerKind"] == "new_source":
-            current = self.discovery.registered_publication(source_id, self.coordinator)
-            if {k: v for k, v in job.items() if k != "Stalled"} != current["job"]:
-                raise SourceConflict("Publication changed after review.")
+            try:
+                current = self.discovery.registered_publication(source_id, self.coordinator)
+                if {k: v for k, v in job.items() if k != "Stalled"} != current["job"]:
+                    raise SourceConflict("Publication changed after review.")
+            except Exception as exc:
+                raise PublicationCheckUnavailable(
+                    "Publication registration could not be verified; no settlement was attempted."
+                ) from exc
             self._settle_publication(source_id, current, actor)
         elif action in {"rebuild_damaged", "retry_absent"} and self.rebuild_plan is not None:
-            self.discovery.registered_publication(source_id, self.coordinator)
-            plan = self.rebuild_plan(source_id, reason)
-            if {k: v for k, v in job.items() if k != "Stalled"} != plan["snapshot"]["job"]:
-                raise SourceConflict("Publication changed while preparing its repair.")
-            expected_outcome = "absent" if action == "retry_absent" else "damaged"
-            if plan["proof"].get("state") != expected_outcome:
-                raise SourceConflict("Publication outcome changed. Review its current recovery.")
+            try:
+                self.discovery.registered_publication(source_id, self.coordinator)
+                plan = self.rebuild_plan(source_id, reason)
+                if {k: v for k, v in job.items() if k != "Stalled"} != plan["snapshot"]["job"]:
+                    raise SourceConflict("Publication changed while preparing its repair.")
+                expected_outcome = "absent" if action == "retry_absent" else "damaged"
+                if plan["proof"].get("state") != expected_outcome:
+                    raise SourceConflict(
+                        "Publication outcome changed. Review its current recovery."
+                    )
+            except Exception as exc:
+                raise PublicationCheckUnavailable(
+                    "Repair preparation could not be verified; no export was admitted."
+                ) from exc
             # The centre persists the initiating Discord admin; the downstream
             # audit uses the durable action identity for acknowledgement recovery.
             plan["actor"] = actor
@@ -221,7 +265,15 @@ class ExportRecoveryAdapter:
             raise SourceConflict("This export recovery action is unavailable.")
 
     def _settle_publication(self, source_id, current, actor):
-        proof = self.reconciler.probe(deepcopy(current))
+        try:
+            proof = self.reconciler.probe(deepcopy(current))
+        except Exception as exc:
+            # This producer can only observe/close journals. No retirement or
+            # outcome settlement has been entered, so a refused check must not
+            # strand its admin action ahead of the separate replacement path.
+            raise PublicationCheckUnavailable(
+                "Publication could not be proven; original ownership and outcomes remain unchanged."
+            ) from exc
         if any(s["State"] == "retired" for s in current.get("pool", {}).get("slots", [])):
             if self.retirement is None:
                 raise SourceConflict("Retirement recovery is unavailable; reservations retained.")
@@ -254,6 +306,12 @@ class ExportRecoveryAdapter:
                 return "verified"
             if job_token(snapshot) != action["EvidenceHash"]:
                 return "not_applied"
+            if (
+                action.get("State") == "unknown"
+                and json.loads(action.get("ResultJson") or "{}").get("error_type")
+                == "PublicationCheckUnavailable"
+            ):
+                return "not_applied"
             self.execute(
                 source_id, action["ActionKind"], action["EvidenceHash"], actor, action["Reason"]
             )
@@ -278,6 +336,16 @@ class ExportRecoveryAdapter:
         if job_token(snapshot) != action["EvidenceHash"]:
             # Consuming DAL actions compare the original durable job version under
             # their account lock. A changed receipt cannot accept the old intent.
+            return "not_applied"
+        if (
+            action["ActionKind"] == "verify_publication"
+            and action.get("State") == "unknown"
+            and json.loads(action.get("ResultJson") or "{}").get("error_type")
+            == "PublicationCheckUnavailable"
+        ):
+            # Only the durably recorded initial read refusal can finish this
+            # way. A crash without that marker, or an unknown SQL/retirement
+            # outcome, must continue through its own receipt reconciliation.
             return "not_applied"
         self.execute(
             source_id, action["ActionKind"], action["EvidenceHash"], actor, action["Reason"]

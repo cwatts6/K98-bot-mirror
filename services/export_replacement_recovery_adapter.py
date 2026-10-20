@@ -2,7 +2,7 @@
 
 import json
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_failure_diagnostics import replacement_decision_context
 from services.export_recovery_service import job_token, skipped_export_verified
 from services.export_replacement_delivery import ReplacementDelivery
@@ -32,14 +32,28 @@ class ReplacementRecoveryAdapter:
     def pending_recovery(self, *, after=None):
         return self.base.pending_recovery(after=after)
 
+    def published_outputs(self, *, after=None):
+        return self.base.published_outputs(after=after)
+
     def inspect(self, job_id):
+        return self._inspect(job_id, ())
+
+    def _inspect(self, job_id, ancestors):
+        if job_id in ancestors or len(ancestors) >= 32:
+            raise SourceConflict(
+                "Repair ancestry cannot be verified; original history is retained."
+            )
         snapshot = self.base.discovery.job(job_id)
         # A saved retirement remains authoritative even if shared destinations
         # are subsequently isolated. Only private receipt verification may
         # resolve it; a malformed/unverifiable marker must not enable replacement.
         if "failed_export_retired" in json.loads(snapshot["job"]["ProvenanceJson"]):
             result = self.client.failed_export_recovery(job_id, "inspect")
-            return result["evidence"], result["token"], result["resolved"]
+            return (
+                self._with_parent(snapshot, result["evidence"]),
+                result["token"],
+                result["resolved"],
+            )
         if skipped_export_verified(snapshot):
             return self.base.inspect(job_id)
         if (
@@ -65,8 +79,56 @@ class ReplacementRecoveryAdapter:
                     and not (result["evidence"].get("delivery") or {}).get("job_id")
                 ):
                     result["evidence"]["actions"][action] = original["actions"][action]
-            return result["evidence"], result["token"], result["resolved"]
-        return self.base.inspect(job_id)
+            return (
+                self._with_parent(snapshot, result["evidence"]),
+                result["token"],
+                result["resolved"],
+            )
+        evidence, token, resolved = self.base.inspect(job_id)
+        repairs = [
+            link
+            for link in evidence.get("recovery_links", [])
+            if link["label"] == "Review repair export"
+        ]
+        if repairs and not resolved:
+            members = self.base.discovery.repairs(job_id)
+            if len(members) > 32:
+                raise SourceConflict(
+                    "Repair membership exceeds the verification bound; history is retained."
+                )
+            children = [self._inspect(child["JobID"], (*ancestors, job_id)) for child in members]
+            if children and all(
+                done
+                and child.get("outcome")
+                in {"confirmed", "replacement_delivered", "repair_delivered"}
+                for child, _, done in children
+            ):
+                evidence.update(
+                    outcome="repair_delivered",
+                    explanation="The separate repair and any verified replacement successor have confirmed delivery. The original outcome and receipts remain unchanged.",
+                    actions={},
+                )
+                token = digest([token, [value for _, value, _ in children]]).hex()
+                resolved = True
+        return evidence, token, resolved
+
+    @staticmethod
+    def _with_parent(snapshot, evidence):
+        original = (
+            json.loads(snapshot["job"]["ProvenanceJson"])
+            .get("repair", {})
+            .get("snapshot", {})
+            .get("job", {})
+        )
+        if original.get("JobID"):
+            evidence.setdefault("recovery_links", []).append(
+                dict(
+                    label="Return to original export",
+                    kind="export_job",
+                    source_id=original["JobID"],
+                )
+            )
+        return evidence
 
     def input_fields(self, job_id, action, token):
         return self.client.replacement_recovery(job_id, "fields", step=action, token=token)

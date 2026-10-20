@@ -1,6 +1,6 @@
 # P0 final recovery acceptance
 
-## Current boundary — 19 October 2026
+## Current boundary — 20 October 2026
 
 The operator requests completion of P0 as the next work package, retaining focused
 PRs where they reduce deployment risk. This is the finite completion checklist for
@@ -8,8 +8,8 @@ that package. It does not authorize an agent to merge, deploy, execute productio
 repairs or simulate production failures. Existing implementation and disposable
 testing approval carries forward. P0 is **not complete**.
 
-The deployed private revision is `515e3f00b55e612dbf23b821806f40d27ec340e6`.
-The supplied complete report (19 October, 20:21 UTC) includes 17,491 incidents,
+The deployed private revision is `2726deae890896dd4f87716ce13b2906c071b354`.
+The supplied complete report (20 October, 05:52 UTC) includes 17,492 incidents,
 all resolved, no pending verification or required repairs, and healthy monitoring.
 This closes that observed backlog, not every possible recovery path. Retired
 historical imports still have unknown original SQL outcomes.
@@ -23,7 +23,7 @@ those documents with `P0b Monitor and Admission Closeout.md`; none moves to P1.
 
 | ID | Remaining outcome | Current evidence and gap | Acceptance required |
 | --- | --- | --- | --- |
-| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement proposal, verification, activation and retained-input delivery exist. The deployed action policy withholds replacement and verified-publication repair actions. Historical retirement covers obsolete output only. | Admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement. |
+| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement proposal, verification, activation and retained-input delivery are deployed through #405/#657. Fresh publication checks and verified absence/damage repairs are the current focused candidate. Historical retirement covers obsolete output only. | Admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement. |
 | P0-F02 | Missing evidence and configuration/ownership conflicts | Exact-byte evidence repair is deployed; lost proposals/read checks have backend recovery. Loss of all valid containment/active-registration history and unattributed holds remain explicit gaps. | Guided evidence collection and comparison, exact verified restoration or a separately verified superseding repair. Preserve unverifiable history and foreign/live ownership. A terminal disposition must not claim a recovered original receipt. No indefinite generic Recheck-only workflow. |
 | P0-F03 | Interrupted producers and remaining import pipeline | Atomic configuration/report receipts, captured-output continuation and saved-admission decisions exist. Historical partial configuration, partial UPDATE_ALL2 reporting, remaining durable pipeline stages and failures before durable request creation remain required. | Resume only unfinished stages from durable receipts, or guide a separately confirmed superseding/disposition decision. Original input/configuration details, partial results, caches/maintenance/publication state and missing-input collection remain visible. Restart and lost acknowledgements cannot repeat committed work. |
 | P0-F04 | Rollover and cross-workflow access | Rollover containment/replacement backends exist but the deployed action policy withholds the family. Some blockers already link to their owning incident. | Qualify every interrupted rollover phase through real admin callbacks, authority journals, temporary SQL and worker settlement. Guided blocker navigation must return to the original repair. Prove exact release and independently verified final continuation. |
@@ -44,9 +44,9 @@ Each implementation row must retain its source files, tests, Changes review and
 operator verification evidence before being marked complete. No percentage or
 single-release completion promise is inferred from the cleared incident backlog.
 
-## Current focused change — replacement action qualification
+## Delivered milestone — replacement action qualification
 
-Candidate change enables the seven existing replacement steps for `export_job`:
+The deployed change enables the seven existing replacement steps for `export_job`:
 isolate targets, save replacement links, verify files, finish/discard a read check,
 activate replacements, publish retained input. It does not enable unqualified
 publication rebuild/absence actions, rollover, or partial-import acceptance.
@@ -83,11 +83,26 @@ confirmation, stale isolation refusal, and finishing a complete saved read journ
 without a new provider request. No old uncertain write is replayed. The updater
 has an exact three-file runtime transition for this release.
 
-This candidate still needs Changes review,
-protected-source packaging, PR CI/review and operator acceptance. It is not
-deployment-ready. No new SQL schema
+Replacement PRs #405/#657 are merged and deployed. Their exact package passed
+the protected Windows rehearsal; the operator report confirms the observed backlog
+is resolved. Fresh import/export health remains unconfirmed by the updater.
+No new SQL schema
 is proposed; contracts are checked against the authoritative SQL repository's
 reviewed `b663308a` checkout used by the installed migration profile.
+
+## Current focused candidate — publication verification and physical repair
+
+`P0b Verified Publication Recovery.md` owns the next P0-F01/F05 release. It adds
+private retained-publication selection, explicit current-output checks, separate
+repairs for proven absence/content damage, and original/repair navigation with
+independent delivery verification. The latest production report has no open
+incidents, so validation must not manufacture a production fault.
+
+All P0-F02/F03/F04 and unfinished P0-F01/F05 acceptance remains required. Missing
+permissions, registration, pointer evidence or all valid private copies are not
+classified as content damage. Closed seasons and foreign/live ownership remain
+protected. Pipeline startup `build_player_stats_cache` deadline observations
+remain in P0-F03; view rehydration is separately scoped below.
 
 ## P1 — wider bot recovery, as originally scoped
 

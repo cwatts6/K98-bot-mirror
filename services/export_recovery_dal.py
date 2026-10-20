@@ -58,6 +58,36 @@ class ExportRecoveryDAL:
             )
             return [identity(row["JobID"]) for row in rows(cursor)]
 
+    def published_outputs(self, *, after=None):
+        """Latest retained publication per destination/epoch, oldest first."""
+        with transaction(self.connect) as cursor:
+            marker = self.job(after)["job"] if after else None
+            cursor.execute(
+                "SELECT TOP (20) JobID,CreatedUTC,KVK_NO,InputHash FROM dbo.ExportJob j WHERE "
+                + self.job_scope
+                + " AND ConsumerKind='new_source' AND State='confirmed' "
+                "AND NOT EXISTS(SELECT 1 FROM dbo.ExportJob newer WHERE "
+                "newer.AccountKey=j.AccountKey AND newer.DestinationSetHash=j.DestinationSetHash "
+                "AND newer.PoolEpoch=j.PoolEpoch AND (newer.CreatedUTC>j.CreatedUTC OR "
+                "(newer.CreatedUTC=j.CreatedUTC AND newer.JobID>j.JobID))) "
+                + (
+                    "AND (CreatedUTC>CAST(? AS datetime2) OR "
+                    "(CreatedUTC=CAST(? AS datetime2) AND JobID>CAST(? AS uniqueidentifier))) "
+                    if marker
+                    else ""
+                )
+                + "ORDER BY CreatedUTC,JobID",
+                *self.job_parameters,
+                *((marker["CreatedUTC"], marker["CreatedUTC"], identity(after)) if marker else ()),
+            )
+            result = _wire(rows(cursor))
+        return result
+
+    def decision_context(self, snapshot):
+        from services.export_failure_diagnostics import publication_decision_context
+
+        return publication_decision_context(snapshot, self.registration.value())
+
     def pending_rollovers(self, *, after=None):
         with transaction(self.connect) as cursor:
             cursor.execute(

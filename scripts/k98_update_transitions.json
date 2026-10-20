@@ -365,6 +365,66 @@
           "after_sha256": "375165520d91648b30a0dca579a67a6481a0f3a300dc0d12a2db8a71a1d97138"
         }
       ]
+    },
+    {
+      "id": "guided_publication_recovery_v1",
+      "members": [
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "2f54321518916478368a674b2a0b5e2a8e9950982ef012f3d18d262c42ea34de",
+          "after_sha256": "3996db07e36e838656aa645e56e955b106b24f804854d2748c0d7531b77b9cf8"
+        },
+        {
+          "path": "services/export_failure_diagnostics.py",
+          "before_sha256": "64ff59aba8262f1b59117e1e2187bd563213bb1171d0811e92a3e9a3295b0a54",
+          "after_sha256": "ef49be02185c2ac81e09d903fd844c54871ff95ca24415cebd00da76cd4f3b7d"
+        },
+        {
+          "path": "services/export_recovery_dal.py",
+          "before_sha256": "744d523e33c440c61b56bab9eba8be2fdce839eb8deb31da7e170fc6c49ba4c3",
+          "after_sha256": "cf28e26bf480d2743037b34f01ad65a9ce14d905a3316fcdfbb91aa44e3002ab"
+        },
+        {
+          "path": "services/export_recovery_service.py",
+          "before_sha256": "dc2ccd8373b94b25d04062c74bfe040dc811abf1400f50f3f365827b161ab846",
+          "after_sha256": "ee38d79703d28ef0f7fe28e5eb55ecbcf361b79809e7ad420a60f49df1c9d447"
+        },
+        {
+          "path": "services/export_replacement_recovery_adapter.py",
+          "before_sha256": "45666a1da52ab472ea1558171379b4f623c00495dc2538ff7e139292951c77b5",
+          "after_sha256": "60e6d4607062473f9dee6e71e496f6a9f3a78967c3cf3fe49d6427ed918c38da"
+        },
+        {
+          "path": "services/recovery_dal.py",
+          "before_sha256": "853d513cdb3144690bf5f9d622d87c86f6430117bf44c7a0c9bf508ca2e15bd2",
+          "after_sha256": "1fa4b349f569d0411131d4489a8d6a154ee1fdd2025f29ca58526ad7ae7c1427"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "375165520d91648b30a0dca579a67a6481a0f3a300dc0d12a2db8a71a1d97138",
+          "after_sha256": "a17cb5c757c3b47beaf0a3b0860d2c4e3016610861781e6da197e712afd45446"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "e8bbf2017a438e160694829f4fe16dab9bba1716202d950af5a087ba1c41fa8e",
+          "after_sha256": "758d1a8c379f2d1ed1c1718bdb7c08b0dd7cf12812dbe3150e2780eb8ecfc122"
+        },
+        {
+          "path": "ui/views/recovery_publication_view.py",
+          "before_sha256": null,
+          "after_sha256": "1c0347b31bd28e311f00e19dc1a397f0ef9b2cd0964f425d1262eb9d1a7ff429"
+        },
+        {
+          "path": "ui/views/recovery_target_view.py",
+          "before_sha256": "595f0069f942995625b2eec78189ff1f9823bc13b352634f84c449f1a67409a2",
+          "after_sha256": "1b6382b2793a94bd710c5bbafe6abaf9c54bb609eae17e6bdf97e54caf703541"
+        },
+        {
+          "path": "ui/views/recovery_view.py",
+          "before_sha256": "a71feed040b44424112f6e2fcb1505c1ba41c7cd521297d9f26d769f0a858213",
+          "after_sha256": "6cafe03bdbe9db5d1b6d1a3fb20e68963b28ffac839a1b3ee45a02c58bb8116f"
+        }
+      ]
     }
   ]
 }

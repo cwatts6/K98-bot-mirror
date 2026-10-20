@@ -20,7 +20,7 @@ def test_replacement_workflow_transition_pins_every_runtime_member():
             (
                 m["after_sha256"]
                 for t in reversed(updater.reviewed_transitions())
-                if t["id"] == "guided_replacement_release_v1"
+                if t["id"] in {"guided_replacement_release_v1", "guided_publication_recovery_v1"}
                 for m in t["members"]
                 if m["path"] == member["path"]
             ),

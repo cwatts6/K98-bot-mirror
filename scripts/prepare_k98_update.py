@@ -125,6 +125,22 @@ REPLACEMENT_WORKFLOW_TRANSITION_PATHS = frozenset(
     }
 )
 
+PUBLICATION_RECOVERY_TRANSITION_PATHS = frozenset(
+    {
+        "services/export_coordination_dal.py",
+        "services/export_failure_diagnostics.py",
+        "services/export_recovery_dal.py",
+        "services/export_recovery_service.py",
+        "services/export_replacement_recovery_adapter.py",
+        "services/recovery_dal.py",
+        "services/recovery_release_policy.py",
+        "services/recovery_service.py",
+        "ui/views/recovery_view.py",
+        "ui/views/recovery_target_view.py",
+        "ui/views/recovery_publication_view.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -170,6 +186,10 @@ def reviewed_transitions():
                 item["id"] == "guided_replacement_release_v1"
                 and path in REPLACEMENT_WORKFLOW_TRANSITION_PATHS
             )
+            fixed_publication = (
+                item["id"] == "guided_publication_recovery_v1"
+                and path in PUBLICATION_RECOVERY_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -178,6 +198,7 @@ def reviewed_transitions():
                     or fixed_configuration
                     or fixed_monitor
                     or fixed_replacement
+                    or fixed_publication
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -209,6 +230,11 @@ def reviewed_transitions():
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed replacement workflow transition required.")
+        if (
+            item["id"] == "guided_publication_recovery_v1"
+            and paths != PUBLICATION_RECOVERY_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed publication recovery transition required.")
     return value["transitions"]
 
 

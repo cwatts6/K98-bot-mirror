@@ -204,3 +204,46 @@ def replacement_decision_context(job, registration):
         + context["summary"]
     )
     return context
+
+
+def publication_decision_context(snapshot, registration):
+    """Identify retained input without claiming current settings caused the fault."""
+    import json
+
+    job = snapshot["job"]
+    context = replacement_decision_context(job, registration)
+    targets = sorted(
+        r["ResourceKey"].removeprefix("destination:")
+        for r in snapshot["resources"]
+        if r["ResourceKey"].startswith("destination:")
+        and re.fullmatch(r"destination:[A-Za-z0-9_-]+", r["ResourceKey"])
+    )
+    if job["ConsumerKind"] == "new_source":
+        provenance = json.loads(job["ProvenanceJson"])
+        original = provenance.get("output_preflight", {})
+        matching = next(
+            (p for p in registration["pools"] if p["pool_id"] == original.get("pool_id")), None
+        )
+        files_match = bool(
+            matching and targets == sorted([matching["index_file_id"], *matching["slot_file_ids"]])
+        )
+        context["retained_input_sha256"] = job["InputHash"]
+        context["retained_intent_id"] = job["IntentID"]
+        context["retained_pool_epoch"] = job["PoolEpoch"]
+        context["configuration_comparison"] = (
+            "registered output files match"
+            if files_match
+            else "output registration differs or is unavailable"
+        )
+        context["summary"] = (
+            f"Created: {context['original_created_utc']} (UTC). KVK season {job['KVK_NO']}; "
+            f"retained input {job['InputHash'][:12]}. {context['configuration_comparison']}. "
+            "Repair uses the retained input and weights; it does not recompute them from today's settings. "
+            + recovery_failure_context(job, provenance)["summary"]
+        )
+    return dict(
+        failure_context=context,
+        targets=targets,
+        target_purpose="publication",
+        output_location_note="Registered publication files. Keep these files unchanged during verification. A repair uses separate safe capacity; this page does not certify current contents.",
+    )

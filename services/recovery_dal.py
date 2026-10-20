@@ -287,12 +287,27 @@ class RecoveryDAL:
             existing = one(cursor)
             if existing:
                 return identity(existing["ActionID"]), False
-            if row["State"] != "open" or (row["Revision"], row["EvidenceHash"]) != (
+            publication_check = (
+                row["State"] == "resolved"
+                and row["SourceKind"] == "export_job"
+                and kind == "verify_publication"
+                and kind in row["evidence"].get("actions", {})
+            )
+            if (row["State"] != "open" and not publication_check) or (
+                row["Revision"],
+                row["EvidenceHash"],
+            ) != (
                 revision,
                 evidence_hash,
             ):
                 raise SourceConflict(
                     "The evidence changed. Review the refreshed incident before confirming."
+                )
+            if publication_check:
+                cursor.execute(
+                    "UPDATE dbo.RecoveryIncident SET State='open' WHERE IncidentID=? AND ScopeKey=?",
+                    row["IncidentID"],
+                    self.scope,
                 )
             action_id = str(uuid4())
             if payload is not None:
@@ -404,9 +419,26 @@ class RecoveryDAL:
             row = self._get(cursor, incident_id, lock=True)
             cursor.execute(
                 "UPDATE dbo.RecoveryAction SET State=?,ResultJson=?,UpdatedUTC=SYSUTCDATETIME() "
+                "OUTPUT inserted.IncidentRevision "
                 "WHERE ActionID=? AND IncidentID=? AND State IN ('dispatched','unknown')",
                 state,
                 document(result),
                 identity(action_id),
                 row["IncidentID"],
             )
+            completed = one(cursor)
+            if (
+                state == "not_applied"
+                and completed
+                and completed["IncidentRevision"] == row["Revision"]
+            ):
+                # The exact action was independently verified not applied. Give
+                # the admin a fresh decision; the prior confirmation stays stale
+                # and cannot own every subsequent repair of unchanged evidence.
+                cursor.execute(
+                    "UPDATE dbo.RecoveryIncident SET Revision=Revision+1 "
+                    "WHERE IncidentID=? AND ScopeKey=? AND Revision=? AND State='open'",
+                    row["IncidentID"],
+                    self.scope,
+                    row["Revision"],
+                )

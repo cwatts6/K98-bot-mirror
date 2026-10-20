@@ -166,3 +166,50 @@ def test_replacement_summary_does_not_expose_unvalidated_names_or_configuration_
     assert context["input_file"] == "not recorded"
     assert context["configuration_comparison"] == "comparison unavailable"
     assert "secret" not in json.dumps(context)
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_publication_summary_identifies_retained_generation_and_registered_outputs(changed):
+    from services.export_failure_diagnostics import publication_decision_context
+
+    job = dict(
+        JobID=str(uuid4()),
+        ConsumerKind="new_source",
+        CreatedUTC="2026-10-20T05:52:00",
+        KVK_NO=16,
+        InputHash="a" * 64,
+        IntentID=str(uuid4()),
+        PoolEpoch=4,
+        ProvenanceJson=json.dumps({"output_preflight": {"pool_id": "pool"}}),
+    )
+    snapshot = dict(
+        job=job,
+        resources=[
+            {"ResourceKey": "destination:index"},
+            {"ResourceKey": "destination:slot"},
+            {"ResourceKey": "account:private-account"},
+        ],
+    )
+    registration = dict(
+        pools=[
+            dict(
+                pool_id="pool",
+                index_file_id="index",
+                slot_file_ids=["replacement" if changed else "slot"],
+            )
+        ]
+    )
+    result = publication_decision_context(snapshot, registration)
+    assert result["targets"] == ["index", "slot"]
+    assert result["target_purpose"] == "publication"
+    context = result["failure_context"]
+    assert context["retained_input_sha256"] == "a" * 64
+    assert context["retained_intent_id"] == job["IntentID"]
+    assert context["configuration_comparison"] == (
+        "output registration differs or is unavailable"
+        if changed
+        else "registered output files match"
+    )
+    assert context["original_fault"] == "not_recorded"
+    assert "does not recompute" in context["summary"]
+    assert "private-account" not in json.dumps(result)

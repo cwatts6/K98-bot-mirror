@@ -88,6 +88,27 @@ def test_unknown_provider_outcome_is_not_released_by_human_confirmation():
     assert not adapter.inspect("source")[2]
 
 
+@pytest.mark.parametrize("error_type", ["PublicationCheckUnavailable", "TimeoutError", None])
+def test_only_durable_initial_probe_refusal_can_close_without_applying(error_type):
+    adapter, snapshot = job_fixture(state="uncertain", attempted=True)
+    action = dict(
+        ActionID="action",
+        ActionKind="verify_publication",
+        State="unknown",
+        EvidenceHash=job_token(snapshot),
+        Reason="Check original outcome",
+        ResultJson=json.dumps({"error_type": error_type}),
+    )
+    adapter.reconciler.probe.side_effect = SourceConflict("Proof still unavailable")
+    if error_type == "PublicationCheckUnavailable":
+        assert adapter.reconcile("source", action) == "not_applied"
+        adapter.reconciler.probe.assert_not_called()
+    else:
+        with pytest.raises(SourceConflict):
+            adapter.reconcile("source", action)
+    adapter.coordinator.reconcile_operator.assert_not_called()
+
+
 def test_stale_preview_and_changed_registration_refuse_before_provider_reads():
     adapter, snapshot = job_fixture(state="uncertain", attempted=True)
     token = job_token(snapshot)
@@ -282,7 +303,12 @@ def test_recovery_export_uses_durable_repair_id_and_reads_receipt_after_ack_loss
         adapter.execute(job_id, kind, token, "recovery:" + action_id, "recover export")
     repair_id, plan = adapter.coordinator.admit_repair.call_args.args
     assert repair_id == action_id and plan["actor"] == "recovery:" + action_id
-    repair = dict(JobID=str(uuid4()), ProvenanceJson=json.dumps(dict(repair=plan)))
+    repair = dict(
+        JobID=str(uuid4()),
+        ProvenanceJson=json.dumps(dict(repair=plan)),
+        State="ready",
+        CreatedUTC="2026-10-19T21:00:00",
+    )
     adapter.coordinator.repair_receipt.return_value = dict(
         job_id=repair["JobID"], actor=plan["actor"]
     )
@@ -298,6 +324,9 @@ def test_recovery_export_uses_durable_repair_id_and_reads_receipt_after_ack_loss
     assert adapter.reconcile(job_id, action) == "verified"
     adapter.coordinator.admit_repair.assert_called_once()
     adapter.discovery.repairs.return_value = [repair]
+    assert not adapter.inspect(job_id)[2]
+    assert adapter.inspect(job_id)[0]["recovery_links"][0]["source_id"] == repair["JobID"]
+    repair["State"] = "confirmed"
     assert adapter.inspect(job_id)[2]
     adapter.coordinator.repair_receipt.return_value["actor"] = "other"
     with pytest.raises(SourceConflict, match="belong"):
@@ -308,10 +337,14 @@ def test_damage_plan_changed_during_verification_does_not_queue_repair():
     adapter, snapshot = job_fixture(state="confirmed", attempted=True)
     plan = dict(snapshot=dict(job=dict(snapshot["job"], Version=99)))
     adapter.rebuild_plan = Mock(return_value=plan)
-    with pytest.raises(SourceConflict, match="changed"):
+    from services.export_recovery_service import PublicationCheckUnavailable
+
+    with pytest.raises(PublicationCheckUnavailable, match="no export was admitted") as error:
         adapter.execute(
             "source", "rebuild_damaged", job_token(snapshot), "recovery:" + str(uuid4()), "ok"
         )
+    assert isinstance(error.value.__cause__, SourceConflict)
+    assert "changed" in str(error.value.__cause__)
     adapter.coordinator.admit_repair.assert_not_called()
 
 
@@ -370,3 +403,28 @@ def test_runtime_keeps_export_incidents_in_the_recovery_centre(monkeypatch):
     with recovery_runtime.recovery_service() as service:
         assert service.adapters["export_job"] is export
         assert service.adapters["export_rollover"] is rollover
+
+
+@pytest.mark.parametrize("kind", ["retry_absent", "rebuild_damaged"])
+@pytest.mark.parametrize("refusal", [True, False])
+def test_repair_preparation_refusal_is_not_an_unknown_admission(kind, refusal):
+    adapter, snapshot = job_fixture(state="confirmed", attempted=True)
+    adapter.coordinator.repair_receipt.return_value = None
+    adapter.execute = Mock()
+    action = dict(
+        ActionID=str(uuid4()),
+        ActionKind=kind,
+        EvidenceHash=job_token(snapshot),
+        Reason="Retained output needed",
+        State="unknown",
+        ResultJson=json.dumps(
+            {"error_type": "PublicationCheckUnavailable" if refusal else "UncertainCommit"}
+        ),
+    )
+    outcome = adapter.reconcile(snapshot["job"]["JobID"], action)
+    if refusal:
+        assert outcome == "not_applied"
+        adapter.execute.assert_not_called()
+    else:
+        assert outcome is None
+        adapter.execute.assert_called_once()

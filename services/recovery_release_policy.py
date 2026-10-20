@@ -33,6 +33,9 @@ P0A_ACTIONS = MappingProxyType(
                 "discard_replacement_check",
                 "activate_replacements",
                 "publish_replacement",
+                "verify_publication",
+                "retry_absent",
+                "rebuild_damaged",
             }
         ),
         "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),

@@ -25,6 +25,7 @@ def test_cache_transition_pins_every_runtime_member():
                     "configuration_only_completion_v1",
                     "monitor_admission_closeout_v1",
                     "guided_replacement_release_v1",
+                    "guided_publication_recovery_v1",
                 }
                 for m in t["members"]
                 if m["path"] == member["path"]

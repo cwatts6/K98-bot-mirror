@@ -83,6 +83,15 @@ class RecoveryService:
             open_count=self.store.count_open(),
         )
 
+    def published_outputs(self, actor, after=None):
+        self.authorize(actor)
+        adapter = self.adapters.get("export_job")
+        if adapter is None:
+            raise SourceConflict(
+                "Restore the private registration evidence before checking outputs."
+            )
+        return adapter.published_outputs(after=after)
+
     def download_report(self, actor, after=None, through=None, part=1, max_bytes=8388608):
         from services.recovery_report import build_report
 
@@ -294,7 +303,11 @@ class RecoveryService:
         draft_version=None,
     ):
         row = self.refresh(incident_id)
-        if row["State"] == "resolved":
+        if row["State"] == "resolved" and not (
+            row["SourceKind"] == "export_job"
+            and action == "verify_publication"
+            and action in row["evidence"]["actions"]
+        ):
             return row
         if (row["Revision"], row["EvidenceHash"]) != (revision, token):
             raise SourceConflict(

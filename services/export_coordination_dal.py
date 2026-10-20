@@ -521,7 +521,37 @@ class ExportCoordinationDAL:
                 intent, vector = read_export_intent(cursor, spec.intent_id)
                 from kvk.dal.source_weight_dal import require_current_export_weights
 
-                if _replacement_original is None:
+                if _repair_plan is not None:
+                    original = _repair_plan["snapshot"]["job"]
+                    if (
+                        _cursor is None
+                        or spec.repair_id is None
+                        or _replacement_original is not None
+                        or (
+                            original["IntentID"],
+                            original["InputHash"],
+                            original["ConsumerKind"],
+                            original["AccountKey"],
+                            original["KVK_NO"],
+                            original["PoolEpoch"],
+                        )
+                        != (
+                            spec.intent_id,
+                            spec.input_hash.hex(),
+                            spec.consumer,
+                            spec.account,
+                            spec.kvk_no,
+                            spec.epoch,
+                        )
+                    ):
+                        raise SourceConflict(
+                            "Repair must preserve its verified original input and configuration."
+                        )
+                    # admit_repair has consumed the fresh authority proof and
+                    # compared the original snapshot under this transaction.
+                    # A physical repair preserves its sealed generation; it
+                    # must not require or apply today's season weights.
+                elif _replacement_original is None:
                     require_current_export_weights(cursor, intent, vector)
                 elif (
                     _cursor is None
