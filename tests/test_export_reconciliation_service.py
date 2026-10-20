@@ -40,6 +40,9 @@ class ProofCursor:
         assert statement.startswith(
             ("SELECT", "WITH catalogue_scope")
         ), "Unexpected mutation before proof validation"
+        if "SELECT TOP (1) JobID,Version,Fence,CreatedUTC FROM dbo.ExportJob" in statement:
+            self.description, self.row = (), None
+            return self
         if "SELECT o.*" in statement:
             self.description = tuple((k,) for k in self.origins[0]) if self.origins else ()
             self.batch = [tuple(r.values()) for r in self.origins]
@@ -72,7 +75,11 @@ def proof_fixture():
             AccountKey="account-a",
             State="confirmed",
             Version=7,
+            Fence=1,
             ProvenanceJson="{}",
+            DestinationSetHash="ab" * 32,
+            PoolEpoch=1,
+            CreatedUTC="2026-01-01T00:00:00",
         ),
         resources=[],
         pool=dict(

@@ -69,8 +69,7 @@ class ExportRecoveryDAL:
                 "AND NOT EXISTS(SELECT 1 FROM dbo.ExportJob newer WHERE "
                 "newer.ConsumerKind='new_source' AND newer.State='confirmed' AND "
                 "newer.AccountKey=j.AccountKey AND newer.DestinationSetHash=j.DestinationSetHash "
-                "AND newer.PoolEpoch=j.PoolEpoch AND (newer.CreatedUTC>j.CreatedUTC OR "
-                "(newer.CreatedUTC=j.CreatedUTC AND newer.JobID>j.JobID))) "
+                "AND newer.PoolEpoch=j.PoolEpoch AND newer.Fence>j.Fence) "
                 + (
                     "AND (CreatedUTC>CAST(? AS datetime2) OR "
                     "(CreatedUTC=CAST(? AS datetime2) AND JobID>CAST(? AS uniqueidentifier))) "

@@ -31,20 +31,18 @@ logger = logging.getLogger(__name__)
 
 def publication_successor(cursor, job):
     """Read a newer confirmed publication in this exact account/destination epoch."""
+    # Claims advance the shared account fence. Creation timestamps and random
+    # UUIDs cannot establish publication order, especially within one second.
     destination = job["DestinationSetHash"]
     cursor.execute(
-        "SELECT TOP (1) JobID,Version,CreatedUTC FROM dbo.ExportJob WHERE "
+        "SELECT TOP (1) JobID,Version,Fence,CreatedUTC FROM dbo.ExportJob WHERE "
         "ConsumerKind='new_source' AND State='confirmed' AND AccountKey=? "
         "AND DestinationSetHash=CAST(? AS binary(32)) AND PoolEpoch=? "
-        "AND (CreatedUTC>CAST(? AS datetime2) OR "
-        "(CreatedUTC=CAST(? AS datetime2) AND JobID>CAST(? AS uniqueidentifier))) "
-        "ORDER BY CreatedUTC DESC,JobID DESC",
+        "AND Fence>? ORDER BY Fence DESC,JobID DESC",
         job["AccountKey"],
         bytes.fromhex(destination) if isinstance(destination, str) else bytes(destination),
         job["PoolEpoch"],
-        job["CreatedUTC"],
-        job["CreatedUTC"],
-        job["JobID"],
+        job["Fence"],
     )
     return one(cursor)
 

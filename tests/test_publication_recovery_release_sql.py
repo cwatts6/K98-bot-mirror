@@ -236,13 +236,11 @@ async def test_publication_confirmation_reads_existing_output_and_settles_exact_
 
 
 @pytest.mark.parametrize("publication", ["damaged"], indirect=True)
-def test_last_publication_remains_discoverable_until_newer_publication_confirms(
-    publication, monkeypatch
-):
+def test_last_publication_remains_discoverable_until_newer_publication_confirms(publication):
     from kvk.dal.new_source_import_dal import SourceConflict
 
     p = publication
-    original, newer = p.r.claim.job_id, str(uuid4())
+    original, newer = p.r.claim.job_id, "00000000-0000-0000-0000-000000000001"
     adapter = p.service.adapters["export_job"]
     _, original_token, _ = adapter.inspect(original)
     sql = p.r.f.sql
@@ -253,7 +251,7 @@ def test_last_publication_remains_discoverable_until_newer_publication_confirms(
         "CreatedUTC,UpdatedUTC,Actor,Reason,ProvenanceJson) "
         "SELECT ?,ConsumerKind,SourceKey,IntentID,AccountKey,DestinationSetHash,InputHash,"
         "KVK_NO,PoolEpoch,NEWID(),EnqueueSequence+1,'waiting',NULL,0,1,"
-        "DATEADD(second,1,CreatedUTC),DATEADD(second,1,UpdatedUTC),Actor,Reason,ProvenanceJson "
+        "CreatedUTC,UpdatedUTC,Actor,Reason,ProvenanceJson "
         "FROM #ExportJob WHERE JobID=?",
         newer,
         original,
@@ -275,8 +273,10 @@ def test_last_publication_remains_discoverable_until_newer_publication_confirms(
         assert original in [item["JobID"] for item in listed], state
         assert newer not in [item["JobID"] for item in listed], state
     sql.execute(
-        "UPDATE #ExportJob SET State='confirmed',OwnerID=NEWID(),Fence=1,"
+        "UPDATE #ExportJob SET State='confirmed',OwnerID=NEWID(),"
+        "Fence=(SELECT Fence+1 FROM #ExportJob WHERE JobID=?),"
         "SupersededByJobID=NULL WHERE JobID=?",
+        original,
         newer,
     )
     sql.commit()
