@@ -141,6 +141,10 @@ PUBLICATION_RECOVERY_TRANSITION_PATHS = frozenset(
     }
 )
 
+PROBE_ADMISSION_TRANSITION_PATHS = frozenset(
+    {"services/export_execution_dal.py", "services/legacy_export_snapshot_dal.py"}
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -190,6 +194,10 @@ def reviewed_transitions():
                 item["id"] == "guided_publication_recovery_v1"
                 and path in PUBLICATION_RECOVERY_TRANSITION_PATHS
             )
+            fixed_probe = (
+                item["id"] == "probe_stream_admission_v1"
+                and path in PROBE_ADMISSION_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -199,6 +207,7 @@ def reviewed_transitions():
                     or fixed_monitor
                     or fixed_replacement
                     or fixed_publication
+                    or fixed_probe
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -235,6 +244,8 @@ def reviewed_transitions():
             and paths != PUBLICATION_RECOVERY_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed publication recovery transition required.")
+        if item["id"] == "probe_stream_admission_v1" and paths != PROBE_ADMISSION_TRANSITION_PATHS:
+            raise ValueError("Complete fixed probe admission transition required.")
     return value["transitions"]
 
 

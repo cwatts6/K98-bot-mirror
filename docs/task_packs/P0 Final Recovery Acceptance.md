@@ -8,11 +8,13 @@ that package. It does not authorize an agent to merge, deploy, execute productio
 repairs or simulate production failures. Existing implementation and disposable
 testing approval carries forward. P0 is **not complete**.
 
-The deployed private revision is `2726deae890896dd4f87716ce13b2906c071b354`.
-The supplied complete report (20 October, 05:52 UTC) includes 17,492 incidents,
-all resolved, no pending verification or required repairs, and healthy monitoring.
-This closes that observed backlog, not every possible recovery path. Retired
-historical imports still have unknown original SQL outcomes.
+Replacement and publication recovery have now been deployed. The supplied
+complete report (20 October, 08:25 UTC) includes 17,500 incidents, all resolved,
+and healthy monitoring after guided withdrawal of an unstarted probe ticket.
+Fresh publication verification failed earlier and is not certified by that
+healthy snapshot. Preventing the recurring ticket and resolving the publication
+stall remain required; `P0 Probe Admission and Publication Stall.md` records this
+focused work. Retired historical imports still have unknown original SQL outcomes.
 
 The original scope remains in `guided_recovery_delivery.md` and
 `guided_recovery_release_split.md`. Their dated implementation checkpoints are
@@ -23,7 +25,7 @@ those documents with `P0b Monitor and Admission Closeout.md`; none moves to P1.
 
 | ID | Remaining outcome | Current evidence and gap | Acceptance required |
 | --- | --- | --- | --- |
-| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement proposal, verification, activation and retained-input delivery are deployed through #405/#657. Fresh publication checks and verified absence/damage repairs are the current focused candidate. Historical retirement covers obsolete output only. | Admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement. |
+| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement delivery and publication/absence/damage actions are deployed. Production fresh checking encountered a stall and remains unverified. Historical retirement covers obsolete output only. | Resolve the stalled check; admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement. |
 | P0-F02 | Missing evidence and configuration/ownership conflicts | Exact-byte evidence repair is deployed; lost proposals/read checks have backend recovery. Loss of all valid containment/active-registration history and unattributed holds remain explicit gaps. | Guided evidence collection and comparison, exact verified restoration or a separately verified superseding repair. Preserve unverifiable history and foreign/live ownership. A terminal disposition must not claim a recovered original receipt. No indefinite generic Recheck-only workflow. |
 | P0-F03 | Interrupted producers and remaining import pipeline | Atomic configuration/report receipts, captured-output continuation and saved-admission decisions exist. Historical partial configuration, partial UPDATE_ALL2 reporting, remaining durable pipeline stages and failures before durable request creation remain required. | Resume only unfinished stages from durable receipts, or guide a separately confirmed superseding/disposition decision. Original input/configuration details, partial results, caches/maintenance/publication state and missing-input collection remain visible. Restart and lost acknowledgements cannot repeat committed work. |
 | P0-F04 | Rollover and cross-workflow access | Rollover containment/replacement backends exist but the deployed action policy withholds the family. Some blockers already link to their owning incident. | Qualify every interrupted rollover phase through real admin callbacks, authority journals, temporary SQL and worker settlement. Guided blocker navigation must return to the original repair. Prove exact release and independently verified final continuation. |

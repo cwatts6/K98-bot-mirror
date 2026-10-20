@@ -14,6 +14,11 @@ from uuid import UUID
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows
 from services.export_coordination_dal import bounded_json
 
+
+class ActiveProviderStream(SourceConflict):
+    """Locked observation of an existing stream, not a failed or unknown query."""
+
+
 _PARAMETERS = {
     "session": (
         "SessionID",
@@ -1456,7 +1461,7 @@ class ExportExecutionDAL:
             account,
         )
         if one(cursor) is not None:
-            raise SourceConflict("Provider writer/probe still owns account admission.")
+            raise ActiveProviderStream("Provider writer/probe still owns account admission.")
 
     @staticmethod
     def settlement_proof(cursor, reference, *, snapshot, account, kind):

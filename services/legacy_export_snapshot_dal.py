@@ -404,7 +404,21 @@ class LegacySnapshotDAL:
                         ticket=preparation["EnqueueSequence"],
                     )
                     return None
-            self._execution_gate(cursor, account, probe_only=stage == "writing")
+            from services.export_execution_dal import ActiveProviderStream
+
+            try:
+                self._execution_gate(cursor, account, probe_only=stage == "writing")
+            except ActiveProviderStream:
+                # Admission has not changed ownership. Return through the transaction
+                # context so a commit/close failure still propagates as uncertainty.
+                # Only an acknowledged refusal lets callers withdraw their own ticket.
+                _log_admission_refusal(
+                    identifier,
+                    stage,
+                    "provider_stream_active",
+                    ticket=preparation["EnqueueSequence"],
+                )
+                return None
             fence = max(preparation["Fence"], *(r["Fence"] for r in resources)) + 1
             owner = str(uuid4())
             version = _cas(
