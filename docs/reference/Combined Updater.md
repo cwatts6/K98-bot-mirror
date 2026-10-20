@@ -1,0 +1,165 @@
+# Normal combined Bot and SQL updater
+
+## Reusable reader-report extension — implementation for review
+
+The candidate updater additionally supports `additive_tables_v1` and installed,
+exact-byte export protocol transitions. This is local implementation evidence,
+not a claim that MINI_AMD has this updater installed or that any report is active.
+Install a reviewed exact-version updater upgrade before selecting these releases.
+The operator still uses `Update-K98.ps1 -PrepareOnly`, then `Update-K98.ps1`, and
+requests one `/ops graceful_restart` only when prompted. `-Status` and existing
+same-release recovery remain available. No custom release launcher is required.
+
+An additive release uses the same version-1 Bot descriptor below with
+`profile: "additive_tables_v1"`. Every selected SQL profile must use that profile;
+mixing module and table profiles in one descriptor is not supported. SQL main is
+pinned explicitly. The SQL repository's `docs/additive-table-release.md` defines
+the bounded column/key/check/foreign-key declarations and recovery semantics.
+It creates new ordinary tables only: no arbitrary migration text, existing-table
+alterations, data backfill, grants, drops, schema creation or activation changes.
+The two report-history tables are the first supported case. Existing tables are
+accepted only with this exact profile's original committed receipt and release
+binding; matching tables without that receipt are refused, never adopted.
+
+`scripts/k98_update_transitions.json` is part of the protected installed updater
+package and its exact manifest. A transition names every required protocol file
+and its reviewed before/after LF hash (absence is explicit for new modules).
+All members must match together and be included in the source-change inventory.
+The reader transition covers `services/export_execution_protocol.py` and
+`services/export_reader_protocol.py`. The target repository cannot supply its own
+exemption: the installed registry selects transitions. Unknown versions still
+stop before drain. Adding another protected transition requires review and a new
+exact-version updater package. This admits a reviewed transition, not arbitrary
+future edits to export modules. The existing source/seed hashes, protected custody,
+retained uncertainty, flags and single-successor checks are unchanged.
+
+The updated compatibility checker compares both the candidate preparation policy
+and registry with the actual installed manifest. Without installed observations,
+its result is source capability only. The committed `deploy/k98-release.json`
+now binds the operator-observed MINI_AMD private Bot predecessor to the reviewed
+SQL commit and exact history-profile hash. The profile uses the observed database
+and tempdb collations and compatibility. These are release inputs for review, not
+evidence of installation or activation. Before deployment, the pinned SQL commit
+must be reachable from reviewed SQL main; preserve its ancestry when merging or
+repin and review the descriptor before merging Bot. Preparing an upgrade requires
+the real installed `update-tool.json`, not a fixture manifest.
+
+Validation includes the normal updater regressions and the new protocol/profile
+tests. The SQL rehearsal uses explicitly approved disposable targets, tests real
+SqlClient transaction/process death and retains evidence; it does not touch MINI_AMD.
+Production report activation, guild/slot binding and runtime history permissions
+remain separate from deploying this source and schema.
+
+The installed `Update-K98.ps1` can prepare source-only releases or a bounded
+combined release from private `K98-bot/main`. It preserves the installed startup
+contracts, activation flags and held work. This change does not deploy or restart
+the live Bot, repeat the completed 10 October 2026 release, or complete broader S11
+business-failure acceptance.
+
+## Reviewed inputs and supported profile
+
+A changed `deploy/k98-release.json` in the reviewed Bot target selects SQL. An
+unchanged description means a source-only update. Removing a description is
+refused. The containing Bot commit is the target; `bot_predecessors` lists exact
+permitted private production predecessor commits, not mirror commits.
+
+```json
+{
+  "version": 1,
+  "profile": "module_grants_v1",
+  "bot_predecessors": ["<40 lowercase hexadecimal characters>"],
+  "sql_commit": "<40 lowercase hexadecimal characters>",
+  "migrations": [
+    {"id": "20261010_901_example", "sha256": "<SHA256 of exact profile bytes>"}
+  ]
+}
+```
+
+The SQL commit must be on reviewed SQL main. Its exact runner, ordered profiles
+and module files are acquired into a separate protected Git database and sealed
+into the release package. SQL main is never selected independently of this pin.
+Each profile lives at `migrations/<id>.release.json`; the SQL repository's
+`docs/module-release.md` defines its format. No operational release description
+is synthesized by the updater: the committed reader descriptor is an explicit,
+reviewed release input. Retain it unchanged for subsequent source-only releases;
+removing it is refused, but leaving it unchanged does not reapply SQL.
+
+Descriptor-only pull requests trigger updater CI. The metadata check validates
+the actual descriptor's shape, exact commit/hash fields and explicit migration
+order. CI compares the exact PR base to reject deletion of a previously committed
+descriptor. Installed-predecessor compatibility, private SQL acquisition and live SQL
+preconditions remain preparation checks before drain; CI does not claim those
+production observations.
+
+The `module_grants_v1` profile supports existing unsigned ordinary stored procedures/views and
+explicit new object EXECUTE/SELECT grants. It refuses sealed startup objects or
+principals, whole-database startup contracts, schema/data migrations, identities,
+dependencies/configuration changes, SQL Agent jobs, file/external effects, CLR,
+encrypted modules, DDL triggers and ledger triggers. Profiles cannot modify the
+same module or grant twice in a release. Required migration history must already
+exist before drain; intra-release predecessor dependencies are not supported.
+Unsupported changes need a separately reviewed release design before deployment.
+The additive profile described above is a separate reviewed extension; it does not
+broaden the module profile or enable the historical arbitrary-SQL runner.
+
+## Operator sequence
+
+1. Install the reviewed stable updater package using its generated
+   `Upgrade-K98InstalledUpdater.ps1`. The package binds the actual previous
+   `update-tool.json`, installer and new tool manifest. It refuses an active
+   release or unexpected installed bytes; it archives the prior tool and retains
+   all evidence. Do not substitute a guessed previous manifest.
+2. On MINI_AMD, use Windows PowerShell 5.1, Run as administrator under the existing
+   deployment account. Run the protected installed `Update-K98.ps1 -PrepareOnly`.
+   This acquires and validates exact files, source custody, installed dependencies,
+   full startup SQL comparators, module preimages, database/tempdb collations,
+   compatibility level and backups before requesting drain. No drain is requested
+   by PrepareOnly. Inspect the named transcript and selected revisions.
+3. Run the same `Update-K98.ps1` and follow its existing Discord drain/restart
+   instruction. The coordinated runner applies SQL in explicit order, source,
+   successor seed, one start, readiness, then atomic outer closeout.
+4. After any interruption, run `Update-K98.ps1 -Status`, retain its evidence paths
+   and the update transcript, then rerun the same updater only as indicated.
+   Do not manually restart, remove receipts, change hashes or replay SQL.
+
+No new force switch, arbitrary SQL command, manual receipt editor or bespoke
+release launcher is part of this workflow. Production always deploys private
+`K98-bot/main`; Bot mirror and SQL histories remain separate.
+
+## Status and recovery
+
+| Evidence | Meaning and next action |
+| --- | --- |
+| Unstarted, exact preconditions | Continue the same reviewed release through drain. |
+| SQL `rolled_back`, exclusive owner lock acquired, exact preimages | The same release may apply again; earlier attempts remain recorded. |
+| SQL `committed`, exact Applied receipt and postimages | Verify and continue later stages; SQL is not applied again. |
+| Live SQL owner, unknown outcome, drift or Failed migration identity | Stop; retain transcript, profile, expected/observed hashes and history. Review the named discrepancy; do not force or reuse a corrective identity. |
+| Source target committed, exact permitted checkout bytes, unchanged index and same drain intent | Complete exact byte installation and index reconciliation. Unknown/interrupted Git state before target commit requires review. |
+| Partial seed, exact existing members, empty successor history, disabled expected task | Install missing members and complete task binding. Torn or unknown members require review. |
+| Start intent without verified native successor | Stop for native/task/session evidence review. Never request a second start automatically. |
+| Readiness pending after verified start | Repeat the bounded read-only readiness wait. |
+| All stages verified, outer bookkeeping pending | Publish closeout atomically; do not run SQL/source/start verifiers again. |
+| `VERIFIED_HISTORICAL` | Deployment completed at its recorded readiness time. This is not a fresh health or process-liveness claim. |
+
+Status performs protected reads and SQL observations without starting a transcript,
+creating receipts, applying source/SQL, altering tasks or starting processes. A
+concurrent change can make status inconclusive; it is not an atomic live snapshot.
+Resume holds the operator lock. Timing fields measure updater stages, not business
+export or Google Sheets latency.
+
+## Validation and retained scope
+
+Run Python updater/release tests, Windows PowerShell orchestration/source/upgrade
+tests, `Test-K98CombinedUpdate.ps1`, and the SQL profile tests. The SQL repository
+provides an isolated K98DEV rehearsal of the actual Windows 5.1 outer runner and
+SqlClient: differing database/tempdb collation, exact Unicode/LF definitions,
+rollback retention, process death before/after commit, lock contention and drift.
+Native administrative custody additionally needs the elevated development-PC
+rehearsal. Substituted external task/process tests must not be described as a live
+production deployment rehearsal.
+
+Keep separate: business failure/restart acceptance and admin-resolution runbook
+coverage; busy/not-probed versus provider-failure wording; business stage latency;
+old persistent-view rehydration; reminder temporary-file races; disabled-DM retry
+handling. Preserve the existing separation between player statistics and optional
+Sheets outcomes. Their detailed prior captures remain in the S11 handover.
