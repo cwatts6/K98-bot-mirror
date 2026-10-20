@@ -108,9 +108,28 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
             evidence, token, resolved = super().inspect(source_id)
             try:
                 cache_only = self._no_export(preview)
+                if cache_only:
+                    producer = self.dal.request(preview["preparation"])["request"]["producer"]
+                    if producer.get("parent"):
+                        evidence.setdefault("recovery_links", []).append(
+                            dict(
+                                label="Return to report and cache",
+                                kind="player_report_continuation",
+                                source_id=producer["parent"],
+                            )
+                        )
                 if cache_only and resolved and evidence["outcome"] == "export_skipped":
                     evidence["outcome"] = self.no_export_outcome
                     evidence["explanation"] = self.no_export_explanation
+                    if producer.get("parent"):
+                        evidence["explanation"] = (
+                            "The SQL report step is complete: its committed output, captured "
+                            "evidence and no-export disposition are verified. This green card "
+                            "does not confirm the whole report/cache workflow. Choose Return "
+                            "to report and cache to check the overall result and complete any "
+                            "remaining local cache refresh. Do not build the report again. "
+                            "Spreadsheet publication is a separate check."
+                        )
                     evidence["failure_context"]["summary"] = evidence["explanation"]
                 elif cache_only and not resolved:
                     if preview["action"] == "resume_capture":

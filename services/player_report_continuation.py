@@ -63,7 +63,7 @@ class PlayerReportContinuation:
             else:
                 evidence["recovery_links"].append(
                     dict(
-                        label="Review fresh report result",
+                        label="Review SQL report step",
                         kind=self.producer.kind,
                         source_id=child["PreparationID"],
                     )
@@ -75,7 +75,7 @@ class PlayerReportContinuation:
                 if child_resolved and result["outcome"] == "cache_only_completed":
                     evidence.update(
                         outcome="cache_refresh_pending",
-                        explanation="The fresh report and its no-export disposition are verified. Refresh the local cache from the currently stored SQL report next. This step does not rerun the report procedure or an import.",
+                        explanation="Step 1 of 2 is complete: the fresh SQL report and its no-export disposition are verified. This overall workflow remains open until step 2, local cache refresh, is verified. Choose Refresh local player cache below and confirm once. It reads the currently stored SQL report without rerunning the report procedure or an import. The linked green report card confirms step 1 only.",
                     )
                     evidence["actions"]["refresh_cache"] = dict(
                         label="Refresh local player cache",

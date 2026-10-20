@@ -58,7 +58,7 @@ def incident_embed(row):
         embed.add_field(
             name="Verified local cache",
             value=(
-                f"KVK {receipt['source_kvk_no']} · {receipt['source_row_count']} rows\n"
+                f"KVK {receipt['source_kvk_no']} Â· {receipt['source_row_count']} rows\n"
                 f"Source scan (UTC): {receipt['source_last_refresh']}\n"
                 f"Cache verified (UTC): {receipt['verified_utc']}"
             )[:1024],
@@ -221,7 +221,7 @@ class RecoveryIncidentView(discord.ui.View):
             # that linked incident rechecks authorization and current evidence.
             if (
                 row["State"] == "resolved"
-                and linked_kind != "configuration_continuation"
+                and linked_kind not in {"configuration_continuation", "player_report_continuation"}
                 and label != "Return to original export"
             ):
                 continue
@@ -334,10 +334,10 @@ class RecoveryListView(discord.ui.View):
     def __init__(self, rows, *, individual=False, queues_only=False):
         super().__init__(timeout=300)
         select = discord.ui.Select(
-            placeholder="Choose an incident — oldest first (UTC)",
+            placeholder="Choose an incident â€” oldest first (UTC)",
             options=[
                 discord.SelectOption(
-                    label=f"{row['evidence']['title']} — {row['evidence'].get('outcome', 'unknown')}"[
+                    label=f"{row['evidence']['title']} â€” {row['evidence'].get('outcome', 'unknown')}"[
                         :100
                     ],
                     value=row["IncidentID"],

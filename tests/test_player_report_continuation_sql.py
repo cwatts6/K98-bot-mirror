@@ -129,7 +129,12 @@ def test_stale_registration_and_unauthorized_admin_cannot_refresh(recovery):
 
 
 @pytest.mark.parametrize("lost_reply", [False, True])
-def test_fresh_report_then_cache_no_sql_replay_across_restart(recovery, lost_reply):
+@pytest.mark.asyncio
+async def test_fresh_report_then_cache_no_sql_replay_across_restart(
+    recovery, lost_reply, monkeypatch
+):
+    from ui.views import recovery_view as view
+
     r = recovery
     generation = json.loads(r.outcomes.inspect(r.source)["preparation"]["GenerationJson"])
     calls = []
@@ -161,6 +166,47 @@ def test_fresh_report_then_cache_no_sql_replay_across_restart(recovery, lost_rep
     )
     result = service.refresh(row["IncidentID"])
     assert set(result["evidence"]["actions"]) == {"refresh_cache"}
+    assert "Step 1 of 2 is complete" in result["evidence"]["explanation"]
+    # The resolved child must lead back to the still-open overall workflow,
+    # including after rebuilding the view. Navigation never dispatches a repair.
+    child_service = RecoveryService(
+        Store(),
+        {adapter.producer.kind: adapter.producer},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
+    )
+    child_row = child_service.review_source(ACTOR, adapter.producer.kind, child)
+    assert child_row["State"] == "resolved"
+    assert "does not confirm the whole" in child_row["evidence"]["explanation"]
+    assert child_row["evidence"]["recovery_links"] == [
+        dict(
+            label="Return to report and cache",
+            kind=adapter.kind,
+            source_id=r.source,
+        )
+    ]
+
+    async def call(method, *args):
+        return getattr(service, method)(*args)
+
+    monkeypatch.setattr(view, "call", call)
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    back = next(
+        b
+        for b in view.RecoveryIncidentView(child_row).children
+        if b.label == "Return to report and cache"
+    )
+    approvals_before = len(service.store.actions)
+    await back.callback(interaction)
+    returned = interaction.followup.send.call_args.kwargs["view"].row
+    assert returned["IncidentID"] == row["IncidentID"] and returned["State"] == "open"
+    assert set(returned["evidence"]["actions"]) == {"refresh_cache"}
+    assert len(service.store.actions) == approvals_before
+    cache.assert_not_called()
     adapter = PlayerReportContinuation(
         adapter.dal, adapter.producer, runner=runner, cache_runner=cache
     )
@@ -172,6 +218,14 @@ def test_fresh_report_then_cache_no_sql_replay_across_restart(recovery, lost_rep
     service.refresh(row["IncidentID"])
     cache.assert_called_once()
     assert r.source not in adapter.pending_recovery()
+    # Reopening the old green report now returns the verified parent, not a
+    # stale invitation to refresh or recalculate it.
+    await back.callback(interaction)
+    returned = interaction.followup.send.call_args.kwargs["view"].row
+    assert returned["State"] == "resolved"
+    assert returned["evidence"]["outcome"] == "report_and_cache_verified"
+    assert not returned["evidence"]["actions"]
+    cache.assert_called_once()
 
 
 @pytest.mark.asyncio

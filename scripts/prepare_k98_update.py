@@ -44,6 +44,13 @@ RELEASE_DESCRIPTION = "deploy/k98-release.json"
 SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
 
 DRAINED_ISSUER_TRANSITION_PATHS = frozenset({"scripts/run_export_startup_issuer.py"})
+REPORT_CACHE_HANDOFF_PATHS = frozenset(
+    {
+        "services/player_report_continuation.py",
+        "services/player_report_recovery_service.py",
+        "ui/views/recovery_view.py",
+    }
+)
 
 
 def coordinated_policy():
@@ -254,6 +261,9 @@ def reviewed_transitions():
             fixed_issuer = (
                 item["id"] == "drained_issuer_exit_v1" and path in DRAINED_ISSUER_TRANSITION_PATHS
             )
+            fixed_report_handoff = (
+                item["id"] == "report_cache_handoff_v1" and path in REPORT_CACHE_HANDOFF_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -268,6 +278,7 @@ def reviewed_transitions():
                     or fixed_probe_busy
                     or fixed_report_cache
                     or fixed_issuer
+                    or fixed_report_handoff
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -282,6 +293,8 @@ def reviewed_transitions():
                     raise ValueError("Exact reviewed protocol hashes required.")
         if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:
             raise ValueError("Complete fixed drained-issuer transition required.")
+        if item["id"] == "report_cache_handoff_v1" and paths != REPORT_CACHE_HANDOFF_PATHS:
+            raise ValueError("Complete fixed report/cache handoff transition required.")
         if (
             item["id"] == "fresh_report_cache_diagnostics_v1"
             and paths != REPORT_CACHE_TRANSITION_PATHS

@@ -590,6 +590,26 @@
           "after_sha256": "9060757926460f24decc5310763d9e818082eef8933e7937bb4059420464342d"
         }
       ]
+    },
+    {
+      "id": "report_cache_handoff_v1",
+      "members": [
+        {
+          "path": "services/player_report_continuation.py",
+          "before_sha256": "bf4affd06c7016ad18e28c240ddcf172f56410f2e83a5bd0e8c9640352181561",
+          "after_sha256": "87b3f112573bab417a6cc37ca4f2c0f5289792387c69e9b67cba2cbf0238d8ee"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "de966b44b8862c6f44a9e1f9812cdc2fe737ef125005f9300af9845724111059",
+          "after_sha256": "939b7b8f48c557e435a7da7da56e3a3c1090cb1eefb77d1f176e7da8ce2b092d"
+        },
+        {
+          "path": "ui/views/recovery_view.py",
+          "before_sha256": "03a56abca63b8eafa84a40868f00877ccaab26cd2e693038f981274fd8f98732",
+          "after_sha256": "69423a6f2736ab3f4c197e2f7726032ff210c7433c58ef77ca154e1cabeb4d46"
+        }
+      ]
     }
   ]
 }
