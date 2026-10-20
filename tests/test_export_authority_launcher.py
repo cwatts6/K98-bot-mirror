@@ -19,6 +19,24 @@ from tests.test_export_runtime_composition import registration_fixture
 from tests.test_export_single_account import TRUST_MODEL, process_bindings
 
 
+@pytest.fixture(autouse=True)
+def restore_publication_logger():
+    """Launcher startup configures a process-local logger; isolate each fixture."""
+    from services.export_reconciliation_service import publication_timing_logger as logger
+
+    handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
+    try:
+        yield
+    finally:
+        for handler in list(logger.handlers):
+            if handler not in handlers:
+                logger.removeHandler(handler)
+                handler.close()
+        logger.handlers[:] = handlers
+        logger.setLevel(level)
+        logger.propagate = propagate
+
+
 def test_dispatch_failure_reports_sql_guard_without_private_prose(capsys):
     import json
 
@@ -129,7 +147,7 @@ def authority_launch(monkeypatch, tmp_path):
         "python": str(path),
         "child_script": "fixture-child",
         "authority_sid": "fixture-sid",
-        "evidence_root": "fixture-store",
+        "evidence_root": str(tmp_path),
         "storage_owner": "fixture-owner",
         "runtime_registration": {},
     }
@@ -339,10 +357,13 @@ def test_post_open_initialization_failure_closes_empty_session(
     if stage == "proof_import":
         original = builtins.__import__
 
-        def import_fixture(name, *args, **kwargs):
-            if name == "services.export_reconciliation_service":
+        def import_fixture(name, globals=None, locals=None, fromlist=(), level=0):
+            if (
+                name == "services.export_reconciliation_service"
+                and "TrustedProofIssuer" in fromlist
+            ):
                 raise failure
-            return original(name, *args, **kwargs)
+            return original(name, globals, locals, fromlist, level)
 
         monkeypatch.setattr(builtins, "__import__", import_fixture)
     else:
@@ -798,7 +819,7 @@ def test_explicit_authority_startup_checks_installation_before_session_store_or_
             if (p["ObjectName"], p["ColumnName"], p["PermissionName"]) == (name, column, permission)
         )
         row["Allowed"] = 1 - row["Allowed"]
-    manifest = {"sql_contract": approved}
+    manifest = {"sql_contract": approved, "evidence_root": str(tmp_path)}
     path = tmp_path / "fixture-manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setattr(launcher.sys, "path", list(launcher.sys.path))
