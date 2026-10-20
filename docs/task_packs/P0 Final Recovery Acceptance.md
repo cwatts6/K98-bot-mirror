@@ -16,6 +16,15 @@ healthy snapshot. Preventing the recurring ticket and resolving the publication
 stall remain required; `P0 Probe Admission and Publication Stall.md` records this
 focused work. Retired historical imports still have unknown original SQL outcomes.
 
+The probe-admission prevention release (#407/#659) is now merged and deployed.
+The 20 October 09:46 UTC complete report again contains all 17,500 recorded
+incidents resolved, with healthy monitoring. Startup logs show ProcConfig waiting
+for the active writer and then committing successfully. This does not manufacture
+an active-stream refusal or certify fresh publication. The player-stats cache
+deadline remains a P0-F03 observation; the separately scoped tracked Discord view
+deadline remains P1. `P0 Publication Check Progress.md` owns the next focused
+publication race, authority responsiveness and guided progress release.
+
 The original scope remains in `guided_recovery_delivery.md` and
 `guided_recovery_release_split.md`. Their dated implementation checkpoints are
 history, not separate additional tasks. The remaining obligations below reconcile

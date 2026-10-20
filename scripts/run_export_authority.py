@@ -437,8 +437,64 @@ class AuthorityBroker:
         self.boundary = boundary
         self.issuer = None
         self.replacements: ReplacementAuthority | None = None
+        from services.export_proof_progress import ProofProgress
+
+        self.proof_progress = ProofProgress(self._dispatch)
 
     def dispatch(self, message):
+        from services.export_execution_protocol import uuid_text
+        from services.export_proof_progress import AuthorityProofBusy
+
+        if not isinstance(message, dict) or (
+            self.boundary is not None
+            and message.get("deployment_hash") != self.boundary.fingerprint
+        ):
+            raise ValueError("Action belongs to another deployment boundary.")
+        action = message.get("action")
+        if action in {"proof_start", "proof_status"}:
+            fields = {
+                "version",
+                "action",
+                "request_id",
+                "kind",
+                "object_id",
+                "snapshot_hash",
+                "current_attempt_id",
+                "old_attempt_id",
+            }
+            if self.boundary is not None:
+                fields.add("deployment_hash")
+            if (
+                set(message) != fields
+                or type(message["version"]) is not int
+                or message["version"] != 1
+                or message["kind"] not in {"publication", "retirement_recovery"}
+                or not isinstance(message["snapshot_hash"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", message["snapshot_hash"]) is None
+                or message["current_attempt_id"] is not None
+                or message["old_attempt_id"] is not None
+                or self.issuer is None
+            ):
+                raise ValueError("Exact observational proof progress selector required.")
+            uuid_text(message["object_id"])
+            request_id = uuid_text(message["request_id"])
+            if self.boundary is not None:
+                self.boundary.recheck()
+            selector = {k: v for k, v in message.items() if k != "request_id"}
+            selector["action"] = "prove"
+            method = (
+                self.proof_progress.start if action == "proof_start" else self.proof_progress.poll
+            )
+            return method(request_id, selector)
+        if (
+            self.proof_progress.busy()
+            and not self.proof_progress.owns_current_thread()
+            and action not in {"ready", "effective_registration"}
+        ):
+            raise AuthorityProofBusy("Publication verification is in progress.")
+        return self._dispatch(message)
+
+    def _dispatch(self, message):
         from services.export_execution_protocol import ProviderRequest, uuid_text
 
         if self.boundary is not None:
@@ -759,8 +815,13 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                 except Exception as exc:
                     # A lost reply is uncertainty to the caller. Never include SQL,
                     # provider, credential or private evidence prose in IPC errors.
-                    report_dispatch_failure(message, exc)
-                    reply = {"version": 1, "error": "unresolved_action"}
+                    from services.export_proof_progress import AuthorityProofBusy
+
+                    if isinstance(exc, AuthorityProofBusy):
+                        reply = {"version": 1, "error": "authority_busy"}
+                    else:
+                        report_dispatch_failure(message, exc)
+                        reply = {"version": 1, "error": "unresolved_action"}
                 else:
                     reply = {"version": 1, "result": result}
                 pipe.send(reply)
@@ -893,6 +954,8 @@ def main(argv=None):
             pass
     finally:
         # Construction opens no streams; once constructed, require a proven drain.
+        if authority is not None and "broker" in locals():
+            broker.proof_progress.drain()
         drained = authority is None or authority.drain()
         if drained:
             dal.transition(

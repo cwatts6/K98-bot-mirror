@@ -440,6 +440,56 @@
           "after_sha256": "c11c2bdcbb55af07abf8f0c1b8dc88d76c8e334154b73c40bca39bb3737ce3fd"
         }
       ]
+    },
+    {
+      "id": "publication_progress_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "8a6983cdeb973493640eb456ee3219c8247e2350d9f41fda367343b319624a68",
+          "after_sha256": "83d5ac55e2cbcc528b28aaf861a5f71d1657b8169a3dbf9b058bddbf670f8911"
+        },
+        {
+          "path": "services/export_proof_progress.py",
+          "before_sha256": null,
+          "after_sha256": "5e8bd49a4fd3dc26b30ff7e25f4f13b9d0a53e03bf8aa62287bef416cff90aad"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "before_sha256": "11558c4ea37d79b829f36a905b84c9b8461cb0b032a96b8b3a6be523504f3318",
+          "after_sha256": "d6a6a1bebf8e4688a3ed4fa88ed09c69ee01e2edc526fc52835ca5f89e9e0372"
+        },
+        {
+          "path": "services/recovery_execution_guard.py",
+          "before_sha256": null,
+          "after_sha256": "2a09e5e240730294f3760ad6a757fb36172347ab6c707cf6e5a4790c454a30fb"
+        },
+        {
+          "path": "services/recovery_health.py",
+          "before_sha256": "87ef719530aa1824e99fc09817038274856bf6f9b24e3e14bbd7774baa1c25dd",
+          "after_sha256": "7c420359fbabed2c60474ff972822d17b958c5c3bd50ebd02618842928e5ffef"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "0f540462a3e480dd40b6a6d2dbb48aa09a4d000044b2febc8b8ed19c2ff0dce2",
+          "after_sha256": "add320d56da0faf42e1c4bbd1888ff22ded06ff4e36776d67973c6c0174ebd06"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "fb607bb6e11fe6255bcc9bdb03a3c2098c38aa488ccdc0ee6f8f35b7eae83923",
+          "after_sha256": "41815fc1192ba2ce84c58c333863b8915f673b9cceeefc8db1445ee0c6203a7d"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "758d1a8c379f2d1ed1c1718bdb7c08b0dd7cf12812dbe3150e2780eb8ecfc122",
+          "after_sha256": "1a90527bf59eae6c3e62881a76842d154c1e251554f545e01b5cacad7e57d197"
+        },
+        {
+          "path": "ui/views/recovery_view.py",
+          "before_sha256": "6cafe03bdbe9db5d1b6d1a3fb20e68963b28ffac839a1b3ee45a02c58bb8116f",
+          "after_sha256": "1a4e9e24b271848ca5ae75e778df94018be1be49cd47d98a4c7691b464e835e0"
+        }
+      ]
     }
   ]
 }

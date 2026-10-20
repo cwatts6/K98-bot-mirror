@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import logging
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.recovery_execution_guard import execution_progress, recovery_execution
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,14 @@ class RecoveryService:
                 "Normal recovery checks will resume after registration verifies."
             )
         adapter = self.adapters[row["SourceKind"]]
-        for action in self.store.pending_actions(incident_id):
-            outcome = adapter.reconcile(row["SourceID"], action)
-            if outcome:
-                self.store.finish(
-                    incident_id, action["ActionID"], outcome, {"verification": outcome}
-                )
+        with recovery_execution(incident_id) as acquired:
+            if acquired:
+                for action in self.store.pending_actions(incident_id):
+                    outcome = adapter.reconcile(row["SourceID"], action)
+                    if outcome:
+                        self.store.finish(
+                            incident_id, action["ActionID"], outcome, {"verification": outcome}
+                        )
         evidence, token, resolved = adapter.inspect(row["SourceID"])
         current = self.store.observe(
             row["SourceKind"], row["SourceID"], evidence, token, resolved=resolved
@@ -58,6 +61,7 @@ class RecoveryService:
         row["pending_action"] = (
             {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
         )
+        row["execution_progress"] = execution_progress(row["IncidentID"]) if pending else None
         return self.presentation_policy(row) if self.presentation_policy else row
 
     def review(self, actor, incident_id):
@@ -302,6 +306,34 @@ class RecoveryService:
         payload=None,
         draft_version=None,
     ):
+        with recovery_execution(incident_id) as acquired:
+            if not acquired:
+                return self.present(self.store.get(incident_id))
+            self._dispatch(
+                incident_id,
+                revision,
+                token,
+                action,
+                reason,
+                actor_identity,
+                payload=payload,
+                draft_version=draft_version,
+            )
+        # The original call has returned. Reconcile its durable receipt only now.
+        return self.refresh(incident_id)
+
+    def _dispatch(
+        self,
+        incident_id,
+        revision,
+        token,
+        action,
+        reason,
+        actor_identity,
+        *,
+        payload=None,
+        draft_version=None,
+    ):
         row = self.refresh(incident_id)
         if row["State"] == "resolved" and not (
             row["SourceKind"] == "export_job"
@@ -351,4 +383,4 @@ class RecoveryService:
                 type(exc).__name__,
             )
             self.store.finish(incident_id, action_id, "unknown", {"error_type": type(exc).__name__})
-        return self.refresh(incident_id)
+        return self.present(self.store.get(incident_id))

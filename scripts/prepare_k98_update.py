@@ -145,6 +145,20 @@ PROBE_ADMISSION_TRANSITION_PATHS = frozenset(
     {"services/export_execution_dal.py", "services/legacy_export_snapshot_dal.py"}
 )
 
+PUBLICATION_PROGRESS_TRANSITION_PATHS = frozenset(
+    {
+        "scripts/run_export_authority.py",
+        "services/export_proof_progress.py",
+        "services/export_runtime_composition.py",
+        "services/recovery_execution_guard.py",
+        "services/recovery_health.py",
+        "services/recovery_service.py",
+        "services/recovery_runtime.py",
+        "services/recovery_report.py",
+        "ui/views/recovery_view.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -198,6 +212,10 @@ def reviewed_transitions():
                 item["id"] == "probe_stream_admission_v1"
                 and path in PROBE_ADMISSION_TRANSITION_PATHS
             )
+            fixed_progress = (
+                item["id"] == "publication_progress_v1"
+                and path in PUBLICATION_PROGRESS_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -208,6 +226,7 @@ def reviewed_transitions():
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
+                    or fixed_progress
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -246,6 +265,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed publication recovery transition required.")
         if item["id"] == "probe_stream_admission_v1" and paths != PROBE_ADMISSION_TRANSITION_PATHS:
             raise ValueError("Complete fixed probe admission transition required.")
+        if (
+            item["id"] == "publication_progress_v1"
+            and paths != PUBLICATION_PROGRESS_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed publication progress transition required.")
     return value["transitions"]
 
 

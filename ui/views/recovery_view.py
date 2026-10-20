@@ -79,9 +79,18 @@ def incident_embed(row):
             inline=False,
         )
     if row.get("pending_action"):
+        progress = row.get("execution_progress")
+        publication = row["pending_action"]["kind"] == "verify_publication"
         embed.add_field(
-            name="Repair being verified",
-            value=f"The accepted repair is {row['pending_action']['state']}. The bot will reconcile its existing receipt on the next monitor cycle. No second repair will be dispatched. Use Recheck for current progress.",
+            name="Publication check in progress" if publication else "Repair being verified",
+            value=(
+                f"The original check is still running ({progress['elapsed_seconds']} seconds). "
+                "Provider pacing and verification can take several minutes. "
+                "Use Recheck for progress; do not start another check or restart the bot. "
+                "Only the final saved receipt confirms its outcome."
+                if publication and progress
+                else f"The accepted repair is {row['pending_action']['state']}. The bot will reconcile its existing receipt on the next monitor cycle. No second repair will be dispatched. Use Recheck for current progress."
+            ),
             inline=False,
         )
     if row.get("release_notice"):
@@ -142,6 +151,15 @@ class RecoveryConfirmView(discord.ui.View):
             actor = actor_for(interaction)
             if not await safe_defer(interaction, ephemeral=True):
                 return
+            if self.action == "verify_publication":
+                await interaction.followup.send(
+                    "Publication verification requested. This can take several minutes while "
+                    "the bot checks retained history and current output. Use Recheck to follow "
+                    "progress. A slow check does not authorise a retry or restart.",
+                    view=RecoveryIncidentView(self.row),
+                    ephemeral=True,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
             row = await call(
                 "execute",
                 actor,

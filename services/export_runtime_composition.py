@@ -2552,6 +2552,7 @@ class AuthorityClient:
 
     def _invoke(self, message):
         from core.export_execution_host import MessagePipe
+        from services.export_proof_progress import AuthorityProofBusy
 
         if self.deployment_hash is not None:
             message = dict(message, deployment_hash=self.deployment_hash)
@@ -2569,9 +2570,13 @@ class AuthorityClient:
                 verify_process_snapshot(
                     process_snapshot(server), self.process_bindings["authority"]
                 )
+            if reply == {"version": 1, "error": "authority_busy"}:
+                raise AuthorityProofBusy("Publication verification is in progress.")
             if set(reply) != {"version", "result"} or reply["version"] != 1:
                 raise ExecutionUncertain("Authority action has no exact acknowledgment.")
             return reply["result"]
+        except AuthorityProofBusy:
+            raise
         except BaseException as exc:
             raise ExecutionUncertain("Authority action outcome requires reconciliation.") from exc
         finally:
@@ -2837,17 +2842,45 @@ class AuthorityClient:
         self, kind, object_id, snapshot_hash, *, current_attempt_id=None, old_attempt_id=None
     ):
         uuid_text(object_id)
-        result = self._invoke(
-            dict(
-                version=1,
-                action="prove",
-                kind=kind,
-                object_id=object_id,
-                snapshot_hash=snapshot_hash,
-                current_attempt_id=current_attempt_id,
-                old_attempt_id=old_attempt_id,
-            )
+        message = dict(
+            version=1,
+            action="prove",
+            kind=kind,
+            object_id=object_id,
+            snapshot_hash=snapshot_hash,
+            current_attempt_id=current_attempt_id,
+            old_attempt_id=old_attempt_id,
         )
+        if kind in {"publication", "retirement_recovery"}:
+            from time import sleep
+
+            request_id = str(uuid4())
+            message.update(action="proof_start", request_id=request_id)
+            while True:
+                progress = self._invoke(message)
+                if (
+                    not isinstance(progress, dict)
+                    or set(progress) != {"request_id", "state", "elapsed_seconds", "result"}
+                    or progress["request_id"] != request_id
+                    or progress["state"] not in {"running", "complete", "unavailable"}
+                    or type(progress["elapsed_seconds"]) is not int
+                    or progress["elapsed_seconds"] < 0
+                    or (progress["state"] != "complete" and progress["result"] is not None)
+                ):
+                    raise ExecutionUncertain("Proof progress acknowledgment differs.")
+                if progress["state"] == "unavailable":
+                    raise ExecutionUncertain(
+                        "Saved proof check is unavailable; no replay requested."
+                    )
+                if progress["state"] == "complete":
+                    result = progress["result"]
+                    break
+                # Polling never starts another worker, including after authority
+                # restart. The calling runtime retains/drains the original call.
+                message["action"] = "proof_status"
+                sleep(1)
+        else:
+            result = self._invoke(message)
         if (
             not isinstance(result, dict)
             or result.get("snapshot_hash") != snapshot_hash

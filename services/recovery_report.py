@@ -5,6 +5,7 @@ import json
 
 from core.operator_diagnostic_payloads import redact_diagnostic_text
 from services import recovery_health
+from services.recovery_execution_guard import execution_progress
 from services.recovery_service import SourceConflict
 
 
@@ -141,6 +142,9 @@ def incident_report(service, row):
             ),
             required_repairs=required,
             pending_verification=current.get("pending_action"),
+            execution_progress=(
+                execution_progress(row["IncidentID"]) if current.get("pending_action") else None
+            ),
             release_restriction=current.get("release_notice"),
             adapter_available=row["SourceKind"] in service.adapters,
             next_step=_next_step(current, evidence, actions, blocked),
