@@ -213,6 +213,7 @@ def guided(workflow, monkeypatch):
     from threading import RLock
 
     from scripts.run_export_authority import AuthorityBroker
+    from services.export_proof_progress import ProofProgress
     from services.export_replacement_recovery_adapter import ReplacementRecoveryAdapter
     from services.export_runtime_composition import LocalAuthorityClient
     from services.recovery_release_policy import p0a_presentation
@@ -222,6 +223,7 @@ def guided(workflow, monkeypatch):
     service, state, _, _ = workflow
     service.execution.connect = object()
     broker = object.__new__(AuthorityBroker)
+    broker.proof_progress = ProofProgress(broker._dispatch)
     broker.boundary = SimpleNamespace(fingerprint="b" * 64, recheck=Mock())
     broker.authority = SimpleNamespace(
         _lock=RLock(), dal=service.execution, store=service.store, enrollment_plan=None
