@@ -607,7 +607,7 @@
         {
           "path": "ui/views/recovery_view.py",
           "before_sha256": "03a56abca63b8eafa84a40868f00877ccaab26cd2e693038f981274fd8f98732",
-          "after_sha256": "69423a6f2736ab3f4c197e2f7726032ff210c7433c58ef77ca154e1cabeb4d46"
+          "after_sha256": "f7410c471ec8708d48cdb6253a028a860cf9e2b9abc7cb14c43da1c654409a9b"
         }
       ]
     }
