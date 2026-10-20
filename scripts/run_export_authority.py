@@ -439,7 +439,7 @@ class AuthorityBroker:
         self.replacements: ReplacementAuthority | None = None
         from services.export_proof_progress import ProofProgress
 
-        self.proof_progress = ProofProgress(self._dispatch)
+        self.proof_progress = ProofProgress(self._dispatch, report_failure=report_dispatch_failure)
 
     def dispatch(self, message):
         from services.export_execution_protocol import uuid_text

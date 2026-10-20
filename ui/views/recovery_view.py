@@ -53,6 +53,17 @@ def incident_embed(row):
     if evidence.get("season") is not None:
         embed.add_field(name="KVK season", value=str(evidence["season"]), inline=True)
     embed.add_field(name="Last checked (UTC)", value=str(row["LastSeenUTC"]), inline=False)
+    if evidence.get("cache_receipt"):
+        receipt = evidence["cache_receipt"]
+        embed.add_field(
+            name="Verified local cache",
+            value=(
+                f"KVK {receipt['source_kvk_no']} · {receipt['source_row_count']} rows\n"
+                f"Source scan (UTC): {receipt['source_last_refresh']}\n"
+                f"Cache verified (UTC): {receipt['verified_utc']}"
+            )[:1024],
+            inline=False,
+        )
     if evidence.get("failure_context"):
         context = evidence["failure_context"]
         embed.add_field(

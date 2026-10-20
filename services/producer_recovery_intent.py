@@ -113,6 +113,25 @@ def atomic_producer_intent(kind, *, cache_refresh=False, configuration_refresh=F
 
 
 @contextmanager
+def report_retry_intent(action_id, parent):
+    """A separately approved report refresh, never a replay of the failed import."""
+    if _intent.get() is not None:
+        raise SourceConflict("Report continuation requires its own producer context.")
+    value = dict(
+        kind="player_stats_report",
+        atomic_checkpoint=1,
+        operation=identity(action_id),
+        parent=identity(parent),
+        export_disposition="cache_only_v1",
+    )
+    token = _intent.set(value)
+    try:
+        yield value
+    finally:
+        _intent.reset(token)
+
+
+@contextmanager
 def configuration_retry_intent(action_id, parent):
     if _intent.get() is not None:
         raise SourceConflict("Configuration continuation requires its own producer context.")

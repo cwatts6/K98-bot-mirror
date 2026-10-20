@@ -510,6 +510,76 @@
           "after_sha256": "013fc7bfe389a78efea5fb6f981d2ec4571b75db6ebcb6f97a8277696cde24e9"
         }
       ]
+    },
+    {
+      "id": "fresh_report_cache_diagnostics_v1",
+      "members": [
+        {
+          "path": "player_stats_cache.py",
+          "before_sha256": "72b2a778eca0c50d1cb5e95e19f33409c8034401806623781b9ed1f497c51156",
+          "after_sha256": "50e1a526e1e1e547376983b5c34f73820570806068bf23f5414116affde15c3e"
+        },
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "95aecdb21551fa98f2e99cf1a6baf84d4d4cd7cdb39cda3ac4b03a31c9993ef3",
+          "after_sha256": "32079eb22c02ab8eedb188d1d0302ecf27009aac04548bba3ec8082573253de3"
+        },
+        {
+          "path": "services/configuration_continuation_dal.py",
+          "before_sha256": "0c79a814102300b0e16b2afec6d349ffbfec8d087469b0b90ac03948840efa9b",
+          "after_sha256": "5090eccb01a20e6415d014410ec996f111e0d135b0d2ae4586ad81f0c44cc01b"
+        },
+        {
+          "path": "services/export_proof_progress.py",
+          "before_sha256": "5e8bd49a4fd3dc26b30ff7e25f4f13b9d0a53e03bf8aa62287bef416cff90aad",
+          "after_sha256": "92f59ef5182f7310714c5fb85340d3e5b8638f66bb8921393ec70e87c1620fad"
+        },
+        {
+          "path": "services/import_capture_recovery_service.py",
+          "before_sha256": "96963a20c22af1148e56a2ff7ac1838631b1fe8a9c89e9e40b9824c76c26b352",
+          "after_sha256": "628e392a42684f842f225d4afd27dc8400c0d3d4e4bb4aed4730a71dbf609c8b"
+        },
+        {
+          "path": "services/player_report_continuation.py",
+          "before_sha256": null,
+          "after_sha256": "bf4affd06c7016ad18e28c240ddcf172f56410f2e83a5bd0e8c9640352181561"
+        },
+        {
+          "path": "services/player_report_continuation_dal.py",
+          "before_sha256": null,
+          "after_sha256": "8f120ad2eab58eadacfa6c4c5583f6e0fea2123b001c73c67556853ccd50af8d"
+        },
+        {
+          "path": "services/player_report_recovery_dal.py",
+          "before_sha256": "52ee45f096b070be968fed2bf3e72bfddc7b706e6bf2023cdebefef759be0bab",
+          "after_sha256": "6748d0813e569fb428e386c0c5a44d94c9c5e52d9d76fa9b103f0af52e580e3a"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "7c65505318f0819ac46c95edc98e8ccdb5c065c9164a6ec3a06e1f4a49e55aaf",
+          "after_sha256": "de966b44b8862c6f44a9e1f9812cdc2fe737ef125005f9300af9845724111059"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "95ff38e51d3b2f10df115d81b7a70a0c2fcf0479e11c963bc8cd30a3f1c8336b",
+          "after_sha256": "b1d18d5f8c0596c81b44908167136cdca436e9c9f63776f061e85fbb9ef72e2b"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "a17cb5c757c3b47beaf0a3b0860d2c4e3016610861781e6da197e712afd45446",
+          "after_sha256": "c97fce76441a10f5a0d6cc3d269ad2f947ca67145696f882ff40519086df2cc1"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "41815fc1192ba2ce84c58c333863b8915f673b9cceeefc8db1445ee0c6203a7d",
+          "after_sha256": "ff4645f447fb5b4bf03178c4529d8711ed1f7901a79fa77774f986725b8dede2"
+        },
+        {
+          "path": "ui/views/recovery_view.py",
+          "before_sha256": "1a4e9e24b271848ca5ae75e778df94018be1be49cd47d98a4c7691b464e835e0",
+          "after_sha256": "03a56abca63b8eafa84a40868f00877ccaab26cd2e693038f981274fd8f98732"
+        }
+      ]
     }
   ]
 }

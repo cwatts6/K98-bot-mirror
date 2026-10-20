@@ -28,6 +28,31 @@ def service(r):
     return RecoveryService(Store(), {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
 
 
+def test_recovered_configuration_only_capture_never_queues_export(recovery):
+    from kvk.dal.new_source_import_dal import digest
+
+    r = recovery
+    request = json.loads(r.outcomes.inspect(r.source)["preparation"]["RequestJson"])
+    request["request"]["producer"]["export_disposition"] = "configuration_only_v1"
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET RequestJson=?,RequestHash=? WHERE PreparationID=?"
+        ),
+        json.dumps(request),
+        digest(request),
+        r.source,
+    )
+    adapter = ConfigurationProducerRecovery(r.outcomes, r.service)
+    evidence, token, _ = adapter.inspect(r.source)
+    assert "resume_capture" in evidence["actions"]
+    adapter.execute(r.source, "resume_capture", token, "recovery:" + str(uuid4()), "Capture only")
+    preview = r.outcomes.inspect(r.source)
+    assert preview["captured"] and not preview["preparation"]["JobID"]
+    assert r.service.verify_queued(r.source)
+    with pytest.raises(SourceConflict):
+        r.service.queue(r.source, preview["token"])
+
+
 @pytest.mark.parametrize("commit", [True, False])
 def test_configuration_output_and_checkpoint_are_one_transaction(recovery, commit):
     r = recovery
@@ -58,7 +83,7 @@ def test_configuration_output_and_checkpoint_are_one_transaction(recovery, commi
 @pytest.mark.parametrize("committed", [True, False])
 @pytest.mark.asyncio
 async def test_alert_to_actual_confirmation_and_verified_repair(recovery, monkeypatch, committed):
-    from ui.views import recovery_view as view
+    from ui.views import recovery_summary_view as summary_view, recovery_view as view
 
     r = recovery
     if not committed:
@@ -75,6 +100,9 @@ async def test_alert_to_actual_confirmation_and_verified_repair(recovery, monkey
     monkeypatch.setattr(view, "call", call)
     monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
     monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(summary_view, "call", call)
+    monkeypatch.setattr(summary_view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(summary_view, "safe_defer", AsyncMock(return_value=True))
     interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
     button = next(
         b
@@ -83,6 +111,12 @@ async def test_alert_to_actual_confirmation_and_verified_repair(recovery, monkey
     )
     await button.callback(interaction)
     confirmation = interaction.followup.send.call_args.kwargs["view"]
+    if isinstance(confirmation, summary_view.RecoverySummaryView):
+        assert not current.store.actions
+        await next(
+            b for b in confirmation.children if b.label == "Continue to confirmation"
+        ).callback(interaction)
+        confirmation = interaction.followup.send.call_args.kwargs["view"]
     assert confirmation.action == action
     assert not current.store.actions
     confirm = next(b for b in confirmation.children if b.label.startswith("Confirm"))

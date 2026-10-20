@@ -18,6 +18,30 @@ class PlayerReportCaptureRecovery(ImportCaptureRecovery):
         super().__init__(runtime, outcomes)
         self.dal = ImportCaptureRecoveryDAL(outcomes, stats_execution=False)
 
+    def no_export(self, prep):
+        producer = self.request_dal.request(prep)["request"]["producer"]
+        return producer.get("export_disposition") in {"cache_only_v1", "configuration_only_v1"}
+
+    def after_capture(self, preparation_id):
+        prep = self.outcomes.inspect(preparation_id)["preparation"]
+        if self.no_export(prep):
+            self.runtime.verified_snapshot(preparation_id)
+            return None
+        return super().after_capture(preparation_id)
+
+    def verify_queued(self, source_id):
+        preview = self.outcomes.inspect(source_id)
+        if not self.no_export(preview["preparation"]):
+            return super().verify_queued(source_id)
+        self.generation(preview["preparation"], preview["execution"])
+        row, _, _ = self.runtime.verified_snapshot(source_id)
+        return bool(preview["captured"] and not row["JobID"] and row["State"] == "captured")
+
+    def queue(self, source_id, token):
+        if self.no_export(self.outcomes.inspect(source_id)["preparation"]):
+            raise SourceConflict("The original no-export intent cannot queue spreadsheet work.")
+        return super().queue(source_id, token)
+
     def generation(self, prep, execution=None):
         request = self.request_dal.request(prep)
         scope = json.loads(self.runtime.configuration)[self.consumer]
@@ -89,6 +113,17 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                     evidence["explanation"] = self.no_export_explanation
                     evidence["failure_context"]["summary"] = evidence["explanation"]
                 elif cache_only and not resolved:
+                    if preview["action"] == "resume_capture":
+                        evidence["actions"].pop("queue_capture", None)
+                        evidence["actions"]["resume_capture"].update(
+                            check="Confirm that the committed output should be captured without rerunning the producer.",
+                            effect="Preserve and verify the exact committed output. The original no-export intent remains binding: no spreadsheet job is queued. Its no-export completion is checked separately.",
+                        )
+                        evidence["explanation"] = (
+                            "The SQL result committed, but its retained capture needs recovery. "
+                            "This invocation requested no spreadsheet export."
+                        )
+                        return evidence, token, resolved
                     self._verify_no_export(source_id, preview)
                     evidence["actions"] = {
                         self.automatic_action: dict(

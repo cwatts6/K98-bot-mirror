@@ -96,6 +96,13 @@ def recovery_service():
             report_outcomes, PlayerReportCaptureRecovery(runtime, report_outcomes)
         )
         adapters[report_adapter.kind] = report_adapter
+        from services.player_report_continuation import PlayerReportContinuation
+        from services.player_report_continuation_dal import PlayerReportContinuationDAL
+
+        report_continuation = PlayerReportContinuation(
+            PlayerReportContinuationDAL(runtime, report_outcomes), report_adapter
+        )
+        adapters[report_continuation.kind] = report_continuation
         from services.configuration_producer_recovery import (
             ConfigurationProducerCapture,
             ConfigurationProducerDAL,

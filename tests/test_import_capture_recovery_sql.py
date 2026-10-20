@@ -56,7 +56,7 @@ def recovery(tmp_path, request):
             "ExportExecutionStream",
         )
     }
-    if request.param == "configuration_continuation":
+    if request.param in {"configuration_continuation", "player_report_continuation"}:
         names.update(
             {
                 name: "##Capture_" + namespace + "_" + name.split(".")[1]
@@ -82,7 +82,7 @@ def recovery(tmp_path, request):
         )
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
     procedures = {}
-    if request.param == "configuration_continuation":
+    if request.param in {"configuration_continuation", "player_report_continuation"}:
         procedures = {
             "dbo." + name: "##Capture_" + namespace + "_" + name
             for name in (
@@ -176,6 +176,7 @@ def recovery(tmp_path, request):
             base, preview, resources = kvk_fixture()
         elif request.param in {
             "player_report",
+            "player_report_continuation",
             "configuration_producer",
             "configuration_continuation",
         }:
@@ -231,6 +232,7 @@ def recovery(tmp_path, request):
             "all_kvk": AllKvkCaptureRecoveryDAL,
             "scan_data": StatsImportOutcomeDAL,
             "player_report": PlayerReportRecoveryDAL,
+            "player_report_continuation": PlayerReportRecoveryDAL,
         }.get(request.param)
         if request.param in {"configuration_producer", "configuration_continuation"}:
             outcome_type = ConfigurationProducerDAL
@@ -280,6 +282,7 @@ def recovery(tmp_path, request):
             "all_kvk": AllKvkCaptureRecovery,
             "scan_data": ImportCaptureRecovery,
             "player_report": PlayerReportCaptureRecovery,
+            "player_report_continuation": PlayerReportCaptureRecovery,
         }.get(request.param)
         if request.param in {"configuration_producer", "configuration_continuation"}:
             service_type = ConfigurationProducerCapture

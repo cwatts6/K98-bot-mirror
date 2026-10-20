@@ -16,8 +16,9 @@ class AuthorityProofBusy(ImportExecutionActive):
 
 
 class ProofProgress:
-    def __init__(self, issue):
+    def __init__(self, issue, *, report_failure=None):
         self.issue = issue
+        self.report_failure = report_failure
         self._lock = Lock()
         self._entries = {}
         self._active = None
@@ -88,8 +89,15 @@ class ProofProgress:
     def _run(self, entry):
         try:
             result = self.issue(deepcopy(entry["selector"]))
-        except BaseException:
+        except BaseException as error:
             # Exception prose may include private SQL/provider details.
+            # The broker's bounded diagnostic reporter accepts the exception
+            # locally; neither its prose nor provider payload enters IPC.
+            if self.report_failure is not None:
+                try:
+                    self.report_failure(deepcopy(entry["selector"]), error)
+                except BaseException:
+                    pass  # Diagnostics cannot strand admission or change truth.
             with self._lock:
                 entry["state"] = "unavailable"
         else:

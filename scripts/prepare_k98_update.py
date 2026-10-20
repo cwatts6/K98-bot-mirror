@@ -167,6 +167,24 @@ PROBE_BUSY_TRANSITION_PATHS = frozenset(
     }
 )
 
+REPORT_CACHE_TRANSITION_PATHS = frozenset(
+    {
+        "player_stats_cache.py",
+        "scripts/run_export_authority.py",
+        "services/configuration_continuation_dal.py",
+        "services/export_proof_progress.py",
+        "services/import_capture_recovery_service.py",
+        "services/player_report_continuation.py",
+        "services/player_report_continuation_dal.py",
+        "services/player_report_recovery_dal.py",
+        "services/player_report_recovery_service.py",
+        "services/producer_recovery_intent.py",
+        "services/recovery_release_policy.py",
+        "services/recovery_runtime.py",
+        "ui/views/recovery_view.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -227,6 +245,10 @@ def reviewed_transitions():
             fixed_probe_busy = (
                 item["id"] == "probe_busy_recovery_v1" and path in PROBE_BUSY_TRANSITION_PATHS
             )
+            fixed_report_cache = (
+                item["id"] == "fresh_report_cache_diagnostics_v1"
+                and path in REPORT_CACHE_TRANSITION_PATHS
+            )
             if (
                 not (
                     path.startswith("services/export_")
@@ -239,6 +261,7 @@ def reviewed_transitions():
                     or fixed_probe
                     or fixed_progress
                     or fixed_probe_busy
+                    or fixed_report_cache
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -251,6 +274,11 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if (
+            item["id"] == "fresh_report_cache_diagnostics_v1"
+            and paths != REPORT_CACHE_TRANSITION_PATHS
+        ):
+            raise ValueError("Complete fixed report/cache diagnostics transition required.")
         if item["id"] == "failed_export_closeout_v1" and paths != FAILED_EXPORT_TRANSITION_PATHS:
             raise ValueError("Complete fixed failed-export transition required.")
         if item["id"] == "cache_only_completion_v1" and paths != CACHE_ONLY_TRANSITION_PATHS:

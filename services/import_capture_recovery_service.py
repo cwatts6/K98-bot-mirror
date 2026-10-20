@@ -117,6 +117,9 @@ class ImportCaptureRecovery:
                 self.runtime.dal.captured(claim, receipt)
         # This is an idempotent queue admission of the retained snapshot, not export
         # dispatch. Its acknowledgement must also be reconciled before resolution.
+        return self.after_capture(preparation_id)
+
+    def after_capture(self, preparation_id):
         return self.runtime.enqueue_snapshot(preparation_id)
 
     def verify_queued(self, source_id):

@@ -303,10 +303,11 @@ def test_monitor_finishes_lost_approval_receipt_before_report_disappears(
     monkeypatch.setattr(runtime, "_priority_incident_cursor", None)
     failures = runtime.observe_recovery()
     if lose_cancel_reply:
-        assert failures and store.get(row["IncidentID"])["State"] == "open"
-        assert store.pending_actions(row["IncidentID"])
-        # Empty end pages reset their cursors; the following pass verifies the
-        # saved marker without another cancellation.
+        assert failures
+        # Priority incident checks can verify the saved marker in this same
+        # cycle. If not, the next pass must do so without another cancellation.
+        if store.get(row["IncidentID"])["State"] == "open":
+            assert store.pending_actions(row["IncidentID"])
         for _ in range(2):
             failures = runtime.observe_recovery()
         assert failures == []

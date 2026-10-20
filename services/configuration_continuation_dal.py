@@ -9,6 +9,8 @@ from services.producer_refusal_dal import ProducerRefusalDAL
 
 
 class ConfigurationContinuationDAL(ProducerRefusalDAL):
+    marker_key = "configuration_continuation"
+
     def __init__(self, runtime, outcomes):
         super().__init__(runtime)
         self.outcomes = outcomes
@@ -44,7 +46,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
         from services.replacement_admission_dal import admission_blocker
 
         root = self.original(source_id)
-        marker = json.loads(root["GenerationJson"] or "{}").get("configuration_continuation")
+        marker = json.loads(root["GenerationJson"] or "{}").get(self.marker_key)
         child = None
         if marker and marker.get("action"):
             operation = identity(marker["action"])
@@ -104,7 +106,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
         if digest(state).hex() != expected_token:
             raise SourceConflict("Configuration continuation evidence changed.")
         generation = json.loads(state["root"]["GenerationJson"] or "{}")
-        generation["configuration_continuation"] = marker
+        generation[self.marker_key] = marker
         encoded = bounded_json(generation)
         with transaction(self.connect) as cursor:
             _cas(

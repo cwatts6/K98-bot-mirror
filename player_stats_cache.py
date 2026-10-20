@@ -786,7 +786,7 @@ def _map_excel_row(
     return mapped
 
 
-def _build_cache_sync() -> dict[str, Any]:
+def _build_cache_sync(*, refresh: bool | None = None) -> dict[str, Any]:
     """
     Build in-memory dict for cache payload.
     Uses centralized DB connection retries via file_utils.get_conn_with_retries().
@@ -808,7 +808,7 @@ def _build_cache_sync() -> dict[str, Any]:
 
     # Standardized DB_* env vars are honored inside get_conn_with_retries()
     with get_conn_with_retries(meta={"operation": "player_stats_cache"}) as cn:
-        if _REFRESH_BEFORE_BUILD:
+        if _REFRESH_BEFORE_BUILD if refresh is None else refresh:
             sp_attempted = True
             try:
                 _execute_sp_with_retries(cn)
@@ -1032,6 +1032,40 @@ def _failed_cache_outcome(
             "existing_json_preserved": existing_json_preserved,
         }
     }
+
+
+def rebuild_validated_cache_only() -> dict[str, Any]:
+    """Explicit recovery: read existing SQL once; never rerun a producer/fallback.
+
+    The receipt certifies the cache bytes at readback, not that a newer scan was
+    imported. The source's own LAST_REFRESH remains visible to the admin.
+    """
+    import hashlib
+    import json
+
+    from file_utils import acquire_lock
+
+    with acquire_lock(_cache_lock_path(), timeout=_CACHE_LOCK_TIMEOUT):
+        output = _build_cache_sync(refresh=False)
+        meta = output["_meta"]
+        meta["cache_write_status"] = "written"
+        meta["existing_json_preserved"] = False
+        # Match the normal cache's shape; fail before replacement if the result
+        # cannot fit our bounded verification read.
+        if len(json.dumps(output, ensure_ascii=False, indent=2).encode("utf-8")) > 64 * 1024 * 1024:
+            raise CacheSnapshotValidationError("cache_snapshot_too_large")
+        _atomic_write_json_with_retries(PLAYER_STATS_CACHE, output)
+        with open(PLAYER_STATS_CACHE, "rb") as source:
+            raw = source.read(64 * 1024 * 1024 + 1)
+        if len(raw) > 64 * 1024 * 1024 or json.loads(raw) != output:
+            raise CacheSnapshotValidationError("cache_readback_differs")
+        return dict(
+            sha256=hashlib.sha256(raw).hexdigest(),
+            verified_utc=_utc_now_iso(),
+            source_last_refresh=meta["source_last_refresh"],
+            source_kvk_no=meta["source_kvk_no"],
+            source_row_count=meta["source_row_count"],
+        )
 
 
 def _build_and_persist_cache_sync() -> dict[str, Any] | None:

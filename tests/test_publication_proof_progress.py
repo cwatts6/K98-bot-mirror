@@ -14,6 +14,36 @@ from services.export_runtime_composition import AuthorityClient, RuntimeRegistra
 from tests.test_export_runtime_composition import registration_fixture
 
 
+def test_failed_proof_reports_bounded_diagnostic_without_exposing_exception(capsys):
+    broker, client, _ = endpoint()
+    request = selector()
+    broker.issuer.issue.side_effect = ValueError("private spreadsheet contents")
+    client._invoke(request)
+    broker.proof_progress.drain()
+    result = client._invoke(dict(request, action="proof_status"))
+    assert result["state"] == "unavailable" and result["result"] is None
+    import json
+
+    record = json.loads(capsys.readouterr().err)
+    assert record["stage"] == "AUTHORITY_DISPATCH_FAILED"
+    assert record["action"] == "prove"
+    assert record["object_id"] == request["object_id"]
+    assert record["exception_types"] == ["ValueError"]
+    assert "private spreadsheet contents" not in str(record)
+
+
+def test_failure_reporter_failure_cannot_strand_proof_admission():
+    def fail(*_):
+        raise RuntimeError("private details")
+
+    progress = ProofProgress(fail, report_failure=fail)
+    request = selector()
+    progress.start(request["request_id"], request)
+    progress.drain()
+    assert not progress.busy()
+    assert progress.poll(request["request_id"], request)["state"] == "unavailable"
+
+
 def endpoint():
     boundary = Mock(fingerprint="d" * 64, _manifest={})
     boundary.recheck.return_value = boundary.fingerprint

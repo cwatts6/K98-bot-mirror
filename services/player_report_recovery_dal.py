@@ -19,6 +19,9 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
     @classmethod
     def producer_fields(cls, producer):
         fields = {"kind", "atomic_checkpoint", "operation"}
+        if "parent" in producer:
+            identity(producer["parent"])
+            fields |= {"parent"}
         if "export_disposition" in producer:
             if (
                 type(producer["export_disposition"]) is not str
