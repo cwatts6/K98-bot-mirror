@@ -23,6 +23,7 @@ def test_cache_transition_pins_every_runtime_member():
                 if t["id"]
                 in {
                     "guided_rollover_v1",
+                    "publication_timing_v1",
                     "configuration_only_completion_v1",
                     "monitor_admission_closeout_v1",
                     "guided_replacement_release_v1",

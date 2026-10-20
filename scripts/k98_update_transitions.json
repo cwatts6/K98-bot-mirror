@@ -745,6 +745,21 @@
           "after_sha256": "4293ed7755d4908590da082010b991aa4f0c4e0baf3b7d83a3ad7b7154ae6416"
         }
       ]
+    },
+    {
+      "id": "publication_timing_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "4e90fa2121065281e97a85294c0e637f9ce58b2f47f87e0244602e6d95c89c07",
+          "after_sha256": "bed3ef382208dc909c8498c2e40bf15d08d2f7fc208ef1bd3ccf0d2e5c92576c"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "67e64b740cc09ef4ad5de96964d3d3569d11db1609f8cd6395a4a584fc2399db",
+          "after_sha256": "4c82047f74ce7123e035f0b42af1329036dc40d435ff901661f575bc587c2e09"
+        }
+      ]
     }
   ]
 }

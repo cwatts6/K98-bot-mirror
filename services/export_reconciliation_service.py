@@ -10,6 +10,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 import json
 import logging
+import sys
+import time
 from time import monotonic
 
 from kvk.dal.new_source_import_dal import SourceConflict
@@ -26,6 +28,23 @@ from services.export_execution_protocol import (
 )
 
 logger = logging.getLogger(__name__)
+publication_timing_logger = logging.getLogger(__name__ + ".publication_timing")
+
+
+def configure_publication_timing():
+    """Enable only fixed publication timings in the separate authority process."""
+    if not any(
+        getattr(handler, "k98_publication_timing", False)
+        for handler in publication_timing_logger.handlers
+    ):
+        handler = logging.StreamHandler(sys.stderr)
+        handler.k98_publication_timing = True
+        formatter = logging.Formatter("%(asctime)s UTC %(message)s")
+        formatter.converter = time.gmtime
+        handler.setFormatter(formatter)
+        publication_timing_logger.addHandler(handler)
+    publication_timing_logger.setLevel(logging.INFO)
+    publication_timing_logger.propagate = False
 
 
 @contextmanager
@@ -37,7 +56,7 @@ def publication_phase(name):
         yield
         completed = True
     finally:
-        logger.info(
+        publication_timing_logger.info(
             "publication_verification_phase phase=%s completed=%s duration_ms=%d",
             name,
             completed,

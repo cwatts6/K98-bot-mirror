@@ -21,6 +21,7 @@ def test_progress_transition_pins_complete_runtime():
                 if t["id"]
                 in {
                     "guided_rollover_v1",
+                    "publication_timing_v1",
                     "probe_busy_recovery_v1",
                     "fresh_report_cache_diagnostics_v1",
                     "report_cache_handoff_v1",

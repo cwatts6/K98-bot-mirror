@@ -17,7 +17,14 @@ def test_guided_rollover_pins_complete_runtime():
         source = root / member["path"]
         if member["path"] == "services/rollover_replacement_authority.py" and not source.exists():
             continue  # Scrubbed mirror; exact source is checked in the private checkout.
-        assert updater.sha256(source.read_bytes().replace(b"\r\n", b"\n")) == member["after_sha256"]
+        expected = member["after_sha256"]
+        for transition in updater.reviewed_transitions():
+            if transition["id"] == "publication_timing_v1":
+                for successor in transition["members"]:
+                    if successor["path"] == member["path"]:
+                        assert successor["before_sha256"] == expected
+                        expected = successor["after_sha256"]
+        assert updater.sha256(source.read_bytes().replace(b"\r\n", b"\n")) == expected
         assert member["before_sha256"] and member["before_sha256"] != member["after_sha256"]
 
 

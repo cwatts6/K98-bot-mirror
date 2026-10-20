@@ -23,6 +23,7 @@ def test_replacement_workflow_transition_pins_every_runtime_member():
                 if t["id"]
                 in {
                     "guided_rollover_v1",
+                    "publication_timing_v1",
                     "guided_replacement_release_v1",
                     "guided_publication_recovery_v1",
                     "publication_progress_v1",

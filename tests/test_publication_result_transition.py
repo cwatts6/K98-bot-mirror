@@ -21,7 +21,7 @@ def test_result_transition_pins_all_runtime_members(transition, paths):
     successors = {
         m["path"]: m["after_sha256"]
         for t in updater.reviewed_transitions()
-        if t["id"] == "guided_rollover_v1"
+        if t["id"] in {"guided_rollover_v1", "publication_timing_v1"}
         for m in t["members"]
     }
     for member in item["members"]:

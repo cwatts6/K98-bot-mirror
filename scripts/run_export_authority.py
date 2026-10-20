@@ -858,9 +858,11 @@ def main(argv=None):
     from services.export_execution_authority import ExportExecutionAuthority
     from services.export_execution_dal import ExportExecutionDAL, installation_migrations
     from services.export_execution_protocol import decode
+    from services.export_reconciliation_service import configure_publication_timing
     from services.export_request_budget import RequestBudget
     from services.export_runtime_composition import verify_installation_contract
 
+    configure_publication_timing()
     manifest_file = assert_protected_path(args.manifest, private=True)
     raw = manifest_file.read_bytes()
     manifest = manifest_contract(
