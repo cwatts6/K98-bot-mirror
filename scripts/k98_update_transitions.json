@@ -1,0 +1,370 @@
+{
+  "version": 1,
+  "transitions": [
+    {
+      "id": "reader_workbook_and_failed_read_history_v1",
+      "members": [
+        {
+          "path": "services/export_execution_protocol.py",
+          "before_sha256": "fca1f960b6539928761d79096119f025d821a1e2a257b07b8cc3854d4dffa393",
+          "after_sha256": "3ee66e910a0921767fff54af6a1e33d57cc23f888f4bdac1daf381fcc2eaf6b3"
+        },
+        {
+          "path": "services/export_reader_protocol.py",
+          "before_sha256": null,
+          "after_sha256": "58a0106050d8ae2c323cc8a243d9b56be4f7ee6591f74157476ba1b99e3cfce5"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "ae176cdc541a4df2d82cad4b1c36db35efd2ec32f7c9926056b8157ef786cb75",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "failed_read_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "932261c58ee2cc092c9642db569c12145f569140b5780ba088cf7fe666b8d44b",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "owned_closure_recovery_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "d113effbd427007aa8788c3fe2745c1dd4055cd1c38cecf3afdd63216ee47ec4",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "sealed_read_prefix_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "7674afc32f1efee9abbcfa6388c3248cc8a9e78f1983494545c718a731997587",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "failed_publication_probe_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "b506b4a0d8224faae573e3985ee723ee33242c274621718e7a396587e709acbf",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "retired_read_child_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "516e88656768955a6ed10b7a3d3499f35634b45b35dae27098b074654626077b",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "contained_read_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "0bdcc6c8e428fe0347520fbbb8de63afa182d160f09606d7dac382ea5449cca8",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "replacement_read_check_history_v1",
+      "members": [
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "399aede5dacc44bdec271d1045a8efeea10fa3b3efd902baa7009e0bdaaa4629",
+          "after_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3"
+        }
+      ]
+    },
+    {
+      "id": "unstarted_export_recovery_v1",
+      "members": [
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "7daa91f93ef2e126575c0e9dbea9e4d044e2a9accfe097dd53905b293d5acd2e",
+          "after_sha256": "286283cc212678c0fa60542d8c90af18e912893e9bc1bcfa572c09575fedee4b"
+        },
+        {
+          "path": "services/export_recovery_service.py",
+          "before_sha256": "8db60196cd61ac624ec5f24769a695bd31252a901f9c5df0763e8b3a83cc3e94",
+          "after_sha256": "96353d2632eff6af1ec15690d099fceec130bb7c9b36e7a030f79f3dcee1ac85"
+        },
+        {
+          "path": "services/export_recovery_dal.py",
+          "before_sha256": "3cfb6fb5d1aaf2c73d0ba20e5791472515cd077b08bd7514d112930bfa733b01",
+          "after_sha256": "744d523e33c440c61b56bab9eba8be2fdce839eb8deb31da7e170fc6c49ba4c3"
+        }
+      ]
+    },
+    {
+      "id": "captured_output_recovery_v1",
+      "members": [
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "286283cc212678c0fa60542d8c90af18e912893e9bc1bcfa572c09575fedee4b",
+          "after_sha256": "0fbb83a499875d0dad6798a6a9c351df3d0151ed4774d3b5cc957230b6637ff0"
+        },
+        {
+          "path": "services/export_coordination_service.py",
+          "before_sha256": "d16e59013758c2e3b7b2b9723166e1cd6f66c92d218dcf55b446626fd3ae13c0",
+          "after_sha256": "f6adcfb86af3dd8d60ba5bdad9fc2b2b1db97022f7f20e29a66796c54c8630ab"
+        },
+        {
+          "path": "services/export_recovery_service.py",
+          "before_sha256": "96353d2632eff6af1ec15690d099fceec130bb7c9b36e7a030f79f3dcee1ac85",
+          "after_sha256": "dc2ccd8373b94b25d04062c74bfe040dc811abf1400f50f3f365827b161ab846"
+        },
+        {
+          "path": "services/export_failure_diagnostics.py",
+          "before_sha256": "eac833bd2e905120385be89f15aa942047b3af497244c6e963cb31020432119a",
+          "after_sha256": "a87544310865543c3fa3961ce4bd899c61dc5cb1ec47bbc6b8312fc81742cb52"
+        }
+      ]
+    },
+    {
+      "id": "failed_export_closeout_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "a1ba9ca87f0293e075fb5e179bf6df4b2b93e2ec669e5244d4a676f7211f3575",
+          "after_sha256": "8a6983cdeb973493640eb456ee3219c8247e2350d9f41fda367343b319624a68"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "0fbb83a499875d0dad6798a6a9c351df3d0151ed4774d3b5cc957230b6637ff0",
+          "after_sha256": "2f54321518916478368a674b2a0b5e2a8e9950982ef012f3d18d262c42ea34de"
+        },
+        {
+          "path": "services/export_evidence_catalog_dal.py",
+          "before_sha256": "f7ec62042b65b6543a2e9a0cc2114282b8dfae0d553f0e9d486b481487aaf0b2",
+          "after_sha256": "b847742c214981af86d6b34a0fe4d7cd7b5bb4260c41b3f5f27d5b475edf25c7"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "b99261162047af69b7560f8e77c12075c472de5972c6d267a4fb6d9b10e9ece3",
+          "after_sha256": "49ae41ef0f44621dadfebb2fc2facc599c66c17d2faa160297693f3552721cdd"
+        },
+        {
+          "path": "services/export_replacement_recovery_adapter.py",
+          "before_sha256": "40136c5a4dac02cf47587995ac75201f2e2d4ad4c73902e7fc9b6ff2020fab25",
+          "after_sha256": "9e98681bf71ac5466702db02857180b97a830616917ae76a3a056649b74cdd9d"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "before_sha256": "6135908d7ce892641f64356cf2e9a7472216b35030f379c746b7a0218b29379d",
+          "after_sha256": "11558c4ea37d79b829f36a905b84c9b8461cb0b032a96b8b3a6be523504f3318"
+        },
+        {
+          "path": "services/failed_export_closeout.py",
+          "before_sha256": null,
+          "after_sha256": "2e39f0e8356d9169db4eb92f0207f79bc2e5bd78de737d4d2d9a42068d700076"
+        },
+        {
+          "path": "services/failed_export_closeout_dal.py",
+          "before_sha256": null,
+          "after_sha256": "454fc233b7a8c061ee4ba7f860856a3eab4840a6dd23a3c1d8ccc96e084c65dc"
+        },
+        {
+          "path": "services/failed_export_recovery_authority.py",
+          "before_sha256": null,
+          "after_sha256": "353abefbceb8bdf078a51b0c4537244e659aefea3e7425d7a4e53b81af5d2f13"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "3e7c7aa9a05e22bf7c1d4949257fc06159c88cb1cf858d86cdf976c9fc3fc08c",
+          "after_sha256": "a902c2b717a3a79ceac5fd7fa9b50bba4a5b7708eb32ecc817e62ec2c8c75db1"
+        }
+      ]
+    },
+    {
+      "id": "cache_only_completion_v1",
+      "members": [
+        {
+          "path": "player_stats_cache.py",
+          "before_sha256": "39b8d0dcc86520d265eb50acf54c22cbaf636755b40347da85170877607c2ab1",
+          "after_sha256": "72b2a778eca0c50d1cb5e95e19f33409c8034401806623781b9ed1f497c51156"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "f37c7d482c9bc5beba376c3136b88f6b77660e62b4cf8c8b1953960bd77ab97d",
+          "after_sha256": "b4b21a1e63374a5465dc5ac865b6338aa7594945e2963e601d6b17e68b72fdcc"
+        },
+        {
+          "path": "services/player_report_recovery_dal.py",
+          "before_sha256": "489d228eb00ca99b8118d51e1d4ccb558242ab48ac48de73b2d79426a9f8ae48",
+          "after_sha256": "6bc7ff8a7482884182cd79c77da6b35d504a9db6c0753b1dd3cfa130f338669b"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "5c01ed30bb58b8b7a6916c639b4f4f9c19e6536babe56b8b551313eba5f6333c",
+          "after_sha256": "2a63b98f20dfcab8bd0e3db717963ec96002d4f47f22089cd50dc00aff1caafd"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "af846a4a47455a468e7d7929bde4acb613da813c6563a0895cc7537ded1fcbbd",
+          "after_sha256": "bff562c62d4c2ad9a0745daba5a8406093b082391d12899cdfde4ee0f45e6d4b"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "a902c2b717a3a79ceac5fd7fa9b50bba4a5b7708eb32ecc817e62ec2c8c75db1",
+          "after_sha256": "62074fa62d0240c368f651ff97c78a96e30c25745734abd86eb53363bc6b8c1a"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "7c097990952c52696133ea8e1040f3721d7322ad9946e1c67431ea5f535bcbfc",
+          "after_sha256": "654801e38dac0a4195d6cb64ea41af13bdf57474ff5df233f85294b0a1a817f8"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "9285eb24700c3f704189f3a6a872330f727f02673609e07ad853881c1cc71d7a",
+          "after_sha256": "04063844585b1103d053a002933a9046a471c99f57a76e5e35594218af298d56"
+        }
+      ]
+    },
+    {
+      "id": "configuration_only_completion_v1",
+      "members": [
+        {
+          "path": "proc_config_import.py",
+          "before_sha256": "ced6b0cafe4204e2a090f63be30042b3ad0e957870c1d6bd0308408d5ae91c66",
+          "after_sha256": "f892587be3236900e88fbf3a2898c93c4b4d66a8a7ff3c7494c68ef7da4fa343"
+        },
+        {
+          "path": "services/capture_recovery_context.py",
+          "before_sha256": "e09d0ef7b355fb32fbdf1bcafb30738466b7ffcf9b3e072025ba7a770e07f9c1",
+          "after_sha256": "55ab6286326ced7834c20f31438769c5a3b6385c3c607ce1b4bd87f78107978c"
+        },
+        {
+          "path": "services/configuration_producer_recovery.py",
+          "before_sha256": "53cb367255314d032b34e1a2fbdd58dd94c238106e7ca45091f074a5cca6bcdf",
+          "after_sha256": "b5a91facb79b6cfc9ff1414e620bfafe21e309161285a30d80d0973a4bc83fc0"
+        },
+        {
+          "path": "services/configuration_read_continuation_dal.py",
+          "before_sha256": "7235cdb0f41b533ec0def4b3841928682f52d5d3b066687b98fa3f23e6e58667",
+          "after_sha256": "7778816e83d49167c28f96b6d098c26d65e463939a2148b17bcd694691c2881f"
+        },
+        {
+          "path": "services/player_report_recovery_dal.py",
+          "before_sha256": "6bc7ff8a7482884182cd79c77da6b35d504a9db6c0753b1dd3cfa130f338669b",
+          "after_sha256": "52ee45f096b070be968fed2bf3e72bfddc7b706e6bf2023cdebefef759be0bab"
+        },
+        {
+          "path": "services/player_report_recovery_service.py",
+          "before_sha256": "2a63b98f20dfcab8bd0e3db717963ec96002d4f47f22089cd50dc00aff1caafd",
+          "after_sha256": "7c65505318f0819ac46c95edc98e8ccdb5c065c9164a6ec3a06e1f4a49e55aaf"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "bff562c62d4c2ad9a0745daba5a8406093b082391d12899cdfde4ee0f45e6d4b",
+          "after_sha256": "95ff38e51d3b2f10df115d81b7a70a0c2fcf0479e11c963bc8cd30a3f1c8336b"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "62074fa62d0240c368f651ff97c78a96e30c25745734abd86eb53363bc6b8c1a",
+          "after_sha256": "2b1baba7305b9d18b6cb0ae92198397d9d13ccdc9ed17592dcf7e96be64fa067"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "654801e38dac0a4195d6cb64ea41af13bdf57474ff5df233f85294b0a1a817f8",
+          "after_sha256": "1460749b81579aae28910dd154abac932894e75c7d875ce17e243c1f96b41e18"
+        },
+        {
+          "path": "services/recovery_service.py",
+          "before_sha256": "04063844585b1103d053a002933a9046a471c99f57a76e5e35594218af298d56",
+          "after_sha256": "e8bbf2017a438e160694829f4fe16dab9bba1716202d950af5a087ba1c41fa8e"
+        }
+      ]
+    },
+    {
+      "id": "monitor_admission_closeout_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "c03f7121b71ede87ecabde46ee0ce628a881ae48881778ecf856fe99ec9551bb",
+          "after_sha256": "141d606ea061659dbb4b82c0bc24cd3b571b4778733965338f6f06cf6e40f06e"
+        },
+        {
+          "path": "core/startup_diagnostics.py",
+          "before_sha256": null,
+          "after_sha256": "d2a71770de53e48a7226922f79729f267d45e86a84832bfb9b1d1c9911393d5a"
+        },
+        {
+          "path": "services/producer_recovery_review.py",
+          "before_sha256": "0275be2171915f060bfb0cda79dcde9ebc8cd0316f045d8e40b639273dabd6e5",
+          "after_sha256": "afb3ad204d2842fe61de9e4d78e48b9967de4dfb9f414ae1f99e2f6bae179b55"
+        },
+        {
+          "path": "services/producer_refusal_dal.py",
+          "before_sha256": "d98a4e54113750974f0195b948e6f78c295c32c82879fce7a189cbcb878f06a5",
+          "after_sha256": "71001f3d7424f37e8e2df5e2c6f614b2e55ef9e59829a514c747b3d2595389e0"
+        },
+        {
+          "path": "services/producer_refusal_recovery.py",
+          "before_sha256": "938b8f5609f4997981be6e5033be186b36410aac44dc53f937bd22388967b277",
+          "after_sha256": "7529ddd6ce7cbcb024b8e42f5ca2ff90f77fd37cc4df77b64fc8c9302828b359"
+        },
+        {
+          "path": "services/recovery_dal.py",
+          "before_sha256": "30a1a16ba3650a90da51728b260ca6ea35072abf7c4e70d57163fe7d12bc92ea",
+          "after_sha256": "853d513cdb3144690bf5f9d622d87c86f6430117bf44c7a0c9bf508ca2e15bd2"
+        },
+        {
+          "path": "services/recovery_health.py",
+          "before_sha256": "380916e0c9999b81de5d4d7f10e7b36fb83ade0f92e674c4a8e16ce4e0e2f918",
+          "after_sha256": "87ef719530aa1824e99fc09817038274856bf6f9b24e3e14bbd7774baa1c25dd"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "2b1baba7305b9d18b6cb0ae92198397d9d13ccdc9ed17592dcf7e96be64fa067",
+          "after_sha256": "b90f3f9292c371958e4aaa7dd9222ed59671b74cff0364a67ebac5d527385cc8"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "1460749b81579aae28910dd154abac932894e75c7d875ce17e243c1f96b41e18",
+          "after_sha256": "0f540462a3e480dd40b6a6d2dbb48aa09a4d000044b2febc8b8ed19c2ff0dce2"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "1e04ca83221b4bf0b838d03d845863f6753b045e4c17b9d2a3c37d082dbc513a",
+          "after_sha256": "fb607bb6e11fe6255bcc9bdb03a3c2098c38aa488ccdc0ee6f8f35b7eae83923"
+        }
+      ]
+    },
+    {
+      "id": "guided_replacement_release_v1",
+      "members": [
+        {
+          "path": "services/export_failure_diagnostics.py",
+          "before_sha256": "a87544310865543c3fa3961ce4bd899c61dc5cb1ec47bbc6b8312fc81742cb52",
+          "after_sha256": "64ff59aba8262f1b59117e1e2187bd563213bb1171d0811e92a3e9a3295b0a54"
+        },
+        {
+          "path": "services/export_replacement_recovery_adapter.py",
+          "before_sha256": "9e98681bf71ac5466702db02857180b97a830616917ae76a3a056649b74cdd9d",
+          "after_sha256": "45666a1da52ab472ea1558171379b4f623c00495dc2538ff7e139292951c77b5"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "b90f3f9292c371958e4aaa7dd9222ed59671b74cff0364a67ebac5d527385cc8",
+          "after_sha256": "375165520d91648b30a0dca579a67a6481a0f3a300dc0d12a2db8a71a1d97138"
+        }
+      ]
+    }
+  ]
+}
