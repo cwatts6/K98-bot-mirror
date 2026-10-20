@@ -9,6 +9,23 @@ import pytest
 from services import export_reconciliation_service as module
 
 
+@pytest.fixture(autouse=True)
+def restore_publication_logger():
+    """Authority-only setup must not alter another test's root capture behavior."""
+    logger = module.publication_timing_logger
+    handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
+    try:
+        yield
+    finally:
+        for handler in list(logger.handlers):
+            if handler not in handlers:
+                logger.removeHandler(handler)
+                handler.close()
+        logger.handlers[:] = handlers
+        logger.setLevel(level)
+        logger.propagate = propagate
+
+
 @pytest.mark.parametrize("fails", [False, True])
 def test_authority_startup_retains_timing_without_standard_error(tmp_path, fails):
     script = r"""
