@@ -25,6 +25,7 @@ def test_configuration_transition_pins_every_runtime_member():
                     "monitor_admission_closeout_v1",
                     "guided_replacement_release_v1",
                     "guided_publication_recovery_v1",
+                    "publication_progress_v1",
                 }
                 for m in t["members"]
                 if m["path"] == member["path"]

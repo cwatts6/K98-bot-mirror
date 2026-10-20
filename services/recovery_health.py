@@ -117,7 +117,7 @@ def status():
     if _last_success:
         text += f". Last successful check: {_last_success.isoformat()}"
     if _cycle and _cycle.get("waiting_checks"):
-        text += ". Active SQL work is still running; its recovery checks will retry automatically. No completion or release is inferred"
+        text += ". Existing SQL work or publication verification is still running; its recovery checks will retry automatically. No completion or release is inferred"
     if not healthy and _cycle and _cycle["in_progress"]:
         text += ". A monitoring cycle is in progress; the downloadable report identifies its latest checkpoint"
     if _notification_failure:

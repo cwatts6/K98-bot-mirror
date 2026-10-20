@@ -162,6 +162,9 @@ def _retry_admission():
     try:
         retry_recovery_admission()
         return True
+    except ImportExecutionActive as exc:
+        recovery_health.record_check("registration_admission", exc, waiting=True)
+        return True
     except Exception as exc:
         recovery_health.record_check("registration_admission", exc)
         logger.warning("recovery_admission_unavailable error_type=%s", type(exc).__name__)

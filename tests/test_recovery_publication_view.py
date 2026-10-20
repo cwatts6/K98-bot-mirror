@@ -37,3 +37,43 @@ async def test_entry_preserves_review_first_and_persistent_publication_route():
     entry = RecoveryEntryView()
     assert entry.children[0].label == "Review & fix"
     assert any(b.custom_id == "k98:recovery:publications:v1" for b in entry.children)
+
+
+@pytest.mark.asyncio
+async def test_confirmation_explains_wait_before_entering_long_check(monkeypatch):
+    from tests.test_guided_recovery import setup
+    from ui.views import recovery_view as module
+
+    _, _, _, row = setup()
+    row["SourceKind"] = "export_job"
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
+    events = []
+
+    async def send(*args, **kwargs):
+        assert kwargs["ephemeral"] and not kwargs["allowed_mentions"].everyone
+        events.append("progress" if args else "result")
+
+    async def execute(*args):
+        assert events == ["progress"]
+        events.append("execute")
+        return row
+
+    interaction.followup.send.side_effect = send
+    monkeypatch.setattr(module, "call", execute)
+    confirmation = module.RecoveryConfirmView(row, "verify_publication")
+    await confirmation.confirm.callback(interaction)
+    assert events == ["progress", "execute", "result"]
+    assert confirmation.confirm.disabled
+
+
+def test_running_publication_embed_explains_elapsed_time_and_receipt_boundary():
+    from tests.test_guided_recovery import setup
+    from ui.views.recovery_view import incident_embed
+
+    _, _, _, row = setup()
+    row["pending_action"] = dict(kind="verify_publication", state="dispatched")
+    row["execution_progress"] = dict(state="in_progress", elapsed_seconds=124)
+    field = next(f for f in incident_embed(row).fields if f.name == "Publication check in progress")
+    assert "124 seconds" in field.value and "final saved receipt" in field.value
