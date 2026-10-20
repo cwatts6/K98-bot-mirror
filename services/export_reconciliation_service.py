@@ -10,7 +10,9 @@ from copy import deepcopy
 from dataclasses import dataclass
 import json
 import logging
-import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+import stat
 import time
 from time import monotonic
 
@@ -31,18 +33,70 @@ logger = logging.getLogger(__name__)
 publication_timing_logger = logging.getLogger(__name__ + ".publication_timing")
 
 
-def configure_publication_timing():
-    """Enable only fixed publication timings in the separate authority process."""
-    if not any(
-        getattr(handler, "k98_publication_timing", False)
+class _PublicationTimingHandler(RotatingFileHandler):
+    """Bounded diagnostics, independent of the authority's absent console handles."""
+
+    def __init__(self, root, inspect_path):
+        self.root = Path(root)
+        self.inspect_path = inspect_path
+        self._check_paths()
+        super().__init__(
+            self.root / "publication-timing.log",
+            maxBytes=256 * 1024,
+            backupCount=2,
+            encoding="utf-8",
+        )
+        try:
+            self._check_paths()
+        except Exception:
+            self.close()
+            raise
+
+    def _check_paths(self):
+        self.inspect_path(self.root, private=True)
+        for name in (
+            "publication-timing.log",
+            "publication-timing.log.1",
+            "publication-timing.log.2",
+        ):
+            path = self.root / name
+            if path.exists() or path.is_symlink():
+                self.inspect_path(path, private=True)
+                metadata = path.stat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise ValueError("Private regular diagnostic file required.")
+
+    def emit(self, record):
+        try:
+            self._check_paths()
+            super().emit(record)
+        except Exception:
+            # A diagnostic write failure must not change a proof result or replay work.
+            self.handleError(record)
+
+    def handleError(self, record):
+        # No stderr is guaranteed in the automatic authority process; never leak
+        # raw exception text or turn an unavailable diagnostic into a failed proof.
+        pass
+
+
+def configure_publication_timing(evidence_root, *, inspect_path):
+    """Retain fixed timings under the verified private root; no inherited handles."""
+    destination = str(Path(evidence_root) / "publication-timing.log")
+    existing = [
+        handler
         for handler in publication_timing_logger.handlers
-    ):
-        handler = logging.StreamHandler(sys.stderr)
-        handler.k98_publication_timing = True
+        if isinstance(handler, _PublicationTimingHandler)
+    ]
+    if not any(handler.baseFilename == destination for handler in existing):
+        handler = _PublicationTimingHandler(evidence_root, inspect_path)
         formatter = logging.Formatter("%(asctime)s UTC %(message)s")
         formatter.converter = time.gmtime
         handler.setFormatter(formatter)
         publication_timing_logger.addHandler(handler)
+        for previous in existing:
+            publication_timing_logger.removeHandler(previous)
+            previous.close()
     publication_timing_logger.setLevel(logging.INFO)
     publication_timing_logger.propagate = False
 

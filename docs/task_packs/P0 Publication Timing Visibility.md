@@ -16,8 +16,13 @@ to reproduce this logging defect.
 
 ## Focused change
 
-Enable one dedicated UTC stderr handler for the publication timing child logger
-at authority startup. Keep root logging unchanged. Emit only the existing fixed
+Retain one dedicated UTC rotating log for the publication timing child logger
+after the protected manifest and native identity have been checked, before SQL
+session creation. Automatic authority startup does not inherit standard handles,
+so stderr is not a usable destination. Use the existing private evidence root
+with fixed names `publication-timing.log`, `.1` and `.2`, each limited to 256 KiB.
+Validate private paths and reject hard-linked/non-regular files before use.
+No new startup handle inheritance or configuration is required. Keep root logging unchanged. Emit only the existing fixed
 phase, completion flag and monotonic duration. Do not log provider contents,
 credentials or exception prose. Repeated configuration must not duplicate lines.
 No SQL, pacing, provider request, ownership, settlement or replay behavior changes.
@@ -29,15 +34,18 @@ Existing saved request timings remain useful for provider/pacing attribution.
 
 ## Validation and remaining release gates
 
-Two fresh-interpreter regression cases passed: normal completion and an exception
-whose exact outcome is preserved. They exercise authority startup up to a deliberate
-stop before manifest access or SQL; timings are emitted exactly once and unrelated
-INFO/private text remains absent. The combined publication/reconciliation selection
+Fresh-interpreter regression cases exercise authority startup with stderr absent
+and a deliberate stop before SQL; normal completion and the original exception
+are preserved, timings are retained exactly once, and unrelated INFO/private text
+remains absent. Negative path tests reject untrusted directories and hard links;
+rotation remains bounded and a later diagnostic write failure cannot change a
+proof result. These files are diagnostics, never execution or settlement receipts. The combined publication/reconciliation selection
 passed 163 tests in 167.95 seconds. Final lint, Changes security review, mirror/private parity,
 exact updater transition and protected package rehearsal remain required before
 deployment readiness. No production action has been performed.
 
-After deployment, collect bounded phase records from the authority log for an
+After deployment, collect bounded phase records from `publication-timing.log` and its two rotations in the installed manifest
+private evidence root for an
 authorized check when one is needed. Retain the already confirmed receipt. Use
 those timings and durable request evidence to choose the performance change;
 do not weaken pacing or skip independent verification based on elapsed time.

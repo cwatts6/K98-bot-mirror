@@ -862,7 +862,6 @@ def main(argv=None):
     from services.export_request_budget import RequestBudget
     from services.export_runtime_composition import verify_installation_contract
 
-    configure_publication_timing()
     manifest_file = assert_protected_path(args.manifest, private=True)
     raw = manifest_file.read_bytes()
     manifest = manifest_contract(
@@ -874,6 +873,7 @@ def main(argv=None):
     if manifest.get("trust_model") == TRUST_MODEL:
         own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
         own.Close()
+    configure_publication_timing(manifest["evidence_root"], inspect_path=assert_protected_path)
     connect = connection_factory(manifest)
     dal = ExportExecutionDAL(connect)
     # This explicit startup performs read-only metadata inspection before an
