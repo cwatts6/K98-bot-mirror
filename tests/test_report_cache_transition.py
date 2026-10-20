@@ -31,6 +31,12 @@ def test_report_cache_transition_pins_complete_runtime():
             successor = result_members[member["path"]]
             assert successor["before_sha256"] == expected
             expected = successor["after_sha256"]
+        for transition in updater.reviewed_transitions():
+            if transition["id"] == "guided_rollover_v1":
+                for successor in transition["members"]:
+                    if successor["path"] == member["path"]:
+                        assert successor["before_sha256"] == expected
+                        expected = successor["after_sha256"]
         assert (
             updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == expected
         )
@@ -74,6 +80,12 @@ def test_handoff_transition_pins_complete_runtime():
         if member["path"] in successors:
             assert successors[member["path"]]["before_sha256"] == expected
             expected = successors[member["path"]]["after_sha256"]
+        for transition in updater.reviewed_transitions():
+            if transition["id"] == "guided_rollover_v1":
+                for successor in transition["members"]:
+                    if successor["path"] == member["path"]:
+                        assert successor["before_sha256"] == expected
+                        expected = successor["after_sha256"]
         assert (
             updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == expected
         )

@@ -9,6 +9,20 @@ P0A_ACTIONS = MappingProxyType(
     {
         "evidence_batch": frozenset(),
         "historical_batch": frozenset(),
+        "export_rollover": frozenset(
+            {
+                "continue_unstarted_rollover",
+                "verify_rollover",
+                "isolate_targets",
+                "choose_replacements",
+                "verify_replacements",
+                "finish_replacement_check",
+                "discard_replacement_check",
+                "activate_replacements",
+                "start_replacement_rollover",
+                "verify_replacement_rollover",
+            }
+        ),
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued", "close_withdrawn_read"}),
         "player_report": frozenset(

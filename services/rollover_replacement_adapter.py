@@ -1,6 +1,7 @@
 """Admin-button routing for complete rollover replacement and final verification."""
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.export_recovery_service import rollover_decision_context, rollover_parent_link
 from services.export_replacement_recovery_adapter import STEPS
 from services.rollover_replacement_dal import RolloverReplacementDAL
 
@@ -32,6 +33,10 @@ class RolloverReplacementAdapter:
         if snapshot["operation"]["State"] not in {"running", "uncertain"}:
             return self.base.inspect(source_id)
         result = self._call(source_id, "inspect")
+        result["evidence"]["failure_context"] = rollover_decision_context(snapshot)
+        parent = rollover_parent_link(snapshot["operation"])
+        if parent:
+            result["evidence"].setdefault("recovery_links", []).insert(0, parent)
         original, _, _ = self.base.inspect(source_id)
         if (
             result["evidence"]["outcome"] == "isolation_required"

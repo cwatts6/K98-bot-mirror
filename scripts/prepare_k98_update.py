@@ -63,6 +63,18 @@ REPORT_CACHE_HANDOFF_PATHS = frozenset(
     }
 )
 PUBLICATION_RESULT_HANDOFF_PATHS = PUBLICATION_RESULT_PATHS | REPORT_CACHE_HANDOFF_PATHS
+ROLLOVER_GUIDED_PATHS = frozenset(
+    {
+        "scripts/run_export_authority.py",
+        "services/export_recovery_service.py",
+        "services/export_runtime_composition.py",
+        "services/recovery_release_policy.py",
+        "services/rollover_replacement_adapter.py",
+        "services/rollover_replacement_authority.py",
+        "ui/views/recovery_view.py",
+        "ui/views/recovery_input_view.py",
+    }
+)
 
 
 def coordinated_policy():
@@ -283,6 +295,7 @@ def reviewed_transitions():
                 item["id"] == "publication_result_handoff_v1"
                 and path in PUBLICATION_RESULT_HANDOFF_PATHS
             )
+            fixed_rollover = item["id"] == "guided_rollover_v1" and path in ROLLOVER_GUIDED_PATHS
             if (
                 not (
                     path.startswith("services/export_")
@@ -300,6 +313,7 @@ def reviewed_transitions():
                     or fixed_report_handoff
                     or fixed_publication_result
                     or fixed_publication_handoff
+                    or fixed_rollover
                 )
                 or not path.endswith(".py")
                 or path in paths
@@ -314,6 +328,8 @@ def reviewed_transitions():
                     raise ValueError("Exact reviewed protocol hashes required.")
         if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:
             raise ValueError("Complete fixed drained-issuer transition required.")
+        if item["id"] == "guided_rollover_v1" and paths != ROLLOVER_GUIDED_PATHS:
+            raise ValueError("Complete fixed guided-rollover transition required.")
         if item["id"] == "report_cache_handoff_v1" and paths != REPORT_CACHE_HANDOFF_PATHS:
             raise ValueError("Complete fixed report/cache handoff transition required.")
         if item["id"] == "publication_result_v1" and paths != PUBLICATION_RESULT_PATHS:

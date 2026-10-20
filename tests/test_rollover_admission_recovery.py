@@ -4,11 +4,13 @@ from copy import deepcopy
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
 import pytest
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_recovery_service import RolloverRecoveryAdapter
+from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
 from tests.test_guided_recovery import ACTOR, Store, execute
 
@@ -32,7 +34,14 @@ def fixture(state="closing"):
     discovery.rollover.side_effect = lambda *_: deepcopy(snapshot)
     adapter = RolloverRecoveryAdapter(discovery, pools, reconciler, rollover=rollover)
     store = Store()
-    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    service = RecoveryService(
+        store,
+        {adapter.kind: adapter},
+        admin_id=1,
+        guild_id=2,
+        channel_id=3,
+        presentation_policy=p0a_presentation,
+    )
     evidence, token, resolved = adapter.inspect("operation")
     row = store.observe(adapter.kind, "operation", evidence, token, resolved=resolved)
     return service, adapter, store, row, snapshot
@@ -159,3 +168,65 @@ async def test_admin_button_previews_destructive_rollover_and_requires_confirmat
     assert "made private and cleared" in message["embed"].fields[0].value
     assert "16 to 17" in message["embed"].fields[0].value
     view.call.assert_awaited_once_with("review", ACTOR, row["IncidentID"])
+
+
+def test_original_configuration_summary_preserves_unknown_fault():
+    _, adapter, _, _, snapshot = fixture()
+    snapshot["operation"]["PlanJson"] = json.dumps(
+        dict(snapshot=dict(pool=dict(RegistrationHash="a")))
+    )
+    snapshot["pool"]["pool"] = dict(RegistrationHash="a")
+    summary = adapter.inspect("operation")[0]["failure_context"]["summary"]
+    assert "16 to 17" in summary and "settings match" in summary
+    assert "exception was not retained" in summary
+    snapshot["pool"]["pool"]["RegistrationHash"] = "b"
+    summary = adapter.inspect("operation")[0]["failure_context"]["summary"]
+    assert "settings differ" in summary and "does not identify the fault" in summary
+
+
+def test_reopened_completed_replacement_retains_verified_original_link():
+    _, adapter, _, _, snapshot = fixture("completed")
+    parent = str(uuid4())
+    plan = dict(replacement_rollover=dict(operation_id=parent))
+    snapshot["operation"].update(
+        OperationID=str(uuid4()), PlanJson=json.dumps(plan), PlanHash=digest(plan).hex()
+    )
+    evidence, _, resolved = adapter.inspect("operation")
+    assert resolved and evidence["recovery_links"] == [
+        dict(label="Return to original rollover", kind="export_rollover", source_id=parent)
+    ]
+    snapshot["operation"]["PlanHash"] = "f" * 64
+    with pytest.raises(SourceConflict, match="linkage cannot be verified"):
+        adapter.inspect("operation")
+
+
+@pytest.mark.asyncio
+async def test_blocker_navigation_keeps_authorized_return_after_recheck(monkeypatch):
+    from ui.views import recovery_view as view
+
+    _, _, store, row, _ = fixture()
+    row["evidence"]["recovery_links"] = [
+        dict(label="Review blocker", kind="export_job", source_id="job")
+    ]
+    child = dict(
+        row,
+        IncidentID="child",
+        SourceID="job",
+        SourceKind="export_job",
+        State="resolved",
+        evidence=dict(row["evidence"], recovery_links=[], actions={}),
+    )
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "call", AsyncMock(side_effect=[child, child, row]))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    link = next(b for b in view.RecoveryIncidentView(row).children if b.label == "Review blocker")
+    await link.callback(interaction)
+    opened = interaction.followup.send.call_args.kwargs["view"]
+    await next(b for b in opened.children if b.label == "Recheck").callback(interaction)
+    reopened = interaction.followup.send.call_args.kwargs["view"]
+    await next(b for b in reopened.children if b.label == "Return to rollover").callback(
+        interaction
+    )
+    assert view.call.await_args_list[-1].args == ("review", ACTOR, row["IncidentID"])
+    assert interaction.followup.send.call_args.kwargs["ephemeral"] is True

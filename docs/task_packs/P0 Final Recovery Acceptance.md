@@ -39,9 +39,20 @@ verification after deployment. This does not close any remaining P0 workstream.
 
 ## Completion workstreams
 
+20 October, 19:46 UTC production evidence: the complete report includes all 17,521
+recorded incidents, all resolved, and healthy monitoring. The saved KVK16 publication
+check is confirmed at 19:42 UTC after 810.3 seconds; the deployed display now separates
+that fresh check from historical delivery. No repeat check is required. The delay
+investigation remains open pending the new phase timing evidence. The latest extra
+configuration-only operation closed automatically from its SQL/capture receipts.
+The startup player-cache deadline remains an outcome-unconfirmed P0-F03 observation.
+
+`P0 Guided Rollover Qualification.md` owns the next focused P0-F04 candidate. Zero
+open incidents does not establish coverage of the remaining failure families.
+
 | ID | Remaining outcome | Current evidence and gap | Acceptance required |
 | --- | --- | --- | --- |
-| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement delivery and publication/absence/damage actions are deployed. Production fresh checking encountered a stall and remains unverified. Historical retirement covers obsolete output only. | Resolve the stalled check; admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement. |
+| P0-F01 | Unknown/failed spreadsheet writes and still-needed captures | Replacement delivery and publication/absence/damage actions are deployed. Fresh publication checking is now confirmed in production; its long duration still needs attribution. Historical retirement covers obsolete output only. | Admin identifies input, original/current configuration and known/unknown fault; chooses the applicable replacement, verified retry or disposition; final receipt and ownership are independently verified. No committed import or uncertain write is replayed. Cover another failure during replacement and complete remaining acceptance evidence. |
 | P0-F02 | Missing evidence and configuration/ownership conflicts | Exact-byte evidence repair is deployed; lost proposals/read checks have backend recovery. Loss of all valid containment/active-registration history and unattributed holds remain explicit gaps. | Guided evidence collection and comparison, exact verified restoration or a separately verified superseding repair. Preserve unverifiable history and foreign/live ownership. A terminal disposition must not claim a recovered original receipt. No indefinite generic Recheck-only workflow. |
 | P0-F03 | Interrupted producers and remaining import pipeline | Atomic configuration/report receipts, captured-output continuation and saved-admission decisions exist. Historical partial configuration, partial UPDATE_ALL2 reporting, remaining durable pipeline stages and failures before durable request creation remain required. | Resume only unfinished stages from durable receipts, or guide a separately confirmed superseding/disposition decision. Original input/configuration details, partial results, caches/maintenance/publication state and missing-input collection remain visible. Restart and lost acknowledgements cannot repeat committed work. |
 | P0-F04 | Rollover and cross-workflow access | Rollover containment/replacement backends exist but the deployed action policy withholds the family. Some blockers already link to their owning incident. | Qualify every interrupted rollover phase through real admin callbacks, authority journals, temporary SQL and worker settlement. Guided blocker navigation must return to the original repair. Prove exact release and independently verified final continuation. |

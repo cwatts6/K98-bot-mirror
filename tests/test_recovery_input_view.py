@@ -93,10 +93,11 @@ async def test_review_does_not_execute_and_confirmation_binds_draft(interaction)
         preview="Six exact files under the registered owner.",
     )
     view.call.return_value = proposal
-    controls = view.RecoveryInputView(current)
+    controls = view.RecoveryInputView(current, return_to="original-rollover-incident")
     await controls.review.callback(interaction)
     sent = interaction.followup.send.call_args.kwargs
     assert isinstance(sent["view"], view.RecoveryInputConfirmView)
+    assert sent["view"].return_to == "original-rollover-incident"
     assert sent["embed"].description == proposal["preview"]
     view.call.assert_awaited_once_with(
         "input_confirmation", ACTOR, current["row"]["IncidentID"], current["action"]
@@ -104,6 +105,9 @@ async def test_review_does_not_execute_and_confirmation_binds_draft(interaction)
     view.call.reset_mock()
     view.call.return_value = current["row"]
     await sent["view"].confirm.callback(interaction)
+    assert (
+        interaction.followup.send.call_args.kwargs["view"].return_to == "original-rollover-incident"
+    )
     row = current["row"]
     view.call.assert_awaited_once_with(
         "execute_input",

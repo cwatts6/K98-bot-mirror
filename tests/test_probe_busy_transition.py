@@ -14,9 +14,17 @@ def test_probe_busy_transition_pins_complete_runtime():
     assert {m["path"] for m in item["members"]} == updater.PROBE_BUSY_TRANSITION_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in item["members"]:
+        expected = member["after_sha256"]
+        for successor in updater.reviewed_transitions():
+            if successor["id"] != "guided_rollover_v1":
+                continue
+            for changed in successor["members"]:
+                if changed["path"] == member["path"]:
+                    assert changed["before_sha256"] == expected
+                    expected = changed["after_sha256"]
         assert (
             updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
+            == expected
         )
 
 

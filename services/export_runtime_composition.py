@@ -2895,7 +2895,7 @@ class AuthorityClient:
             current_attempt_id=current_attempt_id,
             old_attempt_id=old_attempt_id,
         )
-        if kind in {"publication", "retirement_recovery"}:
+        if kind in {"publication", "retirement_recovery", "rollover_drain", "rollover_complete"}:
             from time import sleep
 
             request_id = str(uuid4())

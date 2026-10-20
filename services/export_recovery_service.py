@@ -418,6 +418,9 @@ class RolloverRecoveryAdapter:
                 dict(label="Review old-season export", kind="export_job", source_id=j["JobID"])
                 for j in pending[:3]
             ]
+        parent = rollover_parent_link(operation)
+        if parent:
+            links.insert(0, parent)
         if (
             self.rollover is not None
             and operation["State"] in {"closing", "ready"}
@@ -449,6 +452,7 @@ class RolloverRecoveryAdapter:
                 explanation=f"Season {operation['OldKVK']} to {operation['NewKVK']}; retained phase: {operation['Phase']}. Completion requires the recorded phase journal and fresh authority verification.",
                 actions=actions,
                 recovery_links=links,
+                failure_context=rollover_decision_context(snapshot),
             ),
             digest(snapshot).hex(),
             operation["State"] == "completed",
@@ -496,3 +500,44 @@ class RolloverRecoveryAdapter:
             source_id, action["ActionKind"], action["EvidenceHash"], actor, action["Reason"]
         )
         return None
+
+
+def rollover_parent_link(operation):
+    """Reconstruct navigation from the immutable plan after a restart."""
+    plan = json.loads(operation.get("PlanJson", "{}"))
+    link = plan.get("replacement_rollover")
+    if not link:
+        return None
+    if digest(plan).hex() != operation.get("PlanHash"):
+        raise SourceConflict("Original rollover linkage cannot be verified.")
+    parent = identity(link["operation_id"])
+    if parent == operation["OperationID"]:
+        raise SourceConflict("Original rollover linkage is cyclic.")
+    return dict(label="Return to original rollover", kind="export_rollover", source_id=parent)
+
+
+def rollover_decision_context(snapshot):
+    """Original season intent and configuration comparison, without inventing a cause."""
+    operation = snapshot["operation"]
+    plan = json.loads(operation.get("PlanJson", "{}"))
+    original = plan.get("snapshot", {}).get("pool", {})
+    installed = snapshot.get("pool", {}).get("pool", {})
+    old_hash, current_hash = original.get("RegistrationHash"), installed.get("RegistrationHash")
+    comparison = (
+        "Original and current pool settings match."
+        if old_hash and current_hash and old_hash == current_hash
+        else (
+            "Pool settings differ; this alone does not identify the fault."
+            if old_hash and current_hash
+            else "Original/current configuration comparison is unavailable."
+        )
+    )
+    return dict(
+        summary=(
+            f"Original request (UTC): {operation.get('ConfirmedUTC', 'not recorded')}. "
+            f"Season {operation['OldKVK']} to {operation['NewKVK']}; no new scan file. "
+            f"Saved phase: {operation['Phase']}. {comparison} "
+            "The phase identifies where work stopped; the original exception was not retained. "
+            "Review the intended season change and keep copies of any output still needed."
+        )
+    )

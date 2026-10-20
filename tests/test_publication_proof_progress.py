@@ -67,10 +67,12 @@ def selector():
     )
 
 
-def test_proof_check_leaves_control_plane_responsive_and_preserves_exclusion():
+@pytest.mark.parametrize("kind", ["publication", "rollover_drain", "rollover_complete"])
+def test_proof_check_leaves_control_plane_responsive_and_preserves_exclusion(kind):
     broker, client, boundary = endpoint()
     entered, finish = Event(), Event()
     request = selector()
+    request["kind"] = kind
     receipt = dict(state="confirmed", snapshot_hash="a" * 64, proof_id=str(uuid4()))
 
     def issue(**kwargs):
@@ -173,7 +175,7 @@ def test_existing_progress_cannot_be_rebound(field, value):
     "change",
     [
         dict(kind="retirement"),
-        dict(kind="rollover_complete"),
+        dict(kind="rollover_unknown"),
         dict(snapshot_hash="bad"),
         dict(current_attempt_id=str(uuid4())),
         dict(old_attempt_id=str(uuid4())),
@@ -200,10 +202,15 @@ def test_restart_poll_never_starts_or_adopts_work():
     broker.issuer.issue.assert_not_called()
 
 
-def test_client_polls_same_request_and_validates_final_proof(monkeypatch):
+@pytest.mark.parametrize("kind", ["publication", "rollover_drain", "rollover_complete"])
+def test_client_polls_same_request_and_validates_final_proof(monkeypatch, kind):
     client = object.__new__(AuthorityClient)
     messages = []
-    proof = dict(state="confirmed", snapshot_hash="a" * 64, proof_id=str(uuid4()))
+    proof = dict(
+        state="completed" if kind == "rollover_complete" else "confirmed",
+        snapshot_hash="a" * 64,
+        proof_id=str(uuid4()),
+    )
 
     def invoke(message):
         messages.append(deepcopy(message))
@@ -216,7 +223,7 @@ def test_client_polls_same_request_and_validates_final_proof(monkeypatch):
 
     client._invoke = invoke
     monkeypatch.setattr("time.sleep", lambda _: None)
-    assert client.prove("publication", str(uuid4()), "a" * 64) == proof
+    assert client.prove(kind, str(uuid4()), "a" * 64) == proof
     assert [m["action"] for m in messages] == ["proof_start", "proof_status"]
     assert len({m["request_id"] for m in messages}) == 1
 

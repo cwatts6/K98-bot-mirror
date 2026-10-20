@@ -27,21 +27,22 @@ def page_embed(page):
     return embed
 
 
-async def show_input_page(interaction, page):
+async def show_input_page(interaction, page, *, return_to=None):
     await interaction.followup.send(
         embed=page_embed(page),
-        view=RecoveryInputView(page),
+        view=RecoveryInputView(page, return_to=return_to),
         ephemeral=True,
         allowed_mentions=discord.AllowedMentions.none(),
     )
 
 
 class RecoveryInputModal(discord.ui.Modal):
-    def __init__(self, page):
+    def __init__(self, page, *, return_to=None):
         super().__init__(
             title=f"Replacement details ({page['page'] + 1}/{page['pages']})"[:45], timeout=300
         )
         self.page = page
+        self.return_to = return_to
         self.fields = {}
         for field in page["fields"]:
             item = discord.ui.InputText(
@@ -71,15 +72,16 @@ class RecoveryInputModal(discord.ui.Modal):
                 page["draft_version"],
                 {key: item.value for key, item in self.fields.items()},
             )
-            await show_input_page(interaction, saved)
+            await show_input_page(interaction, saved, return_to=self.return_to)
         except Exception as exc:
             await report_error(interaction, exc)
 
 
 class RecoveryInputView(discord.ui.View):
-    def __init__(self, page):
+    def __init__(self, page, *, return_to=None):
         super().__init__(timeout=300)
         self.page = page
+        self.return_to = return_to
         self.previous.disabled = page["page"] == 0
         self.next.disabled = page["page"] + 1 == page["pages"]
         self.review.disabled = page["completed"] != page["total"]
@@ -90,7 +92,9 @@ class RecoveryInputView(discord.ui.View):
             actor_for(interaction)
             # Modal acknowledgement must be immediate. Service-side revision,
             # draft version and permissions are checked again on submission.
-            await interaction.response.send_modal(RecoveryInputModal(self.page))
+            await interaction.response.send_modal(
+                RecoveryInputModal(self.page, return_to=self.return_to)
+            )
         except Exception as exc:
             await report_error(interaction, exc)
 
@@ -106,7 +110,7 @@ class RecoveryInputView(discord.ui.View):
                 self.page["action"],
                 self.page["page"] + offset,
             )
-            await show_input_page(interaction, page)
+            await show_input_page(interaction, page, return_to=self.return_to)
         except Exception as exc:
             await report_error(interaction, exc)
 
@@ -141,7 +145,7 @@ class RecoveryInputView(discord.ui.View):
             )
             await interaction.followup.send(
                 embed=embed,
-                view=RecoveryInputConfirmView(proposal),
+                view=RecoveryInputConfirmView(proposal, return_to=self.return_to),
                 ephemeral=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
@@ -150,9 +154,10 @@ class RecoveryInputView(discord.ui.View):
 
 
 class RecoveryInputConfirmView(discord.ui.View):
-    def __init__(self, proposal):
+    def __init__(self, proposal, *, return_to=None):
         super().__init__(timeout=300)
         self.proposal = proposal
+        self.return_to = return_to
 
     @discord.ui.button(label="Confirm saved choices", style=discord.ButtonStyle.danger)
     async def confirm(self, button, interaction):
@@ -172,7 +177,7 @@ class RecoveryInputConfirmView(discord.ui.View):
             )
             await interaction.followup.send(
                 embed=incident_embed(updated),
-                view=RecoveryIncidentView(updated),
+                view=RecoveryIncidentView(updated, return_to=self.return_to),
                 ephemeral=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )

@@ -700,6 +700,51 @@
           "after_sha256": "98ecd40c93d2d2d606b6329ae63498fa2976e9f94a806b95aef7ee991678ccb2"
         }
       ]
+    },
+    {
+      "id": "guided_rollover_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "32079eb22c02ab8eedb188d1d0302ecf27009aac04548bba3ec8082573253de3",
+          "after_sha256": "4e90fa2121065281e97a85294c0e637f9ce58b2f47f87e0244602e6d95c89c07"
+        },
+        {
+          "path": "services/export_recovery_service.py",
+          "before_sha256": "0611303f93365999e53d30b87a50b4eade32189b481dbbcf6e54df501fb57f98",
+          "after_sha256": "cb3801152047c97f80422b752339f1166bca5a8dae4a543a7ea1954366e969e2"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "before_sha256": "227d767e4a223886501d2c530bcb2888730a53bcf9c18edcdfde295515ddce9d",
+          "after_sha256": "e0a6fe9d37538598a7cd49d1664ad591218ca4fb44602d628f943de3f664f9b5"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "c97fce76441a10f5a0d6cc3d269ad2f947ca67145696f882ff40519086df2cc1",
+          "after_sha256": "71c61b7cf0a81f41e302b43d01ac11c83c9c92175fb51ffd4895bf8c8a8f592c"
+        },
+        {
+          "path": "services/rollover_replacement_adapter.py",
+          "before_sha256": "3c1e641a78ef3aef47047bd64e2494083d1a4438d6333b8ffe7108dc1800b968",
+          "after_sha256": "7bca31796e62c9e8f6df0762aa03bf79f4ed158a18fa263343d27c4c2dbe77f6"
+        },
+        {
+          "path": "services/rollover_replacement_authority.py",
+          "before_sha256": "675b33bd39fba5496ad9382ed50ed4b8679edd4b54d94074c8c2b37d6c24e9a3",
+          "after_sha256": "d2ee3b28f2a76bfe52b9b0bb7eb32403716b669ea90f944ee3798fbc2953aa7e"
+        },
+        {
+          "path": "ui/views/recovery_input_view.py",
+          "before_sha256": "c08628f79e00720c165191140850aa985b3cf72ed4c2c173c3a02491a84a2ca5",
+          "after_sha256": "4de64d72804f845d1c1699edfa68cce1ae59bf4da9eaa9bd6e0b3c437d389ae1"
+        },
+        {
+          "path": "ui/views/recovery_view.py",
+          "before_sha256": "98ecd40c93d2d2d606b6329ae63498fa2976e9f94a806b95aef7ee991678ccb2",
+          "after_sha256": "4293ed7755d4908590da082010b991aa4f0c4e0baf3b7d83a3ad7b7154ae6416"
+        }
+      ]
     }
   ]
 }

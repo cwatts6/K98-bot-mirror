@@ -89,6 +89,16 @@ def test_completed_replacement_requires_intact_private_journals():
     assert f.trace
 
 
+@pytest.mark.parametrize("ancestors", [("current",), tuple(str(n) for n in range(32))])
+def test_invalid_replacement_ancestry_stops_before_loading_registration(ancestors):
+    workflow = pytest.importorskip("services.rollover_replacement_authority").workflow
+
+    owner = Mock()
+    with pytest.raises(SourceConflict, match="ancestry cannot be verified"):
+        workflow(owner, "current", ancestors=ancestors)
+    owner.registrations.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "fault",
     [

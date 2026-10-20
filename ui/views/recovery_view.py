@@ -166,7 +166,7 @@ async def report_error(interaction, exc):
     await send_ephemeral(interaction, text, allowed_mentions=discord.AllowedMentions.none())
 
 
-async def show_incident(interaction, incident_id):
+async def show_incident(interaction, incident_id, *, return_to=None):
     try:
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
@@ -174,7 +174,7 @@ async def show_incident(interaction, incident_id):
         row = await call("review", actor, incident_id)
         await interaction.followup.send(
             embed=incident_embed(row),
-            view=RecoveryIncidentView(row),
+            view=RecoveryIncidentView(row, return_to=return_to),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -183,9 +183,10 @@ async def show_incident(interaction, incident_id):
 
 
 class RecoveryConfirmView(discord.ui.View):
-    def __init__(self, row, action):
+    def __init__(self, row, action, *, return_to=None):
         super().__init__(timeout=300)
         self.row, self.action = row, action
+        self.return_to = return_to
         if action == "verify_publication":
             self.confirm.label = "Confirm publication check"
             self.confirm.style = discord.ButtonStyle.primary
@@ -202,7 +203,7 @@ class RecoveryConfirmView(discord.ui.View):
                     "Acceptance is not yet established. If accepted, checking retained history "
                     "and current output can take several minutes. Use Recheck for saved progress; "
                     "do not submit another check or restart while this request is unresolved.",
-                    view=RecoveryIncidentView(self.row),
+                    view=RecoveryIncidentView(self.row, return_to=self.return_to),
                     ephemeral=True,
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
@@ -217,7 +218,7 @@ class RecoveryConfirmView(discord.ui.View):
             )
             await interaction.followup.send(
                 embed=incident_embed(row),
-                view=RecoveryIncidentView(row),
+                view=RecoveryIncidentView(row, return_to=self.return_to),
                 ephemeral=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
@@ -228,9 +229,20 @@ class RecoveryConfirmView(discord.ui.View):
 
 
 class RecoveryIncidentView(discord.ui.View):
-    def __init__(self, row):
+    def __init__(self, row, *, return_to=None):
         super().__init__(timeout=300)
         self.row = row
+        self.return_to = return_to
+        if return_to is not None:
+            back = discord.ui.Button(
+                label="Return to rollover", style=discord.ButtonStyle.secondary
+            )
+
+            async def return_to_rollover(interaction):
+                await show_incident(interaction, return_to)
+
+            back.callback = return_to_rollover
+            self.add_item(back)
         delivery = row["evidence"].get("delivery") or {}
         links_to_jobs = []
         if row["evidence"].get("evidence_recovery_job_id"):
@@ -257,7 +269,7 @@ class RecoveryIncidentView(discord.ui.View):
             if (
                 row["State"] == "resolved"
                 and linked_kind not in {"configuration_continuation", "player_report_continuation"}
-                and label != "Return to original export"
+                and label not in {"Return to original export", "Return to original rollover"}
             ):
                 continue
             linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
@@ -272,7 +284,14 @@ class RecoveryIncidentView(discord.ui.View):
                     current = await call("review_source", actor, linked_kind, linked_job)
                     await interaction.followup.send(
                         embed=incident_embed(current),
-                        view=RecoveryIncidentView(current),
+                        view=RecoveryIncidentView(
+                            current,
+                            return_to=(
+                                row["IncidentID"]
+                                if row["SourceKind"] == "export_rollover"
+                                else self.return_to
+                            ),
+                        ),
                         ephemeral=True,
                         allowed_mentions=discord.AllowedMentions.none(),
                     )
@@ -311,7 +330,7 @@ class RecoveryIncidentView(discord.ui.View):
                     if not detail:
                         await interaction.followup.send(
                             embed=incident_embed(current),
-                            view=RecoveryIncidentView(current),
+                            view=RecoveryIncidentView(current, return_to=self.return_to),
                             ephemeral=True,
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
@@ -320,7 +339,7 @@ class RecoveryIncidentView(discord.ui.View):
                         from ui.views.recovery_input_view import show_input_page
 
                         page = await call("input_page", actor, current["IncidentID"], action, 0)
-                        await show_input_page(interaction, page)
+                        await show_input_page(interaction, page, return_to=self.return_to)
                         return
                     if detail.get("review_summary") is True:
                         from ui.views.recovery_summary_view import show_summary
@@ -346,7 +365,7 @@ class RecoveryIncidentView(discord.ui.View):
                     )
                     await interaction.followup.send(
                         embed=embed,
-                        view=RecoveryConfirmView(current, action),
+                        view=RecoveryConfirmView(current, action, return_to=self.return_to),
                         ephemeral=True,
                         allowed_mentions=discord.AllowedMentions.none(),
                     )
@@ -358,7 +377,7 @@ class RecoveryIncidentView(discord.ui.View):
 
     @discord.ui.button(label="Recheck", style=discord.ButtonStyle.secondary)
     async def recheck(self, button, interaction):
-        await show_incident(interaction, self.row["IncidentID"])
+        await show_incident(interaction, self.row["IncidentID"], return_to=self.return_to)
 
     @discord.ui.button(label="Download recovery report", style=discord.ButtonStyle.secondary)
     async def download(self, button, interaction):

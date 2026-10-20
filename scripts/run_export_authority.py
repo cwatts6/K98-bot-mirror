@@ -468,7 +468,8 @@ class AuthorityBroker:
                 set(message) != fields
                 or type(message["version"]) is not int
                 or message["version"] != 1
-                or message["kind"] not in {"publication", "retirement_recovery"}
+                or message["kind"]
+                not in {"publication", "retirement_recovery", "rollover_drain", "rollover_complete"}
                 or not isinstance(message["snapshot_hash"], str)
                 or re.fullmatch(r"[0-9a-f]{64}", message["snapshot_hash"]) is None
                 or message["current_attempt_id"] is not None

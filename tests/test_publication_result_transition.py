@@ -18,11 +18,16 @@ def test_result_transition_pins_all_runtime_members(transition, paths):
     item = next(t for t in updater.reviewed_transitions() if t["id"] == transition)
     assert {m["path"] for m in item["members"]} == paths
     root = Path(__file__).resolve().parents[1]
+    successors = {
+        m["path"]: m["after_sha256"]
+        for t in updater.reviewed_transitions()
+        if t["id"] == "guided_rollover_v1"
+        for m in t["members"]
+    }
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert updater.sha256(
+            (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
+        ) == successors.get(member["path"], member["after_sha256"])
         assert member["before_sha256"] != member["after_sha256"]
 
 
