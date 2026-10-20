@@ -489,7 +489,7 @@ class AuthorityBroker:
         if (
             self.proof_progress.busy()
             and not self.proof_progress.owns_current_thread()
-            and action not in {"ready", "effective_registration"}
+            and action != "ready"
         ):
             raise AuthorityProofBusy("Publication verification is in progress.")
         return self._dispatch(message)

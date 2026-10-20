@@ -35,8 +35,10 @@ returns bounded progress while one owned proof thread runs. The Bot polls the sa
 request; polling never dispatches a proof. A missing request after authority restart
 returns unavailable, retaining durable SQL/private evidence for recovery. The proof
 producer, membership checks, private readback and SQL settlement remain unchanged.
-Only readiness, effective-registration reads and exact progress polling are served
-alongside the proof. Other actions are refused as busy before dispatch; local
+Only readiness and exact progress polling are served alongside the proof.
+Effective-registration reads share the proof's authority lock and are refused as
+busy before dispatch, so they cannot block the serial control connection.
+Other actions are also refused as busy before dispatch; local
 observational calls made by the proof itself retain the existing typed broker.
 Authority shutdown joins its owned proof before draining the execution session.
 

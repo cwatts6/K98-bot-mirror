@@ -1,7 +1,7 @@
 """Publication proofs keep IPC responsive without bypassing authority evidence."""
 
 from copy import deepcopy
-from threading import Event, Thread
+from threading import Event, RLock, Thread
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -68,6 +68,57 @@ def test_proof_check_leaves_control_plane_responsive_and_preserves_exclusion():
     result = client._invoke(dict(request, action="proof_status"))
     assert result["state"] == "complete" and result["result"] == receipt
     assert broker.issuer.issue.call_count == 1
+
+
+def test_registration_request_cannot_block_progress_behind_proof_lock():
+    broker, client, _ = endpoint()
+    entered, finish, answered = Event(), Event(), Event()
+    authority_lock = RLock()
+    request = selector()
+    broker.replacements = Mock()
+    broker.replacements.registrations.return_value = (
+        (broker.registration,),
+        broker.registration,
+    )
+
+    def current():
+        with authority_lock:
+            return {}
+
+    def issue(**kwargs):
+        with authority_lock:
+            entered.set()
+            assert finish.wait(5)
+            return dict(state="confirmed", snapshot_hash="a" * 64, proof_id=str(uuid4()))
+
+    broker.replacements.current.side_effect = current
+    broker.issuer.issue.side_effect = issue
+    errors = []
+
+    def registration():
+        try:
+            client._invoke(dict(version=1, action="effective_registration"))
+        except AuthorityProofBusy:
+            answered.set()
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = Thread(target=registration)
+    try:
+        client._invoke(request)
+        assert entered.wait(5)
+        thread.start()
+        assert answered.wait(1), "Registration blocked the serial control plane"
+        assert client._invoke(dict(request, action="proof_status"))["state"] == "running"
+        broker.replacements.current.assert_not_called()
+    finally:
+        finish.set()
+        broker.proof_progress.drain()
+        if thread.ident is not None:
+            thread.join(5)
+    assert not errors
+    client._invoke(dict(version=1, action="effective_registration"))
+    broker.replacements.current.assert_called_once()
 
 
 @pytest.mark.parametrize(

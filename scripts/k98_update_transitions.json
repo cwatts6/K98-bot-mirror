@@ -447,7 +447,7 @@
         {
           "path": "scripts/run_export_authority.py",
           "before_sha256": "8a6983cdeb973493640eb456ee3219c8247e2350d9f41fda367343b319624a68",
-          "after_sha256": "83d5ac55e2cbcc528b28aaf861a5f71d1657b8169a3dbf9b058bddbf670f8911"
+          "after_sha256": "95aecdb21551fa98f2e99cf1a6baf84d4d4cd7cdb39cda3ac4b03a31c9993ef3"
         },
         {
           "path": "services/export_proof_progress.py",
