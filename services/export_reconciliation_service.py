@@ -5,10 +5,12 @@ This verifier never infers complete historical coverage or current provider trut
 never issues a ProofID, and never releases claims or dispatches a request.
 """
 
-from contextlib import AbstractContextManager, closing
+from contextlib import AbstractContextManager, closing, contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+import logging
+from time import monotonic
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_execution_dal import ExportExecutionDAL
@@ -22,6 +24,25 @@ from services.export_execution_protocol import (
     uuid_text,
     validate_response,
 )
+
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def publication_phase(name):
+    """Bounded local timing only; never a receipt or an execution decision."""
+    started = monotonic()
+    completed = False
+    try:
+        yield
+        completed = True
+    finally:
+        logger.info(
+            "publication_verification_phase phase=%s completed=%s duration_ms=%d",
+            name,
+            completed,
+            max(0, round((monotonic() - started) * 1000)),
+        )
 
 
 @dataclass(frozen=True)
@@ -69,7 +90,9 @@ class ClosedStreamVerifier:
                     "An isolated read cannot establish a fresh provider observation."
                 )
             from services.config_read_containment import verify_contained_read
-            from services.export_replacement_read_containment import verify_discarded_replacement
+            from services.export_replacement_read_containment import (
+                verify_discarded_replacement,
+            )
 
             verify_read = (
                 verify_discarded_replacement
@@ -77,7 +100,11 @@ class ClosedStreamVerifier:
                 else verify_contained_read
             )
             seal = verify_read(
-                self.dal, self.store, stream, account=account, registration_hash=registration_hash
+                self.dal,
+                self.store,
+                stream,
+                account=account,
+                registration_hash=registration_hash,
             )
             return ClosedStreamEvidence(
                 stream_id, stream["Version"], seal["last_sequence"], 0, 0, seal["event_digest"]
@@ -323,7 +350,9 @@ class CatalogueVerifier:
         ):
             raise SourceConflict("A writer changed the catalogue around the fresh probe.")
         verified = self.closed.verify(
-            stream_id, account=history.account, registration_hash=bytes(probe["RegistrationHash"])
+            stream_id,
+            account=history.account,
+            registration_hash=bytes(probe["RegistrationHash"]),
         )
         if (
             verified.version != probe["Version"]
@@ -679,9 +708,14 @@ class PublicationProbe:
         snapshot = deepcopy(self.coordinator.operator_snapshot(job_id))
         if snapshot["job"]["JobID"] != job_id:
             raise SourceConflict("Publication snapshot belongs to another job.")
-        origin_hash = self.origins.verify(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
         catalogue = CatalogueVerifier(dal=self.dal, store=self.store)
-        history = catalogue.before_probe(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
+        with publication_phase("retained_history"):
+            origin_hash = self.origins.verify(
+                snapshot=snapshot, account=snapshot["job"]["AccountKey"]
+            )
+            history = catalogue.before_probe(
+                snapshot=snapshot, account=snapshot["job"]["AccountKey"]
+            )
         allow_absent = snapshot["job"]["State"] in {"running", "uncertain", "failed"}
         if allow_absent:
             with closing(
@@ -703,7 +737,7 @@ class PublicationProbe:
         # Admission independently rereads the exact domain snapshot. Every exit,
         # including readback failure, closes the owned stream once; a lost close
         # acknowledgment propagates uncertainty and cannot trigger a second try.
-        with self.streams.probe(snapshot) as stream:
+        with publication_phase("provider_readback"), self.streams.probe(snapshot) as stream:
             observed = observe_publication(
                 snapshot=snapshot,
                 registration=self.registration,
@@ -714,28 +748,33 @@ class PublicationProbe:
             )
         if self.coordinator.operator_snapshot(job_id) != snapshot:
             raise SourceConflict("Publication snapshot changed during the probe.")
-        membership = catalogue.bind_probe(history, snapshot=snapshot, stream_id=stream.stream_id)
+        with publication_phase("sealed_history"):
+            membership = catalogue.bind_probe(
+                history, snapshot=snapshot, stream_id=stream.stream_id
+            )
         # The return value is derived again from private, durably sealed response
         # bytes; a successful response retained only in memory is insufficient.
-        replayed = observe_closed_publication(
-            dal=self.dal,
-            store=self.store,
-            snapshot=snapshot,
-            registration=self.registration,
-            protected_file_ids=self.protected_file_ids,
-            stream_id=stream.stream_id,
-            allow_absent=allow_absent,
-        )
+        with publication_phase("sealed_response_replay"):
+            replayed = observe_closed_publication(
+                dal=self.dal,
+                store=self.store,
+                snapshot=snapshot,
+                registration=self.registration,
+                protected_file_ids=self.protected_file_ids,
+                stream_id=stream.stream_id,
+                allow_absent=allow_absent,
+            )
         if replayed != observed:
             raise SourceConflict("Sealed publication differs from the fresh observation.")
         # Neither this check nor the prior catalogue read replaces the independent
         # account-locked enumeration at SQL proof issue and consuming settlement.
-        if (
-            self.origins.verify(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
-            != origin_hash
-            or self.coordinator.operator_snapshot(job_id) != snapshot
-        ):
-            raise SourceConflict("Publication snapshot changed during sealed evaluation.")
+        with publication_phase("final_origin_verification"):
+            if (
+                self.origins.verify(snapshot=snapshot, account=snapshot["job"]["AccountKey"])
+                != origin_hash
+                or self.coordinator.operator_snapshot(job_id) != snapshot
+            ):
+                raise SourceConflict("Publication snapshot changed during sealed evaluation.")
         return SealedPublicationObservation(
             replayed, encode(membership).decode("utf-8"), origin_hash
         )
@@ -785,7 +824,10 @@ class TrustedProofIssuer:
         from services.export_coordination_dal import Claim, bounded_json
         from services.export_retirement_evidence import RetirementProbe
         from services.export_retirement_recovery_evidence import RetirementRecoveryProbe
-        from services.export_rollover_evidence import RolloverCompletionProbe, RolloverDrainProbe
+        from services.export_rollover_evidence import (
+            RolloverCompletionProbe,
+            RolloverDrainProbe,
+        )
 
         uuid_text(object_id)
         if kind not in {

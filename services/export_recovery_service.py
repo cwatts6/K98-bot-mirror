@@ -103,7 +103,7 @@ class ExportRecoveryAdapter:
                 )
             elif self.rebuild_plan is not None:
                 actions["retry_absent" if absent else "rebuild_damaged"] = dict(
-                    label="Retry verified absent export" if absent else "Rebuild verified damage",
+                    label=("Retry verified absent export" if absent else "Rebuild verified damage"),
                     check="Confirm that this retained report should be exported. Keep the registered files unchanged while the bot verifies the outcome and available capacity.",
                     effect="Recheck old writer closure and current publication. Require proof of no delayed write for an absent export; preserve the original attempt and quarantine, then queue one separate physical export with a durable repair identity.",
                 )
@@ -191,6 +191,15 @@ class ExportRecoveryAdapter:
             )
         evidence = dict(
             title="Spreadsheet export recovery",
+            publication_receipt=(
+                dict(
+                    actor=history[-1].get("actor"),
+                    proof_id=history[-1].get("proof", {}).get("proof_id"),
+                    state=history[-1].get("proof", {}).get("state"),
+                )
+                if history
+                else None
+            ),
             outcome=(
                 "replacement_required"
                 if replacement_required
@@ -220,7 +229,9 @@ class ExportRecoveryAdapter:
         if repair.get("JobID"):
             evidence["recovery_links"].append(
                 dict(
-                    label="Return to original export", kind="export_job", source_id=repair["JobID"]
+                    label="Return to original export",
+                    kind="export_job",
+                    source_id=repair["JobID"],
                 )
             )
         if successor:

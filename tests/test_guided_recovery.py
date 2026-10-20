@@ -39,7 +39,10 @@ class Store:
             if (self.row["EvidenceHash"], self.row["State"]) != (token, state):
                 self.row["Revision"] += 1
             self.row.update(
-                evidence=evidence, EvidenceHash=token, State=state, LastSeenUTC=datetime.now(UTC)
+                evidence=evidence,
+                EvidenceHash=token,
+                State=state,
+                LastSeenUTC=datetime.now(UTC),
             )
             return deepcopy(self.row)
 
@@ -49,6 +52,17 @@ class Store:
 
     def pending_actions(self, key):
         return [deepcopy(a) for a in self.actions if a["State"] in {"dispatched", "unknown"}]
+
+    def latest_publication_action(self, key):
+        self.get(key)
+        return next(
+            (
+                deepcopy(a)
+                for a in reversed(self.actions)
+                if a["ActionKind"] == "verify_publication"
+            ),
+            None,
+        )
 
     def claim(self, key, revision, token, kind, actor, reason):
         with self.lock:
@@ -67,6 +81,8 @@ class Store:
                 State="dispatched",
                 Actor=actor,
                 Reason=reason,
+                CreatedUTC=datetime.now(UTC),
+                UpdatedUTC=datetime.now(UTC),
             )
             self.actions.append(action)
             if self.lose_claim_ack:
@@ -76,7 +92,7 @@ class Store:
     def finish(self, key, action_id, state, result):
         for action in self.actions:
             if action["ActionID"] == str(action_id):
-                action.update(State=state, result=result)
+                action.update(State=state, result=result, UpdatedUTC=datetime.now(UTC))
 
 
 class ImportDAL:

@@ -178,10 +178,16 @@ class RecoveryDAL:
             total = one(cursor)["Total"]
             cursor.execute(
                 "SELECT TOP (101) i.*, a.State AS PendingActionState, "
-                "a.ActionKind AS PendingActionKind FROM dbo.RecoveryIncident i "
+                "a.ActionKind AS PendingActionKind, p.ActionID AS PublicationActionID, "
+                "p.State AS PublicationState, p.CreatedUTC AS PublicationCreatedUTC, "
+                "p.UpdatedUTC AS PublicationUpdatedUTC FROM dbo.RecoveryIncident i "
                 "OUTER APPLY (SELECT TOP (1) State,ActionKind FROM dbo.RecoveryAction "
                 "WHERE IncidentID=i.IncidentID AND State IN ('dispatched','unknown') "
-                "ORDER BY CreatedUTC,ActionID) a WHERE i.ScopeKey=? "
+                "ORDER BY CreatedUTC,ActionID) a "
+                "OUTER APPLY (SELECT TOP (1) ActionID,State,CreatedUTC,UpdatedUTC "
+                "FROM dbo.RecoveryAction WHERE IncidentID=i.IncidentID "
+                "AND i.SourceKind='export_job' AND ActionKind='verify_publication' "
+                "ORDER BY CreatedUTC DESC,ActionID DESC) p WHERE i.ScopeKey=? "
                 "AND i.FirstSeenUTC<=? AND (? IS NULL OR i.IncidentID>CAST(? AS uniqueidentifier)) "
                 "ORDER BY i.IncidentID",
                 self.scope,
@@ -199,6 +205,21 @@ class RecoveryDAL:
                     {"state": row["PendingActionState"], "kind": row["PendingActionKind"]}
                     if row["PendingActionState"] is not None
                     else None
+                )
+                from services.recovery_publication_result import publication_result
+
+                row["publication_check"] = publication_result(
+                    row,
+                    (
+                        dict(
+                            ActionID=row["PublicationActionID"],
+                            State=row["PublicationState"],
+                            CreatedUTC=row["PublicationCreatedUTC"],
+                            UpdatedUTC=row["PublicationUpdatedUTC"],
+                        )
+                        if row["PublicationActionID"]
+                        else None
+                    ),
                 )
             return dict(rows=result, through=through, total=total, more=more)
 
@@ -411,6 +432,20 @@ class RecoveryDAL:
                 row["IncidentID"],
             )
             return rows(cursor)
+
+    def latest_publication_action(self, incident_id):
+        """Read only within the same registered incident scope."""
+        with transaction(self.connect) as cursor:
+            row = self._get(cursor, incident_id)
+            if row["SourceKind"] != "export_job":
+                return None
+            cursor.execute(
+                "SELECT TOP (1) ActionID,State,CreatedUTC,UpdatedUTC "
+                "FROM dbo.RecoveryAction WHERE IncidentID=? AND ActionKind='verify_publication' "
+                "ORDER BY CreatedUTC DESC,ActionID DESC",
+                row["IncidentID"],
+            )
+            return one(cursor)
 
     def finish(self, incident_id, action_id, state, result):
         if state not in {"verified", "unknown", "not_applied"}:

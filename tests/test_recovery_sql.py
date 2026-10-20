@@ -44,7 +44,10 @@ def store():
         # SQL Server does not enforce FKs for temporary tables. Persistent FK is
         # covered by source validation; all other table constraints run here.
         sql = re.sub(
-            r"^\s*CONSTRAINT FK_Recovery(?:Action|InputDraft)_Incident[^\n]*\n", "", sql, flags=re.M
+            r"^\s*CONSTRAINT FK_Recovery(?:Action|InputDraft)_Incident[^\n]*\n",
+            "",
+            sql,
+            flags=re.M,
         )
         sql = re.sub(r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + uuid4().hex, sql)
         owner.execute(rewrite(sql))
@@ -99,6 +102,39 @@ def test_large_export_incident_preserves_all_guided_links_and_failure_diagnostic
 
 def incident(store):
     return store.observe("stats_import", str(uuid4()), {"actions": {}}, "a" * 64)
+
+
+def test_latest_publication_action_is_scoped_and_report_retains_terminal_failure(store):
+    evidence = {"actions": {"verify_publication": {}}}
+    row = store.observe("export_job", str(uuid4()), evidence, "a" * 64, resolved=True)
+    first, _ = store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "verify_publication",
+        "discord:1",
+        "fixture",
+    )
+    store.finish(row["IncidentID"], first, "verified", {"verification": "verified"})
+    row = store.observe("export_job", row["SourceID"], evidence, "b" * 64, resolved=True)
+    second, _ = store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "verify_publication",
+        "discord:1",
+        "fixture",
+    )
+    store.finish(row["IncidentID"], second, "not_applied", {"verification": "not_applied"})
+    latest = store.latest_publication_action(row["IncidentID"])
+    assert str(latest["ActionID"]).lower() == second
+    assert latest["State"] == "not_applied"
+    page = store.report_page()
+    assert page["rows"][0]["publication_check"]["outcome"] == "not_verified"
+    foreign = RecoveryDAL(store.connect, account="foreign", storage_owner="disk", guild_id=2)
+    with pytest.raises(SourceConflict, match="scope"):
+        foreign.latest_publication_action(row["IncidentID"])
+    assert not foreign.report_page()["rows"]
 
 
 @pytest.mark.parametrize("outcome", ["not_applied", "unknown", "verified"])

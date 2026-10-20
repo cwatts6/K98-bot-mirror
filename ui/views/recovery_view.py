@@ -17,7 +17,9 @@ def actor_for(interaction):
     import bot_config
 
     actor = RecoveryActor(
-        int(interaction.user.id), int(interaction.guild_id or 0), int(interaction.channel_id or 0)
+        int(interaction.user.id),
+        int(interaction.guild_id or 0),
+        int(interaction.channel_id or 0),
     )
     if (actor.user_id, actor.guild_id, actor.channel_id) != (
         int(bot_config.ADMIN_USER_ID),
@@ -39,15 +41,44 @@ async def call(method, *args):
 
 def incident_embed(row):
     evidence = row["evidence"]
+    publication = row.get("publication_check")
     embed = discord.Embed(
-        title=evidence["title"],
-        description=evidence["explanation"][:3500],
-        color=0x2ECC71 if row["State"] == "resolved" else 0xF1C40F,
+        title="Published output check" if publication else evidence["title"],
+        description=(publication["explanation"] if publication else evidence["explanation"])[:3500],
+        color=(
+            0x2ECC71
+            if (
+                publication["outcome"] == "confirmed" if publication else row["State"] == "resolved"
+            )
+            else 0xF1C40F
+        ),
     )
-    embed.add_field(name="Recovery status", value=row["State"], inline=True)
     embed.add_field(
-        name="Operation outcome", value=str(evidence.get("outcome", "unproven")), inline=True
+        name="Export recovery status" if publication else "Recovery status",
+        value=row["State"],
+        inline=True,
     )
+    embed.add_field(
+        name="Recorded export outcome" if publication else "Operation outcome",
+        value=str(evidence.get("outcome", "unproven")),
+        inline=True,
+    )
+    if publication:
+        embed.add_field(
+            name="Publication check outcome", value=publication["outcome"], inline=False
+        )
+        if publication["completed_utc"]:
+            embed.add_field(
+                name="Check completed (UTC)",
+                value=publication["completed_utc"],
+                inline=False,
+            )
+        if publication["duration_seconds"] is not None:
+            embed.add_field(
+                name="Check duration",
+                value=f"{publication['duration_seconds']:g} seconds (including waiting and verification)",
+                inline=False,
+            )
     if evidence.get("scan") is not None:
         embed.add_field(name="Committed scan", value=str(evidence["scan"]), inline=True)
     if evidence.get("season") is not None:
@@ -155,6 +186,9 @@ class RecoveryConfirmView(discord.ui.View):
     def __init__(self, row, action):
         super().__init__(timeout=300)
         self.row, self.action = row, action
+        if action == "verify_publication":
+            self.confirm.label = "Confirm publication check"
+            self.confirm.style = discord.ButtonStyle.primary
 
     @discord.ui.button(label="Confirm & apply repair", style=discord.ButtonStyle.danger)
     async def confirm(self, button, interaction):
@@ -415,7 +449,10 @@ class RecoveryReportView(discord.ui.View):
     @discord.ui.button(label="Download next report part", style=discord.ButtonStyle.primary)
     async def download(self, button, interaction):
         await show_report(
-            interaction, self.report["next_after"], self.report["through"], self.report["part"] + 1
+            interaction,
+            self.report["next_after"],
+            self.report["through"],
+            self.report["part"] + 1,
         )
 
 
@@ -501,7 +538,9 @@ class RecoveryEntryView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="Review & fix", custom_id="k98:recovery:review:v1", style=discord.ButtonStyle.primary
+        label="Review & fix",
+        custom_id="k98:recovery:review:v1",
+        style=discord.ButtonStyle.primary,
     )
     async def review(self, button, interaction):
         try:

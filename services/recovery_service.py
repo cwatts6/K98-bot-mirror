@@ -72,6 +72,12 @@ class RecoveryService:
             {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
         )
         row["execution_progress"] = execution_progress(row["IncidentID"]) if pending else None
+        if row["SourceKind"] == "export_job":
+            from services.recovery_publication_result import publication_result
+
+            row["publication_check"] = publication_result(
+                row, self.store.latest_publication_action(row["IncidentID"])
+            )
         return self.presentation_policy(row) if self.presentation_policy else row
 
     def review(self, actor, incident_id):
@@ -174,7 +180,11 @@ class RecoveryService:
         if type(page) is not int or not 0 <= page < pages:
             raise SourceConflict("Choose a current recovery review page.")
         return dict(
-            row=row, action=action, page=page, pages=pages, fields=fields[page * 5 : (page + 1) * 5]
+            row=row,
+            action=action,
+            page=page,
+            pages=pages,
+            fields=fields[page * 5 : (page + 1) * 5],
         )
 
     def review_source(self, actor, kind, source_id):

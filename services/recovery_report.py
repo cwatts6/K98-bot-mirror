@@ -24,6 +24,9 @@ def _next_step(row, evidence, actions, blocked):
         return "A repair is already accepted and awaiting verification. Use Recheck to follow its recorded outcome; do not submit another repair."
     if evidence.get("check_unavailable"):
         return "Verification is unavailable. Use Recheck after the check recovers; no repair or healthy outcome is established."
+    publication = row.get("publication_check")
+    if publication and publication["outcome"] != "confirmed":
+        return publication["explanation"]
     if (
         row["SourceKind"] in {"evidence_batch", "historical_batch"}
         and evidence.get("outcome") == "completed_with_exceptions"
@@ -142,6 +145,7 @@ def incident_report(service, row):
             ),
             required_repairs=required,
             pending_verification=current.get("pending_action"),
+            publication_check=current.get("publication_check"),
             execution_progress=(
                 execution_progress(row["IncidentID"]) if current.get("pending_action") else None
             ),

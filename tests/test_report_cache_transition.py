@@ -19,10 +19,16 @@ def test_report_cache_transition_pins_complete_runtime():
         t for t in updater.reviewed_transitions() if t["id"] == "report_cache_handoff_v1"
     )
     successors = {m["path"]: m for m in handoff["members"]}
+    result = next(t for t in updater.reviewed_transitions() if t["id"] == "publication_result_v1")
+    result_members = {m["path"]: m for m in result["members"]}
     for member in item["members"]:
         expected = member["after_sha256"]
         if member["path"] in successors:
             successor = successors[member["path"]]
+            assert successor["before_sha256"] == expected
+            expected = successor["after_sha256"]
+        if member["path"] in result_members:
+            successor = result_members[member["path"]]
             assert successor["before_sha256"] == expected
             expected = successor["after_sha256"]
         assert (
@@ -61,10 +67,15 @@ def test_handoff_transition_pins_complete_runtime():
     item = next(t for t in updater.reviewed_transitions() if t["id"] == "report_cache_handoff_v1")
     assert {m["path"] for m in item["members"]} == updater.REPORT_CACHE_HANDOFF_PATHS
     root = Path(__file__).resolve().parents[1]
+    result = next(t for t in updater.reviewed_transitions() if t["id"] == "publication_result_v1")
+    successors = {m["path"]: m for m in result["members"]}
     for member in item["members"]:
+        expected = member["after_sha256"]
+        if member["path"] in successors:
+            assert successors[member["path"]]["before_sha256"] == expected
+            expected = successors[member["path"]]["after_sha256"]
         assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
+            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == expected
         )
 
 
