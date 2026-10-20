@@ -18,7 +18,12 @@ def test_progress_transition_pins_complete_runtime():
             (
                 m["after_sha256"]
                 for t in reversed(updater.reviewed_transitions())
-                if t["id"] in {"probe_busy_recovery_v1", "fresh_report_cache_diagnostics_v1"}
+                if t["id"]
+                in {
+                    "probe_busy_recovery_v1",
+                    "fresh_report_cache_diagnostics_v1",
+                    "report_cache_handoff_v1",
+                }
                 for m in t["members"]
                 if m["path"] == member["path"]
             ),

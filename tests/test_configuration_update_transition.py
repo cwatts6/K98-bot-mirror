@@ -28,6 +28,7 @@ def test_configuration_transition_pins_every_runtime_member():
                     "publication_progress_v1",
                     "probe_busy_recovery_v1",
                     "fresh_report_cache_diagnostics_v1",
+                    "report_cache_handoff_v1",
                 }
                 for m in t["members"]
                 if m["path"] == member["path"]
