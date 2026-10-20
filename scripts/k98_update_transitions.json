@@ -502,7 +502,7 @@
         {
           "path": "services/export_runtime_composition.py",
           "before_sha256": "6e0cbfa8260409ee4ca75afd215c8d02befb762fb00f57342e3c0a2780b308e6",
-          "after_sha256": "d5e5396883cc3a70b5c30f993efdaaece5b0f0684a0ba8baa58618dc8a196f3c"
+          "after_sha256": "227d767e4a223886501d2c530bcb2888730a53bcf9c18edcdfde295515ddce9d"
         },
         {
           "path": "services/legacy_export_snapshot_service.py",

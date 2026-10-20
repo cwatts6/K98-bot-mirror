@@ -2493,6 +2493,19 @@ class LegacyExecutionStreams:
 
 class AuthorityClient:
     @contextmanager
+    def _proof_admission(self):
+        from services.export_proof_progress import AuthorityProofBusy
+
+        if not _configuration_proof_lock.acquire(blocking=False):
+            # Do not queue another proof behind an existing proof/read and
+            # silently start it after its caller's observation deadline.
+            raise AuthorityProofBusy("An owned authority check or configuration read is active.")
+        try:
+            yield
+        finally:
+            _configuration_proof_lock.release()
+
+    @contextmanager
     def configuration_admission(self, *, wait_for_admission=True):
         from services.legacy_export_snapshot_service import ConfigurationAdmissionDeferred
 
@@ -2860,7 +2873,7 @@ class AuthorityClient:
     ):
         # Hold exclusion until the owned call finishes, including progress
         # polling. A health probe must not claim SQL resources in that interval.
-        with self.configuration_admission():
+        with self._proof_admission():
             return self._prove(
                 kind,
                 object_id,
@@ -2946,6 +2959,11 @@ class LocalAuthorityClient(AuthorityClient):
     def configuration_admission(self, *, wait_for_admission=True):
         # The authority proof worker performs its own observational reads.
         # It must not wait for the Bot call that is waiting for that worker.
+        yield
+
+    @contextmanager
+    def _proof_admission(self):
+        # This internal transport is already under authority ownership.
         yield
 
     def _invoke(self, message):

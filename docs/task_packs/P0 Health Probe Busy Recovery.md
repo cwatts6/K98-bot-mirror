@@ -21,6 +21,8 @@ remains mandatory.
   proofs. Health observations defer before creating any SQL ticket if the lock is
   busy. Collection keeps the lock until closure and settlement. The authority's
   own observational worker does not acquire the Bot scheduling lock.
+  Another proof is refused as busy immediately; it is never silently queued
+  behind an existing proof or read to start after the caller's deadline.
 - A probe already admitted by SQL waits on an authenticated pre-dispatch busy
   response using its original stream ID and request. Unknown, malformed or lost
   replies still preserve uncertain ownership. Existing runtime lifetime/drain

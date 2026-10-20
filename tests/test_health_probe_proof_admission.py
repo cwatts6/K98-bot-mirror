@@ -50,17 +50,25 @@ def test_running_publication_defers_health_before_any_ticket_and_releases_after_
         dal.request.assert_not_called()
         dal.claim.assert_not_called()
         dal.uncertain.assert_not_called()
+        from services.export_proof_progress import AuthorityProofBusy
+
+        with pytest.raises(AuthorityProofBusy):
+            client.prove("publication", str(uuid4()), "a" * 64)
+        assert broker.issuer.issue.call_count == 1
     finally:
         finish.set()
         worker.join(5)
     assert not worker.is_alive() and results[0]["state"] == "confirmed"
+    assert broker.issuer.issue.call_count == 1
     with runtime.configuration_requests():
         pass
     dal.request.assert_called_once()
     dal.transition.assert_called_once()
 
 
-def test_existing_configuration_read_blocks_proof_until_settlement(tmp_path):
+def test_existing_configuration_read_refuses_proof_without_queueing_a_later_check(tmp_path):
+    from services.export_proof_progress import AuthorityProofBusy
+
     client = object.__new__(AuthorityClient)
     runtime, dal = runtime_with_admission(tmp_path, client)
     entered, finish, proving = Event(), Event(), Event()
@@ -74,10 +82,10 @@ def test_existing_configuration_read_blocks_proof_until_settlement(tmp_path):
     reader = Thread(target=read)
     reader.start()
     assert entered.wait(5)
-    proof = Thread(target=lambda: client.prove("publication", str(uuid4()), "a" * 64))
-    proof.start()
     try:
-        assert not proving.wait(0.05)
+        with pytest.raises(AuthorityProofBusy):
+            client.prove("publication", str(uuid4()), "a" * 64)
+        client._prove.assert_not_called()
         # The authority's internal observational stream is not a competing Bot
         # read. It must not deadlock on the Bot thread waiting for its receipt.
         with object.__new__(LocalAuthorityClient).configuration_admission(wait_for_admission=False):
@@ -85,9 +93,10 @@ def test_existing_configuration_read_blocks_proof_until_settlement(tmp_path):
     finally:
         finish.set()
         reader.join(5)
-        proof.join(5)
-    assert not reader.is_alive() and not proof.is_alive() and proving.is_set()
+    assert not reader.is_alive() and not proving.is_set()
     dal.transition.assert_called_once()
+    client.prove("publication", str(uuid4()), "a" * 64)
+    client._prove.assert_called_once()
 
 
 def test_uncertain_proof_reply_releases_only_local_scheduling_gate(tmp_path):
