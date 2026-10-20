@@ -6,7 +6,7 @@ publication, proof producer/consumer, recovery action and ownership SQL are real
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -233,6 +233,51 @@ async def test_publication_confirmation_reads_existing_output_and_settles_exact_
     await confirmation.children[0].callback(interaction)
     assert tuple(p.r.provider.sent) == after
     assert p.r.f.sql.execute("SELECT COUNT(*) FROM #ExportReconciliationProof").fetchval() == 1
+
+
+@pytest.mark.parametrize("publication", ["damaged"], indirect=True)
+def test_last_publication_remains_discoverable_until_newer_publication_confirms(publication):
+    p = publication
+    original, newer = p.r.claim.job_id, str(uuid4())
+    sql = p.r.f.sql
+    sql.execute(
+        "INSERT INTO #ExportJob "
+        "(JobID,ConsumerKind,SourceKey,IntentID,AccountKey,DestinationSetHash,InputHash,"
+        "KVK_NO,PoolEpoch,RepairID,EnqueueSequence,State,OwnerID,Fence,Version,"
+        "CreatedUTC,UpdatedUTC,Actor,Reason,ProvenanceJson) "
+        "SELECT ?,ConsumerKind,SourceKey,IntentID,AccountKey,DestinationSetHash,InputHash,"
+        "KVK_NO,PoolEpoch,NEWID(),EnqueueSequence+1,'waiting',NULL,0,1,"
+        "DATEADD(second,1,CreatedUTC),DATEADD(second,1,UpdatedUTC),Actor,Reason,ProvenanceJson "
+        "FROM #ExportJob WHERE JobID=?",
+        newer,
+        original,
+    )
+    sql.commit()
+    before = tuple(p.r.provider.sent)
+    for state in ("waiting", "ready", "running", "failed", "uncertain", "cancelled", "coalesced"):
+        owned = state in {"running", "failed", "uncertain"}
+        sql.execute(
+            "UPDATE #ExportJob SET State=?,OwnerID=?,Fence=?,SupersededByJobID=? WHERE JobID=?",
+            state,
+            str(uuid4()) if owned else None,
+            1 if owned else 0,
+            original if state == "coalesced" else None,
+            newer,
+        )
+        sql.commit()
+        listed = p.service.published_outputs(ACTOR)
+        assert original in [item["JobID"] for item in listed], state
+        assert newer not in [item["JobID"] for item in listed], state
+    sql.execute(
+        "UPDATE #ExportJob SET State='confirmed',OwnerID=NEWID(),Fence=1,"
+        "SupersededByJobID=NULL WHERE JobID=?",
+        newer,
+    )
+    sql.commit()
+    listed = p.service.published_outputs(ACTOR)
+    assert original not in [item["JobID"] for item in listed]
+    assert newer in [item["JobID"] for item in listed]
+    assert tuple(p.r.provider.sent) == before
 
 
 @pytest.mark.parametrize("publication", ["unknown_write"], indirect=True)

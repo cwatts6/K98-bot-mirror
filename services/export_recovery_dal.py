@@ -67,6 +67,7 @@ class ExportRecoveryDAL:
                 + self.job_scope
                 + " AND ConsumerKind='new_source' AND State='confirmed' "
                 "AND NOT EXISTS(SELECT 1 FROM dbo.ExportJob newer WHERE "
+                "newer.ConsumerKind='new_source' AND newer.State='confirmed' AND "
                 "newer.AccountKey=j.AccountKey AND newer.DestinationSetHash=j.DestinationSetHash "
                 "AND newer.PoolEpoch=j.PoolEpoch AND (newer.CreatedUTC>j.CreatedUTC OR "
                 "(newer.CreatedUTC=j.CreatedUTC AND newer.JobID>j.JobID))) "
