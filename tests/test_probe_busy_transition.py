@@ -16,7 +16,11 @@ def test_probe_busy_transition_pins_complete_runtime():
     for member in item["members"]:
         expected = member["after_sha256"]
         for successor in updater.reviewed_transitions():
-            if successor["id"] not in {"guided_rollover_v1", "publication_timing_v1"}:
+            if successor["id"] not in {
+                "guided_rollover_v1",
+                "publication_timing_v1",
+                "configuration_read_request_v1",
+            }:
                 continue
             for changed in successor["members"]:
                 if changed["path"] == member["path"]:

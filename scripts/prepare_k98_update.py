@@ -47,6 +47,13 @@ DRAINED_ISSUER_TRANSITION_PATHS = frozenset({"scripts/run_export_startup_issuer.
 STARTUP_CACHE_COMPLETION_PATHS = frozenset(
     {"bot_instance.py", "core/startup_diagnostics.py", "services/player_stats_startup.py"}
 )
+CONFIGURATION_READ_REQUEST_PATHS = frozenset(
+    {
+        "services/config_preparation_recovery_service.py",
+        "services/configuration_producer_recovery.py",
+        "services/configuration_read_continuation_dal.py",
+    }
+)
 PUBLICATION_TIMING_PATHS = frozenset(
     {"scripts/run_export_authority.py", "services/export_reconciliation_service.py"}
 )
@@ -309,6 +316,10 @@ def reviewed_transitions():
                 item["id"] == "startup_cache_completion_v1"
                 and path in STARTUP_CACHE_COMPLETION_PATHS
             )
+            fixed_configuration_read = (
+                item["id"] == "configuration_read_request_v1"
+                and path in CONFIGURATION_READ_REQUEST_PATHS
+            )
             fixed_rollover_timing = item["id"] == "guided_rollover_timing_v1" and path in (
                 ROLLOVER_GUIDED_PATHS | PUBLICATION_TIMING_PATHS
             )
@@ -332,6 +343,7 @@ def reviewed_transitions():
                     or fixed_rollover
                     or fixed_timing
                     or fixed_startup_cache
+                    or fixed_configuration_read
                     or fixed_rollover_timing
                 )
                 or not path.endswith(".py")
@@ -353,6 +365,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed publication-timing transition required.")
         if item["id"] == "startup_cache_completion_v1" and paths != STARTUP_CACHE_COMPLETION_PATHS:
             raise ValueError("Complete fixed startup-cache completion transition required.")
+        if (
+            item["id"] == "configuration_read_request_v1"
+            and paths != CONFIGURATION_READ_REQUEST_PATHS
+        ):
+            raise ValueError("Complete fixed configuration-read request transition required.")
         if item["id"] == "guided_rollover_timing_v1" and paths != (
             ROLLOVER_GUIDED_PATHS | PUBLICATION_TIMING_PATHS
         ):

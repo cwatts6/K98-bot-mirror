@@ -830,6 +830,26 @@
           "after_sha256": "eabb55780b7c07bf97a884704633ca559db30c50c8a2aa8c67a62ed0b53910ce"
         }
       ]
+    },
+    {
+      "id": "configuration_read_request_v1",
+      "members": [
+        {
+          "path": "services/config_preparation_recovery_service.py",
+          "before_sha256": "4b262527f2baa53a8e942c133df72a439aaaffbae9a7d9b88ab12bbd59ff6724",
+          "after_sha256": "bff07ef865b4e4a480ac235b2c983b786367d45dc3a9a102accf63091d972c8a"
+        },
+        {
+          "path": "services/configuration_producer_recovery.py",
+          "before_sha256": "b5a91facb79b6cfc9ff1414e620bfafe21e309161285a30d80d0973a4bc83fc0",
+          "after_sha256": "ebb063f6c4cb518efba939bcb52636796cac8f505dc9a67b211cf0ab4e366d98"
+        },
+        {
+          "path": "services/configuration_read_continuation_dal.py",
+          "before_sha256": "7778816e83d49167c28f96b6d098c26d65e463939a2148b17bcd694691c2881f",
+          "after_sha256": "8a9412a5556ad9df7769a65e71593ec6826c4687b26726249489fc530a4f17bb"
+        }
+      ]
     }
   ]
 }
