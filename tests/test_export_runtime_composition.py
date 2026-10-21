@@ -244,6 +244,10 @@ def test_local_authority_probe_uses_registered_broker_without_connecting_to_its_
 ):
     from scripts.run_export_authority import AuthorityBroker
     from services.export_execution_protocol import ProviderRequest
+    from services.export_publication_metrics import (
+        measure_publication_step,
+        publication_details,
+    )
     from services.export_runtime_composition import (
         AuthorityClient,
         LocalAuthorityClient,
@@ -251,10 +255,15 @@ def test_local_authority_probe_uses_registered_broker_without_connecting_to_its_
     )
     from tests.test_export_authority_launcher import scope
 
+    def execute(message):
+        with measure_publication_step("provider_child"):
+            return {"id": "index-0"}
+
+    timing = Mock()
     authority = SimpleNamespace(
         enrollment_plan=None,
         open_stream=Mock(side_effect=lambda **kw: kw["stream_id"]),
-        execute=Mock(return_value={"id": "index-0"}),
+        execute=Mock(side_effect=execute),
         close_stream=Mock(side_effect=lambda identifier: dict(stream_id=identifier, version=5)),
     )
     connector = Mock(side_effect=AssertionError("local proof tried self-IPC"))
@@ -262,7 +271,7 @@ def test_local_authority_probe_uses_registered_broker_without_connecting_to_its_
     client = LocalAuthorityClient(
         AuthorityBroker(authority, RuntimeRegistration(registration_fixture()))
     )
-    with client.stream(scope() | {"Purpose": "probe"}) as stream:
+    with publication_details(timing), client.stream(scope() | {"Purpose": "probe"}) as stream:
         request = ProviderRequest.parse(
             dict(
                 version=1,
@@ -278,6 +287,8 @@ def test_local_authority_probe_uses_registered_broker_without_connecting_to_its_
     authority.execute.assert_called_once()
     authority.close_stream.assert_called_once_with(stream.stream_id)
     connector.assert_not_called()
+    timing.info.assert_called_once()
+    assert timing.info.call_args.args[1:4] == ("provider_child", 1, 0)
 
 
 def test_local_probe_preserves_registration_rejection_and_cannot_use_creation_profile():

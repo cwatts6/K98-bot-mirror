@@ -31,3 +31,20 @@ try {
  if(Test-Path -LiteralPath $path){Remove-Item -LiteralPath $path}
 }
 'PASS: redaction, window, partial record, shared active-file read, bounds, hash mismatch'
+
+$start=[DateTimeOffset]::Parse('2026-10-22T10:00:00Z')
+$end=$start.AddMinutes(30)
+$detail="2026-10-22 10:05:00,000 UTC publication_verification_detail step=provider_child count=8 failed=0 duration_ms=1200`n"+
+ "2026-10-22 10:05:00,001 UTC publication_verification_detail step=private-secret count=1 failed=0 duration_ms=1`n"+
+ "2026-10-22 10:05:00,002 UTC publication_verification_detail step=budget_wait count=1 failed=2 duration_ms=1`n"+
+ "2026-10-22 10:05:00,003 UTC publication_verification_detail step=budget_sql count=0 failed=0 duration_ms=1`n"+
+ "2026-10-22 10:31:00,004 UTC publication_verification_detail step=budget_sql count=1 failed=0 duration_ms=1`n"+
+ "2026-10-22 10:05:00,005 UTC publication_verification_detail step=budget_complete count=1 failed=0 duration_ms=1"
+$parsed=@(Select-PublicationDetails $detail $start $end)
+if($parsed.Count -ne 1 -or $parsed[0].step -cne 'provider_child' -or $parsed[0].count -ne 8 -or $parsed[0].duration_ms -ne 1200){throw 'Bounded detail parsing failed'}
+foreach($bad in @($start,$start.AddSeconds(-1),$start.AddHours(25))) {
+ $refused=$false
+ try{$null=Select-PublicationDetails $detail $start $bad}catch{$refused=$true}
+ if(-not $refused){throw 'Invalid window accepted'}
+}
+'PASS: explicit window, detail redaction, malformed count, partial line and 24-hour bound'

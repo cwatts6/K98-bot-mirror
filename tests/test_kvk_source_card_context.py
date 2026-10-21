@@ -149,6 +149,47 @@ async def test_ordinary_context_unavailable_preserves_numbers(card_store, case, 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case,reason",
+    [
+        ("missing", "overall_missing"),
+        ("disabled", "serving_disabled"),
+        ("routing", "routing_missing"),
+        ("capability", "capability_unsupported"),
+        ("choice", "season_choice_missing"),
+    ],
+)
+async def test_missing_overall_does_not_inspect_display_fight_or_mask_routing(
+    card_store, case, reason
+):
+    from kvk.models.kvk_stats_card import card_context_label
+
+    card_store.has_overall = False
+    if case == "disabled":
+        card_store.routing["Enabled"] = False
+    elif case == "routing":
+        card_store.routing = None
+    elif case == "capability":
+        card_store.routing["CapabilitiesVersion"] = "unsupported"
+    elif case == "choice":
+        card_store.choice = None
+    payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
+        {"GovernorID": "1001", "KVK_NO": 16, "T4&T5_Kills": 123, "Kill Target": 200}
+    )
+    assert payload.source_context["reason"] == reason
+    assert payload.source_read["period_id"] is None
+    assert payload.kills_gain == 123 and payload.kill_target == 200
+    assert not any(
+        "SourceCompleteSelection" in sql or "SourcePlayerResult" in sql
+        for _, sql, _ in card_store.events
+    )
+    if case == "missing":
+        assert card_context_label(payload) == (
+            "Overall context unavailable: no season-wide overall period is configured"
+        )
+
+
+@pytest.mark.asyncio
 async def test_card_revalidation_rejects_new_selection_without_retarget(card_store):
     payload = await kvk_stats_card_service.build_kvk_stats_card_payload(
         {"GovernorID": "1001", "KVK_NO": 16}

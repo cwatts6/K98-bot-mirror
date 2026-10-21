@@ -67,6 +67,14 @@ CONFIGURATION_INTENT_REPLAY_PATHS = frozenset(
 PUBLICATION_TIMING_PATHS = frozenset(
     {"scripts/run_export_authority.py", "services/export_reconciliation_service.py"}
 )
+PUBLICATION_DETAIL_PATHS = frozenset(
+    {
+        "services/export_publication_metrics.py",
+        "services/export_reconciliation_service.py",
+        "services/export_execution_authority.py",
+        "services/export_request_budget.py",
+    }
+)
 PUBLICATION_RESULT_PATHS = frozenset(
     {
         "services/export_reconciliation_service.py",
@@ -378,6 +386,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed guided-rollover transition required.")
         if item["id"] == "publication_timing_v1" and paths != PUBLICATION_TIMING_PATHS:
             raise ValueError("Complete fixed publication-timing transition required.")
+        if item["id"] == "publication_detail_v1" and paths != PUBLICATION_DETAIL_PATHS:
+            raise ValueError("Complete fixed publication-detail transition required.")
         if item["id"] == "startup_cache_completion_v1" and paths != STARTUP_CACHE_COMPLETION_PATHS:
             raise ValueError("Complete fixed startup-cache completion transition required.")
         if (

@@ -19,7 +19,11 @@ def test_guided_rollover_pins_complete_runtime():
             continue  # Scrubbed mirror; exact source is checked in the private checkout.
         expected = member["after_sha256"]
         for transition in updater.reviewed_transitions():
-            if transition["id"] in {"publication_timing_v1", "configuration_intent_replay_v1"}:
+            if transition["id"] in {
+                "publication_timing_v1",
+                "configuration_intent_replay_v1",
+                "publication_detail_v1",
+            }:
                 for successor in transition["members"]:
                     if successor["path"] == member["path"]:
                         assert successor["before_sha256"] == expected

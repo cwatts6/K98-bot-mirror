@@ -5,6 +5,8 @@ from email.utils import parsedate_to_datetime
 import math
 import time
 
+from services.export_publication_metrics import measure_publication_step
+
 
 class BudgetCompletionUnknown(RuntimeError):
     """The request ended but its durable spacing checkpoint is unconfirmed."""
@@ -45,12 +47,17 @@ class RequestBudget:
     def __call__(self):
         if self.stop is not None and self.stop.is_set():
             raise InterruptedError("Export admission stopped.")
-        reservation = self.dal.reserve_request(self.account_key)
+        with measure_publication_step("budget_sql"):
+            reservation = self.dal.reserve_request(self.account_key)
         # Another process may extend the cooldown while this reservation sleeps.
         # Query server time again; local wall-clock changes cannot dispatch early.
         while True:
-            self._wait(reservation["WaitSeconds"])
-            reservation = self.dal.refresh_reservation(self.account_key, reservation["ReservedUTC"])
+            with measure_publication_step("budget_wait"):
+                self._wait(reservation["WaitSeconds"])
+            with measure_publication_step("budget_sql"):
+                reservation = self.dal.refresh_reservation(
+                    self.account_key, reservation["ReservedUTC"]
+                )
             if reservation["WaitSeconds"] <= 0:
                 return
 

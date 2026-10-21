@@ -20,6 +20,7 @@ def test_probe_busy_transition_pins_complete_runtime():
                 "guided_rollover_v1",
                 "publication_timing_v1",
                 "configuration_intent_replay_v1",
+                "publication_detail_v1",
                 "configuration_read_request_v1",
             }:
                 continue

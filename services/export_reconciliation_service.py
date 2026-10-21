@@ -28,6 +28,7 @@ from services.export_execution_protocol import (
     uuid_text,
     validate_response,
 )
+from services.export_publication_metrics import measured_probe, publication_details
 
 logger = logging.getLogger(__name__)
 publication_timing_logger = logging.getLogger(__name__ + ".publication_timing")
@@ -820,7 +821,11 @@ class PublicationProbe:
         # Admission independently rereads the exact domain snapshot. Every exit,
         # including readback failure, closes the owned stream once; a lost close
         # acknowledgment propagates uncertainty and cannot trigger a second try.
-        with publication_phase("provider_readback"), self.streams.probe(snapshot) as stream:
+        with (
+            publication_details(publication_timing_logger),
+            publication_phase("provider_readback"),
+            measured_probe(self.streams, snapshot) as stream,
+        ):
             observed = observe_publication(
                 snapshot=snapshot,
                 registration=self.registration,

@@ -31,9 +31,12 @@ def resolve_card_read(kvk_no, *, connect=None):
             )
             period = one(cursor)
         read = resolve_season_read(
-            kvk_no, period_id=period["PeriodID"] if period else None, connect=connect
+            kvk_no,
+            period_id=period["PeriodID"] if period else None,
+            use_display_period=False,
+            connect=connect,
         )
-        if read.source_key == SOURCE_KEY and not period:
+        if read.source_key == SOURCE_KEY and not period and read.reason == "period_missing":
             read = replace(
                 read, availability="unavailable", reason="overall_missing", period_id=None
             )

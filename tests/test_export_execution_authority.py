@@ -882,3 +882,32 @@ def test_child_handshake_failure_retains_claim_and_returns_authority_control(run
     monkeypatch.setattr(Child, "resume", original)
     next_id = str(uuid4())
     assert authority.open_stream(stream_id=next_id, scope=scope) == next_id
+
+
+@pytest.mark.parametrize("failure", [None, "dispatch_intent", "succeeded", "provider", "complete"])
+def test_publication_diagnostics_preserve_dispatch_and_uncertainty(runtime, failure):
+    from services.export_publication_metrics import publication_details
+
+    authority, dal, store, child, budget, request = runtime
+    if failure in {"dispatch_intent", "succeeded"}:
+        dal.fail = failure
+    child.fail = failure == "provider"
+    budget.fail_complete = failure == "complete"
+    log = Mock()
+    with publication_details(log):
+        if failure:
+            with pytest.raises(ExecutionUncertain):
+                authority.execute(request)
+        else:
+            assert authority.execute(request)["updatedRows"] == 1
+    assert len(child.calls) == (0 if failure == "dispatch_intent" else 1)
+    if failure:
+        with pytest.raises(ExecutionUncertain):
+            authority.execute(request)
+        assert len(child.calls) == (0 if failure == "dispatch_intent" else 1)
+    steps = {call.args[1]: call.args[2:] for call in log.info.call_args_list}
+    assert steps["request_lookup"][0] == 1
+    assert steps["request_prepared"][0] == 1
+    assert "registered_file" not in str(log.mock_calls)
+    assert request["request_id"] not in str(log.mock_calls)
+    assert not any("response lost" in str(call) for call in log.mock_calls)

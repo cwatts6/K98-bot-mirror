@@ -1,6 +1,10 @@
 [CmdletBinding()]
-param()
-# Read-only collection for the already completed 21 October publication check.
+param(
+ [DateTimeOffset]$StartUtc=[DateTimeOffset]::Parse('2026-10-21T06:23:54Z'),
+ [DateTimeOffset]$EndUtc=[DateTimeOffset]::Parse('2026-10-21T06:38:07Z')
+)
+# Read-only collection for one explicit publication-check window (at most 24 hours).
+# Defaults preserve collection of the original completed 21 October check.
 # Never loads application code, starts a process, connects to SQL/provider, or
 # changes a task, policy, manifest, journal, cache, receipt or diagnostic file.
 Set-StrictMode -Version Latest
@@ -59,10 +63,13 @@ function Read-TimingJson([string]$Path,[string]$Expected='') {
  [Text.Encoding]::UTF8.GetString((Read-TimingBytes $Path $Expected))|ConvertFrom-Json
 }
 
-function Select-PublicationPhases([string]$Text) {
+function Assert-PublicationWindow([DateTimeOffset]$Start,[DateTimeOffset]$End) {
+ if($End -le $Start -or ($End-$Start).TotalHours -gt 24){throw 'A positive window of at most 24 hours is required'}
+}
+
+function Select-PublicationPhases([string]$Text,[DateTimeOffset]$Start=$StartUtc,[DateTimeOffset]$End=$EndUtc) {
+ Assert-PublicationWindow $Start $End
  $pattern='^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) UTC publication_verification_phase phase=(retained_history|provider_readback|sealed_history|sealed_response_replay|final_origin_verification) completed=(True|False) duration_ms=(\d{1,12})\r?$'
- $start=[DateTimeOffset]::Parse('2026-10-21T06:23:54Z')
- $end=[DateTimeOffset]::Parse('2026-10-21T06:38:07Z')
  # Require a terminating newline: an active partial final record is not evidence.
  $lines=$Text.Split([char]10)
  for($i=0;$i -lt $lines.Count-1;$i++) {
@@ -75,7 +82,24 @@ function Select-PublicationPhases([string]$Text) {
  }
 }
 
+function Select-PublicationDetails([string]$Text,[DateTimeOffset]$Start=$StartUtc,[DateTimeOffset]$End=$EndUtc) {
+ Assert-PublicationWindow $Start $End
+ $steps='probe_admission|probe_observation|probe_closure|request_lookup|request_payload|request_prepared|request_budget|request_guard|request_dispatch|provider_child|response_validation|request_result|budget_complete|budget_sql|budget_wait|budget_feedback'
+ $pattern='^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) UTC publication_verification_detail step=('+ $steps +') count=(\d{1,9}) failed=(\d{1,9}) duration_ms=(\d{1,12})\r?$'
+ $lines=$Text.Split([char]10)
+ for($i=0;$i -lt $lines.Count-1;$i++) {
+  if($lines[$i] -cmatch $pattern) {
+   $stamp=[DateTimeOffset]::ParseExact($Matches[1]+' +00:00','yyyy-MM-dd HH:mm:ss,fff zzz',[Globalization.CultureInfo]::InvariantCulture)
+   $count=[long]$Matches[3];$failed=[long]$Matches[4]
+   if($stamp -ge $Start -and $stamp -le $End -and $count -gt 0 -and $failed -le $count) {
+    [pscustomobject]@{ended_utc=$stamp.ToString('o');step=$Matches[2];count=$count;failed=$failed;duration_ms=[long]$Matches[5]}
+   }
+  }
+ }
+}
+
 function Get-SavedPublicationTiming {
+ Assert-PublicationWindow $StartUtc $EndUtc
  if($env:COMPUTERNAME -cne 'MINI_AMD'){throw 'Run on MINI_AMD'}
  $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
  if(-not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Administrator read access required'}
@@ -105,17 +129,18 @@ function Get-SavedPublicationTiming {
  $authority=Read-TimingJson $plan.manifests.authority $journal.publication.manifests.authority
  if($authority.authority_sid -cne $identity.User.Value -or $authority.bot_sid -cne $identity.User.Value -or $authority.evidence_root -cne 'C:\ProgramData\K98\S11\evidence'){throw 'Authority evidence binding differs'}
  Assert-TimingPath $authority.evidence_root $identity.User.Value
- $rows=@();$absent=0
+ $rows=@();$details=@();$absent=0
  foreach($name in @('publication-timing.log.2','publication-timing.log.1','publication-timing.log')) {
   $path=Join-Path $authority.evidence_root $name
   if(-not(Test-Path -LiteralPath $path)){$absent++;continue}
   $raw=Read-TimingBytes $path '' 262144 $identity.User.Value
   $rows+=@(Select-PublicationPhases ([Text.Encoding]::UTF8.GetString($raw)))
+  $details+=@(Select-PublicationDetails ([Text.Encoding]::UTF8.GetString($raw)))
  }
  # Revalidate the selected journal: never silently combine two incarnations.
  $again=Read-TimingJson $journalFile.FullName
  if(($again|ConvertTo-Json -Depth 50 -Compress) -cne ($journal|ConvertTo-Json -Depth 50 -Compress)){throw 'Incarnation changed during collection'}
- [pscustomobject]@{version=1;read_only=$true;window_start_utc='2026-10-21T06:23:54Z';window_end_utc='2026-10-21T06:38:07Z';absent_rotations=$absent;records=@($rows|Sort-Object ended_utc,phase -Unique);contains_operational_identifiers=$false}
+ [pscustomobject]@{version=2;read_only=$true;window_start_utc=$StartUtc.ToUniversalTime().ToString('o');window_end_utc=$EndUtc.ToUniversalTime().ToString('o');absent_rotations=$absent;records=@($rows|Sort-Object ended_utc,phase -Unique);details=@($details|Sort-Object ended_utc,step -Unique);detail_intervals_overlap=$true;contains_operational_identifiers=$false}
 }
 
 if($MyInvocation.InvocationName -ne '.') {

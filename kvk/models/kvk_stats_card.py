@@ -98,6 +98,8 @@ def card_context_label(payload):
     if source is None:
         return "Legacy Full Data context" if payload.source_read else ""
     if not source.get("available"):
+        if source.get("reason") == "overall_missing":
+            return "Overall context unavailable: no season-wide overall period is configured"
         reason = str(source.get("reason", "unavailable")).replace("_", " ")
         if source.get("cohort_available"):
             return f"Snapshot overall | frozen B0 camp | as of {source['as_of_utc']} | rank unavailable"

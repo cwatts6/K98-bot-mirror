@@ -63,7 +63,7 @@ def validate_complete(read, selection, update, publication):
         raise SourceConflict("Complete combat result requires its supplied aggregate.")
 
 
-def resolve_season_read(kvk_no, *, period_id=None, connect=None):
+def resolve_season_read(kvk_no, *, period_id=None, use_display_period=True, connect=None):
     """Resolve each request under the writer's season-first lock order.
 
     Only small authority rows are loaded under the mutex. Immutable result rows,
@@ -100,9 +100,14 @@ def resolve_season_read(kvk_no, *, period_id=None, connect=None):
                 return replace(read, reason="serving_disabled")
             if read.capabilities_version != PUBLIC_REPORT_CAPABILITY:
                 return replace(read, reason="capability_unsupported")
-            selected_period = period_id or routing["DisplayPeriodID"]
+            selected_period = period_id or (
+                routing["DisplayPeriodID"] if use_display_period else None
+            )
             if selected_period is None:
-                return replace(read, reason="display_period_missing")
+                return replace(
+                    read,
+                    reason="display_period_missing" if use_display_period else "period_missing",
+                )
             read = replace(read, period_id=identity(selected_period))
             # Same ordering as locked_period: component rows, complete rows, then config.
             cursor.execute(

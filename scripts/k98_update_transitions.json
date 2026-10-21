@@ -885,6 +885,31 @@
           "after_sha256": "a7c8434809eb58b297bff8c02b9c509c7d018a66a46ae2a5dff2e0a86358041f"
         }
       ]
+    },
+    {
+      "id": "publication_detail_v1",
+      "members": [
+        {
+          "path": "services/export_publication_metrics.py",
+          "before_sha256": null,
+          "after_sha256": "cef01b070feecab472945da577681667b9352fc935a97829204c2d6014017652"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "a7c8434809eb58b297bff8c02b9c509c7d018a66a46ae2a5dff2e0a86358041f",
+          "after_sha256": "eabdd107a0ad22642e2757c4c2ec2b999d377fc7131ded1215bdbe27240e9319"
+        },
+        {
+          "path": "services/export_execution_authority.py",
+          "before_sha256": "54759bdd561f35900c7c2e90668260f94a94cc16099817e88683bd21fbee29de",
+          "after_sha256": "fa591647aab9c90aa3cf286b92a8bed2603b72d47930d2a9945e8db55822096c"
+        },
+        {
+          "path": "services/export_request_budget.py",
+          "before_sha256": "f3675771ea75315220d980b81286be568ea19a8698ed0bed295703ec3553b1be",
+          "after_sha256": "d43b165223ce7d0e178b660e94adfc3d289520d393584afbf7766d3f652bee72"
+        }
+      ]
     }
   ]
 }

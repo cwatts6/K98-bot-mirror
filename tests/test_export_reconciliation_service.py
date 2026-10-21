@@ -1438,6 +1438,9 @@ def test_publication_probe_closes_and_seals_before_returning_observation(monkeyp
     from services.export_execution_protocol import CATALOGUE_SEED
     from services.export_reconciliation_service import PublicationProbe
 
+    timing = Mock()
+    monkeypatch.setattr("services.export_reconciliation_service.publication_timing_logger", timing)
+
     args, api, observations, receipt = publication_observation_fixture(monkeypatch)
     snapshot = deepcopy(args["snapshot"])
     origins, origin_hash = stub_origin_journal(
@@ -1508,6 +1511,18 @@ def test_publication_probe_closes_and_seals_before_returning_observation(monkeyp
         assert steps.index("close") < steps.index("private")
     assert steps.count("open") == steps.count("close") == (0 if failure == "origin" else 1)
     assert bool(observations) == (failure != "origin")
+    details = {
+        call.args[1]: call.args[2:]
+        for call in timing.info.call_args_list
+        if call.args[0].startswith("publication_verification_detail ")
+    }
+    assert set(details) == (
+        set() if failure == "origin" else {"probe_admission", "probe_observation", "probe_closure"}
+    )
+    for count, failed, duration in details.values():
+        assert count == 1 and failed in {0, 1} and duration >= 0
+    if failure == "close":
+        assert details["probe_closure"][1] == 1
 
 
 @pytest.mark.parametrize("wrong", ["evidence", "operations", "coordinator"])

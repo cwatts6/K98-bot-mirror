@@ -16,6 +16,7 @@ from services.export_execution_protocol import (
     encode,
     validate_response,
 )
+from services.export_publication_metrics import measure_publication_step
 from services.export_request_budget import BudgetCompletionUnknown
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,8 @@ class ExportExecutionAuthority:
                 )
             # An IPC replay never calls the child. The response may have been lost
             # after dispatch; return uncertainty rather than creating a new write.
-            existing, _ = self.dal.read_request(request.request_id)
+            with measure_publication_step("request_lookup"):
+                existing, _ = self.dal.read_request(request.request_id)
             if existing is not None:
                 raise ExecutionUncertain(
                     "RequestID already exists; reconcile its retained outcome."
@@ -234,49 +236,62 @@ class ExportExecutionAuthority:
             intent_confirmed = False
             outcome_attempted = False
             try:
-                payload = self.store.put(encode(request.message()))
-                self._event(
-                    stream,
-                    request,
-                    "prepared",
-                    {"request_id": request.request_id, "payload_hash": payload.sha256},
-                    Operation=request.operation,
-                    RequestKind="mutation" if request.mutation else "read",
-                    TargetID=request.target,
-                    PayloadHash=bytes.fromhex(payload.sha256),
-                    PayloadReference=str(UUID(payload.key)),
-                )
+                with measure_publication_step("request_payload"):
+                    payload = self.store.put(encode(request.message()))
+                with measure_publication_step("request_prepared"):
+                    self._event(
+                        stream,
+                        request,
+                        "prepared",
+                        {"request_id": request.request_id, "payload_hash": payload.sha256},
+                        Operation=request.operation,
+                        RequestKind="mutation" if request.mutation else "read",
+                        TargetID=request.target,
+                        PayloadHash=bytes.fromhex(payload.sha256),
+                        PayloadReference=str(UUID(payload.key)),
+                    )
                 prepared = True
-                budget()
+                with measure_publication_step("request_budget"):
+                    budget()
                 if self.dispatch_guard is not None:
-                    self.dispatch_guard()
+                    with measure_publication_step("request_guard"):
+                        self.dispatch_guard()
                 # Procedure checks current owner/fence/version AFTER the wait.
                 # Any commit exception prevents send. A lost acknowledgment may
                 # still leave dispatch_intent in SQL and therefore retains claims.
                 intent_attempted = True
-                self._event(stream, request, "dispatch_intent", {"request_id": request.request_id})
+                with measure_publication_step("request_dispatch"):
+                    self._event(
+                        stream, request, "dispatch_intent", {"request_id": request.request_id}
+                    )
                 intent_confirmed = True
                 if self.dispatch_guard is not None:
-                    self.dispatch_guard()
+                    with measure_publication_step("request_guard"):
+                        self.dispatch_guard()
                 dispatched = True
                 try:
-                    response = stream.child.execute(request.message())
+                    with measure_publication_step("provider_child"):
+                        response = stream.child.execute(request.message())
                 except ProviderThrottled as exc:
                     # Persist shared feedback, but never infer non-delivery or
                     # replay. A lost cooldown acknowledgment is uncertain too.
                     stream.uncertain = True
-                    budget.rejected(exc)
+                    with measure_publication_step("budget_feedback"):
+                        budget.rejected(exc)
                     raise
-                validate_response(request, response)
+                with measure_publication_step("response_validation"):
+                    validate_response(request, response)
                 outcome_attempted = True
-                self._event(
-                    stream,
-                    request,
-                    "succeeded",
-                    {"request_id": request.request_id, "response": response},
-                )
+                with measure_publication_step("request_result"):
+                    self._event(
+                        stream,
+                        request,
+                        "succeeded",
+                        {"request_id": request.request_id, "response": response},
+                    )
                 durable_success = True
-                budget.completed()
+                with measure_publication_step("budget_complete"):
+                    budget.completed()
                 return response
             except BaseException as exc:
                 stream.uncertain = True

@@ -557,3 +557,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Risk: medium
 - Dependencies: Blocker to the current walkthrough, not an optional post-export cleanup. Focused review/scope and operator approval before runtime changes; validate authoritative SQL defaults and persistence contracts and route Changes security review. Preserve accepted scans 1-18, baseline/configuration history, Pass 4 imported endpoints 12-18, aggregate file and all prior backlog entries. No direct production timestamp patch, re-baselining, repeated import or live failure injection as a workaround.
 - Status: Operator approved the focused current-weight/window fix and configuration UX for local implementation and validation on 2026-10-12. Current coefficients supersede the earlier frozen-weight identity proposal above; import timestamps remain provenance. See [scope and behaviour](kvk_source_migration/current_weights_windows_20261012.md). Receipt UX items remain deferred. PRs, deployment and production changes are outside this approval; live walkthrough completion is not claimed.
+# Publication transition test maintenance
+
+### Deferred Optimisation
+- Area: tests/test_*transition.py
+- Type: consistency
+- Description: Historical runtime-pin tests repeat explicit successor lists across several files; each reviewed protected transition needs the same list maintenance.
+- Suggested Fix: In a separate test-only change, centralize exact transition-chain traversal while retaining historical endpoint and missing/foreign-member rejection checks.
+- Impact: medium
+- Risk: low
+- Dependencies: Preserve the protected updater acceptance tests and immutable deployed transition hashes.
