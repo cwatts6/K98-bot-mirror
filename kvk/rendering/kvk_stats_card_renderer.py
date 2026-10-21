@@ -299,7 +299,7 @@ def _overall_kvk_rank_context(payload: KvkStatsCardPayload) -> str | None:
             if payload.source_context.get("available")
             else None
         )
-        return f"Frozen B0: {population}" if population else "Context unavailable"
+        return f"Frozen B0: {population}" if population else "Season-wide ranking unavailable"
     if payload.overall_kvk_rank in (None, 0):
         return None
     parts: list[str] = []

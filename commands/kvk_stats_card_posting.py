@@ -102,8 +102,9 @@ async def post_kvk_stats_output(
     for embed in embeds:
         embed.set_image(url=None)
         embed.set_thumbnail(url=None)
-    embeds[0].add_field(name="Source context", value=card_context_label(safe_payload), inline=False)
-    embeds[0].set_footer(text="Independent stats retained. Request a new card for source context.")
+    if label := card_context_label(safe_payload):
+        embeds[0].add_field(name="Source context", value=label, inline=False)
+    embeds[0].set_footer(text="Season-wide ranking unavailable.")
     if use_fallback_chain:
         return await post_stats_message(bot, ctx, embeds=embeds)
     if channel is None:

@@ -157,10 +157,10 @@ def test_source_provenance_renders_with_independent_targets(available):
         camp_name="Camp Ω" if available else None,
     )
     rendered = renderer.render_kvk_targets_card(payload)
-    assert Image.open(rendered.image_bytes).size == (1180, 696)
+    assert Image.open(rendered.image_bytes).size == (1180, 696 if available else 640)
     assert (
         "frozen B0" in card_context_label(payload)
         if available
-        else "disabled" in card_context_label(payload)
+        else card_context_label(payload) == ""
     )
     assert payload.metrics[0].target == 20_000_000
