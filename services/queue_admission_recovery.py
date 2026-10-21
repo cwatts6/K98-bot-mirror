@@ -132,6 +132,16 @@ class QueueAdmissionRecovery:
                 )
             ),
         )
+        if not closed and not domain_resolved and not actions and not links:
+            from services.recovery_evidence_guidance import ownership_evidence_steps
+
+            evidence["required_evidence"] = ownership_evidence_steps()
+            evidence["explanation"] = (
+                "This request cannot be safely linked to a supported execution owner. Collect the ownership evidence below; no cancellation or release is authorised."
+            )
+            evidence["failure_context"][
+                "summary"
+            ] = "Execution ownership requires evidence collection; no supported recovery link is available."
         return (
             evidence,
             digest(dict(queue=state, domain=domain_proof) if domain_proof else state).hex(),

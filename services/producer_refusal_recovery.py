@@ -113,6 +113,7 @@ class ProducerRefusalRecovery:
                 ),
             )
             for blocker in state["blockers"]:
+                prior_links = len(links)
                 if blocker["ActiveOutputOperationID"]:
                     links.append(
                         dict(
@@ -161,6 +162,10 @@ class ProducerRefusalRecovery:
                                 source_id=linked_source,
                             )
                         )
+                if len(links) == prior_links and blocker["ResourceKey"] != "queue":
+                    from services.recovery_evidence_guidance import ownership_evidence_steps
+
+                    evidence["required_evidence"] = ownership_evidence_steps()
         if state["original_phase"] == "refused" and not active:
             actions["cancel_saved_stage"] = dict(
                 label="Cancel saved import",

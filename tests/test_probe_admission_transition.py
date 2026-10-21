@@ -18,7 +18,12 @@ def test_probe_admission_transition_matches_complete_runtime_patch():
     for member in bundle["members"]:
         expected = member["after_sha256"]
         for successor in updater.reviewed_transitions():
-            if successor["id"] not in {"configuration_intent_replay_v1", "publication_detail_v1"}:
+            if successor["id"] not in {
+                "configuration_intent_replay_v1",
+                "publication_detail_v1",
+                "publication_readback_batches_v1",
+                "evidence_backup_collection_v1",
+            }:
                 continue
             for update in successor["members"]:
                 if update["path"] == member["path"]:

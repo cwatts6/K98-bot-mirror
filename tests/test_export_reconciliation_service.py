@@ -1129,7 +1129,8 @@ def test_contradictory_publication_readback_is_unresolved_never_absence_or_damag
 
 
 @pytest.mark.parametrize("changed", [False, True])
-def test_reader_confirmed_assessment_and_closed_replay(monkeypatch, changed):
+@pytest.mark.parametrize("batched", [False, True])
+def test_reader_confirmed_assessment_and_closed_replay(monkeypatch, changed, batched):
     from services.export_coordination_dal import bounded_json
     from services.export_reconciliation_service import (
         observe_closed_publication,
@@ -1137,6 +1138,7 @@ def test_reader_confirmed_assessment_and_closed_replay(monkeypatch, changed):
     )
 
     args, api, observations, _ = publication_observation_fixture(monkeypatch, reader=True)
+    args["batch_reader_reads"] = batched
     args["snapshot"]["job"]["State"] = "confirmed"
     if changed:
         sid = api.grids["fake-1"]["Pass 4 Players"]["sheetId"]

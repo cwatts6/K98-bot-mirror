@@ -114,10 +114,18 @@ def incident_embed(row):
             value="\n".join(f"{key.title()}: {value}" for key, value in evidence["copies"].items()),
             inline=False,
         )
+        if evidence.get("backup_candidate"):
+            embed.add_field(name="Staged backup", value=evidence["backup_candidate"], inline=False)
     if evidence.get("check_unavailable"):
         embed.add_field(
             name="Verification unavailable",
             value="The latest check failed. The evidence above is the last successful observation. Automatic checks will retry; repair choices are disabled until verification succeeds.",
+            inline=False,
+        )
+    for index, step in enumerate(evidence.get("required_evidence", []), 1):
+        embed.add_field(
+            name=f"Evidence collection — step {index}",
+            value=discord.utils.escape_markdown(step)[:1024],
             inline=False,
         )
     if row.get("pending_action"):

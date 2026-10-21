@@ -20,13 +20,18 @@ class EvidenceRecovery:
         binding = self.catalog.get(reference)
         copies = self.copies.inspect(reference, bytes.fromhex(binding["sha256"]))
         good = {key for key, value in copies.items() if value["state"] == "verified"}
+        backup = (
+            self.copies.inspect_backup(reference, bytes.fromhex(binding["sha256"]))
+            if not good
+            else None
+        )
         actions = {}
         replacement = None
         resolved = len(good) == 2
         if len(good) == 2:
             outcome = "verified"
             explanation = "Both protected evidence copies match the original saved hash. Normal recovery will verify the operation separately; restoring evidence does not establish write success."
-        elif good:
+        elif good or backup["state"] == "verified":
             outcome = "recoverable"
             explanation = "A protected evidence copy is missing or cannot be read, but another copy matches the original saved hash. The bot can restore the exact original bytes."
             action = "protect_evidence" if "primary" in good else "restore_evidence"
@@ -39,6 +44,12 @@ class EvidenceRecovery:
                 check="Confirm restoration of this saved evidence. The surviving copy has been decrypted and matched to the original SQL commitment. No provider result or admin assertion will be substituted.",
                 effect="Preserve any damaged encrypted file, restore the missing or damaged copy, and independently decrypt and hash both copies. Then retry normal admission and the original recovery checks. No import or provider write is replayed and no reservation is released by this action.",
             )
+            if not good:
+                explanation = "Both protected evidence copies are unavailable. A locally staged encrypted backup decrypts and matches the original SQL hash. Confirm restoration below; the original operation still needs its own verification."
+                actions[action].update(
+                    label="Restore verified backup",
+                    check="Confirm restoration from the staged backup that matches the original SQL hash. This restores evidence only; it does not certify the operation or release ownership.",
+                )
         else:
             outcome = "backup_required"
             explanation = "Neither protected evidence copy verifies. The original operation remains unresolved. Exact backup restoration or a separately verified superseding recovery is required; confirmation alone cannot recreate this receipt."
@@ -88,6 +99,15 @@ class EvidenceRecovery:
             evidence_kinds=binding["kinds"],
             copies={key: value["state"] for key, value in copies.items()},
         )
+        if backup is not None:
+            evidence["backup_candidate"] = backup["state"]
+            if backup["state"] != "verified" and replacement is None:
+                evidence["required_evidence"] = [
+                    "Download this recovery report and preserve the original SQL evidence binding and damaged files. Do not rerun the operation or release its reservations.",
+                    "On the bot machine, use the installed authority manifest's evidence_root folder. Obtain the original encrypted evidence file from a trusted backup made for the same Windows identity; do not send plaintext or credentials through Discord.",
+                    f"Copy that encrypted file into the protected evidence folder as {self.copies.backup_key(reference)}. Leave the primary and replica files untouched. Required decrypted SHA-256: {binding['sha256']}.",
+                    "Choose Recheck. Only a decryptable, hash-matching backup enables Restore verified backup, followed by separate confirmation. If no backup verifies, retain the incident for independently verified successor recovery; it is not resolved by an admin assertion.",
+                ]
         if replacement is not None:
             evidence.update(
                 evidence_recovery_job_id=replacement["job_id"],
@@ -108,7 +128,9 @@ class EvidenceRecovery:
                 ]
         return dict(
             evidence=evidence,
-            token=digest(dict(binding=binding, copies=copies, replacement=replacement)).hex(),
+            token=digest(
+                dict(binding=binding, copies=copies, replacement=replacement, backup=backup)
+            ).hex(),
             resolved=resolved,
         )
 

@@ -21,6 +21,20 @@ class EvidenceCopies:
         key = UUID(str(reference)).hex
         return key, "replica_" + key
 
+    @staticmethod
+    def backup_key(reference):
+        """One operator-staged ciphertext, never a caller-selected filesystem path."""
+        return "backup_" + UUID(str(reference)).hex
+
+    def inspect_backup(self, reference, expected_hash):
+        try:
+            encrypted = self._read(self.backup_key(reference), expected_hash)
+            return dict(state="verified", cipher_sha256=hashlib.sha256(encrypted).hexdigest())
+        except FileNotFoundError:
+            return dict(state="missing")
+        except Exception:
+            return dict(state="unavailable")
+
     def _read(self, key, expected_hash):
         with self.store._path(key).open("rb") as source:
             encrypted = source.read(self.store.max_bytes + 1)
@@ -77,7 +91,11 @@ class EvidenceCopies:
             None,
         )
         if source is None:
-            raise SourceConflict("No surviving copy verifies against the original evidence hash.")
+            source = self.backup_key(reference)
+            if self.inspect_backup(reference, expected_hash)["state"] != "verified":
+                raise SourceConflict(
+                    "No surviving copy or staged backup verifies against the original evidence hash."
+                )
         encrypted = self._read(source, expected_hash)
         for label, key in zip(("primary", "replica"), keys, strict=True):
             if copies[label]["state"] != "verified":

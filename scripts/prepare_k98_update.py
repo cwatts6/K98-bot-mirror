@@ -75,6 +75,13 @@ PUBLICATION_DETAIL_PATHS = frozenset(
         "services/export_request_budget.py",
     }
 )
+PUBLICATION_READBACK_BATCH_PATHS = frozenset(
+    {
+        "services/export_execution_dal.py",
+        "services/export_reconciliation_service.py",
+        "kvk/services/new_source_workbook_transport.py",
+    }
+)
 PUBLICATION_RESULT_PATHS = frozenset(
     {
         "services/export_reconciliation_service.py",
@@ -250,6 +257,19 @@ REPORT_CACHE_TRANSITION_PATHS = frozenset(
 )
 
 
+EVIDENCE_BACKUP_PATHS = frozenset(
+    {
+        "services/export_evidence_storage.py",
+        "services/export_evidence_recovery.py",
+        "services/recovery_evidence_guidance.py",
+        "services/producer_refusal_recovery.py",
+        "services/queue_admission_recovery.py",
+        "services/recovery_report.py",
+        "ui/views/recovery_view.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -262,7 +282,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 32:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 40:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -330,6 +350,13 @@ def reviewed_transitions():
             fixed_timing = (
                 item["id"] == "publication_timing_v1" and path in PUBLICATION_TIMING_PATHS
             )
+            fixed_readback_batch = (
+                item["id"] == "publication_readback_batches_v1"
+                and path in PUBLICATION_READBACK_BATCH_PATHS
+            )
+            fixed_evidence_backup = (
+                item["id"] == "evidence_backup_collection_v1" and path in EVIDENCE_BACKUP_PATHS
+            )
             fixed_startup_cache = (
                 item["id"] == "startup_cache_completion_v1"
                 and path in STARTUP_CACHE_COMPLETION_PATHS
@@ -364,6 +391,8 @@ def reviewed_transitions():
                     or fixed_publication_handoff
                     or fixed_rollover
                     or fixed_timing
+                    or fixed_readback_batch
+                    or fixed_evidence_backup
                     or fixed_startup_cache
                     or fixed_configuration_read
                     or fixed_configuration_intent_replay
@@ -380,6 +409,8 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if item["id"] == "evidence_backup_collection_v1" and paths != EVIDENCE_BACKUP_PATHS:
+            raise ValueError("Complete fixed evidence-backup transition required.")
         if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:
             raise ValueError("Complete fixed drained-issuer transition required.")
         if item["id"] == "guided_rollover_v1" and paths != ROLLOVER_GUIDED_PATHS:
@@ -388,6 +419,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed publication-timing transition required.")
         if item["id"] == "publication_detail_v1" and paths != PUBLICATION_DETAIL_PATHS:
             raise ValueError("Complete fixed publication-detail transition required.")
+        if (
+            item["id"] == "publication_readback_batches_v1"
+            and paths != PUBLICATION_READBACK_BATCH_PATHS
+        ):
+            raise ValueError("Complete fixed publication-readback batch transition required.")
         if item["id"] == "startup_cache_completion_v1" and paths != STARTUP_CACHE_COMPLETION_PATHS:
             raise ValueError("Complete fixed startup-cache completion transition required.")
         if (

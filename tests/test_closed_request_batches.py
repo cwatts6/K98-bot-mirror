@@ -23,8 +23,8 @@ def database(count=130, damage=None):
 
         def execute(sql, *args):
             assert args[0] == stream
-            if "SELECT TOP (64)" in sql:
-                selected = [r.copy() for r in requests if r["Sequence"] > args[1]][:64]
+            if "SELECT TOP (256)" in sql:
+                selected = [r.copy() for r in requests if r["Sequence"] > args[1]][:256]
                 if damage == "gap" and selected:
                     selected[0]["Sequence"] += 1
                 if damage == "foreign_stream" and selected:
@@ -48,7 +48,7 @@ def database(count=130, damage=None):
     return ExportExecutionDAL(connect), stream, requests, events, connections
 
 
-@pytest.mark.parametrize("count", [0, 1, 64, 65, 130, 1024])
+@pytest.mark.parametrize("count", [0, 1, 64, 65, 170, 256, 257, 1024])
 def test_batches_are_complete_bounded_and_release_sql_before_yield(count):
     dal, stream, requests, events, connections = database(count)
     result = []
@@ -59,7 +59,7 @@ def test_batches_are_complete_bounded_and_release_sql_before_yield(count):
         result.append(row)
     assert [r for _, r, _ in result] == requests
     assert [e for _, _, values in result for e in values] == events
-    pages = (count + 63) // 64
+    pages = (count + 255) // 256
     assert len(connections) == pages + 1
     assert sum(c.cursor().execute.call_count for c in connections) == 2 * pages + 1
 

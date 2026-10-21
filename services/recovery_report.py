@@ -60,6 +60,8 @@ def _next_step(row, evidence, actions, blocked):
         return "Open the linked recovery incident for its guided actions."
     if row.get("release_notice"):
         return "The required repair is not enabled in this release. The incident remains open; Recheck cannot unlock it."
+    if evidence.get("required_evidence"):
+        return "Follow the evidence-collection steps in this report. Recheck after collecting the required evidence; no release, replay or successful outcome is authorised by missing evidence."
     return "No repair is authorized by the saved evidence. The diagnosis and required repairs above identify the blocker."
 
 
@@ -113,6 +115,8 @@ def incident_report(service, row):
                     "evidence_reference",
                     "evidence_kinds",
                     "copies",
+                    "backup_candidate",
+                    "required_evidence",
                     "check_unavailable",
                     "check_diagnostic",
                     "blocking_job_ids",
