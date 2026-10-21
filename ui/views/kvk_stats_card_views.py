@@ -46,7 +46,7 @@ def _overall_rank_text(payload: KvkStatsCardPayload) -> str:
         return (
             f"#{source['rank']} / {source['population']} (usable frozen B0 cohort)"
             if source.get("available")
-            else "Unavailable"
+            else "Season-wide ranking unavailable"
         )
     if not payload.overall_kvk_rank:
         return "TBC"
