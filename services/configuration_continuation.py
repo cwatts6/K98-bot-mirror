@@ -180,6 +180,13 @@ class ConfigurationContinuation:
                             choice=choice,
                             configuration=state["current"],
                             reason="Dispatch not acknowledged; never replay automatically",
+                            # The matching snapshot binds this new approval to
+                            # SQL-only intent. Existing legacy markers stay untouched.
+                            **(
+                                {"export_disposition": state["continuation_export_disposition"]}
+                                if choice == "retry"
+                                else {}
+                            ),
                         ),
                     )
                     state = self.dal.snapshot(source_id)

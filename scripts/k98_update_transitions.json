@@ -857,7 +857,7 @@
         {
           "path": "services/configuration_continuation.py",
           "before_sha256": "2317c47166346574e87b7c70a5e59aafb5b929420220a75faf00a97cfd85ebee",
-          "after_sha256": "f096a8151f568db8fc704bbed76a521f9a95630bdb7c27bc7d2f5ef9ea8b301d"
+          "after_sha256": "138a1def32efd100025305dfd8692c485e8cc4950066a469678439f4eb407ba7"
         },
         {
           "path": "services/configuration_continuation_dal.py",

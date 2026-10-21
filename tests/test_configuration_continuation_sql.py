@@ -90,6 +90,52 @@ def test_no_dispatch_reply_creates_terminal_tombstone_and_allows_new_decision(re
         )
 
 
+@pytest.mark.parametrize("read_continuation", [False, True])
+def test_claimed_retry_reconstructs_no_export_intent_without_dispatch(recovery, read_continuation):
+    calls = []
+    if read_continuation:
+        from tests.test_configuration_read_continuation_sql import setup as read_setup
+
+        source, adapter, service = read_setup(recovery, lambda: calls.append(1))
+    else:
+        adapter, service = setup(recovery, lambda: calls.append(1))
+        source = recovery.source
+    row = service.review_source(ACTOR, adapter.kind, source)
+    action_id, _ = service.store.claim(
+        row["IncidentID"],
+        row["Revision"],
+        row["EvidenceHash"],
+        "retry_configuration",
+        "discord:1",
+        "Confirmed SQL-only refresh",
+    )
+    assert adapter.dal.snapshot(source)["marker"] is None
+    restarted = type(adapter)(adapter.dal, adapter.producer, lambda: calls.append(1))
+    service.adapters[adapter.kind] = restarted
+    for _ in range(2):
+        final = service.refresh(row["IncidentID"])
+        state = restarted.dal.snapshot(source)
+        child = state["child"]
+        request = json.loads(child["RequestJson"])["request"]["producer"]
+        assert state["marker"]["export_disposition"] == "configuration_only_v1"
+        assert request["export_disposition"] == "configuration_only_v1"
+        assert request["operation"] == action_id
+        assert request["parent"] == source
+        assert child["State"] == "unavailable"
+        assert not recovery.outcomes.inspect(child["PreparationID"])["resources"]
+        assert service.store.actions[0]["State"] == "not_applied"
+        assert "retry_configuration" in final["evidence"]["actions"]
+        assert calls == []
+    with pytest.raises(SourceConflict):
+        restarted.execute(
+            source,
+            "retry_configuration",
+            row["EvidenceHash"],
+            "recovery:" + action_id,
+            "Late callback",
+        )
+
+
 def test_claimed_keep_prior_survives_restart_without_creating_continuation(recovery):
     calls = []
     adapter, service = setup(recovery, lambda: calls.append(1))
