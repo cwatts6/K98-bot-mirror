@@ -250,3 +250,37 @@ def test_both_mobile_cards_suppress_unlabelled_source_rank():
         assert actual is not None and baseline is not None
         assert actual.image_bytes.getvalue() == baseline.image_bytes.getvalue()
         assert Image.open(actual.image_bytes).size == (1180, 640)
+
+
+@pytest.mark.parametrize("reason", ["serving_disabled", "overall_missing", "configuration_pending"])
+def test_unavailable_context_is_explained_only_in_ranking_area(monkeypatch, reason):
+    from kvk.rendering import kvk_stats_card_renderer as renderer
+    from ui.views.kvk_stats_card_views import build_more_stats_embed
+
+    payload = replace(
+        _payload(),
+        source_context={"available": False, "reason": reason, "rank": 1, "population": 99},
+    )
+    drawn = []
+    draw_text = renderer._draw_text
+
+    def capture(draw, xy, text, **kwargs):
+        drawn.append(text)
+        return draw_text(draw, xy, text, **kwargs)
+
+    monkeypatch.setattr(renderer, "_draw_text", capture)
+    main = render_kvk_stats_card(payload)
+    assert Image.open(main.image_bytes).size == (1180, 640)
+    assert not any("unavailable" in text.lower() for text in drawn)
+    assert _main_rank_value(payload) == "#23"
+    drawn.clear()
+    more = render_kvk_more_stats_card(payload)
+    assert Image.open(more.image_bytes).size == (1180, 640)
+    assert "Season-wide ranking unavailable" in drawn
+    assert _overall_kvk_rank_value(payload) == "N/A"
+    embed = build_more_stats_embed(payload)
+    fields = {field.name: field.value for field in embed.fields}
+    assert fields["KVK Overall Rank"] == "Season-wide ranking unavailable"
+    assert "Source context" not in fields
+    assert payload.source_context["reason"] == reason
+    assert reason.replace("_", " ") not in " ".join(drawn)

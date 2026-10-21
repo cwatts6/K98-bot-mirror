@@ -183,10 +183,8 @@ async def test_missing_overall_does_not_inspect_display_fight_or_mask_routing(
         "SourceCompleteSelection" in sql or "SourcePlayerResult" in sql
         for _, sql, _ in card_store.events
     )
-    if case == "missing":
-        assert card_context_label(payload) == (
-            "Overall context unavailable: no season-wide overall period is configured"
-        )
+    assert card_context_label(payload) == ""
+    assert payload.source_read["reason"] == reason
 
 
 @pytest.mark.asyncio

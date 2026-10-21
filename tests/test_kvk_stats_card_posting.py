@@ -35,7 +35,8 @@ async def test_post_kvk_stats_output_fallback_contains_independent_values(monkey
     embed = channel.sent[0]["embeds"][0]
     assert "200" in embed.fields[0].value
     assert "123" in next(f.value for f in embed.fields if "KILLS" in f.name)
-    assert "suppressed" in next(f.value for f in embed.fields if f.name == "Source context")
+    assert all(f.value and f.name != "Source context" for f in embed.fields)
+    assert embed.footer.text == "Season-wide ranking unavailable."
 
 
 async def test_build_card_passes_discord_avatar_bytes_to_renderer(monkeypatch):
@@ -199,10 +200,10 @@ async def test_fallback_preserves_history_and_tiers_without_source_context(
         "34.6k",
         "MM Healed:",
         "45.7k",
-        "suppressed",
+        "Season-wide ranking unavailable.",
     ]:
         assert expected in serialized
-    for forbidden in ["FORBIDDEN", "987654", "attachment://", "thumbnail", "source_read"]:
+    for forbidden in ["FORBIDDEN", "987654", "attachment://", "thumbnail", "source_read", "suppressed"]:
         assert forbidden not in serialized
     assert payload.camp_name == "FORBIDDEN CAMP"  # Suppression never mutates the saved input.
 

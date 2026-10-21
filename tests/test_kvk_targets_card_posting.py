@@ -128,6 +128,10 @@ async def test_post_targets_component_edits_selector_message(monkeypatch):
     assert message.edits
     assert message.edits[0]["view"] is None
     assert message.edits[0]["embed"].title == "KVK Targets - Gov"
+    assert all(
+        field.value and field.name != "Source context"
+        for field in message.edits[0]["embed"].fields
+    )
 
 
 async def test_post_targets_component_sends_followup_when_edit_fails(monkeypatch):
@@ -225,6 +229,10 @@ async def test_channel_output_falls_back_to_canonical_embed(monkeypatch):
     await posting.post_kvk_targets_channel_output(interaction, "1")
 
     assert channel.sent[0]["embed"].title == "KVK Targets - Gov"
+    assert all(
+        field.value and field.name != "Source context"
+        for field in channel.sent[0]["embed"].fields
+    )
     assert interaction.followup.sent == []
     assert acknowledgement_edits == [
         {"content": "Targets posted in this channel.", "embed": None, "view": None}

@@ -182,4 +182,4 @@ def test_stale_source_rank_population_never_render_as_current():
         },
     )
     assert _overall_kvk_rank_value(payload) == "N/A"
-    assert _overall_kvk_rank_context(payload) == "Context unavailable"
+    assert _overall_kvk_rank_context(payload) == "Season-wide ranking unavailable"

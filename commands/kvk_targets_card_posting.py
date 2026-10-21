@@ -156,7 +156,8 @@ async def post_kvk_targets_output(
 
     payload = suppress_card_context(payload)
     embed = build_targets_fallback_embed(payload)
-    embed.add_field(name="Source context", value=card_context_label(payload), inline=False)
+    if label := card_context_label(payload):
+        embed.add_field(name="Source context", value=label, inline=False)
     await _send_or_edit(
         interaction,
         embed=embed,
@@ -188,7 +189,8 @@ async def post_kvk_targets_channel_output(
 
     payload = suppress_card_context(payload)
     embed = build_targets_fallback_embed(payload)
-    embed.add_field(name="Source context", value=card_context_label(payload), inline=False)
+    if label := card_context_label(payload):
+        embed.add_field(name="Source context", value=label, inline=False)
     if channel is not None:
         try:
             await channel.send(embed=embed)
