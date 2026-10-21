@@ -134,7 +134,7 @@ def report_retry_intent(action_id, parent):
 @contextmanager
 def configuration_retry_intent(action_id, parent, *, export_disposition=None):
     """Use the saved approval; omission remains unknown for legacy continuations."""
-    if export_disposition not in (None, "configuration_only_v1"):
+    if export_disposition not in (None, "configuration_only_v1", "pipeline_export_v1"):
         raise SourceConflict("Configuration continuation requires its approved export intent.")
     if _intent.get() is not None:
         raise SourceConflict("Configuration continuation requires its own producer context.")

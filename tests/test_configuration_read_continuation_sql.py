@@ -98,7 +98,9 @@ def test_queue_and_read_follow_one_guided_decision_and_verify_after_restart(
         assert row["evidence"]["recovery_links"][0]["kind"] == continuation.kind
         assert row["evidence"]["recovery_links"][0]["source_id"] == source
     decision = service.review_source(ACTOR, continuation.kind, source)
-    assert set(decision["evidence"]["actions"]) == {"keep_prior", "retry_configuration"}
+    assert set(decision["evidence"]["actions"]) == {"keep_prior", "retry_configuration"} | (
+        {"continue_configuration_export"} if disposition == "pipeline_export_v1" else set()
+    )
     assert decision["evidence"]["failure_context"]["original_export_intent"] == (
         disposition or "not_recorded"
     )

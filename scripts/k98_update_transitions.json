@@ -970,6 +970,41 @@
           "after_sha256": "976174ab0254b8a8d3938f7e05330e82e7975ee86f40ad5329c250891c0f5b14"
         }
       ]
+    },
+    {
+      "id": "configuration_pipeline_continuation_v1",
+      "members": [
+        {
+          "path": "services/configuration_continuation.py",
+          "before_sha256": "138a1def32efd100025305dfd8692c485e8cc4950066a469678439f4eb407ba7",
+          "after_sha256": "8dd8f0a3f297ac94659eb72dc7228a724fc4866106fc3c0e95a586800d050307"
+        },
+        {
+          "path": "services/configuration_continuation_dal.py",
+          "before_sha256": "f6d9efd2ac738be0aa6b6c1c2314119203d011782cc8eafaa0bfcbe6aafdf3f9",
+          "after_sha256": "8366c06b16ceb0985fcba4c5ab77a58b6d0b24986f980aee25d015fe1d51de26"
+        },
+        {
+          "path": "services/configuration_read_continuation_dal.py",
+          "before_sha256": "bbb48790bee927d60164fe01071871064dc367454d597856823359bcba8fe2ac",
+          "after_sha256": "2e9e38a662dad05cbfa8d980afe1646c8168259c3a42302c569a84e3ae9dc3b5"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "013fc7bfe389a78efea5fb6f981d2ec4571b75db6ebcb6f97a8277696cde24e9",
+          "after_sha256": "0b7a78046b0d2a96d82735f98f07c939f08ae4e8f0dc1a4c38991575b5a7a306"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "1c7f1720813175ceddec2c827981ffe0dcbd4a8791de481b71b78ac959480a03",
+          "after_sha256": "23376329c7f7e2b763f3abc7c1fec4abb4b60f055193cce61c7df7f54969d1e3"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "71c61b7cf0a81f41e302b43d01ac11c83c9c92175fb51ffd4895bf8c8a8f592c",
+          "after_sha256": "b0cf3defcdf2b2389450b269890e888bb635df0ac602d322912ad9e34af9085e"
+        }
+      ]
     }
   ]
 }

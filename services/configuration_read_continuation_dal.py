@@ -83,7 +83,8 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
                 or (
                     "export_disposition" in marker
                     and (
-                        marker["export_disposition"] != "configuration_only_v1"
+                        marker["export_disposition"]
+                        not in ("configuration_only_v1", "pipeline_export_v1")
                         or marker["choice"] != "retry"
                     )
                 )
@@ -105,6 +106,7 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
     def review_context(self, root):
         association = json.loads(root["RequestJson"])["request"]["configuration_import"]
         return dict(
+            original_export_disposition=association["producer"].get("export_disposition"),
             review_root=dict(
                 RequestJson=json.dumps({"request": {"config": association["outputs"]}})
             ),

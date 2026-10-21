@@ -1,10 +1,13 @@
 """Guided fresh configuration retry after verified rollback, with durable handoff."""
 
+from contextlib import nullcontext
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
 from services.producer_recovery_intent import configuration_retry_intent
+
+PIPELINE_ACTION = "continue_configuration_export"
 
 
 class ConfigurationContinuation:
@@ -76,8 +79,18 @@ class ConfigurationContinuation:
                     effect="Record and verify your decision against the closed original attempt. No configuration write or unrelated reservation release occurs.",
                 ),
             )
+            if state.get("original_export_disposition") == "pipeline_export_v1":
+                actions[PIPELINE_ACTION] = dict(
+                    label="Continue config for export",
+                    review_details=True,
+                    review_title="Review unfinished configuration and export",
+                    review_description="Review current configuration sources and output destinations. This continues the unfinished configuration stage; scan import, maintenance and cache completion are not inferred.",
+                    check="The original request records pipeline export intent. Confirm a fresh read and atomic configuration publication using these reviewed sources and destinations. The scan import will not run. Capture and export admission will be verified through the linked result.",
+                    effect="Save this exact export intent before dispatch, publish configuration once, then retain its output for the existing capture and export decisions. A lost reply is reconciled from receipts; it cannot trigger a second configuration write. Spreadsheet delivery remains separately verified.",
+                )
             if state["blocker"]:
                 actions.pop("retry_configuration")
+                actions.pop(PIPELINE_ACTION, None)
                 evidence.update(
                     outcome="waiting_for_access",
                     explanation="The closed configuration attempt is safe to retain. Fresh publication is waiting for another operation. Review the blocking operation, then Recheck to restore the retry choice after verified settlement.",
@@ -146,15 +159,18 @@ class ConfigurationContinuation:
                 choice="keep_prior" if action == "keep_prior" else "retry",
                 configuration=state["current"],
             )
-            if action == "retry_configuration":
-                marker["export_disposition"] = "configuration_only_v1"
+            if action != "keep_prior":
+                marker["export_disposition"] = (
+                    "pipeline_export_v1" if action == PIPELINE_ACTION else "configuration_only_v1"
+                )
             self.dal.record(source_id, token, marker)
             if action == "keep_prior":
                 return
-            from services.legacy_export_snapshot_service import use_runtime
+            from services.legacy_export_snapshot_service import producer_capture_scope, use_runtime
 
             with (
                 use_runtime(self.dal.runtime),
+                producer_capture_scope() if action == PIPELINE_ACTION else nullcontext(),
                 configuration_retry_intent(
                     action_id, source_id, export_disposition=marker["export_disposition"]
                 ),
@@ -162,15 +178,25 @@ class ConfigurationContinuation:
                 self.runner()
 
     def reconcile(self, source_id, action):
-        if action["ActionKind"] not in {"retry_configuration", "keep_prior"}:
+        if action["ActionKind"] not in {"retry_configuration", PIPELINE_ACTION, "keep_prior"}:
             raise SourceConflict("Unsupported configuration continuation action.")
         choice = "keep_prior" if action["ActionKind"] == "keep_prior" else "retry"
+        disposition = (
+            "pipeline_export_v1"
+            if action["ActionKind"] == PIPELINE_ACTION
+            else "configuration_only_v1"
+        )
         with self.dal.serialized(source_id):
             state = self.dal.snapshot(source_id)
             marker = state["marker"]
             if not marker or marker.get("action") != identity(action["ActionID"]):
                 # Fence a callback that has not yet recorded its dispatch marker.
                 if digest(state).hex() == action["EvidenceHash"]:
+                    if (
+                        action["ActionKind"] == PIPELINE_ACTION
+                        and state.get("original_export_disposition") != "pipeline_export_v1"
+                    ):
+                        raise SourceConflict("Original pipeline export intent is not verified.")
                     self.dal.record(
                         source_id,
                         action["EvidenceHash"],
@@ -180,13 +206,9 @@ class ConfigurationContinuation:
                             choice=choice,
                             configuration=state["current"],
                             reason="Dispatch not acknowledged; never replay automatically",
-                            # The matching snapshot binds this new approval to
-                            # SQL-only intent. Existing legacy markers stay untouched.
-                            **(
-                                {"export_disposition": state["continuation_export_disposition"]}
-                                if choice == "retry"
-                                else {}
-                            ),
+                            # The matching snapshot binds this action's exact intent.
+                            # Existing legacy markers stay untouched.
+                            **({"export_disposition": disposition} if choice == "retry" else {}),
                         ),
                     )
                     state = self.dal.snapshot(source_id)
@@ -198,6 +220,16 @@ class ConfigurationContinuation:
             if marker.get("choice") != choice:
                 raise SourceConflict(
                     "Saved configuration choice differs from the confirmed action."
+                )
+            if choice == "retry" and (
+                (
+                    action["ActionKind"] == PIPELINE_ACTION
+                    and marker.get("export_disposition") != disposition
+                )
+                or ("export_disposition" in marker and marker["export_disposition"] != disposition)
+            ):
+                raise SourceConflict(
+                    "Saved configuration export intent differs from the confirmed action."
                 )
             if choice == "keep_prior":
                 return "verified"

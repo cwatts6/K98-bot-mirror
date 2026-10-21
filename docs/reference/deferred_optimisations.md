@@ -14,6 +14,15 @@ Natural Pre-KVK/off-season and Phase 2F public-save observations remain independ
 inventory upload privacy finding belongs in security triage, not this optimisation register.
 
 ### Deferred Optimisation
+- Area: `services/export_reconciliation_service.py` publication history/readback and `services/export_request_budget.py`
+- Type: performance
+- Description: The confirmed 21 October KVK16 check took 715 seconds / 132 requests, down from 816.7 seconds / 170 requests. Existing timings attribute 130.032 seconds to retained history and 148.735 seconds to sealed history. Provider readback took 403.546 seconds including 258.027 seconds of budget waiting; sealed replay took 29.562 seconds. Detail intervals overlap. Batching improved the observed check, but substantial history and quota-wait time remains; the precise remaining history cost is not yet attributed.
+- Suggested Fix: Use the saved timing evidence to scope history replay/SQL round-trip profiling and quota scheduling separately. Preserve complete sealed request membership, exact response replay, shared-account budgets and independent final verification. Benchmark changes with deterministic retained histories first; request a new provider measurement only for a materially changed candidate, not to repeat the already confirmed check.
+- Impact: medium
+- Risk: high
+- Dependencies: Separate bounded performance work after P0 recovery correctness. Do not weaken budgets or evidence verification, and do not move unfinished P0 acceptance into this item.
+
+### Deferred Optimisation
 - Area: standalone/embedded KS claims and production Pre-KVK edit fallback
 - Type: consistency
 - Description: KS pre-send ping claims can remain consumed after send failure; production Pre-KVK may replace after an ambiguous edit. Phase 2K records these outcomes but preserves both policies.

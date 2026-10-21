@@ -102,7 +102,7 @@ async def test_configuration_only_retry_cannot_be_collected_as_pipeline_export()
     assert current_intent() is None
 
 
-@pytest.mark.parametrize("value", [None, True, {}, "pipeline_export_v1", "cache_only_v1"])
+@pytest.mark.parametrize("value", [None, True, {}, "cache_only_v1"])
 def test_saved_continuation_rejects_invalid_explicit_export_disposition(value):
     from services.configuration_continuation_dal import ConfigurationContinuationDAL
 

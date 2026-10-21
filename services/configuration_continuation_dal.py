@@ -40,13 +40,21 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
         return root
 
     def review_context(self, root):
-        return {}
+        producer = self.outcomes.request(root)["request"]["producer"]
+        return dict(original_export_disposition=producer.get("export_disposition"))
 
     def snapshot(self, source_id):
         from services.replacement_admission_dal import admission_blocker
 
         root = self.original(source_id)
         marker = json.loads(root["GenerationJson"] or "{}").get(self.marker_key)
+        context = self.review_context(root)
+        if (
+            marker
+            and marker.get("export_disposition") == "pipeline_export_v1"
+            and context.get("original_export_disposition") != "pipeline_export_v1"
+        ):
+            raise SourceConflict("Saved pipeline continuation has no original export intent.")
         child = None
         if marker and marker.get("action"):
             operation = identity(marker["action"])
@@ -84,7 +92,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
                 # Bind newly reviewed actions to the no-export contract. A pending
                 # pre-upgrade approval without a marker cannot dispatch under it.
                 continuation_export_disposition="configuration_only_v1",
-                **self.review_context(root),
+                **context,
             )
         )
 
@@ -93,7 +101,8 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
         operation = identity(marker["action"])
         disposition = marker.get("export_disposition")
         if "export_disposition" in marker and (
-            disposition != "configuration_only_v1" or marker.get("choice") != "retry"
+            disposition not in ("configuration_only_v1", "pipeline_export_v1")
+            or marker.get("choice") != "retry"
         ):
             raise SourceConflict("Invalid saved configuration export intent.")
         return dict(

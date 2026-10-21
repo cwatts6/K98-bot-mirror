@@ -27,6 +27,7 @@ def test_configuration_read_transition_pins_current_sources():
                 "publication_detail_v1",
                 "publication_readback_batches_v1",
                 "evidence_backup_collection_v1",
+                "configuration_pipeline_continuation_v1",
             }:
                 continue
             for update in successor["members"]:

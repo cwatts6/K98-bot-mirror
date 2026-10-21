@@ -22,7 +22,11 @@ def test_complete_runtime_is_pinned_to_actual_sources():
     for member in item["members"]:
         expected = member["after_sha256"]
         for successor in updater.reviewed_transitions():
-            if successor["id"] not in {"publication_detail_v1", "publication_readback_batches_v1"}:
+            if successor["id"] not in {
+                "publication_detail_v1",
+                "publication_readback_batches_v1",
+                "configuration_pipeline_continuation_v1",
+            }:
                 continue
             for update in successor["members"]:
                 if update["path"] == member["path"]:

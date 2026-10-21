@@ -71,8 +71,12 @@ P0A_ACTIONS = MappingProxyType(
                 "complete_configuration_only",
             }
         ),
-        "configuration_continuation": frozenset({"retry_configuration", "keep_prior"}),
-        "configuration_read_continuation": frozenset({"retry_configuration", "keep_prior"}),
+        "configuration_continuation": frozenset(
+            {"retry_configuration", "continue_configuration_export", "keep_prior"}
+        ),
+        "configuration_read_continuation": frozenset(
+            {"retry_configuration", "continue_configuration_export", "keep_prior"}
+        ),
         "player_report_continuation": frozenset({"refresh_report", "refresh_cache", "keep_prior"}),
         # A resumed admission hands off here. Only proven rollback or completed
         # SQL output is included; accepting incomplete reports is not completion.

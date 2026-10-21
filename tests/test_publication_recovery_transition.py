@@ -28,6 +28,7 @@ def test_publication_recovery_transition_pins_every_runtime_member():
                     "publication_detail_v1",
                     "publication_readback_batches_v1",
                     "evidence_backup_collection_v1",
+                    "configuration_pipeline_continuation_v1",
                     "guided_publication_recovery_v1",
                     "publication_progress_v1",
                     "probe_busy_recovery_v1",

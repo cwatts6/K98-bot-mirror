@@ -28,6 +28,7 @@ def test_publication_timing_pins_complete_runtime(transition):
                 "publication_detail_v1",
                 "publication_readback_batches_v1",
                 "evidence_backup_collection_v1",
+                "configuration_pipeline_continuation_v1",
             }:
                 continue
             for update in successor["members"]:

@@ -510,14 +510,21 @@ def producer_captures_requested():
     return _captures.get() is not None
 
 
+@contextmanager
+def producer_capture_scope():
+    """Collect this invocation's captures; durable preparations remain authoritative."""
+    token = _captures.set([])
+    try:
+        yield
+    finally:
+        _captures.reset(token)
+
+
 def collect_producer_captures(function):
     @wraps(function)
     async def run(*args, **kwargs):
-        token = _captures.set([])
-        try:
+        with producer_capture_scope():
             return await function(*args, **kwargs)
-        finally:
-            _captures.reset(token)
 
     return run
 

@@ -69,7 +69,15 @@ not a production latency result. Do not inject production corruption or loss.
 
 ## Remaining P0 scope
 
-F01 still needs production timing acceptance and remaining absence, damage,
+21 October follow-up: private #673 is merged/deployed at `6c8f7bad`; the operator
+confirmed the comparable KVK16 check at **715 seconds / 132 requests** versus
+**816.7 seconds / 170 requests**. Retain this result; do not repeat the check.
+Startup cache completion is verified at 415 rows with 29 September provenance.
+The [unfinished-pipeline pack](P0%20Unfinished%20Pipeline%20Continuation.md) records
+the durable-stage review and next implementation. Larger timing work is deferred;
+the other obligations below remain required.
+
+F01 retains remaining absence, damage,
 replacement and repeated-repair-failure qualification. F02 still needs independently
 qualified successor handling when no exact backup survives and ownership/conflict
 resolution beyond evidence collection. F03 retains historical partial configuration,

@@ -39,6 +39,15 @@ verification after deployment. This does not close any remaining P0 workstream.
 
 ## Completion workstreams
 
+21 October continuation checkpoint: private #673 is merged/deployed at `6c8f7bad`
+and mirror main is `8b986c3c`. The latest KVK16 publication check is confirmed at
+715 seconds / 132 requests, compared with 816.7 seconds / 170 requests; do not
+repeat it. Startup cache completion is verified at 415 rows, source 29 September.
+These supersede the older timing/cache observations below. The
+[unfinished-pipeline continuation pack](P0%20Unfinished%20Pipeline%20Continuation.md)
+owns the current stage-receipt review. All other F01-F05 obligations remain open;
+tracked-view restoration remains unconfirmed in the full P1 programme.
+
 20 October, 19:46 UTC production evidence: the complete report includes all 17,521
 recorded incidents, all resolved, and healthy monitoring. The saved KVK16 publication
 check is confirmed at 19:42 UTC after 810.3 seconds; the deployed display now separates

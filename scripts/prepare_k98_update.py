@@ -67,6 +67,16 @@ CONFIGURATION_INTENT_REPLAY_PATHS = frozenset(
 PUBLICATION_TIMING_PATHS = frozenset(
     {"scripts/run_export_authority.py", "services/export_reconciliation_service.py"}
 )
+CONFIGURATION_PIPELINE_CONTINUATION_PATHS = frozenset(
+    {
+        "services/configuration_continuation.py",
+        "services/configuration_continuation_dal.py",
+        "services/configuration_read_continuation_dal.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/producer_recovery_intent.py",
+        "services/recovery_release_policy.py",
+    }
+)
 PUBLICATION_DETAIL_PATHS = frozenset(
     {
         "services/export_publication_metrics.py",
@@ -369,6 +379,10 @@ def reviewed_transitions():
                 item["id"] == "configuration_intent_replay_v1"
                 and path in CONFIGURATION_INTENT_REPLAY_PATHS
             )
+            fixed_configuration_pipeline = (
+                item["id"] == "configuration_pipeline_continuation_v1"
+                and path in CONFIGURATION_PIPELINE_CONTINUATION_PATHS
+            )
             fixed_rollover_timing = item["id"] == "guided_rollover_timing_v1" and path in (
                 ROLLOVER_GUIDED_PATHS | PUBLICATION_TIMING_PATHS
             )
@@ -396,6 +410,7 @@ def reviewed_transitions():
                     or fixed_startup_cache
                     or fixed_configuration_read
                     or fixed_configuration_intent_replay
+                    or fixed_configuration_pipeline
                     or fixed_rollover_timing
                 )
                 or not path.endswith(".py")
@@ -436,6 +451,11 @@ def reviewed_transitions():
             and paths != CONFIGURATION_INTENT_REPLAY_PATHS
         ):
             raise ValueError("Complete fixed configuration-intent/replay transition required.")
+        if (
+            item["id"] == "configuration_pipeline_continuation_v1"
+            and paths != CONFIGURATION_PIPELINE_CONTINUATION_PATHS
+        ):
+            raise ValueError("Complete fixed configuration pipeline continuation required.")
         if item["id"] == "guided_rollover_timing_v1" and paths != (
             ROLLOVER_GUIDED_PATHS | PUBLICATION_TIMING_PATHS
         ):
