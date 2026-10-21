@@ -73,12 +73,13 @@ def validate_snapshot(
         # LegacyPreparationDAL hashes and stores the whole envelope. Check its
         # identity before inspecting the inner request; never discard extra
         # fields that could describe another operation or publication intent.
-        if isinstance(request, dict) and set(request) == {
+        wrapped = isinstance(request, dict) and set(request) == {
             "consumer",
             "kvk_no",
             "request",
             "storage_owner",
-        }:
+        }
+        if wrapped:
             if (
                 request["consumer"] != "config"
                 or request["kvk_no"] is not None
@@ -89,14 +90,23 @@ def validate_snapshot(
         if (
             not containment
             or not isinstance(request, dict)
-            or set(request) != {"read_configuration"}
             or snapshot["request_count"] != 0
             or snapshot["event_count"] != 0
         ):
             raise SourceConflict(
                 "An unstarted read needs its exact request and empty execution ledger."
             )
-        uuid_text(request["read_configuration"])
+        if set(request) == {"read_configuration"}:
+            uuid_text(request["read_configuration"])
+        elif wrapped:
+            from services.configuration_producer_recovery import ConfigurationProducerDAL
+
+            # The producer saves publication intent before opening its read.
+            # Validate that exact contract; it never substitutes for the empty
+            # ledger, resource ownership or transaction-time fence checks.
+            ConfigurationProducerDAL.validate_read_request(request)
+        else:
+            raise SourceConflict("Exact wrapped configuration import read required.")
     for s in streams:
         scope = json.loads(s["ScopeJson"])
         if set(scope) not in ({"resources"}, {"resources", "host_birth"}):

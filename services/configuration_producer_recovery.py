@@ -14,6 +14,38 @@ class ConfigurationProducerDAL(PlayerReportRecoveryDAL):
     export_dispositions = frozenset({"configuration_only_v1", "pipeline_export_v1"})
 
     @classmethod
+    def validate_read_request(cls, request):
+        """Validate saved root publication intent, without executing or replaying it."""
+        from kvk.dal.new_source_import_dal import SourceConflict
+        from services.export_coordination_dal import identity
+
+        if not isinstance(request, dict) or set(request) != {
+            "read_configuration",
+            "configuration_import",
+        }:
+            raise SourceConflict("Exact configuration import read request required.")
+        association = request["configuration_import"]
+        if (
+            not isinstance(association, dict)
+            or set(association) != {"producer", "sources", "outputs", "invocation_mode"}
+            or association["invocation_mode"] != "publish"
+            or not all(isinstance(association[k], dict) for k in ("sources", "outputs"))
+        ):
+            raise SourceConflict("Exact configuration import read association required.")
+        producer = association["producer"]
+        if (
+            not isinstance(producer, dict)
+            or "parent" in producer
+            or set(producer) != cls.producer_fields(producer)
+            or producer.get("kind") != cls.producer_kind
+            or type(producer.get("atomic_checkpoint")) is not int
+            or producer["atomic_checkpoint"] != 1
+        ):
+            raise SourceConflict("Exact root configuration import producer required.")
+        identity(request["read_configuration"])
+        identity(producer["operation"])
+
+    @classmethod
     def producer_fields(cls, producer):
         from services.export_coordination_dal import identity
 

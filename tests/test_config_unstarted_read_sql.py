@@ -11,6 +11,7 @@ from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services import config_preparation_recovery_dal as recovery_dal
 from services.config_read_containment import verify_preparation_receipt
 from tests import test_config_read_containment_sql as fixture_module
+from tests.test_config_unstarted_read import publication_association
 
 containment = fixture_module.containment
 containment_schema = fixture_module.containment_schema
@@ -21,10 +22,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def empty_preparation(containment):
+def empty_preparation(containment, publication=True):
     repair, sql = containment
     original = repair.execution.read_stream(repair.target.stream_ids[0])
     request = {"read_configuration": str(uuid4())}
+    if publication:
+        request["configuration_import"] = publication_association()
     request = dict(
         consumer="config", kvk_no=None, request=request, storage_owner=repair.storage_owner
     )
@@ -39,10 +42,13 @@ def empty_preparation(containment):
     return repair, sql, original
 
 
-def test_real_empty_claim_cancellation_fences_late_open_and_releases_admission(containment):
+@pytest.mark.parametrize("publication", [False, True])
+def test_real_empty_claim_cancellation_fences_late_open_and_releases_admission(
+    containment, publication
+):
     import pyodbc
 
-    repair, sql, original = empty_preparation(containment)
+    repair, sql, original = empty_preparation(containment, publication)
     assert repair.dal.pending_recovery(
         account=repair.target.account, storage_owner=repair.storage_owner
     ) == [repair.target.preparation_id]

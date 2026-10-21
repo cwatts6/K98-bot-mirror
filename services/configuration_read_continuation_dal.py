@@ -53,8 +53,7 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             execution = one(cursor)["n"]
         document = json.loads(root["RequestJson"])
         inner = document.get("request", {})
-        association = inner.get("configuration_import", {})
-        producer = association.get("producer", {})
+        ConfigurationProducerDAL.validate_read_request(inner)
         generation = json.loads(root["GenerationJson"] or "{}")
         if (
             bytes(root["RequestHash"]) != digest(document)
@@ -62,16 +61,6 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             or document.get("storage_owner") != self.storage_owner
             or document.get("kvk_no") is not None
             or root["KVK_NO"] is not None
-            or set(inner) != {"read_configuration", "configuration_import"}
-            or set(association) != {"producer", "sources", "outputs", "invocation_mode"}
-            or association.get("invocation_mode") != "publish"
-            or not isinstance(producer, dict)
-            or "parent" in producer
-            or set(producer) != ConfigurationProducerDAL.producer_fields(producer)
-            or producer.get("kind") != "configuration_import"
-            or type(producer.get("atomic_checkpoint")) is not int
-            or producer["atomic_checkpoint"] != 1
-            or not all(isinstance(association[k], dict) for k in ("sources", "outputs"))
             or not isinstance(generation, dict)
             or set(generation) - {"configuration_continuation"}
             or root["State"] != "unavailable"
@@ -85,8 +74,6 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             raise SourceConflict(
                 "Exact withdrawn, never-admitted configuration import read required."
             )
-        identity(inner["read_configuration"])
-        identity(producer["operation"])
         if generation:
             marker = generation["configuration_continuation"]
             if (

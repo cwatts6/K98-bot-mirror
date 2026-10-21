@@ -6,12 +6,19 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 
-function Assert-TimingPath([string]$Path) {
+function Assert-TimingPath([string]$Path,[string]$EvidenceSid='') {
+ if($EvidenceSid) {
+  $root='C:\ProgramData\K98\S11\evidence'
+  $allowed=@($root,($root+'\publication-timing.log'),($root+'\publication-timing.log.1'),($root+'\publication-timing.log.2'))
+  if($Path -cnotin $allowed -or $EvidenceSid -cne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value){throw 'Evidence identity or path differs'}
+ }
  if(-not [IO.Path]::IsPathRooted($Path)){throw 'Absolute installed path required'}
  $item=Get-Item -LiteralPath $Path -Force
  $strict=if($item.PSIsContainer){0}else{1};$depth=0
- $trusted=@('S-1-5-18','S-1-5-32-544','S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+ $baseTrusted=@('S-1-5-18','S-1-5-32-544','S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
  while($null -ne $item) {
+  $trusted=$baseTrusted
+  if($EvidenceSid -and $depth -le $strict){$trusted+=@($EvidenceSid)}
   if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Reparse path refused'}
   $acl=Get-Acl -LiteralPath $item.FullName
   if($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $trusted){throw 'Protected owner differs'}
@@ -21,7 +28,7 @@ function Assert-TimingPath([string]$Path) {
       ($ace.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0 -and
       $ace.IdentityReference.Value -notin $trusted -and ([long]$ace.FileSystemRights -band $mask) -ne 0){throw 'Untrusted write access'}
   }
-  $item=if($item.PSIsContainer){$item.Parent}else{$item.Directory};$depth++
+  $item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory};$depth++
  }
 }
 
@@ -30,8 +37,8 @@ function Timing-Hash([byte[]]$Bytes) {
  try{([BitConverter]::ToString($hash.ComputeHash($Bytes))).Replace('-','').ToLowerInvariant()}finally{$hash.Dispose()}
 }
 
-function Read-TimingBytes([string]$Path,[string]$Expected='', [int]$Limit=1MB) {
- Assert-TimingPath $Path
+function Read-TimingBytes([string]$Path,[string]$Expected='', [int]$Limit=1MB,[string]$EvidenceSid='') {
+ Assert-TimingPath $Path $EvidenceSid
  $item=Get-Item -LiteralPath $Path -Force
  if($item.PSIsContainer -or $item.Length -gt $Limit){throw 'Bounded file required'}
  # The authority keeps this file open. Shared read/write/delete also tolerates
@@ -96,12 +103,13 @@ function Get-SavedPublicationTiming {
  if($journal.policy_sha256 -cne $policyHash){throw 'Publication policy differs'}
  $plan=Read-TimingJson (Join-Path $live 'ManualProcessPairPlan-CANDIDATE.json') $journal.publication.plan_sha256
  $authority=Read-TimingJson $plan.manifests.authority $journal.publication.manifests.authority
- Assert-TimingPath $authority.evidence_root
+ if($authority.authority_sid -cne $identity.User.Value -or $authority.bot_sid -cne $identity.User.Value -or $authority.evidence_root -cne 'C:\ProgramData\K98\S11\evidence'){throw 'Authority evidence binding differs'}
+ Assert-TimingPath $authority.evidence_root $identity.User.Value
  $rows=@();$absent=0
  foreach($name in @('publication-timing.log.2','publication-timing.log.1','publication-timing.log')) {
   $path=Join-Path $authority.evidence_root $name
   if(-not(Test-Path -LiteralPath $path)){$absent++;continue}
-  $raw=Read-TimingBytes $path '' 262144
+  $raw=Read-TimingBytes $path '' 262144 $identity.User.Value
   $rows+=@(Select-PublicationPhases ([Text.Encoding]::UTF8.GetString($raw)))
  }
  # Revalidate the selected journal: never silently combine two incarnations.
