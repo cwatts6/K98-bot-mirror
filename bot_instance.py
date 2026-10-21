@@ -146,10 +146,10 @@ def _aware(dt: datetime) -> datetime:
 START_TIME = _aware(utcnow())
 
 
-async def _with_timeout(coro, seconds: float, label: str):
+async def _with_timeout(coro, seconds: float, label: str, **observation):
     from core.startup_diagnostics import run
 
-    return await run(coro, seconds, label)
+    return await run(coro, seconds, label, **observation)
 
 
 async def _jittered(min_s=0.4, max_s=1.2):
@@ -170,10 +170,12 @@ async def _refresh_mge_caches_on_startup() -> None:
         logger.exception("[BOOT] MGE cache refresh failed")
 
 
-def schedule_bg(name: str, timeout: float, coro_factory: Callable[[], Awaitable[Any]]):
+def schedule_bg(
+    name: str, timeout: float, coro_factory: Callable[[], Awaitable[Any]], **observation
+):
     async def _runner():
         await _jittered()
-        await _with_timeout(coro_factory(), timeout, name)
+        await _with_timeout(coro_factory(), timeout, name, **observation)
 
     task_monitor.create(name, _runner)
 
@@ -1550,7 +1552,15 @@ async def on_ready():
 
         # OPTIONAL: ensure stats cache (KVK) is populated too
         try:
-            schedule_bg("build_player_stats_cache", 20.0, lambda: build_player_stats_cache())
+            from services.player_stats_startup import verify_completion
+
+            schedule_bg(
+                "build_player_stats_cache",
+                20.0,
+                lambda: build_player_stats_cache(),
+                cancel_on_deadline=False,
+                completion_check=verify_completion,
+            )
             logger.info("[CACHE] Player stats (KVK) cache build scheduled")
         except Exception as e:
             logger.warning(f"[CACHE] Failed to build stats cache (will retry on next cycle): {e}")

@@ -810,6 +810,26 @@
           "after_sha256": "27b12e6a7d0e2fbd58b696751e7f35dc2f5fb748c1ea06d391a8fcb60e905386"
         }
       ]
+    },
+    {
+      "id": "startup_cache_completion_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "141d606ea061659dbb4b82c0bc24cd3b571b4778733965338f6f06cf6e40f06e",
+          "after_sha256": "730c2c21743d67750576b366f9c49d7ca1e6b62104fd62c1f9767bec016ac14d"
+        },
+        {
+          "path": "core/startup_diagnostics.py",
+          "before_sha256": "d2a71770de53e48a7226922f79729f267d45e86a84832bfb9b1d1c9911393d5a",
+          "after_sha256": "4521299ebe562382ad9ed9053e954f2718872215697f9aab868a9355e75dc050"
+        },
+        {
+          "path": "services/player_stats_startup.py",
+          "before_sha256": null,
+          "after_sha256": "eabb55780b7c07bf97a884704633ca559db30c50c8a2aa8c67a62ed0b53910ce"
+        }
+      ]
     }
   ]
 }

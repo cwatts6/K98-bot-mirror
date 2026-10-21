@@ -42,26 +42,42 @@ async def _drain_cancel(task):
         task.exception()
 
 
-async def run(coro, seconds, label):
+async def run(coro, seconds, label, *, cancel_on_deadline=True, completion_check=None):
     """Keep cancellation/drain semantics; distinguish a deadline from a failure.
 
+    The default cancels at the deadline. An explicitly observed long-running task
+    instead remains pending until it returns; shutdown still cancels and drains it.
+    A supplied completion check runs in that same tracked task before success.
     The coroutine is awaited after cancellation and is never replayed. Executor
     callers must track their actual workers: cancelling a proxy future alone
     does not stop its thread. Cancelled business outcomes remain unproven.
     """
-    task = asyncio.ensure_future(coro)
+
+    async def observed():
+        result = await coro
+        summary = await completion_check(result) if completion_check is not None else None
+        return result, summary
+
+    task = asyncio.ensure_future(observed())
     _record(label, "running", seconds)
     try:
         done, _ = await asyncio.wait({task}, timeout=seconds)
         if not done:
-            _record(label, "deadline_elapsed_draining", seconds)
+            _record(
+                label,
+                "deadline_elapsed_draining" if cancel_on_deadline else "deadline_elapsed_pending",
+                seconds,
+            )
             logger.warning(
-                "[BOOT] %s exceeded %.1fs; waiting for cancellation/drain. No retry requested.",
+                "[BOOT] %s exceeded %.1fs; waiting for the original task. No retry requested.",
                 label,
                 seconds,
             )
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+            if cancel_on_deadline:
+                task.cancel()
+            # Shield from outer shutdown cancellation so the explicit drain below
+            # remains the only cancellation owner, including repeated cancellation.
+            await asyncio.shield(asyncio.gather(task, return_exceptions=True))
             if task.cancelled():
                 _record(label, "deadline_elapsed_outcome_unconfirmed", seconds)
                 logger.warning(
@@ -69,9 +85,11 @@ async def run(coro, seconds, label):
                     label,
                 )
                 return None
-        result = task.result()
+        result, summary = task.result()
         state = "completed" if done else "completed_after_deadline"
         _record(label, state, seconds)
+        if summary is not None and label in _steps:
+            _steps[label]["completion"] = summary
         logger.info("[BOOT] %s state=%s", label, state)
         return result
     except asyncio.CancelledError:
