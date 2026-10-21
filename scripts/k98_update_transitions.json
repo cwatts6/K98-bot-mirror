@@ -910,6 +910,26 @@
           "after_sha256": "d43b165223ce7d0e178b660e94adfc3d289520d393584afbf7766d3f652bee72"
         }
       ]
+    },
+    {
+      "id": "publication_readback_batches_v1",
+      "members": [
+        {
+          "path": "services/export_execution_dal.py",
+          "before_sha256": "d01ea9d09d7318621c45e57c15ef1ffcb6ec744f4f9d67a5cea0fc4fc8a68a06",
+          "after_sha256": "934ec13bb0914b1a41c0d2d4d319e4311d409dbb339ea894858b5b2ad04864e4"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "eabdd107a0ad22642e2757c4c2ec2b999d377fc7131ded1215bdbe27240e9319",
+          "after_sha256": "8dcbc2bf818e9bd99272466394f32c77c15c9f87fc78f5ce14a46f088670a974"
+        },
+        {
+          "path": "kvk/services/new_source_workbook_transport.py",
+          "before_sha256": "7ffc87e1616923b141c51ce8a603f7676c6f88dde00b69f1a623828d13ed194a",
+          "after_sha256": "fa46f6a041d945628654879c6c4bc05902c2d4e6c27cb924a8b90e6c4350c874"
+        }
+      ]
     }
   ]
 }

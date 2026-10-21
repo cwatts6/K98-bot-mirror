@@ -203,7 +203,14 @@ async def test_fallback_preserves_history_and_tiers_without_source_context(
         "Season-wide ranking unavailable.",
     ]:
         assert expected in serialized
-    for forbidden in ["FORBIDDEN", "987654", "attachment://", "thumbnail", "source_read", "suppressed"]:
+    for forbidden in [
+        "FORBIDDEN",
+        "987654",
+        "attachment://",
+        "thumbnail",
+        "source_read",
+        "suppressed",
+    ]:
         assert forbidden not in serialized
     assert payload.camp_name == "FORBIDDEN CAMP"  # Suppression never mutates the saved input.
 

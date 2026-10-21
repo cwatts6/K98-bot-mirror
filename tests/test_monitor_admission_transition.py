@@ -26,6 +26,7 @@ def test_monitor_admission_transition_pins_every_runtime_member():
                     "publication_timing_v1",
                     "configuration_intent_replay_v1",
                     "publication_detail_v1",
+                    "publication_readback_batches_v1",
                     "monitor_admission_closeout_v1",
                     "startup_cache_completion_v1",
                     "guided_replacement_release_v1",

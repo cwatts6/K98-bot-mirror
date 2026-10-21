@@ -85,6 +85,18 @@ class ReaderAPI(GoogleMemoryAPI):
                     raise TimeoutError("data response lost")
                 return {}
         if path == "/spreadsheets" and method == "get" and args.get("ranges"):
+            if len(args["ranges"]) > 1:
+                before = len(self.calls)
+                sheets = []
+                for rectangle in args["ranges"]:
+                    sheets.extend(
+                        self.execute(path, method, dict(args, ranges=[rectangle]), retries)[
+                            "sheets"
+                        ]
+                    )
+                del self.calls[before:]
+                self.calls.append((path, method, deepcopy(args)))
+                return dict(sheets=sheets)
             self.calls.append((path, method, deepcopy(args)))
             match = re.fullmatch(r"'((?:[^']|'')+)'!A(\d+):[A-Z]+(\d+)", args["ranges"][0])
             name, start, end = match.groups()

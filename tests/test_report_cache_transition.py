@@ -37,6 +37,7 @@ def test_report_cache_transition_pins_complete_runtime():
                 "publication_timing_v1",
                 "configuration_intent_replay_v1",
                 "publication_detail_v1",
+                "publication_readback_batches_v1",
             }:
                 for successor in transition["members"]:
                     if successor["path"] == member["path"]:
@@ -91,6 +92,7 @@ def test_handoff_transition_pins_complete_runtime():
                 "publication_timing_v1",
                 "configuration_intent_replay_v1",
                 "publication_detail_v1",
+                "publication_readback_batches_v1",
             }:
                 for successor in transition["members"]:
                     if successor["path"] == member["path"]:

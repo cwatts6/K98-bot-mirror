@@ -129,8 +129,7 @@ async def test_post_targets_component_edits_selector_message(monkeypatch):
     assert message.edits[0]["view"] is None
     assert message.edits[0]["embed"].title == "KVK Targets - Gov"
     assert all(
-        field.value and field.name != "Source context"
-        for field in message.edits[0]["embed"].fields
+        field.value and field.name != "Source context" for field in message.edits[0]["embed"].fields
     )
 
 
@@ -230,8 +229,7 @@ async def test_channel_output_falls_back_to_canonical_embed(monkeypatch):
 
     assert channel.sent[0]["embed"].title == "KVK Targets - Gov"
     assert all(
-        field.value and field.name != "Source context"
-        for field in channel.sent[0]["embed"].fields
+        field.value and field.name != "Source context" for field in channel.sent[0]["embed"].fields
     )
     assert interaction.followup.sent == []
     assert acknowledgement_edits == [

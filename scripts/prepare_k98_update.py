@@ -75,6 +75,13 @@ PUBLICATION_DETAIL_PATHS = frozenset(
         "services/export_request_budget.py",
     }
 )
+PUBLICATION_READBACK_BATCH_PATHS = frozenset(
+    {
+        "services/export_execution_dal.py",
+        "services/export_reconciliation_service.py",
+        "kvk/services/new_source_workbook_transport.py",
+    }
+)
 PUBLICATION_RESULT_PATHS = frozenset(
     {
         "services/export_reconciliation_service.py",
@@ -330,6 +337,10 @@ def reviewed_transitions():
             fixed_timing = (
                 item["id"] == "publication_timing_v1" and path in PUBLICATION_TIMING_PATHS
             )
+            fixed_readback_batch = (
+                item["id"] == "publication_readback_batches_v1"
+                and path in PUBLICATION_READBACK_BATCH_PATHS
+            )
             fixed_startup_cache = (
                 item["id"] == "startup_cache_completion_v1"
                 and path in STARTUP_CACHE_COMPLETION_PATHS
@@ -364,6 +375,7 @@ def reviewed_transitions():
                     or fixed_publication_handoff
                     or fixed_rollover
                     or fixed_timing
+                    or fixed_readback_batch
                     or fixed_startup_cache
                     or fixed_configuration_read
                     or fixed_configuration_intent_replay
@@ -388,6 +400,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed publication-timing transition required.")
         if item["id"] == "publication_detail_v1" and paths != PUBLICATION_DETAIL_PATHS:
             raise ValueError("Complete fixed publication-detail transition required.")
+        if (
+            item["id"] == "publication_readback_batches_v1"
+            and paths != PUBLICATION_READBACK_BATCH_PATHS
+        ):
+            raise ValueError("Complete fixed publication-readback batch transition required.")
         if item["id"] == "startup_cache_completion_v1" and paths != STARTUP_CACHE_COMPLETION_PATHS:
             raise ValueError("Complete fixed startup-cache completion transition required.")
         if (

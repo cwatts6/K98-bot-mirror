@@ -568,7 +568,14 @@ class ObservedPublication:
 
 
 def observe_publication(
-    *, snapshot, registration, protected_file_ids, execute, stream_id, allow_absent=False
+    *,
+    snapshot,
+    registration,
+    protected_file_ids,
+    execute,
+    stream_id,
+    allow_absent=False,
+    batch_reader_reads=False,
 ):
     """Fixed read-only evaluator shared by fresh probes and sealed transcript replay.
 
@@ -660,6 +667,7 @@ def observe_publication(
     if transport_type is not GoogleSheetsTransport:
         transport.observation_bindings = generation["reader_bindings"]
         transport.observation_index_id = generation["reader_index_id"]
+        transport.batch_observation_reads = batch_reader_reads
     state, contents = "confirmed", None
     if (
         allow_absent
@@ -735,7 +743,15 @@ def observe_publication(
 
 
 def observe_closed_publication(
-    *, dal, store, snapshot, registration, protected_file_ids, stream_id, allow_absent=False
+    *,
+    dal,
+    store,
+    snapshot,
+    registration,
+    protected_file_ids,
+    stream_id,
+    allow_absent=False,
+    batch_reader_reads=False,
 ):
     """Evaluate private response evidence; neither perform a new probe nor issue proof."""
     with ClosedProbeReplay(
@@ -752,6 +768,7 @@ def observe_closed_publication(
             execute=replay.execute,
             stream_id=stream_id,
             allow_absent=allow_absent,
+            batch_reader_reads=batch_reader_reads,
         )
     return result
 
@@ -833,6 +850,7 @@ class PublicationProbe:
                 execute=stream.execute,
                 stream_id=stream.stream_id,
                 allow_absent=allow_absent,
+                batch_reader_reads=True,
             )
         if self.coordinator.operator_snapshot(job_id) != snapshot:
             raise SourceConflict("Publication snapshot changed during the probe.")
@@ -851,6 +869,7 @@ class PublicationProbe:
                 protected_file_ids=self.protected_file_ids,
                 stream_id=stream.stream_id,
                 allow_absent=allow_absent,
+                batch_reader_reads=True,
             )
         if replayed != observed:
             raise SourceConflict("Sealed publication differs from the fresh observation.")

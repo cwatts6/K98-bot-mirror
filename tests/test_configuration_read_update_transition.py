@@ -22,7 +22,11 @@ def test_configuration_read_transition_pins_current_sources():
     for member in transition["members"]:
         expected = member["after_sha256"]
         for successor in updater.reviewed_transitions():
-            if successor["id"] not in {"configuration_intent_replay_v1", "publication_detail_v1"}:
+            if successor["id"] not in {
+                "configuration_intent_replay_v1",
+                "publication_detail_v1",
+                "publication_readback_batches_v1",
+            }:
                 continue
             for update in successor["members"]:
                 if update["path"] == member["path"]:

@@ -20,6 +20,8 @@ from kvk.rendering.new_source_workbook import (
 )
 from kvk.services.new_source_export_service import GoogleSheetsTransport
 
+_CELL_FIELDS = "sheets(properties,data(startRow,startColumn,columnMetadata(pixelSize),rowData(values(userEnteredValue,userEnteredFormat,hyperlink,textFormatRuns))),basicFilter)"
+
 
 class ReaderSheetsTransport(GoogleSheetsTransport):
     """Explicitly composed reader version; legacy callers retain their transport."""
@@ -382,7 +384,58 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                     file["id"], file["reader_bindings"][p["name"]], rows, p["columns"]
                 )
 
-    def _read_cells(self, file_id, title, count, width, sheet_id):
+    # Only fresh publication probes opt in; legacy transcript evaluators retain
+    # their exact one-range request sequence.
+    batch_observation_reads = False
+
+    def _batched_cell_responses(self, file_id, rectangles):
+        """Bounded lazy reads, one range per sheet per batch; never cache across checks."""
+        pending, cells = [], 0
+
+        def flush():
+            ranges = []
+            for title, start, end, width in pending:
+                escaped = title.replace("'", "''")
+                ranges.append(f"'{escaped}'!A{start + 1}:{self._column(width)}{end}")
+            response = self._execute(
+                self.sheets.spreadsheets().get(
+                    spreadsheetId=file_id,
+                    ranges=ranges,
+                    fields=_CELL_FIELDS,
+                )
+            )
+            sheets = response.get("sheets", [])
+            if not isinstance(sheets, list) or len(sheets) != len(pending):
+                raise SourceConflict("Reader batch sheet membership differs.")
+            by_title = {}
+            for sheet in sheets:
+                if not isinstance(sheet, dict) or not isinstance(sheet.get("properties"), dict):
+                    raise SourceConflict("Reader batch sheet metadata is malformed.")
+                title = sheet["properties"].get("title")
+                if not isinstance(title, str):
+                    raise SourceConflict("Reader batch sheet title is malformed.")
+                by_title[title] = sheet
+            if len(by_title) != len(sheets) or set(by_title) != {p[0] for p in pending}:
+                raise SourceConflict("Reader batch has duplicate, missing or foreign sheets.")
+            for rectangle in pending:
+                yield rectangle, {"sheets": [by_title[rectangle[0]]]}
+
+        for title, count, width in rectangles:
+            step = min(self.batch_rows, max(1, 50_000 // width))
+            for start in range(0, max(7, count), step):
+                end = min(max(7, count), start + step)
+                size = (end - start) * width
+                if pending and (
+                    cells + size > 50_000 or len(pending) == 16 or title in {p[0] for p in pending}
+                ):
+                    yield from flush()
+                    pending, cells = [], 0
+                pending.append((title, start, end, width))
+                cells += size
+        if pending:
+            yield from flush()
+
+    def _read_cells(self, file_id, title, count, width, sheet_id, *, responses=None):
         result = []
         column_pixels = None
         requested_count = count
@@ -391,13 +444,19 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
         for start in range(0, count, step):
             end = min(count, start + step)
             escaped = title.replace("'", "''")
-            response = self._execute(
-                self.sheets.spreadsheets().get(
-                    spreadsheetId=file_id,
-                    ranges=[f"'{escaped}'!A{start+1}:{self._column(width)}{end}"],
-                    fields="sheets(properties,data(startRow,startColumn,columnMetadata(pixelSize),rowData(values(userEnteredValue,userEnteredFormat,hyperlink,textFormatRuns))),basicFilter)",
+            if responses is None:
+                response = self._execute(
+                    self.sheets.spreadsheets().get(
+                        spreadsheetId=file_id,
+                        ranges=[f"'{escaped}'!A{start+1}:{self._column(width)}{end}"],
+                        fields=_CELL_FIELDS,
+                    )
                 )
-            )
+            else:
+                item = next(responses, None)
+                if item is None or item[0] != (title, start, end, width):
+                    raise SourceConflict("Reader batch rectangle differs from the pinned read.")
+                response = item[1]
             sheets = response.get("sheets", [])
             if (
                 len(sheets) != 1
@@ -503,8 +562,16 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
             for title, sid in file["reader_bindings"].items():
                 if actual[title]["sheetId"] != sid:
                     raise SourceConflict("Reader grid identity differs.")
+            expected_directory = self._reader_directory(files, layout) if part == 0 else None
+            rectangles = (
+                [(DIRECTORY, len(expected_directory), 5)] if expected_directory is not None else []
+            ) + [(p["name"], 6 + p["rows"], p["columns"]) for p in pieces]
+            responses = (
+                self._batched_cell_responses(file["id"], rectangles)
+                if self.batch_observation_reads
+                else None
+            )
             if part == 0:
-                expected_directory = self._reader_directory(files, layout)
                 directory_grid = actual[DIRECTORY]
                 if directory_grid.get("index") != 0 or any(
                     directory_grid["gridProperties"].get(k) != v
@@ -523,6 +590,7 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                         len(expected_directory),
                         5,
                         file["reader_bindings"][DIRECTORY],
+                        responses=responses,
                     )
                 ) != payload_hash(expected_directory):
                     raise SourceConflict("Reader directory differs.")
@@ -545,6 +613,7 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                     6 + p["rows"],
                     p["columns"],
                     file["reader_bindings"][p["name"]],
+                    responses=responses,
                 )
                 for row in rows:
                     for value in row:
@@ -564,6 +633,8 @@ class ReaderSheetsTransport(GoogleSheetsTransport):
                 if prior and prior[:6] != rows[:6]:
                     raise SourceConflict("Reader partition headers differ.")
                 prior.extend(rows if not prior else rows[6:])
+            if responses is not None and next(responses, None) is not None:
+                raise SourceConflict("Reader batch contains unconsumed observations.")
         observed = {
             name: dict(spec, sha256=payload_hash(combined[name])) for name, spec in manifest.items()
         }

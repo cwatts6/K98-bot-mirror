@@ -1414,7 +1414,7 @@ class ExportExecutionDAL:
     def request_records(self, stream_id):
         """Page immutable closed-stream rows; release SQL before private evidence I/O.
 
-        A page contains at most 64 requests and 192 events (three per request in
+        A page contains at most 256 requests and 768 events (three per request in
         the SQL contract). Callers still verify closure, membership and every
         private payload/event; these rows never authorize settlement themselves.
         """
@@ -1429,7 +1429,7 @@ class ExportExecutionDAL:
                 cursor = connection.cursor()
                 try:
                     cursor.execute(
-                        "SELECT TOP (64) * FROM dbo.ExportProviderRequest "
+                        "SELECT TOP (256) * FROM dbo.ExportProviderRequest "
                         "WHERE StreamID=? AND Sequence>? ORDER BY Sequence",
                         stream_id,
                         after,
