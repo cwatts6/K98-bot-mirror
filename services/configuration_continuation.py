@@ -68,7 +68,7 @@ class ConfigurationContinuation:
                     review_title="Review configuration sources and outputs",
                     review_description="Open the registered source sheets and verify the configuration you want published now. Review the output destinations, then continue to a separate confirmation.",
                     check="Review every current configuration source and destination page. Verify the source sheets contain the configuration you want published now. Confirm a fresh read and atomic publication; this does not rerun the scan import.",
-                    effect="Save this exact approval, read the registered configuration, publish configuration and targets in one transaction, then verify the durable result. An uncertain attempt is reconciled before another retry.",
+                    effect="Save this exact approval, read the registered configuration, publish configuration and targets in one transaction, then verify the durable result. No spreadsheet export is requested. An uncertain attempt is reconciled before another retry.",
                 ),
                 keep_prior=dict(
                     label="Keep prior configuration",
@@ -146,12 +146,19 @@ class ConfigurationContinuation:
                 choice="keep_prior" if action == "keep_prior" else "retry",
                 configuration=state["current"],
             )
+            if action == "retry_configuration":
+                marker["export_disposition"] = "configuration_only_v1"
             self.dal.record(source_id, token, marker)
             if action == "keep_prior":
                 return
             from services.legacy_export_snapshot_service import use_runtime
 
-            with use_runtime(self.dal.runtime), configuration_retry_intent(action_id, source_id):
+            with (
+                use_runtime(self.dal.runtime),
+                configuration_retry_intent(
+                    action_id, source_id, export_disposition=marker["export_disposition"]
+                ),
+            ):
                 self.runner()
 
     def reconcile(self, source_id, action):

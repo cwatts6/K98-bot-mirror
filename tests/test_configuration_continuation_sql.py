@@ -323,6 +323,18 @@ def test_committed_retry_hands_off_exact_result_and_cannot_replay(recovery, lost
         "recovery:" + str(uuid4()),
         "Capture committed output",
     )
+    result = adapter.producer.inspect(link["source_id"])
+    assert set(result[0]["actions"]) == {"complete_configuration_only"}
+    adapter.producer.execute(
+        link["source_id"],
+        "complete_configuration_only",
+        result[1],
+        "recovery:" + str(uuid4()),
+        "Verify approved configuration-only completion",
+    )
+    assert (
+        adapter.producer.inspect(link["source_id"])[0]["outcome"] == "configuration_only_completed"
+    )
     assert service.refresh(row["IncidentID"])["State"] == "resolved"
     run(service, row, "retry_configuration")
     assert calls == [1]

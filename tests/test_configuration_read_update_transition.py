@@ -20,9 +20,16 @@ def test_configuration_read_transition_pins_current_sources():
     assert {m["path"] for m in transition["members"]} == updater.CONFIGURATION_READ_REQUEST_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in transition["members"]:
+        expected = member["after_sha256"]
+        successor = next(
+            t for t in updater.reviewed_transitions() if t["id"] == "configuration_intent_replay_v1"
+        )
+        for update in successor["members"]:
+            if update["path"] == member["path"]:
+                assert update["before_sha256"] == expected
+                expected = update["after_sha256"]
         assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
+            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == expected
         )
         assert member["before_sha256"] and member["before_sha256"] != member["after_sha256"]
 

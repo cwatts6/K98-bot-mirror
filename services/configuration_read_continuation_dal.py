@@ -78,7 +78,15 @@ class ConfigurationReadContinuationDAL(ConfigurationContinuationDAL):
             marker = generation["configuration_continuation"]
             if (
                 not isinstance(marker, dict)
-                or set(marker) != {"action", "token", "reason", "choice", "configuration"}
+                or set(marker) - {"export_disposition"}
+                != {"action", "token", "reason", "choice", "configuration"}
+                or (
+                    "export_disposition" in marker
+                    and (
+                        marker["export_disposition"] != "configuration_only_v1"
+                        or marker["choice"] != "retry"
+                    )
+                )
                 or marker["choice"] not in {"keep_prior", "retry"}
                 or not isinstance(marker["reason"], str)
                 or not isinstance(marker["token"], str)

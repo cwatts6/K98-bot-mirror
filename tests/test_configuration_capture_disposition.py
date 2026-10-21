@@ -64,6 +64,55 @@ def test_existing_guided_retry_is_not_reinterpreted_as_no_export():
         assert "export_disposition" not in intent
 
 
+def test_approved_configuration_only_retry_preserves_intent_before_admission():
+    from services.configuration_continuation_dal import ConfigurationContinuationDAL
+
+    action, parent = str(uuid4()), str(uuid4())
+    marker = dict(
+        action=action,
+        choice="retry",
+        configuration={"scan_data": {}},
+        export_disposition="configuration_only_v1",
+    )
+    with configuration_retry_intent(
+        action, parent, export_disposition=marker["export_disposition"]
+    ) as intent:
+        assert config_work() == intent
+        assert ConfigurationContinuationDAL.child_request(parent, marker)["producer"] == intent
+    assert current_intent() is None
+    # Restarting an older marker preserves its exact request hash and unknown intent.
+    del marker["export_disposition"]
+    assert (
+        "export_disposition"
+        not in ConfigurationContinuationDAL.child_request(parent, marker)["producer"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_configuration_only_retry_cannot_be_collected_as_pipeline_export():
+    @collect_producer_captures
+    async def pipeline():
+        return await asyncio.to_thread(config_work)
+
+    with configuration_retry_intent(
+        str(uuid4()), str(uuid4()), export_disposition="configuration_only_v1"
+    ):
+        with pytest.raises(SourceConflict, match="original export intent"):
+            await pipeline()
+    assert current_intent() is None
+
+
+@pytest.mark.parametrize("value", [None, True, {}, "pipeline_export_v1", "cache_only_v1"])
+def test_saved_continuation_rejects_invalid_explicit_export_disposition(value):
+    from services.configuration_continuation_dal import ConfigurationContinuationDAL
+
+    with pytest.raises(SourceConflict, match="export intent"):
+        ConfigurationContinuationDAL.child_request(
+            str(uuid4()),
+            dict(action=str(uuid4()), choice="retry", export_disposition=value),
+        )
+
+
 @pytest.mark.parametrize(
     "disposition",
     [None, "configuration_only_v1", "pipeline_export_v1", "cache_only_v1", True, {}, []],
