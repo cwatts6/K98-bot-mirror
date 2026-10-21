@@ -85,7 +85,7 @@ def fetch_source_windows(kvk_no, *, connect=None):
             "c.UpdateID,c.PublicationID,c.PublicSelectionVersion,"
             "pub.StartScanID AS SelectedStartScanID,pub.EndScanID AS SelectedEndScanID,"
             "pub.ConfigVersionID AS SelectedConfigVersionID,w.ConfigVersionID AS DesiredConfigVersionID,"
-            "pub.PeriodState,pub.BuildState,pub.EligibleCount AS RowCount,"
+            "pub.PeriodState,pub.BuildState,pub.EligibleCount AS [RowCount],"
             "pending.UpdateID AS PendingUpdateID,pending.UpdateState AS PendingUpdateState,"
             "o1.ScanStartUTC AS StartTS,o2.ScanStartUTC AS EndTS "
             "FROM KVK.SourcePeriod p "

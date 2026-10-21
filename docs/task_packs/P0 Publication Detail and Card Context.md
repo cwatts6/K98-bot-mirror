@@ -14,6 +14,11 @@ an agent to merge, deploy, restart, change source routing, or repeat business wo
    and then overwrites any routing failure with `overall_missing`. Resolve the
    card's explicit period without display fallback, preserve routing diagnoses,
    and explain a missing overall period in readable language.
+3. The operator's read-only window preview reproduced a SQL grammar error in the
+   snapshot-source query. Quote its reserved `RowCount` alias, preserving output
+   keys and bound source/season parameters. The new regression reproduces the
+   original driver error and compiles the actual emitted query on local tempdb
+   through SQL Server metadata analysis without executing application SQL.
 
 ## Architecture and contracts
 
