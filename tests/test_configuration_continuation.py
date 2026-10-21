@@ -71,3 +71,34 @@ def test_unacknowledged_retry_retains_tombstone_without_replaying_runner():
     assert state["marker"]["choice"] == "retry"
     dal.close_uncommitted.assert_called_once_with("child", state["marker"])
     adapter.runner.assert_not_called()
+
+
+def test_new_approval_saves_configuration_only_intent_before_runner(monkeypatch):
+    from services.producer_recovery_intent import current_intent
+
+    state, action, dal, adapter = fixture("retry_configuration")
+    adapter.inspect = Mock(
+        return_value=({"actions": {"retry_configuration": {}}}, action["EvidenceHash"], False)
+    )
+    monkeypatch.setattr(
+        "services.legacy_export_snapshot_service.use_runtime", lambda _: nullcontext()
+    )
+    captured = []
+
+    def run():
+        assert state["marker"]["export_disposition"] == "configuration_only_v1"
+        captured.append(dict(current_intent()))
+
+    adapter.runner = run
+    source = str(uuid4())
+    adapter.execute(
+        source,
+        "retry_configuration",
+        action["EvidenceHash"],
+        "recovery:" + action["ActionID"],
+        "Confirmed",
+    )
+    assert captured[0]["export_disposition"] == "configuration_only_v1"
+    assert captured[0]["parent"] == source
+    assert captured[0]["operation"] == action["ActionID"]
+    assert current_intent() is None

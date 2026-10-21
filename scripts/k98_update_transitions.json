@@ -850,6 +850,41 @@
           "after_sha256": "8a9412a5556ad9df7769a65e71593ec6826c4687b26726249489fc530a4f17bb"
         }
       ]
+    },
+    {
+      "id": "configuration_intent_replay_v1",
+      "members": [
+        {
+          "path": "services/configuration_continuation.py",
+          "before_sha256": "2317c47166346574e87b7c70a5e59aafb5b929420220a75faf00a97cfd85ebee",
+          "after_sha256": "f096a8151f568db8fc704bbed76a521f9a95630bdb7c27bc7d2f5ef9ea8b301d"
+        },
+        {
+          "path": "services/configuration_continuation_dal.py",
+          "before_sha256": "5090eccb01a20e6415d014410ec996f111e0d135b0d2ae4586ad81f0c44cc01b",
+          "after_sha256": "f6d9efd2ac738be0aa6b6c1c2314119203d011782cc8eafaa0bfcbe6aafdf3f9"
+        },
+        {
+          "path": "services/configuration_read_continuation_dal.py",
+          "before_sha256": "8a9412a5556ad9df7769a65e71593ec6826c4687b26726249489fc530a4f17bb",
+          "after_sha256": "bbb48790bee927d60164fe01071871064dc367454d597856823359bcba8fe2ac"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "b1d18d5f8c0596c81b44908167136cdca436e9c9f63776f061e85fbb9ef72e2b",
+          "after_sha256": "1c7f1720813175ceddec2c827981ffe0dcbd4a8791de481b71b78ac959480a03"
+        },
+        {
+          "path": "services/export_execution_dal.py",
+          "before_sha256": "21c9a5fb50ded8ed2f37586a376b845a486bf8a4ade47c30601dbd00f251abfd",
+          "after_sha256": "d01ea9d09d7318621c45e57c15ef1ffcb6ec744f4f9d67a5cea0fc4fc8a68a06"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "27b12e6a7d0e2fbd58b696751e7f35dc2f5fb748c1ea06d391a8fcb60e905386",
+          "after_sha256": "a7c8434809eb58b297bff8c02b9c509c7d018a66a46ae2a5dff2e0a86358041f"
+        }
+      ]
     }
   ]
 }

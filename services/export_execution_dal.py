@@ -1411,6 +1411,65 @@ class ExportExecutionDAL:
                 after = sequence
                 yield str(identifier).lower()
 
+    def request_records(self, stream_id):
+        """Page immutable closed-stream rows; release SQL before private evidence I/O.
+
+        A page contains at most 64 requests and 192 events (three per request in
+        the SQL contract). Callers still verify closure, membership and every
+        private payload/event; these rows never authorize settlement themselves.
+        """
+        from services.export_execution_protocol import uuid_text
+
+        uuid_text(stream_id)
+        after = 0
+        while True:
+            connection = self.connect()
+            try:
+                connection.autocommit = True
+                cursor = connection.cursor()
+                try:
+                    cursor.execute(
+                        "SELECT TOP (64) * FROM dbo.ExportProviderRequest "
+                        "WHERE StreamID=? AND Sequence>? ORDER BY Sequence",
+                        stream_id,
+                        after,
+                    )
+                    batch = rows(cursor)
+                    if not batch:
+                        return
+                    end = batch[-1]["Sequence"]
+                    cursor.execute(
+                        "SELECT e.* FROM dbo.ExportProviderRequestEvent e "
+                        "JOIN dbo.ExportProviderRequest r ON r.RequestID=e.RequestID "
+                        "WHERE r.StreamID=? AND r.Sequence>? AND r.Sequence<=? "
+                        "ORDER BY r.Sequence,e.EventSequence",
+                        stream_id,
+                        after,
+                        end,
+                    )
+                    events = rows(cursor)
+                finally:
+                    cursor.close()
+            finally:
+                connection.close()
+            grouped = {str(row["RequestID"]).lower(): [] for row in batch}
+            if len(grouped) != len(batch) or len(events) > 3 * len(batch):
+                raise SourceConflict("Closed request/event membership is invalid.")
+            for event in events:
+                identifier = str(event["RequestID"]).lower()
+                if identifier not in grouped:
+                    raise SourceConflict("Closed event belongs to another request page.")
+                grouped[identifier].append(event)
+            for request in batch:
+                if (
+                    request["Sequence"] != after + 1
+                    or str(request["StreamID"]).lower() != stream_id
+                ):
+                    raise SourceConflict("Closed request membership has a gap or foreign stream.")
+                after = request["Sequence"]
+                identifier = str(request["RequestID"]).lower()
+                yield identifier, request, grouped[identifier]
+
     def stream_digest(self, stream_id):
         """Bounded-memory digest of immutable request/event membership after freeze."""
         from services.export_execution_protocol import encode

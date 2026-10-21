@@ -81,6 +81,9 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
                 child=child,
                 blocker=blocker,
                 current=json.loads(self.runtime.configuration),
+                # Bind newly reviewed actions to the no-export contract. A pending
+                # pre-upgrade approval without a marker cannot dispatch under it.
+                continuation_export_disposition="configuration_only_v1",
                 **self.review_context(root),
             )
         )
@@ -88,6 +91,11 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
     @staticmethod
     def child_request(source_id, marker):
         operation = identity(marker["action"])
+        disposition = marker.get("export_disposition")
+        if "export_disposition" in marker and (
+            disposition != "configuration_only_v1" or marker.get("choice") != "retry"
+        ):
+            raise SourceConflict("Invalid saved configuration export intent.")
         return dict(
             operation=operation,
             kind="scan_data",
@@ -97,6 +105,7 @@ class ConfigurationContinuationDAL(ProducerRefusalDAL):
                 atomic_checkpoint=1,
                 operation=operation,
                 parent=identity(source_id),
+                **({"export_disposition": disposition} if disposition is not None else {}),
             ),
         )
 

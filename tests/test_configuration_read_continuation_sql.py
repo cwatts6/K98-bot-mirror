@@ -245,6 +245,27 @@ def test_lost_dispatch_reconciles_without_rerunning_and_new_decision_is_fresh(re
     assert len(calls) == 2 and calls[0]["operation"] != calls[1]["operation"]
 
 
+def test_pre_upgrade_unrecorded_approval_cannot_adopt_new_no_export_contract(recovery):
+    calls = []
+    source, adapter, _ = setup(recovery, lambda: calls.append(1))
+    state = adapter.dal.snapshot(source)
+    del state["continuation_export_disposition"]
+    action = dict(
+        ActionID=str(uuid4()), ActionKind="retry_configuration", EvidenceHash=digest(state).hex()
+    )
+    assert adapter.reconcile(source, action) == "not_applied"
+    with pytest.raises(SourceConflict, match="evidence changed"):
+        adapter.execute(
+            source,
+            "retry_configuration",
+            action["EvidenceHash"],
+            "recovery:" + action["ActionID"],
+            "Old approval",
+        )
+    assert calls == []
+    assert adapter.dal.snapshot(source)["marker"] is None
+
+
 def test_confirmed_keep_prior_reconciles_after_restart_and_rejects_late_callback(recovery):
     source, adapter, service = setup(recovery)
     row = service.review_source(ACTOR, adapter.kind, source)
@@ -360,6 +381,17 @@ def test_fresh_publication_and_capture_are_verified_without_replaying(recovery, 
     adapter.producer.execute(
         child, "resume_capture", result[1], "recovery:" + str(uuid4()), "Capture committed output"
     )
+    result = adapter.producer.inspect(child)
+    assert set(result[0]["actions"]) == {"complete_configuration_only"}
+    assert adapter.dal.snapshot(source)["marker"]["export_disposition"] == "configuration_only_v1"
+    adapter.producer.execute(
+        child,
+        "complete_configuration_only",
+        result[1],
+        "recovery:" + str(uuid4()),
+        "Verify approved configuration-only completion",
+    )
+    assert adapter.producer.inspect(child)[0]["outcome"] == "configuration_only_completed"
     assert service.refresh(row["IncidentID"])["State"] == "resolved"
     queue, read, client = add_linked_views(r, adapter, service)
     for linked in (queue, read):

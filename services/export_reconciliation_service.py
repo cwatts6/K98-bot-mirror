@@ -128,6 +128,17 @@ class ClosedStreamEvidence:
     event_digest: str
 
 
+def _request_records(dal, stream_id):
+    """Allow older read-only adapters while the SQL DAL uses bounded pages."""
+    if hasattr(dal, "request_records"):
+        yield from dal.request_records(stream_id)
+    else:
+        with closing(dal.request_ids(stream_id)) as identities:
+            for identifier in identities:
+                request, events = dal.read_request(identifier)
+                yield identifier, request, events
+
+
 class ClosedStreamVerifier:
     def __init__(self, *, dal, store):
         self.dal, self.store = dal, store
@@ -228,9 +239,8 @@ class ClosedStreamVerifier:
         ):
             raise SourceConflict("Private closure evidence differs from the exact child/stream.")
         count = mutations = reads = 0
-        with closing(self.dal.request_ids(stream_id)) as identities:
-            for identifier in identities:
-                request, events = self.dal.read_request(identifier)
+        with closing(_request_records(self.dal, stream_id)) as records:
+            for identifier, request, events in records:
                 count += 1
                 if (
                     request is None
@@ -480,7 +490,7 @@ class ClosedProbeReplay(AbstractContextManager):
             account=self.account,
             registration_hash=bytes.fromhex(pool["RegistrationHash"]),
         )
-        self._identities = self.verifier.dal.request_ids(self.stream_id)
+        self._identities = _request_records(self.verifier.dal, self.stream_id)
         self._active = True
         return self
 
@@ -500,11 +510,11 @@ class ClosedProbeReplay(AbstractContextManager):
             or requested.mutation
         ):
             raise SourceConflict("Only exact reads from the opened probe may be evaluated.")
-        identifier = next(self._identities, None)
-        if identifier is None:
+        record = next(self._identities, None)
+        if record is None:
             raise SourceConflict("Probe transcript has no further observed request.")
         self._sequence += 1
-        request, events = self.verifier.dal.read_request(identifier)
+        identifier, request, events = record
         if (
             request is None
             or str(request["StreamID"]).lower() != self.stream_id
