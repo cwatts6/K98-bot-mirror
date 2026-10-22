@@ -45,7 +45,15 @@ def execution_connection(legacy_factory, *, timeout_seconds):
     try:
         connection.timeout = timeout
         yield connection
-    finally:
+    except BaseException as execution_error:
+        try:
+            connection.timeout = previous_timeout
+        except Exception as restore_error:
+            execution_error.add_note(
+                "Borrowed SQL timeout restoration also failed: " + type(restore_error).__name__
+            )
+        raise
+    else:
         connection.timeout = previous_timeout
 
 

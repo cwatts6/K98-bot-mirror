@@ -20,6 +20,9 @@ The six-column result was the committed Phase A summary, not completed reporting
   writer's autocommit connection; they do not enter its connection context,
   commit, roll back, close it or release its guard. The outer writer retains
   custody until capture/failure settlement. The original timeout is restored.
+  If restoration itself fails while an execution/cancellation error propagates,
+  preserve the original error and attach a secondary restoration note. A standalone
+  restoration failure after success still propagates.
 - Other producer connection behavior remains unchanged. Missing admission,
   closed/wrong owners, runtime mismatch and ambient transactions are refused.
 - The log wrapper skips description-less rowcounts but propagates driver errors

@@ -61,3 +61,35 @@ def test_runtime_without_admission_cannot_open_replacement_connection(monkeypatc
         with execution_connection(factory, timeout_seconds=600):
             pytest.fail("unadmitted execution")
     factory.assert_not_called()
+
+
+@pytest.mark.parametrize("failure_kind", [RuntimeError, BaseException])
+def test_broken_connection_restoration_preserves_execution_error(admitted, failure_kind):
+    from unittest.mock import PropertyMock
+
+    restore_error = RuntimeError("connection closed during reporting")
+    timeout = PropertyMock(side_effect=[15, None, restore_error])
+    type(admitted.connection).timeout = timeout
+    failure = failure_kind("original SQL or cancellation failure")
+    with pytest.raises(failure_kind) as caught:
+        with execution_connection(Mock(), timeout_seconds=600):
+            raise failure
+    assert caught.value is failure
+    assert failure.__notes__ == ["Borrowed SQL timeout restoration also failed: RuntimeError"]
+    assert timeout.call_count == 3
+    admitted.connection.close.assert_not_called()
+    admitted.connection.commit.assert_not_called()
+    admitted.connection.rollback.assert_not_called()
+
+
+def test_standalone_timeout_restoration_failure_is_not_hidden(admitted):
+    from unittest.mock import PropertyMock
+
+    restore_error = RuntimeError("connection closed after success")
+    timeout = PropertyMock(side_effect=[15, None, restore_error])
+    type(admitted.connection).timeout = timeout
+    with pytest.raises(RuntimeError) as caught:
+        with execution_connection(Mock(), timeout_seconds=600):
+            pass
+    assert caught.value is restore_error
+    assert timeout.call_count == 3
