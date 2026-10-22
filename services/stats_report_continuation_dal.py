@@ -135,10 +135,7 @@ class StatsReportContinuationDAL:
                 # subsequently obtains these same guards and verifies that marker.
                 dispatched = True
                 cursor.execute(
-                    "DECLARE @r int; EXEC @r=dbo.ARCHIVE_IMPORT_STAGING_FILE @CompletedFileName=?; "
-                    "IF @r<>0 THROW 51961,'The exact immutable archive did not verify.',1; "
                     "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=?,@ExportPreparationID=?",
-                    snapshot["execution"]["CompletedFileName"],
                     snapshot["execution"]["CompletedFileName"],
                     source_id,
                 )

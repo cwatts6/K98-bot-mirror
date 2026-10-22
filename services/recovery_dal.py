@@ -180,14 +180,18 @@ class RecoveryDAL:
                 "SELECT TOP (101) i.*, a.State AS PendingActionState, "
                 "a.ActionKind AS PendingActionKind, p.ActionID AS PublicationActionID, "
                 "p.State AS PublicationState, p.CreatedUTC AS PublicationCreatedUTC, "
-                "p.UpdatedUTC AS PublicationUpdatedUTC FROM dbo.RecoveryIncident i "
+                "p.UpdatedUTC AS PublicationUpdatedUTC, r.ActionID AS LastActionID, "
+                "r.State AS LastActionState, r.ResultJson AS LastActionResult FROM dbo.RecoveryIncident i "
                 "OUTER APPLY (SELECT TOP (1) State,ActionKind FROM dbo.RecoveryAction "
                 "WHERE IncidentID=i.IncidentID AND State IN ('dispatched','unknown') "
                 "ORDER BY CreatedUTC,ActionID) a "
                 "OUTER APPLY (SELECT TOP (1) ActionID,State,CreatedUTC,UpdatedUTC "
                 "FROM dbo.RecoveryAction WHERE IncidentID=i.IncidentID "
                 "AND i.SourceKind='export_job' AND ActionKind='verify_publication' "
-                "ORDER BY CreatedUTC DESC,ActionID DESC) p WHERE i.ScopeKey=? "
+                "ORDER BY CreatedUTC DESC,ActionID DESC) p "
+                "OUTER APPLY (SELECT TOP (1) ActionID,State,ResultJson FROM dbo.RecoveryAction "
+                "WHERE IncidentID=i.IncidentID ORDER BY CreatedUTC DESC,ActionID DESC) r "
+                "WHERE i.ScopeKey=? "
                 "AND i.FirstSeenUTC<=? AND (? IS NULL OR i.IncidentID>CAST(? AS uniqueidentifier)) "
                 "ORDER BY i.IncidentID",
                 self.scope,
@@ -206,7 +210,16 @@ class RecoveryDAL:
                     if row["PendingActionState"] is not None
                     else None
                 )
+                from services.recovery_failure_diagnostics import action_result
                 from services.recovery_publication_result import publication_result
+
+                row["last_repair"] = action_result(
+                    dict(
+                        ActionID=row["LastActionID"],
+                        State=row["LastActionState"],
+                        ResultJson=row["LastActionResult"],
+                    )
+                )
 
                 row["publication_check"] = publication_result(
                     row,
@@ -432,6 +445,17 @@ class RecoveryDAL:
                 row["IncidentID"],
             )
             return rows(cursor)
+
+    def latest_action(self, incident_id):
+        """Read action diagnostics only within the registered incident scope."""
+        with transaction(self.connect) as cursor:
+            row = self._get(cursor, incident_id)
+            cursor.execute(
+                "SELECT TOP (1) ActionID,State,ResultJson FROM dbo.RecoveryAction "
+                "WHERE IncidentID=? ORDER BY CreatedUTC DESC,ActionID DESC",
+                row["IncidentID"],
+            )
+            return one(cursor)
 
     def latest_publication_action(self, incident_id):
         """Read only within the same registered incident scope."""

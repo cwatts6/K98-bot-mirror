@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "db18f23730521a41a215b744957cd61002eedf8d",
+  "sql_revision": "135964c3fb03df40b3a56587cb462c2725acccb4",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -2654,7 +2654,9 @@
       "dbo.StatsImportReportContinuation"
     ],
     "dbo.usp_S11CompleteStatsReports": [
-      "dbo.usp_S11CompleteStatsReportsCore"
+      "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+      "dbo.usp_S11CompleteStatsReportsCore",
+      "dbo.usp_S11ValidateStatsReportStage"
     ],
     "dbo.usp_S11CompleteStatsReportsCore": [
       "dbo.ACQUIRE_KS4_IMPORT_LOCK",

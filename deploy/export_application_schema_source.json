@@ -3087,7 +3087,7 @@
     "name": "dbo.usp_S11CompleteStatsReports",
     "type": "P",
     "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-    "sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4"
+    "sha256": "e6574a0924e6629f037e714882ab526fb87f274e4615c746f329d98c06a1c810"
   },
   {
     "name": "dbo.usp_S11CompleteStatsReportsCore",

@@ -122,3 +122,30 @@ def test_report_cutoff_matches_incident_timestamp_precision(contained_job, monke
     assert page["total"] == 1
     assert [item["IncidentID"] for item in page["rows"]] == [row["IncidentID"]]
     assert page["through"] == page["rows"][0]["FirstSeenUTC"]
+
+
+def test_action_failure_is_batched_and_scope_bound(contained_job):
+    import pyodbc
+
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from services.recovery_failure_diagnostics import action_failure, action_result
+
+    f = contained_job
+    store = RecoveryDAL(f.connect, account="test-account", storage_owner="disk", guild_id=2)
+    foreign = RecoveryDAL(f.connect, account="other-account", storage_owner="disk", guild_id=2)
+    evidence = dict(title="Test", explanation="Fixture", outcome="held", actions={})
+    row = store.observe("stats_import", str(uuid4()), evidence, "a" * 64)
+    action, acquired = store.claim(
+        row["IncidentID"], 1, "a" * 64, "complete_reports", "discord:1", "fixture"
+    )
+    assert acquired
+    failure = action_failure(pyodbc.ProgrammingError("42000", "private text (229)"), action)
+    store.finish(
+        row["IncidentID"], action, "not_applied", dict(failure=failure, verification="not_applied")
+    )
+    latest = action_result(store.latest_action(row["IncidentID"]))
+    assert latest["failure"]["sql_numbers"] == [229]
+    assert store.report_page()["rows"][0]["last_repair"] == latest
+    with pytest.raises(SourceConflict):
+        foreign.latest_action(row["IncidentID"])
+    assert foreign.report_page()["rows"] == []

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "authored-not-installed; requires 20261022_001_p0_pipeline_receipts and exact paired protected contract reissue",
+  "status": "authored-not-installed; requires 20261022_003_stats_report_recovery_boundary and exact paired protected contract reissue",
   "database": "ROK_TRACKER",
   "default_schema": "dbo",
   "sql_server_major_version": 16,
@@ -506,15 +506,17 @@
     {
       "name": "dbo.usp_S11CompleteStatsReports",
       "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-      "source_sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4",
-      "definition_sha256": "78fd1381a630d4ec23fce8a1c4381642956a32d7b7145d74e457f63d8a6d3fd7",
+      "source_sha256": "e6574a0924e6629f037e714882ab526fb87f274e4615c746f329d98c06a1c810",
+      "definition_sha256": "c4db4108be182c6a083e6a2d8416303c4b92cc634127b24b2b6d7d3ba1d3c471",
       "object_type": "P",
       "execute_as": null,
       "calls": [
-        "dbo.usp_S11CompleteStatsReportsCore"
+        "dbo.ARCHIVE_IMPORT_STAGING_FILE",
+        "dbo.usp_S11CompleteStatsReportsCore",
+        "dbo.usp_S11ValidateStatsReportStage"
       ],
       "compatible_definition_sha256": [
-        "95de9061208bb548ef113d16efe381134a35188f91f5e65a085b1470f372413a"
+        "f36c3662e51c933278b3875e8646fbfdc873ba966231d14d53bd5ec567e4f5f3"
       ]
     },
     {

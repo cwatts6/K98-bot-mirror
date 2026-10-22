@@ -392,3 +392,186 @@ def test_natural_import_session_uses_both_guards_and_preserves_custody(reports, 
             )
         cursor.close()
         connection.close()
+
+
+@pytest.fixture
+def restricted_reports(reports):
+    """Real module ownership chaining in a disposable local database.
+
+    Business calculation bodies remain counted probes, as in reports. The
+    validator, wrapper, transaction boundaries, receipt writes and DAL are real.
+    Neither the private archive body nor any production file is executed.
+    """
+    import pyodbc
+
+    r = reports
+    database = "K98RecoveryPermissionTest_" + uuid4().hex
+    cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE="
+    cs += database + ";Trusted_Connection=yes;TrustServerCertificate=yes"
+    r.owner.execute("CREATE DATABASE [" + database + "]")
+    owner = pyodbc.connect(cs, autocommit=True, timeout=5)
+    tables = (
+        "ExportJob",
+        "ExportJobResource",
+        "ExportAttempt",
+        "ExportPreparation",
+        "ExportPreparationResource",
+        "ExportResource",
+        "StatsImportExecution",
+        "ExportExecutionStream",
+        "StatsImportReportContinuation",
+        "ProcConfig",
+        "KingdomScanData4",
+        "KS4_ImportFileClaim",
+        "Update_ALL_Complete",
+        "StageProbe",
+        "StageFailure",
+    )
+    procedures = (
+        "usp_S11ValidateStatsReportStage",
+        "usp_S11CompleteStatsReportsCore",
+        "ARCHIVE_IMPORT_STAGING_FILE",
+        "usp_S11CompleteStatsReports",
+    )
+    try:
+        for table in tables:
+            owner.execute("SELECT * INTO dbo." + table + " FROM " + r.rewrite("dbo." + table))
+        for procedure in procedures:
+            name = r.rewrite("dbo." + procedure)
+            definition = r.owner.execute(
+                "SELECT definition FROM tempdb.sys.sql_modules WHERE object_id=OBJECT_ID(?)",
+                "tempdb.." + name,
+            ).fetchval()
+            for item in (*procedures, *tables):
+                definition = definition.replace(r.rewrite("dbo." + item), "dbo." + item)
+            owner.execute(definition)
+        owner.execute("CREATE USER S11_ExportApplication WITHOUT LOGIN")
+        # Same relevant grants as production. No table access to the claim and
+        # no direct execution of archive/core; static same-owner calls may work.
+        for table in (
+            "ExportPreparation",
+            "StatsImportExecution",
+            "ExportResource",
+            "ExportExecutionStream",
+            "StatsImportReportContinuation",
+        ):
+            owner.execute("GRANT SELECT, UPDATE ON dbo." + table + " TO S11_ExportApplication")
+        for procedure in ("usp_S11ValidateStatsReportStage", "usp_S11CompleteStatsReports"):
+            owner.execute("GRANT EXECUTE ON dbo." + procedure + " TO S11_ExportApplication")
+        owner.execute("DENY EXECUTE ON dbo.usp_S11CompleteStatsReportsCore TO public")
+
+        class Connection:
+            def __init__(self):
+                self.inner = pyodbc.connect(cs, autocommit=True, timeout=5)
+                self.inner.execute("EXECUTE AS USER='S11_ExportApplication'")
+
+            @property
+            def autocommit(self):
+                return self.inner.autocommit
+
+            @autocommit.setter
+            def autocommit(self, value):
+                self.inner.autocommit = value
+
+            def cursor(self):
+                inner = self.inner.cursor()
+
+                class Cursor:
+                    def execute(self, sql, *args):
+                        sql = sql.replace(
+                            "N'k98-legacy-output-snapshot'",
+                            "N'" + r.base.parameter("k98-legacy-output-snapshot") + "'",
+                        )
+                        inner.execute(sql, *(r.base.parameter(a) for a in args))
+                        return self
+
+                    def __getattr__(self, key):
+                        return getattr(inner, key)
+
+                return Cursor()
+
+            def close(self):
+                try:
+                    self.inner.execute("IF @@TRANCOUNT>0 ROLLBACK; REVERT;")
+                finally:
+                    self.inner.close()
+
+            def __getattr__(self, key):
+                return getattr(self.inner, key)
+
+        from services.stats_import_outcome_dal import StatsImportOutcomeDAL
+
+        dal = StatsReportContinuationDAL(
+            StatsImportOutcomeDAL(Connection, account="a", storage_owner="disk-a")
+        )
+        yield SimpleNamespace(dal=dal, owner=owner, connect=Connection, source=r.source)
+    finally:
+        owner.close()
+        # Only the database created above, on the fixed local test instance.
+        assert re.fullmatch(r"K98RecoveryPermissionTest_[0-9a-f]{32}", database)
+        r.owner.execute("ALTER DATABASE [" + database + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
+        r.owner.execute("DROP DATABASE [" + database + "]")
+
+
+def test_restricted_account_denies_direct_archive_but_completes_guarded_reports(restricted_reports):
+    r = restricted_reports
+    connection = r.connect()
+    try:
+        for statement in (
+            "EXEC dbo.ARCHIVE_IMPORT_STAGING_FILE @CompletedFileName=N'test.csv'",
+            "EXEC dbo.usp_S11CompleteStatsReportsCore @CompletedFileName=N'test.csv'",
+            "SELECT * FROM dbo.KS4_ImportFileClaim",
+        ):
+            with pytest.raises(Exception, match=r"\(229\)"):
+                connection.cursor().execute(statement)
+    finally:
+        connection.close()
+    before = r.owner.execute(
+        "SELECT ScanOrder,State,Resolution FROM dbo.StatsImportExecution"
+    ).fetchone()
+    first = r.dal.inspect(r.source)
+    action = str(uuid4())
+    r.dal.run(r.source, first["token"], action)
+    r.dal.run(r.source, first["token"], action)
+    assert r.dal.inspect(r.source)["complete"]
+    assert [
+        row[0] for row in r.owner.execute("SELECT Stage FROM dbo.StageProbe ORDER BY Stage")
+    ] == [1, 2, 3]
+    after = r.owner.execute(
+        "SELECT ScanOrder,State,Resolution FROM dbo.StatsImportExecution"
+    ).fetchone()
+    assert before[0] == after[0] and after[1] == "completed" and after[2] is None
+
+
+def test_restricted_account_preserves_committed_stage_after_failure(restricted_reports):
+    r = restricted_reports
+    r.owner.execute("INSERT dbo.StageFailure VALUES(2)")
+    first = r.dal.inspect(r.source)
+    with pytest.raises(Exception, match="injected report failure"):
+        r.dal.run(r.source, first["token"], str(uuid4()))
+    after = r.dal.inspect(r.source)
+    assert after["receipt"]["CompletedStage"] == 1
+    r.owner.execute("DELETE dbo.StageFailure")
+    r.dal.run(r.source, after["token"], str(uuid4()))
+    assert [
+        row[0] for row in r.owner.execute("SELECT Stage FROM dbo.StageProbe ORDER BY Stage")
+    ] == [1, 2, 3]
+
+
+def test_restricted_entry_rejects_changed_input_before_archive(restricted_reports):
+    r = restricted_reports
+    # A write in the archive probe proves validation runs before that module.
+    r.owner.execute(
+        "ALTER PROCEDURE dbo.ARCHIVE_IMPORT_STAGING_FILE @CompletedFileName nvarchar(260) AS INSERT dbo.StageProbe VALUES(99); RETURN 0;"
+    )
+    r.owner.execute("UPDATE dbo.ProcConfig SET ConfigValue=2")
+    with r.dal.guards.session(r.source) as connection:
+        with pytest.raises(Exception, match="configuration"):
+            connection.cursor().execute(
+                "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=?,@ExportPreparationID=?",
+                r.owner.execute(
+                    "SELECT CompletedFileName FROM dbo.StatsImportExecution"
+                ).fetchval(),
+                r.source,
+            )
+    assert r.owner.execute("SELECT COUNT(*) FROM dbo.StageProbe").fetchval() == 0

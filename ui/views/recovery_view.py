@@ -79,6 +79,10 @@ def incident_embed(row):
                 value=f"{publication['duration_seconds']:g} seconds (including waiting and verification)",
                 inline=False,
             )
+    if row.get("last_repair"):
+        embed.add_field(
+            name="Last repair result", value=row["last_repair"]["explanation"], inline=False
+        )
     if evidence.get("scan") is not None:
         embed.add_field(name="Committed scan", value=str(evidence["scan"]), inline=True)
     if evidence.get("season") is not None:

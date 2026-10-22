@@ -39,6 +39,8 @@ def _next_step(row, evidence, actions, blocked):
         ):
             return "This attempt is resolved. Open Choose configuration continuation to review whether to retry publication or keep the prior configuration; that separate decision still requires current verification."
         return "Resolved; no repair required."
+    if row.get("last_repair") and row["last_repair"]["state"] == "not_applied":
+        return row["last_repair"]["explanation"]
     if (
         row["SourceKind"] in {"evidence_batch", "historical_batch"}
         and evidence.get("outcome") == "running"
@@ -122,6 +124,7 @@ def incident_report(service, row):
                     "blocking_job_ids",
                     "recovery_links",
                     "receipt_diagnostics",
+                    "completed_reporting_stages",
                     "failure_context",
                     "group_id",
                     "approved_count",
@@ -150,6 +153,7 @@ def incident_report(service, row):
             required_repairs=required,
             pending_verification=current.get("pending_action"),
             publication_check=current.get("publication_check"),
+            last_repair=current.get("last_repair"),
             execution_progress=(
                 execution_progress(row["IncidentID"]) if current.get("pending_action") else None
             ),

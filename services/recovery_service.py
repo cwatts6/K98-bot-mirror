@@ -5,6 +5,7 @@ import logging
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.recovery_execution_guard import execution_progress, recovery_execution
+from services.recovery_failure_diagnostics import action_failure, action_result, retained_failure
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +49,11 @@ class RecoveryService:
             for action in self.store.pending_actions(incident_id):
                 outcome = adapter.reconcile(row["SourceID"], action)
                 if outcome:
-                    self.store.finish(
-                        incident_id, action["ActionID"], outcome, {"verification": outcome}
-                    )
+                    result = {"verification": outcome}
+                    failure = retained_failure(action)
+                    if failure:
+                        result["failure"] = failure
+                    self.store.finish(incident_id, action["ActionID"], outcome, result)
             return self._inspect(row)
 
     def _inspect(self, row):
@@ -67,6 +70,7 @@ class RecoveryService:
         return self.present(current)
 
     def present(self, row):
+        row["last_repair"] = action_result(self.store.latest_action(row["IncidentID"]))
         pending = self.store.pending_actions(row["IncidentID"])
         row["pending_action"] = (
             {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
@@ -398,11 +402,12 @@ class RecoveryService:
                 **(dict(payload=payload) if payload is not None else {}),
             )
         except Exception as exc:
+            failure = action_failure(exc, action_id)
             logger.warning(
-                "recovery_action_uncertain incident=%s action=%s error_type=%s",
+                "recovery_action_uncertain incident=%s action=%s failure=%s",
                 incident_id,
                 action_id,
-                type(exc).__name__,
+                failure,
             )
-            self.store.finish(incident_id, action_id, "unknown", {"error_type": type(exc).__name__})
+            self.store.finish(incident_id, action_id, "unknown", {"failure": failure})
         return self.present(self.store.get(incident_id))

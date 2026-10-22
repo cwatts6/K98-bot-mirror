@@ -1355,7 +1355,7 @@
       "object": "dbo.usp_S11CompleteStatsReports",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-      "source_sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4"
+      "source_sha256": "e6574a0924e6629f037e714882ab526fb87f274e4615c746f329d98c06a1c810"
     },
     {
       "object": "dbo.usp_S11ValidateStatsReportStage",
@@ -1384,7 +1384,7 @@
   ],
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
-  "legacy_source_sha256": "c27cd05695fef983d45fa0c152942eb9d0adb4e02719dd0cedb6bf4aa799c82c",
+  "legacy_source_sha256": "64f673aec3794b37443fa5500453ef427625b1d5fa80366ef5e5e40e13fc1880",
   "master_database_permissions": [
     "CONNECT"
   ],

@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import UTC, datetime
+import json
 from threading import Lock
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -53,6 +54,10 @@ class Store:
     def pending_actions(self, key):
         return [deepcopy(a) for a in self.actions if a["State"] in {"dispatched", "unknown"}]
 
+    def latest_action(self, key):
+        self.get(key)
+        return deepcopy(self.actions[-1]) if self.actions else None
+
     def latest_publication_action(self, key):
         self.get(key)
         return next(
@@ -92,7 +97,12 @@ class Store:
     def finish(self, key, action_id, state, result):
         for action in self.actions:
             if action["ActionID"] == str(action_id):
-                action.update(State=state, result=result, UpdatedUTC=datetime.now(UTC))
+                action.update(
+                    State=state,
+                    result=result,
+                    ResultJson=json.dumps(result),
+                    UpdatedUTC=datetime.now(UTC),
+                )
 
 
 class ImportDAL:

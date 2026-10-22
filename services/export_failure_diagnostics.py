@@ -5,6 +5,9 @@ import re
 from uuid import uuid4
 
 _CODE_FILES = {
+    "recovery_service.py",
+    "stats_report_continuation_dal.py",
+    "import_capture_recovery_dal.py",
     "export_coordination_service.py",
     "export_coordination_dal.py",
     "export_provider_adapter.py",
@@ -60,7 +63,7 @@ def failure_record(error, *, job_id=None, stage="delivery"):
         ),
         stage=(
             stage
-            if stage in {"authorization", "snapshot", "delivery", "terminal_record"}
+            if stage in {"authorization", "snapshot", "delivery", "terminal_record", "recovery"}
             else "unknown"
         ),
         exception_types=types,
@@ -83,7 +86,14 @@ def safe_failure_record(value):
         if observed.tzinfo is None:
             return None
         stage = value["stage"]
-        if stage not in {"authorization", "snapshot", "delivery", "terminal_record", "unknown"}:
+        if stage not in {
+            "authorization",
+            "snapshot",
+            "delivery",
+            "terminal_record",
+            "recovery",
+            "unknown",
+        }:
             return None
         types = value["exception_types"]
         states, numbers, locations = (
@@ -139,6 +149,7 @@ def recovery_failure_context(job, provenance):
         "delivery": "preparing or delivering the spreadsheet",
         "terminal_record": "recording the final outcome",
         "unknown": "an unidentified export stage",
+        "recovery": "checking a recovery action",
     }[record["stage"]]
     types = ", ".join(record["exception_types"]) or "unclassified error"
     return dict(
