@@ -35,7 +35,7 @@ class ProcessingPipelineRecovery:
         return self.dal.pending_recovery(after=after)
 
     def _state(self, source_id):
-        state = self.dal.snapshot(source_id)
+        state = self.dal.review_snapshot(source_id)
         children, reads = {}, {}
         for name in ("import", "player_cache", "configuration"):
             operation = state["stages"][name]["OperationID"]
@@ -43,11 +43,8 @@ class ProcessingPipelineRecovery:
             if name == "configuration":
                 reads[name] = self.dal.configuration_read(operation)
                 children[name] = self.dal.configuration_result(operation)
-        state.update(
-            children=children,
-            reads=reads,
-            current_registration=json.loads(self.dal.runtime.configuration),
-        )
+        self.dal.assert_review_current(self.dal.review_snapshot(source_id), state)
+        state.update(children=children, reads=reads)
         return state
 
     def inspect(self, source_id):
@@ -154,6 +151,7 @@ class ProcessingPipelineRecovery:
             actions=actions,
             recovery_links=links,
         )
+        self.dal.assert_review_current(self.dal.review_snapshot(source_id), state)
         return evidence, self.dal.token(state), not unfinished
 
     def review_details(self, source_id, action, token):
@@ -168,6 +166,8 @@ class ProcessingPipelineRecovery:
         ):
             raise SourceConflict("Pipeline review changed; reopen the incident.")
         state = self._state(source_id)
+        if self.dal.token(state) != token:
+            raise SourceConflict("Pipeline review changed; reopen the incident.")
         original = json.loads(state["run"]["RegistrationJson"])
         fields = []
         for consumer in ("config", "scan_data"):
@@ -197,7 +197,9 @@ class ProcessingPipelineRecovery:
             if complete or token != current or action not in evidence["actions"]:
                 raise SourceConflict("Pipeline evidence changed; review the current decision.")
             selected = evidence["selected_stage"]
-            state = self.dal.snapshot(source_id)
+            state = self._state(source_id)
+            if self.dal.token(state) != token:
+                raise SourceConflict("Pipeline evidence changed; reopen the confirmation.")
             result = None
             if action == "verify_stage":
                 result, verified = producer_evidence(
@@ -208,14 +210,15 @@ class ProcessingPipelineRecovery:
             self.dal.decide(
                 source_id,
                 selected,
-                self.dal.token(state),
+                token,
                 dict(
                     action=action_id,
                     token=token,
                     reason=reason,
                     choice=action,
-                    registration=json.loads(self.dal.runtime.configuration),
+                    registration=state["current_registration"],
                 ),
+                reviewed_state=state,
                 disposition=action == "retain_stage",
                 evidence=result,
             )

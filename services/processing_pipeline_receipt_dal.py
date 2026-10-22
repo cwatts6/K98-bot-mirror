@@ -5,7 +5,8 @@ import json
 from uuid import uuid4
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
-from services.export_coordination_dal import _cas, bounded_json, identity
+from services.export_contention import CoordinationLockRefused, sql_error_facts
+from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
 
 STAGES = (
     "import",
@@ -66,6 +67,110 @@ class PipelineReceiptDAL:
     def snapshot(self, run_id):
         with transaction(self.connect) as cursor:
             return self._snapshot(cursor, run_id)
+
+    def _review_snapshot(self, cursor, run_id):
+        """Lock the evidence behind confirmation, including absent associations.
+
+        The pipeline guard does not serialize independent producer recovery.
+        HOLDLOCK keeps its rows and association gaps stable through a decision.
+        No producer work or independent DAL transaction runs under these locks.
+        """
+        state = self._snapshot(cursor, run_id)
+        preparations, successors, receipts = {}, {}, {}
+        for name in ("import", "player_cache", "configuration"):
+            operation = identity(state["stages"][name]["OperationID"])
+            cursor.execute(
+                "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) "
+                "WHERE AccountKey=? AND StorageOwner=? AND ConsumerKind='scan_data' "
+                "AND JSON_VALUE(RequestJson,'$.request.producer.operation')=? ORDER BY PreparationID",
+                self.runtime.account,
+                self.runtime.store.storage_owner,
+                operation,
+            )
+            preparations[name] = rows(cursor)
+        cursor.execute(
+            "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) "
+            "WHERE AccountKey=? AND StorageOwner=? AND ConsumerKind='config' "
+            "AND JSON_VALUE(RequestJson,'$.request.configuration_import.producer.operation')=? "
+            "ORDER BY PreparationID",
+            self.runtime.account,
+            self.runtime.store.storage_owner,
+            identity(state["stages"]["configuration"]["OperationID"]),
+        )
+        preparations["configuration_read"] = rows(cursor)
+        for root in preparations["configuration"] + preparations["configuration_read"]:
+            marker = json.loads(root["GenerationJson"] or "{}").get("configuration_continuation")
+            if marker and marker.get("action"):
+                root_id = identity(root["PreparationID"])
+                cursor.execute(
+                    "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) "
+                    "WHERE AccountKey=? AND StorageOwner=? "
+                    "AND JSON_VALUE(RequestJson,'$.request.producer.parent')=? "
+                    "AND JSON_VALUE(RequestJson,'$.request.producer.operation')=? ORDER BY PreparationID",
+                    self.runtime.account,
+                    self.runtime.store.storage_owner,
+                    root_id,
+                    identity(marker["action"]),
+                )
+                successors[root_id] = rows(cursor)
+        identifiers = sorted(
+            {
+                identity(row["PreparationID"])
+                for group in (*preparations.values(), *successors.values())
+                for row in group
+            }
+        )
+        for preparation_id in identifiers:
+            proof = receipts[preparation_id] = {}
+            # These are the source rows used by the independent import,
+            # configuration publication and withdrawn-read validators.
+            for table, column, order in (
+                ("StatsImportExecution", "PreparationID", "PreparationID"),
+                ("ExportPreparationResource", "PreparationID", "ResourceKey"),
+                ("ExportResource", "ActivePreparationID", "ResourceKey"),
+                ("ExportExecutionStream", "PreparationID", "StreamID"),
+            ):
+                cursor.execute(
+                    f"SELECT * FROM dbo.{table} WITH (UPDLOCK,HOLDLOCK) "
+                    f"WHERE {column}=? ORDER BY {order}",
+                    preparation_id,
+                )
+                proof[table] = rows(cursor)
+        state.update(
+            review_associations=dict(
+                preparations=preparations, successors=successors, receipts=receipts
+            ),
+            current_registration=json.loads(self.runtime.configuration),
+        )
+        return state
+
+    def review_snapshot(self, run_id):
+        with self._review_transaction() as cursor:
+            return self._review_snapshot(cursor, run_id)
+
+    @contextmanager
+    def _review_transaction(self):
+        try:
+            with transaction(self.connect) as cursor:
+                # Match admission's account-first ordering. Direct SQL producers
+                # need not hold that mutex: never wait on their row locks while
+                # retaining another part of the evidence snapshot.
+                cursor.execute("SET LOCK_TIMEOUT 0")
+                _mutex(cursor, "account:" + self.runtime.account)
+                yield cursor
+        except Exception as error:
+            if (
+                isinstance(error, CoordinationLockRefused)
+                or 1222 in sql_error_facts(error)["native_errors"]
+            ):
+                raise SourceConflict(
+                    "Pipeline evidence is busy; wait for the active worker and reopen the review."
+                ) from error
+            raise
+
+    def assert_review_current(self, current, reviewed):
+        if self.token(current) != self.token({key: reviewed[key] for key in current}):
+            raise SourceConflict("Pipeline evidence changed; reopen the confirmation.")
 
     @contextmanager
     def guard(self, run_id):
@@ -195,14 +300,21 @@ class PipelineReceiptDAL:
         state = contract(self.runtime, outcomes).snapshot(identity(root["PreparationID"]))
         return state["child"] if state["marker"]["choice"] == "retry" else original
 
-    def decide(self, run_id, stage, token, marker, *, disposition=False, evidence=None):
+    def decide(
+        self, run_id, stage, token, marker, *, reviewed_state, disposition=False, evidence=None
+    ):
         """Save a separate decision and preserve its predecessor, including unknown work."""
         if stage not in STAGES or (stage == "import" and not disposition and evidence is None):
             raise SourceConflict("The committed import cannot be dispatched by pipeline recovery.")
-        with transaction(self.connect) as cursor:
-            state = self._snapshot(cursor, run_id)
-            if self.token(state) != token:
-                raise SourceConflict("Pipeline evidence changed; reopen the confirmation.")
+        if (
+            self.token(reviewed_state) != token
+            or marker.get("token") != token
+            or marker.get("registration") != reviewed_state["current_registration"]
+        ):
+            raise SourceConflict("The full confirmed pipeline evidence is required.")
+        with self._review_transaction() as cursor:
+            state = self._review_snapshot(cursor, run_id)
+            self.assert_review_current(state, reviewed_state)
             row = state["stages"][stage]
             history = json.loads(row["DecisionJson"] or "[]")
             history.append(

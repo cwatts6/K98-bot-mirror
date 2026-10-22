@@ -202,7 +202,13 @@ def test_pipeline_cannot_export_a_sql_only_configuration_successor(
         reads={"configuration": None},
         run={"InputsJson": "{}"},
     )
-    adapter = ProcessingPipelineRecovery(SimpleNamespace(token=lambda _: "a" * 64))
+    adapter = ProcessingPipelineRecovery(
+        SimpleNamespace(
+            token=lambda _: "a" * 64,
+            review_snapshot=lambda _: state,
+            assert_review_current=lambda *_: None,
+        )
+    )
     monkeypatch.setattr(adapter, "_state", lambda _: state)
     evidence, _, complete = adapter.inspect(str(uuid4()))
     assert not complete

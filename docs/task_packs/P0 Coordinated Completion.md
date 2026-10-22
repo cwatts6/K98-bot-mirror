@@ -101,7 +101,15 @@ compare-and-swap prove it is safe. Prepared/running detached imports still block
 
 The UI retains return links after verified evidence repair or disposition so the
 original unfinished operation stays reachable. No new commands or activation flags
-are introduced. The SQL migration adds six tables and changes four procedures.
+are introduced. The SQL migration adds six tables and changes five procedures.
+
+Pipeline decisions bind the complete confirmation token to run/stage rows, scoped
+producer and configuration-read associations, exact saved successors, execution
+receipts, reservations and current registration. The DAL rechecks those source rows
+and absent associations under transaction-held locks before recording a decision.
+Independent producer recovery cannot substitute newer evidence for the confirmed
+snapshot. SQL regressions cover all three actions, late association changes, mixed
+reads, concurrent writes/inserts and lost-reply reconciliation without import replay.
 
 ## F01-F05 qualification matrix
 
