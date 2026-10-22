@@ -1,6 +1,7 @@
 """Persisted recovery errors survive reconciliation without exposing SQL prose."""
 
 import json
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pyodbc
@@ -8,6 +9,49 @@ import pytest
 
 from services.recovery_failure_diagnostics import action_failure, action_result
 from tests.test_guided_recovery import execute, setup
+
+
+@pytest.mark.parametrize("kind", ["verify_publication", "retry_absent", "rebuild_damaged"])
+def test_initial_publication_refusal_settles_without_repeating_probe_or_preparation(kind):
+    from kvk.dal.new_source_import_dal import SourceConflict
+    from services.recovery_service import RecoveryService
+    from tests.test_export_recovery import job_fixture
+    from tests.test_guided_recovery import Store
+
+    state = {
+        "verify_publication": "uncertain",
+        "retry_absent": "failed",
+        "rebuild_damaged": "confirmed",
+    }[kind]
+    adapter, snapshot = job_fixture(state=state, attempted=True)
+    if kind != "verify_publication":
+        snapshot["job"]["ProvenanceJson"] = json.dumps(
+            {
+                "reconciliations": [
+                    {"proof": {"state": "absent" if kind == "retry_absent" else "damaged"}}
+                ]
+            }
+        )
+    adapter.discovery.repairs.return_value = []
+    adapter.coordinator.repair_receipt.return_value = None
+    adapter.reconciler.probe.side_effect = SourceConflict("Private probe refusal")
+    adapter.rebuild_plan = Mock(side_effect=SourceConflict("Private preparation refusal"))
+    store = Store()
+    service = RecoveryService(store, {adapter.kind: adapter}, admin_id=1, guild_id=2, channel_id=3)
+    source = snapshot["job"]["JobID"]
+    evidence, token, resolved = adapter.inspect(source)
+    row = store.observe(adapter.kind, source, evidence, token, resolved=resolved)
+
+    current = execute(service, row, action=kind)
+    assert store.actions[0]["State"] == "not_applied"
+    assert current["last_repair"]["failure"]["exception_types"][0] == "PublicationCheckUnavailable"
+    restarted = RecoveryService(store, service.adapters, admin_id=1, guild_id=2, channel_id=3)
+    restarted.refresh(row["IncidentID"])
+    assert adapter.reconciler.probe.call_count == (1 if kind == "verify_publication" else 0)
+    assert adapter.rebuild_plan.call_count == (0 if kind == "verify_publication" else 1)
+    adapter.coordinator.admit_repair.assert_not_called()
+    adapter.coordinator.reconcile_operator.assert_not_called()
+    assert len(store.actions) == 1
 
 
 def test_sql_permission_failure_survives_not_applied_readback(caplog):

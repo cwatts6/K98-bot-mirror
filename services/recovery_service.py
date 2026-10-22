@@ -409,5 +409,12 @@ class RecoveryService:
                 action_id,
                 failure,
             )
-            self.store.finish(incident_id, action_id, "unknown", {"failure": failure})
+            # Existing adapters use this bounded marker to settle an initial
+            # publication refusal without repeating its probe or preparation.
+            self.store.finish(
+                incident_id,
+                action_id,
+                "unknown",
+                {"error_type": failure["exception_types"][0], "failure": failure},
+            )
         return self.present(self.store.get(incident_id))
