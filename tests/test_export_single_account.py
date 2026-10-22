@@ -194,7 +194,7 @@ def test_source_inventory_digest_tracks_pinned_git_bytes_and_rejects_old_pin():
         (Path(__file__).parents[1] / "deploy/export_application_schema_source.json").read_bytes()
     )
     names = {item["name"] for item in manifest}
-    assert len(manifest) == len(names) == 568
+    assert len(manifest) == len(names) == 569
     assert {
         "dbo.ExportContainmentAttestation",
         "dbo.ExportRegistrationAttestation",
@@ -203,6 +203,7 @@ def test_source_inventory_digest_tracks_pinned_git_bytes_and_rejects_old_pin():
         "dbo.ProcessingPipelineStage",
         "dbo.StatsImportReportContinuation",
         "dbo.usp_S11CompleteStatsReports",
+        "dbo.usp_S11CompleteStatsReportsCore",
         "dbo.usp_S11ValidateStatsReportStage",
     } <= names
     assert digest(manifest).hex() == APPLICATION_SCHEMA_SOURCE_HASH
