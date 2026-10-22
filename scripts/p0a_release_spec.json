@@ -34,11 +34,11 @@
             "type": "U"
           }
         ],
-        "metadata_hash": "46df76d74cf1358170f6d352ba4e6be748ddf5ee834c27acee9344f5dc3bad05",
-        "permissions_hash": "f1ddcf2ff6d6c871c32d1b014258bd40f2901eb73964cbb64f19b5f035c2f2f2",
+        "metadata_hash": "09aef27755698baaf228718ae206d0076ab8ccbc4350863febfff775155aa488",
+        "permissions_hash": "36b84d4114fab0817be92527fa7a0b32dcffbf61a5777b5ebc09cb87f1044587",
         "principal": "S11_ExportApplication",
         "review_id": "e41429d6-ea59-56df-989d-b8d545c785ca",
-        "scope_hash": "2b4088d0a33b41cdcbdb2495fff1622ace0bb67b5914ece35c94cf6c28971d8f",
+        "scope_hash": "19589723c81882c8a4c6597236fc1e51247604a85e1ea3a9622eb66b5d871a0b",
         "server": "mini_AMD",
         "sources": [
           {
@@ -2642,7 +2642,7 @@
           {
             "name": "dbo.UPDATE_ALL2",
             "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-            "sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d",
+            "sha256": "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978",
             "type": "P"
           },
           {
@@ -3128,7 +3128,13 @@
           {
             "name": "dbo.usp_S11CompleteStatsReports",
             "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-            "sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b",
+            "sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4",
+            "type": "P"
+          },
+          {
+            "name": "dbo.usp_S11CompleteStatsReportsCore",
+            "path": "sql_schema/dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql",
+            "sha256": "d7e2fe51c5045e33d3f92a60bf28d3257eb08e56bf43269cd623cee6d3261bc9",
             "type": "P"
           },
           {
@@ -6859,7 +6865,7 @@
       "after": {
         "database": "ROK_TRACKER",
         "login_sid": "4cd6a8a024f24341accad859487b5075",
-        "metadata_hash": "8042ffa23115e9d6ec0436258b0c8ec7f1f809a418edb6cd0c4a32a271b77bc6",
+        "metadata_hash": "e65ae13610c1a6ac75ff88eac78be2c9c7821cf8024516ba96c8fdde31638488",
         "migration_hash": "06ae12fe70cd66778f6ef41cdeebc0f614fa82894712215d018f4d042812c58e",
         "module_amendment": "20261008_001_sql_auth_import_file_visibility",
         "outcome_installation": {
@@ -7339,19 +7345,19 @@
                 "dbo.CLAIM_KS4_IMPORT_FILE",
                 "dbo.IMPORT_STAGING_PROC_CORE",
                 "dbo.Refresh_PlayerScanMeta",
-                "dbo.usp_S11CompleteStatsReports",
+                "dbo.usp_S11CompleteStatsReportsCore",
                 "dbo.usp_UpsertGovernorNameHistoryForScan",
                 "sp_executesql"
               ],
               "compatible_definition_sha256": [
-                "d0b5f9317651a8b271acc91bddd71b2e7013c8f54677a5c8c14ae0e5e5bcaca8"
+                "2c3d4f0a411639e3acfb48adfee4de011d46fb0c6f4dc311bf5d38139f571a84"
               ],
-              "definition_sha256": "d45eab56aaf1a47c5cb6b1894f079da15fae6b8136d38ad41185d53abe20eb4d",
+              "definition_sha256": "873e30f87ec06efb1d38a281494a1a1bb08ad07ccb8ce77e9b8e0558c75f9c15",
               "execute_as": null,
               "name": "dbo.UPDATE_ALL2",
               "object_type": "P",
               "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-              "source_sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d"
+              "source_sha256": "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978"
             },
             {
               "calls": [],
@@ -7527,6 +7533,20 @@
             },
             {
               "calls": [
+                "dbo.usp_S11CompleteStatsReportsCore"
+              ],
+              "compatible_definition_sha256": [
+                "95de9061208bb548ef113d16efe381134a35188f91f5e65a085b1470f372413a"
+              ],
+              "definition_sha256": "78fd1381a630d4ec23fce8a1c4381642956a32d7b7145d74e457f63d8a6d3fd7",
+              "execute_as": null,
+              "name": "dbo.usp_S11CompleteStatsReports",
+              "object_type": "P",
+              "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
+              "source_sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4"
+            },
+            {
+              "calls": [
                 "dbo.CREATE_DASH2",
                 "dbo.CREATE_THE_AVERAGES",
                 "dbo.GOVERNOR_NAMES_PROC",
@@ -7538,14 +7558,14 @@
                 "dbo.usp_S11ValidateStatsReportStage"
               ],
               "compatible_definition_sha256": [
-                "1e944df22beab0900a36c894d1bc8ca2c454853ba04ebf3c3a1ea1c4769b5182"
+                "775bbb5a24f9a37f928896181faf2364438dbda04e738fd47562b07bfc30c712"
               ],
-              "definition_sha256": "062e9b6583c7bb7813cce1984f609de73cdd73019e7e713b4b6fb42ea47fad98",
+              "definition_sha256": "4600b4c18024583b1b5ec76c7cc6d68a134708ea105bdd860eb78ff7b15f4a8d",
               "execute_as": null,
-              "name": "dbo.usp_S11CompleteStatsReports",
+              "name": "dbo.usp_S11CompleteStatsReportsCore",
               "object_type": "P",
-              "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-              "source_sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b"
+              "path": "sql_schema/dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql",
+              "source_sha256": "d7e2fe51c5045e33d3f92a60bf28d3257eb08e56bf43269cd623cee6d3261bc9"
             },
             {
               "calls": [
@@ -8672,7 +8692,7 @@
       "path": "services/export_evidence_recovery.py"
     },
     {
-      "after": "82987ea9a5a78cf91c4404623e6789d4377cc4a9e75a7695ed54fd6855cd26df",
+      "after": "2f733e6e39e88ecfb5e50dc0984f94881a4da81bb35efe3ff908845bc41f0bde",
       "before": "934ec13bb0914b1a41c0d2d4d319e4311d409dbb339ea894858b5b2ad04864e4",
       "path": "services/export_execution_dal.py"
     },
@@ -8702,7 +8722,7 @@
       "path": "services/export_replacement_origin.py"
     },
     {
-      "after": "5fbf1ebbce1d10c1c3f3ec5a897e6dea7c4e44fc6ad9b2132e4a176d8b07c135",
+      "after": "b557116f5a4b03c66727ba03f0449893717028f9dbc949ccf4192f5e0f3c46f5",
       "before": "c49e1248d99f473b72bff05a7bf64144268ab9eb183fe4fcf68543dc597ed77a",
       "path": "services/export_sql_direct_permissions.py"
     },
@@ -8798,7 +8818,7 @@
     }
   ],
   "sql": {
-    "commit": "203f90cd94a351f11865f5e339f352f0214d2a0d",
+    "commit": "db18f23730521a41a215b744957cd61002eedf8d",
     "members": [
       {
         "path": "deploy/Deploy-SqlMigration.ps1",
@@ -8810,11 +8830,11 @@
       },
       {
         "path": "deploy/SqlDeploy.RecoveryRelease.ps1",
-        "sha256": "2e278c5b199c2da9ffafc2a82c7f4ce083f81d86368a7ad4344ef7103f5b36c5"
+        "sha256": "720eafbf0c33c78f35491a123e5ea9cb66ed68d5fa8e30cb551454fee0607c9f"
       },
       {
         "path": "migrations/20261022_001_p0_pipeline_receipts.sql",
-        "sha256": "3ab8803851fdcaf21cbe256ddbba049517f605a637ed05c5f7d8021ca0ad0194"
+        "sha256": "90bba6abaef59f24f027d9059d0d41b7d944b06bc311e6bde761a574adc88f87"
       }
     ],
     "profile": {
@@ -8850,14 +8870,19 @@
           "name": "dbo.StatsImportReportContinuation"
         },
         {
-          "after": "b9e3772d611ba7aecda55b9229c5fc917f82ea2838986a22fb6e4311e68628c6",
+          "after": "0bb1171227bdf0d8dba40b1239cf35c2397219cc3e65b6b9339365dc0fe418b6",
           "before": "78d4db9dec9a22601631651a01043acf7c7c2b1a8944ec211149926b30417759",
           "name": "dbo.UPDATE_ALL2"
         },
         {
-          "after": "9aa79e7a957803bb55f7e545b8e349258b329f5e7d776eea4cd9d021cf30878a",
+          "after": "39336de3157b03bce8c68a465edda8b6ec9ac86d2f453c2c2dfbc431915bb42e",
           "before": "5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792",
           "name": "dbo.usp_S11CompleteStatsReports"
+        },
+        {
+          "after": "1e87cdd3a7fc051e4dd5f9c5319bf6e03a19b93393d34619fe3162014aff6c10",
+          "before": "5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792",
+          "name": "dbo.usp_S11CompleteStatsReportsCore"
         },
         {
           "after": "fced6dcd192a8421a854d1b114761c73ad78e4633ff16ce0a4e8558465ab42e9",
@@ -8957,7 +8982,7 @@
       "scripts": [
         {
           "id": "20261022_001_p0_pipeline_receipts",
-          "sha256": "3ab8803851fdcaf21cbe256ddbba049517f605a637ed05c5f7d8021ca0ad0194"
+          "sha256": "90bba6abaef59f24f027d9059d0d41b7d944b06bc311e6bde761a574adc88f87"
         }
       ],
       "version": 1

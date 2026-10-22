@@ -115,22 +115,27 @@ are introduced. The SQL migration adds six tables and changes four procedures.
 
 ## SQL and release evidence
 
-The SQL candidate is `203f90cd94a351f11865f5e339f352f0214d2a0d` over
-`716c74ebbced800de8243892a7bce6a5ebac380c`. Its Changes review
-`31697a73-3524-4af7-a405-00ecccf1aa94` completed with no findings across all
-23 changed files. The generated migration and retained baseline were independently
-checked against exact source. Historical SQL whitespace is retained intentionally
+The SQL candidate is `db18f23730521a41a215b744957cd61002eedf8d` over
+`716c74ebbced800de8243892a7bce6a5ebac380c`. Its recovery reporting entry point
+requires a non-NULL preparation ID. The legacy nullable `UPDATE_ALL2` call uses
+an internal same-owner reporting core, with direct EXECUTE denied to `public`.
+Restricted-user regression cases cover omitted/NULL IDs, dynamic and nested calls,
+core invocation and legitimate static legacy/recovery chains. The existing trusted
+application ALTER capabilities are outside this entry-point boundary. Final exact
+Changes review evidence is recorded in the release handoff.
+
+Historical SQL whitespace is retained intentionally
 where it forms an authenticated preimage; it is not normalized to satisfy a cosmetic
 diff check.
 
 The disposable migration rehearsal passes live-writer refusal, precommit rollback,
 apply/reapply, disabled-check refusal and changed-procedure refusal. A separately
 installed literal-source reference is compared with the real protected adapter's
-result across 459 application objects, effective permissions and three startup
+result across 460 application objects, effective permissions and three startup
 contracts. This is no production migration or populated business-data benchmark.
 
 The updater uses finite profile `20261022_002_p0_completion_release`, one child
-migration, ten pinned images, the deployed private predecessor and exact runtime
+migration, eleven pinned images, the deployed private predecessor and exact runtime
 source pairs. It drains before SQL, then installs matching source/seed and verifies
 one successor. A bot-only rollback after schema change is unsupported because the
 previous whole-application contract rejects the new schema. Preserve receipts and

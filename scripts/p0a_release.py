@@ -88,7 +88,7 @@ def validate_sql_policy(sql):
         ),
         (
             profile["images"],
-            10 if completion else 26,
+            11 if completion else 26,
             {"name", "before", "after"},
             "name",
             r"(?:dbo|KVK)\.[A-Za-z0-9_]+",

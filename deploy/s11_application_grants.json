@@ -1271,7 +1271,7 @@
       "object": "dbo.UPDATE_ALL2",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.UPDATE_ALL2.StoredProcedure.sql",
-      "source_sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d"
+      "source_sha256": "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978"
     },
     {
       "object": "dbo.sp_TARGETS_MASTER",
@@ -1355,7 +1355,7 @@
       "object": "dbo.usp_S11CompleteStatsReports",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-      "source_sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b"
+      "source_sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4"
     },
     {
       "object": "dbo.usp_S11ValidateStatsReportStage",
@@ -1384,7 +1384,7 @@
   ],
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
-  "legacy_source_sha256": "6accce17fde94ff272cebfceb8ee86436ca974ba965fe6f368fb29c258e70eea",
+  "legacy_source_sha256": "c27cd05695fef983d45fa0c152942eb9d0adb4e02719dd0cedb6bf4aa799c82c",
   "master_database_permissions": [
     "CONNECT"
   ],

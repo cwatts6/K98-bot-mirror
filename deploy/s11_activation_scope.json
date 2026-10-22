@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "203f90cd94a351f11865f5e339f352f0214d2a0d",
+  "sql_revision": "db18f23730521a41a215b744957cd61002eedf8d",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -221,6 +221,7 @@
     "dbo.usp_RecordKvkFinalReportCompletion",
     "dbo.usp_RecordLeadershipPlayerReviewAudit",
     "dbo.usp_S11CompleteStatsReports",
+    "dbo.usp_S11CompleteStatsReportsCore",
     "dbo.usp_S11RunStatsImport",
     "dbo.usp_S11ValidateStatsReportStage",
     "dbo.usp_SetAllianceActivitySnapshotCompletion",
@@ -680,6 +681,7 @@
     "dbo.usp_RecordKvkFinalReportCompletion",
     "dbo.usp_RecordLeadershipPlayerReviewAudit",
     "dbo.usp_S11CompleteStatsReports",
+    "dbo.usp_S11CompleteStatsReportsCore",
     "dbo.usp_S11RunStatsImport",
     "dbo.usp_S11ValidateStatsReportStage",
     "dbo.usp_SetAllianceActivitySnapshotCompletion",
@@ -1814,7 +1816,7 @@
       "dbo.sp_ExcelOutput_ByKVK",
       "dbo.sp_Rebuild_ExcelForDashboard",
       "dbo.sp_RefreshInactiveGovernors",
-      "dbo.usp_S11CompleteStatsReports",
+      "dbo.usp_S11CompleteStatsReportsCore",
       "dbo.usp_UpsertGovernorNameHistoryForScan"
     ],
     "dbo.UPDATE_RALLY_DATA": [
@@ -2652,6 +2654,9 @@
       "dbo.StatsImportReportContinuation"
     ],
     "dbo.usp_S11CompleteStatsReports": [
+      "dbo.usp_S11CompleteStatsReportsCore"
+    ],
+    "dbo.usp_S11CompleteStatsReportsCore": [
       "dbo.ACQUIRE_KS4_IMPORT_LOCK",
       "dbo.ALL_STATS_FOR_DASHBAORD",
       "dbo.ARCHIVE_IMPORT_STAGING_FILE",

@@ -2601,7 +2601,7 @@
     "name": "dbo.UPDATE_ALL2",
     "type": "P",
     "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-    "sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d"
+    "sha256": "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978"
   },
   {
     "name": "dbo.UPDATE_RALLY_DATA",
@@ -3087,7 +3087,13 @@
     "name": "dbo.usp_S11CompleteStatsReports",
     "type": "P",
     "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-    "sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b"
+    "sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4"
+  },
+  {
+    "name": "dbo.usp_S11CompleteStatsReportsCore",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql",
+    "sha256": "d7e2fe51c5045e33d3f92a60bf28d3257eb08e56bf43269cd623cee6d3261bc9"
   },
   {
     "name": "dbo.usp_S11RunStatsImport",

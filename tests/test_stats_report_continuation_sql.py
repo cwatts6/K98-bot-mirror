@@ -40,6 +40,7 @@ def reports(recovery):
             "StageProbe",
             "StageFailure",
             "usp_S11ValidateStatsReportStage",
+            "usp_S11CompleteStatsReportsCore",
             "usp_S11CompleteStatsReports",
             "ARCHIVE_IMPORT_STAGING_FILE",
         )
@@ -112,12 +113,12 @@ def reports(recovery):
     try:
         # Syntax/binding compilation of the unchanged business procedure. It is
         # never executed in master and references no real production database.
-        raw = (schema / "dbo.usp_S11CompleteStatsReports.StoredProcedure.sql").read_text(
+        raw = (schema / "dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql").read_text(
             encoding="utf-8-sig"
         )
         compile_name = "##ReportCompile_" + namespace
         body = raw[raw.index("CREATE OR ALTER PROCEDURE") :].replace(
-            "dbo.usp_S11CompleteStatsReports", compile_name, 1
+            "dbo.usp_S11CompleteStatsReportsCore", compile_name, 1
         )
         r.owner.execute(body)
         procedures.append(compile_name)
@@ -169,6 +170,12 @@ def reports(recovery):
         body = body[body.index("CREATE OR ALTER PROCEDURE") :]
         assert not re.search(r"\b(?:dbo|KVK)\.[A-Za-z_]", rewrite(body))
         r.owner.execute(rewrite(body))
+        procedures.append(names["dbo.usp_S11CompleteStatsReportsCore"])
+        wrapper = (schema / "dbo.usp_S11CompleteStatsReports.StoredProcedure.sql").read_text(
+            encoding="utf-8-sig"
+        )
+        wrapper = wrapper[wrapper.index("CREATE OR ALTER PROCEDURE") :]
+        r.owner.execute(rewrite(wrapper))
         procedures.append(names["dbo.usp_S11CompleteStatsReports"])
         r.owner.execute(
             rewrite(
@@ -253,3 +260,33 @@ def test_missing_contract_is_not_backfilled_and_stale_confirmation_is_rejected(r
     r.owner.execute(r.rewrite("DELETE dbo.StatsImportReportContinuation"))
     with pytest.raises(SourceConflict, match="Historical partial"):
         r.dal.inspect(r.source)
+
+
+@pytest.mark.parametrize("arguments", ["", ", @ExportPreparationID=NULL"])
+@pytest.mark.parametrize("dynamic", [False, True])
+def test_direct_reporting_without_receipt_is_rejected_before_writes(reports, arguments, dynamic):
+    r = reports
+    statement = "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=N'test.csv'" + arguments
+    if dynamic:
+        statement = "EXEC sys.sp_executesql N'" + statement.replace("'", "''") + "'"
+    with pytest.raises(Exception, match="Recovery reporting requires a preparation ID"):
+        r.owner.execute(r.rewrite(statement))
+    assert r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.StageProbe")).fetchval() == 0
+    assert (
+        r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.Update_ALL_Complete")).fetchval() == 0
+    )
+    assert r.owner.execute("SELECT @@TRANCOUNT").fetchval() == 0
+
+
+def test_nonnull_reporting_still_requires_both_producer_guards(reports):
+    r = reports
+    with pytest.raises(Exception, match="Both independent producer session guards"):
+        r.owner.execute(
+            r.rewrite(
+                "EXEC dbo.usp_S11CompleteStatsReports "
+                "@CompletedFileName=N'test.csv',@ExportPreparationID=?"
+            ),
+            str(uuid4()),
+        )
+    assert r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.StageProbe")).fetchval() == 0
+    assert r.owner.execute("SELECT @@TRANCOUNT").fetchval() == 0

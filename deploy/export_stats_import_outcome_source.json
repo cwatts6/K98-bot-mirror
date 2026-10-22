@@ -313,8 +313,8 @@
     {
       "name": "dbo.UPDATE_ALL2",
       "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-      "source_sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d",
-      "definition_sha256": "d45eab56aaf1a47c5cb6b1894f079da15fae6b8136d38ad41185d53abe20eb4d",
+      "source_sha256": "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978",
+      "definition_sha256": "873e30f87ec06efb1d38a281494a1a1bb08ad07ccb8ce77e9b8e0558c75f9c15",
       "object_type": "P",
       "execute_as": null,
       "calls": [
@@ -323,12 +323,12 @@
         "dbo.CLAIM_KS4_IMPORT_FILE",
         "dbo.IMPORT_STAGING_PROC_CORE",
         "dbo.Refresh_PlayerScanMeta",
-        "dbo.usp_S11CompleteStatsReports",
+        "dbo.usp_S11CompleteStatsReportsCore",
         "dbo.usp_UpsertGovernorNameHistoryForScan",
         "sp_executesql"
       ],
       "compatible_definition_sha256": [
-        "d0b5f9317651a8b271acc91bddd71b2e7013c8f54677a5c8c14ae0e5e5bcaca8"
+        "2c3d4f0a411639e3acfb48adfee4de011d46fb0c6f4dc311bf5d38139f571a84"
       ]
     },
     {
@@ -506,8 +506,22 @@
     {
       "name": "dbo.usp_S11CompleteStatsReports",
       "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
-      "source_sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b",
-      "definition_sha256": "062e9b6583c7bb7813cce1984f609de73cdd73019e7e713b4b6fb42ea47fad98",
+      "source_sha256": "c9d18863da167e98859d8924d04c04286c03fa92cb7b7d3b3cf79dc27e42bdc4",
+      "definition_sha256": "78fd1381a630d4ec23fce8a1c4381642956a32d7b7145d74e457f63d8a6d3fd7",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.usp_S11CompleteStatsReportsCore"
+      ],
+      "compatible_definition_sha256": [
+        "95de9061208bb548ef113d16efe381134a35188f91f5e65a085b1470f372413a"
+      ]
+    },
+    {
+      "name": "dbo.usp_S11CompleteStatsReportsCore",
+      "path": "sql_schema/dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql",
+      "source_sha256": "d7e2fe51c5045e33d3f92a60bf28d3257eb08e56bf43269cd623cee6d3261bc9",
+      "definition_sha256": "4600b4c18024583b1b5ec76c7cc6d68a134708ea105bdd860eb78ff7b15f4a8d",
       "object_type": "P",
       "execute_as": null,
       "calls": [
@@ -522,7 +536,7 @@
         "dbo.usp_S11ValidateStatsReportStage"
       ],
       "compatible_definition_sha256": [
-        "1e944df22beab0900a36c894d1bc8ca2c454853ba04ebf3c3a1ea1c4769b5182"
+        "775bbb5a24f9a37f928896181faf2364438dbda04e738fd47562b07bfc30c712"
       ]
     },
     {
