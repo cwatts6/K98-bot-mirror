@@ -119,7 +119,7 @@ def test_sql_inventory_to_admin_restore_then_original_history_verification(rpc, 
         path.unlink()
     else:
         path.write_bytes(b"damaged")
-    with pytest.raises(SourceConflict, match="Private replacement evidence"):
+    with pytest.raises(SourceConflict, match="separate verified registration attestation"):
         r.broker.replacements.current()
     adapter = EvidenceRecoveryAdapter(r.rpc_runtime.client)
     service = RecoveryService(

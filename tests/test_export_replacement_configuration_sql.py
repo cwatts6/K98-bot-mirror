@@ -262,7 +262,9 @@ def test_source_prerequisites_are_checked_without_creating_requests(shared, faul
     }
     period, config = str(uuid4()), str(uuid4())
     r.f.sql.execute(
-        "INSERT #SeasonSource VALUES (42,?,?)",
+        "INSERT #SeasonSource (KVK_NO,SourceKey,SeasonState,ChoiceID,ChosenBy,ChosenUTC,"
+        "Reason,ProvenanceJson,SeasonVersion) "
+        "VALUES (42,?,?,NEWID(),'test',SYSUTCDATETIME(),'temporary fixture','{}',1)",
         SOURCE_KEY,
         "closed" if fault == "closed" else "open",
     )
@@ -308,7 +310,13 @@ def test_valid_source_preflight_does_not_create_configuration_requests(shared, m
     }
     period, config = str(uuid4()), str(uuid4())
     state = "closed" if mode == "unchanged_closed_weights" else "open"
-    r.f.sql.execute("INSERT #SeasonSource VALUES (42,?,?)", SOURCE_KEY, state)
+    r.f.sql.execute(
+        "INSERT #SeasonSource (KVK_NO,SourceKey,SeasonState,ChoiceID,ChosenBy,ChosenUTC,"
+        "Reason,ProvenanceJson,SeasonVersion) "
+        "VALUES (42,?,?,NEWID(),'test',SYSUTCDATETIME(),'temporary fixture','{}',1)",
+        SOURCE_KEY,
+        state,
+    )
     r.f.sql.execute("INSERT #SourcePeriod VALUES (?,?,42,'pass4','fight')", period, SOURCE_KEY)
     r.f.sql.execute("INSERT #SourceConfigVersion VALUES (?,?,42,1)", config, SOURCE_KEY)
     r.f.sql.execute(

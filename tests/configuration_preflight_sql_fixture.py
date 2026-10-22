@@ -38,6 +38,10 @@ def install_preflight_tables(monkeypatch, fixture):
 
     monkeypatch.setattr(fixture_module, "local_sql", rewrite)
     for name, columns in TABLE_COLUMNS.items():
+        if name in fixture_module.TABLES:
+            # The shared recovery fixture now provides the authoritative table.
+            # Retain its constraints instead of replacing it with a projection.
+            continue
         fixture.sql.execute(f"CREATE TABLE #{name.split('.')[1]} ({columns})")
     fixture.sql.execute("INSERT #KingdomScanData4 (ScanOrder) VALUES (101),(107)")
     fixture.sql.commit()
