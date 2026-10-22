@@ -16,7 +16,10 @@ def historical_runtime_hash(root, path):
     # This immutable fixture is the original P0 completion policy's source
     # pairs. A later corrective policy must not redefine historical bundles.
     raw = (root / "tests/fixtures/p0_completion_source_pairs.json").read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == "37b591d1d4b9b43833809ceac337936e3a545e7a9632893f1532afbbf44cd4ec"
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "37b591d1d4b9b43833809ceac337936e3a545e7a9632893f1532afbbf44cd4ec"
+    )
     historic = next((r for r in json.loads(raw) if r["path"] == path), None)
     if historic is not None:
         assert actual == historic["after"], path
