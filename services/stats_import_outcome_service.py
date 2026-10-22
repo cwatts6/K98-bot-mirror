@@ -1,5 +1,6 @@
 """Import outcome decisions independent of Discord and provider execution."""
 
+from contextlib import contextmanager
 import json
 import logging
 
@@ -7,6 +8,45 @@ from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit
 from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def execution_connection(legacy_factory, *, timeout_seconds):
+    """Run coordinated import/reporting on the admitted snapshot-guard session.
+
+    SQL acquires the exact import guard on this same session. Borrowing does not
+    enter/exit the connection context, close it, or release the writer's guard.
+    The outer admitted writer retains custody through capture or failure.
+    """
+    from core.export_sql_connection import producer_connection
+    from services.legacy_export_snapshot_service import current_owner, require_runtime
+
+    owner = current_owner()
+    timeout = max(1, int(timeout_seconds) - 5)
+    if owner is None:
+        from services.legacy_export_snapshot_service import has_runtime_context
+
+        if has_runtime_context():
+            raise SourceConflict("Stats import requires its admitted writer session.")
+        with producer_connection(legacy_factory) as connection:
+            connection.autocommit = True
+            connection.timeout = timeout
+            yield connection
+        return
+    if (
+        owner.kind != "scan_data"
+        or owner.closed
+        or owner.runtime is not require_runtime()
+        or not owner.connection.autocommit
+    ):
+        raise SourceConflict("Stats import requires its active autocommit writer session.")
+    connection = owner.connection
+    previous_timeout = connection.timeout
+    try:
+        connection.timeout = timeout
+        yield connection
+    finally:
+        connection.timeout = previous_timeout
 
 
 def outcome_dal(runtime):

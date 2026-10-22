@@ -338,24 +338,17 @@ async def run_sql_procedure(
     @admitted_writer("scan_data")
     def _proc_and_get_expected_counter() -> int:
         nonlocal execution_id, execution_owner, metadata_consumed
-        from core.export_sql_connection import producer_connection
         from services.legacy_export_snapshot_service import current_owner
+        from services.stats_import_outcome_service import execution_connection
 
         owner = current_owner()
         execution_owner = owner
         if owner is not None:
             owner.stats_import_context = True
 
-        with producer_connection(_conn_trusted) as conn:
-            # UPDATE_ALL2 owns its Phase A/Phase B transactions and rejects any
-            # caller-owned transaction at entry. Keep this connection in
-            # autocommit mode so the counter/control queries do not create an
-            # ambient transaction before the public procedure is invoked.
-            conn.autocommit = True
-            # pyodbc query timeouts belong to the connection and are inherited
-            # by new cursors. This is a dedicated producer connection; the
-            # runtime's separate coordination connections retain their limit.
-            conn.timeout = max(1, int(timeout_seconds) - 5)
+        with execution_connection(_conn_trusted, timeout_seconds=timeout_seconds) as conn:
+            # Import and reporting require both guards on this same session.
+            # The outer writer owns its lifetime; SQL owns its transactions.
             cur = conn.cursor()
             from services.legacy_export_snapshot_service import verify_producer_cursor
 

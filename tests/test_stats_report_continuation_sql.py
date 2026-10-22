@@ -290,3 +290,105 @@ def test_nonnull_reporting_still_requires_both_producer_guards(reports):
         )
     assert r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.StageProbe")).fetchval() == 0
     assert r.owner.execute("SELECT @@TRANCOUNT").fetchval() == 0
+
+
+def test_natural_import_session_uses_both_guards_and_preserves_custody(reports, monkeypatch):
+    """Reproduce the split-session refusal, then exercise the corrected borrower.
+
+    Real SQL locks and the deployed validator are used; no import is replayed.
+    Business reporting stays on the fixture's counted transactional probes.
+    """
+    from services import legacy_export_snapshot_service as snapshots
+    from services.stats_import_outcome_service import execution_connection
+
+    r = reports
+    runtime = object()
+    connection = r.connect()
+    connection.autocommit = True
+    connection.timeout = 15
+    owner = SimpleNamespace(connection=connection, runtime=runtime, kind="scan_data", closed=False)
+    monkeypatch.setattr(snapshots, "current_owner", lambda: owner)
+    monkeypatch.setattr(snapshots, "require_runtime", lambda: runtime)
+    snapshot_lock, import_lock = r.dal.guards.guards(r.source)
+
+    def lock(conn, resource):
+        cursor = conn.cursor()
+        cursor.execute(
+            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; SELECT @r",
+            r.base.parameter(resource),
+        )
+        assert cursor.fetchone()[0] >= 0
+        cursor.close()
+
+    def validate(conn):
+        cursor = conn.cursor()
+        try:
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute(
+                "EXEC dbo.usp_S11ValidateStatsReportStage ?,?",
+                r.source,
+                "stats_" + "a" * 32 + ".ready.csv",
+            )
+            while cursor.nextset():
+                pass
+        finally:
+            cursor.execute("IF @@TRANCOUNT>0 ROLLBACK")
+            cursor.close()
+
+    try:
+        lock(connection, snapshot_lock)
+        separate = r.connect()
+        separate.autocommit = True
+        try:
+            lock(separate, import_lock)
+            with pytest.raises(Exception, match="Both independent producer session guards"):
+                validate(separate)
+        finally:
+            cursor = separate.cursor()
+            cursor.execute(
+                "EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'",
+                r.base.parameter(import_lock),
+            )
+            cursor.close()
+            separate.close()
+        with execution_connection(
+            lambda: pytest.fail("separate producer"), timeout_seconds=600
+        ) as actual:
+            assert actual is connection
+            lock(actual, import_lock)
+            # Use the fixture's exact immutable filename, not an invented input.
+            cursor = actual.cursor()
+            cursor.execute(
+                "SELECT CompletedFileName FROM dbo.StatsImportExecution WHERE PreparationID=?",
+                r.source,
+            )
+            filename = cursor.fetchone()[0]
+            cursor.execute(
+                "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=?,@ExportPreparationID=?",
+                filename,
+                r.source,
+            )
+            while cursor.nextset():
+                pass
+            cursor.close()
+        assert connection.timeout == 15
+        cursor = connection.cursor()
+        cursor.execute("SELECT APPLOCK_MODE('public',?,'Session')", r.base.parameter(snapshot_lock))
+        assert cursor.fetchone()[0] == "Exclusive"
+        cursor.close()
+        assert r.owner.execute(r.rewrite("SELECT COUNT(*) FROM dbo.StageProbe")).fetchval() == 3
+        assert (
+            r.owner.execute(
+                r.rewrite("SELECT CompletedStage FROM dbo.StatsImportReportContinuation")
+            ).fetchval()
+            == 3
+        )
+    finally:
+        cursor = connection.cursor()
+        for resource in (import_lock, snapshot_lock):
+            cursor.execute(
+                "EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'",
+                r.base.parameter(resource),
+            )
+        cursor.close()
+        connection.close()

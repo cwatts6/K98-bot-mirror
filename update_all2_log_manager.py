@@ -547,91 +547,79 @@ def execute_update_all2_with_log_management(
                 identity(export_preparation_id),
             )
 
-        # Consume all result sets. The final 8-column summary must stay last.
-        try:
-            all_results = []
-            result_count = 0
+        # Driver errors may arrive while fetching or advancing result sets.
+        # Only a description-less rowcount is skippable; errors must propagate.
+        all_results = []
+        result_count = 0
 
-            # Loop through all result sets
-            while True:
-                try:
-                    columns = _cursor_column_names(cursor)
-                    rows = cursor.fetchall()
-                    result_count += 1
-                    if rows:
-                        all_results.append({"columns": columns, "rows": rows})
-                        if _is_update_all2_phase_result(columns):
-                            result["phase_results"].extend(
-                                _parse_update_all2_phase_rows(columns, rows)
-                            )
-                        logger.debug(
-                            f"Result set #{result_count}: {len(rows)} row(s), "
-                            f"{len(rows[0]) if rows else 0} column(s)"
-                        )
-                except Exception as fetch_err:
-                    logger.debug(f"Fetch on result set #{result_count} failed: {fetch_err}")
+        # Loop through all result sets
+        while True:
+            columns = _cursor_column_names(cursor)
+            if cursor.description is not None:
+                rows = cursor.fetchall()
+                result_count += 1
+                if rows:
+                    all_results.append({"columns": columns, "rows": rows})
+                    if _is_update_all2_phase_result(columns):
+                        result["phase_results"].extend(_parse_update_all2_phase_rows(columns, rows))
+                    logger.debug(
+                        "Result set #%d: %d row(s), %d column(s)",
+                        result_count,
+                        len(rows),
+                        len(rows[0]),
+                    )
+            if not cursor.nextset():
+                break
 
-                # Try to advance to next result set
-                try:
-                    if not cursor.nextset():
-                        break
-                except Exception:
-                    break
+        logger.info(
+            f"UPDATE_ALL2 returned {result_count} result set(s), {len(all_results)} non-empty"
+        )
 
-            logger.info(
-                f"UPDATE_ALL2 returned {result_count} result set(s), {len(all_results)} non-empty"
+        expected_columns = [
+            "rowsinsertedks5",
+            "rowsinsertedks4",
+            "durationseconds",
+            "phasebdurationms",
+            "logusedpctbefore",
+            "logusedpctafter",
+            "logbackuptriggered",
+            "status",
+        ]
+        if (
+            not all_results
+            or [name.lower() for name in all_results[-1]["columns"]] != expected_columns
+            or len(all_results[-1]["rows"]) != 1
+            or len(all_results[-1]["rows"][0]) != 8
+            or all_results[-1]["rows"][0][7] != "SUCCESS"
+        ):
+            raise RuntimeError(
+                "UPDATE_ALL2 returned without its final reporting success summary; "
+                "retain the exact SQL receipt and do not repeat the import."
             )
+        sp_result_row = all_results[-1]["rows"][0]
+        result["sp_result"] = dict(
+            zip(
+                (
+                    "rows_inserted_ks5",
+                    "rows_inserted_ks4",
+                    "duration_seconds",
+                    "phase_b_duration_ms",
+                    "log_used_pct_before",
+                    "log_used_pct_after",
+                    "log_backup_triggered",
+                    "status",
+                ),
+                sp_result_row,
+                strict=True,
+            )
+        )
+        logger.info("UPDATE_ALL2 Phase B result: %s", result["sp_result"])
 
-            if all_results:
-                final_result_set = all_results[-1]["rows"]
-                if final_result_set and len(final_result_set) > 0:
-                    sp_result_row = final_result_set[-1]  # Last row of final result set
-
-                    # Expected: 8 columns
-                    if len(sp_result_row) >= 8:
-                        result["sp_result"] = {
-                            "rows_inserted_ks5": sp_result_row[0],
-                            "rows_inserted_ks4": sp_result_row[1],
-                            "duration_seconds": sp_result_row[2],
-                            "phase_b_duration_ms": sp_result_row[3],
-                            "log_used_pct_before": sp_result_row[4],
-                            "log_used_pct_after": sp_result_row[5],
-                            "log_backup_triggered": sp_result_row[6],
-                            "status": sp_result_row[7],
-                        }
-                        logger.info("UPDATE_ALL2 Phase B result: %s", result["sp_result"])
-                    elif len(sp_result_row) == 5:
-                        logger.warning("Got Phase A summary instead of Phase B (5 columns)")
-                        result["sp_result"] = {
-                            "ks5_max_scanorder": sp_result_row[0],
-                            "ks5_rows_inserted": sp_result_row[1],
-                            "ks4_rows_inserted": sp_result_row[2],
-                            "import_staging_rows": sp_result_row[3],
-                            "ks4_rows_in_latest": sp_result_row[4],
-                        }
-                    else:
-                        logger.warning(
-                            f"Unexpected final result row length: {len(sp_result_row)} "
-                            f"(expected 8 or 5)"
-                        )
-                        result["sp_result"] = {
-                            "raw": str(sp_result_row)[:200],
-                            "column_count": len(sp_result_row),
-                        }
-                else:
-                    logger.warning("Final result set is empty")
-            else:
-                logger.warning("UPDATE_ALL2 returned no non-empty result sets")
-
-            if result["phase_results"]:
-                logger.info(
-                    "UPDATE_ALL2 emitted %d internal phase audit row(s)",
-                    len(result["phase_results"]),
-                )
-
-        except Exception as e:
-            logger.exception("Error parsing UPDATE_ALL2 results")
-            result["sp_result"] = {"error": str(e)[:200]}
+        if result["phase_results"]:
+            logger.info(
+                "UPDATE_ALL2 emitted %d internal phase audit row(s)",
+                len(result["phase_results"]),
+            )
 
         # Capture log usage after
         result["log_after"] = get_log_space_usage(cursor)

@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest.mock import Mock
 
 import pytest
 
@@ -16,6 +17,8 @@ class _FakeCursor:
         if self.index >= len(self.result_sets):
             return None
         columns, _rows = self.result_sets[self.index]
+        if columns is None:
+            return None
         return [(column,) for column in columns]
 
     def execute(self, sql, *params):
@@ -141,3 +144,81 @@ def test_execute_update_all2_rejects_noncanonical_completed_filename(monkeypatch
             completed_filename="stats.csv",
         )
     assert cursor.executed == []
+
+
+SUMMARY = (
+    [
+        "RowsInsertedKS5",
+        "RowsInsertedKS4",
+        "DurationSeconds",
+        "PhaseBDurationMS",
+        "LogUsedPctBefore",
+        "LogUsedPctAfter",
+        "LogBackupTriggered",
+        "Status",
+    ],
+    [(415, 415, 17, 1000, 1, 2, False, "SUCCESS")],
+)
+PHASE_A = (["a", "b", "c", "d", "e", "ArchivedFilePath"], [(1, 415, 415, 0, 415, "archive")])
+
+
+@pytest.fixture
+def isolated_wrapper(monkeypatch):
+    usage = Mock(return_value=None)
+    triggers = Mock(
+        return_value={
+            "triggers_found": 0,
+            "triggers_processed": 0,
+            "backups_triggered": 0,
+            "errors": [],
+        }
+    )
+    telemetry = Mock()
+    monkeypatch.setattr(mgr, "get_log_space_usage", usage)
+    monkeypatch.setattr(mgr, "process_log_backup_triggers", triggers)
+    monkeypatch.setattr(mgr, "_safe_emit_telemetry", telemetry)
+    return usage, triggers, telemetry
+
+
+@pytest.mark.parametrize("method", ["fetchall", "nextset"])
+def test_driver_error_is_preserved_and_never_reported_as_success(isolated_wrapper, method, caplog):
+    import pyodbc
+
+    cursor = _FakeCursor([PHASE_A])
+    error = pyodbc.ProgrammingError("42000", "Synthetic reporting refusal (51961)")
+    setattr(cursor, method, Mock(side_effect=error))
+    with pytest.raises(pyodbc.ProgrammingError) as caught:
+        mgr.execute_update_all2_with_log_management(
+            cursor, completed_filename="stats_0123456789abcdef0123456789abcdef.ready.csv"
+        )
+    assert caught.value is error
+    usage, triggers, telemetry = isolated_wrapper
+    assert usage.call_count == 1
+    triggers.assert_not_called()
+    assert telemetry.call_args.args[0]["status"] == "failed"
+    assert "completed successfully" not in caplog.text
+
+
+def test_rowcount_only_results_are_skipped_without_fetching(isolated_wrapper):
+    cursor = _FakeCursor([(None, []), PHASE_A, (None, []), SUMMARY])
+    fetch = cursor.fetchall
+
+    def checked_fetch():
+        assert cursor.description is not None
+        return fetch()
+
+    cursor.fetchall = checked_fetch
+    result = mgr.execute_update_all2_with_log_management(
+        cursor, completed_filename="stats_0123456789abcdef0123456789abcdef.ready.csv"
+    )
+    assert result["success"]
+    assert result["sp_result"]["rows_inserted_ks4"] == 415
+
+
+@pytest.mark.parametrize("sets", [[], [PHASE_A], [(["PhaseName"] * 10, [tuple(range(10))])]])
+def test_incomplete_stream_never_becomes_success(isolated_wrapper, sets):
+    with pytest.raises(RuntimeError, match="final reporting success summary"):
+        mgr.execute_update_all2_with_log_management(
+            _FakeCursor(sets), completed_filename="stats_0123456789abcdef0123456789abcdef.ready.csv"
+        )
+    isolated_wrapper[1].assert_not_called()

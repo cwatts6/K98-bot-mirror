@@ -603,6 +603,7 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     class FakeConnection:
         autocommit = False
         commit_called = False
+        timeout = 15
 
         def __enter__(self):
             return self
@@ -616,6 +617,9 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         def commit(self):
             self.commit_called = True
             raise AssertionError("UPDATE_ALL2 caller must not commit its transaction")
+
+        def close(self):
+            pass
 
     async def direct_offload(fn, *args, **kwargs):
         return fn(*args)
@@ -636,7 +640,8 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     connection = FakeConnection()
     monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
     monkeypatch.setattr(stats_module, "_conn_trusted", lambda: connection)
-    monkeypatch.setattr(export_sql_connection, "producer_connection", lambda _: connection)
+    factory = Mock(return_value=connection)
+    monkeypatch.setattr(export_sql_connection, "producer_connection", factory)
     monkeypatch.setattr(snapshots, "verify_producer_cursor", lambda _: None)
     monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 7)
     monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
@@ -654,6 +659,7 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     scope = dict(consumer="scan_data", destinations=["file-a"])
     capture = Mock(return_value=((snapshots.OutputSection("data", ("id",), ((1,),)),), scope))
     runtime, dal = producer_runtime(tmp_path, capture=capture, configuration={"scan_data": scope})
+    dal.connect.return_value = connection
     from services import stats_import_outcome_service as outcomes
 
     receipts = Mock()
@@ -685,6 +691,8 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     assert phases[0]["started_at_utc"] is started
     assert phases[0]["completed_at_utc"] is finished
     if coordinated:
+        factory.assert_not_called()
+        assert connection.timeout == 15
         receipts.prepare.assert_called_once()
         assert receipts.read.call_count == (2 if lost_capture_ack else 1)
         assert receipts.read.call_args.args == (receipts.prepare.call_args.args[0].preparation_id,)

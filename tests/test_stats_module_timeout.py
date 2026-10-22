@@ -40,6 +40,8 @@ COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 @pytest.mark.asyncio
 @pytest.mark.parametrize("setting_fails", [False, True])
 async def test_import_sets_connection_timeout_before_cursor(monkeypatch, setting_fails):
+    from types import SimpleNamespace
+
     from core import export_sql_connection
     from services import legacy_export_snapshot_service
 
@@ -74,7 +76,13 @@ async def test_import_sets_connection_timeout_before_cursor(monkeypatch, setting
             return Cursor()
 
     connection = Connection()
-    monkeypatch.setattr(export_sql_connection, "producer_connection", lambda _: connection)
+    connection.autocommit = True
+    runtime = object()
+    owner = SimpleNamespace(connection=connection, runtime=runtime, kind="scan_data", closed=False)
+    monkeypatch.setattr(legacy_export_snapshot_service, "current_owner", lambda: owner)
+    monkeypatch.setattr(
+        export_sql_connection, "producer_connection", lambda _: pytest.fail("second session")
+    )
     monkeypatch.setattr(legacy_export_snapshot_service, "admitted_writer", lambda _: lambda f: f)
     monkeypatch.setattr(legacy_export_snapshot_service, "verify_producer_cursor", lambda _: None)
 
@@ -84,15 +92,20 @@ async def test_import_sets_connection_timeout_before_cursor(monkeypatch, setting
 
     monkeypatch.setattr(sm, "fetch_update_all2_last_counter", before_procedure)
     monkeypatch.setattr(sm, "_fetch_immutable_import_outcome", lambda _: None)
-    with legacy_export_snapshot_service.use_runtime(object()):
+    monkeypatch.setattr(
+        __import__("services.stats_import_outcome_service", fromlist=["register_execution"]),
+        "register_execution",
+        lambda _: None,
+    )
+    with legacy_export_snapshot_service.use_runtime(runtime):
         ok, _, _ = await sm.run_sql_procedure(
             rank=1590, seed="C", completed_filename=COMPLETED_FILENAME, timeout_seconds=600
         )
     assert not ok
     assert events == (
-        [("timeout", 595)]
+        [("timeout", 595), ("timeout", 15)]
         if setting_fails
-        else [("timeout", 595), ("cursor", 595), ("counter", 595)]
+        else [("timeout", 595), ("cursor", 595), ("counter", 595), ("timeout", 15)]
     )
 
 
