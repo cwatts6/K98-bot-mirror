@@ -8,6 +8,7 @@ from typing import Literal
 
 from services.legacy_export_snapshot_service import bound_runtime, collect_producer_captures
 from services.processing_notification_service import NotificationTransitionFailed
+from services.processing_pipeline_receipts import record_pipeline, stage as receipt_stage
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
@@ -94,6 +95,10 @@ async def _notification_intervention(user, notify_channel, run_id):
 
 
 async def _run_proc_config_step(step_meta):
+    return await receipt_stage("configuration", lambda: _run_proc_config_step_impl(step_meta))
+
+
+async def _run_proc_config_step_impl(step_meta):
     from services.legacy_export_snapshot_service import _writer_runtime
 
     if _writer_runtime() is not None:
@@ -164,7 +169,20 @@ async def _local_send_step_embed(user, title, msg):
         logger.exception("[EMBED_CALLBACK] Failed to send step embed")
 
 
-async def run_step(
+async def run_step(func, *args, offload_sync_to_thread=False, name=None, meta=None, **kwargs):
+    stages = {
+        "run_stats_copy_archive": "import",
+        "build_player_stats_cache": "player_cache",
+        "run_all_exports": "export",
+    }
+    invoke = lambda: _run_step_impl(
+        func, *args, offload_sync_to_thread=offload_sync_to_thread, name=name, meta=meta, **kwargs
+    )
+    selected = stages.get(name or getattr(func, "__name__", ""))
+    return await receipt_stage(selected, invoke) if selected else await invoke()
+
+
+async def _run_step_impl(
     func,
     *args,
     offload_sync_to_thread: bool = False,
@@ -199,6 +217,7 @@ async def run_step(
 
 @bound_runtime
 @collect_producer_captures
+@record_pipeline
 async def execute_processing_pipeline(
     rank: int,
     *,
@@ -432,7 +451,7 @@ async def execute_processing_pipeline(
             {"event": "cache_build_failed", "filename": filename, "error_type": type(exc).__name__}
         )
     try:
-        await warm_name_cache()
+        await receipt_stage("name_cache", warm_name_cache)
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -449,18 +468,21 @@ async def execute_processing_pipeline(
     if success_sql:
         # Keep a single stats refresh after the heavy UPDATE_ALL2 step
         try:
-            ok, out = await run_maintenance_with_isolation(
-                "post_stats",
-                kwargs={
-                    "server": SERVER,
-                    "database": DATABASE,
-                    "username": USERNAME,
-                    "password": PASSWORD,
-                },
-                timeout=POST_MAINT_TIMEOUT,
-                name="run_post_import_stats_update",
-                meta=step_meta,
-                prefer_process=(MAINT_WORKER_MODE == "process"),
+            ok, out = await receipt_stage(
+                "maintenance",
+                lambda: run_maintenance_with_isolation(
+                    "post_stats",
+                    kwargs={
+                        "server": SERVER,
+                        "database": DATABASE,
+                        "username": USERNAME,
+                        "password": PASSWORD,
+                    },
+                    timeout=POST_MAINT_TIMEOUT,
+                    name="run_post_import_stats_update",
+                    meta=step_meta,
+                    prefer_process=(MAINT_WORKER_MODE == "process"),
+                ),
             )
             if not ok:
                 out_text = _safe_trim(out, 4000)
@@ -726,7 +748,7 @@ async def execute_processing_pipeline(
     # ProcConfig publishes targets; refresh their cache after that prerequisite,
     # before an unrelated export failure can prevent current command lookups.
     try:
-        await warm_target_cache()
+        await receipt_stage("target_cache", warm_target_cache)
     except asyncio.CancelledError:
         raise
     except Exception:

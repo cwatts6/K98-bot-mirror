@@ -54,8 +54,12 @@ def captured(r, monkeypatch, disposition):
     # Stop after durable capture, before any queue admission, as the cache does.
     enqueue = Mock(side_effect=TimeoutError("no queue requested"))
     monkeypatch.setattr(r.runtime, "enqueue_snapshot", enqueue)
-    with pytest.raises(TimeoutError):
-        r.service.run(r.source, r.outcomes.inspect(r.source)["token"], "fixture")
+    # No-export captures intentionally never enter enqueue_snapshot. Inject the
+    # lost reply at the shared post-capture boundary, then restore real behavior.
+    with monkeypatch.context() as stopped:
+        stopped.setattr(r.service, "after_capture", Mock(side_effect=TimeoutError("capture saved")))
+        with pytest.raises(TimeoutError):
+            r.service.run(r.source, r.outcomes.inspect(r.source)["token"], "fixture")
     enqueue.reset_mock()
     return enqueue
 

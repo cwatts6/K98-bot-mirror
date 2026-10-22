@@ -1062,6 +1062,12 @@
     "sha256": "65ede42fdfd888e6d652194dab76411a87684727b391e626c5e45850a7da1e89"
   },
   {
+    "name": "dbo.ExportContainmentAttestation",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportContainmentAttestation.Table.sql",
+    "sha256": "e947ddeada303d3be02abee0d48cdc5f7c72fbd51d1061ca79ac0f341e297f60"
+  },
+  {
     "name": "dbo.ExportExecutionSession",
     "type": "U",
     "path": "sql_schema/dbo.ExportExecutionSession.Table.sql",
@@ -1128,6 +1134,12 @@
     "sha256": "47ef6d2677c43ea180289d09004a1661bc706523350a64ad43d91e6e9f99d243"
   },
   {
+    "name": "dbo.ExportRegistrationAttestation",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportRegistrationAttestation.Table.sql",
+    "sha256": "ddbe44244b5144370644d8a9c79ffa8ec57901e93bdc326c168432974e4eb4de"
+  },
+  {
     "name": "dbo.ExportReplacementActivation",
     "type": "U",
     "path": "sql_schema/dbo.ExportReplacementActivation.Table.sql",
@@ -1174,6 +1186,12 @@
     "type": "U",
     "path": "sql_schema/dbo.ExportTargetContainment.Table.sql",
     "sha256": "aafd412359f3139bb69f5416bec6e4ff93012f002341a353296b6878b04875e9"
+  },
+  {
+    "name": "dbo.ExportUnownedHoldDisposition",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportUnownedHoldDisposition.Table.sql",
+    "sha256": "8f732fbf373ee0ccf6d64120f0e2ab8b0720b90e25cf988fac5b1ee9491df5a0"
   },
   {
     "name": "dbo.FIX_IMPORT_STAGING",
@@ -2076,6 +2094,18 @@
     "sha256": "51c2005e1e35390d3ce6368f12613d4cbfc9f43554faa9956da1a61e35e216f5"
   },
   {
+    "name": "dbo.ProcessingPipelineRun",
+    "type": "U",
+    "path": "sql_schema/dbo.ProcessingPipelineRun.Table.sql",
+    "sha256": "da748d8d81826fba42c2c0cc31cb3448bf5d56afdbd75c9e67c44f45676706b6"
+  },
+  {
+    "name": "dbo.ProcessingPipelineStage",
+    "type": "U",
+    "path": "sql_schema/dbo.ProcessingPipelineStage.Table.sql",
+    "sha256": "7b13a147f123d1d0513245de8ec54685eaeee1af38b8e022c7b5b45cac68578d"
+  },
+  {
     "name": "dbo.QS_PerfPack_Run",
     "type": "U",
     "path": "sql_schema/dbo.QS_PerfPack_Run.Table.sql",
@@ -2358,6 +2388,12 @@
     "sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
   },
   {
+    "name": "dbo.StatsImportReportContinuation",
+    "type": "U",
+    "path": "sql_schema/dbo.StatsImportReportContinuation.Table.sql",
+    "sha256": "fe99434aa46414a6c71e129febbb006151b6a65bb5f3bf2af01baaa49fdec6e9"
+  },
+  {
     "name": "dbo.T4KillDelta",
     "type": "U",
     "path": "sql_schema/dbo.T4KillDelta.Table.sql",
@@ -2565,7 +2601,7 @@
     "name": "dbo.UPDATE_ALL2",
     "type": "P",
     "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-    "sha256": "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a"
+    "sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d"
   },
   {
     "name": "dbo.UPDATE_RALLY_DATA",
@@ -3048,10 +3084,22 @@
     "sha256": "337a80a1baff555c801ea3152d26bf2cd6cae2a9f5ae2a80f5435be17d2b6b77"
   },
   {
+    "name": "dbo.usp_S11CompleteStatsReports",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
+    "sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b"
+  },
+  {
     "name": "dbo.usp_S11RunStatsImport",
     "type": "P",
     "path": "sql_schema/dbo.usp_S11RunStatsImport.StoredProcedure.sql",
     "sha256": "bcfe6fb93200f5b0493d59c183f061446d3948b2b46c67f850a4d989304695fc"
+  },
+  {
+    "name": "dbo.usp_S11ValidateStatsReportStage",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_S11ValidateStatsReportStage.StoredProcedure.sql",
+    "sha256": "580d20908b22f520862cdc1f3242b2a5e9349dc346b12fb18db4d5dc58f9dd67"
   },
   {
     "name": "dbo.usp_SetAllianceActivitySnapshotCompletion",
@@ -3075,7 +3123,7 @@
     "name": "dbo.usp_update_stats",
     "type": "P",
     "path": "sql_schema/dbo.usp_update_stats.StoredProcedure.sql",
-    "sha256": "e24841f619894abdb314ad2fba536ad8a4a4f270b3e0608801446bd9da2b43d5"
+    "sha256": "26a67d80549c94b1a321eaa8a51c384d90533554479fa7c3da6c155e0ffd31dd"
   },
   {
     "name": "dbo.vAllianceActivitySnapshots",

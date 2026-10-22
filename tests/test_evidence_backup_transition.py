@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 def bundle():
@@ -20,10 +21,7 @@ def test_backup_bundle_matches_all_reviewed_sources():
     assert {m["path"] for m in item["members"]} == updater.EVIDENCE_BACKUP_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert historical_runtime_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 

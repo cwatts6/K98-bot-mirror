@@ -103,3 +103,10 @@ def test_full_pool_activation_reuses_capacity_number_and_preserves_old_history(a
         editor_email="editor@example.iam.gserviceaccount.com",
     )
     assert sorted(f["file_id"] for f in seal["files"]) == sorted(result["mapping"].values())
+
+
+@pytest.mark.parametrize("lost", ["containment", "activation"])
+def test_pool_history_loss_uses_separate_verified_attestation(activation, lost):
+    from tests.registration_attestation_harness import qualify_pool_attestation
+
+    qualify_pool_attestation(activation, lost=lost)

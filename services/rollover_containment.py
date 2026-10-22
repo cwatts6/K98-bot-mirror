@@ -125,9 +125,14 @@ class RolloverContainment(ExportTargetContainment):
 
     def verify(self, snapshot):
         receipt = snapshot["receipt"]
-        raw = self.store.read_reference(
-            identity(receipt["ReceiptReference"]), bytes.fromhex(receipt["ReceiptHash"])
-        )
+        try:
+            raw = self.store.read_reference(
+                identity(receipt["ReceiptReference"]), bytes.fromhex(receipt["ReceiptHash"])
+            )
+        except (SourceConflict, OSError, ValueError, KeyError):
+            from services.export_containment_attestation import verify
+
+            return verify(self, snapshot)
         audit = json.loads(raw)
         before, op = audit["before"], snapshot["operation"]
         if (
@@ -158,29 +163,16 @@ class RolloverContainment(ExportTargetContainment):
             raise SourceConflict("Exact rollover release is not verified.")
         pool = snapshot["pool"]["pool"]
         if pool.get("RetiredByReplacementID") is not None:
-            activation = self.dal.replacement_retirement(pool["PoolID"], pool["AccountKey"])
-            if activation is None:
-                raise SourceConflict("Retired rollover pool has no replacement receipt.")
-            activation_raw = self.store.read_reference(
-                identity(activation["ReceiptReference"]), bytes.fromhex(activation["ReceiptHash"])
+            from services.export_pool_retirement_evidence import isolated_pool
+
+            pool = isolated_pool(
+                self.dal,
+                self.store,
+                pool,
+                before["pool"]["pool"],
+                audit["containment_id"],
+                rollover=True,
             )
-            attested = json.loads(activation_raw)
-            isolated = attested.get("before_pool")
-            retirement_fields = {"RetiredByReplacementID", "Version", "UpdatedUTC"}
-            if (
-                hashlib.sha256(activation_raw).hexdigest() != activation["ReceiptHash"]
-                or attested.get("kind") != "export_replacement_activation/1"
-                or attested.get("activation_id") != identity(activation["ActivationID"])
-                or attested.get("replacement_id") != identity(activation["ReplacementID"])
-                or identity(activation["ContainmentID"]) != audit["containment_id"]
-                or identity(pool["RetiredByReplacementID"]) != identity(activation["ReplacementID"])
-                or not isinstance(isolated, dict)
-                or pool["Version"] != isolated["Version"] + 1
-                or {k: v for k, v in pool.items() if k not in retirement_fields}
-                != {k: v for k, v in isolated.items() if k not in retirement_fields}
-            ):
-                raise SourceConflict("Replacement rollover pool retirement does not verify.")
-            pool = isolated
         original_pool = dict(before["pool"]["pool"])
         original_pool.setdefault("RetiredByReplacementID", None)
         pool_fields = {"PoolState", "OwnerID", "BlockedReason", "Version", "UpdatedUTC"}

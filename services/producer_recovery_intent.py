@@ -98,7 +98,11 @@ def atomic_producer_intent(kind, *, cache_refresh=False, configuration_refresh=F
                 if disposition and current.get("export_disposition") != disposition:
                     raise SourceConflict("Execution cannot change its original export intent.")
                 return function(*args, **kwargs)
-            value = dict(kind=kind, atomic_checkpoint=1, operation=str(uuid4()))
+            from services.processing_pipeline_receipts import producer_operation
+
+            value = dict(
+                kind=kind, atomic_checkpoint=1, operation=producer_operation() or str(uuid4())
+            )
             if disposition:
                 value["export_disposition"] = disposition
             token = _intent.set(value)
@@ -162,7 +166,13 @@ def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=N
             raise SourceConflict("Inherited producer recovery differs from its saved inputs.")
         yield current
         return
-    value = dict(kind="stats_import", inputs=inputs, operation=identity(action_id or str(uuid4())))
+    from services.processing_pipeline_receipts import producer_operation
+
+    value = dict(
+        kind="stats_import",
+        inputs=inputs,
+        operation=identity(action_id or producer_operation() or str(uuid4())),
+    )
     if parent is not None:
         value["parent"] = identity(parent)
     if registration_recovery is not None:

@@ -54,6 +54,21 @@ def recovery_service():
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
         adapters = {adapter.kind: adapter, batch.kind: batch}
+        from services.unowned_sql_hold_dal import UnownedSqlHoldDAL
+        from services.unowned_sql_hold_recovery import UnownedSqlHoldRecovery
+
+        unowned = UnownedSqlHoldRecovery(UnownedSqlHoldDAL(runtime))
+        adapters[unowned.kind] = unowned
+        from services.stats_report_continuation import StatsReportContinuation
+        from services.stats_report_continuation_dal import StatsReportContinuationDAL
+
+        stats_reports = StatsReportContinuation(StatsReportContinuationDAL(outcomes))
+        adapters[stats_reports.kind] = stats_reports
+        from services.processing_pipeline_receipt_dal import PipelineReceiptDAL
+        from services.processing_pipeline_recovery import ProcessingPipelineRecovery
+
+        pipeline = ProcessingPipelineRecovery(PipelineReceiptDAL(runtime))
+        adapters[pipeline.kind] = pipeline
         from services.historical_retirement_group_service import HistoricalBatchAdapter
 
         historical_batch = HistoricalBatchAdapter(store)
@@ -116,6 +131,28 @@ def recovery_service():
             config_outcomes, ConfigurationProducerCapture(runtime, config_outcomes)
         )
         adapters[config_adapter.kind] = config_adapter
+        from services.legacy_configuration_continuation import (
+            LegacyConfigurationContinuation,
+            LegacyConfigurationContinuationDAL,
+        )
+        from services.unreceipted_producer_recovery import (
+            UnreceiptedProducerDAL,
+            UnreceiptedProducerRecovery,
+        )
+
+        unknown = UnreceiptedProducerRecovery(
+            UnreceiptedProducerDAL(
+                runtime.dal.connect,
+                account=runtime.account,
+                storage_owner=runtime.store.storage_owner,
+            ),
+            configuration=runtime.configuration,
+        )
+        adapters[unknown.kind] = unknown
+        legacy_config = LegacyConfigurationContinuation(
+            LegacyConfigurationContinuationDAL(runtime, config_outcomes), config_adapter
+        )
+        adapters[legacy_config.kind] = legacy_config
         from services.configuration_continuation import ConfigurationContinuation
         from services.configuration_continuation_dal import ConfigurationContinuationDAL
 

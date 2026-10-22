@@ -62,7 +62,7 @@ def test_complete_fault_context_is_exported_without_raw_request():
     assert "NEVER_EXPORT_ME" not in json.dumps(result)
 
 
-def test_report_includes_all_states_across_pages_and_preserves_withheld_repairs():
+def test_report_includes_all_states_across_pages_and_preserves_confirmed_repair_requirements():
     service, store, records = report_service(105)
     first = service.download_report(ACTOR)
     data = json.loads(first["content"])
@@ -71,7 +71,7 @@ def test_report_includes_all_states_across_pages_and_preserves_withheld_repairs(
     assert {r["state"] for r in data["incidents"]} == {"open", "resolved"}
     repair = data["incidents"][0]["required_repairs"][0]
     assert repair["action"] == "supersede_partial"
-    assert repair["availability"] == "not_enabled_in_release"
+    assert repair["availability"] == "guided_confirmation"
     second = service.download_report(ACTOR, first["next_after"], first["through"], 2)
     remaining = json.loads(second["content"])
     assert remaining["included_incidents"] == 5
@@ -144,7 +144,7 @@ def test_collection_failure_is_exportable_without_false_empty_or_secrets():
             None,
             "finished with exceptions",
         ),
-        ("stats_import", "partial", "open", None, None, "not enabled in this release"),
+        ("stats_import", "partial", "open", None, None, "review the checks and confirm"),
     ],
 )
 def test_report_next_step_distinguishes_active_work_from_unavailable_repairs(

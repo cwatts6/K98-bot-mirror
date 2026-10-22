@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 @pytest.mark.parametrize("transition", ["publication_timing_v1", "guided_rollover_timing_v1"])
@@ -35,7 +36,7 @@ def test_publication_timing_pins_complete_runtime(transition):
                 if update["path"] == member["path"]:
                     assert update["before_sha256"] == expected
                     expected = update["after_sha256"]
-        assert updater.sha256(source.read_bytes().replace(b"\r\n", b"\n")) == expected
+        assert historical_runtime_hash(root, member["path"]) == expected
         assert member["before_sha256"] and member["before_sha256"] != member["after_sha256"]
 
 

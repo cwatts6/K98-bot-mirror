@@ -59,6 +59,8 @@ CATALOG = " UNION ALL ".join(
             _select("x.ReceiptReference", "x.ReceiptHash", f"dbo.{table} x", label)
             for table, label in (
                 ("ExportTargetContainment", "target isolation"),
+                ("ExportContainmentAttestation", "present isolation attestation"),
+                ("ExportRegistrationAttestation", "registration dependency attestation"),
                 ("ExportReplacementPlan", "replacement proposal"),
                 ("ExportReplacementActivation", "replacement activation"),
             )

@@ -781,6 +781,18 @@
       "source_sha256": "65ede42fdfd888e6d652194dab76411a87684727b391e626c5e45850a7da1e89"
     },
     {
+      "object": "dbo.ExportContainmentAttestation",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportContainmentAttestation.Table.sql",
+      "source_sha256": "e947ddeada303d3be02abee0d48cdc5f7c72fbd51d1061ca79ac0f341e297f60"
+    },
+    {
+      "object": "dbo.ExportContainmentAttestation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportContainmentAttestation.Table.sql",
+      "source_sha256": "e947ddeada303d3be02abee0d48cdc5f7c72fbd51d1061ca79ac0f341e297f60"
+    },
+    {
       "object": "dbo.ExportExecutionSession",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportExecutionSession.Table.sql",
@@ -883,6 +895,18 @@
       "source_sha256": "655aefc606f7c27f8764c27d559c9ef6eac74949a1b290ed8ed6a779bc72a736"
     },
     {
+      "object": "dbo.ExportRegistrationAttestation",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportRegistrationAttestation.Table.sql",
+      "source_sha256": "ddbe44244b5144370644d8a9c79ffa8ec57901e93bdc326c168432974e4eb4de"
+    },
+    {
+      "object": "dbo.ExportRegistrationAttestation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportRegistrationAttestation.Table.sql",
+      "source_sha256": "ddbe44244b5144370644d8a9c79ffa8ec57901e93bdc326c168432974e4eb4de"
+    },
+    {
       "object": "dbo.ExportReplacementActivation",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportReplacementActivation.Table.sql",
@@ -959,6 +983,18 @@
       "permission": "SELECT",
       "source": "C:\\\\K98-bot-SQL-Server\\\\sql_schema\\\\dbo.ExportTargetContainment.Table.sql",
       "source_sha256": "aafd412359f3139bb69f5416bec6e4ff93012f002341a353296b6878b04875e9"
+    },
+    {
+      "object": "dbo.ExportUnownedHoldDisposition",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportUnownedHoldDisposition.Table.sql",
+      "source_sha256": "8f732fbf373ee0ccf6d64120f0e2ab8b0720b90e25cf988fac5b1ee9491df5a0"
+    },
+    {
+      "object": "dbo.ExportUnownedHoldDisposition",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ExportUnownedHoldDisposition.Table.sql",
+      "source_sha256": "8f732fbf373ee0ccf6d64120f0e2ab8b0720b90e25cf988fac5b1ee9491df5a0"
     },
     {
       "object": "dbo.FallbackImportBatchControl",
@@ -1076,6 +1112,36 @@
       "source_sha256": "f50218600cc071630fa461bf515edb95700a595174a561fa312ffc5173e13f6c"
     },
     {
+      "object": "dbo.ProcessingPipelineRun",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcessingPipelineRun.Table.sql",
+      "source_sha256": "da748d8d81826fba42c2c0cc31cb3448bf5d56afdbd75c9e67c44f45676706b6"
+    },
+    {
+      "object": "dbo.ProcessingPipelineRun",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcessingPipelineRun.Table.sql",
+      "source_sha256": "da748d8d81826fba42c2c0cc31cb3448bf5d56afdbd75c9e67c44f45676706b6"
+    },
+    {
+      "object": "dbo.ProcessingPipelineStage",
+      "permission": "INSERT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcessingPipelineStage.Table.sql",
+      "source_sha256": "7b13a147f123d1d0513245de8ec54685eaeee1af38b8e022c7b5b45cac68578d"
+    },
+    {
+      "object": "dbo.ProcessingPipelineStage",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcessingPipelineStage.Table.sql",
+      "source_sha256": "7b13a147f123d1d0513245de8ec54685eaeee1af38b8e022c7b5b45cac68578d"
+    },
+    {
+      "object": "dbo.ProcessingPipelineStage",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.ProcessingPipelineStage.Table.sql",
+      "source_sha256": "7b13a147f123d1d0513245de8ec54685eaeee1af38b8e022c7b5b45cac68578d"
+    },
+    {
       "object": "dbo.RALLY_EXPORT",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.RALLY_EXPORT.Table.sql",
@@ -1190,10 +1256,22 @@
       "source_sha256": "f153c44559f56e6ac01b012d0258380976390850e75ce20dbbe25d71e874cab5"
     },
     {
+      "object": "dbo.StatsImportReportContinuation",
+      "permission": "SELECT",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.StatsImportReportContinuation.Table.sql",
+      "source_sha256": "fe99434aa46414a6c71e129febbb006151b6a65bb5f3bf2af01baaa49fdec6e9"
+    },
+    {
+      "object": "dbo.StatsImportReportContinuation",
+      "permission": "UPDATE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.StatsImportReportContinuation.Table.sql",
+      "source_sha256": "fe99434aa46414a6c71e129febbb006151b6a65bb5f3bf2af01baaa49fdec6e9"
+    },
+    {
       "object": "dbo.UPDATE_ALL2",
       "permission": "EXECUTE",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.UPDATE_ALL2.StoredProcedure.sql",
-      "source_sha256": "41564b882265e0d0be0eaec5f7f184b912caa9bd5f71fbf3ad7e081e844d83bc"
+      "source_sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d"
     },
     {
       "object": "dbo.sp_TARGETS_MASTER",
@@ -1274,6 +1352,18 @@
       "source_sha256": "74b32aa572c7b10f027a653fc8f75d0047fffb95da8141e628365cbd129334a9"
     },
     {
+      "object": "dbo.usp_S11CompleteStatsReports",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
+      "source_sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b"
+    },
+    {
+      "object": "dbo.usp_S11ValidateStatsReportStage",
+      "permission": "EXECUTE",
+      "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.usp_S11ValidateStatsReportStage.StoredProcedure.sql",
+      "source_sha256": "580d20908b22f520862cdc1f3242b2a5e9349dc346b12fb18db4d5dc58f9dd67"
+    },
+    {
       "object": "dbo.v_PlayerAccounts_Migrate",
       "permission": "SELECT",
       "source": "C:\\K98-bot-SQL-Server\\sql_schema\\dbo.v_PlayerAccounts_Migrate.View.sql",
@@ -1294,7 +1384,7 @@
   ],
   "qualification": "Reviewed source-backed candidate; production SID and installed metadata not bound. This is not an installation list.",
   "permission_model": "direct_application_v1",
-  "legacy_source_sha256": "fa9a3182dd10e58f428738c31ac8515fa44d3bf6b040b6f77cbd2f1e66588f0f",
+  "legacy_source_sha256": "6accce17fde94ff272cebfceb8ee86436ca974ba965fe6f368fb29c258e70eea",
   "master_database_permissions": [
     "CONNECT"
   ],

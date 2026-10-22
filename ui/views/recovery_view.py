@@ -276,8 +276,19 @@ class RecoveryIncidentView(discord.ui.View):
             # that linked incident rechecks authorization and current evidence.
             if (
                 row["State"] == "resolved"
-                and linked_kind not in {"configuration_continuation", "player_report_continuation"}
-                and label not in {"Return to original export", "Return to original rollover"}
+                and linked_kind
+                not in {
+                    "configuration_continuation",
+                    "player_report_continuation",
+                    "legacy_configuration_continuation",
+                }
+                and label
+                not in {
+                    "Return to original export",
+                    "Return to original rollover",
+                    "Continue original recovery",
+                    "Review import and capture",
+                }
             ):
                 continue
             linked = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)

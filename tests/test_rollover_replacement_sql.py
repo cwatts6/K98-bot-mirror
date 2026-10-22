@@ -89,6 +89,13 @@ def test_complete_fresh_pool_is_verified_and_activated_without_old_replay(activa
     assert r.service.proposals.containment.inspect(r.f.operation)["outcome"] == "targets_isolated"
 
 
+@pytest.mark.parametrize("lost", ["containment", "activation"])
+def test_rollover_history_loss_uses_separate_verified_attestation(activation, lost):
+    from tests.registration_attestation_harness import qualify_pool_attestation
+
+    qualify_pool_attestation(activation, lost=lost)
+
+
 def test_replacement_queue_preserves_original_choices_and_reconciles_lost_ack(
     activation, monkeypatch
 ):

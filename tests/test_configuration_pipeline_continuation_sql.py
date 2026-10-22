@@ -45,6 +45,38 @@ def pipeline_setup(r, runner, read):
 
 
 @pytest.mark.parametrize("read", [False, True])
+@pytest.mark.parametrize("choice", [PIPELINE_ACTION, "retry_configuration"])
+def test_pipeline_follows_only_the_saved_configuration_successor(recovery, read, choice):
+    from services.processing_pipeline_receipt_dal import PipelineReceiptDAL
+    from services.processing_pipeline_receipts import producer_evidence
+
+    r = recovery
+    generation = json.loads(r.outcomes.inspect(r.source)["preparation"]["GenerationJson"])
+
+    @configuration_import_intent
+    def runner():
+        return commit_child(r, generation)
+
+    source, adapter, service = pipeline_setup(r, runner, read)
+    state = adapter.dal.snapshot(source)
+    inner = json.loads(state["root"]["RequestJson"])["request"]
+    original_operation = (inner["configuration_import"]["producer"] if read else inner["producer"])[
+        "operation"
+    ]
+    row = service.review_source(ACTOR, adapter.kind, source)
+    run(service, row, choice)
+    expected = adapter.dal.snapshot(source)["child"]
+    pipeline = PipelineReceiptDAL(r.runtime)
+    actual = pipeline.configuration_result(original_operation)
+    assert actual["PreparationID"] == expected["PreparationID"]
+    proof, verified = producer_evidence(pipeline, "configuration", original_operation)
+    assert verified and proof["preparation_id"] == expected["PreparationID"]
+    assert json.loads(actual["RequestJson"])["request"]["producer"]["export_disposition"] == (
+        "pipeline_export_v1" if choice == PIPELINE_ACTION else "configuration_only_v1"
+    )
+
+
+@pytest.mark.parametrize("read", [False, True])
 @pytest.mark.parametrize("lost_reply", [False, True])
 def test_pipeline_configuration_commit_capture_and_queue_survive_restart(
     recovery, read, lost_reply

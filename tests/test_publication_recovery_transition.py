@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 def test_publication_recovery_transition_pins_every_runtime_member():
@@ -16,7 +17,7 @@ def test_publication_recovery_transition_pins_every_runtime_member():
     assert {m["path"] for m in bundle["members"]} == updater.PUBLICATION_RECOVERY_TRANSITION_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in bundle["members"]:
-        assert updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")) == next(
+        assert historical_runtime_hash(root, member["path"]) == next(
             (
                 m["after_sha256"]
                 for t in reversed(updater.reviewed_transitions())

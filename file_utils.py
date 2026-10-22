@@ -657,6 +657,10 @@ def run_post_import_stats_update(
             except Exception:
                 pass
             cur.execute("EXEC [dbo].[usp_update_stats]")
+            # SQL errors can arrive in a later result set. Do not acknowledge
+            # maintenance until the driver has consumed the complete response.
+            while cur.nextset():
+                pass
             emit_telemetry_event(
                 {"event": "post_import_stats", "status": "success", "database": database}
             )

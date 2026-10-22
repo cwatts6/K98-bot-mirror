@@ -48,6 +48,9 @@ def recovery(tmp_path, monkeypatch):
         authority, RuntimeRegistration(registration_fixture()), boundary=boundary
     )
     broker.replacements = SimpleNamespace(
+        activation_dal=SimpleNamespace(
+            chain=Mock(side_effect=SourceConflict("independent activation history unavailable"))
+        ),
         current=Mock(side_effect=SourceConflict("activation receipt unavailable")),
         registrations=Mock(side_effect=SourceConflict("activation receipt unavailable")),
     )

@@ -37,7 +37,7 @@ def specification():
     paths = set()
     for row in value["sources"]:
         if set(row) != {"path", "before", "after"} or not re.fullmatch(
-            r"(?:core|services|scripts)/[a-z_]+\.py|(?:run_bot|bot_config|constants)\.py",
+            r"(?:core|services|scripts|ui/views)/[a-z_]+\.py|(?:run_bot|bot_config|constants|processing_pipeline|file_utils)\.py",
             row["path"],
         ):
             raise ValueError("Exact protected recovery source member required.")
@@ -70,19 +70,42 @@ def validate_sql_policy(sql):
         set(profile) != {"version", "profile", "migration_id", "images", "scripts", "requires"}
         or profile["version"] != 1
         or profile["profile"] != "coordinated_recovery_v1"
-        or profile["migration_id"] != "20261016_003_guided_recovery_release"
+        or profile["migration_id"]
+        not in {
+            "20261016_003_guided_recovery_release",
+            "20261022_002_p0_completion_release",
+        }
     ):
         raise ValueError("Exact coordinated recovery profile required.")
+    completion = profile["migration_id"] == "20261022_002_p0_completion_release"
     for rows, count, keys, identity, pattern in (
-        (sql["members"], 15, {"path", "sha256"}, "path", r"(?:deploy|migrations)/[A-Za-z0-9_.-]+"),
-        (profile["images"], 26, {"name", "before", "after"}, "name", r"(?:dbo|KVK)\.[A-Za-z0-9_]+"),
-        (profile["scripts"], 12, {"id", "sha256"}, "id", r"[0-9]{8}_[0-9]{3}_[a-z_]+"),
+        (
+            sql["members"],
+            4 if completion else 15,
+            {"path", "sha256"},
+            "path",
+            r"(?:deploy|migrations)/[A-Za-z0-9_.-]+",
+        ),
+        (
+            profile["images"],
+            10 if completion else 26,
+            {"name", "before", "after"},
+            "name",
+            r"(?:dbo|KVK)\.[A-Za-z0-9_]+",
+        ),
+        (
+            profile["scripts"],
+            1 if completion else 12,
+            {"id", "sha256"},
+            "id",
+            r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+",
+        ),
         (
             profile["requires"],
-            11,
+            16 if completion else 11,
             {"migration_id", "sha256", "status"},
             "migration_id",
-            r"[0-9]{8}_[0-9]{3}_[a-z_]+",
+            r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+",
         ),
     ):
         if len(rows) != count or len({row[identity].casefold() for row in rows}) != count:

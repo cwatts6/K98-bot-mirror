@@ -39,10 +39,20 @@ def verify_replacement_origin(*, dal, store, account, targets, owner_email, edit
     ):
         raise SourceConflict("Replacement origin policy differs from the registered pool.")
     try:
-        raw = store.read_reference(first["ReceiptReference"], first["ReceiptHash"])
-        if hashlib.sha256(raw).digest() != bytes(first["ReceiptHash"]):
-            raise ValueError("Activation receipt changed")
-        audit = json.loads(raw)
+        try:
+            raw = store.read_reference(first["ReceiptReference"], first["ReceiptHash"])
+            if hashlib.sha256(raw).digest() != bytes(first["ReceiptHash"]):
+                raise ValueError("Activation receipt changed")
+            audit = json.loads(raw)
+            activation_files = audit.get("verification", {}).get("files")
+        except (SourceConflict, OSError, KeyError, ValueError):
+            from services.export_registration_attestation import read_sealed
+
+            successor = read_sealed(dal.connect, store, account, first["ActivationID"])
+            # These fields belong to the independently derived registration.
+            # The missing original receipt is never restored or relabelled.
+            audit = successor["expected_audit"]
+            activation_files = successor["result"]["files"]
         verified_raw = store.read_reference(
             first["VerificationReceiptReference"], first["VerificationReceiptHash"]
         )
@@ -72,7 +82,7 @@ def verify_replacement_origin(*, dal, store, account, targets, owner_email, edit
         or verified.get("kind") != "export_replacement_verification/1"
         or verified.get("provider_observation") is not True
         or verified.get("evidence") != actual
-        or audit.get("verification", {}).get("files") != actual["files"]
+        or activation_files != actual["files"]
     ):
         raise SourceConflict("Replacement pool origin differs from its original sealed readback.")
     return actual

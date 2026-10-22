@@ -265,7 +265,7 @@ class StatsImportOutcomeDAL:
                 raise SourceConflict("Evidence changed since preview; inspect and preview again.")
             if action == "supersede_partial" and not allow_partial:
                 raise SourceConflict(
-                    "Imported data is committed but reporting failed. Admin must explicitly accept superseding unfinished reports with a fresh corrected scan."
+                    "Imported data is committed but reporting is unfinished. Admin must explicitly accept retaining that partial outcome before its exact reservation can be released."
                 )
             _cas(
                 cursor,

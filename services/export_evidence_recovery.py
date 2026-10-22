@@ -27,6 +27,8 @@ class EvidenceRecovery:
         )
         actions = {}
         replacement = None
+        containment = None
+        registration = None
         resolved = len(good) == 2
         if len(good) == 2:
             outcome = "verified"
@@ -90,6 +92,54 @@ class EvidenceRecovery:
                         if resolved
                         else "The old read attempt is settled and holds no reservations, but its result cannot be verified. Use Recover replacement check below for the guided fresh read check or new file choices. Activation still requires a complete new verified journal."
                     )
+            if "target isolation" in binding["kinds"]:
+                from services.export_evidence_containment import open_recovery, summary
+
+                try:
+                    containment = summary(open_recovery(self.broker, reference))
+                except SourceConflict:
+                    pass
+                if containment is not None:
+                    resolved = containment["verified"] is not None
+                    outcome = (
+                        "current_fences_verified" if resolved else "fence_attestation_required"
+                    )
+                    explanation = (
+                        "A separate sealed attestation independently verifies the current permanent target fences and closed dispatch ledger. The original private receipt remains unavailable and the original provider outcome remains unknown. Continue the linked replacement recovery."
+                        if resolved
+                        else "The original private receipt is unavailable. Independent SQL owner, target and request-ledger checks verify the present isolation. Confirm a new attestation to continue replacement recovery; it will not reconstruct the lost receipt, terminate an old worker or claim delivery."
+                    )
+                    if not resolved:
+                        actions["attest_containment"] = dict(
+                            label="Verify current isolation",
+                            check="Confirm a separate present-state isolation attestation. Retain the original receipt as unavailable and the old write outcome as unknown. The old files may still receive delayed writes and must remain retired.",
+                            effect="Recheck the complete permanent target set, exact owner/fence, closed streams and retained request/event seals, then save and independently verify a new private receipt. No original receipt, reservation, job or provider file is changed.",
+                        )
+            if binding["kinds"] == ["replacement activation"]:
+                from services.export_registration_attestation import open_recovery, summary
+
+                try:
+                    registration = summary(open_recovery(self.broker, reference))
+                except (SourceConflict, OSError, KeyError, ValueError):
+                    pass
+                if registration is not None:
+                    resolved = registration["verified"]
+                    outcome = (
+                        "registration_dependencies_verified"
+                        if resolved
+                        else "registration_attestation_required"
+                    )
+                    explanation = (
+                        "A separate receipt verifies this registration from its independently verified proposal, containment and complete readback journal. The original activation receipt remains unavailable. This does not certify delivery or recover any other missing history."
+                        if resolved
+                        else "The activation receipt is unavailable. Its authenticated predecessor, original proposal, containment and complete file-read journal independently derive the exact SQL registration. Confirm a separate attestation to recover this registration dependency; no provider request or registration change is performed."
+                    )
+                    if not resolved:
+                        actions["attest_registration"] = dict(
+                            label="Verify registration evidence",
+                            check="Confirm a separate attestation of the independently verified registration dependencies. The missing original receipt stays missing and original publication remains separately verified.",
+                            effect="Re-derive the exact registration from authenticated predecessors, sealed file choices and the original complete read journal. Compare the SQL binding and save a new independently verified receipt. No targets, access policy, ownership or provider files are changed.",
+                        )
         evidence = dict(
             title="Private recovery evidence",
             outcome=outcome,
@@ -101,7 +151,12 @@ class EvidenceRecovery:
         )
         if backup is not None:
             evidence["backup_candidate"] = backup["state"]
-            if backup["state"] != "verified" and replacement is None:
+            if (
+                backup["state"] != "verified"
+                and replacement is None
+                and containment is None
+                and registration is None
+            ):
                 evidence["required_evidence"] = [
                     "Download this recovery report and preserve the original SQL evidence binding and damaged files. Do not rerun the operation or release its reservations.",
                     "On the bot machine, use the installed authority manifest's evidence_root folder. Obtain the original encrypted evidence file from a trusted backup made for the same Windows identity; do not send plaintext or credentials through Discord.",
@@ -126,10 +181,41 @@ class EvidenceRecovery:
                         source_id=replacement["job_id"],
                     )
                 ]
+        if containment is not None:
+            evidence["original_receipt_verified"] = False
+            evidence["containment_attestation_id"] = (
+                containment["verified"]["attestation_id"] if containment["verified"] else None
+            )
+            evidence["recovery_links"] = [
+                dict(
+                    label="Continue original recovery",
+                    kind=(
+                        "export_rollover"
+                        if containment["owner_kind"] == "rollover"
+                        else "export_job"
+                    ),
+                    source_id=containment["source_id"],
+                )
+            ]
+        if registration is not None:
+            evidence.update(
+                original_receipt_verified=False,
+                registration_attestation_id=(
+                    registration["attestation"]["ActionID"] if resolved else None
+                ),
+                registration_sha256=registration["registration_sha256"],
+            )
         return dict(
             evidence=evidence,
             token=digest(
-                dict(binding=binding, copies=copies, replacement=replacement, backup=backup)
+                dict(
+                    binding=binding,
+                    copies=copies,
+                    replacement=replacement,
+                    backup=backup,
+                    containment=containment,
+                    registration=registration,
+                )
             ).hex(),
             resolved=resolved,
         )
@@ -139,10 +225,10 @@ class EvidenceRecovery:
         fields = {"version", "action", "operation"}
         if operation == "pending":
             fields.add("after")
-        elif operation in {"inspect", "restore"}:
+        elif operation in {"inspect", "restore", "attest", "attest_registration"}:
             fields.add("reference")
             uuid_text(message.get("reference"))
-            if operation == "restore":
+            if operation in {"restore", "attest", "attest_registration"}:
                 fields |= {"token", "actor", "reason"}
                 if (
                     not isinstance(message.get("token"), str)
@@ -167,8 +253,46 @@ class EvidenceRecovery:
                 page = self.catalog.page(after)
                 return page or self.catalog.page()
             current = self.inspect(message["reference"])
+            if operation == "attest_registration":
+                from services.export_registration_attestation import apply, open_recovery
+
+                if (
+                    current["token"] != message["token"]
+                    or "attest_registration" not in current["evidence"]["actions"]
+                ):
+                    raise SourceConflict("Registration evidence changed; reopen its confirmation.")
+                state = open_recovery(self.broker, message["reference"])
+                apply(
+                    state["service"],
+                    state["row"],
+                    state["base"],
+                    token=state["token"],
+                    actor=message["actor"],
+                    reason=message["reason"],
+                )
+                return self.inspect(message["reference"])
+            if operation == "attest":
+                from services.export_containment_attestation import apply
+                from services.export_evidence_containment import open_recovery
+
+                if (
+                    current["token"] != message["token"]
+                    or "attest_containment" not in current["evidence"]["actions"]
+                ):
+                    raise SourceConflict("Isolation review changed; reopen its confirmation.")
+                state = open_recovery(self.broker, message["reference"])
+                apply(
+                    state["service"],
+                    state["snapshot"],
+                    token=state["token"],
+                    actor=message["actor"],
+                    reason=message["reason"],
+                )
+                return self.inspect(message["reference"])
             if operation == "restore":
-                if current["token"] != message["token"] or not current["evidence"]["actions"]:
+                if current["token"] != message["token"] or not set(
+                    current["evidence"]["actions"]
+                ) & {"restore_evidence", "protect_evidence"}:
                     raise SourceConflict(
                         "Evidence changed; review the current restoration choices."
                     )
@@ -197,10 +321,17 @@ class EvidenceRecoveryAdapter:
         return result["evidence"], result["token"], result["resolved"]
 
     def execute(self, source_id, action, token, actor, reason):
-        if action not in {"restore_evidence", "protect_evidence"}:
+        if action not in {
+            "restore_evidence",
+            "protect_evidence",
+            "attest_containment",
+            "attest_registration",
+        }:
             raise SourceConflict("Unsupported evidence repair.")
         return self.client.evidence_recovery(
-            "restore",
+            {"attest_containment": "attest", "attest_registration": "attest_registration"}.get(
+                action, "restore"
+            ),
             reference=source_id,
             token=token,
             actor=actor,
@@ -209,8 +340,38 @@ class EvidenceRecoveryAdapter:
 
     def reconcile(self, source_id, action):
         evidence, token, resolved = self.inspect(source_id)
+        if action["ActionKind"] in {"attest_containment", "attest_registration"}:
+            marker = (
+                "containment_attestation_id"
+                if action["ActionKind"] == "attest_containment"
+                else "registration_attestation_id"
+            )
+            if resolved:
+                return (
+                    "verified"
+                    if evidence.get(marker) == str(action["ActionID"]).lower()
+                    else "not_applied"
+                )
+            if token != action["EvidenceHash"] or action["ActionKind"] not in evidence["actions"]:
+                return "not_applied"
+            # Retry only this already-approved metadata attestation against the
+            # unchanged review, under the same authority lock and action identity.
+            # It cannot release ownership or replay provider/business work.
+            self.execute(
+                source_id,
+                action["ActionKind"],
+                token,
+                "recovery:" + str(action["ActionID"]),
+                action["Reason"],
+            )
+            verified, _, complete = self.inspect(source_id)
+            return (
+                "verified"
+                if complete and verified.get(marker) == str(action["ActionID"]).lower()
+                else None
+            )
         if resolved:
-            return "not_applied" if evidence["outcome"].startswith("superseded_") else "verified"
+            return "verified" if evidence["outcome"] == "verified" else "not_applied"
         if token != action["EvidenceHash"] or action["ActionKind"] not in evidence["actions"]:
             # Repair is exact-byte and idempotent. Partial local restoration may
             # be reviewed afresh, but can never author an operation-success proof.

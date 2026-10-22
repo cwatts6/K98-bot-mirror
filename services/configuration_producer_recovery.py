@@ -1,5 +1,6 @@
 """Guided settlement and capture for atomic configuration publication."""
 
+from kvk.dal.new_source_import_dal import SourceConflict
 from services.player_report_recovery_dal import PlayerReportRecoveryDAL
 from services.player_report_recovery_service import (
     PlayerReportCaptureRecovery,
@@ -89,6 +90,31 @@ class ConfigurationProducerRecovery(PlayerReportRecoveryAdapter):
         return request["request"]["producer"].get("export_disposition") == "configuration_only_v1"
 
     def inspect(self, source_id):
+        from services.unreceipted_producer_recovery import (
+            UnreceiptedProducerDAL,
+            UnreceiptedProducerRecovery,
+        )
+
+        preview = self.dal.inspect(source_id)
+        if preview["action"] == "hold":
+            legacy = UnreceiptedProducerRecovery(
+                UnreceiptedProducerDAL(
+                    self.dal.connect, account=self.dal.account, storage_owner=self.dal.storage_owner
+                )
+            )
+            try:
+                old = legacy.dal.inspect(source_id)
+            except SourceConflict:
+                old = None
+            if old and old["action"] in {"retain_unknown", "retained_unknown"}:
+                evidence, token, resolved = legacy.inspect(source_id)
+                evidence["actions"] = {}
+                evidence["recovery_links"] = [
+                    dict(
+                        label="Review unknown legacy outcome", kind=legacy.kind, source_id=source_id
+                    )
+                ]
+                return evidence, token, resolved
         evidence, token, resolved = super().inspect(source_id)
         if evidence["outcome"] == "configuration_cancelled":
             evidence["explanation"] = (

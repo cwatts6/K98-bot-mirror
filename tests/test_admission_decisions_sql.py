@@ -28,7 +28,11 @@ def registration(r, name):
 @pytest.mark.asyncio
 async def test_changed_registration_dispatch_keeps_exact_inputs_and_receipt(refused, monkeypatch):
     from services.stats_import_outcome_dal import StatsImportOutcomeDAL
-    from ui.views import recovery_review_view as pages, recovery_view as view
+    from ui.views import (
+        recovery_review_view as pages,
+        recovery_summary_view as summaries,
+        recovery_view as view,
+    )
 
     r = refused
     unblock(r)
@@ -72,12 +76,12 @@ async def test_changed_registration_dispatch_keeps_exact_inputs_and_receipt(refu
         raise TimeoutError("Lost reply after registration")
 
     adapter, store, service, row = setup(r, runner)
-    assert set(row["evidence"]["actions"]) == {"resume_current_registration"}
+    assert set(row["evidence"]["actions"]) == {"resume_current_registration", "cancel_saved_stage"}
 
     async def call(method, *args):
         return getattr(service, method)(*args)
 
-    for module in (view, pages):
+    for module in (view, pages, summaries):
         monkeypatch.setattr(module, "actor_for", lambda _: ACTOR)
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
         monkeypatch.setattr(module, "call", call)
@@ -89,9 +93,7 @@ async def test_changed_registration_dispatch_keeps_exact_inputs_and_receipt(refu
     )
     await button.callback(interaction)
     details = interaction.followup.send.call_args.kwargs["view"]
-    while not details.next.disabled:
-        await details.next.callback(interaction)
-        details = interaction.followup.send.call_args.kwargs["view"]
+    assert isinstance(details, summaries.RecoverySummaryView)
     assert not calls and not store.actions
     await details.confirm.callback(interaction)
     confirmation = interaction.followup.send.call_args.kwargs["view"]
@@ -161,7 +163,8 @@ def test_healthy_queued_preparation_is_shown_before_any_resource_claim(refused):
     )
     adapter, _, _, _ = setup(r)
     evidence, _, resolved = adapter.inspect(r.source)
-    assert not resolved and evidence["outcome"] == "waiting_in_queue" and not evidence["actions"]
+    assert not resolved and evidence["outcome"] == "waiting_in_queue"
+    assert set(evidence["actions"]) == {"cancel_saved_stage"}
     assert evidence["recovery_links"] == [
         dict(label="Review blocking stage", kind="producer_refusal", source_id=queued)
     ]

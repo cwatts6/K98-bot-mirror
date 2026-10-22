@@ -7,6 +7,7 @@ import pytest
 from scripts import prepare_k98_update as update
 from scripts.validate_k98_update_compatibility import classify
 from tests.test_update_application_compatibility import installed_manifest
+from tests.updater_source_assertions import historical_runtime_hash
 
 BEFORE, AFTER = "a" * 40, "b" * 40
 PROTOCOL = "services/export_execution_protocol.py"
@@ -82,7 +83,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
                 assert expected[path] in {member["before_sha256"], member["after_sha256"]}
             expected[path] = member["after_sha256"]
     for path, checksum in expected.items():
-        assert update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n")) == checksum
+        assert historical_runtime_hash(root, path) == checksum
     with pytest.raises(ValueError, match="contract change"):
         update.check_source_only(["scripts/k98_update_transitions.json"])
 

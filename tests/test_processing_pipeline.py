@@ -91,6 +91,11 @@ async def test_both_proc_config_branches_keep_runtime_in_thread(monkeypatch, sql
     _patch_lightweight_pipeline_boundaries(monkeypatch)
     monkeypatch.setattr(pp, "MAINT_WORKER_MODE", "process")
     monkeypatch.setattr(snapshots, "_writer_runtime", lambda: object())
+    # This test isolates the ProcConfig offload choice. Durable pipeline state is
+    # exercised with a real scoped runtime in test_processing_pipeline_receipts.
+    from services import processing_pipeline_receipts
+
+    monkeypatch.setattr(processing_pipeline_receipts, "pipeline_runtime", lambda: None)
     offload = AsyncMock(return_value=(True, "config captured"))
     monkeypatch.setattr(proc_config_import, "run_proc_config_import_offload", offload)
     isolated = AsyncMock(return_value=(True, "OK"))

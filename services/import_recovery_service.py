@@ -39,6 +39,35 @@ class ImportRecoveryAdapter:
         decision = preview["action"]
         captured = preview.get("captured", False)
         prep = preview.get("preparation") or {}
+        if not execution and isinstance(self.dal, StatsImportOutcomeDAL):
+            from services.unreceipted_producer_recovery import (
+                UnreceiptedProducerDAL,
+                UnreceiptedProducerRecovery,
+            )
+
+            legacy = UnreceiptedProducerRecovery(
+                UnreceiptedProducerDAL(
+                    self.dal.connect, account=self.dal.account, storage_owner=self.dal.storage_owner
+                )
+            )
+            try:
+                legacy_preview = legacy.dal.inspect(source_id)
+            except SourceConflict:
+                legacy_preview = (
+                    None  # Keep typed and captured preparations on their existing path.
+                )
+            if legacy_preview and legacy_preview["action"] in {
+                "retain_unknown",
+                "retained_unknown",
+            }:
+                evidence, legacy_token, resolved = legacy.inspect(source_id)
+                evidence["actions"] = {}
+                evidence["recovery_links"] = [
+                    dict(
+                        label="Review unknown legacy outcome", kind=legacy.kind, source_id=source_id
+                    )
+                ]
+                return evidence, legacy_token, resolved
         if not execution and self.historical and prep.get("SpoolKey"):
             return self.historical.inspect(source_id)
         capture_pending_queue = captured and not prep.get("JobID")
@@ -91,9 +120,9 @@ class ImportRecoveryAdapter:
             }
         elif decision == "supersede_partial":
             actions[decision] = {
-                "label": "Accept partial & release",
-                "check": "The import committed but its reports did not finish. Confirm you accept leaving those reports unfinished and will provide a corrected scan.",
-                "effect": "Preserve committed data and the original input; close only this unfinished attempt and release its exact reservation. This does not complete reports or rerun the import.",
+                "label": "Keep partial reports & release",
+                "check": "The import committed. Confirm you explicitly accept leaving this attempt's reporting unfinished or unknown. Review the reporting continuation first if those reports are still needed.",
+                "effect": "Exclude the original SQL worker and every snapshot writer, preserve committed input and the partial outcome, then release only this attempt's exact reservation. This is an unfinished-work disposition, not a completion receipt or an instruction to import the same scan again.",
             }
         evidence = {
             "title": "Stats import recovery",
@@ -116,6 +145,14 @@ class ImportRecoveryAdapter:
             ),
             "actions": actions,
         }
+        if execution.get("State") in {"partial", "import_committed"}:
+            evidence["recovery_links"] = [
+                dict(
+                    label="Review unfinished reports",
+                    kind="stats_report_continuation",
+                    source_id=source_id,
+                )
+            ]
         if not execution:
             # Missing receipts can also be typed admissions interrupted before
             # SQL registration. Link to that adapter's stronger proof checks;

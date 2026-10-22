@@ -84,6 +84,7 @@ def contract(monkeypatch):
         source=source,
         migration_hash="a" * 64,
         metadata_hash="b" * 64,
+        recovery_installation=direct.P0_RECEIPT_MIGRATION,
     )
     observed = {k: [] for k in legacy_permission_queries(source)} | dict(version=2)
     observed["target"] = [
@@ -201,6 +202,11 @@ def contract(monkeypatch):
         dict(OwnedSchemas=0, OwnedObjects=0, OwnedPrincipals=0, OwnedServerPrincipals=0)
     ]
     observed["migration"] = [
+        dict(
+            MigrationId=direct.P0_RECEIPT_MIGRATION,
+            ChecksumSha256=direct.P0_RECEIPT_CHECKSUM,
+            Status="Applied",
+        ),
         dict(MigrationId=direct.DIRECT_MIGRATION, ChecksumSha256="a" * 64, Status="Applied"),
         dict(
             MigrationId=direct.STATS_OUTCOME_MIGRATION,
@@ -401,13 +407,14 @@ def test_file_visibility_amendment_requires_exact_postimages_and_receipt(file_vi
         == digest(observed).hex()
     )
     query, params = legacy_permission_queries(approved["source"])["migration"]
-    assert "MigrationId IN (?,?,?,?,?)" in query
+    assert "MigrationId IN (?,?,?,?,?,?)" in query
     assert params == (
         direct.DIRECT_MIGRATION,
         direct.FILE_VISIBILITY_MIGRATION,
         direct.STATS_OUTCOME_MIGRATION,
         direct.STATS_OUTCOME_COLLATION_MIGRATION,
         direct.STATS_OUTCOME_ENCODING_MIGRATION,
+        direct.P0_RECEIPT_MIGRATION,
     )
 
 

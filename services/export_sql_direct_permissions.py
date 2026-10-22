@@ -6,9 +6,9 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 
-DIRECT_SOURCE_HASH = "fa9a3182dd10e58f428738c31ac8515fa44d3bf6b040b6f77cbd2f1e66588f0f"
+DIRECT_SOURCE_HASH = "6accce17fde94ff272cebfceb8ee86436ca974ba965fe6f368fb29c258e70eea"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
-APPLICATION_GRANT_PLAN_HASH = "e81b0a808d114abe41b94371994ed5ebe0c4d1ac3cf2c3de78deeda750848abf"
+APPLICATION_GRANT_PLAN_HASH = "9f1deddccc09ba1882a3c08f4e355152103734d03960a19773665273f9d630dc"
 FILE_VISIBILITY_MIGRATION = "20261008_001_sql_auth_import_file_visibility"
 FILE_VISIBILITY_CHECKSUM = "dde9189ac05cb699b2114775eef5769b7ab7e629b63d4c1681427d53ed3c5aaf"
 STATS_OUTCOME_MIGRATION = "20261009_001_stats_import_outcomes"
@@ -19,6 +19,8 @@ STATS_OUTCOME_COLLATION_CHECKSUM = (
 )
 STATS_OUTCOME_ENCODING_MIGRATION = "20261010_002_stats_import_outcomes_encoding"
 STATS_OUTCOME_ENCODING_CHECKSUM = "3792c37de9642cdb33579a4afec820f9d21a4eb14e8388281f3c40eed01c5aa9"
+P0_RECEIPT_MIGRATION = "20261022_001_p0_pipeline_receipts"
+P0_RECEIPT_CHECKSUM = "3ab8803851fdcaf21cbe256ddbba049517f605a637ed05c5f7d8021ca0ad0194"
 # Canonical UTF-16LE definition hashes of the reviewed migration's exact
 # postimages. This is a behavior amendment, not a compatibility spelling.
 FILE_VISIBILITY_MODULE_HASHES = {
@@ -72,6 +74,7 @@ def validate_contract(approved):
         "source",
         "migration_hash",
         "metadata_hash",
+        "recovery_installation",
     }
     amended = isinstance(approved, dict) and "module_amendment" in approved
     if amended:
@@ -98,6 +101,7 @@ def validate_contract(approved):
             for k in ("migration_hash", "metadata_hash")
         )
         or digest(approved["source"]).hex() != DIRECT_SOURCE_HASH
+        or approved.get("recovery_installation") != P0_RECEIPT_MIGRATION
         or (
             amended
             and (
@@ -228,7 +232,7 @@ def queries(base, source):
     # receipts remain separate; no installed hash can select its own contract.
     result["migration"] = (
         base["migration"][0].replace(
-            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?,?,?) ORDER BY MigrationId"
+            "WHERE MigrationId=?", "WHERE MigrationId IN (?,?,?,?,?,?) ORDER BY MigrationId"
         ),
         (
             DIRECT_MIGRATION,
@@ -236,6 +240,7 @@ def queries(base, source):
             STATS_OUTCOME_MIGRATION,
             STATS_OUTCOME_COLLATION_MIGRATION,
             STATS_OUTCOME_ENCODING_MIGRATION,
+            P0_RECEIPT_MIGRATION,
         ),
     )
     return result
@@ -385,6 +390,9 @@ def verify(observed, approved, *, profile):
     ):
         raise SourceConflict("Direct privileges differ from the exact reviewed grant plan.")
     expected_migrations = [
+        dict(
+            MigrationId=P0_RECEIPT_MIGRATION, ChecksumSha256=P0_RECEIPT_CHECKSUM, Status="Applied"
+        ),
         dict(
             MigrationId=DIRECT_MIGRATION,
             ChecksumSha256=approved["migration_hash"],

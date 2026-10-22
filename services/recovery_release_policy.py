@@ -25,6 +25,7 @@ P0A_ACTIONS = MappingProxyType(
         ),
         "recovery_overview": frozenset(),
         "queue_admission": frozenset({"withdraw_queued", "close_withdrawn_read"}),
+        "unowned_sql_hold": frozenset({"clear_unowned_hold"}),
         "player_report": frozenset(
             {
                 "cancel_report",
@@ -52,7 +53,9 @@ P0A_ACTIONS = MappingProxyType(
                 "rebuild_damaged",
             }
         ),
-        "private_evidence": frozenset({"protect_evidence", "restore_evidence"}),
+        "private_evidence": frozenset(
+            {"protect_evidence", "restore_evidence", "attest_containment", "attest_registration"}
+        ),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(
             {
@@ -80,6 +83,10 @@ P0A_ACTIONS = MappingProxyType(
         "player_report_continuation": frozenset({"refresh_report", "refresh_cache", "keep_prior"}),
         # A resumed admission hands off here. Only proven rollback or completed
         # SQL output is included; accepting incomplete reports is not completion.
+        "stats_report_continuation": frozenset({"continue_reports"}),
+        "processing_pipeline": frozenset({"continue_stage", "verify_stage", "retain_stage"}),
+        "unreceipted_producer": frozenset({"retain_unknown"}),
+        "legacy_configuration_continuation": frozenset({"retry_configuration", "keep_prior"}),
         "stats_import": frozenset(
             {
                 "release_failure",
@@ -87,6 +94,7 @@ P0A_ACTIONS = MappingProxyType(
                 "queue_capture",
                 "abandon_capture",
                 "retire_historical_export",
+                "supersede_partial",
             }
         ),
     }

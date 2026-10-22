@@ -105,7 +105,7 @@ def test_sql_package_binds_ambient_environment_without_learning_images():
     original = deepcopy(spec)
     bindings, payload = recovery.sql_payload(spec, environment, files.get)
     assert spec == original
-    assert len(payload) == 16
+    assert len(payload) == 5
     profile = json.loads(payload[bindings["profiles"][0]["file"]])
     assert profile["images"] == spec["sql"]["profile"]["images"]
     assert profile["requires"] == spec["sql"]["profile"]["requires"]

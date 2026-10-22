@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 def test_exact_startup_cache_transition_matches_reviewed_sources():
@@ -14,10 +15,7 @@ def test_exact_startup_cache_transition_matches_reviewed_sources():
     assert {m["path"] for m in transition["members"]} == updater.STARTUP_CACHE_COMPLETION_PATHS
     root = Path(__file__).resolve().parents[1]
     for member in transition["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert historical_runtime_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 

@@ -311,13 +311,13 @@ async def test_persistent_entry_and_preview_have_explicit_confirmation(monkeypat
     monkeypatch.setattr(view, "call", AsyncMock(return_value=row))
     assert view.RecoveryEntryView().is_persistent()
     buttons = view.RecoveryIncidentView(row)
-    action = next(b for b in buttons.children if b.label == "Accept partial & release")
+    action = next(b for b in buttons.children if b.label == "Keep partial reports & release")
     await action.callback(interaction)
     view.call.assert_awaited_once_with("review", ACTOR, row["IncidentID"])
     sent = interaction.followup.send.call_args.kwargs
     assert sent["ephemeral"] is True
     assert isinstance(sent["view"], view.RecoveryConfirmView)
-    assert "reports did not finish" in sent["embed"].fields[0].value
+    assert "reporting unfinished or unknown" in sent["embed"].fields[0].value
     assert not dal.calls
 
 
@@ -343,6 +343,7 @@ async def test_pending_or_unavailable_verification_hides_repair_buttons():
     assert [item.label for item in RecoveryIncidentView(row).children] == [
         "Recheck",
         "Download recovery report",
+        "Review unfinished reports",
     ]
     assert any(field.name == "Repair being verified" for field in incident_embed(row).fields)
     row["pending_action"] = None
@@ -350,6 +351,7 @@ async def test_pending_or_unavailable_verification_hides_repair_buttons():
     assert [item.label for item in RecoveryIncidentView(row).children] == [
         "Recheck",
         "Download recovery report",
+        "Review unfinished reports",
     ]
     assert any(field.name == "Verification unavailable" for field in incident_embed(row).fields)
 
@@ -420,3 +422,31 @@ async def test_queued_export_skip_requires_guided_confirmation(monkeypatch):
     assert "spreadsheet may remain out of date" in sent["embed"].fields[0].value
     assert sent["view"].action == "skip_unstarted"
     adapter.coordinator.skip_unstarted.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kind,label",
+    [
+        ("legacy_configuration_continuation", "Review fresh configuration decision"),
+        ("export_job", "Continue original recovery"),
+        ("export_rollover", "Continue original recovery"),
+        ("stats_import", "Review import and capture"),
+    ],
+)
+async def test_verified_stage_retains_navigation_to_remaining_work(monkeypatch, kind, label):
+    from ui.views import recovery_view as view
+
+    _, _, _, row = setup()
+    row["State"] = "resolved"
+    row["evidence"].update(
+        actions={}, recovery_links=[dict(label=label, kind=kind, source_id="retained-parent")]
+    )
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    monkeypatch.setattr(view, "call", AsyncMock(return_value=row))
+    interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    button = next(b for b in view.RecoveryIncidentView(row).children if b.label == label)
+    await button.callback(interaction)
+    view.call.assert_awaited_once_with("review_source", ACTOR, kind, "retained-parent")
+    assert interaction.followup.send.call_args.kwargs["ephemeral"] is True

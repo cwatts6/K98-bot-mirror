@@ -47,6 +47,14 @@ def historical_source_bytes(module, raw, outcome_source):
         assert (
             legacy_definition_hash(source_definition(raw)) == current["definition_sha256"]
         ), "Outcome definition drift"
+        if b"EXEC dbo.usp_S11CompleteStatsReports" in raw:
+            raw = (
+                SQL_ROOT / "deploy/source_baselines/UPDATE_ALL2-before-p0-receipts.txt"
+            ).read_bytes()
+            assert (
+                hashlib.sha256(raw).hexdigest()
+                == "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a"
+            ), "Historical outcome source drift"
         text = raw.decode("utf-8").replace("\r\n", "\n")
         text = text.replace(
             "@CompletedFileName [nvarchar](260),\n    @ExportPreparationID uniqueidentifier = NULL",
@@ -247,7 +255,7 @@ def test_amendment_reconstruction_rejects_changed_forward_image(permission_sourc
     raw = (SQL_ROOT / module["path"]).read_bytes()
     # Damage the added code itself, which inversion would otherwise remove.
     before, after = (
-        (b"State='completed',", b"State='partial',")
+        (b"EXEC dbo.usp_S11CompleteStatsReports", b"EXEC dbo.usp_S11ValidateStatsReportStage")
         if name == "dbo.UPDATE_ALL2"
         else (b"SELECT file_exists FROM", b"SELECT file_is_a_directory FROM")
     )
@@ -269,7 +277,11 @@ def test_amendment_reconstruction_rejects_resealed_outcome_manifest(permission_s
     manifest, outcome = permission_sources
     module = next(m for m in manifest["modules"] if m["name"] == "dbo.UPDATE_ALL2")
     raw = (
-        (SQL_ROOT / module["path"]).read_bytes().replace(b"State='completed',", b"State='partial',")
+        (SQL_ROOT / module["path"])
+        .read_bytes()
+        .replace(
+            b"EXEC dbo.usp_S11CompleteStatsReports", b"EXEC dbo.usp_S11ValidateStatsReportStage"
+        )
     )
     changed = deepcopy(outcome)
     current = next(m for m in changed["modules"] if m["name"] == module["name"])

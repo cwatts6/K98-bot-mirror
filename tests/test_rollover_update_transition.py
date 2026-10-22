@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 def test_guided_rollover_pins_complete_runtime():
@@ -31,7 +32,7 @@ def test_guided_rollover_pins_complete_runtime():
                     if successor["path"] == member["path"]:
                         assert successor["before_sha256"] == expected
                         expected = successor["after_sha256"]
-        assert updater.sha256(source.read_bytes().replace(b"\r\n", b"\n")) == expected
+        assert historical_runtime_hash(root, member["path"]) == expected
         assert member["before_sha256"] and member["before_sha256"] != member["after_sha256"]
 
 

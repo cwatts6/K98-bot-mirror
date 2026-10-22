@@ -121,10 +121,30 @@ class ReplacementActivationService:
             return self.verify(records[0], self.proposals.registration)
 
     def verify(self, row, base):
-        raw = self.proposals._read_receipt(identity(row["ReceiptReference"]), row["ReceiptHash"])
+        proof = self.projection(row, base)
+        try:
+            raw = self.proposals._read_receipt(
+                identity(row["ReceiptReference"]), row["ReceiptHash"]
+            )
+        except (SourceConflict, OSError, KeyError, ValueError):
+            from services.export_registration_attestation import verify
+
+            return verify(self, row, base, proof)
         if hashlib.sha256(raw).hexdigest() != row["ReceiptHash"]:
             raise SourceConflict("Private activation receipt hash differs.")
         audit = decode(raw)
+        if any(audit.get(key) != value for key, value in proof["expected_audit"].items()):
+            raise SourceConflict("Activation differs from its exact sealed proposal and readback.")
+        if audit.get("verification", {}).get("files") != proof["result"]["files"]:
+            raise SourceConflict("Activation readback differs from its independent journal.")
+        return proof["result"]
+
+    def projection(self, row, base):
+        """Derive a registration only from independently verified dependencies.
+
+        SQL RegistrationJson is a comparison target, never the input authority.
+        This does not certify the missing activation receipt or provider output.
+        """
         proposal = self.proposals.inspect(identity(row["ReplacementID"]))
         observed = self.verification.inspect(identity(row["VerificationID"]))
         if observed is None or observed["state"] != "verified":
@@ -139,22 +159,15 @@ class ReplacementActivationService:
             observed["files"],
         )
         if (
-            audit.get("kind") != "export_replacement_activation/1"
-            or audit.get("business_resolved") is not False
-            or audit.get("activation_id") != identity(row["ActivationID"])
-            or audit.get("replacement_id") != identity(row["ReplacementID"])
-            or audit.get("verification_id") != identity(row["VerificationID"])
-            or audit.get("proposal") != proposal
-            or audit.get("projected") != projected
-            or audit.get("verification", {}).get("files") != observed["files"]
+            row["AccountKey"] != base.value()["account"]
             or row["BaseRegistrationHash"] != base.fingerprint
             or row["RegistrationHash"] != projected["registration_sha256"]
             or json.loads(row["RegistrationJson"]) != projected["registration"]
-            or audit.get("actor") != row["Actor"]
-            or audit.get("reason") != row["Reason"]
+            or row["Actor"] != "recovery:" + identity(row["ActivationID"])
+            or observed["replacement_id"] != proposal["replacement_id"]
         ):
             raise SourceConflict("Activation differs from its exact sealed proposal and readback.")
-        return dict(
+        result = dict(
             activation_id=identity(row["ActivationID"]),
             replacement_id=proposal["replacement_id"],
             verification_id=identity(row["VerificationID"]),
@@ -167,6 +180,22 @@ class ReplacementActivationService:
                 "input_commitment"
             ],
             business_resolved=False,
+        )
+        return dict(
+            original=row,
+            expected_audit=dict(
+                kind="export_replacement_activation/1",
+                business_resolved=False,
+                activation_id=result["activation_id"],
+                replacement_id=result["replacement_id"],
+                verification_id=result["verification_id"],
+                proposal=proposal,
+                projected=projected,
+                actor=row["Actor"],
+                reason=row["Reason"],
+            ),
+            result=result,
+            original_receipt_verified=False,
         )
 
 

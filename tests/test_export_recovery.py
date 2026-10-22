@@ -409,6 +409,7 @@ def test_runtime_keeps_export_incidents_in_the_recovery_centre(monkeypatch):
     rollover = SimpleNamespace(kind="export_rollover")
     runtime = SimpleNamespace(
         account="account",
+        configuration="{}",
         store=SimpleNamespace(storage_owner="disk"),
         dal=SimpleNamespace(connect=Mock()),
         recovery_client=None,

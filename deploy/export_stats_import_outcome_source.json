@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "authored-not-installed; outcome receipts require 20261009_001_stats_import_outcomes and protected contract reissue",
+  "status": "authored-not-installed; requires 20261022_001_p0_pipeline_receipts and exact paired protected contract reissue",
   "database": "ROK_TRACKER",
   "default_schema": "dbo",
   "sql_server_major_version": 16,
@@ -13,7 +13,9 @@
     "KVK.sp_KVK_AllPlayers_Ingest",
     "KVK.sp_KVK_Recompute_Windows",
     "KVK.sp_KVK_Get_Exports",
-    "dbo.usp_S11RunStatsImport"
+    "dbo.usp_S11RunStatsImport",
+    "dbo.usp_S11CompleteStatsReports",
+    "dbo.usp_S11ValidateStatsReportStage"
   ],
   "modules": [
     {
@@ -311,26 +313,22 @@
     {
       "name": "dbo.UPDATE_ALL2",
       "path": "sql_schema/dbo.UPDATE_ALL2.StoredProcedure.sql",
-      "source_sha256": "830b0a96b06904f3871962e067884529b053b59657d9068e4503cd73ca07663a",
-      "definition_sha256": "4a5640dbdf811d645ba9ed83062f08408f5d02e6c9c2338585042b031af080bc",
+      "source_sha256": "e14c4c7e45f22d42d288bf0dbd2f9c7ff8f860cad92ac32a749ed110846f111d",
+      "definition_sha256": "d45eab56aaf1a47c5cb6b1894f079da15fae6b8136d38ad41185d53abe20eb4d",
       "object_type": "P",
       "execute_as": null,
       "calls": [
         "dbo.ACQUIRE_KS4_IMPORT_LOCK",
         "dbo.ARCHIVE_IMPORT_STAGING_FILE",
         "dbo.CLAIM_KS4_IMPORT_FILE",
-        "dbo.CREATE_DASH2",
-        "dbo.CREATE_THE_AVERAGES",
-        "dbo.GOVERNOR_NAMES_PROC",
         "dbo.IMPORT_STAGING_PROC_CORE",
         "dbo.Refresh_PlayerScanMeta",
-        "dbo.SP_Stats_for_Upload",
-        "dbo.SUMMARY_PROC",
-        "dbo.sp_ExcelOutput_ByKVK",
-        "dbo.sp_Rebuild_ExcelForDashboard",
-        "dbo.sp_RefreshInactiveGovernors",
+        "dbo.usp_S11CompleteStatsReports",
         "dbo.usp_UpsertGovernorNameHistoryForScan",
         "sp_executesql"
+      ],
+      "compatible_definition_sha256": [
+        "d0b5f9317651a8b271acc91bddd71b2e7013c8f54677a5c8c14ae0e5e5bcaca8"
       ]
     },
     {
@@ -506,6 +504,28 @@
       ]
     },
     {
+      "name": "dbo.usp_S11CompleteStatsReports",
+      "path": "sql_schema/dbo.usp_S11CompleteStatsReports.StoredProcedure.sql",
+      "source_sha256": "ea7cb6d32ade02a5444d02976ec182d20b6b457ee50cfff8e869f3a62b43cf5b",
+      "definition_sha256": "062e9b6583c7bb7813cce1984f609de73cdd73019e7e713b4b6fb42ea47fad98",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.CREATE_DASH2",
+        "dbo.CREATE_THE_AVERAGES",
+        "dbo.GOVERNOR_NAMES_PROC",
+        "dbo.SP_Stats_for_Upload",
+        "dbo.SUMMARY_PROC",
+        "dbo.sp_ExcelOutput_ByKVK",
+        "dbo.sp_Rebuild_ExcelForDashboard",
+        "dbo.sp_RefreshInactiveGovernors",
+        "dbo.usp_S11ValidateStatsReportStage"
+      ],
+      "compatible_definition_sha256": [
+        "1e944df22beab0900a36c894d1bc8ca2c454853ba04ebf3c3a1ea1c4769b5182"
+      ]
+    },
+    {
       "name": "dbo.usp_S11RunStatsImport",
       "path": "sql_schema/dbo.usp_S11RunStatsImport.StoredProcedure.sql",
       "object_type": "P",
@@ -517,6 +537,20 @@
       "definition_sha256": "f11f8395fd4837e4decd4b5573b9dc7d1573abf4c8bf24944265d78e8fcf0c68",
       "compatible_definition_sha256": [
         "034ca049c92a8b8ea654edca21f03269afae4884d398ea7d26e7ab0aade0b81e"
+      ]
+    },
+    {
+      "name": "dbo.usp_S11ValidateStatsReportStage",
+      "path": "sql_schema/dbo.usp_S11ValidateStatsReportStage.StoredProcedure.sql",
+      "source_sha256": "580d20908b22f520862cdc1f3242b2a5e9349dc346b12fb18db4d5dc58f9dd67",
+      "definition_sha256": "1a4fde59149792a12c394b6e590532ace26a658237f0795a4f0d003b4b269dd1",
+      "object_type": "P",
+      "execute_as": null,
+      "calls": [
+        "dbo.ACQUIRE_KS4_IMPORT_LOCK"
+      ],
+      "compatible_definition_sha256": [
+        "d57073a77baed7ca784468a79f540df99a13480ab3ddc2e8806ae518a0b6f3f2"
       ]
     },
     {
@@ -672,6 +706,20 @@
       "principal": "ExportLegacyEntryReader",
       "securable_class": "OBJECT",
       "target": "dbo.usp_S11RunStatsImport",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.usp_S11CompleteStatsReports",
+      "permission": "EXECUTE"
+    },
+    {
+      "database": "ROK_TRACKER",
+      "principal": "ExportLegacyEntryReader",
+      "securable_class": "OBJECT",
+      "target": "dbo.usp_S11ValidateStatsReportStage",
       "permission": "EXECUTE"
     }
   ],

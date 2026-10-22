@@ -23,20 +23,22 @@ def pilot(service):
     )
 
 
-def test_partial_reporting_has_no_accept_unfinished_button_or_stale_dispatch():
+def test_partial_reporting_has_explicit_disposition_without_completion_claim():
     original, dal, store, old_row = setup("partial")
     service = pilot(original)
     current = service.review(ACTOR, old_row["IncidentID"])
     assert current["State"] == "open"
-    assert current["evidence"]["actions"] == {}
-    assert "P0b" in current["release_notice"]
+    assert set(current["evidence"]["actions"]) == {"supersede_partial"}
+    choice = current["evidence"]["actions"]["supersede_partial"]
+    assert "unfinished or unknown" in choice["check"]
+    assert "not a completion receipt" in choice["effect"]
     assert current["EvidenceHash"] == old_row["EvidenceHash"]
     # Presentation must not remove original evidence from durable history.
     assert "supersede_partial" in store.get(old_row["IncidentID"])["evidence"]["actions"]
-    with pytest.raises(SourceConflict, match="not enabled in the first release"):
-        execute(service, old_row)
-    assert store.actions == []
-    assert dal.calls == []
+    result = execute(service, current)
+    assert result["State"] == "resolved"
+    assert result["evidence"]["outcome"] == "partial"
+    assert len(dal.calls) == 1
 
 
 def test_previously_accepted_repair_reconciles_after_pilot_boundary_changes():

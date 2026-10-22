@@ -162,6 +162,22 @@ class ProducerRefusalRecovery:
                                 source_id=linked_source,
                             )
                         )
+                if (
+                    len(links) == prior_links
+                    and blocker["ResourceKey"] == "sql_snapshot:legacy_outputs"
+                    and blocker.get("BlockedReason")
+                    and getattr(self.dal, "account", None)
+                    and getattr(self.dal, "storage_owner", None)
+                ):
+                    from services.unowned_sql_hold_dal import source_id as hold_source_id
+
+                    links.append(
+                        dict(
+                            label="Review unowned SQL blocker",
+                            kind="unowned_sql_hold",
+                            source_id=hold_source_id(self.dal.account, self.dal.storage_owner),
+                        )
+                    )
                 if len(links) == prior_links and blocker["ResourceKey"] != "queue":
                     from services.recovery_evidence_guidance import ownership_evidence_steps
 

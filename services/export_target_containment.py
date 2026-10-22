@@ -241,9 +241,14 @@ class ExportTargetContainment:
 
     def verify(self, snapshot):
         receipt = snapshot["receipt"]
-        raw = self.store.read_reference(
-            identity(receipt["ReceiptReference"]), bytes.fromhex(receipt["ReceiptHash"])
-        )
+        try:
+            raw = self.store.read_reference(
+                identity(receipt["ReceiptReference"]), bytes.fromhex(receipt["ReceiptHash"])
+            )
+        except (SourceConflict, OSError, ValueError, KeyError):
+            from services.export_containment_attestation import verify
+
+            return verify(self, snapshot)
         if hashlib.sha256(raw).hexdigest() != receipt["ReceiptHash"]:
             raise SourceConflict("Original private containment receipt cannot be verified.")
         audit = json.loads(raw)
@@ -266,41 +271,11 @@ class ExportTargetContainment:
         if before["pool"] is not None:
             old_pool, current_pool = before["pool"], snapshot["pool"]
             if current_pool and current_pool.get("RetiredByReplacementID") is not None:
-                activation = self.dal.replacement_retirement(
-                    current_pool["PoolID"], current_pool["AccountKey"]
+                from services.export_pool_retirement_evidence import isolated_pool
+
+                current_pool = isolated_pool(
+                    self.dal, self.store, current_pool, old_pool, audit["containment_id"]
                 )
-                if activation is None:
-                    raise SourceConflict("Retired pool has no replacement activation receipt.")
-                activation_raw = self.store.read_reference(
-                    identity(activation["ReceiptReference"]),
-                    bytes.fromhex(activation["ReceiptHash"]),
-                )
-                activation_audit = json.loads(activation_raw)
-                isolated_pool = activation_audit.get("before_pool")
-                if (
-                    hashlib.sha256(activation_raw).hexdigest() != activation["ReceiptHash"]
-                    or activation_audit.get("kind") != "export_replacement_activation/1"
-                    or activation_audit.get("activation_id") != identity(activation["ActivationID"])
-                    or activation_audit.get("replacement_id")
-                    != identity(activation["ReplacementID"])
-                    or identity(activation["ContainmentID"]) != audit["containment_id"]
-                    or identity(current_pool["RetiredByReplacementID"])
-                    != identity(activation["ReplacementID"])
-                    or not isinstance(isolated_pool, dict)
-                    or current_pool["Version"] != isolated_pool["Version"] + 1
-                    or {
-                        k: v
-                        for k, v in current_pool.items()
-                        if k not in {"RetiredByReplacementID", "Version", "UpdatedUTC"}
-                    }
-                    != {
-                        k: v
-                        for k, v in isolated_pool.items()
-                        if k not in {"RetiredByReplacementID", "Version", "UpdatedUTC"}
-                    }
-                ):
-                    raise SourceConflict("Pool replacement differs from its sealed retirement.")
-                current_pool = isolated_pool
             # Older immutable receipts precede the additive nullable column.
             # Only a null value is equivalent to an absent historical key.
             old_pool = dict(old_pool)

@@ -33,6 +33,8 @@ TABLES = (
     "dbo.ExportProviderRequest",
     "dbo.ExportProviderRequestEvent",
     "dbo.ExportTargetContainment",
+    "dbo.ExportContainmentAttestation",
+    "dbo.ExportRegistrationAttestation",
     "dbo.ExportContainedTarget",
     "dbo.ExportContainedStream",
     "dbo.ExportManagedFileOrigin",
@@ -42,6 +44,7 @@ TABLES = (
     "KVK.SourceOutputOperation",
     "KVK.SourceOutputOperationResource",
     "KVK.SourceDelivery",
+    "KVK.SeasonSource",
 )
 PROCEDURES = (
     "dbo.usp_ExportJobContainTargets",
