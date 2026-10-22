@@ -7,12 +7,12 @@ from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
-from services.export_replacement_authority import ReplacementAuthority
 
 from core.export_execution_host import PrivateEvidenceStore
 from kvk.dal.new_source_import_dal import SourceConflict
 from scripts.run_export_authority import AuthorityBroker
 from services.export_evidence_recovery import EvidenceRecoveryAdapter
+from services.export_replacement_authority import ReplacementAuthority
 from services.export_runtime_composition import LocalAuthorityClient
 from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryActor, RecoveryService
