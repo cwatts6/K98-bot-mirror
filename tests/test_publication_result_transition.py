@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
 
 
 @pytest.mark.parametrize(
@@ -33,9 +34,9 @@ def test_result_transition_pins_all_runtime_members(transition, paths):
         for m in t["members"]
     }
     for member in item["members"]:
-        assert updater.sha256(
-            (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-        ) == successors.get(member["path"], member["after_sha256"])
+        assert historical_runtime_hash(root, member["path"]) == successors.get(
+            member["path"], member["after_sha256"]
+        )
         assert member["before_sha256"] != member["after_sha256"]
 
 

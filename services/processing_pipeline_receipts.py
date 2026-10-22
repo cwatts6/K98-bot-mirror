@@ -162,8 +162,16 @@ async def strict_work(name, fallback):
     if name == "maintenance":
         from constants import DATABASE, PASSWORD, SERVER, USERNAME
         from file_utils import run_post_import_stats_update
+        from processing_pipeline import POST_MAINT_TIMEOUT
 
-        await drain_thread(run_post_import_stats_update, SERVER, DATABASE, USERNAME, PASSWORD)
+        await drain_thread(
+            run_post_import_stats_update,
+            SERVER,
+            DATABASE,
+            USERNAME,
+            PASSWORD,
+            timeout_seconds=POST_MAINT_TIMEOUT,
+        )
         return True, "SQL maintenance response consumed"
     result = fallback()
     return await result if inspect.isawaitable(result) else result

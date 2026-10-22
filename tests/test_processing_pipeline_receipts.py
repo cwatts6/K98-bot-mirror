@@ -13,6 +13,62 @@ from services.producer_recovery_intent import atomic_producer_intent, current_in
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("timeout", [17, 901])
+async def test_strict_maintenance_preserves_configured_timeout(monkeypatch, timeout):
+    import file_utils
+    import processing_pipeline
+
+    calls = []
+    monkeypatch.setattr(processing_pipeline, "POST_MAINT_TIMEOUT", timeout)
+    monkeypatch.setattr(
+        file_utils,
+        "run_post_import_stats_update",
+        lambda *args, **kwargs: calls.append(kwargs["timeout_seconds"]),
+    )
+
+    def fallback():
+        pytest.fail("Receipt-enabled maintenance must use the drained strict worker")
+
+    assert await receipts.strict_work("maintenance", fallback) == (
+        True,
+        "SQL maintenance response consumed",
+    )
+    assert calls == [timeout]
+
+
+@pytest.mark.parametrize("timeout", [17, 901])
+def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeout):
+    import file_utils
+
+    calls = []
+
+    class Cursor:
+        __slots__ = ()
+
+        def execute(self, statement):
+            calls.append(statement)
+
+        def nextset(self):
+            calls.append("response_consumed")
+            return False
+
+    class Connection:
+        timeout = 0
+        autocommit = False
+
+        def cursor(self):
+            assert self.timeout == timeout
+            return Cursor()
+
+        def close(self):
+            calls.append("closed")
+
+    monkeypatch.setattr(file_utils, "get_conn_with_retries", lambda **kwargs: Connection())
+    file_utils.run_post_import_stats_update("server", "database", "user", "password", timeout)
+    assert calls == ["EXEC [dbo].[usp_update_stats]", "response_consumed", "closed"]
+
+
+@pytest.mark.asyncio
 async def test_cancelled_waiter_retains_guard_until_worker_and_receipt_finish(monkeypatch):
     started, release = asyncio.Event(), asyncio.Event()
     operation, run_id = str(uuid4()), str(uuid4())

@@ -650,12 +650,11 @@ def run_post_import_stats_update(
             conn.autocommit = True  # type: ignore[attr-defined]
         except Exception:
             pass
+        # pyodbc applies query timeouts to cursors created after this setting.
+        # Cursor.timeout is unsupported; silently ignoring it leaves SQL unbounded.
+        conn.timeout = timeout_seconds
         cur = conn.cursor()
         try:
-            try:
-                cur.timeout = timeout_seconds
-            except Exception:
-                pass
             cur.execute("EXEC [dbo].[usp_update_stats]")
             # SQL errors can arrive in a later result set. Do not acknowledge
             # maintenance until the driver has consumed the complete response.

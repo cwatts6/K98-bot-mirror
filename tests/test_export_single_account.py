@@ -193,7 +193,18 @@ def test_source_inventory_digest_tracks_pinned_git_bytes_and_rejects_old_pin():
     manifest = json.loads(
         (Path(__file__).parents[1] / "deploy/export_application_schema_source.json").read_bytes()
     )
-    assert len(manifest) == len({item["name"] for item in manifest}) == 560
+    names = {item["name"] for item in manifest}
+    assert len(manifest) == len(names) == 568
+    assert {
+        "dbo.ExportContainmentAttestation",
+        "dbo.ExportRegistrationAttestation",
+        "dbo.ExportUnownedHoldDisposition",
+        "dbo.ProcessingPipelineRun",
+        "dbo.ProcessingPipelineStage",
+        "dbo.StatsImportReportContinuation",
+        "dbo.usp_S11CompleteStatsReports",
+        "dbo.usp_S11ValidateStatsReportStage",
+    } <= names
     assert digest(manifest).hex() == APPLICATION_SCHEMA_SOURCE_HASH
     original = deepcopy(manifest)
     next(item for item in original if item["name"] == "dbo.usp_ExportExecutionSessionTransition")[
