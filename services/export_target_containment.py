@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.config_read_containment import stream_wire
 from services.export_coordination_dal import identity
@@ -245,7 +246,7 @@ class ExportTargetContainment:
             raw = self.store.read_reference(
                 identity(receipt["ReceiptReference"]), bytes.fromhex(receipt["ReceiptHash"])
             )
-        except (SourceConflict, OSError, ValueError, KeyError):
+        except (HostBoundaryError, SourceConflict, OSError, ValueError, KeyError):
             from services.export_containment_attestation import verify
 
             return verify(self, snapshot)

@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import identity
 from services.export_execution_protocol import decode, encode
@@ -126,7 +127,7 @@ class ReplacementActivationService:
             raw = self.proposals._read_receipt(
                 identity(row["ReceiptReference"]), row["ReceiptHash"]
             )
-        except (SourceConflict, OSError, KeyError, ValueError):
+        except (HostBoundaryError, SourceConflict, OSError, KeyError, ValueError):
             from services.export_registration_attestation import verify
 
             return verify(self, row, base, proof)

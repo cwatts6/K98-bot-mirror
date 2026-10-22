@@ -592,7 +592,12 @@ class PrivateEvidenceStore:
             encrypted = source.read(self._store.max_bytes + 1)
         if len(encrypted) > self._store.max_bytes:
             raise HostBoundaryError("Encrypted evidence exceeds bound.")
-        data = self._unprotect(encrypted)
+        try:
+            data = self._unprotect(encrypted)
+        except Exception as exc:
+            # Native DPAPI failures are not OSError subclasses. Keep the typed
+            # evidence-read failure distinct from host/custody validation.
+            raise HostBoundaryError("Retained evidence could not be decrypted.") from exc
         if hashlib.sha256(data).digest() != bytes(expected_hash):
             raise HostBoundaryError("Retained evidence hash differs.")
         return data

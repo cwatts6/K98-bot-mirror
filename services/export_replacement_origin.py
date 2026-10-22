@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import identity
 from services.export_replacement_verification import (
@@ -45,7 +46,7 @@ def verify_replacement_origin(*, dal, store, account, targets, owner_email, edit
                 raise ValueError("Activation receipt changed")
             audit = json.loads(raw)
             activation_files = audit.get("verification", {}).get("files")
-        except (SourceConflict, OSError, KeyError, ValueError):
+        except (HostBoundaryError, SourceConflict, OSError, KeyError, ValueError):
             from services.export_registration_attestation import read_sealed
 
             successor = read_sealed(dal.connect, store, account, first["ActivationID"])

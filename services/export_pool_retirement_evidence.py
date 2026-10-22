@@ -8,6 +8,7 @@ association. This function grants no authority to the replacement registration.
 import hashlib
 import json
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import identity
 
@@ -27,7 +28,7 @@ def isolated_pool(dal, store, current, before, containment_id, *, rollover=False
         raw = store.read_reference(
             identity(activation["ReceiptReference"]), bytes.fromhex(activation["ReceiptHash"])
         )
-    except (SourceConflict, OSError, KeyError, ValueError):
+    except (HostBoundaryError, SourceConflict, OSError, KeyError, ValueError):
         # The independent containment snapshot already authenticates the old
         # pool. Only its fixed isolation transition and one SQL retirement may
         # differ. No field of RegistrationJson participates in this proof.

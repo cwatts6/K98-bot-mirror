@@ -3,6 +3,7 @@
 import hashlib
 import re
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_coordination_dal import identity
 from services.export_execution_protocol import decode, encode
@@ -153,7 +154,7 @@ def open_recovery(broker, reference):
             try:
                 verify(service, row, base, proof)
                 verified = True
-            except (SourceConflict, OSError, KeyError, ValueError):
+            except (HostBoundaryError, SourceConflict, OSError, KeyError, ValueError):
                 pass
             return dict(
                 service=service,

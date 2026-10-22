@@ -2,16 +2,32 @@
 
 from uuid import UUID, uuid4
 
+from core.export_execution_host import HostBoundaryError
 from services import export_containment_attestation, export_registration_attestation
 
 
-def qualify_pool_attestation(r, *, lost):
+def qualify_pool_attestation(r, *, lost, damage="missing"):
     containment = r.service.proposals.containment
+
+    def lose(reference):
+        reference = str(UUID(reference))
+        if damage == "missing":
+            del r.docs[reference]
+            return
+        original = containment.store.read_reference
+
+        def read(key, expected_hash):
+            if str(UUID(str(key))) == reference:
+                raise HostBoundaryError("Corrupt retained encrypted evidence")
+            return original(key, expected_hash)
+
+        containment.store.read_reference = read
+
     account = containment.registration.value()["account"]
     pool = containment._scope(r.f.job)[1]
     if lost == "containment":
         snapshot = containment.dal.snapshot(r.f.job, account=account, pool_id=pool)
-        del r.docs[str(UUID(snapshot["receipt"]["ReceiptReference"]))]
+        lose(snapshot["receipt"]["ReceiptReference"])
         _, token, _ = export_containment_attestation.inspect(containment, snapshot)
         export_containment_attestation.apply(
             containment,
@@ -23,7 +39,7 @@ def qualify_pool_attestation(r, *, lost):
     expected = r.apply()
     if lost == "activation":
         row = r.activation.dal.chain(account)[0]
-        del r.docs[str(UUID(row["ReceiptReference"]))]
+        lose(row["ReceiptReference"])
         _, token, _ = export_registration_attestation.inspect(
             r.activation, row, r.service.proposals.registration
         )

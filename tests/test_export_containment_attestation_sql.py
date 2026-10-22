@@ -189,6 +189,32 @@ def confirm(r, row, actor=ACTOR):
     )
 
 
+@pytest.mark.parametrize("damage", ["hash", "decrypt"])
+def test_corrupt_private_receipt_uses_independent_attestation(guided, monkeypatch, damage):
+    r = guided
+    corrupt = b"damaged encrypted containment"
+    path = r.tmp_path / UUID(r.reference).hex
+    path.write_bytes(corrupt)
+    if damage == "decrypt":
+        original = r.private._unprotect
+
+        def decrypt(raw):
+            if raw == corrupt:
+                raise RuntimeError("Native decryption failed")
+            return original(raw)
+
+        monkeypatch.setattr(r.private, "_unprotect", decrypt)
+    before = r.service.dal.snapshot(r.f.job, account="test-account")
+    row = r.guided_service.review_source(ACTOR, "private_evidence", r.reference)
+    assert set(row["evidence"]["actions"]) == {"attest_containment"}
+    result = confirm(r, row)
+    assert result["State"] == "resolved"
+    assert result["evidence"]["original_receipt_verified"] is False
+    assert r.service.inspect(r.f.job)["business_resolved"] is False
+    assert r.service.dal.snapshot(r.f.job, account="test-account") == before
+    assert path.read_bytes() == corrupt
+
+
 def test_guided_current_isolation_requires_admin_and_survives_lost_reply_restart(
     guided, monkeypatch
 ):

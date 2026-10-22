@@ -180,3 +180,39 @@ def test_loss_of_new_witness_requires_another_separate_confirmation(guided):
     assert set(current["evidence"]["actions"]) == {"attest_registration"}
     assert confirm(g, current)["State"] == "resolved"
     assert g.r.f.sql.execute("SELECT COUNT(*) FROM #ExportRegistrationAttestation").fetchval() == 2
+
+
+@pytest.mark.parametrize("damage", ["hash", "decrypt"])
+def test_corrupt_registration_and_witness_require_independent_confirmation(
+    guided, monkeypatch, damage
+):
+    g = guided
+    corrupt = b"damaged encrypted registration"
+    path = g.tmp_path / UUID(g.reference).hex
+    path.write_bytes(corrupt)
+    if damage == "decrypt":
+        original = g.private._unprotect
+
+        def decrypt(raw):
+            if raw == corrupt:
+                raise RuntimeError("Native decryption failed")
+            return original(raw)
+
+        monkeypatch.setattr(g.private, "_unprotect", decrypt)
+    requests = len(g.r.runtime.sent)
+    row = g.service.review_source(ACTOR, "private_evidence", g.reference)
+    assert set(row["evidence"]["actions"]) == {"attest_registration"}
+    assert confirm(g, row)["State"] == "resolved"
+    assert g.broker.replacements.current()["registration"] == g.expected["registration"]
+    saved = g.r.f.sql.execute(
+        "SELECT ReceiptReference FROM #ExportRegistrationAttestation"
+    ).fetchval()
+    for name in (UUID(saved).hex, "replica_" + UUID(saved).hex):
+        (g.tmp_path / name).write_bytes(corrupt)
+    row = g.service.review(ACTOR, row["IncidentID"])
+    assert row["State"] == "open"
+    assert set(row["evidence"]["actions"]) == {"attest_registration"}
+    assert confirm(g, row)["State"] == "resolved"
+    assert g.r.f.sql.execute("SELECT COUNT(*) FROM #ExportRegistrationAttestation").fetchval() == 2
+    assert len(g.r.runtime.sent) == requests
+    assert path.read_bytes() == corrupt

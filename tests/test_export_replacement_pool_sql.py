@@ -106,7 +106,8 @@ def test_full_pool_activation_reuses_capacity_number_and_preserves_old_history(a
 
 
 @pytest.mark.parametrize("lost", ["containment", "activation"])
-def test_pool_history_loss_uses_separate_verified_attestation(activation, lost):
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_pool_history_loss_uses_separate_verified_attestation(activation, lost, damage):
     from tests.registration_attestation_harness import qualify_pool_attestation
 
-    qualify_pool_attestation(activation, lost=lost)
+    qualify_pool_attestation(activation, lost=lost, damage=damage)

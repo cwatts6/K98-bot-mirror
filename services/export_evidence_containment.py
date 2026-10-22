@@ -1,5 +1,6 @@
 """Find a lost isolation binding using only the authenticated registration prefix."""
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_containment_attestation import inspect, verify
 from services.export_containment_attestation_dal import ContainmentAttestationDAL
@@ -32,7 +33,7 @@ def open_recovery(broker, reference):
                 history=registrations,
                 owner_kind="rollover" if row.get("OutputOperationID") else "job",
             ).verify(row, current)
-        except (SourceConflict, OSError, ValueError, KeyError):
+        except (HostBoundaryError, SourceConflict, OSError, ValueError, KeyError):
             break  # Do not treat unverified SQL registration JSON as authority.
         registrations.append(RuntimeRegistration(result["registration"]))
         records.remove(row)
@@ -54,7 +55,7 @@ def open_recovery(broker, reference):
         verified = None
         try:
             verified = verify(service, snapshot)
-        except (SourceConflict, OSError, ValueError, KeyError):
+        except (HostBoundaryError, SourceConflict, OSError, ValueError, KeyError):
             pass
         return dict(
             service=service,

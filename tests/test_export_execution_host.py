@@ -11,6 +11,26 @@ from core.export_execution_host import (
 )
 
 
+def test_reference_decryption_failure_has_typed_boundary_and_preserves_ciphertext(tmp_path):
+    import hashlib
+    from uuid import uuid4
+
+    class NativeDecryptError(Exception):
+        pass
+
+    def fail(raw):
+        raise NativeDecryptError("Native cryptographic failure")
+
+    reference = uuid4()
+    path = tmp_path / reference.hex
+    path.write_bytes(b"corrupt ciphertext")
+    store = PrivateEvidenceStore(tmp_path, "disk", protect=lambda b: b, unprotect=fail)
+    with pytest.raises(HostBoundaryError, match="could not be decrypted") as caught:
+        store.read_reference(reference, hashlib.sha256(b"expected").digest())
+    assert isinstance(caught.value.__cause__, NativeDecryptError)
+    assert path.read_bytes() == b"corrupt ciphertext"
+
+
 @pytest.mark.parametrize(
     "group,privilege,elevation,expected",
     [
