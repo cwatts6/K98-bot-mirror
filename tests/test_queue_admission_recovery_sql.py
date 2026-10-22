@@ -282,7 +282,7 @@ def test_typed_queue_routes_to_domain_close_and_saved_continuation(refused):
     producer, store, service, row = setup(r)
     closed = execute(service, row, action="close_unstarted_admission")
     assert store.actions[0]["State"] == "verified"
-    assert closed["evidence"]["actions"].keys() == {"resume_sql_stage"}
+    assert closed["evidence"]["actions"].keys() == {"resume_sql_stage", "cancel_saved_stage"}
     execute(service, closed, action="resume_sql_stage")
     producer.runner.assert_called_once_with(r.inputs)
 

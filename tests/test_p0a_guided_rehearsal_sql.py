@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from kvk.dal.new_source_import_dal import digest
 from services.configuration_continuation import ConfigurationContinuation
 from services.configuration_continuation_dal import ConfigurationContinuationDAL
 from services.configuration_producer_recovery import ConfigurationProducerRecovery
@@ -44,7 +45,13 @@ pytestmark = [
 
 
 def button(view, label):
-    return next(b for b in view.children if b.label == label)
+    matches = [b for b in view.children if getattr(b, "label", None) == label]
+    assert len(matches) == 1, (
+        type(view).__name__,
+        label,
+        [getattr(b, "label", None) for b in view.children],
+    )
+    return matches[0]
 
 
 @pytest.mark.asyncio
@@ -69,9 +76,21 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     import bot_config
     from services import recovery_runtime
     from stats_alerts import recovery_notifications
-    from ui.views import recovery_review_view, recovery_view
+    from ui.views import recovery_review_view, recovery_summary_view, recovery_view
 
     r = recovery
+    # This rehearsal follows an interrupted pipeline publication. A generic
+    # SQL-only retry cannot authorize the export paths exercised below.
+    request = json.loads(r.outcomes.inspect(r.source)["preparation"]["RequestJson"])
+    request["request"]["producer"]["export_disposition"] = "pipeline_export_v1"
+    r.owner.execute(
+        r.rewrite(
+            "UPDATE dbo.ExportPreparation SET RequestJson=?,RequestHash=? WHERE PreparationID=?"
+        ),
+        json.dumps(request),
+        digest(request),
+        r.source,
+    )
     queue_calls = []
     if choice.startswith("capture"):
         # Real durable admission, snapshot verification and coordinator. Only
@@ -142,7 +161,7 @@ async def test_monitor_alert_to_verified_configuration_disposition(
     monkeypatch.setattr(recovery_runtime, "_cursors", {})
     monkeypatch.setattr(recovery_runtime, "_incident_cursor", None)
     monkeypatch.setattr(recovery_runtime, "_priority_incident_cursor", None)
-    for module in (recovery_view, recovery_review_view):
+    for module in (recovery_view, recovery_review_view, recovery_summary_view):
         monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
 
     async def empty_history(**kwargs):
@@ -214,7 +233,7 @@ async def test_monitor_alert_to_verified_configuration_disposition(
         await click("Confirm & apply repair")
         assert calls == []
     else:
-        await click("Read & publish current config")
+        await click("Continue config for export")
         pages = 0
         while True:
             page = current_view()
@@ -239,6 +258,10 @@ async def test_monitor_alert_to_verified_configuration_disposition(
         label = child_row["evidence"]["actions"][selected_action]["label"]
         await click(label)
         assert r.outcomes.inspect(child_id)["resources"]
+        assert isinstance(current_view(), recovery_summary_view.RecoverySummaryView)
+        await click("Continue to confirmation")
+        assert r.outcomes.inspect(child_id)["resources"]
+        assert calls == [1]
         await click("Confirm & apply repair")
         if choice.startswith("capture"):
             with service_scope() as service:
