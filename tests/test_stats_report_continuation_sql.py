@@ -163,7 +163,7 @@ def reports(recovery):
         body = body[:start] + body[end:]
         body = body.replace("EXEC dbo.SP_Stats_for_Upload;", "BEGIN " + probe(2) + " END;")
         start = body.index(
-            "        ----------------------------------------------------------------\n        -- ⚡⚡⚡"
+            "        ----------------------------------------------------------------\n        -- âš¡âš¡âš¡"
         )
         end = body.index("        IF @ExportPreparationID IS NOT NULL", start)
         body = (
@@ -462,9 +462,11 @@ def restricted_reports(reports):
             "ExportResource",
             "ExportExecutionStream",
             "StatsImportReportContinuation",
-            "ExportPreparationResource",
         ):
             owner.execute("GRANT SELECT, UPDATE ON dbo." + table + " TO S11_ExportApplication")
+        owner.execute(
+            "GRANT INSERT, SELECT ON dbo.ExportPreparationResource TO S11_ExportApplication"
+        )
         for procedure in ("usp_S11ValidateStatsReportStage", "usp_S11CompleteStatsReports"):
             owner.execute("GRANT EXECUTE ON dbo." + procedure + " TO S11_ExportApplication")
         owner.execute("DENY EXECUTE ON dbo.usp_S11CompleteStatsReportsCore TO public")
@@ -540,6 +542,7 @@ def test_restricted_account_denies_direct_archive_but_completes_guarded_reports(
             "EXEC dbo.ARCHIVE_IMPORT_STAGING_FILE @CompletedFileName=N'test.csv'",
             "EXEC dbo.usp_S11CompleteStatsReportsCore @CompletedFileName=N'test.csv'",
             "SELECT * FROM dbo.KS4_ImportFileClaim",
+            "UPDATE dbo.ExportPreparationResource SET PreparationID=PreparationID WHERE 1=0",
         ):
             with pytest.raises(Exception, match=r"\(229\)"):
                 connection.cursor().execute(statement)

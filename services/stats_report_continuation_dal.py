@@ -176,7 +176,24 @@ class StatsReportContinuationDAL:
             )
             while report_cursor.nextset():
                 pass
-        finally:
+        except BaseException as execution_error:
+            # A broken connection may also reject cleanup. Keep the original
+            # driver exception (and its SQL codes) as the repair failure.
+            try:
+                if report_cursor is not None:
+                    report_cursor.close()
+            except Exception as close_error:
+                execution_error.add_note(
+                    "Reporting cursor close also failed: " + type(close_error).__name__
+                )
+            try:
+                connection.timeout = previous_timeout
+            except Exception as restore_error:
+                execution_error.add_note(
+                    "Reporting timeout restoration also failed: " + type(restore_error).__name__
+                )
+            raise
+        else:
             try:
                 if report_cursor is not None:
                     report_cursor.close()

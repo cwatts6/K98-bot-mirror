@@ -1027,7 +1027,7 @@
         {
           "path": "services/stats_report_continuation_dal.py",
           "before_sha256": "87453c4ad4b65b4e8801df70c318b790a489f0cec0338eb66ea1f7cf6aeb23ab",
-          "after_sha256": "c856c61b2ca7f6df6e93fb88de726a710649e39b21b6d3ca0c21ab4fa1efedc8"
+          "after_sha256": "c59c59e5ca7d4dc9bf28003a366fe70b188c34c0a573dedf2ec9ebad42348110"
         }
       ]
     }

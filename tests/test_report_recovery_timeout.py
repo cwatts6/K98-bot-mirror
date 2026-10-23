@@ -38,3 +38,43 @@ def test_report_cursor_gets_bounded_budget_before_creation_and_restores_short_bu
             "exact.csv",
             "prep",
         )
+
+
+@pytest.mark.parametrize("close_fails", [False, True])
+def test_cleanup_failure_preserves_original_driver_error_and_codes(close_fails):
+    import pyodbc
+
+    from services.recovery_health import failure_detail
+
+    original = pyodbc.OperationalError("HYT00", "private report failure (8153)")
+    cursor = Mock()
+    cursor.nextset.side_effect = original
+    if close_fails:
+        cursor.close.side_effect = RuntimeError("private close failure")
+
+    class Connection:
+        value = 15
+
+        @property
+        def timeout(self):
+            return self.value
+
+        @timeout.setter
+        def timeout(self, value):
+            if value == 15:
+                raise RuntimeError("private restoration failure")
+            self.value = value
+
+        def cursor(self):
+            assert self.value == 595
+            return cursor
+
+    with pytest.raises(pyodbc.OperationalError) as caught:
+        StatsReportContinuationDAL._complete_reports(Connection(), "exact.csv", "prep")
+    assert caught.value is original
+    detail = failure_detail(caught.value)
+    assert detail["sqlstates"] == ["HYT00"] and detail["sql_numbers"] == [8153]
+    assert "private" not in str(detail)
+    assert "timeout restoration also failed" in str(original.__notes__)
+    assert "private" not in str(original.__notes__)
+    cursor.close.assert_called_once()
