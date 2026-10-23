@@ -73,6 +73,14 @@ def reports(recovery):
             self.inner = r.connect()
 
         @property
+        def timeout(self):
+            return self.inner.timeout
+
+        @timeout.setter
+        def timeout(self, value):
+            self.inner.timeout = value
+
+        @property
         def autocommit(self):
             return self.inner.autocommit
 
@@ -454,6 +462,7 @@ def restricted_reports(reports):
             "ExportResource",
             "ExportExecutionStream",
             "StatsImportReportContinuation",
+            "ExportPreparationResource",
         ):
             owner.execute("GRANT SELECT, UPDATE ON dbo." + table + " TO S11_ExportApplication")
         for procedure in ("usp_S11ValidateStatsReportStage", "usp_S11CompleteStatsReports"):
@@ -463,7 +472,17 @@ def restricted_reports(reports):
         class Connection:
             def __init__(self):
                 self.inner = pyodbc.connect(cs, autocommit=True, timeout=5)
+                self.inner.timeout = 15
                 self.inner.execute("EXECUTE AS USER='S11_ExportApplication'")
+                self.inner.execute("SET LOCK_TIMEOUT 1000")
+
+            @property
+            def timeout(self):
+                return self.inner.timeout
+
+            @timeout.setter
+            def timeout(self, value):
+                self.inner.timeout = value
 
             @property
             def autocommit(self):
@@ -556,6 +575,88 @@ def test_restricted_account_preserves_committed_stage_after_failure(restricted_r
     assert [
         row[0] for row in r.owner.execute("SELECT Stage FROM dbo.StageProbe ORDER BY Stage")
     ] == [1, 2, 3]
+
+
+def test_restricted_stage_two_continuation_outlasts_short_timeout_without_replay(
+    restricted_reports, monkeypatch
+):
+    from services import stats_report_continuation_dal as module
+
+    r = restricted_reports
+    r.owner.execute("INSERT dbo.StageFailure VALUES(3)")
+    first = r.dal.inspect(r.source)
+    with pytest.raises(Exception, match="injected report failure"):
+        r.dal.run(r.source, first["token"], str(uuid4()))
+    saved = r.dal.inspect(r.source)
+    assert saved["receipt"]["CompletedStage"] == 2
+    r.owner.execute("DELETE dbo.StageFailure")
+    definition = r.owner.execute(
+        "SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.usp_S11CompleteStatsReportsCore'))"
+    ).fetchval()
+    definition = re.sub(
+        r"CREATE\s+(?:OR\s+ALTER\s+)?PROCEDURE", "ALTER PROCEDURE", definition, count=1, flags=re.I
+    )
+    definition = definition.replace(
+        "INSERT dbo.StageProbe VALUES(3);",
+        "WAITFOR DELAY '00:00:16'; INSERT dbo.StageProbe VALUES(3);",
+    )
+    r.owner.execute(definition)
+    with monkeypatch.context() as old_budget:
+        old_budget.setattr(module, "REPORT_QUERY_TIMEOUT_SECONDS", 15)
+        with pytest.raises(Exception, match="HYT00"):
+            r.dal.run(r.source, saved["token"], str(uuid4()))
+    retry = r.dal.inspect(r.source)
+    assert retry["receipt"]["CompletedStage"] == 2
+    action = str(uuid4())
+    r.dal.run(r.source, retry["token"], action)
+    r.dal.run(r.source, retry["token"], action)  # Lost-reply replay only reads completion.
+    final = r.dal.inspect(r.source)
+    assert final["complete"] and final["receipt"]["CompletedStage"] == 3
+    for key in ("ScanOrder", "PrefixCompletedUTC", "UploadCompletedUTC"):
+        assert final["receipt"][key] == saved["receipt"][key]
+    assert [x[0] for x in r.owner.execute("SELECT Stage FROM dbo.StageProbe ORDER BY Stage")] == [
+        1,
+        2,
+        3,
+    ]
+
+
+def test_restricted_monitor_contention_retains_sql_code_and_recovers_without_release(
+    restricted_reports,
+):
+    import pyodbc
+
+    from services import recovery_health
+    from services.queue_admission_recovery_dal import QueueAdmissionDAL
+
+    r = restricted_reports
+
+    def transactional_connect():
+        connection = r.connect()
+        connection.autocommit = False
+        return connection
+
+    dal = QueueAdmissionDAL(
+        SimpleNamespace(
+            dal=SimpleNamespace(connect=transactional_connect),
+            account="a",
+            store=SimpleNamespace(storage_owner="disk-a"),
+        )
+    )
+    before = dal.snapshot(r.source)
+    writer = r.connect()
+    try:
+        writer.cursor().execute(
+            "BEGIN TRANSACTION; UPDATE dbo.StatsImportExecution SET Version=Version+1"
+        )
+        with pytest.raises(pyodbc.Error) as caught:
+            dal.snapshot(r.source)
+        detail = recovery_health.failure_detail(caught.value)
+        assert 1222 in detail["sql_numbers"]
+        assert detail["sqlstates"] == ["42000"]
+    finally:
+        writer.close()  # Fixture rolls back; no release/disposition method is called.
+    assert dal.snapshot(r.source) == before
 
 
 def test_restricted_entry_rejects_changed_input_before_archive(restricted_reports):

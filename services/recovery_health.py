@@ -46,9 +46,15 @@ def _finish_cycle():
 
 def failure_detail(error):
     """Retain call sites, never exception text, locals or private payloads."""
+    from services.export_failure_diagnostics import failure_record
+
+    facts = failure_record(error)
     return {
         "error_type": type(error).__name__,
         "observed_utc": datetime.now(UTC).isoformat(),
+        "exception_types": facts["exception_types"],
+        "sqlstates": facts["sqlstates"],
+        "sql_numbers": facts["sql_numbers"],
         "frames": [
             {"file": PurePath(frame.filename).name, "line": frame.lineno, "function": frame.name}
             for frame in traceback.extract_tb(error.__traceback__)[-12:]

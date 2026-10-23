@@ -182,3 +182,48 @@ def test_diagnostic_observations_are_bounded_and_detached():
     assert result["cycle"]["failed_checks"] == 130
     result["checks"][0]["frames"].append("modified")
     assert health.report()["checks"][0]["frames"] == []
+
+
+def test_monitor_retains_driver_codes_without_private_prose():
+    import pyodbc
+
+    error = pyodbc.ProgrammingError("42000", "private SQL secret (1222)")
+    health.begin_cycle()
+    detail = health.record_check("existing_incident_checks:queue_admission", error)
+    health.record_failure(RuntimeError("aggregate unavailable"))
+    assert detail["sqlstates"] == ["42000"]
+    assert detail["sql_numbers"] == [1222]
+    assert health.report()["checks"][0] == detail
+    assert "private SQL secret" not in str(health.report())
+    assert not health.report()["healthy"]
+
+
+def test_monitor_rechecks_persisted_failures_outside_rotating_page(monkeypatch):
+    row = dict(IncidentID="failed", SourceKind="stats_import")
+    failed = [row]
+    seen = []
+
+    def refresh(identifier):
+        seen.append(identifier)
+        failed.clear()  # Successful observation, not elapsed time, clears it.
+
+    store = SimpleNamespace(
+        scope="scope",
+        list_open=lambda **kw: list(failed) if kw.get("failed_checks_only") else [],
+        has_failed_checks=lambda: bool(failed),
+        check_failed=Mock(),
+    )
+
+    @contextmanager
+    def service():
+        yield SimpleNamespace(
+            store=store,
+            adapters={"stats_import": SimpleNamespace(pending_recovery=lambda **_: [])},
+            recover_automatic=refresh,
+        )
+
+    monkeypatch.setattr(runtime, "recovery_service", service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    health.begin_cycle()
+    assert runtime.observe_recovery() == []
+    assert seen == ["failed"]

@@ -157,6 +157,14 @@ def recovery(tmp_path, request):
                 self.inner.timeout = 3
 
             @property
+            def timeout(self):
+                return self.inner.timeout
+
+            @timeout.setter
+            def timeout(self, value):
+                self.inner.timeout = value
+
+            @property
             def autocommit(self):
                 return self.inner.autocommit
 

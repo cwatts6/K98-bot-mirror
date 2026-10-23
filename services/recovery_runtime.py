@@ -295,8 +295,12 @@ def observe_recovery():
         after = _incident_cursor[1] if _incident_cursor and _incident_cursor[0] == scope else None
         incidents = service.store.list_open(after=after)
         _incident_cursor = (scope, incidents[-1]["IncidentID"]) if incidents else None
+        # A failed check must not disappear behind the rotating backlog while
+        # its persisted failure keeps monitoring unhealthy. Recheck a bounded
+        # page first; only an actual successful observation clears its failure.
+        failed_checks = service.store.list_open(failed_checks_only=True)
         visited = set()
-        for incident in priority + incidents:
+        for incident in failed_checks + priority + incidents:
             if incident["IncidentID"] in visited:
                 continue
             visited.add(incident["IncidentID"])
@@ -317,9 +321,9 @@ def observe_recovery():
                 service.store.check_failed(incident["IncidentID"], detail)
                 failures.append(type(exc).__name__)
                 logger.warning(
-                    "recovery_recheck_unavailable incident=%s error_type=%s",
+                    "recovery_recheck_unavailable incident=%s diagnostic=%s",
                     incident["IncidentID"],
-                    type(exc).__name__,
+                    detail,
                 )
         if service.store.has_failed_checks():
             failures.append("PersistedCheckUnavailable")

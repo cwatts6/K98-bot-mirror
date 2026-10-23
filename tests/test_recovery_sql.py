@@ -250,14 +250,19 @@ def test_check_failure_is_persisted_and_cleared_only_by_successful_observation(s
     assert failed["LastSeenUTC"] == row["LastSeenUTC"]
     assert failed["Revision"] == 2
     assert store.has_failed_checks()
+    assert [r["IncidentID"] for r in store.list_open(failed_checks_only=True)] == [
+        row["IncidentID"]
+    ]
     other = RecoveryDAL(store.connect, account="other", storage_owner="test-disk", guild_id=2)
     assert not other.has_failed_checks()
+    assert other.list_open(failed_checks_only=True) == []
     store.check_failed(row["IncidentID"], "TimeoutError")
     assert store.get(row["IncidentID"])["Revision"] == 2
     fresh = store.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "a" * 64)
     assert "check_unavailable" not in fresh["evidence"]
     assert fresh["Revision"] == 3
     assert not store.has_failed_checks()
+    assert store.list_open(failed_checks_only=True) == []
 
 
 def test_alert_lease_and_paired_identity_constraint(store):

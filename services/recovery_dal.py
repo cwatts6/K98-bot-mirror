@@ -100,7 +100,15 @@ class RecoveryDAL:
                 )
             return self._get(cursor, incident_id)
 
-    def list_open(self, *, after=None, limit=20, non_evidence=False, queues_only=False):
+    def list_open(
+        self,
+        *,
+        after=None,
+        limit=20,
+        non_evidence=False,
+        queues_only=False,
+        failed_checks_only=False,
+    ):
         if type(limit) is not int or not 1 <= limit <= 25:
             raise ValueError("Bounded incident page required.")
         with transaction(self.connect) as cursor:
@@ -111,6 +119,11 @@ class RecoveryDAL:
                 "AND SourceKind<>'recovery_overview' "
                 + ("AND SourceKind<>'private_evidence' " if non_evidence else "")
                 + ("AND SourceKind='queue_admission' " if queues_only else "")
+                + (
+                    "AND JSON_VALUE(EvidenceJson,'$.check_unavailable') IS NOT NULL "
+                    if failed_checks_only
+                    else ""
+                )
                 + (
                     "AND (FirstSeenUTC>? OR (FirstSeenUTC=? AND IncidentID>CAST(? AS uniqueidentifier))) "
                     if boundary
@@ -148,7 +161,10 @@ class RecoveryDAL:
             previous = row["evidence"].get("check_diagnostic") or {}
             if row["evidence"].get("check_unavailable") == error_type and (
                 detail is None
-                or all(previous.get(k) == detail.get(k) for k in ("error_type", "frames", "stage"))
+                or all(
+                    previous.get(k) == detail.get(k)
+                    for k in ("error_type", "frames", "stage", "sqlstates", "sql_numbers")
+                )
             ):
                 return
             evidence = dict(row["evidence"], check_unavailable=error_type)

@@ -7,6 +7,8 @@ from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
+REPORT_QUERY_TIMEOUT_SECONDS = 595  # Normal stats execution's 600s budget less 5s.
+
 
 class StatsReportContinuationDAL:
     def __init__(self, outcomes):
@@ -134,13 +136,9 @@ class StatsReportContinuationDAL:
                 # A lost marker-commit reply exits before dispatch. Reconciliation
                 # subsequently obtains these same guards and verifies that marker.
                 dispatched = True
-                cursor.execute(
-                    "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=?,@ExportPreparationID=?",
-                    snapshot["execution"]["CompletedFileName"],
-                    source_id,
+                self._complete_reports(
+                    connection, snapshot["execution"]["CompletedFileName"], source_id
                 )
-                while cursor.nextset():
-                    pass
             except BaseException:
                 try:
                     cursor.execute("IF @@TRANCOUNT>0 ROLLBACK")
@@ -161,3 +159,26 @@ class StatsReportContinuationDAL:
                 raise
             finally:
                 cursor.close()
+
+    @staticmethod
+    def _complete_reports(connection, filename, source_id):
+        # pyodbc copies the connection timeout when creating a cursor. Keep the
+        # short inspection/cleanup cursor and both session guards unchanged.
+        previous_timeout = connection.timeout
+        report_cursor = None
+        try:
+            connection.timeout = REPORT_QUERY_TIMEOUT_SECONDS
+            report_cursor = connection.cursor()
+            report_cursor.execute(
+                "EXEC dbo.usp_S11CompleteStatsReports @CompletedFileName=?,@ExportPreparationID=?",
+                filename,
+                source_id,
+            )
+            while report_cursor.nextset():
+                pass
+        finally:
+            try:
+                if report_cursor is not None:
+                    report_cursor.close()
+            finally:
+                connection.timeout = previous_timeout
