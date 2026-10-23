@@ -35,7 +35,9 @@ def records(root):
     ]
 
 
-def test_capture_survives_absent_console_and_canonical_launcher_import(tmp_path, monkeypatch):
+def test_capture_survives_absent_console_and_canonical_launcher_import(
+    tmp_path, monkeypatch, capsys
+):
     import runpy
 
     launcher = runpy.run_path(str(Path(__file__).parents[1] / "scripts/run_export_authority.py"))
@@ -50,6 +52,8 @@ def test_capture_survives_absent_console_and_canonical_launcher_import(tmp_path,
         "AUTHORITY_DISPATCH_FAILED",
     ]
     assert "SECRET" not in json.dumps(captured)
+    console = capsys.readouterr()
+    assert console.out == console.err == ""
 
 
 def test_failure_step_preserves_exact_error_and_does_not_retry(tmp_path):

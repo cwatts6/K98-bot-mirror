@@ -136,7 +136,8 @@ def report_authority_event(stage, *, message=None, error=None, checkpoint=None):
             pass
         # Preserve the existing console diagnostic for explicit/manual launchers.
         try:
-            print(text, file=sys.stderr, flush=True)
+            if sys.stderr is not None:
+                print(text, file=sys.stderr, flush=True)
         except Exception:
             pass
     except Exception:

@@ -33,4 +33,3 @@ foreach($bad in @('unknown-stage','secret-field','wrong-pid','old-process','part
 $rows=@(Select-AuthorityDiagnostics ("null`n[]`n{broken`n"+$json) 1234 $created)
 if($rows.Count -ne 1){throw 'Malformed record isolation failed'}
 'PASS: strict projection, pinned incarnation, redaction, partial and malformed records'
-
