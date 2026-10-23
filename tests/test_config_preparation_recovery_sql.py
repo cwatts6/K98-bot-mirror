@@ -32,6 +32,8 @@ TABLES = (
     "ExportProviderRequest",
     "ExportProviderRequestEvent",
     "ExportContainedTarget",
+    "ExportLegacyCloseout",
+    "ExportJob",
 )
 SERVER = r"localhost\K98DEV"
 DATABASE = "master"
