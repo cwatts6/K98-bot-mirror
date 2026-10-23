@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "ce3e68dd499d11870085dc4f5d2387eec9108091",
+  "sql_revision": "687e05c4fa546ae9570b366181633837776a3364",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -2107,6 +2107,7 @@
       "KVK.SourceOutputOperationResource",
       "KVK.SourceOutputPool",
       "dbo.ExportActiveContainedTarget",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2176,6 +2177,7 @@
       "KVK.SourceOutputPool",
       "dbo.ExportActiveContainedTarget",
       "dbo.ExportAttempt",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2187,7 +2189,7 @@
       "dbo.ExportResource"
     ],
     "dbo.usp_ExportReconciliationProofIssue": [
-      "dbo.ExportActiveContainedTarget",
+      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportManagedFileOrigin",

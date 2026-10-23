@@ -902,7 +902,10 @@ class ExportCoordinationDAL:
                         key,
                     )
                     resources.append(one(cursor))
-                if self.execution_evidence and contained_resources(cursor, keys):
+                job = _job(cursor, candidate["JobID"])
+                if self.execution_evidence and contained_resources(
+                    cursor, keys, consumer=job["ConsumerKind"]
+                ):
                     continue
                 if any(
                     not r
@@ -913,7 +916,6 @@ class ExportCoordinationDAL:
                     for r in resources
                 ):
                     continue
-                job = _job(cursor, candidate["JobID"])
                 if self.output_operations and job["ConsumerKind"] == "new_source":
                     from kvk.dal.source_output_pool_dal import assert_registration
 

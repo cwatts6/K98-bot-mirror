@@ -18,6 +18,16 @@ inactive. Old streams and attempts remain disabled and historical outcomes remai
 partial, never confirmed delivery. Restrict this to registered scan_data/all_kvk
 exports; new-source pools and rollover remain outside this correction.
 
+The URLs have not changed: recovery lifts a write restriction, not a URL mapping.
+Only ordinary legacy job mutations and exact configuration preparation probes
+may use targets released by this receipt. Queue selection, locked admission,
+stream creation and request dispatch preserve permanent target history for
+managed pools, rollover and enrollment. Managed publication proof rules remain
+unchanged. A subsequent failed legacy export uses the same evidence-based
+closeout rather than attempting another containment row or replacement URLs.
+An uncertain export with no execution stream retains its existing unstarted-work
+recovery option; it cannot enter the closed-stream closeout path.
+
 The private authority verifies original child closure and complete typed request
 and response journals. For an already-contained stream, retrieve the authenticated
 pre-containment stream from its retained private decision and verify that original

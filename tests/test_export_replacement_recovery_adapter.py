@@ -47,6 +47,19 @@ def adapter():
     return SimpleNamespace(adapter=result, base=base, runtime=runtime, snapshot=snapshot)
 
 
+@pytest.mark.parametrize("consumer", ["scan_data", "all_kvk"])
+def test_unstarted_uncertain_legacy_job_keeps_base_skip_action(adapter, consumer):
+    r = adapter
+    r.snapshot["job"]["ConsumerKind"] = consumer
+    r.snapshot["streams"] = []
+    expected = dict(actions=dict(skip_unstarted=dict(label="Skip unstarted export")))
+    r.base.inspect.return_value = expected, "base-token", False
+    assert r.adapter.inspect("job") == (expected, "base-token", False)
+    r.base.inspect.assert_called_once_with("job")
+    r.runtime.client.failed_export_recovery.assert_not_called()
+    r.runtime.client.replacement_recovery.assert_not_called()
+
+
 @pytest.mark.parametrize("marker", [{"reference": "receipt", "sha256": "a" * 64}, None])
 @pytest.mark.parametrize("verified", [True, False])
 def test_retired_export_cannot_reenter_replacement_after_destination_isolation(

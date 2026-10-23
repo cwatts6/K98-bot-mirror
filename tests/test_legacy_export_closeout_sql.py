@@ -261,7 +261,75 @@ def contain(f):
     f.values["ExpectedVersion"] = 8
 
 
-def test_same_url_admission_returns_but_old_execution_remains_disabled(installed):
+def next_job(f, consumer="scan_data"):
+    job, owner = str(uuid4()), str(uuid4())
+    f.owner.execute(
+        "INSERT dbo.ExportJob (JobID,ConsumerKind,AccountKey,DestinationSetHash,InputHash,SpoolKey,SpoolBytes,StorageOwner,EnqueueSequence,State,OwnerID,Fence,Version,CreatedUTC,UpdatedUTC,Actor,Reason,ProvenanceJson,KVK_NO) "
+        "SELECT ?,?,AccountKey,DestinationSetHash,CAST(? AS binary(32)),'next-scan-input',SpoolBytes,StorageOwner,2,'running',?,3,1,CreatedUTC,UpdatedUTC,Actor,Reason,'{}',? FROM dbo.ExportJob WHERE JobID=?",
+        job,
+        consumer,
+        b"n" * 32,
+        owner,
+        16 if consumer == "all_kvk" else None,
+        f.f.job,
+    )
+    f.owner.execute(
+        "INSERT dbo.ExportJobResource SELECT ?,ResourceKey FROM dbo.ExportJobResource WHERE JobID=?",
+        job,
+        f.f.job,
+    )
+    f.owner.execute(
+        "UPDATE dbo.ExportResource SET ActiveJobID=?,OwnerID=?,Fence=3,Version=5", job, owner
+    )
+    return job, owner
+
+
+def open_stream(f, object_id, owner, *, kind="job", purpose="mutation"):
+    stream = str(uuid4())
+    drain(
+        f.app.execute(
+            "EXEC dbo.usp_ExportExecutionStreamTransition @Action='open',@SessionID=?,@StreamID=?,"
+            "@AccountKey='test-account',@ExpectedVersion=0,@OwnerKind=?,@ObjectID=?,@OwnerID=?,"
+            "@Fence=3,@ClaimVersion=1,@Purpose=?,@ScopeJson=?,@ChildIdentity=?,@RegistrationHash=?,@SnapshotHash=?",
+            f.f.session,
+            stream,
+            kind,
+            object_id,
+            owner,
+            purpose,
+            json.dumps(dict(resources=[dict(key=r["key"], version=5) for r in f.f.resources])),
+            str(uuid4()),
+            b"n" * 32,
+            b"s" * 32,
+        )
+    )
+    return stream
+
+
+def event(f, stream, request, state, version, *, read=False):
+    drain(
+        f.app.execute(
+            "EXEC dbo.usp_ExportProviderRequestEventAppend @SessionID=?,@StreamID=?,@AccountKey='test-account',"
+            "@ExpectedVersion=?,@RequestID=?,@EventID=?,@State=?,@EvidenceHash=?,@EvidenceReference=?,"
+            "@Operation=?,@RequestKind=?,@TargetID='old-file',@PayloadHash=?,@PayloadReference=?",
+            f.f.session,
+            stream,
+            version,
+            request,
+            str(uuid4()),
+            state,
+            b"e" * 32,
+            str(uuid4()),
+            "sheets.get" if read else "sheets.values.update",
+            "read" if read else "mutation",
+            b"p" * 32,
+            str(uuid4()),
+        )
+    )
+
+
+@pytest.mark.parametrize("consumer", ["scan_data", "all_kvk"])
+def test_same_url_admission_returns_but_old_execution_remains_disabled(installed, consumer):
     import pyodbc
 
     f = installed
@@ -272,41 +340,8 @@ def test_same_url_admission_returns_but_old_execution_remains_disabled(installed
     f.apply()
     assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportActiveContainedTarget").fetchval() == 0
     assert f.app.execute("SELECT FileID FROM dbo.ExportContainedTarget").fetchval() == "old-file"
-    next_job, next_owner, next_stream = (str(uuid4()) for _ in range(3))
-    f.owner.execute(
-        "INSERT dbo.ExportJob (JobID,ConsumerKind,AccountKey,DestinationSetHash,InputHash,SpoolKey,SpoolBytes,StorageOwner,EnqueueSequence,State,OwnerID,Fence,Version,CreatedUTC,UpdatedUTC,Actor,Reason,ProvenanceJson) "
-        "SELECT ?,ConsumerKind,AccountKey,DestinationSetHash,CAST(? AS binary(32)),'next-scan-input',SpoolBytes,StorageOwner,2,'running',?,3,1,CreatedUTC,UpdatedUTC,Actor,Reason,'{}' FROM dbo.ExportJob WHERE JobID=?",
-        next_job,
-        b"n" * 32,
-        next_owner,
-        f.f.job,
-    )
-    f.owner.execute(
-        "INSERT dbo.ExportJobResource SELECT ?,ResourceKey FROM dbo.ExportJobResource WHERE JobID=?",
-        next_job,
-        f.f.job,
-    )
-    f.owner.execute(
-        "UPDATE dbo.ExportResource SET ActiveJobID=?,OwnerID=?,Fence=3,Version=5",
-        next_job,
-        next_owner,
-    )
-    resources = [dict(key=r["key"], version=5) for r in f.f.resources]
-    drain(
-        f.app.execute(
-            "EXEC dbo.usp_ExportExecutionStreamTransition @Action='open',@SessionID=?,@StreamID=?,"
-            "@AccountKey='test-account',@ExpectedVersion=0,@OwnerKind='job',@ObjectID=?,@OwnerID=?,"
-            "@Fence=3,@ClaimVersion=1,@Purpose='mutation',@ScopeJson=?,@ChildIdentity=?,@RegistrationHash=?,@SnapshotHash=?",
-            f.f.session,
-            next_stream,
-            next_job,
-            next_owner,
-            json.dumps(dict(resources=resources)),
-            str(uuid4()),
-            b"n" * 32,
-            b"s" * 32,
-        )
-    )
+    next_job_id, next_owner = next_job(f, consumer)
+    next_stream = open_stream(f, next_job_id, next_owner)
     assert (
         f.app.execute(
             "SELECT State FROM dbo.ExportExecutionStream WHERE StreamID=?", next_stream
@@ -333,6 +368,20 @@ def test_same_url_admission_returns_but_old_execution_remains_disabled(installed
                 str(uuid4()),
             )
     assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportProviderRequestEvent").fetchval() == 3
+    # A real restricted-account dispatch succeeds to the same old file. This
+    # fixture never invokes a provider; it exercises the production SQL boundary.
+    f.owner.execute(
+        "INSERT dbo.ExportAttempt (AttemptID,JobID,ConsumerKind,AttemptNo,OwnerID,Fence,Phase,RemoteSequence,Version,CreatedUTC,UpdatedUTC,ManifestHash,ManifestJson,PartCount) "
+        "SELECT NEWID(),?,?,1,?,3,'private_started',1,1,CreatedUTC,UpdatedUTC,CAST(? AS binary(32)),'{}',1 FROM dbo.ExportJob WHERE JobID=?",
+        next_job_id,
+        consumer,
+        next_owner,
+        b"m" * 32,
+        next_job_id,
+    )
+    request = str(uuid4())
+    for version, state in enumerate(("prepared", "dispatch_intent", "succeeded"), 1):
+        event(f, next_stream, request, state, version)
     # A later stopped export must remain recoverable without deleting the first
     # export's historical target records or issuing replacement URLs.
     f.owner.execute(
@@ -343,11 +392,13 @@ def test_same_url_admission_returns_but_old_execution_remains_disabled(installed
         b"e" * 32,
         next_stream,
     )
-    f.owner.execute("UPDATE dbo.ExportJob SET State='uncertain',Version=2 WHERE JobID=?", next_job)
+    f.owner.execute(
+        "UPDATE dbo.ExportJob SET State='uncertain',Version=2 WHERE JobID=?", next_job_id
+    )
     action = str(uuid4())
     f.values.update(
         ActionID=action,
-        JobID=next_job,
+        JobID=next_job_id,
         ExpectedVersion=2,
         OwnerID=next_owner,
         Fence=3,
@@ -357,7 +408,106 @@ def test_same_url_admission_returns_but_old_execution_remains_disabled(installed
     f.apply()
     assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportLegacyCloseout").fetchval() == 2
     assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportContainedTarget").fetchval() == 1
-    assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportProviderRequestEvent").fetchval() == 3
+    assert f.app.execute("SELECT COUNT(*) FROM dbo.ExportProviderRequestEvent").fetchval() == 6
+
+
+@pytest.mark.parametrize(
+    "purpose,enrollment", [("probe", False), ("mutation", False), ("enrollment", True)]
+)
+def test_released_target_allows_only_configuration_reads(installed, purpose, enrollment):
+    import pyodbc
+
+    f = installed
+    contain(f)
+    f.apply()
+    preparation, owner = str(uuid4()), str(uuid4())
+    f.owner.execute(
+        "INSERT dbo.ExportPreparation (PreparationID,AccountKey,ConsumerKind,RequestHash,EnqueueSequence,State,OwnerID,Fence,Version,StorageOwner,RequestJson,Actor,Reason,CreatedUTC,UpdatedUTC) "
+        "VALUES (?,'test-account','config',?,2,'preflight',?,3,1,'disk',?,'test','configuration read',SYSUTCDATETIME(),SYSUTCDATETIME())",
+        preparation,
+        b"q" * 32,
+        owner,
+        json.dumps({"purpose": "output_enrollment"} if enrollment else {"kind": "config"}),
+    )
+    f.owner.execute(
+        "INSERT dbo.ExportPreparationResource SELECT ?,ResourceKey FROM dbo.ExportJobResource WHERE JobID=?",
+        preparation,
+        f.f.job,
+    )
+    f.owner.execute("UPDATE dbo.ExportResource SET Version=5")
+    if purpose != "probe":
+        with pytest.raises(pyodbc.Error, match="Historical target isolation"):
+            open_stream(f, preparation, owner, kind="preparation", purpose=purpose)
+        return
+    stream = open_stream(f, preparation, owner, kind="preparation", purpose="probe")
+    request = str(uuid4())
+    for version, state in enumerate(("prepared", "dispatch_intent", "succeeded"), 1):
+        event(f, stream, request, state, version, read=True)
+    with pytest.raises(pyodbc.Error, match="Stream cannot prepare"):
+        event(f, stream, str(uuid4()), "prepared", 4)
+
+
+@pytest.mark.parametrize("purpose", ["mutation", "probe"])
+def test_managed_stream_cannot_reuse_released_legacy_target(installed, purpose):
+    import pyodbc
+
+    f = installed
+    contain(f)
+    f.apply()
+    job, owner = next_job(f)
+    f.owner.execute(
+        "UPDATE dbo.ExportJob SET ConsumerKind='new_source',SourceKey='snapshot_report_v1',IntentID=?,KVK_NO=16,PoolEpoch=1 WHERE JobID=?",
+        str(uuid4()),
+        job,
+    )
+    with pytest.raises(pyodbc.Error, match="Historical target isolation"):
+        open_stream(f, job, owner, purpose=purpose)
+
+
+@pytest.mark.parametrize("state", ["prepared", "dispatch_intent"])
+def test_already_open_managed_stream_cannot_dispatch_released_target(installed, state):
+    import pyodbc
+
+    f = installed
+    contain(f)
+    f.apply()
+    job, owner = next_job(f)
+    stream = open_stream(f, job, owner)
+    request = str(uuid4())
+    if state == "dispatch_intent":
+        event(f, stream, request, "prepared", 1)
+    # Construct an already-admitted managed stream at the SQL fixture boundary;
+    # event admission must independently reject it before any provider dispatch.
+    f.owner.execute(
+        "UPDATE dbo.ExportJob SET ConsumerKind='new_source',SourceKey='snapshot_report_v1',IntentID=?,KVK_NO=16,PoolEpoch=1 WHERE JobID=?",
+        str(uuid4()),
+        job,
+    )
+    f.owner.execute("UPDATE dbo.ExportExecutionStream SET Epoch=1 WHERE StreamID=?", stream)
+    with pytest.raises(pyodbc.Error, match="Historical target isolation"):
+        event(f, stream, request, state, 2 if state == "dispatch_intent" else 1)
+
+
+def test_managed_proof_still_refuses_historical_legacy_target(installed):
+    import pyodbc
+
+    f = installed
+    contain(f)
+    f.apply()
+    f.owner.execute(
+        "GRANT EXECUTE ON dbo.usp_ExportReconciliationProofIssue TO ExportExecutionAuthority"
+    )
+    with pytest.raises(pyodbc.Error, match="Isolated targets cannot establish"):
+        f.app.execute(
+            "EXEC dbo.usp_ExportReconciliationProofIssue @SessionID=?,@ProofID=?,@AccountKey='test-account',"
+            "@SnapshotHash=?,@RegistrationHash=?,@ProofKind='publication',@Outcome='confirmed',@MembershipJson=?,@EvidenceJson=?",
+            f.f.session,
+            str(uuid4()),
+            b"s" * 32,
+            b"r" * 32,
+            json.dumps(dict(version=2, targets=["old-file"], history={}, probe={})),
+            json.dumps(dict(state="confirmed", snapshot_hash=(b"s" * 32).hex())),
+        )
 
 
 @pytest.mark.parametrize(

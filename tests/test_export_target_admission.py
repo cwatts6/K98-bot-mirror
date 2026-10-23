@@ -50,6 +50,42 @@ def enqueue(f, *, file_id, ticket, state="ready", account="test-account"):
     return job
 
 
+@pytest.mark.parametrize("consumer", ["scan_data", "all_kvk", "new_source"])
+def test_released_target_is_available_only_to_normal_legacy_jobs(contained_job, consumer):
+    from services.export_target_admission_dal import AVAILABLE_JOB_TARGETS_SQL, contained_resources
+
+    f = contained_job
+    f.apply()
+    action = str(uuid4())
+    f.sql.execute(
+        "INSERT #ExportLegacyCloseout SELECT ?,JobID,ContainmentID,AccountKey,1,?,?,?,?,'fixture closeout',SYSUTCDATETIME() FROM #ExportTargetContainment",
+        action,
+        b"s" * 32,
+        b"h" * 32,
+        str(uuid4()),
+        "recovery:" + action,
+    )
+    job = enqueue(f, file_id="old-file", ticket=2)
+    if consumer == "all_kvk":
+        f.sql.execute("UPDATE #ExportJob SET ConsumerKind='all_kvk',KVK_NO=16 WHERE JobID=?", job)
+    elif consumer == "new_source":
+        f.sql.execute(
+            "UPDATE #ExportJob SET ConsumerKind='new_source',SourceKey='snapshot_report_v1',IntentID=?,KVK_NO=16,PoolEpoch=1 WHERE JobID=?",
+            str(uuid4()),
+            job,
+        )
+    cursor = f.connect().cursor()
+    available = cursor.execute(
+        "SELECT JobID FROM dbo.ExportJob WHERE JobID=?" + AVAILABLE_JOB_TARGETS_SQL, job
+    ).fetchval()
+    assert (available is not None) == (consumer != "new_source")
+    assert bool(contained_resources(cursor, ["destination:old-file"], consumer=consumer)) == (
+        consumer == "new_source"
+    )
+    # Non-job callers, including rollover, retain the permanent fence by default.
+    assert contained_resources(cursor, ["destination:old-file"])
+
+
 @pytest.mark.parametrize("state", ["ready", "failed"])
 @pytest.mark.parametrize("account", ["test-account", "other-account"])
 def test_retired_queue_preserved_while_unrelated_job_can_claim(contained_job, state, account):

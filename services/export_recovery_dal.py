@@ -131,10 +131,12 @@ class ExportRecoveryDAL:
             )
             resources = rows(cursor)
             cursor.execute(
-                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportActiveContainedTarget c "
+                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportContainedTarget c "
                 "JOIN dbo.ExportJobResource m ON m.ResourceKey='destination:'+c.FileID "
-                "WHERE m.JobID=? ORDER BY c.FileID",
+                "WHERE m.JobID=? AND (? NOT IN ('scan_data','all_kvk') OR NOT EXISTS "
+                "(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=c.ContainmentID)) ORDER BY c.FileID",
                 job_id,
+                job["ConsumerKind"],
             )
             isolated_targets = rows(cursor)
             if job["ConsumerKind"] == "new_source" and frozenset(

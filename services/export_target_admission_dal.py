@@ -13,22 +13,31 @@ from kvk.dal.new_source_import_dal import rows
 # Fixed SQL fragments only; no identifier is supplied by a caller or Discord.
 ISOLATED_JOB_TARGETS_SQL = (
     "EXISTS (SELECT 1 FROM dbo.ExportJobResource retired_membership "
-    "JOIN dbo.ExportActiveContainedTarget retired_target "
+    "JOIN dbo.ExportContainedTarget retired_target "
     "ON retired_membership.ResourceKey='destination:'+retired_target.FileID "
-    "WHERE retired_membership.JobID=dbo.ExportJob.JobID)"
+    "WHERE retired_membership.JobID=dbo.ExportJob.JobID "
+    "AND (dbo.ExportJob.ConsumerKind NOT IN ('scan_data','all_kvk') OR NOT EXISTS "
+    "(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=retired_target.ContainmentID)))"
 )
 AVAILABLE_JOB_TARGETS_SQL = " AND NOT " + ISOLATED_JOB_TARGETS_SQL + " "
 
 
-def contained_resources(cursor, resource_keys):
+def contained_resources(cursor, resource_keys, *, consumer=None):
     """Call after acquiring the sorted resource mutexes, before claiming them."""
     targets = tuple(
         k.removeprefix("destination:") for k in resource_keys if k.startswith("destination:")
     )
     if not targets:
         return []
+    table = (
+        "dbo.ExportActiveContainedTarget"
+        if consumer in {"scan_data", "all_kvk"}
+        else "dbo.ExportContainedTarget"
+    )
     cursor.execute(
-        "SELECT FileID,ContainmentID FROM dbo.ExportActiveContainedTarget WHERE FileID IN ("
+        "SELECT FileID,ContainmentID FROM "
+        + table
+        + " WHERE FileID IN ("
         + ",".join("?" for _ in targets)
         + ") ORDER BY FileID",
         *targets,
