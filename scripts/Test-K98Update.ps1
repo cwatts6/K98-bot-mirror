@@ -114,7 +114,7 @@ Check ('--preflight' -in $verifyArgs) 'Preflight did not select complete predece
 
 # Retained cohorts may gain new captures, but an existing held/captured row
 # cannot disappear or change during deployment.
-$c=[pscustomobject]@{expected_preparation=@([pscustomobject]@{PreparationID='old';State='captured';Version=6});expected_resources=@();account='fixture'}
+$c=[pscustomobject]@{expected_preparation=@([pscustomobject]@{PreparationID='old';State='captured';Version=6});expected_resources=@();account='fixture';host='MINI_AMD'}
 $script:retained=@($c.expected_preparation)+@([pscustomobject]@{PreparationID='new';State='captured';Version=6})
 function Retained-Preparations {return ,$script:retained}
 function Rows([string]$Query){return ,@()}
@@ -124,15 +124,46 @@ Reject {Assert-Held} '*Retained preparation changed*'
 $script:retained=@([pscustomobject]@{PreparationID='old';State='unavailable';Version=7})
 Reject {Assert-Held} '*Retained preparation changed*'
 $script:retained=$c.expected_preparation
-$script:streams=@([pscustomobject]@{StreamID='stream';SessionID='new-session'})
+$script:streams=@([pscustomobject]@{StreamID='stream';SessionID='new-session';State='open'})
 function Rows([string]$Query){return ,$script:streams}
 function New-Journal {return @{publication='verified-by-separate-test'}}
 function Assert-NewSession($Journal) {}
 function Sessions {return ,@([pscustomobject]@{SessionID='new-session'})}
 Reject {Assert-Held} '*Open provider stream blocks release*'
 Assert-Held -SuccessorRunning;$passed++
-$script:streams=@([pscustomobject]@{StreamID='stream';SessionID='old-session'})
+$script:streams=@([pscustomobject]@{StreamID='stream';SessionID='old-session';State='open'})
 Reject {Assert-Held -SuccessorRunning} '*unexpected session*'
+# A historical contained stream remains quarantined but must not deadlock the
+# release that supplies its recovery. Exercise the real guard before/after start.
+$terminal=[pscustomobject]@{StreamID='retained';SessionID='closed-session';State='target_contained';Purpose='mutation';ActiveAccountKey=$null;JobID='job';PreparationID=$null;OutputOperationID=$null;NestedToken=$null;Epoch=$null;CreatedUTC=[datetime]'2026-01-01';ClosedUTC=[datetime]'2026-01-02';ClosureReference='closure';ClosureHash=[byte[]]::new(32);EventDigest=[byte[]]::new(32);SessionState='closed';HostIdentity='mini_AMD';SessionClosedUTC=[datetime]'2026-01-03'}
+$script:streams=@($terminal);$original=$terminal|ConvertTo-Json -Compress
+Assert-Held;Assert-Held -SuccessorRunning
+Check (($terminal|ConvertTo-Json -Compress) -ceq $original) 'Containment evidence changed'
+foreach($case in @(
+ @('SessionState','open'),@('SessionState',$null),@('HostIdentity','other-host'),
+ @('ActiveAccountKey','fixture'),@('ClosedUTC',$null),@('ClosedUTC',[datetime]'2025-01-01'),
+ @('SessionClosedUTC',$null),@('SessionClosedUTC',[datetime]'2026-01-01'),
+ @('ClosureReference',$null),@('ClosureHash',$null),@('ClosureHash',[byte[]]::new(31)),
+ @('EventDigest',$null),@('EventDigest',[byte[]]::new(31)),@('Purpose','enrollment')
+)) {
+ $saved=$terminal.($case[0]);$terminal.($case[0])=$case[1]
+ Reject {Assert-Held} '*Contained provider stream closure is incomplete*'
+ Reject {Assert-Held -SuccessorRunning} '*Contained provider stream closure is incomplete*'
+ $terminal.($case[0])=$saved
+}
+$terminal.State='read_contained';$terminal.Purpose='probe';$terminal.JobID=$null;$terminal.PreparationID='preparation'
+Assert-Held;$passed++
+foreach($field in @('JobID','OutputOperationID','NestedToken','Epoch')) {
+ $terminal.$field='unexpected';Reject {Assert-Held} '*Contained provider stream closure is incomplete*';$terminal.$field=$null
+}
+$terminal.PreparationID=$null;Reject {Assert-Held} '*Contained provider stream closure is incomplete*';$terminal.PreparationID='preparation'
+foreach($state in @('open','frozen','unknown')) {
+ $script:streams=@($terminal,[pscustomobject]@{StreamID='live';SessionID='old-session';State=$state})
+ Reject {Assert-Held} '*Open provider stream blocks release*'
+ Reject {Assert-Held -SuccessorRunning} '*unexpected session*'
+}
+$script:streams=@($terminal,[pscustomobject]@{StreamID='live';SessionID='new-session';State='open'})
+Assert-Held -SuccessorRunning;$passed++
 # Online markers and a successful SQL/native check do not prove import/export health.
 $online="[BOOT] full_startup_sequence completed successfully`nLogged in as bot"
 $health=Import-ExportStatus $online

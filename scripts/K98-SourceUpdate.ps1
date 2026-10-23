@@ -615,6 +615,23 @@ function Retained-Preparations {
  if($account -notmatch '^[A-Za-z0-9_.@:-]{1,128}$'){throw 'Invalid bound account'}
  return ,(Rows ("SELECT TOP (129) PreparationID,AccountKey,ConsumerKind,State,OwnerID,Fence,Version,JobID,CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),GenerationJson)),2) AS GenerationHash,SpoolKey,SpoolBytes,CONVERT(varchar(64),SpoolHash,2) AS SpoolHash FROM dbo.ExportPreparation WHERE AccountKey='"+$account+"' AND State IN ('captured','materialized','uncertain') ORDER BY PreparationID;"))
 }
+function Assert-RetainedContainedStream($Stream) {
+ # Containment terminates this stream/session; it does not certify delivery or
+ # release an output claim. SQL's transition boundary owns this durable evidence.
+ # Only a closed historical session may survive both sides of a source update.
+ $shape=($Stream.State -ceq 'target_contained' -and $Stream.Purpose -cin @('mutation','probe')) -or
+  ($Stream.State -ceq 'read_contained' -and $Stream.Purpose -cin @('probe','enrollment') -and
+   $null -ne $Stream.PreparationID -and $null -eq $Stream.JobID -and $null -eq $Stream.OutputOperationID -and
+   $null -eq $Stream.NestedToken -and $null -eq $Stream.Epoch)
+ if(-not $shape -or $null -ne $Stream.ActiveAccountKey -or
+    $Stream.SessionState -cne 'closed' -or $Stream.HostIdentity -ine $c.host -or
+    $null -eq $Stream.ClosedUTC -or $Stream.ClosedUTC -lt $Stream.CreatedUTC -or
+    $null -eq $Stream.SessionClosedUTC -or $Stream.SessionClosedUTC -lt $Stream.ClosedUTC -or
+    $null -eq $Stream.ClosureReference -or $Stream.ClosureHash -isnot [byte[]] -or $Stream.ClosureHash.Length -ne 32 -or
+    $Stream.EventDigest -isnot [byte[]] -or $Stream.EventDigest.Length -ne 32) {
+  throw 'Contained provider stream closure is incomplete; retained work unchanged'
+ }
+}
 function Assert-Held([switch]$SuccessorRunning) {
  $current=Retained-Preparations
  foreach($expected in $c.expected_preparation) {
@@ -627,7 +644,12 @@ function Assert-Held([switch]$SuccessorRunning) {
   $match=@($actual | Where-Object {$_.ResourceKey -ceq $expected.ResourceKey})
   if($match.Count -ne 1 -or -not(Same $match[0] $expected)){throw 'Retained resource changed'}
  }
- $streams=Rows ("SELECT TOP (129) StreamID,SessionID FROM dbo.ExportExecutionStream WHERE AccountKey='"+$c.account+"' AND State<>'closed';")
+ $observed=Rows ("SELECT TOP (129) s.StreamID,s.SessionID,s.State,s.Purpose,s.ActiveAccountKey,s.JobID,s.PreparationID,s.OutputOperationID,s.NestedToken,s.Epoch,s.CreatedUTC,s.ClosedUTC,s.ClosureReference,s.ClosureHash,s.EventDigest,e.State AS SessionState,e.HostIdentity,e.ClosedUTC AS SessionClosedUTC FROM dbo.ExportExecutionStream s LEFT JOIN dbo.ExportExecutionSession e ON e.SessionID=s.SessionID WHERE s.AccountKey='"+$c.account+"' AND s.State<>'closed' ORDER BY s.StreamID;")
+ $streams=@()
+ foreach($stream in $observed) {
+  if($stream.State -cin @('target_contained','read_contained')){Assert-RetainedContainedStream $stream}
+  else{$streams+=,$stream}
+ }
  if($streams.Count) {
   if(-not $SuccessorRunning){throw 'Open provider stream blocks release'}
   # The new bot may legitimately perform startup reads. Only its independently
