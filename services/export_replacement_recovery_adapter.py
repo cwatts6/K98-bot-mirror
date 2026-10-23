@@ -47,7 +47,11 @@ class ReplacementRecoveryAdapter:
         snapshot = self.base.discovery.job(job_id)
         if snapshot["job"]["ConsumerKind"] in {"scan_data", "all_kvk"} and (
             snapshot.get("legacy_closeout", False)
-            or (snapshot["job"]["State"] == "uncertain" and snapshot["streams"])
+            or (
+                snapshot["job"]["State"] == "uncertain"
+                and snapshot["streams"]
+                and not snapshot.get("replacement_work")
+            )
         ):
             result = self.client.failed_export_recovery(job_id, "inspect")
             return result["evidence"], result["token"], result["resolved"]

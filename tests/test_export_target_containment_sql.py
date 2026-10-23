@@ -37,6 +37,7 @@ TABLES = (
     "dbo.ExportRegistrationAttestation",
     "dbo.ExportContainedTarget",
     "dbo.ExportLegacyCloseout",
+    "dbo.ExportReplacementPlan",
     "dbo.ExportContainedStream",
     "dbo.ExportManagedFileOrigin",
     "dbo.ExportManualFileOrigin",

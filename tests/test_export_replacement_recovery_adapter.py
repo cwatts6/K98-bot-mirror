@@ -130,6 +130,28 @@ def test_legacy_partial_export_routes_to_same_url_closeout(adapter, contained):
     )
 
 
+@pytest.mark.parametrize("consumer", ["scan_data", "all_kvk"])
+def test_existing_replacement_work_keeps_its_recovery_route(adapter, consumer):
+    r = adapter
+    r.snapshot["job"]["ConsumerKind"] = consumer
+    r.snapshot["isolated_targets"] = [dict(FileID="old-file")]
+    r.snapshot["replacement_work"] = True
+    r.runtime.client.replacement_recovery.side_effect = lambda *_a, **_k: dict(
+        evidence=dict(actions={"finish_replacement_check": dict(label="Verify original check")}),
+        token="retained-check-token",
+        resolved=False,
+    )
+    evidence, token, resolved = r.adapter.inspect("job")
+    assert token == "retained-check-token" and not resolved
+    assert set(evidence["actions"]) == {"finish_replacement_check"}
+    r.runtime.client.failed_export_recovery.assert_not_called()
+    r.runtime.client.replacement_recovery.assert_called_once_with("job", "inspect")
+    r.adapter.execute("job", "finish_replacement_check", token, "actor", "reason")
+    assert (
+        r.runtime.client.replacement_recovery.call_args.kwargs["step"] == "finish_replacement_check"
+    )
+
+
 @pytest.mark.parametrize(
     "outcome,done,expected",
     [

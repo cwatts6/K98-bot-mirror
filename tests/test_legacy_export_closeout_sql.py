@@ -54,7 +54,7 @@ def installed(contained_job):  # noqa: F811
             timeout=5,
         )
         owner.execute("CREATE SCHEMA KVK")
-        for table in (*TABLES, "dbo.ExportReplacementPlan"):
+        for table in TABLES:
             if table == "dbo.ExportLegacyCloseout":
                 continue  # The real migration creates this with its foreign keys.
             source = (root / "sql_schema" / (table + ".Table.sql")).read_text(encoding="utf-8-sig")
@@ -88,7 +88,7 @@ def installed(contained_job):  # noqa: F811
         )
         # Existing installation permissions: this fixture does not grant any
         # direct evidence writes to the authority login.
-        for table in (*TABLES, "dbo.ExportReplacementPlan"):
+        for table in TABLES:
             owner.execute(
                 f"GRANT SELECT ON {table} TO ExportExecutionAuthority,ExportExecutionReader"
             )
@@ -737,3 +737,47 @@ def test_real_dal_snapshot_and_cas_with_restricted_login(installed):
         reason=f.values["Reason"],
     )
     assert dal.snapshot(f.f.job)["closeout"]["ActionID"] == f.values["ActionID"]
+
+
+def test_restricted_discovery_identifies_existing_replacement_work(installed):
+    from services.export_recovery_dal import ExportRecoveryDAL
+
+    f = installed
+    registration = SimpleNamespace(
+        value=lambda: dict(
+            account="test-account",
+            storage_owner="disk",
+            pools=[dict(pool_id="pool", index_file_id="index", slot_file_ids=["slot"])],
+        )
+    )
+    dal = ExportRecoveryDAL(f.connect, registration=registration)
+    before = dal.job(f.f.job)
+    assert not before["replacement_work"]
+    f.owner.execute(
+        "INSERT dbo.ExportTargetContainment "
+        "(ContainmentID,AccountKey,JobID,OwnerVersion,OwnerID,Fence,SnapshotHash,ReceiptHash,"
+        "ReceiptReference,Actor,Reason,CreatedUTC) "
+        "VALUES (?,'test-account',?,7,?,2,?,?,?,'review','existing containment',SYSUTCDATETIME())",
+        str(uuid4()),
+        f.f.job,
+        f.f.owner,
+        b"s" * 32,
+        b"r" * 32,
+        str(uuid4()),
+    )
+    f.owner.execute(
+        "INSERT dbo.ExportReplacementPlan "
+        "(ReplacementID,ContainmentID,AccountKey,BaseRegistrationHash,ProjectedRegistrationHash,"
+        "ReceiptHash,ReceiptReference,MappingJson,Actor,Reason,CreatedUTC) "
+        "SELECT ?,ContainmentID,'test-account',?,?,?,?,'{}','review','existing proposal',SYSUTCDATETIME() "
+        "FROM dbo.ExportTargetContainment WHERE JobID=?",
+        str(uuid4()),
+        b"b" * 32,
+        b"p" * 32,
+        b"r" * 32,
+        str(uuid4()),
+        f.f.job,
+    )
+    after = dal.job(f.f.job)
+    assert after["replacement_work"] and not after["legacy_closeout"]
+    assert after["job"] == before["job"] and after["streams"] == before["streams"]

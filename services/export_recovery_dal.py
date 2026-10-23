@@ -109,7 +109,11 @@ class ExportRecoveryDAL:
                 "SELECT *,CASE WHEN UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
                 "THEN 1 ELSE 0 END AS Stalled,CASE WHEN EXISTS "
                 "(SELECT 1 FROM dbo.ExportLegacyCloseout c WHERE c.JobID=dbo.ExportJob.JobID) "
-                "THEN 1 ELSE 0 END AS LegacyCloseoutRecorded FROM dbo.ExportJob WHERE JobID=? AND "
+                "THEN 1 ELSE 0 END AS LegacyCloseoutRecorded,CASE WHEN EXISTS "
+                "(SELECT 1 FROM dbo.ExportReplacementPlan p JOIN dbo.ExportTargetContainment c "
+                "ON c.ContainmentID=p.ContainmentID WHERE c.JobID=dbo.ExportJob.JobID "
+                "AND p.AccountKey=dbo.ExportJob.AccountKey) "
+                "THEN 1 ELSE 0 END AS ReplacementRecorded FROM dbo.ExportJob WHERE JobID=? AND "
                 + self.job_scope,
                 job_id,
                 *self.job_parameters,
@@ -159,6 +163,7 @@ class ExportRecoveryDAL:
             return _wire(
                 dict(
                     legacy_closeout=bool(job.pop("LegacyCloseoutRecorded", False)),
+                    replacement_work=bool(job.pop("ReplacementRecorded", False)),
                     job=job,
                     attempts=attempts,
                     streams=streams,
