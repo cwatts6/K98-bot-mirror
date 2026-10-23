@@ -295,6 +295,8 @@ RECOVERY_RECEIPT_ROUNDTRIP_PATHS = frozenset(
     }
 )
 
+PIPELINE_DECISION_BOUND_PATHS = frozenset({"services/processing_pipeline_receipt_dal.py"})
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -342,6 +344,9 @@ def reviewed_transitions():
             fixed_receipt_roundtrip = (
                 item["id"] == "recovery_receipt_roundtrip_v1"
                 and path in RECOVERY_RECEIPT_ROUNDTRIP_PATHS
+            )
+            fixed_pipeline_decision = (
+                item["id"] == "pipeline_decision_bound_v1" and path in PIPELINE_DECISION_BOUND_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -418,6 +423,7 @@ def reviewed_transitions():
                     or fixed_monitor
                     or fixed_report_timeout
                     or fixed_receipt_roundtrip
+                    or fixed_pipeline_decision
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -520,6 +526,8 @@ def reviewed_transitions():
             and paths != RECOVERY_RECEIPT_ROUNDTRIP_PATHS
         ):
             raise ValueError("Complete fixed recovery-receipt transition required.")
+        if item["id"] == "pipeline_decision_bound_v1" and paths != PIPELINE_DECISION_BOUND_PATHS:
+            raise ValueError("Complete fixed pipeline-decision transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS

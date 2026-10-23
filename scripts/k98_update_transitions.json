@@ -1055,6 +1055,16 @@
           "after_sha256": "e59b3d0b1616e2bdffe99b45f8e212270bdcaeb19796524bb56f60e875ef254b"
         }
       ]
+    },
+    {
+      "id": "pipeline_decision_bound_v1",
+      "members": [
+        {
+          "path": "services/processing_pipeline_receipt_dal.py",
+          "before_sha256": "14f50f57ee75fac961eb79f60d12d36d4583c9a5aea8bc074640085b95a4b1e3",
+          "after_sha256": "9cb72730fdaecdfa1584c23185a69c3d780c397e897e8edc4d91421d2dc17513"
+        }
+      ]
     }
   ]
 }

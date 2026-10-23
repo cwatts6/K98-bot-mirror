@@ -4,9 +4,9 @@ from contextlib import contextmanager
 import json
 from uuid import uuid4
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
+from kvk.dal.new_source_import_dal import SourceConflict, canonical, digest, one, rows, transaction
 from services.export_contention import CoordinationLockRefused, sql_error_facts
-from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
+from services.export_coordination_dal import _cas, _mutex, identity
 
 STAGES = (
     "import",
@@ -17,6 +17,18 @@ STAGES = (
     "target_cache",
     "export",
 )
+
+
+def pipeline_json(value):
+    """Match the pipeline input/evidence/decision SQL UTF-16 byte constraints."""
+    json.dumps(value, allow_nan=False)
+    result = canonical(value)
+    if len(result.encode("utf-16-le")) > 32768:
+        raise SourceConflict(
+            "Pipeline evidence exceeds its 32768-byte storage limit; retain the recovery "
+            "report for review. Existing durable history is unchanged."
+        )
+    return result
 
 
 class PipelineReceiptDAL:
@@ -32,7 +44,7 @@ class PipelineReceiptDAL:
                 run_id,
                 self.runtime.account,
                 self.runtime.store.storage_owner,
-                bounded_json(inputs),
+                pipeline_json(inputs),
                 self.runtime.configuration,
             )
             for stage in STAGES:
@@ -239,7 +251,7 @@ class PipelineReceiptDAL:
                 "UPDATE dbo.ProcessingPipelineStage SET State=?,EvidenceJson=?,Version=Version+1,UpdatedUTC=SYSUTCDATETIME() "
                 "OUTPUT inserted.Version WHERE RunID=? AND Stage=? AND OperationID=? AND State='running'",
                 "observed" if verified else "unconfirmed",
-                bounded_json(evidence),
+                pipeline_json(evidence),
                 identity(run_id),
                 stage,
                 identity(operation),
@@ -317,15 +329,22 @@ class PipelineReceiptDAL:
             self.assert_review_current(state, reviewed_state)
             row = state["stages"][stage]
             history = json.loads(row["DecisionJson"] or "[]")
+            decision = dict(marker)
+            if disposition or evidence is not None:
+                # Full registration was compared above under the evidence locks.
+                # Terminal decisions cannot dispatch; retain its fingerprint, not
+                # another full snapshot. Existing entries remain untouched. A
+                # continuation still stores the full registration checked by start.
+                decision["registration_sha256"] = digest(decision.pop("registration")).hex()
             history.append(
                 dict(
-                    marker,
+                    decision,
                     previous_operation=identity(row["OperationID"]),
                     previous_state=row["State"],
                     previous_evidence=json.loads(row["EvidenceJson"] or "null"),
                 )
             )
-            recorded = bounded_json(history)
+            recorded = pipeline_json(history)
             outcome = (
                 "skipped"
                 if disposition
@@ -346,7 +365,7 @@ class PipelineReceiptDAL:
                     if disposition or evidence is not None
                     else identity(marker["action"])
                 ),
-                bounded_json(result) if result is not None else None,
+                pipeline_json(result) if result is not None else None,
                 recorded,
                 identity(run_id),
                 stage,
