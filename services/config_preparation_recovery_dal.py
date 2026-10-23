@@ -97,9 +97,13 @@ class ConfigPreparationRecoveryDAL:
             target.preparation_id,
         )
         resources = rows(cursor)
+        # Terminal containment disables this historical stream's dispatch. Its
+        # target restriction is independent of the read's reservation. Include
+        # every stream owned by this preparation and every active account claim;
+        # only unrelated terminal history is excluded from the conflict set.
         cursor.execute(
             "SELECT s.* FROM dbo.ExportExecutionStream s WITH (UPDLOCK,HOLDLOCK) WHERE "
-            "s.PreparationID=? OR s.ActiveAccountKey=? OR (s.State NOT IN ('closed','read_contained') AND EXISTS ("
+            "s.PreparationID=? OR s.ActiveAccountKey=? OR (s.State NOT IN ('closed','read_contained','target_contained') AND EXISTS ("
             "SELECT 1 FROM OPENJSON(s.ScopeJson,'$.resources') WITH (ResourceKey varchar(256) '$.key') x "
             "JOIN dbo.ExportPreparationResource m ON m.ResourceKey=x.ResourceKey COLLATE Latin1_General_100_BIN2 "
             "WHERE m.PreparationID=?)) ORDER BY CONVERT(varchar(36),s.StreamID)",

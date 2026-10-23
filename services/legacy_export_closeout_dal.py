@@ -6,6 +6,21 @@ from services.export_coordination_dal import identity
 from services.export_target_containment_dal import ExportTargetContainmentDAL
 
 
+def _receipt_wire(row):
+    """Match SQL uniqueidentifier values to canonical private receipt identities.
+
+    ODBC can return uppercase GUID strings. Normalize only typed receipt IDs;
+    signed historical bodies and case-sensitive provider file IDs stay intact.
+    """
+    if row is None:
+        return None
+    value = _wire(row)
+    for column in ("ActionID", "ContainmentID", "ReceiptReference"):
+        if value.get(column) is not None:
+            value[column] = identity(value[column])
+    return value
+
+
 class LegacyExportCloseoutDAL:
     def __init__(self, connect, *, account, storage_owner):
         self.connect, self.account, self.storage_owner = connect, account, storage_owner
@@ -24,6 +39,7 @@ class LegacyExportCloseoutDAL:
 
     def _snapshot(self, cursor, job_id):
         state = ExportTargetContainmentDAL._snapshot(cursor, job_id, self.account, None)
+        state["receipt"] = _receipt_wire(state["receipt"])
         job = state["job"]
         # Later jobs may legitimately own this account after closeout. Their
         # execution must block a new decision without reopening old history.
@@ -38,7 +54,7 @@ class LegacyExportCloseoutDAL:
         state["attempts"] = _wire(rows(cursor))
         cursor.execute("SELECT * FROM dbo.ExportLegacyCloseout WHERE JobID=?", job_id)
         receipt = one(cursor)
-        state["closeout"] = _wire(receipt) if receipt else None
+        state["closeout"] = _receipt_wire(receipt)
         cursor.execute(
             "SELECT ReplacementID FROM dbo.ExportReplacementPlan WHERE ContainmentID IN "
             "(SELECT ContainmentID FROM dbo.ExportTargetContainment WHERE JobID=?) ORDER BY ReplacementID",
