@@ -8,7 +8,6 @@ process separation preserves lifecycle accounting, not credential isolation.
 """
 
 import argparse
-from datetime import UTC
 import hashlib
 import json
 import os
@@ -28,75 +27,10 @@ class AuthorityStartupError(RuntimeError):
 
 
 def report_dispatch_failure(message, error):
-    """Local bounded diagnostics; never echo exception prose or IPC payloads."""
-    from datetime import datetime
+    """Retain sanitized failure details even when the authority has no console."""
+    from services.export_authority_diagnostics import report_authority_event
 
-    def identifier(value):
-        return (
-            value.lower()
-            if isinstance(value, str)
-            and re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", value)
-            else None
-        )
-
-    message = message if isinstance(message, dict) else {}
-    scope = message.get("scope")
-    scope = scope if isinstance(scope, dict) else {}
-    action = message.get("action")
-    action = (
-        action
-        if isinstance(action, str) and action in {"ready", "open", "execute", "close", "prove"}
-        else "invalid"
-    )
-    request = message.get("request")
-    request = request if isinstance(request, dict) else {}
-    types, states, numbers = [], set(), set()
-    reason = None
-    current = error
-    for _ in range(4):
-        if not isinstance(current, BaseException):
-            break
-        name = type(current).__name__
-        types.append(name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) else "Exception")
-        args = current.args
-        if (
-            type(current).__module__ == "pyodbc"
-            and args
-            and isinstance(args[0], str)
-            and re.fullmatch(r"[A-Z0-9]{5}", args[0])
-        ):
-            states.add(args[0])
-            for arg in args[1:5]:
-                if not isinstance(arg, str):
-                    continue
-                text = arg[:4096]
-                numbers.update(int(n) for n in re.findall(r"\((\d{3,6})\)", text)[:8])
-                if "Owned SQL producer must drain before observational probe." in text:
-                    reason = "sql_snapshot_owned"
-        current = current.__cause__ or current.__context__
-    record = {
-        "stage": "AUTHORITY_DISPATCH_FAILED",
-        "observed_utc": datetime.now(UTC).isoformat(),
-        "diagnostic_id": str(uuid4()),
-        "authority_pid": os.getpid(),
-        "action": action,
-        "stream_id": identifier(
-            request.get("stream_id") if action == "execute" else message.get("stream_id")
-        ),
-        "object_id": identifier(
-            message.get("object_id") if action == "prove" else scope.get("ObjectID")
-        ),
-        "request_id": identifier(request.get("request_id")) if action == "execute" else None,
-        "exception_types": types,
-        "sqlstates": sorted(states)[:4],
-        "sql_numbers": sorted(numbers)[:8],
-        "reason_code": reason,
-    }
-    # Reporting failure cannot change an uncertain dispatch outcome or trigger replay.
-    try:
-        print(json.dumps(record, separators=(",", ":")), file=sys.stderr, flush=True)
-    except Exception:
-        pass
+    report_authority_event("AUTHORITY_DISPATCH_FAILED", message=message, error=error)
 
 
 def windows_sid():
@@ -826,7 +760,10 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                 else:
                     reply = {"version": 1, "result": result}
                 pipe.send(reply)
-            except Exception:
+            except Exception as exc:
+                from services.export_authority_diagnostics import report_authority_event
+
+                report_authority_event("AUTHORITY_CONNECTION_FAILED", error=exc)
                 # A malformed, stalled, unauthenticated or disconnected peer owns
                 # only this connection. Retain claims and never replay dispatch.
                 # The next iteration independently checks the pinned Bot handle.
@@ -840,7 +777,7 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
             bot.Close()
 
 
-def main(argv=None):
+def _main(argv=None):
     parser = argparse.ArgumentParser(description="Explicit S11 authority; G4 provisioning only")
     parser.add_argument("--manifest", required=True)
     args = parser.parse_args(argv)
@@ -867,6 +804,12 @@ def main(argv=None):
     manifest = manifest_contract(
         decode(raw), script=__file__, current_sid=current_sid(), inspect_path=assert_protected_path
     )
+    from services.export_authority_diagnostics import (
+        configure_authority_diagnostics,
+        report_authority_event,
+    )
+
+    configure_authority_diagnostics(manifest["evidence_root"], inspect_path=assert_protected_path)
     boundary = DeploymentBoundary(manifest)
     from core.export_process_identity import TRUST_MODEL, open_pinned_process
 
@@ -946,6 +889,7 @@ def main(argv=None):
         # chain on every admission. Serve the independent recovery control plane
         # even when a missing private receipt prevents that authentication.
         try:
+            report_authority_event("AUTHORITY_SERVING")
             serve(
                 manifest=manifest,
                 authority=authority,
@@ -965,7 +909,18 @@ def main(argv=None):
                 "session", SessionID=session_id, Action="close", ExpectedVersion=session["Version"]
             )
     # Retained claims require reconciliation; do not report a clean service stop.
+    report_authority_event("AUTHORITY_STOPPED")
     return 0 if drained else 1
+
+
+def main(argv=None):
+    try:
+        return _main(argv)
+    except BaseException as error:
+        from services.export_authority_diagnostics import report_authority_event
+
+        report_authority_event("AUTHORITY_PROCESS_FAILED", error=error)
+        raise
 
 
 if __name__ == "__main__":

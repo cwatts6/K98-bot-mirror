@@ -16,7 +16,6 @@ from services.export_execution_protocol import (
     encode,
     validate_response,
 )
-from services.export_publication_metrics import measure_publication_step
 from services.export_request_budget import BudgetCompletionUnknown
 
 logger = logging.getLogger(__name__)
@@ -207,6 +206,11 @@ class ExportExecutionAuthority:
         stream.version = row["Version"]
 
     def execute(self, message):
+        from services.export_authority_diagnostics import (
+            authority_request_step,
+            report_authority_event,
+        )
+
         request = ProviderRequest.parse(message, enrollment=self.enrollment_plan is not None)
         with self._lock:
             stream = self._streams.get(request.stream_id)
@@ -222,7 +226,7 @@ class ExportExecutionAuthority:
                 )
             # An IPC replay never calls the child. The response may have been lost
             # after dispatch; return uncertainty rather than creating a new write.
-            with measure_publication_step("request_lookup"):
+            with authority_request_step("request_lookup", request):
                 existing, _ = self.dal.read_request(request.request_id)
             if existing is not None:
                 raise ExecutionUncertain(
@@ -236,9 +240,9 @@ class ExportExecutionAuthority:
             intent_confirmed = False
             outcome_attempted = False
             try:
-                with measure_publication_step("request_payload"):
+                with authority_request_step("request_payload", request):
                     payload = self.store.put(encode(request.message()))
-                with measure_publication_step("request_prepared"):
+                with authority_request_step("request_prepared", request):
                     self._event(
                         stream,
                         request,
@@ -251,38 +255,38 @@ class ExportExecutionAuthority:
                         PayloadReference=str(UUID(payload.key)),
                     )
                 prepared = True
-                with measure_publication_step("request_budget"):
+                with authority_request_step("request_budget", request):
                     budget()
                 if self.dispatch_guard is not None:
-                    with measure_publication_step("request_guard"):
+                    with authority_request_step("request_guard", request):
                         self.dispatch_guard()
                 # Procedure checks current owner/fence/version AFTER the wait.
                 # Any commit exception prevents send. A lost acknowledgment may
                 # still leave dispatch_intent in SQL and therefore retains claims.
                 intent_attempted = True
-                with measure_publication_step("request_dispatch"):
+                with authority_request_step("request_dispatch", request):
                     self._event(
                         stream, request, "dispatch_intent", {"request_id": request.request_id}
                     )
                 intent_confirmed = True
                 if self.dispatch_guard is not None:
-                    with measure_publication_step("request_guard"):
+                    with authority_request_step("request_guard", request):
                         self.dispatch_guard()
                 dispatched = True
                 try:
-                    with measure_publication_step("provider_child"):
+                    with authority_request_step("provider_child", request):
                         response = stream.child.execute(request.message())
                 except ProviderThrottled as exc:
                     # Persist shared feedback, but never infer non-delivery or
                     # replay. A lost cooldown acknowledgment is uncertain too.
                     stream.uncertain = True
-                    with measure_publication_step("budget_feedback"):
+                    with authority_request_step("budget_feedback", request):
                         budget.rejected(exc)
                     raise
-                with measure_publication_step("response_validation"):
+                with authority_request_step("response_validation", request):
                     validate_response(request, response)
                 outcome_attempted = True
-                with measure_publication_step("request_result"):
+                with authority_request_step("request_result", request):
                     self._event(
                         stream,
                         request,
@@ -290,8 +294,18 @@ class ExportExecutionAuthority:
                         {"request_id": request.request_id, "response": response},
                     )
                 durable_success = True
-                with measure_publication_step("budget_complete"):
+                with authority_request_step("budget_complete", request):
                     budget.completed()
+                report_authority_event(
+                    "AUTHORITY_REQUEST_COMPLETED",
+                    message={
+                        "action": "execute",
+                        "request": {
+                            "request_id": request.request_id,
+                            "stream_id": request.stream_id,
+                        },
+                    },
+                )
                 return response
             except BaseException as exc:
                 stream.uncertain = True

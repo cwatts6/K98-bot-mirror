@@ -13,7 +13,7 @@ $ErrorActionPreference='Stop'
 function Assert-TimingPath([string]$Path,[string]$EvidenceSid='') {
  if($EvidenceSid) {
   $root='C:\ProgramData\K98\S11\evidence'
-  $allowed=@($root,($root+'\publication-timing.log'),($root+'\publication-timing.log.1'),($root+'\publication-timing.log.2'))
+  $allowed=@($root,($root+'\publication-timing.log'),($root+'\publication-timing.log.1'),($root+'\publication-timing.log.2'),($root+'\authority-diagnostics.jsonl'),($root+'\authority-diagnostics.jsonl.1'),($root+'\authority-diagnostics.jsonl.2'))
   if($Path -cnotin $allowed -or $EvidenceSid -cne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value){throw 'Evidence identity or path differs'}
  }
  if(-not [IO.Path]::IsPathRooted($Path)){throw 'Absolute installed path required'}
@@ -98,8 +98,7 @@ function Select-PublicationDetails([string]$Text,[DateTimeOffset]$Start=$StartUt
  }
 }
 
-function Get-SavedPublicationTiming {
- Assert-PublicationWindow $StartUtc $EndUtc
+function Get-VerifiedPublicationAuthority {
  if($env:COMPUTERNAME -cne 'MINI_AMD'){throw 'Run on MINI_AMD'}
  $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
  if(-not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Administrator read access required'}
@@ -129,6 +128,13 @@ function Get-SavedPublicationTiming {
  $authority=Read-TimingJson $plan.manifests.authority $journal.publication.manifests.authority
  if($authority.authority_sid -cne $identity.User.Value -or $authority.bot_sid -cne $identity.User.Value -or $authority.evidence_root -cne 'C:\ProgramData\K98\S11\evidence'){throw 'Authority evidence binding differs'}
  Assert-TimingPath $authority.evidence_root $identity.User.Value
+ [pscustomobject]@{authority=$authority;identity=$identity;journalFile=$journalFile;journal=$journal}
+}
+
+function Get-SavedPublicationTiming {
+ Assert-PublicationWindow $StartUtc $EndUtc
+ $binding=Get-VerifiedPublicationAuthority
+ $authority=$binding.authority;$identity=$binding.identity;$journalFile=$binding.journalFile;$journal=$binding.journal
  $rows=@();$details=@();$absent=0
  foreach($name in @('publication-timing.log.2','publication-timing.log.1','publication-timing.log')) {
   $path=Join-Path $authority.evidence_root $name

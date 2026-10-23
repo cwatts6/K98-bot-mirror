@@ -79,6 +79,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             "report_timeout_monitor_v1",
             "recovery_receipt_roundtrip_v1",
             "pipeline_decision_bound_v1",
+            "authority_diagnostic_capture_v1",
         }:
             # This successor follows P0's separately reviewed release policies.
             # Prove its delivered image and bridge backwards through P0 before

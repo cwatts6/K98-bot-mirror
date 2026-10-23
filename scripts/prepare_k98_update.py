@@ -295,6 +295,15 @@ RECOVERY_RECEIPT_ROUNDTRIP_PATHS = frozenset(
     }
 )
 
+AUTHORITY_DIAGNOSTIC_PATHS = frozenset(
+    {
+        "scripts/run_export_authority.py",
+        "services/export_authority_diagnostics.py",
+        "services/export_execution_authority.py",
+        "services/export_reconciliation_service.py",
+    }
+)
+
 PIPELINE_DECISION_BOUND_PATHS = frozenset({"services/processing_pipeline_receipt_dal.py"})
 
 
@@ -344,6 +353,10 @@ def reviewed_transitions():
             fixed_receipt_roundtrip = (
                 item["id"] == "recovery_receipt_roundtrip_v1"
                 and path in RECOVERY_RECEIPT_ROUNDTRIP_PATHS
+            )
+            fixed_authority_diagnostics = (
+                item["id"] == "authority_diagnostic_capture_v1"
+                and path in AUTHORITY_DIAGNOSTIC_PATHS
             )
             fixed_pipeline_decision = (
                 item["id"] == "pipeline_decision_bound_v1" and path in PIPELINE_DECISION_BOUND_PATHS
@@ -423,6 +436,7 @@ def reviewed_transitions():
                     or fixed_monitor
                     or fixed_report_timeout
                     or fixed_receipt_roundtrip
+                    or fixed_authority_diagnostics
                     or fixed_pipeline_decision
                     or fixed_replacement
                     or fixed_publication
@@ -526,6 +540,8 @@ def reviewed_transitions():
             and paths != RECOVERY_RECEIPT_ROUNDTRIP_PATHS
         ):
             raise ValueError("Complete fixed recovery-receipt transition required.")
+        if item["id"] == "authority_diagnostic_capture_v1" and paths != AUTHORITY_DIAGNOSTIC_PATHS:
+            raise ValueError("Complete fixed authority diagnostic transition required.")
         if item["id"] == "pipeline_decision_bound_v1" and paths != PIPELINE_DECISION_BOUND_PATHS:
             raise ValueError("Complete fixed pipeline-decision transition required.")
         if (

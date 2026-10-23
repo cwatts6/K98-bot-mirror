@@ -37,12 +37,15 @@ publication_timing_logger = logging.getLogger(__name__ + ".publication_timing")
 class _PublicationTimingHandler(RotatingFileHandler):
     """Bounded diagnostics, independent of the authority's absent console handles."""
 
-    def __init__(self, root, inspect_path):
+    def __init__(self, root, inspect_path, *, filename="publication-timing.log"):
+        if filename not in {"publication-timing.log", "authority-diagnostics.jsonl"}:
+            raise ValueError("Fixed private diagnostic filename required.")
+        self.filename = filename
         self.root = Path(root)
         self.inspect_path = inspect_path
         self._check_paths()
         super().__init__(
-            self.root / "publication-timing.log",
+            self.root / self.filename,
             maxBytes=256 * 1024,
             backupCount=2,
             encoding="utf-8",
@@ -55,11 +58,7 @@ class _PublicationTimingHandler(RotatingFileHandler):
 
     def _check_paths(self):
         self.inspect_path(self.root, private=True)
-        for name in (
-            "publication-timing.log",
-            "publication-timing.log.1",
-            "publication-timing.log.2",
-        ):
+        for name in (self.filename, self.filename + ".1", self.filename + ".2"):
             path = self.root / name
             if path.exists() or path.is_symlink():
                 self.inspect_path(path, private=True)

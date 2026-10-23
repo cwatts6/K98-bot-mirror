@@ -1065,6 +1065,31 @@
           "after_sha256": "9cb72730fdaecdfa1584c23185a69c3d780c397e897e8edc4d91421d2dc17513"
         }
       ]
+    },
+    {
+      "id": "authority_diagnostic_capture_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "88adacc4a3e700ceafd11384b5d045f2f4a1aec40207bc86e5d78c243c8a902e",
+          "after_sha256": "dbb1f329bbdcc54abb6e4666ff3d5d8dc7af65d5a468e218c8319f2c8e2dcba9"
+        },
+        {
+          "path": "services/export_authority_diagnostics.py",
+          "before_sha256": null,
+          "after_sha256": "292412db73544f2d246812e40ac85c83bbb25e529a6f426b028d9c59a34f18ba"
+        },
+        {
+          "path": "services/export_execution_authority.py",
+          "before_sha256": "fa591647aab9c90aa3cf286b92a8bed2603b72d47930d2a9945e8db55822096c",
+          "after_sha256": "f39f7a544fc22c4fc0f33268bdebe94d2729658aaa4b6002c16a707cac8838fb"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "before_sha256": "8dcbc2bf818e9bd99272466394f32c77c15c9f87fc78f5ce14a46f088670a974",
+          "after_sha256": "2f8d92d1757078d33a631d2b342a8708da1063fa6b071df6c4c204e88670b7bb"
+        }
+      ]
     }
   ]
 }
