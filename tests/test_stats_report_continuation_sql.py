@@ -662,6 +662,51 @@ def test_restricted_monitor_contention_retains_sql_code_and_recovers_without_rel
     assert dal.snapshot(r.source) == before
 
 
+def test_restricted_monitor_refreshes_changed_exception_chain_without_revision_churn(
+    restricted_reports,
+):
+    from services.recovery_dal import RecoveryDAL
+    from services.recovery_health import failure_detail
+
+    r = restricted_reports
+    schema = Path(os.environ["K98_CAPTURE_SQL_SCHEMA"])
+    r.owner.execute((schema / "dbo.RecoveryIncident.Table.sql").read_text(encoding="utf-8-sig"))
+    # Exact production application grants; no DELETE or schema permission.
+    r.owner.execute("GRANT INSERT, SELECT, UPDATE ON dbo.RecoveryIncident TO S11_ExportApplication")
+
+    def connect():
+        connection = r.connect()
+        connection.autocommit = False
+        return connection
+
+    store = RecoveryDAL(connect, account="a", storage_owner="disk-a", guild_id=2)
+    row = store.observe("stats_import", str(uuid4()), {"actions": {}}, "a" * 64)
+    reporting_before = r.dal.inspect(r.source)
+
+    def detail(cause):
+        wrapper = RuntimeError("private wrapper prose")
+        wrapper.__cause__ = cause
+        return dict(failure_detail(wrapper), stage="incident:stats_import")
+
+    first = detail(ValueError("private first cause"))
+    changed = detail(TimeoutError("private changed cause"))
+    assert {k for k in first if first[k] != changed[k]} <= {"exception_types", "observed_utc"}
+    assert first["exception_types"] != changed["exception_types"]
+    store.check_failed(row["IncidentID"], first)
+    saved = store.get(row["IncidentID"])
+    restarted = RecoveryDAL(connect, account="a", storage_owner="disk-a", guild_id=2)
+    restarted.check_failed(row["IncidentID"], changed)
+    refreshed = restarted.get(row["IncidentID"])
+    assert refreshed["Revision"] == saved["Revision"] + 1
+    assert refreshed["evidence"]["check_diagnostic"] == changed
+    assert "private" not in str(refreshed["evidence"])
+    for key in ("State", "EvidenceHash", "FirstSeenUTC", "LastSeenUTC"):
+        assert refreshed[key] == saved[key]
+    restarted.check_failed(row["IncidentID"], dict(changed, observed_utc="later"))
+    assert restarted.get(row["IncidentID"])["Revision"] == refreshed["Revision"]
+    assert r.dal.inspect(r.source) == reporting_before
+
+
 def test_restricted_entry_rejects_changed_input_before_archive(restricted_reports):
     r = restricted_reports
     # A write in the archive probe proves validation runs before that module.

@@ -163,7 +163,14 @@ class RecoveryDAL:
                 detail is None
                 or all(
                     previous.get(k) == detail.get(k)
-                    for k in ("error_type", "frames", "stage", "sqlstates", "sql_numbers")
+                    for k in (
+                        "error_type",
+                        "exception_types",
+                        "frames",
+                        "stage",
+                        "sqlstates",
+                        "sql_numbers",
+                    )
                 )
             ):
                 return
