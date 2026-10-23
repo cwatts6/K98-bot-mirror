@@ -60,10 +60,12 @@ execution guards, bounded diagnostics and retained failure semantics.
 Prepare mirror and private bot PRs through patch-based promotion. Validate installed
 r10 updater compatibility against the exact private predecessor and candidate,
 qualify a source-only packet and rehearse protected source installation/re-entry.
-The operator package must identify reviewed heads, checksums, CI/review results,
-fixed updater commands and interruption handling. Do not merge or deploy as part
-of implementation. Do not require an updater replacement if the installed tool is
-already compatible.
+The installed r10 tool refuses the protected monitor files without an exact
+transition. The replacement updater adds one fixed four-file bundle with exact
+predecessor/candidate hashes, retaining all earlier transitions and registry bounds.
+Missing or changed companion bytes remain refused. The operator package must
+identify reviewed heads, checksums, CI/review results, fixed updater upgrade/deploy
+commands and interruption handling. Do not merge or deploy as part of implementation.
 
 After operator deployment, recheck the original reporting incident and submit the
 offered remaining-report repair once. Require durable stage 3, preserved import

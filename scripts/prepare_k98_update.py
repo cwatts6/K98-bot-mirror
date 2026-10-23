@@ -197,6 +197,15 @@ MONITOR_ADMISSION_TRANSITION_PATHS = frozenset(
     }
 )
 
+REPORT_TIMEOUT_MONITOR_PATHS = frozenset(
+    {
+        "services/recovery_dal.py",
+        "services/recovery_health.py",
+        "services/recovery_runtime.py",
+        "services/stats_report_continuation_dal.py",
+    }
+)
+
 
 REPLACEMENT_WORKFLOW_TRANSITION_PATHS = frozenset(
     {
@@ -320,6 +329,9 @@ def reviewed_transitions():
                 item["id"] == "monitor_admission_closeout_v1"
                 and path in MONITOR_ADMISSION_TRANSITION_PATHS
             )
+            fixed_report_timeout = (
+                item["id"] == "report_timeout_monitor_v1" and path in REPORT_TIMEOUT_MONITOR_PATHS
+            )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
                 and path in REPLACEMENT_WORKFLOW_TRANSITION_PATHS
@@ -393,6 +405,7 @@ def reviewed_transitions():
                     or fixed_cache
                     or fixed_configuration
                     or fixed_monitor
+                    or fixed_report_timeout
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -488,6 +501,8 @@ def reviewed_transitions():
             and paths != MONITOR_ADMISSION_TRANSITION_PATHS
         ):
             raise ValueError("Complete fixed monitor/admission transition required.")
+        if item["id"] == "report_timeout_monitor_v1" and paths != REPORT_TIMEOUT_MONITOR_PATHS:
+            raise ValueError("Complete fixed reporting-timeout/monitor transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS
