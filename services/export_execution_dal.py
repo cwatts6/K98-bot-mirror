@@ -577,10 +577,10 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # P0a aligns only the four stale sources with SQL 1159e824/0cc5f529;
 # exact predecessor/postimage provenance is retained in the release task pack.
 # Historical signing profiles and independent installed-metadata checks stay separate.
-APPLICATION_SCHEMA_SOURCE_HASH = "70bf38b825b43ca8793616519e00faf0b0a6625299d1f2321cea7e3a7b4e3cff"
+APPLICATION_SCHEMA_SOURCE_HASH = "b6e2da7367dbab0adc768ccfbac3598d523dd65cd56e278b08ba21af5f81c1da"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
 APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "04783ef8ce5b3220638556b36190abd400d4527dc701825c1f4b052fe8e77f62"
+    "2d5aee25abc339cea7bb573c8c964af661025041b7e9f282ea4aceab80e5ec9f"
 )
 
 

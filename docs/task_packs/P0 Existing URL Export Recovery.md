@@ -21,6 +21,11 @@ exports; new-source pools and rollover remain outside this correction.
 The URLs have not changed: recovery lifts a write restriction, not a URL mapping.
 Only ordinary legacy job mutations and exact configuration preparation probes
 may use targets released by this receipt. Queue selection, locked admission,
+stream opening, request preparation/dispatch and later closeout bind the release
+to the original receipt's account. A missing account retains the restriction;
+destination mutexes remain global for each physical file. The global active-target
+view is diagnostic inventory, not an account-specific authorization decision.
+Queue selection, locked admission,
 stream creation and request dispatch preserve permanent target history for
 managed pools, rollover and enrollment. Managed publication proof rules remain
 unchanged. A subsequent failed legacy export uses the same evidence-based

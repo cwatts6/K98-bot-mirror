@@ -34,11 +34,11 @@
             "type": "U"
           }
         ],
-        "metadata_hash": "162948ea8499ec88e65a93fea6eb481c18059fd12f04c26a9209036b359d16c0",
+        "metadata_hash": "12b7d6f1178e66708210088f59296a885ed7b11f894273bdfae874460ba96b07",
         "permissions_hash": "fbcc88e4fcff0cd55c010967c6943ecce2087940b539b9bc12dcf4259f19ee73",
         "principal": "S11_ExportApplication",
         "review_id": "e41429d6-ea59-56df-989d-b8d545c785ca",
-        "scope_hash": "04783ef8ce5b3220638556b36190abd400d4527dc701825c1f4b052fe8e77f62",
+        "scope_hash": "2d5aee25abc339cea7bb573c8c964af661025041b7e9f282ea4aceab80e5ec9f",
         "server": "mini_AMD",
         "sources": [
           {
@@ -2972,7 +2972,7 @@
           {
             "name": "dbo.usp_ExportExecutionStreamTransition",
             "path": "sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-            "sha256": "8403d717ec0fcf604d12276f356eec352f33b297ea704125e8e1eec5fe7d6e79",
+            "sha256": "442ad0f735618a7568cd9de277712795c72b774917bdecd6a7402ba9ebf1cced",
             "type": "P"
           },
           {
@@ -2984,7 +2984,7 @@
           {
             "name": "dbo.usp_ExportLegacyCloseout",
             "path": "sql_schema/dbo.usp_ExportLegacyCloseout.StoredProcedure.sql",
-            "sha256": "1118d30a817771ad0c16cf4bc4cfd75f036796f9b9a7a4c269a90c6466aab059",
+            "sha256": "2649571a20ea29d9257a663730674325760c54e60221de685f2ad878afd3ed86",
             "type": "P"
           },
           {
@@ -3002,7 +3002,7 @@
           {
             "name": "dbo.usp_ExportProviderRequestEventAppend",
             "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-            "sha256": "56eaf74f31c8c56d3e5285da968d0c67aed06e568edfb3b74d74700ae2d43569",
+            "sha256": "8b094d782b22dd0a0efea9b14fe7b2c5df551287ff0f60e85273ceeddac8590a",
             "type": "P"
           },
           {
@@ -8731,7 +8731,7 @@
       "after": {
         "collation": "Latin1_General_CI_AS",
         "database": "ROK_TRACKER",
-        "metadata_hash": "eb2ff139fd4eee0d1f6cf8f0c2331e68bd1aa7358c34b8ec6552c790fa4af4c9",
+        "metadata_hash": "869e4e9a11c5f67eb52d050207f3f6433e249033b7b362c26d2f40ce7d63ea67",
         "migration_hashes": {
           "20260914_001_shared_export_coordination": "3535e2b25de1e13aec68868c9a9311d861aee1613ce87ddc14709fdd2f84a664",
           "20261001_001_legacy_export_preparation_installation": "3fb26b901274a6941a41d9d1363972e90e856fd106beb8f1493f7acce8591676",
@@ -8749,7 +8749,7 @@
           "20261015_010_configuration_replacement": "441c571b2ed775c421720aa09670723082893391918581eefbfd1c2650b348a1",
           "20261016_001_rollover_replacement": "fec0a6e71b9eb8641e02c9c73c2580eac50eb5598bb107573b138b87c80fcd96",
           "20261016_002_atomic_configuration_publication": "743599645108f9ea08e2be0d4a39e08f79f36d86c6e070ea2f9de8b15989c81b",
-          "20261023_001_legacy_export_closeout": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
+          "20261023_001_legacy_export_closeout": "0772464caf0ac544f6362b1724e05f80f6154d91f337c7522b5686ec33566c43"
         },
         "principal": "S11_ExportApplication",
         "profile": "application",
@@ -8787,7 +8787,7 @@
   },
   "sources": [
     {
-      "after": "195952891b097e0fc4555efb380ce0ee42c76c5095d59a972befd1a48801d3d6",
+      "after": "de2710813c51aa9bc5224709d24bfb9e2c54d11e780bf29c0be10b538fac647d",
       "before": "a9912567c30aa26f13a493d1e36f039b13f487e28142835c0074699548f699cd",
       "path": "services/export_coordination_dal.py"
     },
@@ -8797,12 +8797,12 @@
       "path": "services/export_evidence_catalog_dal.py"
     },
     {
-      "after": "13baec64f005fe250a50318d4e8bee9a5c2a7dfd9225000e02f5f12e0ca6a076",
+      "after": "3da6dc4d501cc2db9cd04d305bf315f4da8bb88e5fbc7624767de5cc38d94de5",
       "before": "6316cbcf5e016ac01ec143de44ba158d82fb4e8ee81c6f8cd201b21d53fb9a83",
       "path": "services/export_execution_dal.py"
     },
     {
-      "after": "e1e2d610f15edc24d3ed8885eb50aeeb576c48dda6581ced8cec8d4c2943a4b2",
+      "after": "da81a81a4486c7abbbe3342d782502691935c15fc1a855fa4ac9f92e37e7ec85",
       "before": "3501a65d02b3686a72e1031241fde5b31538d1ef01e6c2f5f76907395417cd00",
       "path": "services/export_recovery_dal.py"
     },
@@ -8822,12 +8822,12 @@
       "path": "services/export_runtime_composition.py"
     },
     {
-      "after": "dc88829f04aac7bdea6cf8643adf30afc5aee1cdfbdef072d875ed6d665190e7",
+      "after": "9141e3f9b4e98fe388229ac33ac5d429517a5f4af0198d1a89971c02a4a73899",
       "before": "3c71ee89331b17810a93e9c00d8dbb2c767d6ced48241aaeb2f16a609e7959fa",
       "path": "services/export_sql_direct_permissions.py"
     },
     {
-      "after": "dc8b4dbf9350595c5af54679333533edd4e08b692d00d26c747128010b25332f",
+      "after": "c20462a9224102b2b06e6d81f2eb737498b5b137ccf666c034fa00635b157724",
       "before": "cf442e25ed32396fcb095c38e3c5d5bfbec88451a8d83265ee2522ee09e32036",
       "path": "services/export_target_admission_dal.py"
     },
@@ -8852,13 +8852,13 @@
       "path": "services/recovery_release_policy.py"
     },
     {
-      "after": "9edbf114c29bfa58607de5174f1fd08766f189524f88589c3547cf7a2e57e9e0",
+      "after": "b5ed0be878903b96f29a43c0eb14fef85d2e19bf4e91a52f91b5b05e3f03cf8b",
       "before": "4591866bd52cd780649401402de4ebb3ab3ffa469c5f7b1ee84b0553f36ce3e9",
       "path": "services/replacement_admission_dal.py"
     }
   ],
   "sql": {
-    "commit": "e7d1a96474c8b8045a52f0d864e7b34ed80fd9f8",
+    "commit": "8de56c762921a23585e368f9c5d342e2dbe47e48",
     "members": [
       {
         "path": "deploy/Deploy-SqlMigration.ps1",
@@ -8874,7 +8874,7 @@
       },
       {
         "path": "migrations/20261023_001_legacy_export_closeout.sql",
-        "sha256": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
+        "sha256": "0772464caf0ac544f6362b1724e05f80f6154d91f337c7522b5686ec33566c43"
       }
     ],
     "profile": {
@@ -8890,17 +8890,17 @@
           "name": "dbo.ExportLegacyCloseout"
         },
         {
-          "after": "2e85e151d04dbb772265cc34a769948b1aeb5561938d5730bab9b26749a450b0",
+          "after": "4888aed6d35afee57cdd61ecdb91aa9a39d1d372ea32862330a3d72cf2c5432f",
           "before": "e99eb4df68f2b74d992b5fad244be50e6cbc770252a50463213b47dda3a686cf",
           "name": "dbo.usp_ExportExecutionStreamTransition"
         },
         {
-          "after": "1f72601efbece1e814ca800f64a1e50ed562aa874851c0cf9e84d21e4cfed765",
+          "after": "9c257ebf0a0ef28641a2d45f298843c82d32e097744c8832c27ace619180f201",
           "before": "5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792",
           "name": "dbo.usp_ExportLegacyCloseout"
         },
         {
-          "after": "3ca3d249a99c46ca2593ce24a54fba41223aa5e7bc7645bfe1e22466ee8b7dd1",
+          "after": "ce62dcfbe840ec2c4f5d7756e064a00ec206b4b218a9f21cfb3cfb08369ade79",
           "before": "b46d9258bf09c981b22eb2e1bdc0368118bd14d10e73410068386f2ce5d819ae",
           "name": "dbo.usp_ExportProviderRequestEventAppend"
         },
@@ -9007,7 +9007,7 @@
       "scripts": [
         {
           "id": "20261023_001_legacy_export_closeout",
-          "sha256": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
+          "sha256": "0772464caf0ac544f6362b1724e05f80f6154d91f337c7522b5686ec33566c43"
         }
       ],
       "version": 1

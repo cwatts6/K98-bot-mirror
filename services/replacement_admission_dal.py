@@ -141,7 +141,7 @@ def admission_blocker(connect, *, account, replacement_id=None):
             "WHERE p.AccountKey=? AND p.State IN ('pending','preflight','sql_pending','writing','committed','uncertain') "
             "UNION ALL SELECT 'job',j.JobID,j.EnqueueSequence FROM dbo.ExportJob j WHERE j.AccountKey=? AND j.State IN ('ready','running','uncertain') "
             "AND NOT EXISTS(SELECT 1 FROM dbo.ExportJobResource m JOIN dbo.ExportContainedTarget t ON m.ResourceKey='destination:'+t.FileID WHERE m.JobID=j.JobID "
-            "AND (j.ConsumerKind NOT IN ('scan_data','all_kvk') OR NOT EXISTS(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=t.ContainmentID))) "
+            "AND (j.ConsumerKind NOT IN ('scan_data','all_kvk') OR NOT EXISTS(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=t.ContainmentID AND released.AccountKey=j.AccountKey))) "
             "UNION ALL SELECT 'rollover',o.OperationID,o.EnqueueSequence FROM KVK.SourceOutputOperation o WHERE o.AccountKey=? AND o.State IN ('closing','ready','running','uncertain') "
             "AND NOT EXISTS(SELECT 1 FROM dbo.ExportTargetContainment c WHERE c.OutputOperationID=o.OperationID AND c.AccountKey=o.AccountKey)"
             ") pending_owner ORDER BY Ticket,Kind,SourceID",

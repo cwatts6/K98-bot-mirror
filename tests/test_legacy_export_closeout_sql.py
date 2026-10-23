@@ -318,20 +318,35 @@ def next_job(f, consumer="scan_data"):
     return job, owner
 
 
-def open_stream(f, object_id, owner, *, kind="job", purpose="mutation"):
+def open_stream(f, object_id, owner, *, kind="job", purpose="mutation", account="test-account"):
     stream = str(uuid4())
     drain(
         f.app.execute(
             "EXEC dbo.usp_ExportExecutionStreamTransition @Action='open',@SessionID=?,@StreamID=?,"
-            "@AccountKey='test-account',@ExpectedVersion=0,@OwnerKind=?,@ObjectID=?,@OwnerID=?,"
+            "@AccountKey=?,@ExpectedVersion=0,@OwnerKind=?,@ObjectID=?,@OwnerID=?,"
             "@Fence=3,@ClaimVersion=1,@Purpose=?,@ScopeJson=?,@ChildIdentity=?,@RegistrationHash=?,@SnapshotHash=?",
             f.f.session,
             stream,
+            account,
             kind,
             object_id,
             owner,
             purpose,
-            json.dumps(dict(resources=[dict(key=r["key"], version=5) for r in f.f.resources])),
+            json.dumps(
+                dict(
+                    resources=[
+                        dict(
+                            key=(
+                                "account:" + account
+                                if r["key"].startswith("account:")
+                                else r["key"]
+                            ),
+                            version=5,
+                        )
+                        for r in f.f.resources
+                    ]
+                )
+            ),
             str(uuid4()),
             b"n" * 32,
             b"s" * 32,
@@ -340,14 +355,17 @@ def open_stream(f, object_id, owner, *, kind="job", purpose="mutation"):
     return stream
 
 
-def event(f, stream, request, state, version, *, read=False):
+def event(
+    f, stream, request, state, version, *, read=False, account="test-account", target="old-file"
+):
     drain(
         f.app.execute(
-            "EXEC dbo.usp_ExportProviderRequestEventAppend @SessionID=?,@StreamID=?,@AccountKey='test-account',"
+            "EXEC dbo.usp_ExportProviderRequestEventAppend @SessionID=?,@StreamID=?,@AccountKey=?,"
             "@ExpectedVersion=?,@RequestID=?,@EventID=?,@State=?,@EvidenceHash=?,@EvidenceReference=?,"
-            "@Operation=?,@RequestKind=?,@TargetID='old-file',@PayloadHash=?,@PayloadReference=?",
+            "@Operation=?,@RequestKind=?,@TargetID=?,@PayloadHash=?,@PayloadReference=?",
             f.f.session,
             stream,
+            account,
             version,
             request,
             str(uuid4()),
@@ -356,10 +374,129 @@ def event(f, stream, request, state, version, *, read=False):
             str(uuid4()),
             "sheets.get" if read else "sheets.values.update",
             "read" if read else "mutation",
+            target,
             b"p" * 32,
             str(uuid4()),
         )
     )
+
+
+@pytest.mark.parametrize(
+    "kind,stage",
+    [
+        (kind, stage)
+        for kind in ("job", "preparation")
+        for stage in ("open", "prepared", "dispatch_intent")
+    ]
+    + [("job", "closeout")],
+)
+def test_other_account_cannot_use_released_target(installed, kind, stage):
+    import pyodbc
+
+    f = installed
+    contain(f)
+    f.apply()
+    job, owner = next_job(f)
+    object_id = job
+    if kind == "preparation":
+        object_id = str(uuid4())
+        f.owner.execute(
+            "INSERT dbo.ExportPreparation (PreparationID,AccountKey,ConsumerKind,RequestHash,EnqueueSequence,State,OwnerID,Fence,Version,StorageOwner,RequestJson,Actor,Reason,CreatedUTC,UpdatedUTC) "
+            "VALUES (?,'test-account','config',?,2,'preflight',?,3,1,'disk','{}','test','configuration read',SYSUTCDATETIME(),SYSUTCDATETIME())",
+            object_id,
+            b"q" * 32,
+            owner,
+        )
+        f.owner.execute(
+            "INSERT dbo.ExportPreparationResource SELECT ?,ResourceKey FROM dbo.ExportJobResource WHERE JobID=?",
+            object_id,
+            job,
+        )
+        f.owner.execute("UPDATE dbo.ExportResource SET ActiveJobID=NULL,OwnerID=NULL")
+    else:
+        f.owner.execute(
+            "INSERT dbo.ExportAttempt (AttemptID,JobID,ConsumerKind,AttemptNo,OwnerID,Fence,Phase,RemoteSequence,Version,CreatedUTC,UpdatedUTC,ManifestHash,ManifestJson,PartCount) "
+            "SELECT NEWID(),JobID,ConsumerKind,1,OwnerID,3,'private_started',1,1,CreatedUTC,UpdatedUTC,CAST(? AS binary(32)),'{}',1 FROM dbo.ExportJob WHERE JobID=?",
+            b"m" * 32,
+            job,
+        )
+    purpose = "probe" if kind == "preparation" else "mutation"
+    stream = None
+    request = str(uuid4())
+    if stage != "open":
+        stream = open_stream(f, object_id, owner, kind=kind, purpose=purpose)
+        if stage == "dispatch_intent":
+            event(f, stream, request, "prepared", 1, read=kind == "preparation")
+    # Model an otherwise valid account-B owner admitted by an older binary.
+    # Only the fixture administrator may construct this historical state.
+    f.owner.execute(
+        "INSERT dbo.ExportResource (ResourceKey,ResourceKind,ActiveJobID,OwnerID,Fence,Version) "
+        "SELECT 'account:other-account',ResourceKind,ActiveJobID,OwnerID,Fence,Version FROM dbo.ExportResource WHERE ResourceKey='account:test-account'"
+    )
+    f.owner.execute(
+        "UPDATE dbo.ExportResource SET ActiveJobID=NULL,OwnerID=NULL,Version=Version+1 WHERE ResourceKey='account:test-account'"
+    )
+    f.owner.execute("UPDATE dbo.ExportJob SET AccountKey='other-account' WHERE JobID=?", job)
+    f.owner.execute(
+        "UPDATE dbo.ExportJobResource SET ResourceKey='account:other-account' WHERE JobID=? AND ResourceKey='account:test-account'",
+        job,
+    )
+    if kind == "preparation":
+        f.owner.execute(
+            "UPDATE dbo.ExportPreparation SET AccountKey='other-account' WHERE PreparationID=?",
+            object_id,
+        )
+        f.owner.execute(
+            "UPDATE dbo.ExportPreparationResource SET ResourceKey='account:other-account' WHERE PreparationID=? AND ResourceKey='account:test-account'",
+            object_id,
+        )
+    if stream:
+        f.owner.execute(
+            "UPDATE dbo.ExportExecutionStream SET AccountKey='other-account',ActiveAccountKey='other-account',ScopeJson=REPLACE(ScopeJson,'account:test-account','account:other-account') WHERE StreamID=?",
+            stream,
+        )
+    before = f.owner.execute("SELECT COUNT(*) FROM dbo.ExportProviderRequestEvent").fetchval()
+    if stage == "closeout":
+        f.owner.execute(
+            "UPDATE dbo.ExportExecutionStream SET State='closed',ActiveAccountKey=NULL,ClosureHash=?,ClosureReference=?,EventDigest=?,ClosedUTC=SYSUTCDATETIME() WHERE StreamID=?",
+            b"c" * 32,
+            str(uuid4()),
+            b"e" * 32,
+            stream,
+        )
+        f.owner.execute("UPDATE dbo.ExportJob SET State='uncertain',Version=2 WHERE JobID=?", job)
+    with pytest.raises(
+        pyodbc.Error, match="Another containment" if stage == "closeout" else "isolated target"
+    ):
+        if stage == "open":
+            open_stream(f, object_id, owner, kind=kind, purpose=purpose, account="other-account")
+        elif stage == "closeout":
+            action = str(uuid4())
+            f.apply(
+                ActionID=action,
+                Actor="recovery:" + action,
+                JobID=job,
+                AccountKey="other-account",
+                OwnerID=owner,
+                Fence=3,
+                ExpectedVersion=2,
+                ReceiptReference=str(uuid4()),
+            )
+        else:
+            event(
+                f,
+                stream,
+                request,
+                stage,
+                2 if stage == "dispatch_intent" else 1,
+                read=kind == "preparation",
+                account="other-account",
+                target="healthy-file" if stage == "dispatch_intent" else "old-file",
+            )
+    assert (
+        f.owner.execute("SELECT COUNT(*) FROM dbo.ExportProviderRequestEvent").fetchval() == before
+    )
+    assert f.owner.execute("SELECT COUNT(*) FROM dbo.ExportLegacyCloseout").fetchval() == 1
 
 
 @pytest.mark.parametrize("consumer", ["scan_data", "all_kvk"])

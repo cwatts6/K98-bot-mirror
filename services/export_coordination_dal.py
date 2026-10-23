@@ -904,7 +904,7 @@ class ExportCoordinationDAL:
                     resources.append(one(cursor))
                 job = _job(cursor, candidate["JobID"])
                 if self.execution_evidence and contained_resources(
-                    cursor, keys, consumer=job["ConsumerKind"]
+                    cursor, keys, consumer=job["ConsumerKind"], account=job["AccountKey"]
                 ):
                     continue
                 if any(
