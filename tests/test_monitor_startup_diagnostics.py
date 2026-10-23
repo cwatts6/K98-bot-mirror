@@ -18,6 +18,7 @@ def isolated(monkeypatch):
     monkeypatch.setattr(startup, "_steps", {})
     monkeypatch.setattr(health, "_checks", [])
     monkeypatch.setattr(health, "_cycle", None)
+    monkeypatch.setattr(runtime, "_failed_incident_cursor", None)
 
 
 @pytest.mark.asyncio
@@ -227,3 +228,59 @@ def test_monitor_rechecks_persisted_failures_outside_rotating_page(monkeypatch):
     health.begin_cycle()
     assert runtime.observe_recovery() == []
     assert seen == ["failed"]
+
+
+@pytest.mark.parametrize("first_kind", ["stats_import", "unregistered"])
+def test_failed_check_priority_rotates_past_persistent_failures_and_resets_scope(
+    monkeypatch, first_kind
+):
+    failed = [
+        dict(IncidentID=f"{i:02}", SourceKind=first_kind if i < 20 else "stats_import")
+        for i in range(22)
+    ]
+    requests, seen = [], []
+
+    def list_open(**kw):
+        if not kw.get("failed_checks_only"):
+            return []
+        after = kw.get("after")
+        requests.append((store.scope, after))
+        return [row for row in failed if after is None or row["IncidentID"] > after][:20]
+
+    def refresh(identifier):
+        seen.append(identifier)
+        if identifier < "20":
+            raise RuntimeError("still unavailable")
+        failed[:] = [row for row in failed if row["IncidentID"] != identifier]
+
+    store = SimpleNamespace(
+        scope="first-scope",
+        list_open=list_open,
+        has_failed_checks=lambda: bool(failed),
+        check_failed=Mock(),
+    )
+
+    @contextmanager
+    def service():
+        yield SimpleNamespace(
+            store=store,
+            adapters={"stats_import": SimpleNamespace(pending_recovery=lambda **_: [])},
+            recover_automatic=refresh,
+        )
+
+    monkeypatch.setattr(runtime, "recovery_service", service)
+    monkeypatch.setattr(runtime, "_retry_admission", lambda: True)
+    for _ in range(3):
+        health.begin_cycle()
+        assert runtime.observe_recovery()  # The first page is still unhealthy.
+    assert requests == [("first-scope", None), ("first-scope", "19"), ("first-scope", "21")]
+    assert seen[-2:] == ["20", "21"]
+    assert runtime._failed_incident_cursor is None  # End of page rotation.
+    health.begin_cycle()
+    runtime.observe_recovery()
+    assert requests[-1] == ("first-scope", None)
+    assert runtime._failed_incident_cursor == ("first-scope", "19")
+    store.scope = "second-scope"
+    health.begin_cycle()
+    runtime.observe_recovery()
+    assert requests[-1] == ("second-scope", None)

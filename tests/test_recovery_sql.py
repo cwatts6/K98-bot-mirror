@@ -253,9 +253,12 @@ def test_check_failure_is_persisted_and_cleared_only_by_successful_observation(s
     assert [r["IncidentID"] for r in store.list_open(failed_checks_only=True)] == [
         row["IncidentID"]
     ]
+    assert store.list_open(after=row["IncidentID"], failed_checks_only=True) == []
     other = RecoveryDAL(store.connect, account="other", storage_owner="test-disk", guild_id=2)
     assert not other.has_failed_checks()
     assert other.list_open(failed_checks_only=True) == []
+    with pytest.raises(SourceConflict):
+        other.list_open(after=row["IncidentID"], failed_checks_only=True)
     store.check_failed(row["IncidentID"], "TimeoutError")
     assert store.get(row["IncidentID"])["Revision"] == 2
     fresh = store.observe(row["SourceKind"], row["SourceID"], {"actions": {}}, "a" * 64)

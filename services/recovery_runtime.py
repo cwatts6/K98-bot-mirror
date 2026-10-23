@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 _cursors = {}
 _incident_cursor = None
 _priority_incident_cursor = None
+_failed_incident_cursor = None
 
 
 @contextmanager
@@ -216,7 +217,7 @@ def _retry_admission():
 
 
 def observe_recovery():
-    global _incident_cursor, _priority_incident_cursor
+    global _incident_cursor, _priority_incident_cursor, _failed_incident_cursor
     failures = []
     recovery_health.record_progress("opening_recovery_scope")
     with recovery_service() as service:
@@ -298,7 +299,15 @@ def observe_recovery():
         # A failed check must not disappear behind the rotating backlog while
         # its persisted failure keeps monitoring unhealthy. Recheck a bounded
         # page first; only an actual successful observation clears its failure.
-        failed_checks = service.store.list_open(failed_checks_only=True)
+        failed_after = (
+            _failed_incident_cursor[1]
+            if _failed_incident_cursor and _failed_incident_cursor[0] == scope
+            else None
+        )
+        failed_checks = service.store.list_open(after=failed_after, failed_checks_only=True)
+        _failed_incident_cursor = (
+            (scope, failed_checks[-1]["IncidentID"]) if failed_checks else None
+        )
         visited = set()
         for incident in failed_checks + priority + incidents:
             if incident["IncidentID"] in visited:
