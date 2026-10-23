@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from test_export_reconciliation_service import closed_stream_fixture
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_execution_protocol import encode
 from services.legacy_export_closeout import ACTION, LegacyExportCloseout
@@ -268,6 +269,37 @@ def test_active_foreign_stream_prevents_new_closeout(recovery):
     state["foreign_streams"] = [dict(StreamID=str(uuid4()), State="open")]
     evidence, _, resolved = service.inspect(state["job"]["JobID"])
     assert not resolved and not evidence["actions"]
+
+
+@pytest.mark.parametrize("record", ["containment", "closeout"])
+@pytest.mark.parametrize("failure", ["decryption", "hash verification"])
+def test_unreadable_private_evidence_remains_reviewable_without_release(recovery, record, failure):
+    contain(recovery)
+    service, state, *_ = recovery
+    job = state["job"]["JobID"]
+    if record == "closeout":
+        _, token, _ = service.inspect(job)
+        service.execute(job, ACTION, token, "recovery:" + str(uuid4()), "obsolete export")
+    reference = state["receipt" if record == "containment" else "closeout"]["ReceiptReference"]
+    original_read = service.store.read_reference
+
+    def read_reference(key, expected_hash):
+        if key == reference:
+            raise HostBoundaryError("Private " + failure + " detail must not reach Discord")
+        return original_read(key, expected_hash)
+
+    service.store.read_reference = read_reference
+    before = deepcopy(state)
+    service.dal.settle.reset_mock()
+    evidence, token, resolved = service.inspect(job)
+    assert not resolved and evidence["outcome"] == "closeout_review_required"
+    assert not evidence["actions"]
+    assert "Private recovery evidence is incomplete." in evidence["explanation"]
+    assert failure not in evidence["explanation"]
+    with pytest.raises((HostBoundaryError, SourceConflict)):
+        service.execute(job, ACTION, token, "recovery:" + str(uuid4()), "obsolete export")
+    assert state == before
+    service.dal.settle.assert_not_called()
 
 
 @pytest.fixture

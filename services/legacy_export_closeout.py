@@ -3,6 +3,7 @@
 from dataclasses import asdict
 import json
 
+from core.export_execution_host import HostBoundaryError
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.config_read_containment import stream_wire
 from services.export_coordination_dal import identity
@@ -268,7 +269,7 @@ class LegacyExportCloseout:
                     check="Confirm this old export is no longer needed. The next normal scan will refresh the same spreadsheet URLs; until then the sheets may contain mixed scan results.",
                     effect="Save this decision, keep the old execution disabled, and lift only its verified write restriction. No spreadsheet is replaced, no import/report is rerun, and no export is dispatched by this action.",
                 )
-        except (SourceConflict, ValueError, KeyError, TypeError, OSError) as exc:
+        except (HostBoundaryError, SourceConflict, ValueError, KeyError, TypeError, OSError) as exc:
             explanation += " " + (
                 str(exc)
                 if isinstance(exc, SourceConflict)
