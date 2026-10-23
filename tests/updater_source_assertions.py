@@ -8,8 +8,18 @@ from scripts import p0a_release, prepare_k98_update
 
 def historical_runtime_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
-    # Walk the release chain newest first. The current closeout policy follows
-    # the timeout correction, which follows the retained report-boundary policy.
+    # Walk the release chain newest first. The receipt correction follows the
+    # closeout policy, timeout correction and retained report-boundary policy.
+    receipt = next(
+        transition
+        for transition in prepare_k98_update.reviewed_transitions()
+        if transition["id"] == "recovery_receipt_roundtrip_v1"
+    )
+    member = next((m for m in receipt["members"] if m["path"] == path), None)
+    if member is not None:
+        assert actual == member["after_sha256"], path
+        assert member["before_sha256"] is not None, path
+        actual = member["before_sha256"]
     successor = next((r for r in p0a_release.specification()["sources"] if r["path"] == path), None)
     if successor is not None:
         assert actual == successor["after"], path

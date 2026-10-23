@@ -75,7 +75,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     for transition in update.reviewed_transitions():
-        if transition["id"] == "report_timeout_monitor_v1":
+        if transition["id"] in {"report_timeout_monitor_v1", "recovery_receipt_roundtrip_v1"}:
             # This successor follows P0's separately reviewed release policies.
             # Prove its delivered image and bridge backwards through P0 before
             # comparing it with the older registry's terminal images.
