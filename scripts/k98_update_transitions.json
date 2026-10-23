@@ -1040,6 +1040,21 @@
           "after_sha256": "130f58b859c1e32ebb5e9d662611e74fa2b3b110a08c44a5324cbd44d0d49caa"
         }
       ]
+    },
+    {
+      "id": "recovery_receipt_roundtrip_v1",
+      "members": [
+        {
+          "path": "services/config_preparation_recovery_dal.py",
+          "before_sha256": "27d07fbc566cac5c92a8b1f574c7382fcb1b700650af7e1d0630242233c27346",
+          "after_sha256": "84e3b91fa54d6d39a4586591b986119e20774af057229eb0deac969554625811"
+        },
+        {
+          "path": "services/legacy_export_closeout_dal.py",
+          "before_sha256": "7d89a8d8503d8f1490f12d7a7d30bd5c28c91d2b03413b17a81cd2db9c9908fd",
+          "after_sha256": "e59b3d0b1616e2bdffe99b45f8e212270bdcaeb19796524bb56f60e875ef254b"
+        }
+      ]
     }
   ]
 }

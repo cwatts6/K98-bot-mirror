@@ -22,6 +22,11 @@ ExportLegacyCloseout, ExportContainedTarget and the execution/closeout procedure
 Validate against the authoritative SQL repository's merged legacy-closeout release.
 Keep all writes inside the existing DAL transaction and compare-and-swap boundaries.
 
+The installed transition registry must include the complete reviewed two-file
+successor with exact predecessor/successor hashes. This preserves the P0 source
+inventory check and requires a packaged updater upgrade before the routine source
+update. Existing SQL contracts and migration receipts remain unchanged.
+
 ## Validation and review
 
 The restricted disposable SQL regression must connect actual ODBC snapshots to the

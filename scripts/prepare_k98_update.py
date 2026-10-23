@@ -288,6 +288,13 @@ EVIDENCE_BACKUP_PATHS = frozenset(
     }
 )
 
+RECOVERY_RECEIPT_ROUNDTRIP_PATHS = frozenset(
+    {
+        "services/config_preparation_recovery_dal.py",
+        "services/legacy_export_closeout_dal.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -331,6 +338,10 @@ def reviewed_transitions():
             )
             fixed_report_timeout = (
                 item["id"] == "report_timeout_monitor_v1" and path in REPORT_TIMEOUT_MONITOR_PATHS
+            )
+            fixed_receipt_roundtrip = (
+                item["id"] == "recovery_receipt_roundtrip_v1"
+                and path in RECOVERY_RECEIPT_ROUNDTRIP_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -406,6 +417,7 @@ def reviewed_transitions():
                     or fixed_configuration
                     or fixed_monitor
                     or fixed_report_timeout
+                    or fixed_receipt_roundtrip
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -503,6 +515,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed monitor/admission transition required.")
         if item["id"] == "report_timeout_monitor_v1" and paths != REPORT_TIMEOUT_MONITOR_PATHS:
             raise ValueError("Complete fixed reporting-timeout/monitor transition required.")
+        if (
+            item["id"] == "recovery_receipt_roundtrip_v1"
+            and paths != RECOVERY_RECEIPT_ROUNDTRIP_PATHS
+        ):
+            raise ValueError("Complete fixed recovery-receipt transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS
