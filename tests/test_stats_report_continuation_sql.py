@@ -163,7 +163,7 @@ def reports(recovery):
         body = body[:start] + body[end:]
         body = body.replace("EXEC dbo.SP_Stats_for_Upload;", "BEGIN " + probe(2) + " END;")
         start = body.index(
-            "        ----------------------------------------------------------------\n        -- âš¡âš¡âš¡"
+            "        ----------------------------------------------------------------\n        -- ⚡⚡⚡"
         )
         end = body.index("        IF @ExportPreparationID IS NOT NULL", start)
         body = (
