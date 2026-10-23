@@ -1030,6 +1030,16 @@
           "after_sha256": "c59c59e5ca7d4dc9bf28003a366fe70b188c34c0a573dedf2ec9ebad42348110"
         }
       ]
+    },
+    {
+      "id": "contained_stream_restart_v1",
+      "members": [
+        {
+          "path": "services/export_startup_reconciliation.py",
+          "before_sha256": "07cd3528c4a1e7200075975b25a04b4c88aafd97d06c34ee65241955a0841d51",
+          "after_sha256": "130f58b859c1e32ebb5e9d662611e74fa2b3b110a08c44a5324cbd44d0d49caa"
+        }
+      ]
     }
   ]
 }

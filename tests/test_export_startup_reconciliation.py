@@ -55,7 +55,7 @@ def test_restart_keeps_uncertain_preparation_quarantined(monkeypatch, caplog):
     transitions = Mock()
     monkeypatch.setattr(module, "ExportExecutionDAL", transitions)
     reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
-    assert native.call_count == 2
+    assert native.call_count == 3
     transitions.assert_not_called()
     assert "resources_quarantined=1 replay_enabled=false" in caplog.text
     for connection in connections:
@@ -73,10 +73,11 @@ def test_restart_never_bypasses_unexplained_ownership(monkeypatch, unsafe):
     monkeypatch.setattr(TerminatedPair, "verify", native)
     with pytest.raises(SourceConflict, match="quarantined"):
         reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
-    native.assert_not_called()
+    native.assert_called_once()
 
 
 def test_quarantined_preparation_does_not_bypass_open_provider_stream(monkeypatch):
+    monkeypatch.setattr(TerminatedPair, "verify", Mock())
     reconciler, _, _ = setup(monkeypatch)
     observations = iter([{"Held": 1}, {"UnsafeHeld": 0}, {"Held": 1}])
     monkeypatch.setattr(module, "one", lambda _: next(observations))
@@ -116,7 +117,7 @@ def test_exact_previous_session_requires_native_termination_then_rechecks(monkey
     dal.transition.return_value = dict(State="closed", Version=2)
     monkeypatch.setattr(module, "ExportExecutionDAL", lambda _: dal)
     reconciler.prepare(previous_hash="a" * 64, termination=proof)
-    native.assert_called_once()
+    assert native.call_count == 2
     dal.transition.assert_called_once_with(
         "session", SessionID="fixture-session", Action="close", ExpectedVersion=1
     )
@@ -162,5 +163,42 @@ def test_bad_session_version_never_closes_a_session(monkeypatch, version):
     monkeypatch.setattr(module, "ExportExecutionDAL", transition)
     with pytest.raises(SourceConflict):
         reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
-    native.assert_not_called()
+    native.assert_called_once()
     transition.assert_not_called()
+
+
+def test_failed_termination_does_not_even_connect(monkeypatch):
+    reconciler, connect, _ = setup(monkeypatch)
+    monkeypatch.setattr(TerminatedPair, "verify", Mock(side_effect=ValueError("not proven")))
+    with pytest.raises(ValueError, match="not proven"):
+        reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
+    connect.assert_not_called()
+
+
+def test_closed_session_still_requires_termination_before_retaining_history(monkeypatch):
+    reconciler, connect, _ = setup(monkeypatch)
+    events = []
+    monkeypatch.setattr(TerminatedPair, "verify", lambda _: events.append("termination"))
+    original_connect = reconciler.connect
+    reconciler.connect = lambda: (events.append("connect"), original_connect())[1]
+    reconciler.prepare(previous_hash="a" * 64, termination=TerminatedPair({}))
+    assert events == ["termination", "connect", "connect"]
+    assert connect.call_count == 2
+
+
+@pytest.mark.parametrize("retained", [False, True])
+def test_containment_admission_uses_exact_parameterized_predicate(monkeypatch, retained):
+    reconciler, _, connections = setup(monkeypatch)
+    monkeypatch.setattr(TerminatedPair, "verify", Mock())
+    kwargs = dict(previous_hash="a" * 64, termination=TerminatedPair({})) if retained else {}
+    reconciler.prepare(**kwargs)
+    for connection in connections:
+        calls = [
+            c
+            for c in connection.cursor.return_value.execute.call_args_list
+            if "FROM dbo.ExportExecutionStream " in c.args[0]
+        ]
+        assert len(calls) == 1
+        assert calls[0].args[1:] == ("fixture-account", int(retained))
+        assert "ActiveAccountKey IS NULL" in calls[0].args[0]
+        assert "ClosureReference IS NOT NULL" in calls[0].args[0]

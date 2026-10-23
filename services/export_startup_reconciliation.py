@@ -65,8 +65,20 @@ class StartupReconciler:
             ):
                 raise SourceConflict("Retained work is not a quarantined preparation.")
         cursor.execute(
-            "SELECT COUNT(*) AS Held FROM dbo.ExportExecutionStream WHERE AccountKey=? AND State<>'closed'",
+            # A contained stream is terminal for process/session shutdown, not
+            # proof of delivery or permission to release its output quarantine.
+            # Only a positively terminated predecessor may retain this history.
+            "SELECT COUNT(*) AS Held FROM dbo.ExportExecutionStream "
+            "WHERE AccountKey=? AND State<>'closed' AND NOT "
+            "(?=1 AND ActiveAccountKey IS NULL AND ClosedUTC IS NOT NULL "
+            "AND ClosedUTC>=CreatedUTC AND ClosureHash IS NOT NULL "
+            "AND ClosureReference IS NOT NULL AND EventDigest IS NOT NULL AND "
+            "((State='target_contained' AND Purpose IN ('mutation','probe')) OR "
+            "(State='read_contained' AND Purpose IN ('probe','enrollment') "
+            "AND PreparationID IS NOT NULL AND JobID IS NULL "
+            "AND OutputOperationID IS NULL AND NestedToken IS NULL AND Epoch IS NULL)))",
             account,
+            int(retained_pair),
         )
         observed = one(cursor)
         if observed is None or type(observed.get("Held")) is not int or observed["Held"] != 0:
@@ -75,6 +87,10 @@ class StartupReconciler:
 
     def prepare(self, *, previous_hash=None, termination=None):
         retained_pair = previous_hash is not None and isinstance(termination, TerminatedPair)
+        if retained_pair:
+            # Verify even when no session remains open: terminal containment
+            # must never become a way to start alongside the previous pair.
+            termination.verify()
         connection = self.connect()
         try:
             connection.autocommit = True

@@ -207,7 +207,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         "core/export_automatic_pair.py",
         "core/export_process_identity.py",
         "core/export_startup_windows.py",
-        "services/export_startup_reconciliation.py",
         "scripts/run_export_process_gate.py",
         "scripts/provision_export_process_pair.py",
         "scripts/prepare_k98_release.py",
@@ -746,3 +745,16 @@ def test_installer_ignores_inherited_user_module_search(tmp_path):
     resolved = Path(result.stdout.strip())
     assert resolved.is_relative_to(Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\Modules"))
     assert resolved.name == "ScheduledTasks.psd1"
+
+
+def test_startup_reconciliation_unreviewed_bytes_still_refused():
+    with pytest.raises(ValueError, match="reviewed"):
+        source_plan(
+            inventory(),
+            BEFORE,
+            AFTER,
+            ["services/export_startup_reconciliation.py"],
+            lambda commit, path: (
+                b"unreviewed predecessor" if commit == BEFORE else b"unreviewed successor"
+            ),
+        )
