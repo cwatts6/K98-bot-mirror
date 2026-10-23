@@ -2943,7 +2943,7 @@
     "name": "dbo.usp_ExportLegacyCloseout",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportLegacyCloseout.StoredProcedure.sql",
-    "sha256": "6b7cad8c4b23f66e9a16b50a232caa6dcff01403040dec06223c4c97ae23e3b4"
+    "sha256": "1118d30a817771ad0c16cf4bc4cfd75f036796f9b9a7a4c269a90c6466aab059"
   },
   {
     "name": "dbo.usp_ExportManualOutputEnrollmentTransition",

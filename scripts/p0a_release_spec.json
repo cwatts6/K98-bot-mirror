@@ -34,11 +34,11 @@
             "type": "U"
           }
         ],
-        "metadata_hash": "eb586a83580ba95eb3a1bf6e55f089d98e3218e2fae2b7ab24507ee15679d6c9",
+        "metadata_hash": "162948ea8499ec88e65a93fea6eb481c18059fd12f04c26a9209036b359d16c0",
         "permissions_hash": "fbcc88e4fcff0cd55c010967c6943ecce2087940b539b9bc12dcf4259f19ee73",
         "principal": "S11_ExportApplication",
         "review_id": "e41429d6-ea59-56df-989d-b8d545c785ca",
-        "scope_hash": "5425f7a0243e4d45a9b538e2476c223519b0338266e1e3a8579658c1ab848557",
+        "scope_hash": "04783ef8ce5b3220638556b36190abd400d4527dc701825c1f4b052fe8e77f62",
         "server": "mini_AMD",
         "sources": [
           {
@@ -2984,7 +2984,7 @@
           {
             "name": "dbo.usp_ExportLegacyCloseout",
             "path": "sql_schema/dbo.usp_ExportLegacyCloseout.StoredProcedure.sql",
-            "sha256": "6b7cad8c4b23f66e9a16b50a232caa6dcff01403040dec06223c4c97ae23e3b4",
+            "sha256": "1118d30a817771ad0c16cf4bc4cfd75f036796f9b9a7a4c269a90c6466aab059",
             "type": "P"
           },
           {
@@ -8731,7 +8731,7 @@
       "after": {
         "collation": "Latin1_General_CI_AS",
         "database": "ROK_TRACKER",
-        "metadata_hash": "dd3e2a222d65e7097338465622953b28b21429483e0eb36999f1d2b48c5c889d",
+        "metadata_hash": "eb2ff139fd4eee0d1f6cf8f0c2331e68bd1aa7358c34b8ec6552c790fa4af4c9",
         "migration_hashes": {
           "20260914_001_shared_export_coordination": "3535e2b25de1e13aec68868c9a9311d861aee1613ce87ddc14709fdd2f84a664",
           "20261001_001_legacy_export_preparation_installation": "3fb26b901274a6941a41d9d1363972e90e856fd106beb8f1493f7acce8591676",
@@ -8749,7 +8749,7 @@
           "20261015_010_configuration_replacement": "441c571b2ed775c421720aa09670723082893391918581eefbfd1c2650b348a1",
           "20261016_001_rollover_replacement": "fec0a6e71b9eb8641e02c9c73c2580eac50eb5598bb107573b138b87c80fcd96",
           "20261016_002_atomic_configuration_publication": "743599645108f9ea08e2be0d4a39e08f79f36d86c6e070ea2f9de8b15989c81b",
-          "20261023_001_legacy_export_closeout": "d47d38a2851fe2858a239a1f48afb132963f9e5fe13d35fa9e20100c5f3ff4f4"
+          "20261023_001_legacy_export_closeout": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
         },
         "principal": "S11_ExportApplication",
         "profile": "application",
@@ -8792,22 +8792,22 @@
       "path": "services/export_coordination_dal.py"
     },
     {
-      "after": "ed782c1a1a087c9ceacd805507e80668cc37ccbaacead2b2f248adbe4fb55fd5",
+      "after": "d58193d0019135fd4fd4a92c8ec7b525bdfc36b6a242edf42d0b810e65a2ece8",
       "before": "21de864ba11c7c89b4146a7f032ee1c1aca6d555b9a4f0ac56443361b6457a1b",
       "path": "services/export_evidence_catalog_dal.py"
     },
     {
-      "after": "dceb8568bff0bd234d65360da4b7ff3a0185293224c9ac655b4bff305d63fa8c",
+      "after": "13baec64f005fe250a50318d4e8bee9a5c2a7dfd9225000e02f5f12e0ca6a076",
       "before": "6316cbcf5e016ac01ec143de44ba158d82fb4e8ee81c6f8cd201b21d53fb9a83",
       "path": "services/export_execution_dal.py"
     },
     {
-      "after": "b111aa46a135b7c237f786d374c4f9cfc357871ff674db1632ba739987e50b93",
+      "after": "e1e2d610f15edc24d3ed8885eb50aeeb576c48dda6581ced8cec8d4c2943a4b2",
       "before": "3501a65d02b3686a72e1031241fde5b31538d1ef01e6c2f5f76907395417cd00",
       "path": "services/export_recovery_dal.py"
     },
     {
-      "after": "6ab261fd725cac85667408093b96ed5d27b58014701f991f8ecdc07f5786dd3b",
+      "after": "1475aac1f838369d0dfc20191d1dd5905cfaa0417b89599607d21b8805f1e34c",
       "before": "069e1b8d8703a5426cf1aa0479323a2d92139271937f3a7620882922e602f649",
       "path": "services/export_replacement_recovery_adapter.py"
     },
@@ -8832,17 +8832,17 @@
       "path": "services/export_target_admission_dal.py"
     },
     {
-      "after": "840f35da3e74b0274387c4afb18e87f8cae07e9738b0fea4ad3fe6d54971c13f",
+      "after": "0b19fe836de019f1bac0cf249208e33a7164e2c4c637ea9c0af67e2f9d65c54b",
       "before": "353abefbceb8bdf078a51b0c4537244e659aefea3e7425d7a4e53b81af5d2f13",
       "path": "services/failed_export_recovery_authority.py"
     },
     {
-      "after": "92d7d3801e0bc4df91a9efb86de2afe2e39336940700e8724ec4facbdab6613e",
+      "after": "117d434afe5515fceb61151ee1124b7350c0b1074ea2ab4fb6ce3865e2d89bfb",
       "before": null,
       "path": "services/legacy_export_closeout.py"
     },
     {
-      "after": "45836a92c5eff8eb2ba015ee06c13e2eb73d2d0bd3ea44f6aa933d31e7029967",
+      "after": "7d89a8d8503d8f1490f12d7a7d30bd5c28c91d2b03413b17a81cd2db9c9908fd",
       "before": null,
       "path": "services/legacy_export_closeout_dal.py"
     },
@@ -8858,7 +8858,7 @@
     }
   ],
   "sql": {
-    "commit": "687e05c4fa546ae9570b366181633837776a3364",
+    "commit": "e7d1a96474c8b8045a52f0d864e7b34ed80fd9f8",
     "members": [
       {
         "path": "deploy/Deploy-SqlMigration.ps1",
@@ -8874,7 +8874,7 @@
       },
       {
         "path": "migrations/20261023_001_legacy_export_closeout.sql",
-        "sha256": "d47d38a2851fe2858a239a1f48afb132963f9e5fe13d35fa9e20100c5f3ff4f4"
+        "sha256": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
       }
     ],
     "profile": {
@@ -8895,7 +8895,7 @@
           "name": "dbo.usp_ExportExecutionStreamTransition"
         },
         {
-          "after": "6e3970a66b42d2ac242777c93165bd950e7a9428bd2957585d3ca86eab98bf5e",
+          "after": "1f72601efbece1e814ca800f64a1e50ed562aa874851c0cf9e84d21e4cfed765",
           "before": "5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792",
           "name": "dbo.usp_ExportLegacyCloseout"
         },
@@ -9007,7 +9007,7 @@
       "scripts": [
         {
           "id": "20261023_001_legacy_export_closeout",
-          "sha256": "d47d38a2851fe2858a239a1f48afb132963f9e5fe13d35fa9e20100c5f3ff4f4"
+          "sha256": "a6c10344b6e2c693754de2a2ab84f0c17c2649d65bbfe99d32125ebc1745caee"
         }
       ],
       "version": 1

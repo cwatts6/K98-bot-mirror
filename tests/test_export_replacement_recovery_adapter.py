@@ -93,6 +93,20 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
     r.base.execute.assert_called_once_with("job", "verify_publication", original, "actor", "reason")
 
 
+@pytest.mark.parametrize("verified", [False, True])
+def test_closeout_receipt_routes_without_a_provenance_marker(adapter, verified):
+    r = adapter
+    r.snapshot["job"].update(ConsumerKind="scan_data", State="failed", ProvenanceJson="{}")
+    r.snapshot["legacy_closeout"] = True
+    expected = dict(actions={}, outcome="abandoned" if verified else "closeout_review_required")
+    r.runtime.client.failed_export_recovery.return_value = dict(
+        evidence=expected, token="receipt-token", resolved=verified
+    )
+    assert r.adapter.inspect("job") == (expected, "receipt-token", verified)
+    r.runtime.client.failed_export_recovery.assert_called_once_with("job", "inspect")
+    r.base.inspect.assert_not_called()
+
+
 @pytest.mark.parametrize("contained", [False, True])
 def test_legacy_partial_export_routes_to_same_url_closeout(adapter, contained):
     r = adapter

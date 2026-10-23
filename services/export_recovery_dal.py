@@ -107,7 +107,9 @@ class ExportRecoveryDAL:
         with transaction(self.connect) as cursor:
             cursor.execute(
                 "SELECT *,CASE WHEN UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
-                "THEN 1 ELSE 0 END AS Stalled FROM dbo.ExportJob WHERE JobID=? AND "
+                "THEN 1 ELSE 0 END AS Stalled,CASE WHEN EXISTS "
+                "(SELECT 1 FROM dbo.ExportLegacyCloseout c WHERE c.JobID=dbo.ExportJob.JobID) "
+                "THEN 1 ELSE 0 END AS LegacyCloseoutRecorded FROM dbo.ExportJob WHERE JobID=? AND "
                 + self.job_scope,
                 job_id,
                 *self.job_parameters,
@@ -154,6 +156,7 @@ class ExportRecoveryDAL:
                 successor = publication_successor(cursor, job)
             return _wire(
                 dict(
+                    legacy_closeout=bool(job.pop("LegacyCloseoutRecorded", False)),
                     job=job,
                     attempts=attempts,
                     streams=streams,

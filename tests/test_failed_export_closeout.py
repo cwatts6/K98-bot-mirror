@@ -235,6 +235,10 @@ def guided(workflow, monkeypatch):
         "services.failed_export_recovery_authority.FailedExportCloseoutDAL",
         lambda *_a, **_kw: service.dal,
     )
+    monkeypatch.setattr(
+        "services.legacy_export_closeout_dal.LegacyExportCloseoutDAL",
+        lambda *_a, **_kw: SimpleNamespace(receipt_exists=lambda _job: False),
+    )
     client = LocalAuthorityClient(broker)
     base = SimpleNamespace(discovery=SimpleNamespace(job=lambda _: deepcopy(state)))
     adapter = ReplacementRecoveryAdapter(base, runtime=SimpleNamespace(client=client), store=None)

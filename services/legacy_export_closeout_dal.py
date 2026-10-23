@@ -10,6 +10,18 @@ class LegacyExportCloseoutDAL:
     def __init__(self, connect, *, account, storage_owner):
         self.connect, self.account, self.storage_owner = connect, account, storage_owner
 
+    def receipt_exists(self, job_id):
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT c.ActionID FROM dbo.ExportLegacyCloseout c JOIN dbo.ExportJob j "
+                "ON j.JobID=c.JobID WHERE j.JobID=? AND j.AccountKey=? AND j.StorageOwner=? "
+                "AND j.ConsumerKind IN ('scan_data','all_kvk')",
+                identity(job_id),
+                self.account,
+                self.storage_owner,
+            )
+            return one(cursor) is not None
+
     def _snapshot(self, cursor, job_id):
         state = ExportTargetContainmentDAL._snapshot(cursor, job_id, self.account, None)
         job = state["job"]

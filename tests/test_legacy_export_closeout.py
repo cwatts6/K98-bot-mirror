@@ -97,13 +97,15 @@ def recovery():
             Reason=reason,
         )
         job = state["job"]
-        provenance = json.loads(job["ProvenanceJson"])
-        provenance["legacy_export_abandoned"] = marker
-        job.update(State="failed", Version=8, ProvenanceJson=json.dumps(provenance))
+        job.update(State="failed", Version=8)
         for r in state["resources"]:
             r.update(ActiveJobID=None, OwnerID=None, Version=r["Version"] + 1)
 
-    dal = SimpleNamespace(snapshot=lambda _: deepcopy(state), settle=Mock(side_effect=settle))
+    dal = SimpleNamespace(
+        snapshot=lambda _: deepcopy(state),
+        settle=Mock(side_effect=settle),
+        receipt_exists=lambda _: state["closeout"] is not None,
+    )
     from services.export_runtime_composition import RuntimeRegistration
 
     registration = SimpleNamespace(
@@ -182,6 +184,7 @@ def test_partial_success_can_be_abandoned_without_replay_and_survives_restart(re
     assert state["streams"] == before["streams"] and state["attempts"] == before["attempts"]
     assert state["contained_targets"] == before["contained_targets"]
     assert state["job"]["InputHash"] == before["job"]["InputHash"]
+    assert state["job"]["ProvenanceJson"] == before["job"]["ProvenanceJson"]
     assert service.dal.settle.call_count == 1
     with pytest.raises(SourceConflict):
         service.execute(job, ACTION, token, "recovery:" + action["ActionID"], action["Reason"])
@@ -301,7 +304,11 @@ def guided_closeout(recovery, monkeypatch):
     )
     client = LocalAuthorityClient(broker)
     adapter = ReplacementRecoveryAdapter(
-        SimpleNamespace(discovery=SimpleNamespace(job=lambda _: deepcopy(state))),
+        SimpleNamespace(
+            discovery=SimpleNamespace(
+                job=lambda _: dict(deepcopy(state), legacy_closeout=state["closeout"] is not None)
+            )
+        ),
         runtime=SimpleNamespace(client=client),
         store=None,
     )

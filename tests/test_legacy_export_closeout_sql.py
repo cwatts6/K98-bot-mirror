@@ -193,6 +193,40 @@ def installed(contained_job):  # noqa: F811
         admin.close()
 
 
+@pytest.mark.parametrize("provenance_bytes", [65534, 65536])
+def test_closeout_preserves_full_provenance_without_growing_it(installed, provenance_bytes):
+    from services.legacy_export_closeout_dal import LegacyExportCloseoutDAL
+
+    f = installed
+    empty = json.dumps({"padding": ""}, separators=(",", ":"))
+    original = json.dumps(
+        {"padding": "x" * (provenance_bytes // 2 - len(empty))}, separators=(",", ":")
+    )
+    assert len(original.encode("utf-16le")) == provenance_bytes
+    f.owner.execute(
+        "UPDATE dbo.ExportJob SET ProvenanceJson=? WHERE JobID=?", original, f.values["JobID"]
+    )
+    f.apply()
+    assert (
+        f.owner.execute(
+            "SELECT ProvenanceJson FROM dbo.ExportJob WHERE JobID=?", f.values["JobID"]
+        ).fetchval()
+        == original
+    )
+    assert f.owner.execute("SELECT COUNT(*) FROM dbo.ExportLegacyCloseout").fetchval() == 1
+    assert (
+        f.owner.execute(
+            "SELECT COUNT(*) FROM dbo.ExportResource WHERE ActiveJobID IS NOT NULL"
+        ).fetchval()
+        == 0
+    )
+    dal = LegacyExportCloseoutDAL(f.connect, account="test-account", storage_owner="disk")
+    assert dal.receipt_exists(f.values["JobID"])
+    assert not LegacyExportCloseoutDAL(
+        f.connect, account="another-account", storage_owner="disk"
+    ).receipt_exists(f.values["JobID"])
+
+
 def test_restricted_closeout_preserves_input_streams_and_attempts(installed):
     f = installed
     before = {

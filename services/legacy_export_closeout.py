@@ -206,20 +206,15 @@ class LegacyExportCloseout:
         )
         original = body["original"]
         job = state["job"]
-        marker = dict(reference=receipt["ReceiptReference"], sha256=receipt["ReceiptHash"])
-        provenance = json.loads(original["job"]["ProvenanceJson"])
-        provenance["legacy_export_abandoned"] = marker
         expected = dict(
             original["job"],
             State="failed",
             Version=original["job"]["Version"] + 1,
             UpdatedUTC=job["UpdatedUTC"],
-            ProvenanceJson=job["ProvenanceJson"],
         )
         if (
             body["kind"] != "legacy_export_closeout/1"
             or expected != job
-            or json.loads(job["ProvenanceJson"]) != provenance
             or body["proofs"] != proofs
             or body["token"] != receipt["SnapshotHash"]
             or digest(original).hex() != body["token"]
