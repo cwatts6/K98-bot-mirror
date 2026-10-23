@@ -1512,14 +1512,16 @@ def installation_fixture(*, profile="authority"):
                 ObjectName=name,
                 ObjectType=kind,
                 ExecuteAsPrincipal=None,
-                ModuleDefinition="CREATE PROCEDURE fixture AS SELECT 1;" if kind == "P" else None,
-                AnsiNulls=1 if kind == "P" else None,
-                QuotedIdentifier=1 if kind == "P" else None,
+                ModuleDefinition=(
+                    "CREATE PROCEDURE fixture AS SELECT 1;" if kind in {"P", "V"} else None
+                ),
+                AnsiNulls=1 if kind in {"P", "V"} else None,
+                QuotedIdentifier=1 if kind in {"P", "V"} else None,
                 MemoryOptimized=0 if kind == "U" else None,
                 TemporalType=0 if kind == "U" else None,
             )
         )
-        if kind == "U":
+        if kind in {"U", "V"}:
             metadata["columns"].append(dict(ObjectName=name, ColumnName="fixture_id", Ordinal=1))
     metadata["indexes"] = [
         dict(ObjectName="dbo.ExportResource", Disabled=0, Hypothetical=0, FilterDefinition=None)

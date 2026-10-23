@@ -41,6 +41,7 @@ P0A_ACTIONS = MappingProxyType(
                 "retry_unstarted",
                 "skip_unstarted",
                 "retire_failed_export",
+                "allow_next_export",
                 "isolate_targets",
                 "choose_replacements",
                 "verify_replacements",

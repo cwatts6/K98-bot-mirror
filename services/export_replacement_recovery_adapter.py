@@ -18,6 +18,7 @@ STEPS = frozenset(
         "activate_replacements",
         "publish_replacement",
         "retire_failed_export",
+        "allow_next_export",
     )
 )
 
@@ -44,6 +45,12 @@ class ReplacementRecoveryAdapter:
                 "Repair ancestry cannot be verified; original history is retained."
             )
         snapshot = self.base.discovery.job(job_id)
+        if snapshot["job"]["ConsumerKind"] in {"scan_data", "all_kvk"} and (
+            snapshot.get("legacy_closeout", False)
+            or (snapshot["job"]["State"] == "uncertain" and snapshot["streams"])
+        ):
+            result = self.client.failed_export_recovery(job_id, "inspect")
+            return result["evidence"], result["token"], result["resolved"]
         # A saved retirement remains authoritative even if shared destinations
         # are subsequently isolated. Only private receipt verification may
         # resolve it; a malformed/unverifiable marker must not enable replacement.
@@ -155,7 +162,7 @@ class ReplacementRecoveryAdapter:
         )
 
     def execute(self, job_id, action, token, actor, reason, *, payload=None):
-        if action == "retire_failed_export":
+        if action in {"retire_failed_export", "allow_next_export"}:
             return self.client.failed_export_recovery(
                 job_id,
                 "execute",
@@ -222,7 +229,7 @@ class ReplacementRecoveryAdapter:
             k: action.get(k)
             for k in ("ActionID", "ActionKind", "EvidenceHash", "Reason", "InputJson")
         }
-        if action["ActionKind"] == "retire_failed_export":
+        if action["ActionKind"] in {"retire_failed_export", "allow_next_export"}:
             return self.client.failed_export_recovery(job_id, "reconcile", recovery_action=document)
         if action["ActionKind"] == "publish_replacement":
             # Reconciliation on the authority reads the atomic queue receipt.

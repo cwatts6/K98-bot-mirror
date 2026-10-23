@@ -47,6 +47,19 @@ def adapter():
     return SimpleNamespace(adapter=result, base=base, runtime=runtime, snapshot=snapshot)
 
 
+@pytest.mark.parametrize("consumer", ["scan_data", "all_kvk"])
+def test_unstarted_uncertain_legacy_job_keeps_base_skip_action(adapter, consumer):
+    r = adapter
+    r.snapshot["job"]["ConsumerKind"] = consumer
+    r.snapshot["streams"] = []
+    expected = dict(actions=dict(skip_unstarted=dict(label="Skip unstarted export")))
+    r.base.inspect.return_value = expected, "base-token", False
+    assert r.adapter.inspect("job") == (expected, "base-token", False)
+    r.base.inspect.assert_called_once_with("job")
+    r.runtime.client.failed_export_recovery.assert_not_called()
+    r.runtime.client.replacement_recovery.assert_not_called()
+
+
 @pytest.mark.parametrize("marker", [{"reference": "receipt", "sha256": "a" * 64}, None])
 @pytest.mark.parametrize("verified", [True, False])
 def test_retired_export_cannot_reenter_replacement_after_destination_isolation(
@@ -78,6 +91,43 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
     original = job_token(r.snapshot)
     r.adapter.execute("job", "verify_publication", token, "actor", "reason")
     r.base.execute.assert_called_once_with("job", "verify_publication", original, "actor", "reason")
+
+
+@pytest.mark.parametrize("verified", [False, True])
+def test_closeout_receipt_routes_without_a_provenance_marker(adapter, verified):
+    r = adapter
+    r.snapshot["job"].update(ConsumerKind="scan_data", State="failed", ProvenanceJson="{}")
+    r.snapshot["legacy_closeout"] = True
+    expected = dict(actions={}, outcome="abandoned" if verified else "closeout_review_required")
+    r.runtime.client.failed_export_recovery.return_value = dict(
+        evidence=expected, token="receipt-token", resolved=verified
+    )
+    assert r.adapter.inspect("job") == (expected, "receipt-token", verified)
+    r.runtime.client.failed_export_recovery.assert_called_once_with("job", "inspect")
+    r.base.inspect.assert_not_called()
+
+
+@pytest.mark.parametrize("contained", [False, True])
+def test_legacy_partial_export_routes_to_same_url_closeout(adapter, contained):
+    r = adapter
+    r.snapshot["job"]["ConsumerKind"] = "scan_data"
+    r.snapshot["isolated_targets"] = [dict(FileID="old-file")] if contained else []
+    expected = dict(actions={"allow_next_export": dict(label="Allow next export")})
+    r.runtime.client.failed_export_recovery.return_value = dict(
+        evidence=expected, token="proof", resolved=False
+    )
+    assert r.adapter.inspect("job") == (expected, "proof", False)
+    r.runtime.client.replacement_recovery.assert_not_called()
+    r.adapter.execute("job", "allow_next_export", "proof", "actor", "reason")
+    r.runtime.client.failed_export_recovery.assert_called_with(
+        "job",
+        "execute",
+        step="allow_next_export",
+        token="proof",
+        actor="actor",
+        reason="reason",
+        payload=None,
+    )
 
 
 @pytest.mark.parametrize(

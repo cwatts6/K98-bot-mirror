@@ -8,8 +8,13 @@ from scripts import p0a_release, prepare_k98_update
 
 def historical_runtime_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
-    # This correction follows the separate P0 release policies below. Verify
-    # its delivered image before walking backwards through those policies.
+    # Walk the release chain newest first. The current closeout policy follows
+    # the timeout correction, which follows the retained report-boundary policy.
+    successor = next((r for r in p0a_release.specification()["sources"] if r["path"] == path), None)
+    if successor is not None:
+        assert actual == successor["after"], path
+        assert successor["before"] is not None, path
+        actual = successor["before"]
     correction = next(
         transition
         for transition in prepare_k98_update.reviewed_transitions()
@@ -20,11 +25,17 @@ def historical_runtime_hash(root, path):
         assert actual == member["after_sha256"], path
         assert member["before_sha256"] is not None, path
         actual = member["before_sha256"]
-    successor = next((r for r in p0a_release.specification()["sources"] if r["path"] == path), None)
-    if successor is not None:
-        assert actual == successor["after"], path
-        assert successor["before"] is not None, path
-        actual = successor["before"]
+    # Retained from eced3d1b's policy, not reconstructed from current source.
+    boundary_raw = (root / "tests/fixtures/p0_report_boundary_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(boundary_raw).hexdigest()
+        == "44eaa421c2acf8bc33d5bcb3d6b35898497865f30a73e2d3f6b355a05e32334c"
+    )
+    boundary = next((r for r in json.loads(boundary_raw) if r["path"] == path), None)
+    if boundary is not None:
+        assert actual == boundary["after"], path
+        assert boundary["before"] is not None, path
+        actual = boundary["before"]
     # This immutable fixture is the original P0 completion policy's source
     # pairs. A later corrective policy must not redefine historical bundles.
     raw = (root / "tests/fixtures/p0_completion_source_pairs.json").read_bytes()

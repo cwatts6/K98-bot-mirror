@@ -304,3 +304,12 @@ def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch)
     for name in ("p0a_release.py", "p0a_release_spec.json", "recovery_release_seed.py"):
         installed["files"].pop(name)
     assert classify()["classification"] == "UPDATER_UPGRADE_REQUIRED"
+
+
+def test_closeout_release_requires_credential_corrected_predecessor():
+    spec = recovery.specification()
+    assert spec["before"] == "c349802b51686d649d3beeac43e7ef61b3b7f825"
+    paths = {row["path"] for row in spec["sources"]}
+    assert recovery.possible_paths(spec["before"], paths) == paths
+    assert not recovery.possible_paths("a7519e453e0582cd54eee3847af25e1fad0d31a6", paths)
+    assert "services/export_startup_reconciliation.py" not in paths
