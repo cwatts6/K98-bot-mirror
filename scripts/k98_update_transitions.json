@@ -1072,7 +1072,7 @@
         {
           "path": "scripts/run_export_authority.py",
           "before_sha256": "88adacc4a3e700ceafd11384b5d045f2f4a1aec40207bc86e5d78c243c8a902e",
-          "after_sha256": "dbb1f329bbdcc54abb6e4666ff3d5d8dc7af65d5a468e218c8319f2c8e2dcba9"
+          "after_sha256": "e4ed7c7b09eb1380f1cca3114d2a1383213fcf680cc870aba85f83a4a83d2203"
         },
         {
           "path": "services/export_authority_diagnostics.py",

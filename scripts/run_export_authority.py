@@ -917,9 +917,15 @@ def main(argv=None):
     try:
         return _main(argv)
     except BaseException as error:
-        from services.export_authority_diagnostics import report_authority_event
-
-        report_authority_event("AUTHORITY_PROCESS_FAILED", error=error)
+        # Bootstrap failures must not import application code or be replaced by
+        # a missing diagnostic module. Use only a reporter already loaded after
+        # the protected source check; preserve the original failure in all cases.
+        diagnostics = sys.modules.get("services.export_authority_diagnostics")
+        if diagnostics is not None:
+            try:
+                diagnostics.report_authority_event("AUTHORITY_PROCESS_FAILED", error=error)
+            except Exception:
+                pass
         raise
 
 

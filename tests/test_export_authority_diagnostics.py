@@ -139,3 +139,20 @@ def test_private_logger_does_not_propagate_to_bot_logs(tmp_path, caplog):
         diagnostics.report_authority_event("AUTHORITY_SERVING")
     assert "AUTHORITY_SERVING" not in caplog.text
     assert records(tmp_path)[-1]["stage"] == "AUTHORITY_SERVING"
+
+
+@pytest.mark.parametrize("loaded", [False, True])
+def test_prebootstrap_failure_never_imports_or_replaces_original(monkeypatch, loaded):
+    from scripts import run_export_authority as launcher
+
+    failure = launcher.AuthorityStartupError("original source refusal")
+    monkeypatch.setattr(launcher, "_main", Mock(side_effect=failure))
+    if loaded:
+        monkeypatch.setattr(diagnostics, "report_authority_event", Mock(side_effect=OSError()))
+    else:
+        monkeypatch.delitem(launcher.sys.modules, "services.export_authority_diagnostics")
+    with pytest.raises(launcher.AuthorityStartupError) as result:
+        launcher.main([])
+    assert result.value is failure
+    if not loaded:
+        assert "services.export_authority_diagnostics" not in launcher.sys.modules
