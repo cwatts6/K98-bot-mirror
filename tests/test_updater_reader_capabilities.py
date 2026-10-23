@@ -75,6 +75,17 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     for transition in update.reviewed_transitions():
+        if transition["id"] == "report_timeout_monitor_v1":
+            # This successor follows P0's separately reviewed release policies.
+            # Prove its delivered image and bridge backwards through P0 before
+            # comparing it with the older registry's terminal images.
+            for member in transition["members"]:
+                path = member["path"]
+                actual = update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+                assert actual == member["after_sha256"], path
+                if path in expected:
+                    assert historical_runtime_hash(root, path) == expected[path]
+            continue
         for member in transition["members"]:
             path = member["path"]
             if path in expected:
