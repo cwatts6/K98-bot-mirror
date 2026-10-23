@@ -1,0 +1,367 @@
+# commands/location_cmds.py
+from __future__ import annotations
+
+from datetime import UTC, datetime
+import logging
+
+import discord
+from discord.ext import commands as ext_commands
+
+from bot_config import GUILD_ID, LEADERSHIP_CHANNEL_ID, LOCATION_CHANNEL_ID, NOTIFY_CHANNEL_ID
+from core.interaction_safety import safe_command, safe_defer
+from decoraters import (
+    _has_leadership_role,
+    _is_admin,
+    admin_or_leadership_in_allowed_channels,
+    is_admin_and_notify_channel,
+    track_usage,
+)
+from profile_cache import (
+    get_profile_cached,
+    warm_cache,
+)
+from services.location_import_service import (
+    LocationImportAuditContext,
+    import_location_csv_bytes,
+    validate_location_csv_attachment,
+)
+from services.location_refresh_signal import (
+    is_location_refresh_rate_limited,
+    is_location_refresh_running,
+    mark_location_refresh_started,
+    run_location_refresh_guarded,
+    signal_location_refresh_complete,
+    wait_for_location_refresh,
+)
+from services.profile_lookup_service import resolve_profile_lookup
+from target_utils import autocomplete_governor_names
+from ui.views.location_views import (
+    LocationSelectView,
+    RefreshLocationView,
+    configure_location_views,
+)
+from versioning import versioned
+
+logger = logging.getLogger(__name__)
+UTC = UTC
+ALLOWED_CHANNEL_IDS = {int(cid) for cid in (NOTIFY_CHANNEL_ID, LEADERSHIP_CHANNEL_ID) if cid}
+
+
+async def _send_find_all_to_location_channel(
+    bot: ext_commands.Bot, *, interaction: discord.Interaction
+) -> tuple[bool, str]:
+    channel = bot.get_channel(LOCATION_CHANNEL_ID)
+    if not channel:
+        try:
+            channel = await bot.fetch_channel(LOCATION_CHANNEL_ID)
+        except Exception as e:
+            return False, f"Could not resolve LOCATION_CHANNEL_ID: {e}"
+    try:
+        await channel.send("find-all")
+        return True, "OK"
+    except Exception as e:
+        return False, f"Failed to post 'find-all': {e}"
+
+
+def _check_location_refresh_permission(interaction: discord.Interaction) -> bool:
+    member = interaction.guild.get_member(interaction.user.id) if interaction.guild else None
+    return bool(_is_admin(interaction.user) or _has_leadership_role(member))
+
+
+async def _notify_location_refresh_timeout(
+    bot: ext_commands.Bot, interaction: discord.Interaction
+) -> None:
+    try:
+        from bot_config import ADMIN_USER_ID
+
+        if ADMIN_USER_ID:
+            admin = await bot.fetch_user(ADMIN_USER_ID)
+            await admin.send(
+                "⚠️ Location refresh did not complete within 30 minutes. Please check the scanner/import."
+            )
+    except Exception:
+        pass
+
+
+async def _build_location_embed_for_target(
+    target_id: int, *, refreshed: bool = False
+) -> discord.Embed | None:
+    try:
+        warm_cache()
+        p = get_profile_cached(target_id)
+    except Exception:
+        return None
+
+    if not p:
+        return None
+
+    x = p.get("X")
+    y = p.get("Y")
+    updated = p.get("LocationUpdated")
+
+    embed = discord.Embed(
+        title="📍 Player Location (refreshed)" if refreshed else "📍 Player Location",
+        description=f"**{p.get('GovernorName','Unknown')}** (`{target_id}`)",
+        color=0x2ECC71 if refreshed else 0x5865F2,
+    )
+    embed.add_field(
+        name="Coordinates",
+        value=f"X **{x if x is not None else '—'}** • Y **{y if y is not None else '—'}**",
+        inline=False,
+    )
+
+    if not refreshed and (x is None or y is None):
+        embed.add_field(name="Note", value="No recent coordinates found", inline=False)
+
+    if updated:
+        if refreshed:
+            embed.set_footer(
+                text=f"Last updated: {updated} • Tip: Use the button below if it changes again"
+            )
+        else:
+            dt = None
+            if isinstance(updated, datetime):
+                dt = updated if updated.tzinfo else updated.replace(tzinfo=UTC)
+            else:
+                try:
+                    iso = str(updated).replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(iso)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=UTC)
+                except Exception:
+                    dt = None
+
+            if dt:
+                embed.timestamp = dt
+                embed.set_footer(text="Last updated")
+            else:
+                embed.set_footer(text=f"Last updated: {updated}")
+
+    return embed
+
+
+async def _on_location_selected(
+    interaction: discord.Interaction, gid: int, ephemeral: bool
+) -> None:
+    embed = await _build_location_embed_for_target(gid, refreshed=False)
+    if not embed:
+        await interaction.response.send_message(f"❌ GovernorID `{gid}` not found.", ephemeral=True)
+        return
+
+    try:
+        if ephemeral:
+            await interaction.response.edit_message(embed=embed, view=None)
+        else:
+            await interaction.channel.send(embed=embed)
+            await interaction.response.edit_message(
+                content=f"✅ Posted location for `{gid}`.", view=None
+            )
+    except discord.InteractionResponded:
+        try:
+            await interaction.edit_original_response(embed=embed, view=None)
+        except Exception:
+            pass
+
+
+def register_location(bot: ext_commands.Bot) -> None:
+    location_group = discord.SlashCommandGroup(
+        "location",
+        "Location admin and lookup controls",
+        guild_ids=[GUILD_ID],
+    )
+
+    configure_location_views(
+        on_profile_selected=_on_location_selected,
+        on_request_refresh=lambda interaction: _send_find_all_to_location_channel(
+            bot, interaction=interaction
+        ),
+        on_wait_for_refresh=wait_for_location_refresh,
+        build_refreshed_location_embed=lambda target_id: _build_location_embed_for_target(
+            target_id, refreshed=True
+        ),
+        check_refresh_permission=_check_location_refresh_permission,
+        is_refresh_running=is_location_refresh_running,
+        is_refresh_rate_limited=is_location_refresh_rate_limited,
+        mark_refresh_started=mark_location_refresh_started,
+        run_refresh_guarded=run_location_refresh_guarded,
+        on_refresh_timeout=lambda interaction: _notify_location_refresh_timeout(bot, interaction),
+    )
+
+    @location_group.command(
+        name="import",
+        description="Admin: import player locations from an attached output.csv",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.01")
+    @safe_command
+    @is_admin_and_notify_channel()
+    @track_usage()
+    async def import_locations(
+        ctx: discord.ApplicationContext,
+        file: discord.Attachment | None = discord.Option(
+            discord.Attachment, "Upload output.csv", required=False
+        ),
+    ):
+
+        await safe_defer(ctx, ephemeral=True)
+        started = datetime.now(UTC)
+
+        # --- find the attachment (prefer option, fallback to ctx.attachments) ---
+        attach = file
+        if attach is None:
+            try:
+                attach = next(
+                    (a for a in (ctx.attachments or []) if a.filename.lower().endswith(".csv")),
+                    None,
+                )
+            except Exception:
+                attach = None
+
+        if not attach:
+            await ctx.interaction.edit_original_response(
+                content="❌ Please attach your CSV (e.g., `output.csv`) using the `file` option."
+            )
+            return
+
+        validation = validate_location_csv_attachment(
+            filename=getattr(attach, "filename", None),
+            size=getattr(attach, "size", None),
+        )
+        if not validation.ok:
+            await ctx.interaction.edit_original_response(content=validation.message)
+            return
+
+        try:
+            csv_bytes = await attach.read()
+        except Exception as e:
+            logger.exception("[/import_locations] failed to read attachment")
+            await ctx.interaction.edit_original_response(
+                content=f"❌ Failed to read file: `{type(e).__name__}: {e}`"
+            )
+            return
+
+        result = await import_location_csv_bytes(
+            csv_bytes,
+            filename=getattr(attach, "filename", None),
+            size=getattr(attach, "size", None),
+            on_success=signal_location_refresh_complete,
+            started_at_utc=started,
+            audit_context=LocationImportAuditContext(
+                source_filename=getattr(attach, "filename", None),
+                source_channel_id=(
+                    int(ctx.channel.id)
+                    if getattr(getattr(ctx, "channel", None), "id", None) is not None
+                    else None
+                ),
+                actor_discord_id=(
+                    int(ctx.user.id)
+                    if getattr(getattr(ctx, "user", None), "id", None) is not None
+                    else None
+                ),
+                entry_point="location_command_import",
+            ),
+        )
+        await ctx.interaction.edit_original_response(content=result.message)
+
+    @location_group.command(
+        name="player",
+        description="Show last-known (X,Y) for a Governor (by ID or Name).",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.10")
+    @safe_command
+    @admin_or_leadership_in_allowed_channels(ALLOWED_CHANNEL_IDS)
+    @track_usage()
+    async def player_location(
+        ctx: discord.ApplicationContext,
+        governor_id: int | None = discord.Option(int, "Governor ID", required=False),
+        governor_name: str | None = discord.Option(
+            str,
+            "Governor name",
+            autocomplete=autocomplete_governor_names,
+            required=False,
+        ),
+        ephemeral: bool = discord.Option(bool, "Only show to me", required=False, default=False),
+    ):
+        # Resolve target ID (ID takes precedence; name can be autocomplete-id or fuzzy free-text)
+        lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
+        if lookup.status == "not_found":
+            await ctx.respond(lookup.message, ephemeral=True)
+            return
+        if lookup.status == "matches":
+            try:
+                view = LocationSelectView(
+                    list(lookup.matches), ephemeral=ephemeral, author_id=ctx.user.id
+                )
+            except TypeError:
+                view = LocationSelectView(list(lookup.matches), ephemeral=ephemeral)
+            await ctx.respond(lookup.message, view=view, ephemeral=True)
+            return
+        target_id: int | None = lookup.governor_id
+
+        if not target_id:
+            await ctx.respond(
+                "Provide either **governor_id** or pick a name from the list.", ephemeral=True
+            )
+            return
+
+        # Single-ack from here on
+        await safe_defer(ctx, ephemeral=ephemeral)
+
+        try:
+            warm_cache()  # loads/refreshes the profile cache
+            p = get_profile_cached(target_id)
+        except Exception as e:
+            await ctx.interaction.edit_original_response(
+                content=f"❌ Failed to read cache: `{type(e).__name__}: {e}`", embed=None, view=None
+            )
+            return
+
+        if not p:
+            await ctx.interaction.edit_original_response(
+                content=f"❌ GovernorID `{target_id}` not found.", embed=None, view=None
+            )
+            return
+
+        x = p.get("X")
+        y = p.get("Y")
+        updated = p.get("LocationUpdated")
+
+        embed = discord.Embed(
+            title="📍 Player Location",
+            description=f"**{p.get('GovernorName','Unknown')}** (`{target_id}`)",
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="Coordinates",
+            value=f"X **{x if x is not None else '—'}** • Y **{y if y is not None else '—'}**",
+            inline=False,
+        )
+        if x is None or y is None:
+            embed.add_field(name="Note", value="No recent coordinates found", inline=False)
+        # ...existing embed building...
+        if updated:
+            dt = None
+            if isinstance(updated, datetime):
+                dt = updated if updated.tzinfo else updated.replace(tzinfo=UTC)
+            else:
+                # Try ISO parse (supports "...Z")
+                try:
+                    iso = str(updated).replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(iso)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=UTC)
+                except Exception:
+                    dt = None
+
+            if dt:
+                embed.timestamp = dt  # ✅ Discord renders this automatically
+                embed.set_footer(text="Last updated")
+            else:
+                embed.set_footer(text=f"Last updated: {updated}")  # fallback if unparsable
+
+        await ctx.interaction.edit_original_response(
+            embed=embed, view=RefreshLocationView(target_id=target_id, ephemeral=ephemeral)
+        )
+
+    bot.add_application_command(location_group)
