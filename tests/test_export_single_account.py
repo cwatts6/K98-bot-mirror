@@ -194,9 +194,12 @@ def test_source_inventory_digest_tracks_pinned_git_bytes_and_rejects_old_pin():
         (Path(__file__).parents[1] / "deploy/export_application_schema_source.json").read_bytes()
     )
     names = {item["name"] for item in manifest}
-    assert len(manifest) == len(names) == 569
+    assert len(manifest) == len(names) == 572
     assert {
         "dbo.ExportContainmentAttestation",
+        "dbo.ExportLegacyCloseout",
+        "dbo.ExportActiveContainedTarget",
+        "dbo.usp_ExportLegacyCloseout",
         "dbo.ExportRegistrationAttestation",
         "dbo.ExportUnownedHoldDisposition",
         "dbo.ProcessingPipelineRun",
