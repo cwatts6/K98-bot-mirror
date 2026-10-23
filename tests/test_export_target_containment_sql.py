@@ -36,6 +36,7 @@ TABLES = (
     "dbo.ExportContainmentAttestation",
     "dbo.ExportRegistrationAttestation",
     "dbo.ExportContainedTarget",
+    "dbo.ExportLegacyCloseout",
     "dbo.ExportContainedStream",
     "dbo.ExportManagedFileOrigin",
     "dbo.ExportManualFileOrigin",
@@ -56,6 +57,29 @@ TEMP_TABLE_PARAMETER_METADATA = False
 
 
 def local_sql(text):
+    if "dbo.ExportActiveContainedTarget" in text:
+        # SQL Server cannot create a view over local temporary tables. Inline
+        # the exact source-defined SELECT; the separate restricted-login fixture
+        # installs and tests the actual view and permissions in a real database.
+        source = (
+            Path(os.environ["K98_TARGET_CONTAINMENT_SQL_SOURCE"])
+            / "sql_schema/dbo.ExportActiveContainedTarget.View.sql"
+        ).read_text(encoding="utf-8-sig")
+        body = re.search(
+            r"CREATE VIEW dbo.ExportActiveContainedTarget\s+AS\s+(.*?)\s*;\s*GO", source, re.S
+        )[1]
+        body = body.replace(
+            "dbo.ExportContainedTarget t", "dbo.ExportContainedTarget t WITH(HOLDLOCK)"
+        )
+        body = body.replace(
+            "dbo.ExportLegacyCloseout c", "dbo.ExportLegacyCloseout c WITH(HOLDLOCK)"
+        )
+        text = re.sub(
+            r"dbo\.ExportActiveContainedTarget(?:\s+(?!WHERE\b|WITH\b|ON\b|ORDER\b|JOIN\b|LEFT\b|RIGHT\b|INNER\b|GROUP\b|UNION\b)([A-Za-z_]\w*))?(?:\s+WITH\s*\(HOLDLOCK\))?",
+            lambda m: "(" + body + ") " + (m[1] or "ActiveContainedTarget"),
+            text,
+            flags=re.I,
+        )
     for name in sorted((*TABLES, *PROCEDURES), key=len, reverse=True):
         text = re.sub(r"\b" + re.escape(name) + r"\b", "#" + name.split(".")[1], text)
     return text

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sql_revision": "135964c3fb03df40b3a56587cb462c2725acccb4",
+  "sql_revision": "ce3e68dd499d11870085dc4f5d2387eec9108091",
   "roots": [
     "KVK.KVK_AllPlayers_Raw",
     "KVK.KVK_AllPlayers_Stage",
@@ -73,6 +73,7 @@
     "dbo.CaptureLogHealth",
     "dbo.DEADSSUMMARY_PROC",
     "dbo.EXEMPT_FROM_STATS",
+    "dbo.ExportActiveContainedTarget",
     "dbo.ExportAttempt",
     "dbo.ExportAttemptPart",
     "dbo.ExportContainedStream",
@@ -82,6 +83,7 @@
     "dbo.ExportExecutionStream",
     "dbo.ExportJob",
     "dbo.ExportJobResource",
+    "dbo.ExportLegacyCloseout",
     "dbo.ExportManagedFileOrigin",
     "dbo.ExportManualFileOrigin",
     "dbo.ExportPreparation",
@@ -194,6 +196,7 @@
     "dbo.usp_ExportExecutionSessionTransition",
     "dbo.usp_ExportExecutionStreamTransition",
     "dbo.usp_ExportJobContainTargets",
+    "dbo.usp_ExportLegacyCloseout",
     "dbo.usp_ExportManualOutputEnrollmentTransition",
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
@@ -401,6 +404,7 @@
     "dbo.EXCEL_OUTPUT_KVK_TARGETS_MAR25",
     "dbo.EXEMPT_FROM_STATS",
     "dbo.ErrorAudit",
+    "dbo.ExportActiveContainedTarget",
     "dbo.ExportAttempt",
     "dbo.ExportAttemptPart",
     "dbo.ExportContainedStream",
@@ -410,6 +414,7 @@
     "dbo.ExportExecutionStream",
     "dbo.ExportJob",
     "dbo.ExportJobResource",
+    "dbo.ExportLegacyCloseout",
     "dbo.ExportManagedFileOrigin",
     "dbo.ExportManualFileOrigin",
     "dbo.ExportPreparation",
@@ -654,6 +659,7 @@
     "dbo.usp_ExportExecutionSessionTransition",
     "dbo.usp_ExportExecutionStreamTransition",
     "dbo.usp_ExportJobContainTargets",
+    "dbo.usp_ExportLegacyCloseout",
     "dbo.usp_ExportManualOutputEnrollmentTransition",
     "dbo.usp_ExportOutputEnrollmentTransition",
     "dbo.usp_ExportProviderRequestEventAppend",
@@ -2100,7 +2106,7 @@
       "KVK.SourceOutputOperation",
       "KVK.SourceOutputOperationResource",
       "KVK.SourceOutputPool",
-      "dbo.ExportContainedTarget",
+      "dbo.ExportActiveContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2168,8 +2174,8 @@
       "KVK.SourceOutputOperation",
       "KVK.SourceOutputOperationResource",
       "KVK.SourceOutputPool",
+      "dbo.ExportActiveContainedTarget",
       "dbo.ExportAttempt",
-      "dbo.ExportContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportJob",
@@ -2181,7 +2187,7 @@
       "dbo.ExportResource"
     ],
     "dbo.usp_ExportReconciliationProofIssue": [
-      "dbo.ExportContainedTarget",
+      "dbo.ExportActiveContainedTarget",
       "dbo.ExportExecutionSession",
       "dbo.ExportExecutionStream",
       "dbo.ExportManagedFileOrigin",
@@ -2192,8 +2198,7 @@
       "dbo.ExportReconciliationProof",
       "dbo.ExportReplacementActivation",
       "dbo.ExportReplacementTarget",
-      "dbo.ExportReplacementVerification",
-      "dbo.TARGETS"
+      "dbo.ExportReplacementVerification"
     ],
     "dbo.usp_ExportReplacementActivate": [
       "KVK.SourceOutputFile",
@@ -2701,6 +2706,28 @@
       "dbo.sp_RefreshInactiveGovernors",
       "dbo.usp_S11ValidateStatsReportStage",
       "dbo.usp_UpsertGovernorNameHistoryForScan"
+    ],
+    "dbo.ExportLegacyCloseout": [
+      "dbo.ExportJob",
+      "dbo.ExportTargetContainment"
+    ],
+    "dbo.ExportActiveContainedTarget": [
+      "dbo.ExportContainedTarget",
+      "dbo.ExportLegacyCloseout"
+    ],
+    "dbo.usp_ExportLegacyCloseout": [
+      "dbo.ExportActiveContainedTarget",
+      "dbo.ExportContainedTarget",
+      "dbo.ExportExecutionSession",
+      "dbo.ExportExecutionStream",
+      "dbo.ExportJob",
+      "dbo.ExportJobResource",
+      "dbo.ExportLegacyCloseout",
+      "dbo.ExportProviderRequest",
+      "dbo.ExportProviderRequestEvent",
+      "dbo.ExportReplacementPlan",
+      "dbo.ExportResource",
+      "dbo.ExportTargetContainment"
     ]
   }
 }

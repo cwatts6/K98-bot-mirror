@@ -1487,7 +1487,7 @@ def verify_installation_contract(observed, approved):
         or any(
             o["ExecuteAsPrincipal"] is not None
             or (
-                o["ObjectType"] == "P"
+                o["ObjectType"] in {"P", "V"}
                 and (
                     not isinstance(o["ModuleDefinition"], str)
                     or not o["ModuleDefinition"].strip()
@@ -1500,9 +1500,9 @@ def verify_installation_contract(observed, approved):
         )
     ):
         raise SourceConflict(
-            "Required installed table/procedure definition is unavailable or unsupported."
+            "Required installed table/view/procedure definition is unavailable or unsupported."
         )
-    tables = {name for name, kind in INSTALLATION_OBJECTS.items() if kind == "U"}
+    tables = {name for name, kind in INSTALLATION_OBJECTS.items() if kind in {"U", "V"}}
     columns = metadata["columns"]
     if (
         not isinstance(columns, list)

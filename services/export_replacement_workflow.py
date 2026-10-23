@@ -42,6 +42,8 @@ class ReplacementWorkflow:
         proposals = self.proposals.dal.for_job(job_id, account=self.account)
         result = dict(
             job_id=job_id,
+            keep_existing_urls=isolated.get("snapshot", {}).get("job", {}).get("ConsumerKind")
+            in {"scan_data", "all_kvk"},
             isolation=isolated,
             proposal=None,
             check=None,
@@ -118,6 +120,9 @@ class ReplacementWorkflow:
                 "Confirm the listed old outputs must no longer be used. Warn readers that those links may still change.",
                 "Permanently fence these targets and release this job's exact reservations. Continue here to replace the outputs; this does not confirm delivery.",
             )
+            if state["keep_existing_urls"]:
+                actions = {}
+                explanation = "Keep the existing spreadsheet URLs. Review the legacy export closeout to allow a later normal export after execution verification."
         elif state["activation"] is not None:
             delivery = state["delivery"]
             stage, explanation = delivery["stage"], delivery["explanation"]

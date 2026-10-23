@@ -129,7 +129,22 @@ _PROCEDURES = {
     "replacement_plan": "dbo.usp_ExportReplacementPlanCreate",
     "replacement_verification": "dbo.usp_ExportReplacementVerificationTransition",
     "replacement_activation": "dbo.usp_ExportReplacementActivate",
+    "legacy_closeout": "dbo.usp_ExportLegacyCloseout",
 }
+_PARAMETERS["legacy_closeout"] = (
+    "ActionID",
+    "JobID",
+    "AccountKey",
+    "StorageOwner",
+    "ExpectedVersion",
+    "OwnerID",
+    "Fence",
+    "SnapshotHash",
+    "ReceiptHash",
+    "ReceiptReference",
+    "Actor",
+    "Reason",
+)
 _PARAMETERS["replacement_plan"] = (
     "ReplacementID",
     "ContainmentID",
@@ -215,6 +230,7 @@ INSTALLATION_MIGRATIONS = (
     "20261015_010_configuration_replacement",
     "20261016_001_rollover_replacement",
     "20261016_002_atomic_configuration_publication",
+    "20261023_001_legacy_export_closeout",
 )
 
 CURRENT_INSTALLATION_MIGRATIONS = (
@@ -234,6 +250,7 @@ CURRENT_INSTALLATION_MIGRATIONS = (
     "20261015_010_configuration_replacement",
     "20261016_001_rollover_replacement",
     "20261016_002_atomic_configuration_publication",
+    "20261023_001_legacy_export_closeout",
 )
 
 
@@ -254,6 +271,8 @@ EVIDENCE_TABLES = tuple(
         "ExportManagedFileOrigin",
         "ExportManualFileOrigin",
         "ExportTargetContainment",
+        "ExportLegacyCloseout",
+        "ExportActiveContainedTarget",
         "ExportContainedTarget",
         "ExportContainedStream",
         "ExportReplacementPlan",
@@ -286,6 +305,7 @@ INSTALLATION_OBJECTS = {
             "ExportManagedFileOrigin",
             "ExportManualFileOrigin",
             "ExportTargetContainment",
+            "ExportLegacyCloseout",
             "ExportContainedTarget",
             "ExportContainedStream",
             "ExportReplacementPlan",
@@ -315,6 +335,7 @@ INSTALLATION_OBJECTS = {
         )
     },
     **{name: "P" for name in _PROCEDURES.values()},
+    "dbo.ExportActiveContainedTarget": "V",
 }
 
 # Exact writes used by the existing coordination/pool DALs. The three S8 domain
@@ -350,7 +371,7 @@ INSTALLATION_PERMISSIONS = {
     **{
         name: ("SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "CONTROL", "TAKE OWNERSHIP")
         for name, kind in INSTALLATION_OBJECTS.items()
-        if kind == "U"
+        if kind in {"U", "V"}
     },
     **{name: ("EXECUTE", "ALTER", "CONTROL", "TAKE OWNERSHIP") for name in _PROCEDURES.values()},
     **{name: ("EXECUTE",) for name in LOCK_PROCEDURES},
@@ -385,7 +406,8 @@ def installation_permissions(profile, *, direct=False):
                 and name not in EVIDENCE_TABLES
                 # The rollover recovery migration explicitly denies alteration
                 # to both execution roles, overriding the legacy schema grant.
-                and name != "dbo.usp_ExportRolloverContainTargets"
+                and name
+                not in {"dbo.usp_ExportRolloverContainTargets", "dbo.usp_ExportLegacyCloseout"}
             )
             or permission in writes.get(name, ())
             or (
@@ -555,11 +577,9 @@ LEGACY_PERMISSION_SOURCE_HASH = "026de91d412b31f12d8bb45908ca65b60e59f999b7bc614
 # P0a aligns only the four stale sources with SQL 1159e824/0cc5f529;
 # exact predecessor/postimage provenance is retained in the release task pack.
 # Historical signing profiles and independent installed-metadata checks stay separate.
-APPLICATION_SCHEMA_SOURCE_HASH = "a42a24dd21f6330579173760a8186f3fc62f1d8de8b2e44247e4f68634d52cc7"
+APPLICATION_SCHEMA_SOURCE_HASH = "343bb6af3329131807697bb48c031ad561b44b1302c75e8299ffeea85c438958"
 # Conservative closure from reviewed SQL Git blobs, never installed metadata.
-APPLICATION_ACTIVATION_SCOPE_HASH = (
-    "3dc0160434f855dc7601772e1ac6b409f8d50c7c17ce1d737de70a2771fbd9d2"
-)
+APPLICATION_ACTIVATION_SCOPE_HASH = "84dd451af407c29efc527ae444f10a131384bc17749648c1d88842bb4d611d87"
 
 
 def application_activation_scope():

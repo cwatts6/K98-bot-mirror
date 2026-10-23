@@ -92,6 +92,12 @@ CATALOG = " UNION ALL ".join(
             "failed export retirement",
         ),
         _select(
+            "TRY_CONVERT(uniqueidentifier,JSON_VALUE(x.ProvenanceJson,'$.legacy_export_abandoned.reference'))",
+            "TRY_CONVERT(binary(32),JSON_VALUE(x.ProvenanceJson,'$.legacy_export_abandoned.sha256'),2)",
+            "dbo.ExportJob x",
+            "legacy export closeout",
+        ),
+        _select(
             "TRY_CONVERT(uniqueidentifier,CASE WHEN LEN(JSON_VALUE(x.EvidenceJson,'$.evidence_id'))=32 "
             "THEN STUFF(STUFF(STUFF(STUFF(JSON_VALUE(x.EvidenceJson,'$.evidence_id'),"
             "21,0,'-'),17,0,'-'),13,0,'-'),9,0,'-') "

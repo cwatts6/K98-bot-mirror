@@ -1038,6 +1038,12 @@
     "sha256": "1f867d8c02315f8bffdf3c42dbdbfebb147bbf73e5ac48084f2fc4e938fc3e3d"
   },
   {
+    "name": "dbo.ExportActiveContainedTarget",
+    "type": "V",
+    "path": "sql_schema/dbo.ExportActiveContainedTarget.View.sql",
+    "sha256": "21f6852b8f1a0d32531b08ba9afe0a77589d85f91606c440f70f63fe66f403de"
+  },
+  {
     "name": "dbo.ExportAttempt",
     "type": "U",
     "path": "sql_schema/dbo.ExportAttempt.Table.sql",
@@ -1090,6 +1096,12 @@
     "type": "U",
     "path": "sql_schema/dbo.ExportJobResource.Table.sql",
     "sha256": "a2074f10ea097d32c75042e46bb4f9a0174de0185e7ba34879f95fa8161bb90a"
+  },
+  {
+    "name": "dbo.ExportLegacyCloseout",
+    "type": "U",
+    "path": "sql_schema/dbo.ExportLegacyCloseout.Table.sql",
+    "sha256": "096e8fe5b8fc7291a8cb3642abe81484c704fb0d032a1a750bbf971ed06668c2"
   },
   {
     "name": "dbo.ExportManagedFileOrigin",
@@ -2919,13 +2931,19 @@
     "name": "dbo.usp_ExportExecutionStreamTransition",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
-    "sha256": "9bb51a4b821e66f067049a66591002b6f05aa4a31186883b3652231e192109b2"
+    "sha256": "e69fd4bc1d7ed0a6f45bce613672bf559b9992915110217f1c7168ebe11179a0"
   },
   {
     "name": "dbo.usp_ExportJobContainTargets",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportJobContainTargets.StoredProcedure.sql",
     "sha256": "a1f51f1e03a5a405a92ea0d1204b972284083ed607f6ea3ae8bf034bda2783d2"
+  },
+  {
+    "name": "dbo.usp_ExportLegacyCloseout",
+    "type": "P",
+    "path": "sql_schema/dbo.usp_ExportLegacyCloseout.StoredProcedure.sql",
+    "sha256": "6b7cad8c4b23f66e9a16b50a232caa6dcff01403040dec06223c4c97ae23e3b4"
   },
   {
     "name": "dbo.usp_ExportManualOutputEnrollmentTransition",
@@ -2943,13 +2961,13 @@
     "name": "dbo.usp_ExportProviderRequestEventAppend",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
-    "sha256": "ede3e55393138555a3d0309d8bc7c9ef96fc99eaeafd56baf62d3c029aacf968"
+    "sha256": "5bf6d716e46add415f742b31841063a7f40a0f27ee74446bac92619685cd7dc2"
   },
   {
     "name": "dbo.usp_ExportReconciliationProofIssue",
     "type": "P",
     "path": "sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
-    "sha256": "6d139f37aaa1614eed28d44da71045e93017de5660c5603ecc52614fb57f315a"
+    "sha256": "96f5b2e20fff54139146c0d52407ad3dac504a5533f91369f0247408d1fb2ccc"
   },
   {
     "name": "dbo.usp_ExportReplacementActivate",

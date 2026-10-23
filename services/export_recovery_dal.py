@@ -131,7 +131,7 @@ class ExportRecoveryDAL:
             )
             resources = rows(cursor)
             cursor.execute(
-                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportContainedTarget c "
+                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportActiveContainedTarget c "
                 "JOIN dbo.ExportJobResource m ON m.ResourceKey='destination:'+c.FileID "
                 "WHERE m.JobID=? ORDER BY c.FileID",
                 job_id,

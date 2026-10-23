@@ -75,36 +75,38 @@ def validate_sql_policy(sql):
             "20261016_003_guided_recovery_release",
             "20261022_002_p0_completion_release",
             "20261022_004_stats_report_boundary_release",
+            "20261023_002_legacy_export_closeout_release",
         }
     ):
         raise ValueError("Exact coordinated recovery profile required.")
     completion = profile["migration_id"] == "20261022_002_p0_completion_release"
     report_boundary = profile["migration_id"] == "20261022_004_stats_report_boundary_release"
+    legacy_closeout = profile["migration_id"] == "20261023_002_legacy_export_closeout_release"
     for rows, count, keys, identity, pattern in (
         (
             sql["members"],
-            4 if completion or report_boundary else 15,
+            4 if completion or report_boundary or legacy_closeout else 15,
             {"path", "sha256"},
             "path",
             r"(?:deploy|migrations)/[A-Za-z0-9_.-]+",
         ),
         (
             profile["images"],
-            1 if report_boundary else 11 if completion else 26,
+            6 if legacy_closeout else 1 if report_boundary else 11 if completion else 26,
             {"name", "before", "after"},
             "name",
             r"(?:dbo|KVK)\.[A-Za-z0-9_]+",
         ),
         (
             profile["scripts"],
-            1 if completion or report_boundary else 12,
+            1 if completion or report_boundary or legacy_closeout else 12,
             {"id", "sha256"},
             "id",
             r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+",
         ),
         (
             profile["requires"],
-            17 if report_boundary else 16 if completion else 11,
+            18 if legacy_closeout else 17 if report_boundary else 16 if completion else 11,
             {"migration_id", "sha256", "status"},
             "migration_id",
             r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+",
@@ -126,6 +128,21 @@ def validate_sql_policy(sql):
         != ["20261022_003_stats_report_recovery_boundary"]
     ):
         raise ValueError("Exact reporting boundary inventory required.")
+    if legacy_closeout and (
+        [row["name"] for row in profile["images"]]
+        != sorted(
+            [
+                "dbo.ExportLegacyCloseout",
+                "dbo.ExportActiveContainedTarget",
+                "dbo.usp_ExportLegacyCloseout",
+                "dbo.usp_ExportExecutionStreamTransition",
+                "dbo.usp_ExportProviderRequestEventAppend",
+                "dbo.usp_ExportReconciliationProofIssue",
+            ]
+        )
+        or [row["id"] for row in profile["scripts"]] != ["20261023_001_legacy_export_closeout"]
+    ):
+        raise ValueError("Exact legacy closeout inventory required.")
     expected = {
         "deploy/" + name
         for name in (

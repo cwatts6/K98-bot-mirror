@@ -80,6 +80,29 @@ def test_original_publication_verification_remains_guided_before_isolation(adapt
     r.base.execute.assert_called_once_with("job", "verify_publication", original, "actor", "reason")
 
 
+@pytest.mark.parametrize("contained", [False, True])
+def test_legacy_partial_export_routes_to_same_url_closeout(adapter, contained):
+    r = adapter
+    r.snapshot["job"]["ConsumerKind"] = "scan_data"
+    r.snapshot["isolated_targets"] = [dict(FileID="old-file")] if contained else []
+    expected = dict(actions={"allow_next_export": dict(label="Allow next export")})
+    r.runtime.client.failed_export_recovery.return_value = dict(
+        evidence=expected, token="proof", resolved=False
+    )
+    assert r.adapter.inspect("job") == (expected, "proof", False)
+    r.runtime.client.replacement_recovery.assert_not_called()
+    r.adapter.execute("job", "allow_next_export", "proof", "actor", "reason")
+    r.runtime.client.failed_export_recovery.assert_called_with(
+        "job",
+        "execute",
+        step="allow_next_export",
+        token="proof",
+        actor="actor",
+        reason="reason",
+        payload=None,
+    )
+
+
 @pytest.mark.parametrize(
     "outcome,done,expected",
     [
