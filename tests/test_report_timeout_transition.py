@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_contention_hash
 
 
 def test_timeout_transition_requires_complete_exact_companion_bundle(monkeypatch):
@@ -17,7 +18,9 @@ def test_timeout_transition_requires_complete_exact_companion_bundle(monkeypatch
     for member in fixture["members"]:
         path = member["path"]
         after = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after) == member["after_sha256"]
+        assert before_contention_hash(root, path) == member["after_sha256"]
+        # The following transition exercise uses synthetic before/after images.
+        member["after_sha256"] = updater.sha256(after)
         blobs[("before", path)] = b"fixture predecessor\n"
         blobs[("after", path)] = after
         member["before_sha256"] = updater.sha256(blobs[("before", path)])

@@ -1090,6 +1090,51 @@
           "after_sha256": "2f8d92d1757078d33a631d2b342a8708da1063fa6b071df6c4c204e88670b7bb"
         }
       ]
+    },
+    {
+      "id": "export_contention_handoff_v1",
+      "members": [
+        {
+          "path": "services/all_kvk_capture_recovery_service.py",
+          "before_sha256": "38e3b6ed63dc41c8215e227fc2b33c47083f4a0278e691a1e5dfcc97d8249243",
+          "after_sha256": "5abf78eeeb67ad2bd6858d33dd60a64db4a0055a7e5662e54f6a468c019bbb82"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "de2710813c51aa9bc5224709d24bfb9e2c54d11e780bf29c0be10b538fac647d",
+          "after_sha256": "459223c7d71de8dc3d948330b37b3fad914b0285e695cc4b1846bc71fd10e63e"
+        },
+        {
+          "path": "services/export_execution_dal.py",
+          "before_sha256": "3da6dc4d501cc2db9cd04d305bf315f4da8bb88e5fbc7624767de5cc38d94de5",
+          "after_sha256": "9268e2572a23f39df85e74feab4ca7daa0a86c73e2003a9b5077d7448bd5df4f"
+        },
+        {
+          "path": "services/export_execution_lock.py",
+          "before_sha256": null,
+          "after_sha256": "51566ab7f10d3a429f87140b41240ecc4d199d6d247a5265d40c6d62ecc0d0fe"
+        },
+        {
+          "path": "services/import_capture_recovery_service.py",
+          "before_sha256": "628e392a42684f842f225d4afd27dc8400c0d3d4e4bb4aed4730a71dbf609c8b",
+          "after_sha256": "21d9cc7e938176258a9fe2c212c414ce01cb5ae8e14cf66c02b0be8ae3ab0150"
+        },
+        {
+          "path": "services/import_recovery_service.py",
+          "before_sha256": "2dfa135e8651d6bc69a1498b47db755201dd0d12c6b173281fd6e954297def67",
+          "after_sha256": "f4b908f99846dc00bd7b50a0fa9b9324afa2510d3c19dfc2d9976640006534ed"
+        },
+        {
+          "path": "services/pipeline_capture_handoff_dal.py",
+          "before_sha256": null,
+          "after_sha256": "1ce2252f40a9c3d30cdb5622f72ce89f68adde1d96cb6d5209b8e1ef186c1bf0"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "d11cfc181a04fae22d348dd47132b28330c5c42417918af379f2c8ae79fde0b6",
+          "after_sha256": "fe5040b763941bebe741c232910ab96dcf29b6bbc8690c0fd64f99c62f185e10"
+        }
+      ]
     }
   ]
 }

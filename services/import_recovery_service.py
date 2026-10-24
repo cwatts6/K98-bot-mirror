@@ -35,6 +35,10 @@ class ImportRecoveryAdapter:
 
     def inspect(self, source_id):
         preview = self.dal.inspect(source_id)
+        if self.capture_recovery:
+            handoff = self.capture_recovery.handoff_evidence(preview)
+            if handoff is not None:
+                return handoff
         execution = preview["execution"] or {}
         decision = preview["action"]
         captured = preview.get("captured", False)

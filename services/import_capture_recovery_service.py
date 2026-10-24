@@ -19,6 +19,53 @@ class ImportCaptureRecovery:
         self.runtime = runtime
         self.outcomes = outcomes
         self.dal = ImportCaptureRecoveryDAL(outcomes)
+        self.pipeline_handoff = None
+
+    def handoff_evidence(self, preview):
+        if self.pipeline_handoff is None or not preview.get("captured"):
+            return None
+        link = self.pipeline_handoff.inspect(preview["preparation"])
+        if link is None:
+            return None
+        self.generation(preview["preparation"], preview["execution"])
+        self.runtime.verified_snapshot(preview["preparation"]["PreparationID"])
+        links = [
+            dict(
+                label="Review pipeline handoff",
+                kind="processing_pipeline",
+                source_id=link["pipeline_id"],
+            )
+        ]
+        if link["job_id"]:
+            links.insert(
+                0, dict(label="Review existing export", kind="export_job", source_id=link["job_id"])
+            )
+        return (
+            dict(
+                title="Pipeline capture handoff",
+                outcome=(
+                    "pipeline_export_queued" if link["job_id"] else "pipeline_export_unconfirmed"
+                ),
+                explanation=(
+                    "This pipeline queued its final captured output. The earlier SQL result and capture remain preserved. Follow the existing export job; queue admission does not confirm spreadsheet delivery."
+                    if link["job_id"]
+                    else "This capture belongs to a pipeline whose export handoff is unconfirmed. Review that pipeline before any queue decision; the committed result and capture remain preserved."
+                ),
+                actions={},
+                recovery_links=links,
+            ),
+            preview["token"],
+            bool(link["job_id"]),
+        )
+
+    def _assert_independent_capture(self, preview):
+        if (
+            self.pipeline_handoff is not None
+            and self.pipeline_handoff.inspect(preview["preparation"]) is not None
+        ):
+            raise SourceConflict(
+                "This pipeline owns the export handoff; review its existing job before any capture decision."
+            )
 
     def generation(self, prep, execution):
         scope = json.loads(self.runtime.configuration)["scan_data"]
@@ -120,6 +167,8 @@ class ImportCaptureRecovery:
         return self.after_capture(preparation_id)
 
     def after_capture(self, preparation_id):
+        if self.pipeline_handoff is not None:
+            self._assert_independent_capture(self.outcomes.inspect(preparation_id))
         return self.runtime.enqueue_snapshot(preparation_id)
 
     def verify_queued(self, source_id):
@@ -130,6 +179,7 @@ class ImportCaptureRecovery:
 
     def queue(self, source_id, token):
         preview = self.outcomes.inspect(source_id)
+        self._assert_independent_capture(preview)
         self._assert_not_closed(preview["preparation"])
         self.generation(preview["preparation"], preview["execution"])
         if not preview["captured"]:
@@ -169,6 +219,7 @@ class ImportCaptureRecovery:
         return None
 
     def abandon(self, source_id, token, actor, reason):
+        self._assert_independent_capture(self.outcomes.inspect(source_id))
         self.dal.conclude(source_id, token, actor, reason, self.generation, abandon=True)
 
     def reconcile_capture(self, source_id, action):

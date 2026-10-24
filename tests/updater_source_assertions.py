@@ -6,8 +6,22 @@ import json
 from scripts import p0a_release, prepare_k98_update
 
 
-def historical_runtime_hash(root, path):
+def before_contention_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    contention = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "export_contention_handoff_v1"
+    )
+    member = next((m for m in contention["members"] if m["path"] == path), None)
+    if member is not None and member["before_sha256"] is not None:
+        assert actual == member["after_sha256"], path
+        actual = member["before_sha256"]
+    return actual
+
+
+def historical_runtime_hash(root, path):
+    actual = before_contention_hash(root, path)
     diagnostics = next(
         transition
         for transition in prepare_k98_update.reviewed_transitions()

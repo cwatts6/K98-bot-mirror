@@ -4,6 +4,7 @@ Authority transitions own short SQL transactions. Proof consumption instead uses
 the caller's existing settlement transaction under the account/resource locks.
 """
 
+from contextlib import nullcontext
 from datetime import datetime
 import hashlib
 import json
@@ -1104,6 +1105,8 @@ class ExportExecutionDAL:
             connection.close()
 
     def transition(self, kind, **values):
+        from services.export_execution_lock import execution_account_lock
+
         names = _PARAMETERS[kind]
         if not values or not set(values) <= set(names):
             raise ValueError("Unknown evidence procedure parameter.")
@@ -1118,21 +1121,27 @@ class ExportExecutionDAL:
             connection.autocommit = True
             cursor = connection.cursor()
             try:
-                cursor.execute(sql, *(values[name] for name in selected))
-                columns = tuple(column[0] for column in (cursor.description or ()))
-                result = one(cursor)
-                if result is None:
-                    raise EvidenceCommitUnknown("Evidence transition acknowledgment missing.")
-                # Procedure SELECT precedes COMMIT. Consume the entire batch:
-                # a later commit/error token must arrive before dispatch escapes.
-                if cursor.fetchall():
-                    raise EvidenceCommitUnknown("Unexpected evidence result cardinality.")
-                while cursor.nextset():
-                    if cursor.description is not None and cursor.fetchall():
-                        raise EvidenceCommitUnknown("Unexpected additional evidence results.")
-                if kind == "proof":
-                    result = _proof_acknowledgment(values, result, columns)
-                return result
+                guard = (
+                    execution_account_lock(cursor, values.get("AccountKey"))
+                    if kind in {"stream", "event"}
+                    else nullcontext()
+                )
+                with guard:
+                    cursor.execute(sql, *(values[name] for name in selected))
+                    columns = tuple(column[0] for column in (cursor.description or ()))
+                    result = one(cursor)
+                    if result is None:
+                        raise EvidenceCommitUnknown("Evidence transition acknowledgment missing.")
+                    # Procedure SELECT precedes COMMIT. Consume the entire batch:
+                    # a later commit/error token must arrive before dispatch escapes.
+                    if cursor.fetchall():
+                        raise EvidenceCommitUnknown("Unexpected evidence result cardinality.")
+                    while cursor.nextset():
+                        if cursor.description is not None and cursor.fetchall():
+                            raise EvidenceCommitUnknown("Unexpected additional evidence results.")
+                    if kind == "proof":
+                        result = _proof_acknowledgment(values, result, columns)
+                    return result
             except Exception as exc:
                 raise EvidenceCommitUnknown(
                     "Evidence transition unresolved; read exact identity."

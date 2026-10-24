@@ -257,12 +257,18 @@ def _job(cursor, job_id):
     return row
 
 
-def _mutex(cursor, key):
+def _mutex(cursor, key, *, wait_ms=0, owner="Transaction"):
+    if (
+        type(wait_ms) is not int
+        or not 0 <= wait_ms <= 1000
+        or owner not in {"Transaction", "Session"}
+    ):
+        raise ValueError("Bounded coordination lock policy required.")
     resource_hash = hashlib.sha256(key.encode()).hexdigest()
     try:
         cursor.execute(
             "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
-            "@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0;"
+            f"@LockMode='Exclusive',@LockOwner='{owner}',@LockTimeout={wait_ms};"
             "IF @r<0 BEGIN DECLARE @m nvarchar(2048)=CONCAT("
             "'K98_COORDINATION_LOCK result=',@r,' session=',@@SPID,"
             "' xact=',XACT_STATE(),' count=',@@TRANCOUNT); THROW 51400,@m,1; END;",
@@ -345,7 +351,9 @@ class ExportCoordinationDAL:
     @contextmanager
     def _account(self, account):
         with transaction(self.connect) as cursor:
-            _mutex(cursor, "account:" + account)
+            # Wait before acquiring any row/resource locks. No transaction or
+            # provider operation is replayed when another short checkpoint wins.
+            _mutex(cursor, "account:" + account, wait_ms=1000)
             yield cursor
 
     def pending_intents(self, limit=32, *, after=(0, 0), registrations=()):

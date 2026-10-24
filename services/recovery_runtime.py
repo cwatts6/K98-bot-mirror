@@ -132,6 +132,11 @@ def recovery_service():
             config_outcomes, ConfigurationProducerCapture(runtime, config_outcomes)
         )
         adapters[config_adapter.kind] = config_adapter
+        from services.pipeline_capture_handoff_dal import PipelineCaptureHandoffDAL
+
+        handoff = PipelineCaptureHandoffDAL(runtime)
+        for producer_adapter in (adapter, report_adapter, config_adapter):
+            producer_adapter.capture_recovery.pipeline_handoff = handoff
         from services.legacy_configuration_continuation import (
             LegacyConfigurationContinuation,
             LegacyConfigurationContinuationDAL,

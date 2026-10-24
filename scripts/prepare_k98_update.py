@@ -306,6 +306,19 @@ AUTHORITY_DIAGNOSTIC_PATHS = frozenset(
 
 PIPELINE_DECISION_BOUND_PATHS = frozenset({"services/processing_pipeline_receipt_dal.py"})
 
+EXPORT_CONTENTION_HANDOFF_PATHS = frozenset(
+    {
+        "services/all_kvk_capture_recovery_service.py",
+        "services/export_coordination_dal.py",
+        "services/export_execution_dal.py",
+        "services/export_execution_lock.py",
+        "services/import_capture_recovery_service.py",
+        "services/import_recovery_service.py",
+        "services/pipeline_capture_handoff_dal.py",
+        "services/recovery_runtime.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -360,6 +373,10 @@ def reviewed_transitions():
             )
             fixed_pipeline_decision = (
                 item["id"] == "pipeline_decision_bound_v1" and path in PIPELINE_DECISION_BOUND_PATHS
+            )
+            fixed_export_contention = (
+                item["id"] == "export_contention_handoff_v1"
+                and path in EXPORT_CONTENTION_HANDOFF_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -438,6 +455,7 @@ def reviewed_transitions():
                     or fixed_receipt_roundtrip
                     or fixed_authority_diagnostics
                     or fixed_pipeline_decision
+                    or fixed_export_contention
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -544,6 +562,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed authority diagnostic transition required.")
         if item["id"] == "pipeline_decision_bound_v1" and paths != PIPELINE_DECISION_BOUND_PATHS:
             raise ValueError("Complete fixed pipeline-decision transition required.")
+        if (
+            item["id"] == "export_contention_handoff_v1"
+            and paths != EXPORT_CONTENTION_HANDOFF_PATHS
+        ):
+            raise ValueError("Complete fixed export-contention/handoff transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS

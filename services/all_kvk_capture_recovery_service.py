@@ -77,6 +77,9 @@ class AllKvkCaptureRecoveryAdapter(ImportRecoveryAdapter):
 
     def inspect(self, source_id):
         preview = self.dal.inspect(source_id)
+        handoff = self.capture_recovery.handoff_evidence(preview)
+        if handoff is not None:
+            return handoff
         prep = preview["preparation"]
         decision = preview["action"]
         actions = {}
