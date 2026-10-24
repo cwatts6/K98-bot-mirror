@@ -284,3 +284,42 @@ returned by the completed-scan tool.
 Deployment acceptance still requires existing-view inventory reconciliation on the
 deployed revision and working original callbacks. Local deterministic results do
 not close all of WS3, any other P1 family, or outstanding P0 acceptance.
+
+
+## Baseline repair before publication
+
+The operator requested resolution of the full-suite blocker before publishing the
+tracked-view PR. The mirror's broad `**/*auth*` credential exclusion also matched
+legitimate authority Python modules and tests. Its five exact exceptions predated
+nine later delivered files. The snapshot `cc9aa2ba` named private source `27e805e7`;
+the only Python differences between those trees were these nine omissions.
+
+Current mirror main `c718150de19c6de0d291a81ca1f60333ecd57c9e` names delivered private
+revision `3a33062cc102e17e5d18d530fb700534d3a661bd` and has the same nine omissions.
+The tracked-view branch was aligned to that current mirror snapshot in an isolated
+managed checkout after the shared checkout changed during validation. Interrupted
+runs against the shared checkout are not final validation evidence. The nine restored
+files are byte-identical at both named private revisions:
+
+- `services/config_recovery_authority.py`
+- `services/export_authority_diagnostics.py`
+- `services/export_replacement_authority.py`
+- `services/export_target_recovery_authority.py`
+- `services/failed_export_recovery_authority.py`
+- `services/rollover_replacement_authority.py`
+- `tests/test_authority_diagnostic_update_transition.py`
+- `tests/test_export_authority_diagnostics.py`
+- `tests/test_publication_authority_timing.py`
+
+The repair restores existing delivered logic, adds only those exact publication
+exceptions, and extends the filter tests to require explicit review of every
+authority source plus reject nested copies and credential/backup suffixes. Broad
+credential exclusions and production-only workflow exclusions remain. No recovery
+algorithm, SQL contract, migration or production state is changed. The restored
+adapters' existing DAL references resolve to 30 authoritative SQL definitions at
+SQL revision `1e95e41`; no missing object was inferred or invented.
+
+Security routing: a separate Changes review covers the restored source and
+publication-filter delta from the aligned tracked-view commit, with Deep off.
+Final full-suite results will be recorded here before publication. Live SQL/provider
+acceptance and the full P1/P0 carry-forward boundaries above remain separate.

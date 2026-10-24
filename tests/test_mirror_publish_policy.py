@@ -24,10 +24,19 @@ RSYNC_ARGUMENTS = (
 )
 AUTHORITY_PATHS = (
     "scripts/run_export_authority.py",
+    "services/config_recovery_authority.py",
+    "services/export_authority_diagnostics.py",
     "services/export_execution_authority.py",
+    "services/export_replacement_authority.py",
+    "services/export_target_recovery_authority.py",
+    "services/failed_export_recovery_authority.py",
+    "services/rollover_replacement_authority.py",
+    "tests/test_authority_diagnostic_update_transition.py",
     "tests/test_export_authority_boundaries.py",
+    "tests/test_export_authority_diagnostics.py",
     "tests/test_export_authority_launcher.py",
     "tests/test_export_execution_authority.py",
+    "tests/test_publication_authority_timing.py",
 )
 
 
@@ -102,6 +111,17 @@ class MirrorPublishPolicyTests(unittest.TestCase):
             self.assertTrue((ROOT / path).is_file(), path)
             self.assertLess(lines.index(f"+ /{path}"), lines.index("**/*auth*"))
 
+    def test_all_authority_python_sources_have_explicit_reviewed_exceptions(self):
+        # Catch another delivered module disappearing from the scrubbed mirror.
+        # This does not allow new files automatically: extending the exact list
+        # above and the publication filter still requires source review.
+        sources = {
+            path.relative_to(ROOT).as_posix()
+            for directory in ("scripts", "services", "tests")
+            for path in (ROOT / directory).rglob("*authority*.py")
+        }
+        self.assertEqual(sources, set(AUTHORITY_PATHS))
+
     def test_rsync_preserves_source_and_excludes_credentials(self):
         rsync = shutil.which("rsync")
         if rsync is None:
@@ -130,9 +150,9 @@ class MirrorPublishPolicyTests(unittest.TestCase):
             "logs/synthetic.txt",
             "data/synthetic.json",
             "downloads/synthetic.txt",
-            "nested/scripts/run_export_authority.py",
-            "scripts/run_export_authority.py.bak",
-            "scripts/run_export_authority.py.key",
+            *(f"nested/{path}" for path in AUTHORITY_PATHS),
+            *(f"{path}.bak" for path in AUTHORITY_PATHS),
+            *(f"{path}.key" for path in AUTHORITY_PATHS),
             ".github/workflows/publish-mirror.yml",
         )
         with tempfile.TemporaryDirectory() as directory:

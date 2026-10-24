@@ -5,10 +5,12 @@
 All **42 open mirror PRs** inspected are earlier focused recovery branches whose
 observed heads are incorporated into the final P0a aggregate tree. They do not
 need another merge. The operator approved closing them as incorporated/superseded
-while retaining review history and branches. No PRs or branches have been changed:
-GitHub connector access is unavailable and the CLI still returns HTTP 401.
-The hourly `close-superseded-mirror-prs` follow-up will recheck access and exact
-heads, perform authorized closures when possible, and pause after completion.
+while retaining review history and branches. **All 42 were closed on 24 October
+2026** after restored GitHub access, exact current-head checks and a fresh ancestry
+check against the merged aggregate. A final open-PR listing returned no open PRs
+in the mirror. No branches were deleted and no comments were posted. The completed
+`close-superseded-mirror-prs` follow-up is paused. Individual closure timestamps and
+head identities are retained privately in `p1-pr-closure-20261024.json`.
 
 Exact closure set: **#336–#375, #377 and #378**. This includes #356 after the
 additional ancestry check below. [#376](https://github.com/cwatts6/K98-bot-mirror/pull/376)
