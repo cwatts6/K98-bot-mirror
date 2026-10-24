@@ -342,7 +342,8 @@ filter and test delta against `5c8e38449e74b99757c32f3ea4b44591237fc753`, frozen
 patch digest `2fc271caebd90f3f7cc6244755f281a966e154d685634487476c094c5f88c4e7`.
 Both completed with zero findings, complete changed-surface coverage, no unresolved
 candidates and Deep off. No measured token count was returned. Subsequent changes
-to this plan and the cleanup report are evidence/status prose only, with a documented
+to this plan, the cleanup report, P0/P1 status and deferred register are evidence/status
+prose only, with a documented
 security-review skip: no runtime, permission, persistence, configuration or deployment
 behavior changes.
 
@@ -350,5 +351,15 @@ behavior changes.
 skipped locally; the production-only publisher invocation check is also skipped in
 the scrubbed mirror. Static exception/source checks, negative fixture definitions,
 secret scanning and the existing Linux publication-policy gate remain intact.
-Final full-suite results will be recorded here before publication. Live SQL/provider
+Final full-suite validation against committed source `d5ff7f22` completed in
+882.27 seconds: **9,218 passed, 1,080 skipped, one dependency warning and eight
+subtests passed**, with zero failures/errors. The operational-log isolation guard
+passed. The private local evidence is `p1-full-suite-verified.log`; the earlier
+diagnostic run is retained separately and is not represented as a passing run.
+Skips retain existing environment/platform/disposable-integration opt-ins, including
+the two publication checks described above; no test was weakened or newly skipped
+to obtain this result. The complete PR checks also passed: architecture (17 Python
+files), deferred items (12 Markdown files), security routing (zero errors/warnings),
+test selection, import smoke, command registration (36 primary / 102 grouped),
+pre-commit lint/format/type/secret checks and diff whitespace validation. Live SQL/provider
 acceptance and the full P1/P0 carry-forward boundaries above remain separate.

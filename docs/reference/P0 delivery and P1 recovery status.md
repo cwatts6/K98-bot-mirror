@@ -68,7 +68,7 @@ the rest of P1.
 |---|---|---|
 | WS1 — ProcConfig lifetime and truthful outcomes | Coordinated configuration writes, targets and checkpoint share transaction ownership; result sets are drained; lost acknowledgements retain uncertainty; participating offloads execute once. | Reconcile legacy report/manifest and cleanup semantics, including unique per-run artifacts and truthful partial/unknown outcomes. The September HY000 observation is historical evidence, not proof the coordinated path remains unfixed. |
 | WS2 — executor replay prevention | Coordinated Stats path uses the admitted runtime and a cancellation-draining worker. | Legacy Stats fallback, KVK History and stats-alert wrappers still need caller/side-effect inventory and deterministic no-reentry tests. Fix only the tracker adapters necessary for the first WS3 slice. |
-| WS3 — process/task ownership and restoration | P0 startup diagnostics can observe the original task past a deadline and drain on shutdown. | Generic tracked views still select cancellation at ten seconds; empty-event readiness, singleton ownership and public-reminder child supervision remain separate slices. Assess protected-launcher coverage before changing legacy singleton logic. |
+| WS3 — process/task ownership and restoration | P0 startup diagnostics can observe the original task past a deadline and drain on shutdown. | The deployed generic-view path still selects cancellation at ten seconds; the first local slice is implemented and full-suite validated, with deployment acceptance pending. Empty-event readiness, singleton ownership and public-reminder child supervision remain separate slices. Assess protected-launcher coverage before changing legacy singleton logic. |
 | WS4 — DM/JSON ordering | DM tracker I/O lock and single backend selection exist; Phase 2F public-reminder atomic replacement and Phase 6K queue persistence are delivered. | Verify caller ordering, snapshot consistency, shutdown/cancellation and send-versus-disk uncertainty; broader JSON inventory remains. The old claim that current DM wrappers automatically fall back after entry is superseded. |
 | WS5 — dispatch ownership/policy | Pre-KVK reservations and diagnostic isolation exist; P0 processing delivery uses durable enter/ack receipts and retains uncertain outcomes. | Reconcile fighting admission/caps, KS preclaim, legacy ambiguous Pre-KVK edit replacement, general in-memory delivery trackers and publication audit semantics separately. Do not extend P0 durable behavior to every route by assumption. |
 | WS6 — independent ProcConfig admission | Shared writer runtime, owner context, nested token matching and fail-closed protected activation exist. | Audit all independent admin/startup/pipeline and compatibility entrypoints against the existing authority. Missing report evidence never authorizes replay; do not design a duplicate admission protocol. |
@@ -101,6 +101,9 @@ The operator approved architecture, implementation and validation, including the
 first-phase documentation update. The first runtime slice is implemented locally in the
 [tracked-view plan](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md).
 Review and production acceptance follow that staged plan. Local restoration tests
-do not close full P1 or the outstanding P0 acceptance items above.
+do not close full P1 or the outstanding P0 acceptance items above. The baseline
+publication omissions are repaired and the final offline suite passed (9,218 tests
+and eight subtests; 1,080 existing environment/platform/integration skips), with
+production operational logs unchanged. See the plan for the exact evidence and limits.
 The [mirror PR review](../task_packs/Mirror%20PR%20Cleanup%20-%202026-10-24.md)
 separates obsolete review branches from remaining product acceptance.
