@@ -24,8 +24,23 @@ impersonate the Bot or bypass the process-authenticated authority pipe.
 Inspection requires exactly the reviewed legacy job, owner, fence, versions,
 stream, session, child and request sequence. Registered destination membership,
 configuration hash, resources and session principal/manifest must agree. Other
-active streams, attempts, containment, replacement work, queued retry decisions,
+active streams, conflicting attempts, containment, replacement work, queued retry decisions,
 missing private birth evidence or changed ownership stop recovery.
+
+An original `private_started` attempt is expected once legacy mutation begins.
+Inspection accepts at most that first, unverified attempt with its original
+owner/fence, version, input hash, manifest and exact registered output parts.
+Retries, additional attempts, publication evidence, changed parts or ownership
+remain conflicts. The full attempt and part rows are bound into the review token
+and checked again under the existing ownership locks before settlement.
+Settlement retains those rows and their immutable fields, marking the attempt
+uncertain and its parts quarantined through the existing failure transition.
+Resume accepts only that exact versioned transition and its saved failure intent.
+
+A corrected packet uses a new protected directory. When it names a previous
+packet, that packet's protected journal must remain present and have no Apply
+intent. A previous Apply intent stops the corrected packet for evidence review;
+replacing a packet is never permission to reset an in-progress recovery.
 
 Apply uses existing SQL freeze/close procedures and the existing conservative
 worker failure transition. No schema, permission or SQL module change is needed.

@@ -1,7 +1,7 @@
 """Protected, isolated entry point for an explicitly reviewed recovery packet.
 
 The PowerShell launcher authenticates the installed manifest and stages the
-three new tool files outside the application source. No live source is edited.
+recovery tool files outside the application source. No live source is edited.
 """
 
 import argparse
@@ -63,6 +63,13 @@ def load_tool(path, name):
     return module
 
 
+def check_previous_journal(path, inspect):
+    if path is not None:
+        inspect(path, private=True, allow_current_identity=False)
+        if (path / "intent.json").exists():
+            raise ValueError("Previous recovery started; preserve its journal for review.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--action", choices=("Inspect", "Apply"), required=True)
@@ -94,7 +101,6 @@ def main(argv=None):
         assert_protected_path,
     )
     from core.export_process_identity import open_pinned_process, pinned_process_alive
-    from services.export_coordination_dal import ExportCoordinationDAL
     from services.export_execution_dal import ExportExecutionDAL
     from services.export_runtime_composition import RuntimeRegistration
     from services.legacy_export_closeout import LegacyExportCloseout
@@ -106,11 +112,21 @@ def main(argv=None):
         tool_root,
         tool_root / "stranded_export_host.py",
         tool_root / "stranded_export_recovery.py",
+        tool_root / "stranded_export_recovery_dal.py",
         Path(args.target),
     ):
         assert_protected_path(path, private=True, allow_current_identity=False)
     target = json.loads(Path(args.target).read_bytes())
     target["manifest_sha256"] = args.manifest_sha256
+    previous_journal = None
+    if target.get("previous_packet_id"):
+        from uuid import UUID
+
+        previous_journal = (
+            Path("C:/ProgramData/K98/S11/recovery")
+            / str(UUID(target["previous_packet_id"]))
+            / "journal"
+        )
     # No inherited SQL overrides: only the existing protected installation's
     # dedicated application configuration may supply connection credentials.
     for key in (
@@ -142,6 +158,7 @@ def main(argv=None):
 
         def check_boundary():
             boundary.recheck()
+            check_previous_journal(previous_journal, assert_protected_path)
             if hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest() != args.manifest_sha256:
                 raise ValueError("Installed manifest changed during recovery.")
             if not all(
@@ -151,14 +168,16 @@ def main(argv=None):
                 raise ValueError("Original process pair exited; preserve recovery evidence.")
 
         host_module = load_tool(tool_root / "stranded_export_host.py", "_stranded_host")
-        service_module = load_tool(tool_root / "stranded_export_recovery.py", "_stranded_recovery")
+        service_module = load_tool(
+            tool_root / "stranded_export_recovery.py",
+            "_stranded_recovery",
+        )
+        dal_module = load_tool(tool_root / "stranded_export_recovery_dal.py", "_stranded_dal")
         journal = RecoveryJournal(args.journal, assert_protected_path)
         service = service_module.StrandedExportRecovery(
             closeout=closeout,
             execution=execution,
-            coordinator=ExportCoordinationDAL(
-                connect, preparations=True, output_operations=True, execution_evidence=True
-            ),
+            coordinator=dal_module.StrandedExportRecoveryDAL(closeout.dal),
             store=store,
             host=host_module.RecoveryHost(manifest["process_bindings"]["authority"]),
             journal=journal,

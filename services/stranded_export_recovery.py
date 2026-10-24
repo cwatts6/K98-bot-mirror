@@ -12,7 +12,7 @@ from uuid import UUID
 
 from core.export_child_lifecycle import read_birth
 from kvk.dal.new_source_import_dal import SourceConflict, digest
-from services.export_coordination_dal import Claim
+from services.export_coordination_dal import Claim, checked_attempt_manifest, identity
 from services.export_execution_protocol import encode
 from services.export_reconciliation_service import ClosedStreamVerifier
 from services.legacy_export_snapshot_service import configuration_digest
@@ -28,7 +28,7 @@ class StrandedExportRecovery:
 
     def _read(self):
         self.check_boundary()
-        state = self.closeout.dal.snapshot(self.expected["job_id"])
+        state = self.coordinator.snapshot(self.expected["job_id"])
         if len(state["streams"]) != 1:
             raise SourceConflict("Exactly one reviewed writer stream is required.")
         return state, state["job"], state["streams"][0]
@@ -73,7 +73,6 @@ class StrandedExportRecovery:
                 state.get(k)
                 for k in (
                     "foreign_streams",
-                    "attempts",
                     "receipt",
                     "closeout",
                     "contained_targets",
@@ -82,6 +81,7 @@ class StrandedExportRecovery:
             )
         ):
             raise SourceConflict("Reviewed legacy job, destinations or recovery state changed.")
+        self._check_attempt(state, targets)
         if (
             (
                 stream["StreamID"],
@@ -166,6 +166,67 @@ class StrandedExportRecovery:
     def token(review):
         return digest(review).hex()
 
+    @staticmethod
+    def _check_attempt(state, targets):
+        """Accept only the original, unverified legacy output attempt, if present."""
+        attempts, parts, job = state["attempts"], state["attempt_parts"], state["job"]
+        if not attempts and not parts:
+            return
+        if len(attempts) != 1:
+            raise SourceConflict("Exactly one original attempt is required.")
+        attempt = attempts[0]
+        if (
+            any(identity(attempt.get(k)) != identity(job[k]) for k in ("JobID", "OwnerID"))
+            or attempt.get("ConsumerKind") != job["ConsumerKind"]
+            or attempt.get("Fence") != job["Fence"]
+            or attempt.get("RemoteSequence") != job["Fence"]
+            or attempt.get("AttemptNo") != 1
+            or attempt.get("Version") != 1
+            or attempt.get("Phase") != "private_started"
+            or any(
+                attempt.get(k) is not None
+                for k in (
+                    "Epoch",
+                    "VerifiedUTC",
+                    "PublishedUTC",
+                    "ReceiptJson",
+                    "LegacyPublicationID",
+                    "LegacySourceKey",
+                    "LegacyKVK_NO",
+                    "LegacyPeriodID",
+                    "LegacyDestinationKind",
+                    "LegacyDestinationID",
+                )
+            )
+        ):
+            raise SourceConflict("Original unverified attempt ownership or history differs.")
+        document = checked_attempt_manifest(attempt, parts)
+        if (
+            document["generation"].get("export_key") != job["InputHash"]
+            or sorted(p["FileID"] for p in parts) != targets
+            or any(
+                identity(p["AttemptID"]) != identity(attempt["AttemptID"])
+                or p["PartCount"] != attempt["PartCount"]
+                or p["Role"] != "output"
+                or p["Version"] != 1
+                or p["VerificationState"] != "pending"
+                or p["AclState"] != "pending"
+                or p["QuarantineState"] != "none"
+                or any(
+                    p.get(k) is not None
+                    for k in (
+                        "VerifiedUTC",
+                        "AclCheckedUTC",
+                        "QuarantinedUTC",
+                        "QuarantineReason",
+                        "EvidenceJson",
+                    )
+                )
+                for p in parts
+            )
+        ):
+            raise SourceConflict("Original attempt output membership or evidence differs.")
+
     def _current(self, review):
         """Accept only exact original state or this journal's known transitions."""
         state, job, stream = self._read()
@@ -204,6 +265,29 @@ class StrandedExportRecovery:
             for resource in wanted["resources"]:
                 resource.update(
                     Version=resource["Version"] + 1, BlockedReason="Outcome requires reconciliation"
+                )
+            if len(state["attempts"]) != len(wanted["attempts"]) or len(
+                state["attempt_parts"]
+            ) != len(wanted["attempt_parts"]):
+                raise SourceConflict("Attempt history membership changed.")
+            for expected, actual in zip(wanted["attempts"], state["attempts"], strict=True):
+                if not actual["UpdatedUTC"] or actual["UpdatedUTC"] < expected["UpdatedUTC"]:
+                    raise SourceConflict("Attempt settlement timestamp differs.")
+                expected.update(
+                    Phase="uncertain",
+                    Version=expected["Version"] + 1,
+                    UpdatedUTC=actual["UpdatedUTC"],
+                )
+            for expected, actual in zip(
+                wanted["attempt_parts"], state["attempt_parts"], strict=True
+            ):
+                if not actual["QuarantinedUTC"]:
+                    raise SourceConflict("Part settlement timestamp is missing.")
+                expected.update(
+                    QuarantineState="quarantined",
+                    QuarantinedUTC=actual["QuarantinedUTC"],
+                    QuarantineReason="Outcome requires reconciliation",
+                    Version=expected["Version"] + 1,
                 )
         if state != wanted:
             raise SourceConflict("Ownership, history or recovery state changed; preserve evidence.")
@@ -301,7 +385,7 @@ class StrandedExportRecovery:
         )
         if job["State"] == "running":
             self.journal.write("failure-intent", dict(review_sha256=token))
-            self.coordinator.fail(
+            self.coordinator.fail_reviewed(
                 Claim(
                     job["JobID"],
                     job["AccountKey"],
@@ -310,7 +394,7 @@ class StrandedExportRecovery:
                     job["Version"],
                     tuple((r["ResourceKey"], r["Version"]) for r in state["resources"]),
                 ),
-                retain_claims=True,
+                state,
             )
         state, job, stream = self._current(review)
         evidence, _, resolved = self.closeout.inspect(job["JobID"])
