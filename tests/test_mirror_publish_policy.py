@@ -12,6 +12,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISHER = ROOT / ".github/workflows/publish-mirror.yml"
+COMMAND_GOVERNANCE = ".github/workflows/command-governance.yml"
+WORKFLOW_INCLUDES = (".github/workflows/", COMMAND_GOVERNANCE)
 BUILD_STEP = "Build publishable tree (exclude secrets)"
 RSYNC_ARGUMENTS = (
     "-av",
@@ -106,10 +108,17 @@ class MirrorPublishPolicyTests(unittest.TestCase):
     def test_exceptions_are_exact_and_sources_exist(self):
         lines = (ROOT / ".publishignore").read_text(encoding="utf-8").splitlines()
         includes = [line for line in lines if line.startswith("+ ")]
-        self.assertEqual(includes, [f"+ /{path}" for path in AUTHORITY_PATHS])
+        self.assertEqual(
+            includes, [f"+ /{path}" for path in (*AUTHORITY_PATHS, *WORKFLOW_INCLUDES)]
+        )
         for path in AUTHORITY_PATHS:
             self.assertTrue((ROOT / path).is_file(), path)
             self.assertLess(lines.index(f"+ /{path}"), lines.index("**/*auth*"))
+
+        self.assertTrue((ROOT / COMMAND_GOVERNANCE).is_file())
+        for path in WORKFLOW_INCLUDES:
+            self.assertLess(lines.index(f"+ /{path}"), lines.index(".github/workflows/*"))
+            self.assertLess(lines.index(f"+ /{path}"), lines.index(".github/workflows/"))
 
     def test_all_authority_python_sources_have_explicit_reviewed_exceptions(self):
         # Catch another delivered module disappearing from the scrubbed mirror.
@@ -129,7 +138,13 @@ class MirrorPublishPolicyTests(unittest.TestCase):
         # Production uses its actual validated argv. The scrubbed mirror tests
         # the same filter contract, with actual-publisher coverage skipped above.
         arguments = self.publisher_arguments() or list(RSYNC_ARGUMENTS)
-        allowed = (*AUTHORITY_PATHS, "services/ordinary.py", "README.md", ".publishignore")
+        allowed = (
+            *AUTHORITY_PATHS,
+            COMMAND_GOVERNANCE,
+            "services/ordinary.py",
+            "README.md",
+            ".publishignore",
+        )
         excluded = (
             ".git/config",
             ".env",
@@ -154,6 +169,10 @@ class MirrorPublishPolicyTests(unittest.TestCase):
             *(f"{path}.bak" for path in AUTHORITY_PATHS),
             *(f"{path}.key" for path in AUTHORITY_PATHS),
             ".github/workflows/publish-mirror.yml",
+            ".github/workflows/unreviewed.yml",
+            ".github/workflows/nested/command-governance.yml",
+            f"{COMMAND_GOVERNANCE}.bak",
+            f"{COMMAND_GOVERNANCE}.key",
         )
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source"

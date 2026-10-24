@@ -21,13 +21,13 @@ incidents do not prove all views were attached. The inspected baseline schedules
 loop rethrows cancellation, has no resumption owner and removes tracker entries
 by key without checking whether a newer entry replaced the snapshot.
 
-The inspected mirror baseline is `cc9aa2ba9014104aa993aa5778219eaa2a2d35e0`.
-It is a snapshot, not the latest private deployment. The relevant lifecycle,
-rehydration and startup-diagnostic files matched the earlier accepted private
-revision when scoped. The #438/#687 constituent correction has no delta in the
-tracked-view, lifecycle, startup-diagnostic or Ark paths against that predecessor.
-The final private merge object is unavailable locally; repeat exact deployed-head
-alignment during promotion. Do not transplant the entire old stack into current main.
+The initial design used mirror snapshot `cc9aa2ba9014104aa993aa5778219eaa2a2d35e0`.
+After GitHub access was restored, the branch was rebased onto current mirror main
+`c718150de19c6de0d291a81ca1f60333ecd57c9e`, which names private source
+`3a33062cc102e17e5d18d530fb700534d3a661bd`. The tracked-view changes were retained.
+This is source alignment, not fresh deployed-runtime acceptance; repeat exact
+running-revision and restart checks during promotion. Do not transplant the old
+recovery stack into current main.
 
 ## Architecture direction
 
@@ -256,12 +256,11 @@ edit preparation/acknowledgement failures, reconnect, fresh process and repeated
 cancellation. Synthetic test configuration disables dotenv loading; no live provider
 or production database operations are part of validation.
 
-The full suite was attempted and stopped with 35 collection errors for pre-existing
-missing recovery modules, including `config_recovery_authority`,
-`export_replacement_authority` and `export_target_recovery_authority`. Those modules
-are absent in the baseline snapshot too; this slice does not repair unrelated source
-assembly. Focused suites also run through the production-log isolation guard.
-Final local gates: **89 focused tests passed**, production operational logs unchanged;
+The initial full-suite attempt stopped with 35 collection errors for missing
+recovery modules in the mirror baseline. The operator then explicitly authorized
+investigation and resolution before publication; the baseline-repair section below
+records that follow-up. Focused suites also run through the production-log isolation
+guard. Initial tracked-view gates: **89 focused tests passed**, production operational logs unchanged;
 architecture validation passed (seven Python files), deferred validation passed
 (twelve Markdown files), security-routing passed with zero warnings, test selection
 ran, import smoke and command registration passed (36 primary / 102 grouped), and
@@ -273,9 +272,9 @@ surfaces reviewed, zero findings and no deferred security candidates. It reviewe
 the frozen working patch against `cc9aa2ba9014104aa993aa5778219eaa2a2d35e0`, digest
 `e7a5e70314d9b363461f7ec1dc4e45219324df419f8c22982aaefd8b3771b5ee`, with Deep off.
 After sealing, final code review restored the original Ark match-label em dash and
-added a display assertion to the existing factory test. The only subsequent changes
-are that literal, its assertion, line-ending normalization and review-status
-documentation. Security routing
+added a display assertion to the existing factory test. The immediate post-scan changes
+were that literal, its assertion, line-ending normalization and review-status
+documentation. The later baseline restoration has its own Changes reviews below. Security routing
 for this follow-up is a documented skip: no permission, input handling, SQL, path,
 network, persistence, callback or control-flow changes. The frozen scan is preserved;
 it is not represented as covering different bytes. No measured scan token count was
@@ -314,12 +313,42 @@ files are byte-identical at both named private revisions:
 The repair restores existing delivered logic, adds only those exact publication
 exceptions, and extends the filter tests to require explicit review of every
 authority source plus reject nested copies and credential/backup suffixes. Broad
-credential exclusions and production-only workflow exclusions remain. No recovery
+credential exclusions remain. The sole command-governance workflow exception is
+explained below; all other production workflows remain excluded. No recovery
 algorithm, SQL contract, migration or production state is changed. The restored
 adapters' existing DAL references resolve to 30 authoritative SQL definitions at
 SQL revision `1e95e41`; no missing object was inferred or invented.
 
-Security routing: a separate Changes review covers the restored source and
-publication-filter delta from the aligned tracked-view commit, with Deep off.
+The wider run found the existing command-governance test also depended on
+`.github/workflows/command-governance.yml`, which a blanket workflow-directory
+exclusion removed despite the adjacent comment saying it was mirrored. The exact
+49-line workflow was restored from private source `3a33062c`. Its parent directory
+and exact filename are now included ahead of the child/directory exclusions;
+no other workflow is published. Filter fixtures reject unreviewed workflows,
+nested copies and backup/key suffixes. The workflow's governance tests and policy
+checks pass: **43 tests and eight subtests**, with two expected local skips.
+
+The isolated worktree uses its own `.venv` interpreter, with existing dependencies
+loaded using `site.addsitedir` so their Windows `.pth` initialization is honored.
+This preserves the bot's own-checkout interpreter guard and restores `win32event`
+for the disposable native-process test, which passes. The primary environment was
+not modified. These environment failures are not hidden by changing runtime guards
+or weakening tests.
+
+Security routing: Changes scan `f7585c46-7fd7-4db8-92fd-eff05cbddc64` reviewed the
+restored modules and filter delta against `ad0104eaa49f86063632d1b0a0741e6b14c5525c`.
+Follow-up scan `d577e10e-b728-42d0-a8bd-2e5d744317e2` reviewed the exact workflow,
+filter and test delta against `5c8e38449e74b99757c32f3ea4b44591237fc753`, frozen
+patch digest `2fc271caebd90f3f7cc6244755f281a966e154d685634487476c094c5f88c4e7`.
+Both completed with zero findings, complete changed-surface coverage, no unresolved
+candidates and Deep off. No measured token count was returned. Subsequent changes
+to this plan and the cleanup report are evidence/status prose only, with a documented
+security-review skip: no runtime, permission, persistence, configuration or deployment
+behavior changes.
+
+`rsync` is unavailable on this Windows host, so actual filter execution is explicitly
+skipped locally; the production-only publisher invocation check is also skipped in
+the scrubbed mirror. Static exception/source checks, negative fixture definitions,
+secret scanning and the existing Linux publication-policy gate remain intact.
 Final full-suite results will be recorded here before publication. Live SQL/provider
 acceptance and the full P1/P0 carry-forward boundaries above remain separate.

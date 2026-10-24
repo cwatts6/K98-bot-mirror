@@ -23,8 +23,8 @@ require these obsolete review branches to stay open.
 - Read both pages of the [live open-PR inventory](https://github.com/cwatts6/K98-bot-mirror/pulls)
   and each of the 42 PR pages, recording their base/head branch and full observed
   commit identity. The connector was unavailable and GitHub CLI authentication
-  returned 401; public browser reads succeeded. Authenticated mutation is unavailable
-  through those connections in this session.
+  initially returned 401; public browser reads succeeded. GitHub access was later
+  restored and the authorized closure completed as recorded above.
 - The merged aggregate #376 explicitly identifies final reviewed mirror tree
   `2380d642425149062aca86ee38082e2a97d9c5b9`, and its commits page includes that
   correction. Its merged status and merge commit prefix `8aa9158` were visible.
@@ -40,9 +40,9 @@ require these obsolete review branches to stay open.
 - These are review-lifecycle conclusions, not a new security review, current full
   regression run or certification of every historical acceptance case. Subsequent
   fixes are retained in current source; remerging an old stack is unnecessary.
-- Before actual closure, recheck that the PR remains open with the same full head
-  and aggregate relationship. If a head changed, review its new delta first. Preserve
-  PR conversations, branches, worktrees and retained deployment/recovery artifacts.
+- Before actual closure, every PR was rechecked for the same full head and aggregate
+  relationship. PR conversations, branches, worktrees and retained deployment/recovery
+  artifacts were preserved.
 
 ## Reviewed inventory
 

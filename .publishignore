@@ -104,6 +104,9 @@ statsupdate-*.json
 
 # ---- Don't mirror production-only GitHub Actions workflows to the public mirror ----
 # command-governance.yml is mirrored because local tests and command-governance checks assert it.
++ /.github/workflows/
++ /.github/workflows/command-governance.yml
+.github/workflows/*
 .github/workflows/
 .github/workflows/_sanity.yml
 .github/workflows/gitleaks.yml
