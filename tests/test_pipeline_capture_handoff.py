@@ -189,6 +189,37 @@ def test_durable_action_reconciliation_preserves_pipeline_capture(
     assert preview == before
 
 
+@pytest.mark.parametrize("invalid_lineage", [False, True])
+@pytest.mark.parametrize("captured", [False, True])
+def test_saved_pipeline_abandon_action_settles_without_changing_capture(
+    monkeypatch, captured, invalid_lineage
+):
+    service, preview, row, _ = linked_capture(monkeypatch)
+    preview["captured"] = captured
+    before = deepcopy(preview)
+    service.dal.conclude = Mock()
+    service.runtime.enqueue_snapshot = Mock()
+    if invalid_lineage:
+        row["SourceVersion"] += 1
+    action = dict(
+        ActionKind="abandon_capture",
+        ActionID=str(uuid4()),
+        EvidenceHash=preview["token"],
+        Reason="Saved skip intent",
+    )
+    adapter = ImportRecoveryAdapter(service.outcomes, service)
+    if invalid_lineage:
+        with pytest.raises(SourceConflict):
+            adapter.reconcile("source", action)
+    else:
+        assert adapter.reconcile("source", action) == "not_applied"
+        if captured:
+            assert adapter.inspect("source")[0]["outcome"] == "pipeline_export_queued"
+    service.dal.conclude.assert_not_called()
+    service.runtime.enqueue_snapshot.assert_not_called()
+    assert preview == before
+
+
 def test_pipeline_capture_completion_does_not_enqueue_intermediate_snapshot(monkeypatch):
     service, preview, _, _ = linked_capture(monkeypatch)
     service.runtime.enqueue_snapshot = Mock()

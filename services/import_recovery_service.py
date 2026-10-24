@@ -263,6 +263,12 @@ class ImportRecoveryAdapter:
             )
             if marker == expected and self.capture_recovery.abandonment(preview) == "abandoned":
                 return "verified"
+            handoff = self.capture_recovery.pipeline_handoff
+            if handoff is not None and handoff.inspect(prep) is not None:
+                # A saved skip intent cannot abandon pipeline-owned output.
+                # Settle it so refresh can display the current handoff evidence.
+                self.capture_recovery.generation(prep, preview["execution"])
+                return "not_applied"
             if preview["token"] != action["EvidenceHash"]:
                 return "not_applied"
             self.execute(

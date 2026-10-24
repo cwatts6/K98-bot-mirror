@@ -163,3 +163,17 @@ def test_pipeline_capture_only_resume_keeps_sql_and_settles_old_action(
     assert not resolved and evidence["outcome"] == "pipeline_export_unconfirmed"
     assert not evidence["actions"]
     r.runtime.enqueue_snapshot.assert_not_called()
+    stale_skip = dict(
+        ActionKind="abandon_capture",
+        ActionID=str(uuid4()),
+        EvidenceHash=final["token"],
+        Reason="Saved skip intent",
+    )
+    before_skip = deepcopy(final)
+    from services.import_recovery_service import ImportRecoveryAdapter
+
+    assert (
+        ImportRecoveryAdapter(r.outcomes, r.service).reconcile(r.source, stale_skip)
+        == "not_applied"
+    )
+    assert r.outcomes.inspect(r.source) == before_skip
