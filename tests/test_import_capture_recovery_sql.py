@@ -66,6 +66,7 @@ def recovery(tmp_path, request):
                     "dbo.ExportReplacementTarget",
                     "dbo.ExportTargetContainment",
                     "dbo.ExportContainedTarget",
+                    "dbo.ExportLegacyCloseout",
                     "dbo.ExportJobResource",
                     "KVK.SourceOutputOperation",
                     "dbo.ExportAttempt",

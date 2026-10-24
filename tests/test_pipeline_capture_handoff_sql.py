@@ -1,8 +1,10 @@
 """The lineage query runs under a real restricted login against isolated schema."""
 
+from copy import deepcopy
 from datetime import datetime
 import json
 import os
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -117,3 +119,47 @@ def test_restricted_lineage_rejects_job_from_another_configuration_operation(pip
     )
     with pytest.raises(SourceConflict, match="linkage"):
         PipelineCaptureHandoffDAL(p.runtime).inspect(source)
+
+
+@pytest.mark.parametrize("lost_reply", [False, True])
+def test_pipeline_capture_only_resume_keeps_sql_and_settles_old_action(
+    pipeline_base, monkeypatch, lost_reply  # noqa: F811
+):
+    p, r = pipeline_base, pipeline_base.base
+    preview = r.outcomes.inspect(r.source)
+    original_execution = deepcopy(preview["execution"])
+    request = json.loads(preview["preparation"]["RequestJson"])
+    request["request"]["producer"] = dict(
+        kind="stats_import",
+        operation=str(p.dal.snapshot(p.run_id)["stages"]["import"]["OperationID"]).lower(),
+    )
+    r.owner.execute(
+        r.rewrite("UPDATE dbo.ExportPreparation SET RequestJson=? WHERE PreparationID=?"),
+        json.dumps(request),
+        r.source,
+    )
+    r.service.pipeline_handoff = PipelineCaptureHandoffDAL(p.runtime)
+    r.runtime.enqueue_snapshot = Mock(side_effect=AssertionError("Pipeline owns queue admission"))
+    token = r.outcomes.inspect(r.source)["token"]
+    action_id = str(uuid4())
+    actor = "recovery:" + action_id
+    action = dict(ActionKind="resume_capture", ActionID=action_id, EvidenceHash=token)
+    if lost_reply:
+        captured = r.runtime.dal.captured
+
+        def lose_reply(*args):
+            captured(*args)
+            monkeypatch.setattr(r.runtime.dal, "captured", captured)
+            raise TimeoutError("Synthetic capture acknowledgement loss")
+
+        monkeypatch.setattr(r.runtime.dal, "captured", lose_reply)
+        with pytest.raises(TimeoutError):
+            r.service.run(r.source, token, actor)
+    assert r.service.reconcile_capture(r.source, action) == "verified"
+    final = r.outcomes.inspect(r.source)
+    assert final["captured"] and not final["preparation"]["JobID"]
+    assert final["execution"] == original_execution
+    evidence, _, resolved = r.service.handoff_evidence(final)
+    assert not resolved and evidence["outcome"] == "pipeline_export_unconfirmed"
+    assert not evidence["actions"]
+    r.runtime.enqueue_snapshot.assert_not_called()

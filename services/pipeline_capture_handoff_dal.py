@@ -4,6 +4,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, rows, transaction
 from services.export_coordination_dal import identity
+from services.processing_pipeline_receipt_dal import PipelineReceiptDAL
 
 
 class PipelineCaptureHandoffDAL:
@@ -22,7 +23,8 @@ class PipelineCaptureHandoffDAL:
         with transaction(self.runtime.dal.connect) as cursor:
             cursor.execute(
                 "SELECT r.RunID,r.RegistrationJson,s.Stage,p.Version AS SourceVersion,"
-                "e.State AS ExportState,e.EvidenceJson,t.PreparationID AS TargetID,"
+                "e.State AS ExportState,e.EvidenceJson,c.OperationID AS ConfigurationOperation,"
+                "t.PreparationID AS TargetID,"
                 "t.State AS TargetState,t.JobID,t.SpoolKey,t.SpoolBytes,t.SpoolHash,"
                 "t.RequestJson AS TargetRequest,j.State AS JobState,j.InputHash,"
                 "j.SpoolKey AS JobSpoolKey,j.SpoolBytes AS JobSpoolBytes,j.DestinationSetHash "
@@ -34,7 +36,6 @@ class PipelineCaptureHandoffDAL:
                 "LEFT JOIN dbo.ExportPreparation t ON LOWER(CONVERT(varchar(36),t.PreparationID))="
                 "JSON_VALUE(e.EvidenceJson,'$.preparation_id') AND t.AccountKey=r.AccountKey "
                 "AND t.StorageOwner=r.StorageOwner AND t.ConsumerKind='scan_data' "
-                "AND JSON_VALUE(t.RequestJson,'$.request.producer.operation')=LOWER(CONVERT(varchar(36),c.OperationID)) "
                 "LEFT JOIN dbo.ExportJob j ON j.JobID=t.JobID AND j.AccountKey=r.AccountKey "
                 "AND j.StorageOwner=r.StorageOwner AND j.ConsumerKind='scan_data' "
                 "WHERE p.PreparationID=? AND p.AccountKey=r.AccountKey AND p.StorageOwner=r.StorageOwner "
@@ -59,6 +60,19 @@ class PipelineCaptureHandoffDAL:
             return link
         evidence = json.loads(row["EvidenceJson"] or "{}")
         registration = json.loads(row["RegistrationJson"])
+        # Normal capture and a separately approved configuration continuation
+        # share this existing validator; an arbitrary matching job is not enough.
+        final = PipelineReceiptDAL(self.runtime).configuration_result(row["ConfigurationOperation"])
+        if not final or identity(final["PreparationID"]) != identity(row["TargetID"]):
+            raise SourceConflict("Pipeline export linkage has no verified configuration result.")
+        producer = json.loads(final["RequestJson"])["request"]["producer"]
+        if (
+            identity(producer["operation"]) != identity(row["ConfigurationOperation"])
+            and producer.get("export_disposition") != "pipeline_export_v1"
+        ):
+            raise SourceConflict(
+                "Pipeline export linkage cannot adopt a configuration-only result."
+            )
         if (
             evidence.get("outcome") != "queued"
             or not row["JobID"]

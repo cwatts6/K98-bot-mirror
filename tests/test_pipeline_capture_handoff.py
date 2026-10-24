@@ -36,6 +36,7 @@ def linked_capture(monkeypatch):
         ExportState="observed",
         EvidenceJson=json.dumps(dict(outcome="queued", preparation_id=target, job_id=job)),
         TargetID=target,
+        ConfigurationOperation=str(uuid4()),
         TargetState="materialized",
         JobID=job,
         SpoolKey="retained",
@@ -56,6 +57,15 @@ def linked_capture(monkeypatch):
     )
     monkeypatch.setattr(module, "transaction", lambda connect: nullcontext(cursor))
     monkeypatch.setattr(module, "rows", lambda cursor: [row])
+    final = dict(
+        PreparationID=target,
+        RequestJson=json.dumps(
+            dict(request=dict(producer=dict(operation=row["ConfigurationOperation"])))
+        ),
+    )
+    pipeline = SimpleNamespace(configuration_result=Mock(return_value=final))
+    monkeypatch.setattr(module, "PipelineReceiptDAL", lambda runtime: pipeline)
+    service.pipeline_receipts = pipeline
     service.pipeline_handoff = module.PipelineCaptureHandoffDAL(service.runtime)
     return service, preview, row, cursor
 
@@ -106,7 +116,37 @@ def test_pending_pipeline_keeps_capture_open_without_independent_queue_actions(m
     assert evidence["outcome"] == "pipeline_export_unconfirmed"
 
 
-@pytest.mark.parametrize("action", ["queue", "abandon", "after_capture"])
+@pytest.mark.parametrize("disposition", ["pipeline_export_v1", "configuration_only_v1", None])
+def test_handoff_reuses_verified_configuration_successor(monkeypatch, disposition):
+    service, preview, row, _ = linked_capture(monkeypatch)
+    final = service.pipeline_receipts.configuration_result.return_value
+    final["RequestJson"] = json.dumps(
+        dict(request=dict(producer=dict(operation=str(uuid4()), export_disposition=disposition)))
+    )
+    if disposition == "pipeline_export_v1":
+        evidence, _, resolved = service.handoff_evidence(preview)
+        assert resolved and evidence["recovery_links"][0]["source_id"] == row["JobID"]
+    else:
+        with pytest.raises(SourceConflict, match="configuration-only"):
+            service.handoff_evidence(preview)
+    service.pipeline_receipts.configuration_result.assert_called_once_with(
+        row["ConfigurationOperation"]
+    )
+
+
+@pytest.mark.parametrize("result", [None, "foreign", "unverified"])
+def test_unverified_configuration_successor_cannot_link_existing_job(monkeypatch, result):
+    service, preview, _, _ = linked_capture(monkeypatch)
+    resolver = service.pipeline_receipts.configuration_result
+    if result == "unverified":
+        resolver.side_effect = SourceConflict("Continuation request differs")
+    else:
+        resolver.return_value = None if result is None else dict(PreparationID=str(uuid4()))
+    with pytest.raises(SourceConflict):
+        service.handoff_evidence(preview)
+
+
+@pytest.mark.parametrize("action", ["queue", "abandon"])
 def test_saved_old_capture_action_cannot_queue_or_abandon_pipeline_output(monkeypatch, action):
     service, preview, _, _ = linked_capture(monkeypatch)
     service.runtime.enqueue_snapshot = Mock()
@@ -114,7 +154,6 @@ def test_saved_old_capture_action_cannot_queue_or_abandon_pipeline_output(monkey
     args = dict(
         queue=("source", "proof"),
         abandon=("source", "proof", "actor", "reason"),
-        after_capture=("source",),
     )
     with pytest.raises(SourceConflict, match="pipeline owns"):
         getattr(service, action)(*args[action])
@@ -140,11 +179,44 @@ def test_durable_action_reconciliation_preserves_pipeline_capture(
     if invalid_lineage:
         row["SourceVersion"] += 1
     action = dict(ActionKind=kind, ActionID=str(uuid4()), EvidenceHash=preview["token"])
-    with pytest.raises(SourceConflict):
-        service.reconcile_capture("source", action)
+    if invalid_lineage:
+        with pytest.raises(SourceConflict):
+            service.reconcile_capture("source", action)
+    else:
+        assert service.reconcile_capture("source", action) == "not_applied"
     service.dal.conclude.assert_not_called()
     service.runtime.enqueue_snapshot.assert_not_called()
     assert preview == before
+
+
+def test_pipeline_capture_completion_does_not_enqueue_intermediate_snapshot(monkeypatch):
+    service, preview, _, _ = linked_capture(monkeypatch)
+    service.runtime.enqueue_snapshot = Mock()
+    assert service.after_capture(preview["preparation"]["PreparationID"]) is None
+    service.runtime.enqueue_snapshot.assert_not_called()
+
+
+@pytest.mark.parametrize("captured", [False, True])
+def test_pipeline_capture_only_resume_reconciles_to_verified_without_queue(monkeypatch, captured):
+    service, preview, _, _ = linked_capture(monkeypatch)
+    preview["captured"] = captured
+    action = dict(ActionKind="resume_capture", ActionID=str(uuid4()), EvidenceHash=preview["token"])
+    actor = "recovery:" + action["ActionID"]
+    generation = json.loads(preview["preparation"]["GenerationJson"])
+    generation["capture_recovery"] = dict(token=preview["token"], actor=actor)
+    preview["preparation"]["GenerationJson"] = json.dumps(generation)
+    service.runtime.enqueue_snapshot = Mock()
+    service.dal.conclude = Mock()
+
+    def capture_only(source_id, token, actor):
+        preview["captured"] = True
+        return service.after_capture(source_id)
+
+    service.run = Mock(side_effect=capture_only)
+    assert service.reconcile_capture("source", action) == "verified"
+    service.run.assert_called_once_with("source", preview["token"], actor)
+    service.runtime.enqueue_snapshot.assert_not_called()
+    service.dal.conclude.assert_not_called()
 
 
 def test_runtime_wires_all_three_pipeline_producers():

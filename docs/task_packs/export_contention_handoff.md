@@ -33,6 +33,9 @@ attribution to a particular monitoring task would require additional evidence.
   capture cards link to that job and retain all original records. A verified
   handoff resolves only the queue question, never spreadsheet delivery. An
   unconfirmed pipeline remains open; stale independent queue/skip actions refuse.
+  Already approved configuration successors use the existing continuation
+  validator. Committed pipeline producers may finish and reconcile capture-only
+  work; the pipeline retains its separate export-admission decision.
 
 ## Architecture and SQL
 

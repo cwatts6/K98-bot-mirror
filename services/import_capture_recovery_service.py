@@ -168,7 +168,13 @@ class ImportCaptureRecovery:
 
     def after_capture(self, preparation_id):
         if self.pipeline_handoff is not None:
-            self._assert_independent_capture(self.outcomes.inspect(preparation_id))
+            preview = self.outcomes.inspect(preparation_id)
+            if self.pipeline_handoff.inspect(preview["preparation"]) is not None:
+                # A pipeline producer may finish its retained capture without
+                # independently submitting an intermediate snapshot.
+                self.generation(preview["preparation"], preview["execution"])
+                self.runtime.verified_snapshot(preparation_id)
+                return None
         return self.runtime.enqueue_snapshot(preparation_id)
 
     def verify_queued(self, source_id):
@@ -233,9 +239,20 @@ class ImportCaptureRecovery:
             return "not_applied"
         if generation.get("capture_abandoned"):
             return "not_applied"
-        # Pipeline ownership/lineage refusal is not damaged output. Keep it
-        # outside the deterministic capture-failure classifier below.
-        self._assert_independent_capture(preview)
+        # Pipeline ownership/lineage is not damaged output. Capture-only resume
+        # must settle independently of the pipeline's later queue decision.
+        if self.pipeline_handoff is not None and self.pipeline_handoff.inspect(prep) is not None:
+            if action["ActionKind"] == "queue_capture":
+                return "not_applied"
+            marker = generation.get("capture_recovery")
+            if marker != dict(token=token, actor=actor):
+                if preview["captured"] or preview["token"] != token:
+                    return "not_applied"
+            self.run(source_id, token, actor)
+            current = self.outcomes.inspect(source_id)
+            self.generation(current["preparation"], current["execution"])
+            self.runtime.verified_snapshot(source_id)
+            return "verified" if current["captured"] else None
         try:
             if action["ActionKind"] == "queue_capture":
                 if not prep["JobID"] and preview["token"] != token:
