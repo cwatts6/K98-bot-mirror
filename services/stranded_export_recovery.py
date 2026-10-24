@@ -147,19 +147,26 @@ class StrandedExportRecovery:
             or str(session["SessionID"]).lower() != stream["SessionID"]
         ):
             raise SourceConflict("Stream is not owned by the pinned running authority session.")
-        birth, birth_hash = read_birth(self.store, stream)
-        # Retain handles only during this inspection. Apply independently reopens
-        # and verifies the same private named job before its first mutation.
-        with self.host.retain(birth) as child:
-            child.inspect()
+        # Legacy mutations did not persist birth bindings. Only an explicitly
+        # reviewed packet may use current, positive authority-handle custody.
+        # It stays separate from historical birth and never changes ScopeJson.
+        if set(scope) == {"resources"} and expected.get("live_custody") == "authority_handles_v1":
+            with self.host.retain_live(stream["ChildIdentity"]) as child:
+                child.inspect()
+                evidence = deepcopy(child.evidence)
+            identity_evidence = dict(custody=evidence, custody_sha256=digest(evidence).hex())
+        else:
+            birth, birth_hash = read_birth(self.store, stream)
+            with self.host.retain(birth) as child:
+                child.inspect()
+            identity_evidence = dict(birth=birth, birth_sha256=birth_hash)
         if self._read()[0] != state:
             raise SourceConflict("Recovery state changed during inspection.")
         return dict(
             kind="stranded_export_recovery/1",
             expected=expected,
             original=state,
-            birth=birth,
-            birth_sha256=birth_hash,
+            **identity_evidence,
         )
 
     @staticmethod
@@ -309,12 +316,34 @@ class StrandedExportRecovery:
             raise SourceConflict("Another recovery intent exists; preserve it.")
         state, job, stream = self._current(review)
         if stream["State"] != "closed":
-            birth, birth_hash = read_birth(self.store, stream)
-            if birth != review["birth"] or birth_hash != review["birth_sha256"]:
-                raise SourceConflict("Private writer birth changed.")
+            live = "custody" in review
+            if live:
+                evidence, evidence_hash = review["custody"], review.get("custody_sha256")
+                if (
+                    self.expected.get("live_custody") != "authority_handles_v1"
+                    or set(json.loads(stream["ScopeJson"])) != {"resources"}
+                    or "birth" in review
+                    or "birth_sha256" in review
+                    or digest(evidence).hex() != evidence_hash
+                    or evidence.get("child_id") != stream["ChildIdentity"]
+                ):
+                    raise SourceConflict("Exact separate live custody evidence required.")
+                identity_receipt = dict(custody_sha256=evidence_hash)
+            else:
+                evidence, evidence_hash = read_birth(self.store, stream)
+                if evidence != review["birth"] or evidence_hash != review["birth_sha256"]:
+                    raise SourceConflict("Private writer birth changed.")
+                identity_receipt = dict(birth_sha256=evidence_hash)
             terminated = self.journal.read("termination")
             if terminated is None:
-                with self.host.retain(birth) as child:
+                retained = (
+                    self.host.retain_live(
+                        stream["ChildIdentity"], expected=evidence, allow_termination=True
+                    )
+                    if live
+                    else self.host.retain(evidence)
+                )
+                with retained as child:
                     child.inspect()
                     self._current(review)
                     if stream["State"] == "open":
@@ -336,7 +365,10 @@ class StrandedExportRecovery:
                     raise SourceConflict(
                         "Saved termination requires this recovery's frozen stream."
                     )
-                self.host.verify_terminated(birth, terminated)
+                if live:
+                    self.host.verify_live_terminated(evidence, terminated)
+                else:
+                    self.host.verify_terminated(evidence, terminated)
             sequence, event_digest = self.execution.stream_digest(stream["StreamID"])
             if sequence != review["expected"]["last_sequence"]:
                 raise SourceConflict(
@@ -348,7 +380,7 @@ class StrandedExportRecovery:
                 closure=terminated,
                 last_sequence=sequence,
                 event_digest=event_digest.hex(),
-                administrator_recovery=dict(review_sha256=token, birth_sha256=birth_hash),
+                administrator_recovery=dict(review_sha256=token, **identity_receipt),
             )
             saved = self.journal.read("closure")
             if saved is None:

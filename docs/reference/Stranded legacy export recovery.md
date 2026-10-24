@@ -25,7 +25,22 @@ Inspection requires exactly the reviewed legacy job, owner, fence, versions,
 stream, session, child and request sequence. Registered destination membership,
 configuration hash, resources and session principal/manifest must agree. Other
 active streams, conflicting attempts, containment, replacement work, queued retry decisions,
-missing private birth evidence or changed ownership stop recovery.
+unproven writer identity or changed ownership stop recovery.
+
+The deployed legacy mutation path did not persist `host_birth`; the historical
+birth reader remains strict. A packet explicitly pinned to
+`live_custody=authority_handles_v1` can instead inspect an exact resources-only
+legacy scope through the original authority's live Windows handles. This is a
+separate `live_writer_custody/1` review record, never a reconstructed birth or a
+change to `ScopeJson`. Malformed or present-but-invalid birth bindings still stop.
+
+Live custody pins the original authority, exact child command line and parent,
+process creation time, executable hash, token, machine and the unique private
+containment Job actually held by that authority. Inspection duplicates query-only
+Job handles. Apply reobserves the exact reviewed identity before retaining query
+and termination rights; it cannot substitute a new process with the same PID.
+The collector is bounded and fails closed if native Windows observations are
+unavailable, the original child has exited, or any identity is ambiguous.
 
 An original `private_started` attempt is expected once legacy mutation begins.
 Inspection accepts at most that first, unverified attempt with its original
@@ -38,7 +53,7 @@ uncertain and its parts quarantined through the existing failure transition.
 Resume accepts only that exact versioned transition and its saved failure intent.
 
 A corrected packet uses a new protected directory. When it names a previous
-packet, that packet's protected journal must remain present and have no Apply
+packet or packets, every named protected journal must remain present and have no Apply
 intent. A previous Apply intent stops the corrected packet for evidence review;
 replacing a packet is never permission to reset an in-progress recovery.
 
@@ -83,6 +98,14 @@ SQL readback and the immutable local journal. The same reviewed Apply may resume
 only that intent. A different inspection token is never a reset mechanism.
 A crash before positive termination evidence is durably retained may require
 further evidence review; absence of a PID is not a closure receipt.
+For live custody this boundary is explicit: an interruption after termination
+but before saving its positive receipt remains stopped with a frozen stream.
+A saved receipt must match the complete reviewed process incarnation and custody
+hash; resume rechecks the empty named Job without reopening a PID. No receipt is
+fabricated from an exited child. Keep the original Bot and authority running.
+Temporary query handles can extend a Job's lifetime if its original owner exits
+concurrently; inspection closes its own copies promptly and never closes an
+original authority handle.
 
 ## Acceptance and limits
 

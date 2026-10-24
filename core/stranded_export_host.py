@@ -9,8 +9,26 @@ from core.export_process_identity import process_snapshot, verify_process_snapsh
 
 
 class RecoveryHost:
-    def __init__(self, authority_binding):
+    def __init__(self, authority_binding, *, custody=None, child_script=None, manifest_path=None):
         self.binding = authority_binding
+        self.custody, self.child_script, self.manifest_path = custody, child_script, manifest_path
+
+    def retain_live(self, child_id, *, expected=None, allow_termination=False):
+        if self.custody is None or self.child_script is None or self.manifest_path is None:
+            raise HostBoundaryError("Pinned live custody collector is unavailable.")
+        return self.custody.retain_writer(
+            binding=self.binding,
+            child_script=self.child_script,
+            manifest_path=self.manifest_path,
+            child_id=child_id,
+            expected=expected,
+            allow_termination=allow_termination,
+        )
+
+    def verify_live_terminated(self, evidence, receipt):
+        if self.custody is None:
+            raise HostBoundaryError("Pinned live custody collector is unavailable.")
+        self.custody.verify_terminated(evidence, receipt, self.binding)
 
     def _birth(self, birth):
         validate_host_birth(birth)

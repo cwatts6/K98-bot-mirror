@@ -54,7 +54,7 @@ function Recovery-NewDirectory([string]$Path) {
 }
 $packetRaw=Recovery-Read (Join-Path $PSScriptRoot 'recovery-packet.json') $PacketSHA256
 $packet=[Text.Encoding]::UTF8.GetString($packetRaw)|ConvertFrom-Json
-$names=@('Read-K98PublicationTiming.ps1','recover_stranded_export.py','stranded_export_host.py','stranded_export_recovery.py','stranded_export_recovery_dal.py','recovery-target.json')
+$names=@('Read-K98PublicationTiming.ps1','recover_stranded_export.py','stranded_export_host.py','stranded_export_custody.py','stranded_export_recovery.py','stranded_export_recovery_dal.py','recovery-target.json')
 if($packet.version -ne 1 -or $packet.packet_id -cnotmatch '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' -or
    (($packet.members.name|Sort-Object) -join '|') -cne (($names|Sort-Object) -join '|')){throw 'Exact reviewed recovery packet required'}
 $payloads=@{}

@@ -70,6 +70,23 @@ def check_previous_journal(path, inspect):
             raise ValueError("Previous recovery started; preserve its journal for review.")
 
 
+def previous_journal_paths(target):
+    from uuid import UUID
+
+    values = target.get("previous_packet_ids", [])
+    if not isinstance(values, list):
+        raise ValueError("Previous packet identities must be a list.")
+    if target.get("previous_packet_id"):
+        values = [*values, target["previous_packet_id"]]
+    if (
+        len(values) > 8
+        or any(not isinstance(v, str) or str(UUID(v)) != v for v in values)
+        or len(set(values)) != len(values)
+    ):
+        raise ValueError("Bounded distinct canonical previous packet identities required.")
+    return [Path("C:/ProgramData/K98/S11/recovery") / value / "journal" for value in values]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--action", choices=("Inspect", "Apply"), required=True)
@@ -111,6 +128,7 @@ def main(argv=None):
     for path in (
         tool_root,
         tool_root / "stranded_export_host.py",
+        tool_root / "stranded_export_custody.py",
         tool_root / "stranded_export_recovery.py",
         tool_root / "stranded_export_recovery_dal.py",
         Path(args.target),
@@ -118,15 +136,7 @@ def main(argv=None):
         assert_protected_path(path, private=True, allow_current_identity=False)
     target = json.loads(Path(args.target).read_bytes())
     target["manifest_sha256"] = args.manifest_sha256
-    previous_journal = None
-    if target.get("previous_packet_id"):
-        from uuid import UUID
-
-        previous_journal = (
-            Path("C:/ProgramData/K98/S11/recovery")
-            / str(UUID(target["previous_packet_id"]))
-            / "journal"
-        )
+    previous_journals = previous_journal_paths(target)
     # No inherited SQL overrides: only the existing protected installation's
     # dedicated application configuration may supply connection credentials.
     for key in (
@@ -158,7 +168,8 @@ def main(argv=None):
 
         def check_boundary():
             boundary.recheck()
-            check_previous_journal(previous_journal, assert_protected_path)
+            for previous_journal in previous_journals:
+                check_previous_journal(previous_journal, assert_protected_path)
             if hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest() != args.manifest_sha256:
                 raise ValueError("Installed manifest changed during recovery.")
             if not all(
@@ -168,6 +179,7 @@ def main(argv=None):
                 raise ValueError("Original process pair exited; preserve recovery evidence.")
 
         host_module = load_tool(tool_root / "stranded_export_host.py", "_stranded_host")
+        custody_module = load_tool(tool_root / "stranded_export_custody.py", "_stranded_custody")
         service_module = load_tool(
             tool_root / "stranded_export_recovery.py",
             "_stranded_recovery",
@@ -179,7 +191,12 @@ def main(argv=None):
             execution=execution,
             coordinator=dal_module.StrandedExportRecoveryDAL(closeout.dal),
             store=store,
-            host=host_module.RecoveryHost(manifest["process_bindings"]["authority"]),
+            host=host_module.RecoveryHost(
+                manifest["process_bindings"]["authority"],
+                custody=custody_module,
+                child_script=manifest["child_script"],
+                manifest_path=args.manifest,
+            ),
             journal=journal,
             check_boundary=check_boundary,
             expected=target,

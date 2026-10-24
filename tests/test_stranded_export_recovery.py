@@ -468,3 +468,33 @@ def test_replacement_packet_refuses_any_original_intent_without_changing_it(tmp_
     guard.side_effect = ValueError("custody differs")
     with pytest.raises(ValueError, match="custody differs"):
         check_previous_journal(tmp_path, guard)
+
+
+def test_all_predecessor_journals_are_fixed_paths_and_preserved(tmp_path):
+    from pathlib import Path
+
+    from scripts.recover_stranded_export import check_previous_journal, previous_journal_paths
+
+    ids = [str(uuid4()), str(uuid4())]
+    assert previous_journal_paths(dict(previous_packet_ids=ids)) == [
+        Path("C:/ProgramData/K98/S11/recovery") / value / "journal" for value in ids
+    ]
+    for blocked in range(2):
+        folders = [tmp_path / str(blocked) / value for value in ids]
+        for folder in folders:
+            folder.mkdir(parents=True)
+        (folders[blocked] / "intent.json").write_bytes(b"unfinished original")
+        with pytest.raises(ValueError, match="Previous recovery started"):
+            for folder in folders:
+                check_previous_journal(folder, Mock())
+        assert (folders[blocked] / "intent.json").read_bytes() == b"unfinished original"
+
+
+@pytest.mark.parametrize(
+    "values", ["not-a-list", ["../../outside"], ["00000000-0000-0000-0000-000000000001"] * 2, [1]]
+)
+def test_invalid_previous_packet_paths_are_rejected(values):
+    from scripts.recover_stranded_export import previous_journal_paths
+
+    with pytest.raises(ValueError):
+        previous_journal_paths(dict(previous_packet_ids=values))
