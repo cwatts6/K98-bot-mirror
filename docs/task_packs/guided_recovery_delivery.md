@@ -1,5 +1,11 @@
 # Guided recovery delivery
 
+> **Delivery overlay — 2026-10-24:** [Current P0/P1 status](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> supersedes historical P0a/P0b release-priority and unqualified-delivery wording
+> below. P0 delivery and normal import/export are accepted; #438/#687 are deployed,
+> verified and working. Natural eligible rollover and final P0 receipt reconciliation
+> remain open. Full P1 continues through the tracked-view architecture/plan first.
+
 Current delivery priority: **P0a first release**, followed by **P0b full release**,
 as approved by the operator on 16 October. See
 [the release split and acceptance gates](guided_recovery_release_split.md).

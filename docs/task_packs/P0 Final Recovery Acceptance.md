@@ -1,5 +1,12 @@
 # P0 final recovery acceptance
 
+> **Acceptance overlay — 2026-10-24:** [Current status](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> records accepted deployment and normal import/export, delivered #438/#687 and
+> report (40): 17,612 resolved records, zero pending verification, monitor healthy.
+> Earlier publication-stall and source-delivery gaps below are historical where
+> superseded. F04 natural rollover and final F01–F05 receipt reconciliation remain
+> open; full P0 is not closed. Do not repeat accepted work.
+
 ## Current boundary — 20 October 2026
 
 The operator requests completion of P0 as the next work package, retaining focused

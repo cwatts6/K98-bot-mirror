@@ -1,5 +1,12 @@
 # K98 Bot Reference Docs
 
+> **P0/P1 checkpoint — 2026-10-24:** Read [current delivery and acceptance](P0%20delivery%20and%20P1%20recovery%20status.md)
+> for verified P0 delivery, outstanding rollover acceptance and full P1 scope.
+> The [tracked-view plan](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
+> owns the first P1 slice. These are conditional recovery/lifecycle references;
+> the required engineering-reading rules remain unchanged. Earlier dated delivery
+> and next-step statements below are historical where this checkpoint supersedes them.
+
 > **S11 deployment routing — 2026-10-08:** Use the [Promotion Guide](Promotion%20Guide.md)
 > for copy-and-paste operator steps and the
 > [S11 contract](S11%20Deployment%20and%20Restart%20Contract.md) for release semantics.

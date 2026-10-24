@@ -9,7 +9,12 @@ The approved embed implementation programme closes through Phase 2K, whose merge
 clean deployed-main/restart evidence are now recorded. Unresolved items below remain open.
 [Bot Operational Reliability](../task_packs/Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) groups ProcConfig WS1, remaining executors,
 lifecycle, DM/JSON, durable dispatch and evidence-gated import admission as separate workstreams.
-WS1 design is complete; implementation and comparative programme priority remain pending.
+The [24 October P0/P1 reconciliation](P0%20delivery%20and%20P1%20recovery%20status.md)
+supersedes historical design-only status: selected WS1–WS6 capabilities were delivered
+in P0, while their residual scope remains open. Tracked-view restoration is the first
+P1 slice; its approved runtime implementation and local review are complete, with
+deployed acceptance still outstanding. Completed portions are recorded in the resolved history without closing
+whole workstreams. Full P0 acceptance, including natural rollover, remains separate.
 Natural Pre-KVK/off-season and Phase 2F public-save observations remain independent. The incoming
 inventory upload privacy finding belongs in security triage, not this optimisation register.
 
@@ -25,7 +30,7 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 ### Deferred Optimisation
 - Area: standalone/embedded KS claims and production Pre-KVK edit fallback
 - Type: consistency
-- Description: KS pre-send ping claims can remain consumed after send failure; production Pre-KVK may replace after an ambiguous edit. Phase 2K records these outcomes but preserves both policies.
+- Description: KS pre-send ping claims can remain consumed after send failure. Legacy non-durable Pre-KVK routes may replace after an ambiguous edit. Current diagnostic and P0 durable-processing routes instead propagate the failure and retain uncertainty; do not describe every production route as using the old fallback. Phase 2K did not itself change the two legacy policies.
 - Suggested Fix: Review each policy in a separately bounded decision with failure/ambiguity and mention semantics, preserving existing reservations and diagnostic behavior until approved.
 - Impact: medium
 - Risk: medium
@@ -43,24 +48,25 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 ### Deferred Optimisation
 - Area: `proc_config_import.py::run_proc_config_import`, subprocess result reporting and `processing_pipeline.py`
 - Type: consistency
-- Description: Operator log at 2026-09-08 09:20:17 reports HY000 connection busy with results while restoring conn.autocommit at line 1086 after sp_TARGETS_MASTER. The wrapper subsequently reports completion and ProcImport=True. Repeated at 2026-09-09 07:14:26 and again at 11:46:51 during accepted Phase 2K smoke; a subsequent startup import succeeded at 08:40:35 with a manifest. This intermittent failure/false-success contract remains unresolved, not disproved by one successful run.
-- Suggested Fix: Separately inspect pending result/cursor lifecycle and the authoritative procedure result contract; drain/close results at the correct transaction boundary and propagate failure through CLI exit/report and pipeline summary. Prove commit, cleanup failure, manifest and truthful status without rerunning side effects.
+- Description: September operator logs established HY000 while restoring autocommit after targets, followed by reported success. The 24 October source reconciliation finds coordinated configuration/targets/checkpoint transaction ownership, result-set drainage, explicit lost-acknowledgement uncertainty and once-only participating offloads now implemented. Accepted startup configuration receipts support delivery. Remaining WS1 work is the legacy report/manifest and cleanup contract; the historical HY000 symptom must not be restated as an unchanged coordinated-path defect.
+- Suggested Fix: Audit remaining entrypoints against the delivered transaction/result contract and existing tests. Reconcile legacy v1 reports, per-run artifact identity (including second-resolution naming), cleanup failures and truthful partial/unknown outcomes. Extend only demonstrated gaps; preserve accepted commits and do not rerun imports to reproduce historical evidence.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2G–2J; separate from Phase 2K delivery outcomes.
-- Status: Bot Operational Reliability WS1 (formerly Phase 2L); audit/design complete; owner Chris Watts; runtime/test/SQL approval and cross-programme priority pending
-- Last verified: 2026-09-09
+- Status: WS1 partially delivered through P0; residual contract reconciliation required; owner Chris Watts
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
-- Area: `bot_instance.py` tracked-view startup timeout and `rehydrate_views.py`
+- Area: `core/event_rehydration_lifecycle.py`, `bot_instance.py` tracked-view scheduling and `rehydrate_views.py`
 - Type: architecture
-- Description: Supplied restart log on 2026-09-08 cancels generic tracked-view rehydration after 10 seconds while fetching arkmatch_49, then logs deferring and task completed. Earlier views reattached, but completion of the remaining 19-view inventory is not established. Repeated at 2026-09-09 08:40:30 while fetching arkmatch_50; remaining views were aborted. Repeated again at 2026-09-09 12:09:24.054 while fetching arkmatch_50 after final Phase 2K restart; remaining work was aborted. Removal smoke/full-startup completion does not establish full generic rehydration. Programme owner: Reliability WS3.
-- Suggested Fix: Separately inventory remaining views and prove whether deferred work is actually resumed before choosing timeout, batching or lifecycle changes. Record partial versus complete rehydration honestly and test cancellation/restart identity preservation.
+- Description: September restart cancellations recur in the 24 October logs: an earlier 21-entry pass and the later #438/#687 restart both exceed the ten-second generic-view deadline and abort the remainder. The deployed baseline cancels restoration, conflates unavailable trackers with empty and prunes by key. The approved local slice now observes one owned pass past the deadline, uses bounded reads and strict identity checks, and preserves uncertain edits. Its 89 focused tests and Changes review passed; deployed restoration is not yet accepted. Task completion and a healthy recovery report alone do not establish that acceptance.
+- Suggested Fix: Complete the linked plan's protected promotion and existing-view inventory/callback acceptance when release is authorized. Preserve the original messages, identities and unresolved edit receipts; do not repeat imports or manufacture public activity. Keep remaining WS3 readiness and scheduler work separately scoped.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
-- Status: repeated operator observation; owner Chris Watts; separate approval required
-- Last verified: 2026-09-09
+- Status: WS3 first slice implemented and reviewed locally after approval; focused validation and completed Changes review recorded in the linked plan; deployed inventory/callback acceptance still required; owner Chris Watts
+- Last verified: 2026-10-24
+- Plan: [P1 tracked-view restoration](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
 
 ## Status model
 
@@ -75,6 +81,61 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 
 `Last verified` records the most recent documentation/repository review date. It does not by itself
 prove current Production behaviour; Production evidence remains an explicit dependency where required.
+
+### Deferred Optimisation
+- Area: stranded-export operator recovery helper, export child lifecycle and Recovery Centre closeout
+- Type: architecture
+- Description: The reviewed r3 operator helper is now delivered through #438/#687, merged, deployed and verified by the operator. The successful stranded-export recovery still required a separately prepared packet; routine operators need a supported workflow rather than bespoke preparation. The old export was abandoned, not delivered.
+- Suggested Fix: Productize inspect/review/apply/verify using the delivered helper and existing exact custody, ownership, configuration, fence, sealed closure and closeout checks. Keep native privilege operations in the operator helper. Offer resume, reconcile or abandon only when supported evidence permits, retain explained blocks for missing evidence, and keep permission for subsequent work separate from old delivery status.
+- Impact: high
+- Risk: high
+- Dependencies: Existing helper/runbook and SQL closure/closeout contracts; source delivery is satisfied, not a pending PR dependency. Separate architecture, SQL validation, restart/lost-acknowledgement/permission tests and bot/SQL Changes reviews when implementation touches them. Preserve URLs, committed outputs and historical receipts.
+- Status: P1 architecture follow-up; owner Chris Watts
+- Last verified: 2026-10-24
+
+### Deferred Optimisation
+- Area: recovery observer, review SQL and Discord event-loop diagnostics
+- Type: performance
+- Description: Retained accepted-run logs contain transient observer unavailability, SQL 1222 review contention and 41.7/42.2-second websocket delays. The later complete recovery report is healthy. These observations do not establish one common cause or a current unresolved P0 defect.
+- Suggested Fix: Perform bounded offline attribution using saved logs, distinguishing contention from provider failure. Capture missing timing boundaries before proposing focused instrumentation, and suppress repeated non-actionable alerts without hiding correctness failures. Return any demonstrated pipeline/monitor correctness defect to F03/F05.
+- Impact: medium
+- Risk: medium
+- Dependencies: Retained logs and receipts; no repeated import/export, provider probe or production fault injection. Coordinate with, but do not duplicate, the existing publication timing item.
+- Status: evidence required; bounded offline investigation
+- Last verified: 2026-10-24
+
+### Deferred Optimisation
+- Area: `scripts/prepare_k98_update.py` protected updater transition registry
+- Type: architecture
+- Description: The registry has a finite 40-transition limit. Future releases may need additional capacity or receipt-compatible retirement; this reconciliation does not establish exhaustion today.
+- Suggested Fix: Check actual occupancy before adding a transition beyond capacity. Design bounded growth or explicit compatible retirement while preserving old authenticated pins and resumable release receipts; do not silently discard entries.
+- Impact: medium
+- Risk: medium
+- Dependencies: Next release requirements, protected package rehearsal and updater Changes review for any implementation.
+- Status: conditional capacity follow-up
+- Last verified: 2026-10-24
+
+### Deferred Optimisation
+- Area: SQL session-lock acquisition acknowledgement and connection cleanup
+- Type: consistency
+- Description: Retained qualification does not establish an actual transport break after the server grants a session lock but before the client receives its acknowledgement. A closed proxy alone is not proof of server-session cleanup.
+- Suggested Fix: Reconcile current tests, then add a disposable restricted-user SQL/ODBC transport fixture that proves cleanup and no replay after acknowledgement loss. Preserve unknown outcomes if session termination cannot be established.
+- Impact: low
+- Risk: medium
+- Dependencies: Disposable local SQL environment only, authoritative lock/connection contracts and separate test scope; no production fault injection.
+- Status: retained qualification gap; separate from accepted production run
+- Last verified: 2026-10-24
+
+### Deferred Optimisation
+- Area: `core/event_rehydration_lifecycle.py::wait_for_events` and dependent scheduler readiness
+- Type: consistency
+- Description: The latest supplied startup fetched event data successfully but future-only filtering left zero upcoming events. Readiness tests collection truthiness, so a legitimate empty result is reported as not ready and dependent tasks are deferred. This is separate from the generic tracked-view cancellation.
+- Suggested Fix: Model fetch/readiness state independently of event count and supervise the dependent startup tasks using existing lifecycle ownership. Test loaded-empty, unavailable, stale and subsequently refreshed states without manufacturing calendar events or repeated unready tasks.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate WS3/readiness slice after tracked-view restoration; preserve reminder eligibility and public-save semantics.
+- Status: P1 implementation candidate; not included in first runtime slice
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
 - Area: `event_calendar/reminder_state.py`, `player_self_service/service.py`, `event_calendar/reminder_candidates.py`
@@ -333,13 +394,13 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: `stats_module.py::_offload_callable_py` and its current callers
 - Type: consistency
-- Description: Static review proves that `_offload_callable_py` catches an ordinary exception from `run_step`, then invokes the same callable through `run_blocking_in_thread`, catches again, and finally invokes it through `asyncio.to_thread`. A callable exception after entry can therefore cause up to three executions. The current call sites include SQL- and cache-related operations, but their exact production argument shapes, idempotence, and side-effect boundaries have not been audited to the standard completed for `DL_bot.py`.
+- Description: The coordinated Stats runtime now uses a single cancellation-draining worker under writer admission. The legacy branch of `_offload_callable_py` still catches a post-entry run_step exception, then tries run_blocking_in_thread and asyncio.to_thread; that branch can execute the callable up to three times. Audit actual caller reachability and side effects rather than labelling the protected P0 path unfixed.
 - Suggested Fix: Scope a separate once-only audit for every `_offload_callable_py` caller. Reproduce the highest-risk real call shape deterministically, establish which executor contracts preserve its arguments/results/exceptions, then remove post-entry fallback and add cancellation/timeout coverage without changing SQL or cache behavior.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate operator-approved task; complete caller/side-effect inventory; preserve Stats result normalization, SQL failure handling, cache behavior, and existing telemetry.
-- Status: evidence required
-- Last verified: 2026-08-31
+- Status: WS2 residual legacy-path audit; protected path partially delivered
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
 - Area: `ui/views/kvk_history_view.py::_offload_callable` and KVK History payload/export callers
@@ -446,13 +507,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ### Deferred Optimisation
 - Area: `event_scheduler.py` DM sent/scheduled tracker writers and asynchronous offload wrappers; other JSON writers only after a separate inventory
 - Type: consistency
-- Description: Phase 2F changed only active public-reminder atomic replacement. DM sent/scheduled writers already call atomic_write_json, but async exception fallback may re-enter them through asyncio.to_thread. Their task ownership, multi-writer ordering and restart contract were not certified by Phase 2F or Phase 2J; a broad JSON audit has not been performed.
+- Description: The 24 October source review confirms the DM tracker I/O lock and asynchronous wrappers that select one helper and return without caught post-entry fallback. Phase 2F public-reminder atomic replacement and Phase 6K queue persistence are also delivered. Caller ordering, snapshot consistency, interruption and send-versus-disk uncertainty still require dedicated WS4 acceptance; a broad JSON audit has not been performed.
 - Suggested Fix: Audit DM writer callers and invocation counts, ownership, failure/cancellation and restart contracts separately. Reuse existing atomic helpers; do not assume every JSON writer needs replacement or conflate atomic replacement with transactional workflow ownership.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate scope and deterministic no-double-entry/restart tests; coordinate with executor and public-child work without expanding Phase 2K. No DM or broad JSON redesign approved.
-- Status: evidence/design required; owner Chris Watts
-- Last verified: 2026-09-09
+- Status: WS4 partially delivered; ordering and uncertainty acceptance remains; owner Chris Watts
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
 - Area: production `stats_alerts/embeds/kvk.py`, off-season renderers and `mge/mge_content_renderer.py` final payload boundaries
@@ -478,12 +539,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ### Deferred Optimisation
 - Area: independent ProcConfig admin/startup/pipeline invocations and offload ownership
 - Type: architecture
-- Description: At-most-one backend per invocation does not prevent overlapping independent imports or reconstruct lost commit evidence after process death. Current reports/offload records do not establish durable admission authority; actual overlap has not been established by this audit.
-- Suggested Fix: Reliability WS6 should first measure overlapping invocation evidence and existing SQL protection; if justified, design bounded admission/provenance with exact ownership, compatibility and concurrency tests. Missing reports must not initiate replay or recovery.
+- Description: Protected P0 paths now use shared writer admission, exact owner context and matching nested tokens, with fail-closed checks for incomplete protected activation. Reports alone remain non-authoritative. Independent admin/startup/pipeline compatibility entrypoints still require a complete coverage audit; no unprotected live overlap is established by this reconciliation.
+- Suggested Fix: Map each entrypoint to existing authority and worker lifetime, then test overlap, lost acknowledgement and cancellation at uncovered boundaries. Reuse the delivered admission protocol and preserve committed receipts. Missing reports must not initiate replay or a new competing recovery protocol.
 - Impact: medium
 - Risk: high
 - Dependencies: Separate source-of-truth SQL validation, scope and operator approval; outside WS1; preserve committed effects and existing dispatch policy.
-- Status: evidence-gated candidate; owner Chris Watts; implementation unapproved
+- Status: WS6 partially delivered; entrypoint coverage audit required; owner Chris Watts
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
 - Area: `gsheet_module.py::_aggregate_windowed_dfs` and `create_additional_kvk_spreadsheets`

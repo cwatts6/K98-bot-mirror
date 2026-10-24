@@ -17,7 +17,7 @@ async def test_ready_event_cache_rehydration_refreshes_and_schedules_one_shot(mo
         calls.append("refresh_event_cache")
         return 1
 
-    def fake_schedule_bg(name, timeout, coro_factory):
+    def fake_schedule_bg(name, timeout, coro_factory, **observation):
         calls.append(f"schedule_bg:{name}:{timeout}")
         assert callable(coro_factory)
 
@@ -48,7 +48,7 @@ async def test_ready_event_cache_rehydration_schedules_one_shot_when_empty(monke
     async def fake_load_active_reminders(_bot):
         return set()
 
-    def fake_schedule_bg(name, timeout, coro_factory):
+    def fake_schedule_bg(name, timeout, coro_factory, **observation):
         calls.append(f"schedule_bg:{name}:{timeout}")
 
     monkeypatch.setattr(lifecycle, "load_active_reminders", fake_load_active_reminders)
@@ -78,9 +78,14 @@ async def test_ready_event_cache_rehydration_schedules_one_shot_when_empty(monke
 async def test_ready_view_rehydration_helpers_schedule_expected_tasks(monkeypatch):
     calls: list[tuple[str, float]] = []
 
-    def fake_schedule_bg(name, timeout, coro_factory):
+    def fake_schedule_bg(name, timeout, coro_factory, **observation):
         calls.append((name, timeout))
         assert callable(coro_factory)
+        if name == "rehydrate_tracked_views":
+            assert observation["cancel_on_deadline"] is False
+            assert observation["completion_check"] is lifecycle.restoration_completion
+        else:
+            assert not observation
 
     await lifecycle.run_ready_tracked_view_rehydration(bot=object(), schedule_bg=fake_schedule_bg)
     await lifecycle.run_ready_pinned_calendar_rehydration(
@@ -97,7 +102,7 @@ async def test_ready_view_rehydration_helpers_schedule_expected_tasks(monkeypatc
 
 @pytest.mark.asyncio
 async def test_tracked_view_rehydration_schedule_failure_is_best_effort(caplog):
-    def fail_schedule_bg(name, timeout, coro_factory):
+    def fail_schedule_bg(name, timeout, coro_factory, **observation):
         raise RuntimeError("scheduler unavailable")
 
     await lifecycle.run_ready_tracked_view_rehydration(
@@ -110,7 +115,7 @@ async def test_tracked_view_rehydration_schedule_failure_is_best_effort(caplog):
 
 @pytest.mark.asyncio
 async def test_pinned_calendar_rehydration_schedule_failure_is_best_effort(caplog):
-    def fail_schedule_bg(name, timeout, coro_factory):
+    def fail_schedule_bg(name, timeout, coro_factory, **observation):
         raise RuntimeError("scheduler unavailable")
 
     await lifecycle.run_ready_pinned_calendar_rehydration(

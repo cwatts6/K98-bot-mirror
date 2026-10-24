@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 from constants import REMINDER_TRACKING_FILE
 from event_cache import (
@@ -15,11 +15,20 @@ from event_cache import (
 from event_calendar.pinned_embed import rehydrate_pinned_calendar_view
 from event_scheduler import load_active_reminders
 from rehydrate_views import rehydrate_tracked_views
+from services.tracked_view_rehydration_service import restoration_completion
 from voting.rehydration import rehydrate_survey_post_views, rehydrate_vote_post_views
 
 logger = logging.getLogger(__name__)
 
-ScheduleBackground = Callable[[str, float, Callable[[], Awaitable[Any]]], Any]
+
+class ScheduleBackground(Protocol):
+    def __call__(
+        self,
+        name: str,
+        timeout: float,
+        coro_factory: Callable[[], Awaitable[Any]],
+        **observation: Any,
+    ) -> Any: ...
 
 
 async def wait_for_events(timeout_seconds: int = 10) -> bool:
@@ -70,7 +79,13 @@ async def run_ready_tracked_view_rehydration(
     schedule_bg: ScheduleBackground,
 ) -> None:
     try:
-        schedule_bg("rehydrate_tracked_views", 10.0, lambda: rehydrate_tracked_views(bot))
+        schedule_bg(
+            "rehydrate_tracked_views",
+            10.0,
+            lambda: rehydrate_tracked_views(bot),
+            cancel_on_deadline=False,
+            completion_check=restoration_completion,
+        )
         logger.info("[BOOT] View tracker rehydration scheduled")
     except Exception:
         logger.exception("[BOOT] Failed to start rehydrate_tracked_views")

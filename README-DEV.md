@@ -1,5 +1,13 @@
 # Developer Quickstart
 
+> **P0/P1 checkpoint — 2026-10-24:** [Current delivery and acceptance](docs/reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> records verified P0 deployment, accepted normal import/export and delivered
+> #438/#687. Natural eligible rollover and final P0 receipt reconciliation remain
+> open. [Tracked-view architecture and plan](docs/task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
+> is the first P1 slice, now implemented and reviewed locally pending deployed
+> acceptance; all P1 workstreams are retained. This status supersedes
+> older delivery/next-step statements below, without rewriting their evidence.
+
 > **S11 deployment process — 2026-10-08:** Protected initial cutover and normal
 > graceful restart on MINI_AMD are complete. For runtime updates use the
 > [operator Promotion Guide](docs/reference/Promotion%20Guide.md) and

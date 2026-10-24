@@ -1,5 +1,22 @@
 # Resolved Deferred Optimisation History
 
+## Partial-delivery reconciliation — 2026-10-24
+
+The [current P0/P1 status](../P0%20delivery%20and%20P1%20recovery%20status.md) records
+accepted P0 deployment/normal import-export and later delivered #438/#687. Source
+review identifies implemented coordinated ProcConfig transaction/result drainage,
+protected writer admission, once-only coordinated Stats offload, durable P0 processing
+delivery and DM tracker locking/single-backend selection. These supersede the older
+claims that WS1 remained design-only or current DM wrappers necessarily re-enter
+after an exception. Existing Phase 2F/6K persistence delivery remains preserved.
+
+Only those portions are reconciled as delivered. WS1 legacy report/manifest/cleanup,
+WS2 remaining executors, WS3 lifecycle, WS4 ordering/uncertainty, WS5 domain policies
+and WS6 entrypoint coverage remain in the active register. Tracked-view restoration
+is still unconfirmed. Natural Pre-KVK/off-season/public-save observations and P0's
+natural rollover/final receipt reconciliation remain open. Dated records below are
+retained history, not current whole-programme status.
+
 ## Programme-boundary record — 2026-09-09
 
 The approved embed implementation scope closes through Phase 2K. Final merged production HEAD

@@ -1,5 +1,12 @@
 # Task Packs
 
+> **P0/P1 checkpoint — 2026-10-24:** [Current delivery and acceptance](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> records accepted deployment and normal import/export, delivered #438/#687, and
+> pending natural rollover/final P0 closeout. The [tracked-view plan](P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
+> is the first P1 slice and retains the full programme. See also the
+> [mirror PR cleanup review](Mirror%20PR%20Cleanup%20-%202026-10-24.md).
+> Older dated delivery/next-step statements below are historical where superseded.
+
 > **Publication checkpoint — 2026-10-02:** [Bot PR #284](https://github.com/cwatts6/K98-bot-mirror/pull/284) and [SQL PR #91](https://github.com/cwatts6/K98-bot-SQL-Server/pull/91) are authorized, open and ready for review; **leave unmerged**. See the [current PR review checkpoint](../reference/kvk_source_migration/s11_g4_pr_review_checkpoint_20261002.md) for final checks, review fixes and source-pin qualifications. This supersedes older draft/publication-pending text. Bounded production inventory remains approved; merge, deployment and activation remain separate.
 
 ## Local review accepted; production inventory approved — 2026-10-02

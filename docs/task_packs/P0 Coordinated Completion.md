@@ -1,5 +1,11 @@
 # P0 coordinated completion
 
+> **Acceptance overlay — 2026-10-24:** [Current status](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> supersedes earlier pending deployment/normal-export statements. Deployment and
+> the normal import/export are accepted; #438/#687 are also delivered and verified.
+> F04 natural eligible rollover and final F01–F05 receipt reconciliation remain
+> outstanding. Keep the qualification matrix below; full P0 is not closed.
+
 ## Scope review — 22 October 2026
 
 Implementation, validation, Changes reviews, coordinated PR preparation and updater

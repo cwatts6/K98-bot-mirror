@@ -1,16 +1,5 @@
 # rehydrate_views.py
-"""
-Robust view tracker helpers and startup rehydration with enhanced telemetry/logging.
-
-Enhancements in this file:
-- emits structured telemetry events to logger "telemetry" for summary and key actions
-- includes lockfile/process info when lock acquisition timeouts occur (uses file_utils.get_lockfile_info)
-- emits per-entry telemetry on prune / failed / rehydrated events
-- prefers file_utils.run_step when available (instead of direct run_blocking_in_thread) for consistent telemetry naming
-- keeps small back-compat aliases for historical private names used in tests
-- migrated save/remove tracker file operations to run_maintenance_with_isolation(prefer_process=True)
-  with safe fallbacks to run_blocking_in_thread and asyncio.to_thread
-"""
+"""Persistent-view factories and identity-checked startup restoration adapters."""
 
 from __future__ import annotations
 
@@ -35,7 +24,9 @@ except Exception:
     discord = None  # type: ignore
     DISCORD_AVAILABLE = False
 
-from ark.dal.ark_dal import get_config, get_match
+from uuid import uuid4
+
+from ark.dal.rehydration_dal import get_registration_rehydration_data
 from ark.registration_flow import ArkRegistrationController
 from constants import (
     VIEW_PRUNE_ON_FORBIDDEN,
@@ -46,6 +37,15 @@ from constants import (
 
 # Import centralized sanitizer from embed_utils
 from embed_utils import LocalTimeToggleView, sanitize_view_prefix
+from services.legacy_export_snapshot_service import drain_thread
+from services.tracked_view_rehydration_service import EntryOutcome, restore_tracked_views
+from services.tracked_view_store import (
+    EDIT_RECEIPT,
+    TrackedViewStore,
+    fingerprint,
+    preserve_edit_receipt,
+    tracker_lock,
+)
 from ui.views.ark_views import ArkRegistrationView
 
 # Back-compat alias: some callers/tests reference the historical _sanitize_prefix name.
@@ -53,47 +53,13 @@ _sanitize_prefix = sanitize_view_prefix
 
 # Use centralized event helpers and file utils (including run_with_retries + get_lockfile_info)
 from event_utils import events_from_persisted, events_to_persisted
-
-# Prefer run_step where possible; fallback to run_blocking_in_thread or asyncio.to_thread
-try:
-    from file_utils import (
-        acquire_lock,
-        atomic_write_json,
-        get_lockfile_info,
-        read_json_safe,
-        run_step,
-        run_with_retries,
-    )  # type: ignore
-
-    _HAS_RUN_STEP = True
-except Exception:
-    # Fallback set; import the other helpers without run_step
-    from file_utils import (
-        acquire_lock,
-        atomic_write_json,
-        get_lockfile_info,
-        read_json_safe,
-        run_with_retries,
-    )  # type: ignore
-
-    run_step = None  # type: ignore
-    _HAS_RUN_STEP = False
-
-# Try new isolation helpers (optional). We'll use them when available, with safe fallbacks.
-try:
-    from file_utils import run_maintenance_with_isolation  # type: ignore
-except Exception:
-    run_maintenance_with_isolation = None  # type: ignore
-
-try:
-    from file_utils import run_blocking_in_thread  # type: ignore
-except Exception:
-    run_blocking_in_thread = None  # type: ignore
+from file_utils import atomic_write_json, get_lockfile_info, read_json_safe, run_with_retries
 
 _LOCK_PATH = f"{VIEW_TRACKING_FILE}.lock"
 
 REHYDRATE_MIN_DELAY = 0.06  # seconds
 REHYDRATE_FETCH_MAX_ATTEMPTS = 3
+REHYDRATE_FETCH_TIMEOUT = 10.0
 REHYDRATE_FETCH_BACKOFF_BASE = 0.25
 REHYDRATE_FETCH_BACKOFF_MAX = 2.0
 
@@ -116,11 +82,10 @@ def _compute_match_datetime(match: dict) -> datetime:
 
 
 async def _build_ark_registration_view(match_id: int) -> ArkRegistrationView | None:
-    config = await get_config()
+    config, match = await get_registration_rehydration_data(match_id)
     if not config:
         return None
 
-    match = await get_match(match_id)
     if not match:
         return None
 
@@ -320,8 +285,12 @@ async def _attempt_fetch_channel_and_message(bot, channel_id: int, message_id: i
     while attempt < REHYDRATE_FETCH_MAX_ATTEMPTS:
         attempt += 1
         try:
-            channel = await bot.fetch_channel(int(channel_id))
-            msg = await channel.fetch_message(int(message_id))
+            channel = await asyncio.wait_for(
+                bot.fetch_channel(int(channel_id)), REHYDRATE_FETCH_TIMEOUT
+            )
+            msg = await asyncio.wait_for(
+                channel.fetch_message(int(message_id)), REHYDRATE_FETCH_TIMEOUT
+            )
             if attempt > 1:
                 logger.debug(
                     "[VIEW] Fetch succeeded on retry attempt=%d for channel=%s message=%s",
@@ -354,413 +323,123 @@ async def _attempt_fetch_channel_and_message(bot, channel_id: int, message_id: i
     raise last_exc or RuntimeError("Unknown fetch failure")
 
 
-async def rehydrate_tracked_views(bot) -> dict:
-    """
-    Rehydrate views from persistent tracker file. Returns summary dict:
-      {"rehydrated": int, "pruned": int, "failed": int, "entries_total": int}
-    """
-    start_ts = time.monotonic()
-    summary = {"rehydrated": 0, "pruned": 0, "failed": 0, "entries_total": 0}
+def _tracker_store():
+    return TrackedViewStore(
+        VIEW_TRACKING_FILE,
+        _LOCK_PATH,
+        timeout=float(VIEW_TRACKER_LOCK_TIMEOUT),
+        poll=float(VIEW_TRACKER_LOCK_POLL),
+    )
 
-    # Prefer run_step for telemetry; fall back to run_maintenance_with_isolation,
-    # run_blocking_in_thread, or asyncio.to_thread
+
+async def _restore_tracked_entry(bot, store, key, entry):
+    async def prune(reason):
+        receipt = entry.get(EDIT_RECEIPT) if isinstance(entry, dict) else None
+        if receipt is not None and (
+            not isinstance(receipt, dict) or receipt.get("state") != "acknowledged"
+        ):
+            return EntryOutcome("outcome_unconfirmed", "prior_edit_unconfirmed")
+        state = await store.prune(key, entry)
+        return EntryOutcome(
+            state, "prior_edit_unconfirmed" if state == "outcome_unconfirmed" else reason
+        )
+
+    valid, normalized = validate_tracker_entry(entry)
+    if not valid:
+        return await prune("invalid_entry")
     try:
-        if _HAS_RUN_STEP and run_step is not None:
-            view_data = await run_step(load_view_tracker, name="load_view_tracker", meta={})
-        else:
-            if run_maintenance_with_isolation is not None:
-                try:
-                    res = await run_maintenance_with_isolation(
-                        load_view_tracker, name="load_view_tracker", prefer_process=True, meta={}
-                    )
-                    # support helpers that return (value, meta)
-                    if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-                        view_data = res[0]
-                    else:
-                        view_data = res
-                except Exception:
-                    # fallback to thread
-                    if run_blocking_in_thread is not None:
-                        view_data = await run_blocking_in_thread(
-                            load_view_tracker, name="load_view_tracker"
-                        )
-                    else:
-                        view_data = await asyncio.to_thread(load_view_tracker)
-            elif run_blocking_in_thread is not None:
-                view_data = await run_blocking_in_thread(
-                    load_view_tracker, name="load_view_tracker"
-                )
-            else:
-                view_data = await asyncio.to_thread(load_view_tracker)
-    except Exception:
-        view_data = await asyncio.to_thread(load_view_tracker)
-
-    if not view_data:
-        logger.info("[VIEW] No tracked views to rehydrate.")
-        telemetry_logger.info(
-            json.dumps({"event": "rehydration_start", "entries": 0, "timestamp": time.time()})
+        _, message = await _attempt_fetch_channel_and_message(
+            bot, normalized["channel_id"], normalized["message_id"]
         )
-        return summary
+    except Exception as exc:
+        if _is_prunable_fetch_exception(exc):
+            return await prune("inaccessible")
+        return EntryOutcome("failed", "fetch_" + type(exc).__name__)
 
-    summary["entries_total"] = len(view_data)
-    logger.info("[VIEW] Starting rehydration of %d tracked view(s)...", len(view_data))
-    telemetry_logger.info(
-        json.dumps(
-            {"event": "rehydration_start", "entries": len(view_data), "timestamp": time.time()}
-        )
-    )
+    safe_prefix = sanitize_view_prefix(normalized.get("prefix") or key, max_len=_PREFIX_MAX_LEN)
+    if key.startswith("arkmatch_") or safe_prefix.startswith("arkmatch_"):
+        match = re.match(r"^arkmatch_(\d+)", key) or re.match(r"^arkmatch_(\d+)", safe_prefix)
+        if not match:
+            return EntryOutcome("failed", "invalid_ark_identity")
+        # This adapter's SQL worker is bounded by driver timeouts and drains on
+        # cancellation. Never retry through another executor after its entry.
+        view = await _build_ark_registration_view(int(match.group(1)))
+        if view is None:
+            return EntryOutcome("failed", "ark_data_unavailable")
+    else:
+        view, _ = _build_rehydrated_view(key, normalized)
 
-    async def _offload_remove_entry(key: str):
-        # Centralized offload for removing tracker entries: prefer run_step, then maintenance (process), then thread, then to_thread
+    async with store.locked():
+        data = await store.snapshot()
+        if not store.matches(data, key, entry):
+            return EntryOutcome("superseded", "tracker_changed")
         try:
-            if _HAS_RUN_STEP and run_step is not None:
-                await run_step(
-                    remove_view_tracker_entry,
-                    key,
-                    name="remove_view_tracker_entry",
-                    meta={"key": key},
-                )
-                return
-        except Exception:
-            pass
+            # No await between final identity check and local registration.
+            bot.add_view(view, message_id=normalized["message_id"])
+            return EntryOutcome("attached")
+        except (TypeError, AttributeError):
+            pass  # The historical compatibility path below is receipt guarded.
 
-        if run_maintenance_with_isolation is not None:
-            try:
-                res = await run_maintenance_with_isolation(
-                    remove_view_tracker_entry,
-                    key,
-                    name="remove_view_tracker_entry",
-                    prefer_process=True,
-                    meta={"key": key},
-                )
-                # support helpers that return (value, meta)
-                if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-                    return res[0]
-                return res
-            except Exception:
-                # fallback; continue to try other offloads
-                pass
-
-        if run_blocking_in_thread is not None:
-            return await run_blocking_in_thread(
-                remove_view_tracker_entry, key, name="remove_view_tracker_entry", meta={"key": key}
-            )
-        return await asyncio.to_thread(remove_view_tracker_entry, key)
-
-    for key, entry in list(view_data.items()):
+        previous = data[key].get(EDIT_RECEIPT)
+        if previous is not None and (
+            not isinstance(previous, dict) or previous.get("state") != "acknowledged"
+        ):
+            return EntryOutcome("outcome_unconfirmed", "prior_edit_unconfirmed")
+        receipt = {
+            "attempt_id": str(uuid4()),
+            "fingerprint": fingerprint(entry),
+            "state": "prepared",
+        }
+        data[key][EDIT_RECEIPT] = receipt
+        await store.write(data)
         try:
-            if asyncio.current_task() and asyncio.current_task().cancelled():
-                raise asyncio.CancelledError()
-
-            if not isinstance(entry, dict):
-                logger.warning("[VIEW] Skipping invalid tracker entry for key=%s", key)
-                # use run_step if available, else maintenance offload helper
-                await _offload_remove_entry(key)
-
-                summary["pruned"] += 1
-                telemetry_logger.info(
-                    json.dumps(
-                        {
-                            "event": "pruned_entry",
-                            "key": key,
-                            "reason": "not_dict",
-                            "timestamp": time.time(),
-                        }
-                    )
-                )
-                await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                continue
-
-            valid, result = validate_tracker_entry(entry)
-            if not valid:
-                reason = result
-                logger.warning(
-                    "[VIEW] Tracker entry invalid for key=%s: %s -- pruning.", key, reason
-                )
-                await _offload_remove_entry(key)
-
-                summary["pruned"] += 1
-                telemetry_logger.info(
-                    json.dumps(
-                        {
-                            "event": "pruned_entry",
-                            "key": key,
-                            "reason": str(reason),
-                            "timestamp": time.time(),
-                        }
-                    )
-                )
-                await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                continue
-
-            normalized_entry: dict = result
-            channel_id = normalized_entry["channel_id"]
-            message_id = normalized_entry["message_id"]
-
-            try:
-                channel, _message = await _attempt_fetch_channel_and_message(
-                    bot, int(channel_id), int(message_id)
-                )
-            except asyncio.CancelledError:
-                logger.info("[VIEW] Rehydration cancelled while fetching for key=%s", key)
-                raise
-            except Exception as fetch_exc:
-                if _is_prunable_fetch_exception(fetch_exc):
-                    logger.warning(
-                        "[VIEW] Channel/message not accessible for key=%s channel=%s message=%s (pruning). exc=%s status=%s",
-                        key,
-                        channel_id,
-                        message_id,
-                        type(fetch_exc).__name__,
-                        getattr(fetch_exc, "status", getattr(fetch_exc, "status_code", None)),
-                    )
-                    await _offload_remove_entry(key)
-
-                    summary["pruned"] += 1
-                    telemetry_logger.info(
-                        json.dumps(
-                            {
-                                "event": "pruned_entry",
-                                "key": key,
-                                "channel_id": channel_id,
-                                "message_id": message_id,
-                                "reason": "inaccessible",
-                                "exc": type(fetch_exc).__name__,
-                                "timestamp": time.time(),
-                            }
-                        )
-                    )
-                else:
-                    logger.warning(
-                        "[VIEW] Transient error fetching (attempts=%d) for key=%s channel=%s message=%s: %s",
-                        REHYDRATE_FETCH_MAX_ATTEMPTS,
-                        key,
-                        channel_id,
-                        message_id,
-                        type(fetch_exc).__name__,
-                    )
-                    summary["failed"] += 1
-                    telemetry_logger.info(
-                        json.dumps(
-                            {
-                                "event": "fetch_failed",
-                                "key": key,
-                                "channel_id": channel_id,
-                                "message_id": message_id,
-                                "exc": type(fetch_exc).__name__,
-                                "timestamp": time.time(),
-                            }
-                        )
-                    )
-                await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                continue
-
-            try:
-                safe_prefix = sanitize_view_prefix(
-                    normalized_entry.get("prefix") or key, max_len=_PREFIX_MAX_LEN
-                )
-
-                if key.startswith("arkmatch_") or safe_prefix.startswith("arkmatch_"):
-                    match_id = None
-
-                    # Prefer the key (usually clean: "arkmatch_1")
-                    if key.startswith("arkmatch_"):
-                        m = re.match(r"^arkmatch_(\d+)", key)
-                        if m:
-                            match_id = int(m.group(1))
-
-                    # Fallback: prefix may be "arkmatch_1_abcdef"
-                    if match_id is None:
-                        m = re.match(r"^arkmatch_(\d+)", safe_prefix)
-                        if m:
-                            match_id = int(m.group(1))
-
-                    if match_id:
-                        view = await _build_ark_registration_view(match_id)
-                        if view:
-                            try:
-                                bot.add_view(view, message_id=int(message_id))
-                            except (TypeError, AttributeError):
-                                await _message.edit(view=view)
-
-                            logger.info(
-                                "[VIEW] Rehydrated Ark registration view for match_id=%s channel=%s message=%s",
-                                match_id,
-                                channel_id,
-                                message_id,
-                            )
-                            summary["rehydrated"] += 1
-                            telemetry_logger.info(
-                                json.dumps(
-                                    {
-                                        "event": "rehydrated",
-                                        "key": key,
-                                        "channel_id": channel_id,
-                                        "message_id": message_id,
-                                        "prefix": safe_prefix,
-                                        "timestamp": time.time(),
-                                    }
-                                )
-                            )
-                            continue
-                view, safe_prefix = _build_rehydrated_view(key, normalized_entry)
-                try:
-                    try:
-                        bot.add_view(view, message_id=int(message_id))
-                    except (TypeError, AttributeError):
-                        try:
-                            await _message.edit(view=view)
-                        except asyncio.CancelledError:
-                            logger.info(
-                                "[VIEW] Rehydration cancelled while editing message for key=%s", key
-                            )
-                            raise
-                        except Exception as edit_exc:
-                            if _is_prunable_fetch_exception(edit_exc):
-                                logger.warning(
-                                    "[VIEW] Failed to attach view (message inaccessible) for key=%s channel=%s message=%s (pruning). exc=%s",
-                                    key,
-                                    channel_id,
-                                    message_id,
-                                    type(edit_exc).__name__,
-                                )
-                                await _offload_remove_entry(key)
-
-                                summary["pruned"] += 1
-                                telemetry_logger.info(
-                                    json.dumps(
-                                        {
-                                            "event": "pruned_entry",
-                                            "key": key,
-                                            "reason": "attach_inaccessible",
-                                            "exc": type(edit_exc).__name__,
-                                            "timestamp": time.time(),
-                                        }
-                                    )
-                                )
-                                await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                                continue
-                            logger.exception(
-                                "[VIEW] Failed to attach view by editing message for key=%s channel=%s message=%s: %s",
-                                key,
-                                channel_id,
-                                message_id,
-                                edit_exc,
-                            )
-                            summary["failed"] += 1
-                            telemetry_logger.info(
-                                json.dumps(
-                                    {
-                                        "event": "attach_failed",
-                                        "key": key,
-                                        "exc": type(edit_exc).__name__,
-                                        "timestamp": time.time(),
-                                    }
-                                )
-                            )
-                            await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                            continue
-
-                except Exception:
-                    logger.exception(
-                        "[VIEW] Unexpected error while registering view for key=%s channel=%s message=%s",
-                        key,
-                        channel_id,
-                        message_id,
-                    )
-                    summary["failed"] += 1
-                    telemetry_logger.info(
-                        json.dumps(
-                            {
-                                "event": "register_failed",
-                                "key": key,
-                                "channel_id": channel_id,
-                                "message_id": message_id,
-                                "timestamp": time.time(),
-                            }
-                        )
-                    )
-                    await asyncio.sleep(REHYDRATE_MIN_DELAY)
-                    continue
-
-                logger.info(
-                    "[VIEW] Rehydrated view for key=%s (prefix=%s) channel=%s message=%s",
-                    key,
-                    safe_prefix,
-                    channel_id,
-                    message_id,
-                )
-                summary["rehydrated"] += 1
-                telemetry_logger.info(
-                    json.dumps(
-                        {
-                            "event": "rehydrated",
-                            "key": key,
-                            "channel_id": channel_id,
-                            "message_id": message_id,
-                            "prefix": safe_prefix,
-                            "timestamp": time.time(),
-                        }
-                    )
-                )
-
-            except asyncio.CancelledError:
-                logger.info(
-                    "[VIEW] Rehydration cancelled while instantiating/registering view for %s", key
-                )
-                raise
-            except Exception:
-                logger.exception(
-                    "[VIEW] Failed to instantiate/register view for key=%s channel=%s message=%s",
-                    key,
-                    channel_id,
-                    message_id,
-                )
-                summary["failed"] += 1
-                telemetry_logger.info(
-                    json.dumps(
-                        {
-                            "event": "instantiate_failed",
-                            "key": key,
-                            "exc": "exception",
-                            "timestamp": time.time(),
-                        }
-                    )
-                )
-
+            await asyncio.wait_for(message.edit(view=view), timeout=REHYDRATE_FETCH_TIMEOUT)
         except asyncio.CancelledError:
-            logger.info("[VIEW] Rehydration cancelled (outer). Aborting remaining work.")
             raise
+        except Exception as exc:
+            if _is_prunable_fetch_exception(exc):
+                del data[key]
+                await store.write(data)
+                return EntryOutcome("pruned", "edit_inaccessible")
+            return EntryOutcome("outcome_unconfirmed", "edit_" + type(exc).__name__)
+        receipt["state"] = "acknowledged"
+        try:
+            await store.write(data)
         except Exception:
-            logger.exception("[VIEW] Unexpected error while rehydrating key=%s", key)
-            summary["failed"] += 1
-            telemetry_logger.info(
-                json.dumps({"event": "unexpected_error", "key": key, "timestamp": time.time()})
-            )
-        await asyncio.sleep(REHYDRATE_MIN_DELAY)
+            return EntryOutcome("outcome_unconfirmed", "edit_receipt_unconfirmed")
+        return EntryOutcome("attached")
 
-    elapsed = time.monotonic() - start_ts
-    logger.info(
-        "[VIEW] Rehydration complete. rehydrated=%d pruned=%d failed=%d elapsed=%.2fs",
-        summary["rehydrated"],
-        summary["pruned"],
-        summary["failed"],
-        elapsed,
-    )
-    telemetry_logger.info(
-        json.dumps(
-            {
-                "event": "rehydration_summary",
-                "rehydrated": summary["rehydrated"],
-                "pruned": summary["pruned"],
-                "failed": summary["failed"],
-                "total": summary["entries_total"],
-                "elapsed_s": elapsed,
-                "timestamp": time.time(),
-            }
+
+async def rehydrate_tracked_views(bot) -> dict:
+    """One supervised restoration per bot process, including reconnects."""
+    task = getattr(bot, "_k98_tracked_view_restoration", None)
+    owner = task is None
+    if owner:
+        store = _tracker_store()
+        task = asyncio.create_task(
+            restore_tracked_views(
+                store.snapshot,
+                lambda key, entry: _restore_tracked_entry(bot, store, key, entry),
+                pause=REHYDRATE_MIN_DELAY,
+            ),
+            name="tracked_view_restoration_pass",
         )
-    )
-    return summary
+        bot._k98_tracked_view_restoration = task
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        if owner:
+            task.cancel()
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if not task.cancelled():
+                task.exception()
+        raise
 
 
 class LockAcquireTimeout(Exception):
@@ -805,13 +484,11 @@ def save_view_tracker(key: str, entry: dict):
         raise ValueError(f"Invalid tracker entry for key={key}: {result}")
 
     try:
-        with acquire_lock(
+        with tracker_lock(
             _LOCK_PATH, timeout=float(VIEW_TRACKER_LOCK_TIMEOUT), poll=float(VIEW_TRACKER_LOCK_POLL)
         ):
-            tracker = read_json_safe(VIEW_TRACKING_FILE, default={}) or {}
-            if not isinstance(tracker, dict):
-                tracker = {}
-            tracker[str(key)] = entry_copy
+            tracker = _tracker_store().read()
+            tracker[str(key)] = preserve_edit_receipt(tracker.get(str(key)), entry_copy)
             atomic_write_json(VIEW_TRACKING_FILE, tracker)
             logger.debug("[VIEW] Saved tracker entry for key=%s", key)
     except TimeoutError:
@@ -844,38 +521,7 @@ def save_view_tracker(key: str, entry: dict):
 
 # Async wrapper to avoid blocking the event loop.
 async def save_view_tracker_async(key: str, entry: dict) -> None:
-    try:
-        if _HAS_RUN_STEP and run_step is not None:
-            # pass both key and entry through to run_step for correct invocation
-            await run_step(
-                save_view_tracker, key, entry, name="save_view_tracker", meta={"key": key}
-            )
-            return
-    except Exception:
-        pass
-
-    # Prefer process-isolated maintenance offload when available, then thread, then to_thread
-    if run_maintenance_with_isolation is not None:
-        try:
-            await run_maintenance_with_isolation(
-                save_view_tracker,
-                key,
-                entry,
-                name="save_view_tracker",
-                prefer_process=True,
-                meta={"key": key},
-            )
-            return
-        except Exception:
-            # fall through to thread fallback
-            pass
-
-    if run_blocking_in_thread is not None:
-        # ensure both key and entry are forwarded
-        await run_blocking_in_thread(save_view_tracker, key, entry, name="save_view_tracker")
-    else:
-        # fallback to asyncio.to_thread; forward both args
-        await asyncio.to_thread(save_view_tracker, key, entry)
+    await drain_thread(save_view_tracker, key, entry)
 
 
 def save_view_tracker_with_retries(
@@ -900,12 +546,10 @@ def save_view_tracker_with_retries(
 
 def remove_view_tracker_entry(key: str) -> bool:
     try:
-        with acquire_lock(
+        with tracker_lock(
             _LOCK_PATH, timeout=float(VIEW_TRACKER_LOCK_TIMEOUT), poll=float(VIEW_TRACKER_LOCK_POLL)
         ):
-            tracker = read_json_safe(VIEW_TRACKING_FILE, default={}) or {}
-            if not isinstance(tracker, dict):
-                tracker = {}
+            tracker = _tracker_store().read()
             existed = tracker.pop(str(key), None) is not None
             atomic_write_json(VIEW_TRACKING_FILE, tracker)
             if existed:

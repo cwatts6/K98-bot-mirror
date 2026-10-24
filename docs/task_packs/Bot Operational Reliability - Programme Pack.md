@@ -1,5 +1,13 @@
 # Bot Operational Reliability — Programme Pack
 
+> **Programme reconciliation — 2026-10-24:** [Current P0/P1 status](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+> maps delivered P0 capabilities and residual work across all six workstreams.
+> ProcConfig coordination, result draining, protected admission and selected durable
+> delivery/state paths are now implemented; old design-only language below is
+> historical. No whole workstream is closed by that partial delivery. The first
+> P1 slice is the [tracked-view architecture and implementation plan](P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md).
+> Full P1 and outstanding P0 acceptance remain carried forward.
+
 Date: 2026-09-09. Owner and priority decision: Chris Watts.
 Status: programme boundary/documentation approved; portfolio assessment complete; priority selected; runtime implementation approval pending.
 
