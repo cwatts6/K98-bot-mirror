@@ -3,7 +3,12 @@
 Date: 24 October 2026. Owner: Chris Watts.
 Status: architecture, runtime implementation and validation approved. First-phase
 documentation and the first tracked-view runtime slice are implemented and locally
-reviewed on `codex/tracked-view-restoration`; production acceptance remains open.
+reviewed on `codex/tracked-view-restoration`, then merged as #439/#688 and deployed.
+Source/startup and restoration inventory are verified; existing-message callback
+acceptance and inaccessible overview disposition remain open. The
+[current status record](../reference/P0%20delivery%20and%20P1%20recovery%20status.md)
+contains the 21:30 UTC evidence and retains all P0/P1 boundaries. Earlier local
+checkpoints below remain historical validation evidence.
 
 ## Scope summary
 

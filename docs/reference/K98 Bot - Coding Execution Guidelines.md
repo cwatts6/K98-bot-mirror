@@ -399,3 +399,10 @@ When unsure:
 5. Prefer extraction over expansion of legacy files.
 
 If the user has not asked for code yet, stop at plan approval rather than guessing.
+
+## 20. Operational access preflight
+
+Before proposing commands, state machine, shell, actual identity/elevation, exact paths, operation and evidence prerequisites. Inspect installed restrictions; do not infer custody from Git cleanliness or an administrator account name. Use reviewed executable paths and validate PowerShell 5.1 examples. Diagnose before retrying or broadening access.
+
+The [Windows ownership and access contract](Windows%20ownership%20and%20access%20contract.md)
+is required reading for this work and defines the operation matrix and validation details.

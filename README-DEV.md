@@ -4,8 +4,8 @@
 > records verified P0 deployment, accepted normal import/export and delivered
 > #438/#687. Natural eligible rollover and final P0 receipt reconciliation remain
 > open. [Tracked-view architecture and plan](docs/task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
-> is the first P1 slice, now implemented and reviewed locally pending deployed
-> acceptance; all P1 workstreams are retained. This status supersedes
+> is the first P1 slice, now deployed with restoration inventory verified; existing-message
+> callback acceptance and inaccessible overview disposition remain open; all P1 workstreams are retained. This status supersedes
 > older delivery/next-step statements below, without rewriting their evidence.
 
 > **S11 deployment process — 2026-10-08:** Protected initial cutover and normal

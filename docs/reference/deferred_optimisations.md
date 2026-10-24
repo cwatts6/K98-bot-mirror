@@ -59,12 +59,12 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 ### Deferred Optimisation
 - Area: `core/event_rehydration_lifecycle.py`, `bot_instance.py` tracked-view scheduling and `rehydrate_views.py`
 - Type: architecture
-- Description: September restart cancellations recur in the 24 October logs: an earlier 21-entry pass and the later #438/#687 restart both exceed the ten-second generic-view deadline and abort the remainder. The deployed baseline cancels restoration, conflates unavailable trackers with empty and prunes by key. The approved local slice now observes one owned pass past the deadline, uses bounded reads and strict identity checks, and preserves uncertain edits. Its 89 focused tests, final full suite (9,218 passed; 1,080 existing skips; eight subtests) and Changes reviews passed; deployed restoration is not yet accepted. Task completion and a healthy recovery report alone do not establish that acceptance.
-- Suggested Fix: Complete the linked plan's protected promotion and existing-view inventory/callback acceptance when release is authorized. Preserve the original messages, identities and unresolved edit receipts; do not repeat imports or manufacture public activity. Keep remaining WS3 readiness and scheduler work separately scoped.
+- Description: Historical generic-view cancellation is fixed in merged #439/#688 and deployed private d127cb6e08aaecf0a397b9f5a3d41279280b245c. Successor logs and report 42 verify a complete 21-entry pass beyond the ten-second deadline: 20 attached, one inaccessible daily overview pruned, zero failed/unconfirmed/unattempted. Existing-message callbacks and the overview disposition remain to be accepted; task completion and incident counts alone do not replace those checks.
+- Suggested Fix: Complete safe original-message callback acceptance and confirm the overview disposition without automatic reposting or repeated imports. Retain completed restoration evidence and keep remaining WS3 readiness and scheduler work separate.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
-- Status: WS3 first slice implemented and reviewed locally after approval; focused validation and completed Changes review recorded in the linked plan; deployed inventory/callback acceptance still required; owner Chris Watts
+- Status: WS3 first slice deployed; source/startup and restoration inventory verified; callback acceptance and overview disposition remain open; owner Chris Watts
 - Last verified: 2026-10-24
 - Plan: [P1 tracked-view restoration](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
 
@@ -577,11 +577,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ### Deferred Optimisation
 - Area: S11 release authoring around `scripts/prepare_k98_release.py` and `core/export_release_seed.py`
 - Type: architecture
-- Description: The generic runner and successor-seed helper exist, but each runtime release still requires manual assembly of source/seed/start/readiness adapters and operator transfer instructions. PR616 required over forty minutes of bespoke preparation/review, then failed live preflight with an ownership error that omitted the failing path and owner. This is a demonstrated delivery/usability failure, not optional maintenance. Static review and packaging success were insufficient evidence of operational readiness.
-- Suggested Fix: After this defect is deployed, meet the operator's mandatory usability requirement: a manual update, including creation of its release package, must be as simple as the previous git-pull step. Provide a stable script/command with no per-release hand-crafted manifests, hashes, paths or edits. Either automate preparation and coordinated deployment reliably, or explicitly redesign/remove the coordinated startup source-policy update requirement while retaining necessary ownership and no-replay safeguards. A bespoke packet-authoring workflow is not an acceptable permanent solution.
+- Description: Automatic preparation and coordinated source/seed/start/readiness deployment are delivered and verified on 24 October through the fixed updater command. The old per-release manual assembly requirement is superseded. An existing archive directory needed a separately reviewed fresh-object custody repair; protected staging inherited NotContentIndexed and required a scoped metadata allowance. A subsequent stream gate needed SQL-only diagnosis before successful retry. These are remaining usability/diagnostic gaps, not permission to weaken protections or proof of an updater-created stream.
+- Suggested Fix: Productize bounded inspect/review/repair/resume for supported existing-directory custody cases, retaining originals, exact inventories/hashes, handle protections and receipts. Improve errors with owner/ACL/attribute context and exact stream state. Design waiting/quiet-period coordination separately with bounded waits, no force closure, automatic claim release or age-based recovery. Keep the fixed operator command and authenticate installed tool capabilities.
 - Impact: high
 - Risk: medium
-- Dependencies: The 2026-10-08 continuation supersedes the original ordering: reusable updater first, orphan-queue fix immediately next and its deployment used for first live acceptance. Local updater implementation now exists; elevated native and live acceptance remain outstanding. Current source/policy controls remain in force; no implicit removal.
+- Dependencies: Follow the Windows ownership and access contract; actual elevated PowerShell 5.1 inheritance/resume/handle tests and Changes review for runtime implementation. The one-time repair is not a general installed updater feature.
+- Status: Automatic preparation/deployment delivered; residual directory-custody productization and stream diagnostics remain open; owner Chris Watts
+- Last verified: 2026-10-24
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py::kvk_source`, `ui/views/kvk_source_import_view.py`, source receipt/review services and DAL

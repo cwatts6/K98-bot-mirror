@@ -227,3 +227,10 @@ A change is test-ready when:
 - [ ] focused and general validation commands are identified
 - [ ] documentation-only skips are explicitly justified
 - [ ] Codex Security review decision is documented before PR handoff
+
+## 13. Windows custody and deployment validation
+
+For protected filesystem/updater changes, cover production-like inheritance/default ownership, metadata, partial-stage resume, interrupted replacement, prior handles and negative ACL/link/stream/inventory cases. Verify preservation of originals. Distinguish parser checks, surrogate-account fixtures, elevated rehearsal and production receipts. Documentation-only work needs link/content and documentation gates without replaying deployment or provider activity.
+
+The [Windows ownership and access contract](Windows%20ownership%20and%20access%20contract.md)
+is required reading for this work and defines the operation matrix and validation details.

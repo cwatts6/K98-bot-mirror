@@ -2,7 +2,28 @@
 
 Use this sequence for the protected S11 runtime. A merge or development-PC pull does not deploy the bot. The [S11 deployment and restart contract](S11%20Deployment%20and%20Restart%20Contract.md) defines the protected release protocol.
 
-## Current release — 9 October 2026
+## 24 October 2026 deployment checkpoint
+
+Tracked-view PRs #439/#688 are merged. Operator updater evidence confirms private
+source `d127cb6e08aaecf0a397b9f5a3d41279280b245c`, verified source/seed/start/readiness
+and Discord online. Import/export remains degraded because fresh health evidence
+was unavailable; this does not certify provider delivery. Report 42 and successor
+logs confirm 20 attached views, one inaccessible overview pruned and zero failed,
+unconfirmed or unattempted entries. Callback acceptance and overview disposition
+remain separate. See [current P0/P1 status](P0%20delivery%20and%20P1%20recovery%20status.md).
+
+Archive custody repair is verified, with original and receipts retained. Read the
+required [ownership and access contract](Windows%20ownership%20and%20access%20contract.md)
+before filesystem diagnosis/repair. A later open-stream refusal was a separate
+runtime gate. The observed health probe subsequently closed with preparation
+completed; subsequent deployment passed fresh checks. This does not conclusively
+identify the stream present at the earlier failure instant.
+
+No repeat deployment, restart, archive repair or package cleanup is needed for
+this verified release. Earlier dated incidents below retain their evidence and
+are not current instructions to replay recovery.
+
+## Historical release — 9 October 2026
 
 **18:35 UTC update:** the latest exact committed-import preparation was settled
 with two metadata changes and no import replay or restart. Its imported data and

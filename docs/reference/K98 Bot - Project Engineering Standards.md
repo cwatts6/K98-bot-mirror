@@ -296,3 +296,10 @@ Before marking work complete, confirm:
 - [ ] UTC handling is correct.
 - [ ] Tests were added or updated appropriately.
 - [ ] Any deferred debt in the touched area is explicitly called out.
+
+## 14. Windows ownership and protected operations
+
+Before filesystem, deployment or repair work, establish machine, process identity/elevation, shell, ownership domain and permitted operation. Owner, ACL, metadata, bytes and prior handles are separate requirements. Development write access does not authorize live source, startup policy, runtime data or SQL changes.
+
+The [Windows ownership and access contract](Windows%20ownership%20and%20access%20contract.md)
+is required reading for this work and defines the operation matrix and validation details.

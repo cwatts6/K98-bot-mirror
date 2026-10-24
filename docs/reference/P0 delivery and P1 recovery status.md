@@ -20,9 +20,9 @@ Basis: operator acceptance and the retained private `P0-accepted-P1-handoff-2026
 bundle: `ACCEPTANCE.json`, `DEPLOYMENT-438-687-VERIFIED.txt`,
 `REPORT40-VERIFICATION.txt` and supporting scan acceptance records. These contain
 operational identifiers and must not be copied into public documentation unchanged.
-The latest supplied runtime log still records tracked-view cancellation and a
-successful event fetch with zero upcoming events being treated as not ready.
-Neither is repaired by #438/#687.
+The pre-#439/#688 log recorded tracked-view cancellation and a successful empty
+event fetch being treated as not ready. Tracked-view cancellation is addressed by
+the deployment below; empty-event readiness remains a separate slice.
 
 ## P0 acceptance still carried forward
 
@@ -68,7 +68,7 @@ the rest of P1.
 |---|---|---|
 | WS1 — ProcConfig lifetime and truthful outcomes | Coordinated configuration writes, targets and checkpoint share transaction ownership; result sets are drained; lost acknowledgements retain uncertainty; participating offloads execute once. | Reconcile legacy report/manifest and cleanup semantics, including unique per-run artifacts and truthful partial/unknown outcomes. The September HY000 observation is historical evidence, not proof the coordinated path remains unfixed. |
 | WS2 — executor replay prevention | Coordinated Stats path uses the admitted runtime and a cancellation-draining worker. | Legacy Stats fallback, KVK History and stats-alert wrappers still need caller/side-effect inventory and deterministic no-reentry tests. Fix only the tracker adapters necessary for the first WS3 slice. |
-| WS3 — process/task ownership and restoration | P0 startup diagnostics can observe the original task past a deadline and drain on shutdown. | The deployed generic-view path still selects cancellation at ten seconds; the first local slice is implemented and full-suite validated, with deployment acceptance pending. Empty-event readiness, singleton ownership and public-reminder child supervision remain separate slices. Assess protected-launcher coverage before changing legacy singleton logic. |
+| WS3 — process/task ownership and restoration | P0 startup diagnostics can observe the original task past a deadline and drain on shutdown. | The first slice is deployed: the original pass completed after the deadline with 20 attachments and one inaccessible prune. Callback acceptance and overview disposition remain open. Empty-event readiness, singleton ownership and public-reminder child supervision remain separate slices. Assess protected-launcher coverage before changing legacy singleton logic. |
 | WS4 — DM/JSON ordering | DM tracker I/O lock and single backend selection exist; Phase 2F public-reminder atomic replacement and Phase 6K queue persistence are delivered. | Verify caller ordering, snapshot consistency, shutdown/cancellation and send-versus-disk uncertainty; broader JSON inventory remains. The old claim that current DM wrappers automatically fall back after entry is superseded. |
 | WS5 — dispatch ownership/policy | Pre-KVK reservations and diagnostic isolation exist; P0 processing delivery uses durable enter/ack receipts and retains uncertain outcomes. | Reconcile fighting admission/caps, KS preclaim, legacy ambiguous Pre-KVK edit replacement, general in-memory delivery trackers and publication audit semantics separately. Do not extend P0 durable behavior to every route by assumption. |
 | WS6 — independent ProcConfig admission | Shared writer runtime, owner context, nested token matching and fail-closed protected activation exist. | Audit all independent admin/startup/pipeline and compatibility entrypoints against the existing authority. Missing report evidence never authorizes replay; do not design a duplicate admission protocol. |
@@ -98,12 +98,46 @@ Partial delivery is reconciled there, not treated as closure of whole workstream
 ## Approved tracked-view implementation
 
 The operator approved architecture, implementation and validation, including the
-first-phase documentation update. The first runtime slice is implemented locally in the
+first-phase documentation update. The first runtime slice is deployed; its design is retained in the
 [tracked-view plan](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md).
-Review and production acceptance follow that staged plan. Local restoration tests
+Source/startup and restoration inventory are verified below; remaining functional acceptance follows that plan. Local restoration tests
 do not close full P1 or the outstanding P0 acceptance items above. The baseline
 publication omissions are repaired and the final offline suite passed (9,218 tests
 and eight subtests; 1,080 existing environment/platform/integration skips), with
 production operational logs unchanged. See the plan for the exact evidence and limits.
 The [mirror PR review](../task_packs/Mirror%20PR%20Cleanup%20-%202026-10-24.md)
 separates obsolete review branches from remaining product acceptance.
+
+## Tracked-view deployment evidence — 24 October, 21:30 UTC
+
+Operator evidence confirms private deployment of
+`d127cb6e08aaecf0a397b9f5a3d41279280b245c` through merged #439/#688.
+The runner verified source, seed, successor start and readiness, with Discord
+online and retained work/activation flags preserved. Repeated intermediate
+native-verification records do not represent repeated successor starts.
+
+At 21:27:50.864 UTC the successor recorded a complete 21-entry restoration:
+20 attached, one pruned as inaccessible (`daily_kvk_overview`), zero superseded,
+failed, outcome-unconfirmed or unattempted. The original task continued beyond
+the ten-second observation deadline and completed, demonstrating the intended fix.
+Report 42, generated 21:30:25 UTC, carries the same structured completion, a healthy
+monitor and all 17,612 recorded incidents resolved. This is recorded coverage at
+that observation, not a transactional census of every possible failure.
+
+Remaining functional checks: a safe existing-message interaction on a restored
+view and confirmation of the inaccessible overview's intended disposition. The
+summary does not distinguish a deleted message from unavailable access. Do not
+automatically repost it or declare it obsolete; preserve original identities.
+
+The updater retained degraded import/export classification:
+`fresh_import_export_health_evidence_unavailable`. Startup cache/configuration
+completion is supporting evidence, not fresh end-to-end export certification.
+Earlier normal import/export acceptance remains accepted without replay.
+All P1 families and WS1–WS6 residuals, natural P0 rollover and final F01–F05 receipt
+reconciliation remain open as described above.
+
+The archive repair was independently verified before deployment: replacement
+permissions and all six hashes passed, and the original was retained. The new
+engineering/access contract records the lesson. Generic support for unsupported
+existing-directory custody and better stream diagnostics remain deferred;
+a successful one-time repair does not establish those installed capabilities.

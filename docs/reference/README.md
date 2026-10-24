@@ -1,5 +1,7 @@
 # K98 Bot Reference Docs
 
+> **Required for Windows files, deployment and repair:** [Ownership and access contract](Windows%20ownership%20and%20access%20contract.md) defines execution context, operation boundaries and validation. Read it before proposing custody or ACL changes.
+
 > **P0/P1 checkpoint — 2026-10-24:** Read [current delivery and acceptance](P0%20delivery%20and%20P1%20recovery%20status.md)
 > for verified P0 delivery, outstanding rollover acceptance and full P1 scope.
 > The [tracked-view plan](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
