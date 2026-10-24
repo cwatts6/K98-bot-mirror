@@ -128,7 +128,7 @@ function Get-VerifiedPublicationAuthority {
  $authority=Read-TimingJson $plan.manifests.authority $journal.publication.manifests.authority
  if($authority.authority_sid -cne $identity.User.Value -or $authority.bot_sid -cne $identity.User.Value -or $authority.evidence_root -cne 'C:\ProgramData\K98\S11\evidence'){throw 'Authority evidence binding differs'}
  Assert-TimingPath $authority.evidence_root $identity.User.Value
- [pscustomobject]@{authority=$authority;identity=$identity;journalFile=$journalFile;journal=$journal}
+ [pscustomobject]@{authority=$authority;identity=$identity;journalFile=$journalFile;journal=$journal;plan=$plan;gate_path=$gatePath;manifest_path=$plan.manifests.authority;manifest_sha256=$journal.publication.manifests.authority}
 }
 
 function Get-SavedPublicationTiming {
