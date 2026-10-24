@@ -128,6 +128,25 @@ def test_unlinked_standalone_capture_retains_existing_guided_queue(monkeypatch):
     assert service.handoff_evidence(preview) is None
 
 
+@pytest.mark.parametrize("kind", ["queue_capture", "resume_capture"])
+@pytest.mark.parametrize("invalid_lineage", [False, True])
+def test_durable_action_reconciliation_preserves_pipeline_capture(
+    monkeypatch, kind, invalid_lineage
+):
+    service, preview, row, _ = linked_capture(monkeypatch)
+    before = deepcopy(preview)
+    service.dal.conclude = Mock()
+    service.runtime.enqueue_snapshot = Mock()
+    if invalid_lineage:
+        row["SourceVersion"] += 1
+    action = dict(ActionKind=kind, ActionID=str(uuid4()), EvidenceHash=preview["token"])
+    with pytest.raises(SourceConflict):
+        service.reconcile_capture("source", action)
+    service.dal.conclude.assert_not_called()
+    service.runtime.enqueue_snapshot.assert_not_called()
+    assert preview == before
+
+
 def test_runtime_wires_all_three_pipeline_producers():
     import ast
     from pathlib import Path

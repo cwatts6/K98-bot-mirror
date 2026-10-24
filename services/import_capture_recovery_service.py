@@ -233,6 +233,9 @@ class ImportCaptureRecovery:
             return "not_applied"
         if generation.get("capture_abandoned"):
             return "not_applied"
+        # Pipeline ownership/lineage refusal is not damaged output. Keep it
+        # outside the deterministic capture-failure classifier below.
+        self._assert_independent_capture(preview)
         try:
             if action["ActionKind"] == "queue_capture":
                 if not prep["JobID"] and preview["token"] != token:
