@@ -54,7 +54,10 @@ async def run(coro, seconds, label, *, cancel_on_deadline=True, completion_check
     """
 
     async def observed():
-        result = await coro
+        from services.cache_admission_diagnostics import startup_context
+
+        with startup_context(label):
+            result = await coro
         summary = await completion_check(result) if completion_check is not None else None
         return result, summary
 

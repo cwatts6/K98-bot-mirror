@@ -7,7 +7,11 @@ import pytest
 from scripts import prepare_k98_update as update
 from scripts.validate_k98_update_compatibility import classify
 from tests.test_update_application_compatibility import installed_manifest
-from tests.updater_source_assertions import before_contention_hash, historical_runtime_hash
+from tests.updater_source_assertions import (
+    before_contention_hash,
+    before_startup_foundations_hash,
+    historical_runtime_hash,
+)
 
 BEFORE, AFTER = "a" * 40, "b" * 40
 PROTOCOL = "services/export_execution_protocol.py"
@@ -88,7 +92,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             # comparing it with the older registry's terminal images.
             for member in transition["members"]:
                 path = member["path"]
-                actual = update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+                actual = before_startup_foundations_hash(root, path)
                 if transition["id"] not in {
                     "export_contention_handoff_v1",
                     "event_cache_readiness_v1",

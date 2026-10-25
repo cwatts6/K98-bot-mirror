@@ -17,8 +17,7 @@ from decoraters import (
     track_usage,
 )
 from profile_cache import (
-    get_profile_cached,
-    warm_cache,
+    get_profile_async,
 )
 from services.location_import_service import (
     LocationImportAuditContext,
@@ -87,8 +86,7 @@ async def _build_location_embed_for_target(
     target_id: int, *, refreshed: bool = False
 ) -> discord.Embed | None:
     try:
-        warm_cache()
-        p = get_profile_cached(target_id)
+        p = await get_profile_async(target_id)
     except Exception:
         return None
 
@@ -143,17 +141,20 @@ async def _build_location_embed_for_target(
 async def _on_location_selected(
     interaction: discord.Interaction, gid: int, ephemeral: bool
 ) -> None:
+    # The author-bound selector has already checked its caller. Acknowledge the
+    # existing component message before an owned cache read can wait for SQL.
+    await interaction.response.defer()
     embed = await _build_location_embed_for_target(gid, refreshed=False)
     if not embed:
-        await interaction.response.send_message(f"❌ GovernorID `{gid}` not found.", ephemeral=True)
+        await interaction.followup.send(f"❌ GovernorID `{gid}` not found.", ephemeral=True)
         return
 
     try:
         if ephemeral:
-            await interaction.response.edit_message(embed=embed, view=None)
+            await interaction.edit_original_response(embed=embed, view=None)
         else:
             await interaction.channel.send(embed=embed)
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
                 content=f"✅ Posted location for `{gid}`.", view=None
             )
     except discord.InteractionResponded:
@@ -284,9 +285,16 @@ def register_location(bot: ext_commands.Bot) -> None:
         ephemeral: bool = discord.Option(bool, "Only show to me", required=False, default=False),
     ):
         # Resolve target ID (ID takes precedence; name can be autocomplete-id or fuzzy free-text)
-        lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
+        # A private lookup acknowledgement keeps ambiguous/error replies private.
+        if not await safe_defer(ctx, ephemeral=True):
+            return
+        from services.legacy_export_snapshot_service import drain_thread
+
+        lookup = await drain_thread(
+            resolve_profile_lookup, governor_id=governor_id, governor_name=governor_name
+        )
         if lookup.status == "not_found":
-            await ctx.respond(lookup.message, ephemeral=True)
+            await ctx.interaction.edit_original_response(content=lookup.message)
             return
         if lookup.status == "matches":
             try:
@@ -295,22 +303,20 @@ def register_location(bot: ext_commands.Bot) -> None:
                 )
             except TypeError:
                 view = LocationSelectView(list(lookup.matches), ephemeral=ephemeral)
-            await ctx.respond(lookup.message, view=view, ephemeral=True)
+            await ctx.interaction.edit_original_response(content=lookup.message, view=view)
             return
         target_id: int | None = lookup.governor_id
 
         if not target_id:
-            await ctx.respond(
-                "Provide either **governor_id** or pick a name from the list.", ephemeral=True
+            await ctx.interaction.edit_original_response(
+                content="Provide either **governor_id** or pick a name from the list."
             )
             return
 
-        # Single-ack from here on
-        await safe_defer(ctx, ephemeral=ephemeral)
+        # Lookup was already acknowledged; preserve requested result visibility.
 
         try:
-            warm_cache()  # loads/refreshes the profile cache
-            p = get_profile_cached(target_id)
+            p = await get_profile_async(target_id)
         except Exception as e:
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to read cache: `{type(e).__name__}: {e}`", embed=None, view=None
@@ -360,8 +366,14 @@ def register_location(bot: ext_commands.Bot) -> None:
             else:
                 embed.set_footer(text=f"Last updated: {updated}")  # fallback if unparsable
 
-        await ctx.interaction.edit_original_response(
-            embed=embed, view=RefreshLocationView(target_id=target_id, ephemeral=ephemeral)
-        )
+        view = RefreshLocationView(target_id=target_id, ephemeral=ephemeral)
+        if ephemeral:
+            await ctx.interaction.edit_original_response(embed=embed, view=view)
+        else:
+            # Complete the deferred private original before a distinct public
+            # followup; Discord otherwise preserves the initial ephemeral flag.
+            await ctx.interaction.edit_original_response(content="Posting location…")
+            await ctx.interaction.followup.send(embed=embed, view=view, ephemeral=False)
+            await ctx.interaction.delete_original_response()
 
     bot.add_application_command(location_group)

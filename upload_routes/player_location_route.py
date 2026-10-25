@@ -299,10 +299,13 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
 
         try:
             if deps.warm_profile_cache is None:
-                from profile_cache import warm_cache as warm_profile_cache
+                from profile_cache import refresh_async
+
+                await refresh_async(origin="location_import")
             else:
-                warm_profile_cache = deps.warm_profile_cache
-            warm_profile_cache()
+                from services.legacy_export_snapshot_service import drain_thread
+
+                await drain_thread(deps.warm_profile_cache)
         except Exception:
             logger.debug("Failed to warm profile cache after player location import", exc_info=True)
 

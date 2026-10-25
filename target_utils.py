@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from concurrent.futures import Future
+from copy import deepcopy
+from dataclasses import replace
 import logging
+from threading import Lock
 import time
 from typing import Any
 
@@ -16,6 +20,7 @@ from kvk.dal import kvk_targets_dal
 from kvk.models.kvk_target_row import TargetRow, serialize_target_row
 from kvk.models.kvk_targets_card import KvkTargetsPresentationInput
 from kvk.services.kvk_targets_card_service import build_kvk_targets_presentation_input
+from services.cache_outcomes import PROCESS_ID, CacheOutcome
 from targets_sql_cache import refresh_targets_cache
 
 logger = logging.getLogger(__name__)
@@ -41,7 +46,7 @@ def _normalize_name(name: str) -> str:
 # ----------------------------------------------------------------------
 # This function is intentionally module-level so it can be referenced as
 # "target_utils:sync_refresh_worker" by subprocess-based maintenance workers.
-def sync_refresh_worker() -> dict[str, Any]:
+def _build_name_candidate() -> dict[str, Any]:
     """
     Module-level wrapper that performs the synchronous refresh work that was
     previously implemented as a nested function. Being module-level allows
@@ -72,20 +77,106 @@ def sync_refresh_worker() -> dict[str, Any]:
                 name_map[norm] = original
             rows.append(row)
 
-        _name_cache["names"] = name_map
-        _name_cache["norm_to_row"] = norm_to_row
-        _name_cache["rows"] = rows
-        _name_cache["last_updated"] = int(time.time())
-        logger.info("[TARGET_UTILS] Name cache refreshed from SQL (%d rows)", len(rows))
         return {
             "names": name_map,
             "norm_to_row": norm_to_row,
             "rows": rows,
-            "last_updated": _name_cache["last_updated"],
+            "last_updated": int(time.time()),
         }
     except Exception:
         logger.exception("[TARGET_UTILS] sync_refresh_worker failed")
         raise
+
+
+_name_lock = Lock()
+_name_flight = None
+_name_closed = False
+_name_generation = 0
+_name_outcome = CacheOutcome("name", "initial")
+
+
+def close_name_admission():
+    global _name_closed
+    with _name_lock:
+        _name_closed = True
+
+
+def _refresh_name_owned():
+    global _name_flight, _name_cache, _name_outcome, _name_generation
+    with _name_lock:
+        if _name_closed:
+            raise RuntimeError("name_refresh_admission_closed")
+        flight = _name_flight
+        owner = flight is None
+        if owner:
+            flight = _name_flight = Future()
+            outcome = CacheOutcome("name", "refresh", execution="running")
+            _name_outcome = outcome
+    if not owner:
+        return flight.result()
+    started = time.monotonic()
+    try:
+        candidate = _build_name_candidate()
+        with _name_lock:
+            _name_cache = candidate
+            _name_generation += 1
+            outcome = replace(
+                outcome,
+                execution="succeeded",
+                availability="loaded_populated" if candidate["rows"] else "loaded_empty",
+                source="refreshed",
+                verification="original_result",
+                generation=_name_generation,
+                count=len(candidate["rows"]),
+                source_time=candidate["last_updated"],
+                duration_seconds=time.monotonic() - started,
+            )
+            _name_outcome = outcome
+        flight.set_result((candidate, outcome))
+        return candidate, outcome
+    except BaseException as exc:
+        with _name_lock:
+            _name_outcome = replace(
+                outcome,
+                execution="failed",
+                source="retained_last_known_good" if _name_cache["rows"] else "unavailable",
+                availability="loaded_populated" if _name_cache["rows"] else "unavailable",
+                count=len(_name_cache["rows"]),
+                source_time=_name_cache["last_updated"],
+                generation=_name_generation,
+                diagnostic=type(exc).__name__,
+            )
+        flight.set_exception(exc)
+        raise
+    finally:
+        with _name_lock:
+            _name_flight = None
+
+
+def sync_refresh_worker() -> dict[str, Any]:
+    return deepcopy(_refresh_name_owned()[0])
+
+
+async def refresh_name_result():
+    from services.legacy_export_snapshot_service import drain_thread
+
+    return (await drain_thread(_refresh_name_owned))[1]
+
+
+async def verify_name_completion(outcome):
+    with _name_lock:
+        if (
+            outcome.process_id != PROCESS_ID
+            or outcome.generation != _name_generation
+            or outcome.execution != "succeeded"
+        ):
+            raise ValueError("name_result_superseded")
+    return outcome.report()
+
+
+def name_outcome_report():
+    with _name_lock:
+        return _name_outcome.report()
 
 
 # --- Back-compat shim for older imports (e.g., processing_pipeline.py) ---
@@ -135,16 +226,7 @@ async def refresh_name_cache_from_sql() -> None:
     _name_cache mutations happen in the parent process directly.
     """
     try:
-        try:
-            from file_utils import run_blocking_in_thread
-
-            await run_blocking_in_thread(
-                sync_refresh_worker,
-                name="refresh_name_cache_from_sql",
-                meta={"source": "vw_All_Governors_Clean"},
-            )
-        except ImportError:
-            await asyncio.to_thread(sync_refresh_worker)
+        await refresh_name_result()
     except Exception:
         logger.warning("[TARGET_UTILS] refresh_name_cache_from_sql failed; keeping existing cache")
 
@@ -176,10 +258,11 @@ async def lookup_governor_row_by_id(governor_id: str | int) -> dict[str, Any] | 
 
 # Small diagnostic helper to inspect cache state (useful in logs / REPL)
 def get_name_cache_status() -> dict[str, Any]:
+    snapshot = _name_cache
     return {
-        "last_updated": _name_cache.get("last_updated", 0),
-        "rows_count": len(_name_cache.get("rows") or []),
-        "names_count": len(_name_cache.get("names") or {}),
+        "last_updated": snapshot.get("last_updated", 0),
+        "rows_count": len(snapshot.get("rows") or []),
+        "names_count": len(snapshot.get("names") or {}),
     }
 
 
@@ -269,6 +352,7 @@ async def lookup_governor_id(governor_name: str):
             logger.exception("[CACHE] SQL name cache refresh failed (leaving existing cache)")
 
     # Log current cache state for diagnostics
+    snapshot = _name_cache
     status = get_name_cache_status()
     logger.debug(
         "[TARGET_UTILS] name cache status: last_updated=%s rows=%d names=%d",
@@ -282,7 +366,7 @@ async def lookup_governor_id(governor_name: str):
 
     # Exact lookup via cached normalized map
     try:
-        exact_row = _name_cache.get("norm_to_row", {}).get(input_norm)
+        exact_row = snapshot.get("norm_to_row", {}).get(input_norm)
         if exact_row:
             logger.debug("[TARGET_UTILS] exact match found for %r -> %s", governor_name, exact_row)
             return {
@@ -297,7 +381,7 @@ async def lookup_governor_id(governor_name: str):
 
     # Fuzzy matching fallback
     try:
-        names_map = _name_cache.get("names", {})
+        names_map = snapshot.get("names", {})
         if not names_map:
             logger.debug("[TARGET_UTILS] name cache empty; returning not_found")
             return {"status": "not_found", "message": "No governor data available"}
@@ -308,7 +392,7 @@ async def lookup_governor_id(governor_name: str):
             logger.debug("[TARGET_UTILS] empty input; returning top names by insertion order")
             matches = []
             for norm in choices[:8]:
-                row = _name_cache["norm_to_row"].get(norm)
+                row = snapshot["norm_to_row"].get(norm)
                 if row:
                     matches.append(
                         {
@@ -322,7 +406,7 @@ async def lookup_governor_id(governor_name: str):
         results = process.extract(input_norm, choices, scorer=fuzz.WRatio, limit=8)
         matches = []
         for match_norm, score, _ in results:
-            row = _name_cache["norm_to_row"].get(match_norm)
+            row = snapshot["norm_to_row"].get(match_norm)
             if row:
                 matches.append(
                     {
@@ -423,8 +507,9 @@ async def autocomplete_governor_names(ctx: discord.AutocompleteContext):
                 logger.exception("[TARGET_UTILS] autocomplete: SQL cache refresh failed")
 
         prefix_norm = _normalize_name(q)
-        names_map = _name_cache.get("names", {}) or {}
-        norm_to_row = _name_cache.get("norm_to_row", {}) or {}
+        snapshot = _name_cache
+        names_map = snapshot.get("names", {}) or {}
+        norm_to_row = snapshot.get("norm_to_row", {}) or {}
 
         results: list[tuple[str, str]] = []
         seen_norms: set[str] = set()

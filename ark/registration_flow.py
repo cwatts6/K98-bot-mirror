@@ -33,7 +33,7 @@ from ark.registration_messages import upsert_registration_message_result
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
 from core.discord_embed_limits import require_valid_embed_payload, truncate_text
 from decoraters import _has_leadership_role, _is_admin
-from profile_cache import get_profile_cached
+from profile_cache import get_profile_async
 from registry.registry_service import get_discord_user_for_governor
 from services.governor_account_service import (
     AccountResolutionSummary,
@@ -470,7 +470,7 @@ class ArkRegistrationController:
         governor_id: str,
     ) -> bool:
         # TODO(Phase 8): ban checks (discord/governor)
-        gov = get_profile_cached(governor_id)
+        gov = await get_profile_async(governor_id)
         if not gov:
             if self._response_is_done(interaction):
                 await interaction.followup.send(

@@ -309,7 +309,13 @@ async def test_failed_one_shot_factory_does_not_block_other_members_or_reenter()
 
 @pytest.mark.parametrize("path", ["bot_instance.py", "services/recovery_health.py"])
 def test_historical_hash_bridge_rejects_foreign_runtime_bytes(tmp_path, path):
+    from pathlib import Path
+
     from tests.updater_source_assertions import before_contention_hash
+
+    fixture = Path("tests/fixtures/p1_startup_source_pairs.json")
+    (tmp_path / fixture).parent.mkdir(parents=True)
+    (tmp_path / fixture).write_bytes(fixture.read_bytes())
 
     source = tmp_path / path
     source.parent.mkdir(parents=True, exist_ok=True)

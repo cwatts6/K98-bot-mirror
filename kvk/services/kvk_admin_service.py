@@ -174,13 +174,24 @@ async def refresh_stats_caches(
     build_player_stats_cache: Callable[[], Awaitable[Any]],
     build_lastkvk_player_stats_cache: Callable[[], Awaitable[Any]],
 ) -> KvkCacheRefreshResult:
-    main = await _run_cache_builder("Player stats cache", build_player_stats_cache)
-    last_kvk = await _run_cache_builder(
-        "Last-KVK cache",
-        build_lastkvk_player_stats_cache,
-        non_fatal=True,
-    )
-    return KvkCacheRefreshResult(main=main, last_kvk=last_kvk)
+    from services.player_stats_cache_service import StatsComposition, _composition
+
+    owner = StatsComposition()
+    token = _composition.set(owner)
+    try:
+        main = await _run_cache_builder("Player stats cache", build_player_stats_cache)
+
+        async def last_result():
+            if owner.last_entered:
+                if owner.last_state != "succeeded":
+                    raise RuntimeError("last_kvk_outcome_unconfirmed")
+                return owner.last_output
+            return await build_lastkvk_player_stats_cache()
+
+        last_kvk = await _run_cache_builder("Last-KVK cache", last_result, non_fatal=True)
+        return KvkCacheRefreshResult(main=main, last_kvk=last_kvk)
+    finally:
+        _composition.reset(token)
 
 
 def format_cache_refresh_message(result: KvkCacheRefreshResult) -> str:

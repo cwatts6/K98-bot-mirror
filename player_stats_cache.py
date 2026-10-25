@@ -915,6 +915,12 @@ def _build_cache_sync(*, refresh: bool | None = None) -> dict[str, Any]:
 
 
 def _build_last_kvk_cache_sync() -> dict[str, Any] | None:
+    from services.player_stats_cache_service import observe_last
+
+    return observe_last(_build_last_kvk_candidate_sync)
+
+
+def _build_last_kvk_candidate_sync() -> dict[str, Any] | None:
     """
     Build and persist a separate cache containing the last finished KVK snapshot.
     Naming assumption: per-KVK tables follow the pattern ROK_TRACKER.dbo.[EXCEL_FOR_KVK_{N}].
@@ -1272,8 +1278,9 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
 async def build_player_stats_cache() -> dict[str, Any] | None:
     from file_utils import run_blocking_in_thread
     from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
+    from services.player_stats_cache_service import _composition
 
-    if _writer_runtime() is not None:
+    if _writer_runtime() is not None or _composition.get() is not None:
         output = await drain_thread(_build_and_persist_cache_sync)
     else:
         output = await run_blocking_in_thread(
@@ -1311,13 +1318,10 @@ async def build_player_stats_cache() -> dict[str, Any] | None:
 
 async def build_lastkvk_player_stats_cache():
     """Standalone builder for the last-KVK cache (can be scheduled independently)."""
-    from file_utils import run_blocking_in_thread
 
-    output = await run_blocking_in_thread(
-        _build_last_kvk_cache_sync,
-        name="build_lastkvk_player_stats_cache",
-        meta={"cache_path": _last_kvk_cache_path()},
-    )
+    from services.legacy_export_snapshot_service import drain_thread
+
+    output = await drain_thread(_build_last_kvk_cache_sync)
     if output is None:
         return
     try:

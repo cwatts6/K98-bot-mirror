@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import logging
 from typing import Any
@@ -12,7 +11,7 @@ from ark.dal.ark_dal import (
     upsert_team_preference,
 )
 from profile_cache import get_profile_cached
-from target_utils import get_name_cache_rows, refresh_name_cache_from_sql, sync_refresh_worker
+from target_utils import get_name_cache_rows, refresh_name_cache_from_sql
 
 logger = logging.getLogger(__name__)
 _ALLOWED_TEAMS = {1, 2}
@@ -28,25 +27,18 @@ async def _ensure_governor_cache_ready() -> None:
     if rows:
         return
 
-    # First attempt: existing async refresh path (may run in subprocess)
+    # This entrypoint now owns a draining same-process refresh. An empty result
+    # is not a reason to run a second worker or replace an uncertain outcome.
     try:
         await refresh_name_cache_from_sql()
     except Exception:
         logger.exception("[ARK_PREF] refresh_name_cache_from_sql failed")
 
-    rows = get_name_cache_rows()
-    if rows:
-        return
-
-    # Second attempt: force same-process load so this process sees data
-    try:
-        await asyncio.to_thread(sync_refresh_worker)
-    except Exception:
-        logger.exception("[ARK_PREF] sync_refresh_worker same-process fallback failed")
-
 
 async def _get_profile_cached_async(governor_id: int) -> dict[str, Any] | None:
-    return await asyncio.to_thread(get_profile_cached, int(governor_id))
+    from services.legacy_export_snapshot_service import drain_thread
+
+    return await drain_thread(get_profile_cached, int(governor_id))
 
 
 def _normalize_team(team: int) -> int:

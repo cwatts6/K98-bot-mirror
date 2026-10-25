@@ -1,5 +1,21 @@
 # Deferred Optimisations
 
+25 October overlay: the event-cache feature/compatibility phase is deployed. Its
+natural transition and original-message acceptance remain open. The approved
+[Startup Cache Foundations phase](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Implementation%20and%20Acceptance.md)
+now has a local implementation; no production acceptance or whole-workstream closure
+follows. The pack preserves each WS1–WS6 residual and P0 reconciliation separately.
+
+### Deferred Optimisation
+- Area: profile cache invalidation across process restart and remaining cache callers
+- Type: consistency
+- Description: Startup foundations protects in-process publication against an older candidate, but intentionally retains the existing disk envelope and non-forced post-import warm. It does not provide durable invalidation or prove a reused snapshot includes an upstream update. Other cache callers remain outside the selected startup scope.
+- Suggested Fix: First inventory actual update/invalidation callers and required source revision evidence. Separately design durable invalidation or revision-bound refresh only where required, using the explicit fresh-request seam and existing owned workers; preserve fallback provenance and avoid replaying accepted imports.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate source-revision contract and operator scope; this is not closure of WS2, WS4 or WS6. Do not treat a demonstrated current P0 pipeline defect as optional debt.
+
+
 Active deferred optimisation items are staged here before they are grouped, scored, or promoted
 to GitHub issues/task packs.
 

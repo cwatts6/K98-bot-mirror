@@ -95,6 +95,8 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     )
     reminders = SimpleNamespace(cancel_all_and_wait=AsyncMock(return_value=0))
     cache_owner = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
+    profile_owner = SimpleNamespace(close=Mock())
+    name_close = Mock()
     event_bundle = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
 
     def controlled_import(name, *args, **kwargs):
@@ -106,6 +108,10 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
             return reminders
         if name == "event_cache":
             return SimpleNamespace(refresh_service=cache_owner)
+        if name == "profile_cache":
+            return SimpleNamespace(_service=profile_owner)
+        if name == "target_utils":
+            return SimpleNamespace(close_name_admission=name_close)
         return builtins.__import__(name, *args, **kwargs)
 
     tracker = SimpleNamespace(stop=AsyncMock())
@@ -132,6 +138,8 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     )
     await namespace["_graceful_teardown"]()
     cache_owner.close_admission.assert_called_once()
+    profile_owner.close.assert_called_once()
+    name_close.assert_called_once()
     event_bundle.close_admission.assert_called_once()
     cache_owner.shutdown.assert_awaited_once()
     event_bundle.shutdown.assert_awaited_once()

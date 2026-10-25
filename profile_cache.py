@@ -1,25 +1,17 @@
-# profile_cache.py (updated - PR 4 adjustments)
-# - Uses centralized utils.json_default for JSON serialization
-# - Passes json_default into atomic_write_json so atomic path and fallback behave the same
-# - Keeps PR1 (connection handling), PR2 (locking/immutability), PR3 (generated_at normalization) changes
+"""Compatibility facade for owned profile refresh and copy-on-read access."""
+
 from __future__ import annotations
 
 import argparse
-import copy
-from datetime import datetime
-import json
 import logging
 import os
-from pathlib import Path
-import threading
-import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # Central constants (PLAYER_PROFILE_CACHE should be defined in constants.py)
-from constants import DATA_DIR, PLAYER_PROFILE_CACHE as CONST_PLAYER_PROFILE_CACHE, _conn
+from constants import DATA_DIR, PLAYER_PROFILE_CACHE as CONST_PLAYER_PROFILE_CACHE
 
 # Optional fuzzy deps
 try:
@@ -44,9 +36,9 @@ PLAYER_PROFILE_CACHE = (
 )
 CACHE_TTL_SECS = 15 * 60  # 15 min
 
-_cache_lock = threading.Lock()
-_cache: dict[str, Any] = {}
-_cache_loaded_at: float = 0.0
+from services.profile_cache_service import ProfileCacheService
+
+_service = ProfileCacheService()
 
 
 # -------------------- Helpers --------------------
@@ -79,458 +71,67 @@ def _parse_generated_at(raw: Any) -> float:
 
 
 def get_cache_stats() -> dict[str, Any]:
-    """
-    Return lightweight, thread-safe stats about the in-memory cache.
-    Useful for health checks and diagnostics. Does not expose internal objects.
-    """
-    with _cache_lock:
-        count = len(_cache) if _cache else 0
-        loaded_at = _cache_loaded_at
-    # convert loaded_at to ISO if present
-    try:
-        if loaded_at:
-            loaded_iso = datetime.utcfromtimestamp(loaded_at).isoformat() + "Z"
-        else:
-            loaded_iso = None
-    except Exception:
-        loaded_iso = None
-    return {"count": count, "loaded_at_epoch": loaded_at, "loaded_at_iso": loaded_iso}
+    return _service.stats()
 
 
-# -------------------- DB helpers --------------------
-def _connect():
-    """
-    Return a pyodbc.Connection using our centralized retry helper when available.
+def _save(path, payload):
+    from file_utils import atomic_json_write
+    from utils import json_default
 
-    - Prefer file_utils.get_conn_with_retries if present; falls back to constants._conn().
-    """
-    try:
-        # lazy import to avoid circulars
-        from file_utils import get_conn_with_retries
-
-        return get_conn_with_retries()
-    except Exception:
-        # fallback: use constants._conn (may raise)
-        logger.debug(
-            "file_utils.get_conn_with_retries not available; falling back to constants._conn()"
-        )
-        return _conn()
+    atomic_json_write(path, payload, default=json_default)
 
 
-def _rowdicts(cursor, rows):
-    """Convert pyodbc rows to list[dict] using cursor.description."""
-    cols = [d[0] for d in cursor.description]
-    return [dict(zip(cols, r, strict=False)) for r in rows]
+def refresh_result(*, force=False, fresh=False, origin="legacy"):
+    from stats.profile_cache_repository import read_profiles
+
+    return _service.refresh(
+        path=PLAYER_PROFILE_CACHE,
+        ttl=CACHE_TTL_SECS,
+        parse_time=_parse_generated_at,
+        build=read_profiles,
+        save=_save,
+        force=force,
+        fresh=fresh,
+        origin=origin,
+    )
 
 
-def _to_int(v):
-    try:
-        return int(v) if v is not None else None
-    except Exception:
-        try:
-            return int(float(v)) if v is not None else None
-        except Exception:
-            return None
+async def refresh_async(*, force=False, fresh=False, origin="async"):
+    from services.legacy_export_snapshot_service import drain_thread
 
-
-def _to_float(v):
-    try:
-        return float(v) if v is not None else None
-    except Exception:
-        return None
-
-
-# If you might have numpy types; leave import optional
-try:
-    import numpy as np  # type: ignore
-except Exception:
-    np = None
-
-
-def _safe_utc(dt):
-    """
-    Defensive wrapper: if dt is a datetime, try to make it aware UTC using utils.ensure_aware_utc.
-    If conversion fails or dt is falsy, return it unchanged (None or original).
-    """
-    if not dt:
-        return dt
-    try:
-        # lazy import
-        from utils import ensure_aware_utc
-
-        if isinstance(dt, datetime):
-            return ensure_aware_utc(dt)
-    except Exception:
-        # If utils can't be imported or conversion fails, return original
-        pass
-    return dt
+    return await drain_thread(refresh_result, force=force, fresh=fresh, origin=origin)
 
 
 def build_full_cache() -> dict[str, Any]:
-    """
-    Load v_PlayerProfile and (optionally) v_PlayerKVK_Last3; write JSON to disk.
-    Returns the in-memory dict in the same shape.
-
-    Note: Writes atomically using file_utils.atomic_write_json. Raises exceptions on DB errors
-    so callers can decide whether to preserve an on-disk cache.
-    """
-    out: dict[str, Any] = {}
-
-    start_ts = time.perf_counter()
-    logger.info(
-        "[CACHE] Starting DB build of player profile cache: writing to %s", PLAYER_PROFILE_CACHE
-    )
-
-    conn = None
-    cur = None
-    try:
-        conn = _connect()
-        # If the returned connection is a context-manager wrapper, prefer using it
-        if hasattr(conn, "__enter__") and hasattr(conn, "__exit__"):
-            # Use as context manager to allow wrappers to manage lifecycle
-            with conn as c:
-                cur = c.cursor()
-                # v_PlayerProfile is the one-stop view we joined earlier
-                cur.execute("SELECT * FROM dbo.v_PlayerProfile WITH (NOLOCK)")
-                rows = cur.fetchall()
-                for row in _rowdicts(cur, rows):
-                    gid = _to_int(row.get("GovernorID"))
-                    if gid is None:
-                        continue
-
-                    # Handle City Hall column naming (alias or with space)
-                    ch_val = row.get("CityHallLevel", row.get("City Hall"))
-
-                    # Defensive timestamp conversions
-                    forts_updated = _safe_utc(row.get("FortsUpdated"))
-                    location_updated = _safe_utc(row.get("LocationUpdated"))
-                    shield_ends_at_utc = _safe_utc(row.get("ShieldEndsAtUtc"))
-                    status_updated = _safe_utc(row.get("StatusUpdated"))
-
-                    out[str(gid)] = {
-                        "GovernorID": gid,
-                        "GovernorName": (row.get("Governor_Name") or "").strip(),
-                        "Alliance": (row.get("Alliance") or "").strip(),
-                        "CityHallLevel": _to_int(ch_val),
-                        "Power": _to_int(row.get("Power")),
-                        "Kills": _to_int(row.get("Kills")),
-                        "Deads": _to_int(row.get("Deads")),
-                        "RSS_Gathered": _to_int(row.get("RSS_Gathered")),
-                        "Helps": _to_int(row.get("Helps")),
-                        "X": _to_int(row.get("X")),
-                        "Y": _to_int(row.get("Y")),
-                        "ShieldEndsAtUnix": _to_int(row.get("ShieldEndsAtUnix")),
-                        "ShieldEndsAtUtc": shield_ends_at_utc,
-                        "Status": row.get("Status"),
-                        "FortsRank": _to_int(row.get("FortsRank")),
-                        "FortsStarted": _to_int(row.get("FortsStarted")),
-                        "FortsJoined": _to_int(row.get("FortsJoined")),
-                        "FortsTotal": _to_int(row.get("FortsTotal")),
-                        # Timestamp fields
-                        "FortsUpdated": forts_updated,
-                        "LocationUpdated": location_updated,
-                        "StatusUpdated": status_updated,
-                        # NEW — pulled directly from v_PlayerProfile after your SQL change
-                        "PowerRank": _to_int(row.get("PowerRank")),
-                    }
-
-                # --- NEW: enrich with first/last scan and offline >30d ---
-                try:
-                    cur.execute(
-                        "SELECT GovernorID, FirstScanDate, LastScanDate, OfflineDaysOver30 FROM dbo.v_PlayerScanMeta WITH (NOLOCK)"
-                    )
-                    for r in _rowdicts(cur, cur.fetchall()):
-                        gid = str(_to_int(r.get("GovernorID")))
-                        if gid in out:
-                            out_gid = out[gid]
-                            out_gid["FirstScanDate"] = _safe_utc(r.get("FirstScanDate"))
-                            out_gid["LastScanDate"] = _safe_utc(r.get("LastScanDate"))
-                            out_gid["OfflineDaysOver30"] = _to_int(r.get("OfflineDaysOver30")) or 0
-                except Exception:
-                    # If the view isn’t present, we just skip; embed will omit the line gracefully
-                    logger.debug(
-                        "[CACHE] v_PlayerScanMeta not present or query failed; skipping enrichment",
-                        exc_info=True,
-                    )
-
-                # Optional KVK view — skip gracefully if it doesn't exist
-                try:
-                    cur.execute(
-                        "SELECT GovernorID, KVK_NUMBER, KVK_KILL_RANK, KillPercent FROM dbo.v_PlayerKVK_Last3 WITH (NOLOCK)"
-                    )
-                    kvkrows = cur.fetchall()
-                    for rr in _rowdicts(cur, kvkrows):
-                        gid = str(_to_int(rr.get("GovernorID")))
-                        if gid == "None":
-                            continue
-                        out.setdefault(gid, {}).setdefault("KVK", []).append(
-                            {
-                                "KVK": _to_int(rr.get("KVK_NUMBER")),
-                                "Rank": _to_int(rr.get("KVK_KILL_RANK")),
-                                "Percent": _to_float(rr.get("KillPercent")),
-                            }
-                        )
-                except Exception:
-                    logger.debug(
-                        "[CACHE] v_PlayerKVK_Last3 not present or query failed; skipping KVK enrichment",
-                        exc_info=True,
-                    )
-        else:
-            # Plain connection object: manage cursor and close the connection manually
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM dbo.v_PlayerProfile WITH (NOLOCK)")
-            rows = cur.fetchall()
-            for row in _rowdicts(cur, rows):
-                gid = _to_int(row.get("GovernorID"))
-                if gid is None:
-                    continue
-
-                ch_val = row.get("CityHallLevel", row.get("City Hall"))
-                forts_updated = _safe_utc(row.get("FortsUpdated"))
-                location_updated = _safe_utc(row.get("LocationUpdated"))
-                shield_ends_at_utc = _safe_utc(row.get("ShieldEndsAtUtc"))
-                status_updated = _safe_utc(row.get("StatusUpdated"))
-
-                out[str(gid)] = {
-                    "GovernorID": gid,
-                    "GovernorName": (row.get("Governor_Name") or "").strip(),
-                    "Alliance": (row.get("Alliance") or "").strip(),
-                    "CityHallLevel": _to_int(ch_val),
-                    "Power": _to_int(row.get("Power")),
-                    "Kills": _to_int(row.get("Kills")),
-                    "Deads": _to_int(row.get("Deads")),
-                    "RSS_Gathered": _to_int(row.get("RSS_Gathered")),
-                    "Helps": _to_int(row.get("Helps")),
-                    "X": _to_int(row.get("X")),
-                    "Y": _to_int(row.get("Y")),
-                    "ShieldEndsAtUnix": _to_int(row.get("ShieldEndsAtUnix")),
-                    "ShieldEndsAtUtc": shield_ends_at_utc,
-                    "Status": row.get("Status"),
-                    "FortsRank": _to_int(row.get("FortsRank")),
-                    "FortsStarted": _to_int(row.get("FortsStarted")),
-                    "FortsJoined": _to_int(row.get("FortsJoined")),
-                    "FortsTotal": _to_int(row.get("FortsTotal")),
-                    # Timestamp fields
-                    "FortsUpdated": forts_updated,
-                    "LocationUpdated": location_updated,
-                    "StatusUpdated": status_updated,
-                    # NEW — pulled directly from v_PlayerProfile after your SQL change
-                    "PowerRank": _to_int(row.get("PowerRank")),
-                }
-
-            # --- NEW: enrich with first/last scan and offline >30d ---
-            try:
-                cur.execute(
-                    "SELECT GovernorID, FirstScanDate, LastScanDate, OfflineDaysOver30 FROM dbo.v_PlayerScanMeta WITH (NOLOCK)"
-                )
-                for r in _rowdicts(cur, cur.fetchall()):
-                    gid = str(_to_int(r.get("GovernorID")))
-                    if gid in out:
-                        out_gid = out[gid]
-                        out_gid["FirstScanDate"] = _safe_utc(r.get("FirstScanDate"))
-                        out_gid["LastScanDate"] = _safe_utc(r.get("LastScanDate"))
-                        out_gid["OfflineDaysOver30"] = _to_int(r.get("OfflineDaysOver30")) or 0
-            except Exception:
-                logger.debug(
-                    "[CACHE] v_PlayerScanMeta not present or query failed; skipping enrichment",
-                    exc_info=True,
-                )
-
-            # Optional KVK view — skip gracefully if it doesn't exist
-            try:
-                cur.execute(
-                    "SELECT GovernorID, KVK_NUMBER, KVK_KILL_RANK, KillPercent FROM dbo.v_PlayerKVK_Last3 WITH (NOLOCK)"
-                )
-                kvkrows = cur.fetchall()
-                for rr in _rowdicts(cur, kvkrows):
-                    gid = str(_to_int(rr.get("GovernorID")))
-                    if gid == "None":
-                        continue
-                    out.setdefault(gid, {}).setdefault("KVK", []).append(
-                        {
-                            "KVK": _to_int(rr.get("KVK_NUMBER")),
-                            "Rank": _to_int(rr.get("KVK_KILL_RANK")),
-                            "Percent": _to_float(rr.get("KillPercent")),
-                        }
-                    )
-            except Exception:
-                logger.debug(
-                    "[CACHE] v_PlayerKVK_Last3 not present or query failed; skipping KVK enrichment",
-                    exc_info=True,
-                )
-
-    finally:
-        # Close cursor first if present
-        try:
-            if cur is not None:
-                try:
-                    cur.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        # Then close connection (if it's a plain connection)
-        try:
-            if conn is not None and not (hasattr(conn, "__enter__") and hasattr(conn, "__exit__")):
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    # Sort KVK slices by KVK desc for each player
-    for v in out.values():
-        if "KVK" in v and isinstance(v["KVK"], list):
-            v["KVK"].sort(key=lambda x: x.get("KVK") or 0, reverse=True)
-
-    # Persist to disk using atomic write and timezone-aware generated_at
-    try:
-        # lazy import to avoid circulars
-        from file_utils import atomic_write_json
-        from utils import json_default, utcnow
-
-        # Ensure directory exists
-        try:
-            os.makedirs(os.path.dirname(PLAYER_PROFILE_CACHE) or ".", exist_ok=True)
-        except Exception:
-            pass
-
-        payload = {"generated_at": utcnow().isoformat(), "players": out}
-        # pass json_default so datetimes/Decimals etc. serialize in the atomic path too
-        atomic_write_json(PLAYER_PROFILE_CACHE, payload, default=json_default)
-    except Exception:
-        # Best-effort fallback to non-atomic write if atomic helper isn't available;
-        # but don't swallow exceptions raised by DB earlier (they were already raised).
-        try:
-            from utils import json_default, utcnow
-
-            with open(PLAYER_PROFILE_CACHE, "w", encoding="utf-8") as f:
-                json.dump(
-                    {"generated_at": utcnow().isoformat(), "players": out},
-                    f,
-                    default=json_default,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-        except Exception as e:
-            logger.exception("Failed to persist player profile cache: %s", e)
-
-    elapsed = time.perf_counter() - start_ts
-    logger.info(
-        "[CACHE] Finished DB build of player profile cache: %d players in %.2fs", len(out), elapsed
-    )
-
-    return out
+    result = refresh_result(fresh=True, origin="build_full_cache")
+    if result.execution != "succeeded" or result.persistence != "saved":
+        raise RuntimeError("profile_build_not_durable")
+    return _service.snapshot()
 
 
 def warm_cache(force: bool = False):
-    """Load from disk if fresh, else rebuild from SQL. Preserves on-disk cache if DB build fails."""
-    global _cache, _cache_loaded_at
-    with _cache_lock:
-        # Fast path: recent in-memory cache valid
-        if not force and _cache and (time.time() - _cache_loaded_at) < CACHE_TTL_SECS:
-            logger.debug(
-                "[CACHE] In-memory cache fresh; skipping warm (age=%.1fs)",
-                time.time() - _cache_loaded_at,
-            )
-            return
-
-        # Try to load on-disk cache if present and still fresh
-        try:
-            p = Path(PLAYER_PROFILE_CACHE)
-            if p.exists():
-                with p.open(encoding="utf-8") as f:
-                    data = json.load(f)
-                cached_at_raw = data.get("generated_at", 0.0)
-                cached_at = _parse_generated_at(cached_at_raw)
-                players = data.get("players", {})
-                age = time.time() - cached_at if cached_at else float("inf")
-                logger.debug(
-                    "[CACHE] Disk cache found: %s (age=%.1fs, players=%d)",
-                    PLAYER_PROFILE_CACHE,
-                    age,
-                    len(players) if players else 0,
-                )
-                if cached_at and (time.time() - cached_at) < CACHE_TTL_SECS and players:
-                    _cache = players
-                    _cache_loaded_at = cached_at
-                    logger.info(
-                        "[CACHE] Loaded player profile cache from disk (age=%.1fs, count=%d)",
-                        age,
-                        len(players),
-                    )
-                    return
-            else:
-                logger.debug("[CACHE] No on-disk cache at %s", PLAYER_PROFILE_CACHE)
-        except Exception:
-            # Missing or invalid on-disk cache — we'll attempt to build
-            logger.debug(
-                "[CACHE] Failed to read disk cache (will attempt DB rebuild)", exc_info=True
-            )
-
-        # Build fresh from SQL, but be defensive: preserve on-disk cache if the build fails
-        try:
-            # Note: build_full_cache may raise; we let that propagate to the except block below.
-            new_cache = build_full_cache()
-            # mark loaded_at to now (use UTC epoch)
-            try:
-                from utils import utcnow
-
-                _cache_loaded_at = utcnow().timestamp()
-            except Exception:
-                _cache_loaded_at = time.time()
-            _cache = new_cache
-            logger.info("[CACHE] In-memory cache rebuilt from DB (count=%d)", len(_cache))
-        except Exception as e:
-            logger.exception("Failed to build fresh player profile cache from DB: %s", e)
-            # If we had an existing on-disk cache previously loaded above it would already be set.
-            # If not, try to fall back to reading the on-disk cache now (best-effort).
-            try:
-                with open(PLAYER_PROFILE_CACHE, encoding="utf-8") as f:
-                    data = json.load(f)
-                players = data.get("players", {})
-                if players:
-                    _cache = players
-                    # attempt to set _cache_loaded_at from generated_at similar to above
-                    try:
-                        _cache_loaded_at = _parse_generated_at(data.get("generated_at"))
-                    except Exception:
-                        _cache_loaded_at = time.time()
-                    logger.warning(
-                        "Using last-good on-disk player profile cache after DB failure (count=%d).",
-                        len(_cache),
-                    )
-                    return
-            except Exception:
-                logger.error("No usable on-disk player profile cache found; cache is empty.")
-                _cache = {}
-                _cache_loaded_at = 0.0
+    refresh_result(force=force)
 
 
 def invalidate_one(governor_id: int):
-    """Remove one entry so next warm will repopulate it (after you upsert SQL)."""
-    # warm the cache first (warm_cache acquires the lock internally)
-    warm_cache()
-    key = str(governor_id)
-    # mutate under lock to avoid races with readers/writers
-    with _cache_lock:
-        _cache.pop(key, None)
+    _service.invalidate(governor_id)
+
+
+async def invalidate_async(governor_id: int):
+    from services.legacy_export_snapshot_service import drain_thread
+
+    await drain_thread(invalidate_one, governor_id)
 
 
 def get_profile_cached(governor_id: int) -> dict[str, Any] | None:
-    """
-    Return a deep copy of the cached profile or None.
-
-    Note: callers MUST NOT attempt to mutate the returned dict and expect changes
-    to be reflected in the global cache. To update data, write to the DB and call
-    invalidate_one() or warm_cache() to refresh.
-    """
     warm_cache()
-    key = str(governor_id)
-    with _cache_lock:
-        val = _cache.get(key)
-        return copy.deepcopy(val) if val is not None else None
+    return _service.profile(governor_id)
+
+
+async def get_profile_async(governor_id: int):
+    from services.legacy_export_snapshot_service import drain_thread
+
+    return await drain_thread(get_profile_cached, governor_id)
 
 
 # -------------------- Fuzzy search (cache-only) --------------------
@@ -549,8 +150,7 @@ def _iter_name_entries():
     if another thread replaces or mutates the global cache.
     """
     warm_cache()
-    with _cache_lock:
-        snapshot = list(_cache.values())
+    snapshot = list(_service.snapshot().values())
     for v in snapshot:
         try:
             name = (v.get("GovernorName") or "").strip()
@@ -577,9 +177,8 @@ def search_by_governor_name(name_query: str, limit: int = 8):
     """
     warm_cache()
     # Fast check: if cache empty, return quickly (guard under lock)
-    with _cache_lock:
-        if not _cache:
-            return []
+    if not get_cache_stats()["count"]:
+        return []
 
     if not name_query:
         return []

@@ -87,10 +87,27 @@ def retry_coordination(function):
 
     @wraps(function)
     def run(*args, **kwargs):
-        # We do not own rollback or producer work on an external transaction.
         if kwargs.get("external_cursor") is not None:
             return function(*args, **kwargs)
+        from services.cache_admission_diagnostics import identity, record
+
+        correlation = identity()
         started = time.monotonic()
+
+        def emit(outcome, attempt, error=None):
+            facts = dict(
+                stage=function.__name__,
+                outcome=outcome,
+                attempt=attempt,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+                **correlation,
+            )
+            if error is not None:
+                facts.update(sql_error_facts(error))
+            record(facts)
+            log = logger.warning if error is not None else logger.info
+            log("export_contention_result %s", json.dumps(facts, sort_keys=True))
+
         with contention_budget(started + LOCK_BUDGET_SECONDS):
             attempt = 0
             while True:
@@ -101,51 +118,15 @@ def retry_coordination(function):
                     remaining = _deadline.get() - time.monotonic()
                     safe = error.result == -1 and error.transaction_released
                     if not safe or remaining <= 0 or attempt >= MAX_ATTEMPTS:
-                        logger.warning(
-                            "export_contention_result %s",
-                            json.dumps(
-                                dict(
-                                    stage=function.__name__,
-                                    outcome="exhausted" if safe else "not_retryable",
-                                    attempt=attempt,
-                                    elapsed_ms=int((time.monotonic() - started) * 1000),
-                                    **sql_error_facts(error),
-                                ),
-                                sort_keys=True,
-                            ),
-                        )
+                        emit("exhausted" if safe else "not_retryable", attempt, error)
                         raise
                     time.sleep(min(0.025 * 2 ** (attempt - 1), 0.25, remaining))
-                    # Never start a new transaction after the total deadline.
                     if time.monotonic() >= _deadline.get():
-                        logger.warning(
-                            "export_contention_result %s",
-                            json.dumps(
-                                dict(
-                                    stage=function.__name__,
-                                    outcome="exhausted",
-                                    attempt=attempt,
-                                    elapsed_ms=int((time.monotonic() - started) * 1000),
-                                    **sql_error_facts(error),
-                                ),
-                                sort_keys=True,
-                            ),
-                        )
+                        emit("exhausted", attempt, error)
                         raise
                 else:
                     if attempt > 1:
-                        logger.info(
-                            "export_contention_result %s",
-                            json.dumps(
-                                dict(
-                                    stage=function.__name__,
-                                    outcome="recovered",
-                                    attempt=attempt,
-                                    elapsed_ms=int((time.monotonic() - started) * 1000),
-                                ),
-                                sort_keys=True,
-                            ),
-                        )
+                        emit("recovered", attempt)
                     return value
 
     return run

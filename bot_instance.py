@@ -97,17 +97,12 @@ from logging_setup import (
     is_pytest_logging_mode,
 )
 from mge.mge_scheduler import schedule_mge_lifecycle
-from player_stats_cache import (  # optional, see note
-    build_lastkvk_player_stats_cache,
-    build_player_stats_cache,
-)
 from proc_config_import import run_proc_config_import, run_proc_config_import_offload
-from profile_cache import get_cache_stats, warm_cache as warm_profile_cache
+from profile_cache import get_cache_stats
 from server_activity import register_activity_listeners
 from server_activity.activity_store import ensure_activity_schema
 from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
 from subscription_tracker import load_subscriptions
-from target_utils import warm_name_cache
 from utils import (
     ensure_aware_utc,
     load_live_queue_async,
@@ -1384,7 +1379,11 @@ async def _graceful_teardown():
         return
     _shutdown_once.set()
     from event_cache import refresh_service
+    from profile_cache import _service as profile_service
+    from target_utils import close_name_admission
 
+    profile_service.close()
+    close_name_admission()
     refresh_service.close_admission()
     _event_bundle().close_admission()
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
@@ -1548,41 +1547,51 @@ async def on_ready():
         )
 
         try:
-            schedule_bg("warm_name_cache", 8.0, lambda: warm_name_cache())
+            from target_utils import refresh_name_result, verify_name_completion
+
+            schedule_bg(
+                "warm_name_cache",
+                8.0,
+                refresh_name_result,
+                cancel_on_deadline=False,
+                completion_check=verify_name_completion,
+            )
             logger.info("[CACHE] Governor name cache warm scheduled")
         except Exception as e:
             logger.warning(f"[CACHE] Failed to load Governor name cache (will retry later): {e}")
 
         # NEW: warm the player profile cache on startup
         try:
-            schedule_bg("warm_profile_cache", 12.0, lambda: run_blocking(warm_profile_cache))
+            from profile_cache import refresh_async
+            from services.profile_cache_startup import verify_completion as verify_profile
+
+            schedule_bg(
+                "warm_profile_cache",
+                12.0,
+                lambda: refresh_async(origin="startup"),
+                cancel_on_deadline=False,
+                completion_check=verify_profile,
+            )
             logger.info("[CACHE] Player profile cache warm scheduled")
         except Exception as e:
             logger.warning(f"[CACHE] Failed to warm player profile cache: {e} — will retry later")
 
         # OPTIONAL: ensure stats cache (KVK) is populated too
         try:
-            from services.player_stats_startup import verify_completion
+            from services.player_stats_cache_service import build_startup, verify_startup
 
             schedule_bg(
                 "build_player_stats_cache",
                 20.0,
-                lambda: build_player_stats_cache(),
+                build_startup,
                 cancel_on_deadline=False,
-                completion_check=verify_completion,
+                completion_check=verify_startup,
             )
             logger.info("[CACHE] Player stats (KVK) cache build scheduled")
         except Exception as e:
             logger.warning(f"[CACHE] Failed to build stats cache (will retry on next cycle): {e}")
 
-        # OPTIONAL: schedule last-KVK cache build shortly after main stats cache is scheduled.
-        try:
-            schedule_bg(
-                "build_lastkvk_player_stats_cache", 25.0, lambda: build_lastkvk_player_stats_cache()
-            )
-            logger.info("[CACHE] Last-KVK player stats cache build scheduled")
-        except Exception as e:
-            logger.warning(f"[CACHE] Failed to schedule last-KVK cache build: {e}")
+        # Last-KVK belongs to the main composition, including pre-entry fallback.
 
         await cleanup_orphaned_reminders(_startup_loaded_reminder_ids)
 

@@ -1,5 +1,19 @@
 # P0 delivery and P1 recovery status
 
+## 25 October startup-foundations overlay
+
+Latest verified deployment is private `35d8b7e58a5c248c22552b8ae506e1d03ccc6afe`.
+The event-cache feature and compatibility work are delivered. The newer
+[Startup Cache Foundations pack](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Implementation%20and%20Acceptance.md)
+records the approved local implementation and complete carry-forward ledger; it is
+not production acceptance. SQL 51400 preparation admission, exclusive process
+singleton ownership, and profile completion/reporting remain separately attributed.
+Scan 1193 dated 29 September 14:44 is expected unchanged off-season data.
+Natural event transition, original-message callback, exact Daily KVK Overview
+access/deletion disposition, all WS1–WS6 and final F01–F05 obligations remain open.
+Preserve the dated accepted evidence below; do not replay it on a new runtime.
+
+
 Reconciled 24 October 2026. Owner: Chris Watts. This is the current status overlay
 for the dated P0, recovery and Reliability programme packs; their original receipts
 and qualification matrices remain evidence. It does not supersede engineering,

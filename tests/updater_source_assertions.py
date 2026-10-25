@@ -20,8 +20,25 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_contention_hash(root, path):
+def before_startup_foundations_hash(root, path):
+    # Test-only exact successor bridge, not an installed updater capability.
+    # Authenticate both the immutable mapping and current source before walking
+    # the unchanged historical transition chain. Unknown edits still fail.
+    raw = (root / "tests/fixtures/p1_startup_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "998f09dcecdf13b762ff1f21b90f38257c4b27f2590d186ed0a0cc70d1be1457"
+    )
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member is not None:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
+def before_contention_hash(root, path):
+    actual = before_startup_foundations_hash(root, path)
     if path in _EVENT_CACHE_READINESS_PAIRS:
         before, after = _EVENT_CACHE_READINESS_PAIRS[path]
         assert actual == after, path
