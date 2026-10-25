@@ -159,4 +159,8 @@ engineering/access contract records the lesson. Generic support for unsupported
 existing-directory custody and better stream diagnostics remain deferred;
 a successful one-time repair does not establish those installed capabilities.
 
-## Next phase\n\nUse the [25 October handoff](../task_packs/P1%20Next%20Phase%20-%20Handoff%20-%202026-10-25.md)\nfor the review-first boundary, remaining live-button check and complete P1/P0\ncarry-forward. Documentation merge state must be checked before starting work.\n
+## Next phase
+
+Use the [25 October handoff](../task_packs/P1%20Next%20Phase%20-%20Handoff%20-%202026-10-25.md)
+for the review-first boundary, remaining live-button check and complete P1/P0
+carry-forward. Documentation merge state must be checked before starting work.
