@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+import logging
+from typing import Any, Protocol
+
+from constants import REMINDER_TRACKING_FILE
+from event_cache import (
+    get_upcoming_event_cache_snapshot,
+    is_cache_stale,
+    load_event_cache,
+    refresh_event_cache_result,
+)
+from event_calendar.pinned_embed import rehydrate_pinned_calendar_view
+from event_scheduler import load_active_reminders
+from rehydrate_views import rehydrate_tracked_views
+from services.tracked_view_rehydration_service import restoration_completion
+from voting.rehydration import rehydrate_survey_post_views, rehydrate_vote_post_views
+
+logger = logging.getLogger(__name__)
+
+
+class ScheduleBackground(Protocol):
+    def __call__(
+        self,
+        name: str,
+        timeout: float,
+        coro_factory: Callable[[], Awaitable[Any]],
+        **observation: Any,
+    ) -> Any: ...
+
+
+async def wait_for_events(timeout_seconds: int = 10) -> bool:
+    """Availability is independent of count; this observer never refreshes."""
+    checks = int(max(1, timeout_seconds) * 10)
+    for _ in range(checks):
+        try:
+            if get_upcoming_event_cache_snapshot().ok:
+                return True
+        except Exception:
+            logger.debug("[EVENT_CACHE] Upcoming-event readiness check failed", exc_info=True)
+        await asyncio.sleep(0.1)
+    return False
+
+
+async def run_ready_event_cache_rehydration(
+    *,
+    bot: Any,
+    schedule_bg: ScheduleBackground,
+) -> set[Any]:
+    """Load state and observe one refresh owned by the cache service."""
+    logger.info("[REMINDER_CACHE] Attempting to load from %s", REMINDER_TRACKING_FILE)
+    loaded_ids = await load_active_reminders(bot)
+
+    try:
+        load_event_cache()
+        logger.info("[EVENT_CACHE] Loaded cache from disk")
+        if is_cache_stale() or not get_upcoming_event_cache_snapshot().ok:
+            # The service retains and drains the original task after this
+            # observation expires. Scheduling another refresh could race its
+            # completion and accidentally start a second provider request.
+            await refresh_event_cache_result(observation_seconds=10.0)
+        state = get_upcoming_event_cache_snapshot()
+        logger.info(
+            "[EVENT_CACHE] availability=%s upcoming=%d stale=%s persistence=%s",
+            state.ok,
+            len(state.events),
+            state.stale,
+            state.persistence,
+        )
+    except Exception:
+        logger.exception("[STARTUP] Failed to load or refresh event cache")
+
+    return set(loaded_ids or set())
+
+
+async def run_ready_tracked_view_rehydration(
+    *,
+    bot: Any,
+    schedule_bg: ScheduleBackground,
+) -> None:
+    try:
+        schedule_bg(
+            "rehydrate_tracked_views",
+            10.0,
+            lambda: rehydrate_tracked_views(bot),
+            cancel_on_deadline=False,
+            completion_check=restoration_completion,
+        )
+        logger.info("[BOOT] View tracker rehydration scheduled")
+    except Exception:
+        logger.exception("[BOOT] Failed to start rehydrate_tracked_views")
+    try:
+        schedule_bg("rehydrate_vote_post_views", 10.0, lambda: rehydrate_vote_post_views(bot))
+        logger.info("[BOOT] Vote post view rehydration scheduled")
+    except Exception:
+        logger.exception("[BOOT] Failed to start rehydrate_vote_post_views")
+    try:
+        schedule_bg("rehydrate_survey_post_views", 10.0, lambda: rehydrate_survey_post_views(bot))
+        logger.info("[BOOT] Survey post view rehydration scheduled")
+    except Exception:
+        logger.exception("[BOOT] Failed to start rehydrate_survey_post_views")
+
+
+async def run_ready_pinned_calendar_rehydration(
+    *,
+    bot: Any,
+    schedule_bg: ScheduleBackground,
+) -> None:
+    try:
+        schedule_bg(
+            "rehydrate_pinned_calendar_view",
+            8.0,
+            lambda: rehydrate_pinned_calendar_view(bot),
+        )
+        logger.info("[BOOT] pinned calendar view rehydration scheduled")
+    except Exception:
+        logger.exception("[BOOT] failed to schedule pinned calendar rehydration")
