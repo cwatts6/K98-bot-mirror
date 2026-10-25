@@ -903,7 +903,8 @@ async def rehydrate_dm_scheduled_tasks(bot):
                             try:
                                 user = await bot.fetch_user(int(uid))
                             except Exception as e:
-                                failed += 1
+                                # Existing policy disposes this marker. A successful
+                                # save below confirms cleanup, not uncertain work.
                                 logger.warning(
                                     "[DM_REHYDRATE] Failed to fetch user %s for %s: %s — removing marker.",
                                     uid,
@@ -941,7 +942,8 @@ async def rehydrate_dm_scheduled_tasks(bot):
                             try:
                                 user = await bot.fetch_user(int(uid))
                             except Exception as e:
-                                failed += 1
+                                # Count failed persistence below, not completed
+                                # cleanup under the existing marker policy.
                                 logger.warning(
                                     "[DM_REHYDRATE] Failed to fetch user %s for immediate send for %s: %s — removing marker.",
                                     uid,

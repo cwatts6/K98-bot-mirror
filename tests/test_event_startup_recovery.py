@@ -1,5 +1,7 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -185,6 +187,79 @@ async def test_corrupt_dm_tracker_blocks_startup_and_is_not_reloaded(monkeypatch
     assert not await scheduler._ensure_dm_startup(object())
     assert scheduler.dm_sent_tracker == {"retained": {"123": [0]}}
     assert scheduler.dm_startup_report() == {"state": "unconfirmed", "error": "ValueError"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seconds_until", [60, -5])
+@pytest.mark.parametrize("failure", [None, "save", "item"])
+async def test_dm_cleanup_admits_startup_only_after_confirmed_disposition(
+    monkeypatch, tmp_path, seconds_until, failure
+):
+    import event_cache
+    import event_scheduler as scheduler
+
+    now = datetime.now(UTC)
+    event = {"name": "event", "start_time": now + timedelta(hours=1)}
+    delta = "invalid" if failure == "item" else 3600 - seconds_until
+    markers = {"event": {"1": {delta}, "2": {3600 - seconds_until}}}
+    tasks, fetched = [], []
+    path = tmp_path / "scheduled.json"
+    monkeypatch.setattr(scheduler, "DM_SCHEDULED_TRACKER_FILE", str(path))
+    monkeypatch.setattr(scheduler, "dm_scheduled_tracker", markers)
+    monkeypatch.setattr(scheduler, "_dm_startup_state", "not_started")
+    monkeypatch.setattr(scheduler, "_dm_startup_error", None)
+    monkeypatch.setattr(scheduler, "_dm_startup_lock", asyncio.Lock())
+    monkeypatch.setattr(scheduler, "load_dm_sent_tracker", lambda: None)
+    monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker", lambda: None)
+    monkeypatch.setattr(scheduler, "utcnow", lambda: now)
+    monkeypatch.setattr(scheduler, "make_event_id", lambda _event: "event")
+    monkeypatch.setattr(
+        event_cache,
+        "get_upcoming_event_cache_snapshot",
+        lambda: UpcomingEventCacheSnapshot(True, (event,), now, False),
+    )
+
+    async def fetch_user(uid):
+        fetched.append(uid)
+        if uid == 1:
+            raise RuntimeError("existing fetch-failure cleanup policy")
+        return SimpleNamespace(id=uid)
+
+    async def reminder(*_args):
+        pass
+
+    monkeypatch.setattr(scheduler, "delayed_user_dm", reminder)
+    monkeypatch.setattr(scheduler, "send_user_reminder", reminder)
+    monkeypatch.setattr(
+        scheduler, "register_user_task", lambda _uid, task, **_kw: tasks.append(task)
+    )
+    if failure == "save":
+
+        def fail_save():
+            raise PermissionError("test persistence failure")
+
+        monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker", fail_save)
+
+    try:
+        assert await scheduler._ensure_dm_startup(SimpleNamespace(fetch_user=fetch_user)) is (
+            failure is None
+        )
+        assert scheduler.dm_startup_report()["state"] == (
+            "complete" if failure is None else "unconfirmed"
+        )
+        assert markers == {"event": {"2": {3600 - seconds_until}}}
+        assert len(tasks) == 1
+        if failure != "save":
+            assert json.loads(path.read_text(encoding="utf-8")) == {
+                "event": {"2": [3600 - seconds_until]}
+            }
+        before = list(fetched)
+        assert await scheduler._ensure_dm_startup(SimpleNamespace(fetch_user=fetch_user)) is (
+            failure is None
+        )
+        assert fetched == before and len(tasks) == 1
+    finally:
+        await asyncio.gather(*tasks)
 
 
 @pytest.mark.asyncio
