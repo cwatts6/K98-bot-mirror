@@ -6,6 +6,8 @@ operator's subsequent implementation approval supersedes the review-only stage
 in the [25 October handoff](P1%20Next%20Phase%20-%20Handoff%20-%202026-10-25.md).
 This approval covers local implementation and validation, not merge, deployment,
 restart, SQL/provider operations, or activation changes.
+The subsequent PR-stage approval also covers opening mirror/production PRs and
+addressing review feedback. Both PRs must remain unmerged for operator review.
 
 ## Baseline and custody
 
@@ -163,8 +165,8 @@ fixtures are not installation authority.
 
 The corrected affected suites passed 113 tests with operational logs unchanged.
 Every caller of the historical-source test helper was then checked: 134 passed.
-The full suite was not rerun after these test-only corrections; do not describe
-the original full run as passing. Black/Ruff, diff whitespace, architecture,
+At that checkpoint the full suite had not been rerun after the test-only
+corrections; the original failed run remains historical evidence. Black/Ruff, diff whitespace, architecture,
 deferred-item/security-routing validators, test selection, synthetic-config import
 smoke and command registration passed. The active command surface remains 36
 primary commands and 102 grouped subcommands. Existing platform/integration skips
@@ -177,6 +179,36 @@ to test fixtures/negative tests and these documentation results: no runtime,
 permission, provider, persistence, configuration or deployment behavior changed.
 Those follow-up edits receive a documented security-review skip; the runtime
 source reviewed by the completed scan is unchanged. No live acceptance is claimed.
+
+### PR-stage validation and review correction
+
+The corrected mirror implementation at `97f9b5a` subsequently passed the full
+suite: **9,261 passed, 1,080 skipped, one dependency warning and eight subtests
+passed** in 1,109.47 seconds. The log-noise harness confirmed operational logs
+unchanged. Pre-commit, including secrets scanning and Pyright, passed.
+
+Mirror PR #441 identified one startup regression: a marker removed under the
+existing fetch-failure cleanup policy was counted as uncertain even after a
+successful save, blocking other subscribers. Commit `56e08e67` corrects that
+classification in both delayed and immediate restoration. Failed saves and
+per-item uncertainty still block re-entry. Six new regression cases exercise
+both paths, another subscriber, persistence failure, item failure and repeated
+startup observation; the focused suite passed **18 tests**, with operational
+logs unchanged. Marker eligibility/deletion and retry policies are unchanged.
+
+The initial full run above predates this bounded correction. Production full-suite
+results and exact final-head review/check evidence are retained with the PRs;
+do not describe a pre-correction run as final-head execution. Incremental Changes
+scan `00476fb3-4fac-4f97-a957-3a7e09bb795d` covered the correction without findings.
+Final production Changes scan `3c6ce67f-d06c-4166-8369-bd63255c11d7` reconciled all
+ten source files to the reviewed source and correction, also without findings.
+
+An unconfirmed DM restoration still requires separately reviewed operator recovery;
+it is not automatically replayed. Existing marker deletion after failed user fetch
+remains a separate durability obligation. Startup completion records historical
+registration; consumers must also inspect current liveness. Thread drainage relies
+on the configured transport returning. None of these local results settles runtime
+acceptance or protected-updater compatibility with the actual installed version.
 
 ## Acceptance and explicit residuals
 
