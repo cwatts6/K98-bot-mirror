@@ -49,7 +49,7 @@ async def rehydrate_live_event_views(bot, event_channel_id):
         channel = await bot.fetch_channel(event_channel_id)
     except Exception as e:
         logger.warning("[REHYDRATE] Cannot fetch event channel %s: %s", event_channel_id, e)
-        return
+        return {"status": "unavailable", "error": type(e).__name__}
 
     now = utcnow()
     upcoming = get_all_upcoming_events()
@@ -61,6 +61,7 @@ async def rehydrate_live_event_views(bot, event_channel_id):
         <= now + timedelta(hours=48)
     ]
 
+    attached, failed = 0, 0
     for event in events_48h:
         event_id = make_event_id(event)
         entry = embed_tracker.get(event_id)
@@ -85,15 +86,19 @@ async def rehydrate_live_event_views(bot, event_channel_id):
                     [event], prefix=safe_prefix, timeout=None, complete_event_packing=True
                 )
             )
+            attached += 1
             logger.info(
                 "[REHYDRATE] Re-registered view for event_id=%s with prefix=%s",
                 event_id,
                 safe_prefix,
             )
         except Exception as e:
+            failed += 1
             logger.warning("[REHYDRATE] Failed to rehydrate view for %s: %s", event_id, e)
         # micro-yield to keep loop responsive
         await asyncio.sleep(0)
+
+    return {"status": "partial" if failed else "complete", "attached": attached, "failed": failed}
 
 
 def save_embed_tracker():

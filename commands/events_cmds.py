@@ -12,10 +12,15 @@ from core.interaction_safety import safe_command, safe_defer
 from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
 from decoraters import is_admin_and_notify_channel, track_usage
 from embed_utils import format_event_embed, format_fight_embed
-from event_cache import get_last_refreshed, is_cache_stale, refresh_event_cache
+from event_cache import (
+    get_upcoming_event_cache_snapshot,
+    is_cache_stale,
+    refresh_event_cache_result,
+)
 from event_embed_manager import update_live_event_embeds
 from event_utils import serialize_event
 from rehydrate_views import save_view_tracker_with_retries as save_view_tracker_async
+from services.event_cache_service import refresh_message
 from ui.views.events_views import NextEventView, NextFightView
 from utils import get_next_events, get_next_fights, utcnow
 from versioning import versioned
@@ -171,21 +176,25 @@ def register_events(bot: ext_commands.Bot) -> None:
 
         started = datetime.now(UTC)
         try:
-            await refresh_event_cache()
-            await update_live_event_embeds(bot, KVK_EVENT_CHANNEL_ID)
-
-            ts = get_last_refreshed()
-            if isinstance(ts, datetime):
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=UTC)
-                ts_text = ts.strftime("%Y-%m-%d %H:%M:%S UTC")
-            else:
-                ts_text = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-
+            result = await refresh_event_cache_result(observation_seconds=10.0)
+            publication = "Countdown publication was not attempted."
+            if (
+                result.status not in {"pending", "closed", "cancelled"}
+                and get_upcoming_event_cache_snapshot().ok
+            ):
+                await update_live_event_embeds(bot, KVK_EVENT_CHANNEL_ID)
+                publication = (
+                    "Countdown publication attempted; delivery is not independently verified."
+                )
+            ts_text = (
+                result.last_refreshed.strftime("%Y-%m-%d %H:%M:%S UTC")
+                if result.last_refreshed
+                else "unavailable"
+            )
             dur = (datetime.now(UTC) - started).total_seconds()
             await ctx.interaction.edit_original_response(
-                content=f"✅ Event cache and countdown embeds refreshed.\n"
-                f"🕒 Last refreshed: `{ts_text}` • ⏱ {dur:.1f}s"
+                content=f"{refresh_message(result)}\n{publication}\n"
+                f"Cache timestamp: `{ts_text}` | {dur:.1f}s"
             )
 
         except Exception as e:
@@ -209,31 +218,29 @@ def register_events(bot: ext_commands.Bot) -> None:
 
         started = utcnow()
         try:
-            try:
-                if is_cache_stale():
-                    await refresh_event_cache()
-            except Exception:
-                logger.warning(
-                    "[/refresh_kvk_overview] Cache refresh check failed; proceeding anyway.",
-                    exc_info=True,
+            result = None
+            if is_cache_stale():
+                result = await refresh_event_cache_result(observation_seconds=10.0)
+            snapshot = get_upcoming_event_cache_snapshot()
+            cache_text = (
+                refresh_message(result) if result else "Using the previously loaded event cache."
+            )
+            publication = "Overview publication was not attempted."
+            if snapshot.ok and (
+                result is None or result.status not in {"pending", "closed", "cancelled"}
+            ):
+                await post_or_update_daily_KVK_overview(bot, event_channel_id=KVK_EVENT_CHANNEL_ID)
+                publication = (
+                    "Overview publication attempted; delivery is not independently verified."
                 )
-
-            await post_or_update_daily_KVK_overview(bot, KVK_EVENT_CHANNEL_ID)
-
-            ts = get_last_refreshed()
-            if isinstance(ts, datetime):
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=UTC)
-                ts_text = ts.strftime("%Y-%m-%d %H:%M:%S UTC")
-            else:
-                ts_text = utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-
+            ts_text = (
+                snapshot.last_refreshed.strftime("%Y-%m-%d %H:%M:%S UTC")
+                if snapshot.last_refreshed
+                else "unavailable"
+            )
             dur = (utcnow() - started).total_seconds()
             await ctx.interaction.edit_original_response(
-                content=(
-                    f"✅ Daily KVK Overview refreshed in **{dur:.1f}s** and posted to <#{KVK_EVENT_CHANNEL_ID}>.\n"
-                    f"🕒 Event cache last refreshed: `{ts_text}`"
-                )
+                content=f"{cache_text}\n{publication}\nCache timestamp: `{ts_text}` | {dur:.1f}s"
             )
 
         except Exception as e:

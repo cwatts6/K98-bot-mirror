@@ -134,8 +134,8 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate WS3/readiness slice after tracked-view restoration; preserve reminder eligibility and public-save semantics.
-- Status: P1 implementation candidate; not included in first runtime slice
-- Last verified: 2026-10-24
+- Status: Expanded local implementation complete with affected-suite validation; see [implementation and acceptance](../task_packs/P1%20Event%20Cache%20Readiness%20-%20Implementation%20and%20Acceptance.md) for the full-run failures and test-only corrections. Not deployed or runtime-accepted; remaining WS3 obligations stay separate.
+- Last verified: 2026-10-25
 
 ### Deferred Optimisation
 - Area: `event_calendar/reminder_state.py`, `player_self_service/service.py`, `event_calendar/reminder_candidates.py`

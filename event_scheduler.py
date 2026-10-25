@@ -32,7 +32,7 @@ from core.discord_embed_limits import (
 )
 from embed_utils import LocalTimeToggleView, fmt_short
 from event_cache import get_all_upcoming_events
-from file_utils import atomic_json_write, atomic_write_json, read_json_safe, run_blocking_in_thread
+from file_utils import atomic_json_write, atomic_write_json, run_blocking_in_thread
 from registry.governor_registry import load_registry
 from reminder_domain.kvk_candidates import (
     build_kvk_alert_projection,
@@ -247,11 +247,75 @@ def _ensure_parent(path: str):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
 
+_dm_startup_state = "not_started"
+_dm_startup_error = None
+_dm_startup_lock = asyncio.Lock()
+
+
+def dm_startup_report():
+    return {"state": _dm_startup_state, "error": _dm_startup_error}
+
+
+def _read_dm_snapshot(path):
+    try:
+        with open(path, encoding="utf-8") as stream:
+            raw = json.load(stream)
+    except FileNotFoundError:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("Invalid DM tracker envelope")
+    for value in raw.values():
+        if not isinstance(value, (dict, list)):
+            raise ValueError("Invalid DM tracker entry")
+        if isinstance(value, dict) and any(not isinstance(items, list) for items in value.values()):
+            raise ValueError("Invalid DM tracker markers")
+    return raw
+
+
+async def _ensure_dm_startup(bot):
+    global _dm_startup_state, _dm_startup_error
+    from event_cache import get_upcoming_event_cache_snapshot
+    from services.legacy_export_snapshot_service import drain_thread
+
+    async with _dm_startup_lock:
+        if _dm_startup_state == "complete":
+            return True
+        if _dm_startup_state in {"unconfirmed", "failed"}:
+            return False
+        try:
+            if _dm_startup_state == "not_started":
+                _dm_startup_state = "loading"
+                await drain_thread(load_dm_sent_tracker)
+                await drain_thread(load_dm_scheduled_tracker)
+                _dm_startup_state = "waiting_for_events"
+            while True:
+                snapshot = get_upcoming_event_cache_snapshot()
+                if snapshot.ok and snapshot.events:
+                    break
+                # No refresh, tracker pruning, or new scheduler while waiting.
+                await asyncio.sleep(1)
+            _dm_startup_state = "restoring"
+            outcome = await rehydrate_dm_scheduled_tasks(bot)
+            if not isinstance(outcome, dict) or outcome.get("status") != "complete":
+                _dm_startup_state = "unconfirmed"
+                return False
+            _dm_startup_state = "complete"
+            return True
+        except asyncio.CancelledError:
+            if _dm_startup_state != "waiting_for_events":
+                _dm_startup_state = "unconfirmed"
+            raise
+        except Exception as exc:
+            _dm_startup_error = type(exc).__name__
+            _dm_startup_state = "unconfirmed"
+            logger.warning("[DM_REHYDRATE] Startup unresolved error_type=%s", _dm_startup_error)
+            return False
+
+
 def load_dm_sent_tracker():
     """Load and migrate dm_sent_tracker to per-user nested dict."""
     global dm_sent_tracker
-    dm_sent_tracker = {}
-    raw = read_json_safe(DM_SENT_TRACKER_FILE, default={}) or {}
+    raw = _read_dm_snapshot(DM_SENT_TRACKER_FILE)
     migrated = {}
     for event_id, value in (raw.items() if isinstance(raw, dict) else []):
         if isinstance(value, list):
@@ -296,8 +360,7 @@ def save_dm_scheduled_tracker():
 def load_dm_scheduled_tracker():
     """Load and migrate dm_scheduled_tracker to per-user nested dict with sets."""
     global dm_scheduled_tracker
-    dm_scheduled_tracker = {}
-    raw = read_json_safe(DM_SCHEDULED_TRACKER_FILE, default={}) or {}
+    raw = _read_dm_snapshot(DM_SCHEDULED_TRACKER_FILE)
     migrated = {}
     for event_id, value in (raw.items() if isinstance(raw, dict) else []):
         if isinstance(value, list):
@@ -771,14 +834,20 @@ async def rehydrate_dm_scheduled_tasks(bot):
             - If seconds_until < -REHYDRATE_STALE_GRACE_SECONDS: treat as stale and remove marker
       - Save dm_scheduled_tracker after pruning/restoring.
     """
+    from event_cache import get_upcoming_event_cache_snapshot
+
+    snapshot = get_upcoming_event_cache_snapshot()
+    if not snapshot.ok or not snapshot.events:
+        return {"status": "deferred", "reason": "event_data_unavailable_or_empty"}
+    failed = 0
     try:
         if not dm_scheduled_tracker:
             logger.debug("[DM_REHYDRATE] No persisted scheduled DM markers to rehydrate.")
-            return
+            return {"status": "complete", "restored": 0}
 
         logger.info("[DM_REHYDRATE] Attempting to rehydrate persisted scheduled DMs from disk.")
         # Build a mapping of event_id -> event for quick lookup
-        upcoming = get_all_upcoming_events() or []
+        upcoming = list(snapshot.events)
         event_map = {make_event_id(e): e for e in upcoming}
 
         now = utcnow()
@@ -834,6 +903,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
                             try:
                                 user = await bot.fetch_user(int(uid))
                             except Exception as e:
+                                failed += 1
                                 logger.warning(
                                     "[DM_REHYDRATE] Failed to fetch user %s for %s: %s — removing marker.",
                                     uid,
@@ -871,6 +941,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
                             try:
                                 user = await bot.fetch_user(int(uid))
                             except Exception as e:
+                                failed += 1
                                 logger.warning(
                                     "[DM_REHYDRATE] Failed to fetch user %s for immediate send for %s: %s — removing marker.",
                                     uid,
@@ -915,6 +986,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
                         removed_any = True
 
                     except Exception as e:
+                        failed += 1
                         # Defensive: don't abort rehydration on per-item error
                         logger.warning(
                             "[DM_REHYDRATE] Error rehydrating marker %s / %s / %s: %s",
@@ -946,6 +1018,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
             try:
                 save_dm_scheduled_tracker()
             except Exception as e:
+                failed += 1
                 logger.warning(
                     "[DM_REHYDRATE] Failed to save dm_scheduled_tracker after pruning: %s", e
                 )
@@ -955,9 +1028,15 @@ async def rehydrate_dm_scheduled_tasks(bot):
             restored_count,
             removed_any,
         )
+        return {
+            "status": "partial" if failed else "complete",
+            "restored": restored_count,
+            "failed": failed,
+        }
     except Exception as e:
         # Fail-safe: never crash the scheduler due to rehydrate errors
         logger.exception("[DM_REHYDRATE] Unexpected error during DM rehydration: %s", e)
+        return {"status": "unconfirmed", "error": type(e).__name__}
 
 
 async def delayed_user_dm(bot, user, event, delta, seconds_until):
@@ -1101,15 +1180,9 @@ async def send_user_reminder(user, event, delta):
 
 
 async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test_user_id=None):
-    await load_dm_sent_tracker_async()
-    await load_dm_scheduled_tracker_async()
-
-    if not test_mode:
-        # Rehydrate any persisted scheduled DM tasks so restarts don't permanently block reminders.
-        try:
-            await rehydrate_dm_scheduled_tasks(bot)
-        except Exception as e:
-            logger.warning("[DM_REHYDRATE] Rehydration attempt failed at startup: %s", e)
+    if not test_mode and not await _ensure_dm_startup(bot):
+        logger.warning("[DM_REHYDRATE] Scheduler blocked by unresolved startup; no replay")
+        return
 
     if test_mode:
         now = utcnow()
@@ -1299,6 +1372,7 @@ async def reminder_cleanup_loop():
 async def refresh_reminder_format(bot, notify_channel_id):
     try:
         updated = 0
+        failed = 0
         # Build a quick lookup of upcoming events by event_id
         events = {make_event_id(e): e for e in get_all_upcoming_events()}
 
@@ -1329,10 +1403,14 @@ async def refresh_reminder_format(bot, notify_channel_id):
                 await msg.edit(embed=embed)  # keep existing view
                 updated += 1
             except Exception as e:
+                failed += 1
                 logger.error(f"[SCHEDULE_CACHE_REFRESH] Failed to edit message for {event_id}: {e}")
 
         logger.info(
             f"[SCHEDULE_CACHE_REFRESH] Reminder update complete. Edited {updated} messages."
         )
+        return {"status": "partial" if failed else "complete", "updated": updated, "failed": failed}
     except Exception as e:
         logger.error(f"[SCHEDULE_CACHE_REFRESH] Entire function failed: {e}")
+
+        return {"status": "unconfirmed", "error": type(e).__name__}

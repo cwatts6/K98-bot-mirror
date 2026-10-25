@@ -34,6 +34,10 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
         captured.append({"user_id": user_id, "meta": meta})
         task.cancel()
 
+    async def ready(_bot):
+        return True
+
+    monkeypatch.setattr(scheduler, "_ensure_dm_startup", ready)
     monkeypatch.setattr(scheduler, "load_dm_sent_tracker_async", no_op_async)
     monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker_async", no_op_async)
     monkeypatch.setattr(scheduler, "rehydrate_dm_scheduled_tasks", no_op_async)

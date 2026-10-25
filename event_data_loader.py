@@ -1,7 +1,6 @@
 ﻿# event_data_loader.py  — improved exception classification + telemetry for _fetch_values
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 import logging
@@ -33,16 +32,6 @@ logger = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 # Standard UTC
 UTC = UTC
-
-# Try to import the centralized helpers once. If unavailable, we will fallback to asyncio.to_thread()
-try:
-    from file_utils import run_blocking_in_thread, start_callable_offload  # type: ignore
-except Exception:
-    try:
-        from file_utils import run_blocking_in_thread  # type: ignore
-    except Exception:
-        run_blocking_in_thread = None  # type: ignore
-    start_callable_offload = None  # type: ignore
 
 if not _HAVE_PARSE_ISO:
     logger.debug(
@@ -131,7 +120,7 @@ def _get_credentials():
 
 
 # ---- Google Sheets client (factory per-call; credentials cached) -------------
-def _sheets_client():
+def _sheets_client(timeout=None):
     """
     Build a Google Sheets client with HTTP timeout.
 
@@ -152,7 +141,7 @@ def _sheets_client():
     except Exception as e:
         raise RuntimeError(f"Google client libraries unavailable: {e}")
 
-    http = httplib2.Http(timeout=30)  # seconds
+    http = httplib2.Http(timeout=timeout or GSHEETS_CALL_TIMEOUT or 30)  # seconds
     authed_http = google_auth_httplib2.AuthorizedHttp(creds, http=http)
     svc = build("sheets", "v4", http=authed_http, cache_discovery=False)
     return svc.spreadsheets()
@@ -222,7 +211,7 @@ def _classify_exception(e: Exception) -> tuple[str, bool]:
         return (err_type, True)
 
 
-def _fetch_values(range_a1: str) -> list[list[Any]] | None:
+def _fetch_values(range_a1: str, *, timeout=None) -> list[list[Any]] | None:
     """
     Returns rows [] on success (empty), or None on error.
 
@@ -259,11 +248,8 @@ def _fetch_values(range_a1: str) -> list[list[Any]] | None:
     if gm is not None and hasattr(gm, "get_sheet_values"):
         try:
             # Use configured timeout from constants (may be None)
-            timeout = None
-            try:
+            if timeout is None:
                 timeout = float(GSHEETS_CALL_TIMEOUT) if GSHEETS_CALL_TIMEOUT is not None else None
-            except Exception:
-                timeout = None
 
             try:
                 rows = gm.get_sheet_values(TIMELINE_SHEET_ID, range_a1, timeout=timeout)
@@ -432,7 +418,7 @@ def _fetch_values(range_a1: str) -> list[list[Any]] | None:
 
     # Fallback: use the inline sheets client builder (preserve previous behaviour if wrapper unavailable)
     try:
-        sheet = _sheets_client()
+        sheet = _sheets_client(timeout=timeout)
         req = sheet.values().get(
             spreadsheetId=TIMELINE_SHEET_ID,
             range=range_a1,
@@ -710,244 +696,70 @@ def parse_chronicle_dates(raw_list: list[list[Any]]) -> list[Event]:
     return res
 
 
-# ---- Helper: normalize offload return shapes ---------------------------------
-def _normalize_offload_result(res: Any) -> Any:
-    """
-    Normalize the start_callable_offload return shapes.
+# The event loader owns its real thread until completion. No executor fallback.
+async def _load_owned(sync_fn, timeout):
+    from services.legacy_export_snapshot_service import drain_thread
 
-    Common shapes observed:
-     - direct result (list)
-     - (result, metadata_dict)
-    This helper extracts the first element in the latter case (expected).
-    """
-    try:
-        if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-            return res[0]
-    except Exception:
-        pass
-    return res
+    # timeout is enforced by the transport and outer owner, not a proxy that
+    # releases ownership while a Python thread remains active.
+    return await drain_thread(sync_fn, timeout=timeout)
 
 
-# ---- Public async loaders (run off-thread/process) ---------------------------
-async def load_upcoming_ruins_events(timeout: float | None = None) -> list[Event] | None:
-    """
-    Fetch and parse 'ruins' timeline. Prefer start_callable_offload for process-level
-    visibility when Google requests hang. Fall back to run_blocking_in_thread and asyncio.to_thread.
-
-    New:
-      - timeout: optional float seconds to bound the call. Propagated to offload helpers.
-    """
-    meta = {"range": RANGES["ruins"], "sheet_id": TIMELINE_SHEET_ID, "etype": "ruins"}
-
-    # Resolve the sync callable at runtime to avoid forward-reference NameError
-    sync_fn = globals().get("_load_upcoming_ruins_sync")
-    if sync_fn is None:
-        logger.warning(
-            "[TIMELINE] internal sync loader _load_upcoming_ruins_sync missing; using placeholder for offload invocation."
-        )
-
-        # Placeholder: many tests only assert that start_callable_offload was invoked with kwargs;
-        # the fake offload helper usually doesn't call the provided function. Use a noop.
-        def _placeholder():
-            return None
-
-        sync_fn = _placeholder
-
-    # prefer start_callable_offload if available
-    if start_callable_offload is not None:
-        try:
-            res = await start_callable_offload(
-                sync_fn,
-                name="load_upcoming_ruins_events",
-                prefer_process=True,
-                meta=meta,
-                timeout=timeout,
-            )
-            return _normalize_offload_result(res)
-        except Exception:
-            # fallback to thread
-            pass
-
-    if run_blocking_in_thread is not None:
-        return await run_blocking_in_thread(
-            sync_fn, name="load_upcoming_ruins_events", meta=meta, timeout=timeout
-        )
-
-    # fallback to asyncio.to_thread (wrap with wait_for if timeout provided)
-    logger.debug(
-        "[TIMELINE] run_blocking_in_thread unavailable; using asyncio.to_thread fallback for ruins"
-    )
-    if timeout is not None:
-        return await asyncio.wait_for(asyncio.to_thread(sync_fn), timeout=timeout)
-    return await asyncio.to_thread(sync_fn)
-
-
-def _load_upcoming_ruins_sync() -> list[Event] | None:
-    values = _fetch_values(RANGES["ruins"])
+def _load_sync(kind, timeout=None):
+    values = _fetch_values(RANGES[kind], timeout=timeout)
     if values is None:
         return None
-    return parse_event_dates(values, label="Next Ruins", etype="ruins") if values else []
-
-
-async def load_upcoming_altar_events(timeout: float | None = None) -> list[Event] | None:
-    meta = {"range": RANGES["altar"], "sheet_id": TIMELINE_SHEET_ID, "etype": "altar"}
-
-    sync_fn = globals().get("_load_upcoming_altar_events_sync")
-    if sync_fn is None:
-        logger.warning(
-            "[TIMELINE] internal sync loader _load_upcoming_altar_events_sync missing; using placeholder for offload invocation."
-        )
-
-        def _placeholder():
-            return None
-
-        sync_fn = _placeholder
-
-    if start_callable_offload is not None:
-        try:
-            res = await start_callable_offload(
-                sync_fn,
-                name="load_upcoming_altar_events",
-                prefer_process=True,
-                meta=meta,
-                timeout=timeout,
-            )
-            return _normalize_offload_result(res)
-        except Exception:
-            pass
-
-    if run_blocking_in_thread is not None:
-        return await run_blocking_in_thread(
-            sync_fn,
-            name="load_upcoming_altar_events",
-            meta=meta,
-            timeout=timeout,
-        )
-    logger.debug(
-        "[TIMELINE] run_blocking_in_thread unavailable; using asyncio.to_thread fallback for altar"
-    )
-    if timeout is not None:
-        return await asyncio.wait_for(asyncio.to_thread(sync_fn), timeout=timeout)
-    return await asyncio.to_thread(sync_fn)
-
-
-def _load_upcoming_altar_events_sync() -> list[Event] | None:
-    values = _fetch_values(RANGES["altar"])
-    if values is None:
-        return None
-    return parse_event_dates(values, label="Next Altar Fight", etype="altar") if values else []
-
-
-async def load_upcoming_major_events(timeout: float | None = None) -> list[Event] | None:
-    meta = {"range": RANGES["major"], "sheet_id": TIMELINE_SHEET_ID, "etype": "major"}
-
-    sync_fn = globals().get("_load_upcoming_major_events_sync")
-    if sync_fn is None:
-        logger.warning(
-            "[TIMELINE] internal sync loader _load_upcoming_major_events_sync missing; using placeholder for offload invocation."
-        )
-
-        def _placeholder():
-            return None
-
-        sync_fn = _placeholder
-
-    if start_callable_offload is not None:
-        try:
-            res = await start_callable_offload(
-                sync_fn,
-                name="load_upcoming_major_events",
-                prefer_process=True,
-                meta=meta,
-                timeout=timeout,
-            )
-            return _normalize_offload_result(res)
-        except Exception:
-            pass
-
-    if run_blocking_in_thread is not None:
-        return await run_blocking_in_thread(
-            sync_fn, name="load_upcoming_major_events", meta=meta, timeout=timeout
-        )
-    logger.debug(
-        "[TIMELINE] run_blocking_in_thread unavailable; using asyncio.to_thread fallback for major"
-    )
-    if timeout is not None:
-        return await asyncio.wait_for(asyncio.to_thread(sync_fn), timeout=timeout)
-    return await asyncio.to_thread(sync_fn)
-
-
-def _load_upcoming_major_events_sync() -> list[Event] | None:
-    values = _fetch_values(RANGES["major"])
-    if values is None:
-        return None
-    return parse_major_dates(values) if values else []
-
-
-async def load_upcoming_chronicle_events(timeout: float | None = None) -> list[Event] | None:
-    meta = {"range": RANGES["chronicle"], "sheet_id": TIMELINE_SHEET_ID, "etype": "chronicle"}
-
-    sync_fn = globals().get("_load_upcoming_chronicle_events_sync")
-    if sync_fn is None:
-        logger.warning(
-            "[TIMELINE] internal sync loader _load_upcoming_chronicle_events_sync missing; using placeholder for offload invocation."
-        )
-
-        def _placeholder():
-            return None
-
-        sync_fn = _placeholder
-
-    if start_callable_offload is not None:
-        try:
-            res = await start_callable_offload(
-                sync_fn,
-                name="load_upcoming_chronicle_events",
-                prefer_process=True,
-                meta=meta,
-                timeout=timeout,
-            )
-            return _normalize_offload_result(res)
-        except Exception:
-            pass
-
-    if run_blocking_in_thread is not None:
-        return await run_blocking_in_thread(
-            sync_fn,
-            name="load_upcoming_chronicle_events",
-            meta=meta,
-            timeout=timeout,
-        )
-    logger.debug(
-        "[TIMELINE] run_blocking_in_thread unavailable; using asyncio.to_thread fallback for chronicle"
-    )
-    if timeout is not None:
-        return await asyncio.wait_for(asyncio.to_thread(sync_fn), timeout=timeout)
-    return await asyncio.to_thread(sync_fn)
-
-
-def _load_upcoming_chronicle_events_sync() -> list[Event] | None:
-    values = _fetch_values(RANGES["chronicle"])
-    if values is None:
-        return None
-    return parse_chronicle_dates(values) if values else []
-
-
-# --- Optional: one-call batch loader for all event types ----------------------
-async def load_all_upcoming_events() -> list[Event] | None:
-    """
-    Concurrently load all event categories, return a single sorted list.
-    Returns None if any fetch hard-fails (so caller can surface an error).
-    """
-    ruins, altar, major, chrono = await asyncio.gather(
-        load_upcoming_ruins_events(),
-        load_upcoming_altar_events(),
-        load_upcoming_major_events(),
-        load_upcoming_chronicle_events(),
+    if not isinstance(values, list) or any(not isinstance(row, list) for row in values):
+        raise ValueError("Invalid event source rows")
+    # Validate all nonblank dates BEFORE future filtering. Malformed data is not
+    # an empty calendar; blank rows and valid past-only sources remain valid.
+    for row in values:
+        if row and row[0]:
+            _parse_dt_str_utc(str(row[0]))
+    if kind == "major":
+        return parse_major_dates(values)
+    if kind == "chronicle":
+        return parse_chronicle_dates(values)
+    return parse_event_dates(
+        values, label="Next Ruins" if kind == "ruins" else "Next Altar Fight", etype=kind
     )
 
-    if any(v is None for v in (ruins, altar, major, chrono)):
-        return None
 
-    merged: list[Event] = (ruins or []) + (altar or []) + (major or []) + (chrono or [])
-    return sorted(merged, key=lambda e: e["start_time"])
+def _load_upcoming_ruins_sync(timeout=None):
+    return _load_sync("ruins", timeout)
+
+
+def _load_upcoming_altar_events_sync(timeout=None):
+    return _load_sync("altar", timeout)
+
+
+def _load_upcoming_major_events_sync(timeout=None):
+    return _load_sync("major", timeout)
+
+
+def _load_upcoming_chronicle_events_sync(timeout=None):
+    return _load_sync("chronicle", timeout)
+
+
+async def load_upcoming_ruins_events(timeout=None):
+    return await _load_owned(_load_upcoming_ruins_sync, timeout)
+
+
+async def load_upcoming_altar_events(timeout=None):
+    return await _load_owned(_load_upcoming_altar_events_sync, timeout)
+
+
+async def load_upcoming_major_events(timeout=None):
+    return await _load_owned(_load_upcoming_major_events_sync, timeout)
+
+
+async def load_upcoming_chronicle_events(timeout=None):
+    return await _load_owned(_load_upcoming_chronicle_events_sync, timeout)
+
+
+async def load_all_upcoming_events():
+    # Compatibility read: participate in the cache's single refresh owner.
+    from event_cache import get_all_upcoming_events, refresh_event_cache_result
+
+    result = await refresh_event_cache_result()
+    return get_all_upcoming_events() if result.status.startswith("refreshed") else None

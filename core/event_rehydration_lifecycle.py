@@ -7,10 +7,10 @@ from typing import Any, Protocol
 
 from constants import REMINDER_TRACKING_FILE
 from event_cache import (
-    get_all_upcoming_events,
+    get_upcoming_event_cache_snapshot,
     is_cache_stale,
     load_event_cache,
-    refresh_event_cache,
+    refresh_event_cache_result,
 )
 from event_calendar.pinned_embed import rehydrate_pinned_calendar_view
 from event_scheduler import load_active_reminders
@@ -32,11 +32,11 @@ class ScheduleBackground(Protocol):
 
 
 async def wait_for_events(timeout_seconds: int = 10) -> bool:
-    """Return True once the event cache has upcoming events, otherwise False on timeout."""
+    """Availability is independent of count; this observer never refreshes."""
     checks = int(max(1, timeout_seconds) * 10)
     for _ in range(checks):
         try:
-            if get_all_upcoming_events():
+            if get_upcoming_event_cache_snapshot().ok:
                 return True
         except Exception:
             logger.debug("[EVENT_CACHE] Upcoming-event readiness check failed", exc_info=True)
@@ -49,26 +49,28 @@ async def run_ready_event_cache_rehydration(
     bot: Any,
     schedule_bg: ScheduleBackground,
 ) -> set[Any]:
-    """Load reminder/cache state and schedule the one-shot cache refresh."""
+    """Load state and observe one refresh owned by the cache service."""
     logger.info("[REMINDER_CACHE] Attempting to load from %s", REMINDER_TRACKING_FILE)
     loaded_ids = await load_active_reminders(bot)
 
     try:
         load_event_cache()
         logger.info("[EVENT_CACHE] Loaded cache from disk")
-        if is_cache_stale() or not get_all_upcoming_events():
-            logger.info("[EVENT_CACHE] Cache was stale or empty; refreshing from GSheet")
-            await refresh_event_cache()
-
-        try:
-            count = len(get_all_upcoming_events() or [])
-            logger.info("[EVENT_CACHE] Ready with %s upcoming events.", count)
-        except Exception:
-            logger.info("[EVENT_CACHE] Ready; but could not count events.")
+        if is_cache_stale() or not get_upcoming_event_cache_snapshot().ok:
+            # The service retains and drains the original task after this
+            # observation expires. Scheduling another refresh could race its
+            # completion and accidentally start a second provider request.
+            await refresh_event_cache_result(observation_seconds=10.0)
+        state = get_upcoming_event_cache_snapshot()
+        logger.info(
+            "[EVENT_CACHE] availability=%s upcoming=%d stale=%s persistence=%s",
+            state.ok,
+            len(state.events),
+            state.stale,
+            state.persistence,
+        )
     except Exception:
         logger.exception("[STARTUP] Failed to load or refresh event cache")
-
-    schedule_bg("refresh_event_cache_once", 10.0, lambda: refresh_event_cache())
 
     return set(loaded_ids or set())
 

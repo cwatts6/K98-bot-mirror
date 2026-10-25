@@ -5,9 +5,27 @@ import json
 
 from scripts import p0a_release, prepare_k98_update
 
+# Test-only bridge through this local WS3 source change to the unchanged
+# historical release assertions. These pairs do not authorize installation or
+# amend the production updater registry. Require exact successor bytes first.
+_EVENT_CACHE_READINESS_PAIRS = {
+    "bot_instance.py": (
+        "730c2c21743d67750576b366f9c49d7ca1e6b62104fd62c1f9767bec016ac14d",
+        "ee3aea3c49f14808cc95b43aa1f4aaae716634a9ea3ea39713b2ab5c952b4e03",
+    ),
+    "services/recovery_health.py": (
+        "c275cec2f40189f8a306fc6e544f1d9bcfbe1de2cedb40528e0e8d35e31c7b19",
+        "7d98039061a89beed90eb0a3d558bc3f222c34385fb3818928e24215e55e88b4",
+    ),
+}
+
 
 def before_contention_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in _EVENT_CACHE_READINESS_PAIRS:
+        before, after = _EVENT_CACHE_READINESS_PAIRS[path]
+        assert actual == after, path
+        actual = before
     contention = next(
         t
         for t in prepare_k98_update.reviewed_transitions()

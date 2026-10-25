@@ -94,6 +94,8 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
         )
     )
     reminders = SimpleNamespace(cancel_all_and_wait=AsyncMock(return_value=0))
+    cache_owner = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
+    event_bundle = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
 
     def controlled_import(name, *args, **kwargs):
         if name == "stats_alerts.diagnostics":
@@ -102,12 +104,15 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
             return diagnostic
         if name == "reminder_task_registry":
             return reminders
+        if name == "event_cache":
+            return SimpleNamespace(refresh_service=cache_owner)
         return builtins.__import__(name, *args, **kwargs)
 
     tracker = SimpleNamespace(stop=AsyncMock())
     namespace = {
         "__builtins__": {**vars(builtins), "__import__": controlled_import},
         "_shutdown_once": asyncio.Event(),
+        "_event_bundle": lambda: event_bundle,
         "logger": Mock(),
         "daily_summary": Mock(),
         "refresh_event_cache_task": Mock(),
@@ -126,6 +131,10 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
         compile(ast.Module(body=[teardown], type_ignores=[]), "bot_instance.py", "exec"), namespace
     )
     await namespace["_graceful_teardown"]()
+    cache_owner.close_admission.assert_called_once()
+    event_bundle.close_admission.assert_called_once()
+    cache_owner.shutdown.assert_awaited_once()
+    event_bundle.shutdown.assert_awaited_once()
     namespace["logger"].exception.assert_called_once_with(
         "[SHUTDOWN] Failed draining Pre-KVK diagnostics; preserve session evidence."
     )

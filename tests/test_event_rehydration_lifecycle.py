@@ -6,72 +6,51 @@ from core import event_rehydration_lifecycle as lifecycle
 
 
 @pytest.mark.asyncio
-async def test_ready_event_cache_rehydration_refreshes_and_schedules_one_shot(monkeypatch):
-    calls: list[str] = []
+@pytest.mark.parametrize(
+    "available,stale,status,expected",
+    [
+        (True, False, "refreshed", 0),
+        (True, True, "refreshed", 1),
+        (False, False, "pending", 1),
+        (False, True, "failed", 1),
+    ],
+)
+async def test_cache_startup_observes_one_owner(monkeypatch, available, stale, status, expected):
+    from types import SimpleNamespace
 
-    async def fake_load_active_reminders(_bot):
-        calls.append("load_active_reminders")
-        return {"event-1"}
+    calls = []
 
-    async def fake_refresh_event_cache():
-        calls.append("refresh_event_cache")
-        return 1
+    async def load(_bot):
+        return {"original"}
 
-    def fake_schedule_bg(name, timeout, coro_factory, **observation):
-        calls.append(f"schedule_bg:{name}:{timeout}")
-        assert callable(coro_factory)
+    async def refresh(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(status=status)
 
-    monkeypatch.setattr(lifecycle, "load_active_reminders", fake_load_active_reminders)
-    monkeypatch.setattr(lifecycle, "load_event_cache", lambda: calls.append("load_event_cache"))
-    monkeypatch.setattr(lifecycle, "is_cache_stale", lambda: True)
-    monkeypatch.setattr(lifecycle, "get_all_upcoming_events", lambda: [{"name": "Ready"}])
-    monkeypatch.setattr(lifecycle, "refresh_event_cache", fake_refresh_event_cache)
-
-    loaded = await lifecycle.run_ready_event_cache_rehydration(
-        bot=object(),
-        schedule_bg=fake_schedule_bg,
+    monkeypatch.setattr(lifecycle, "load_active_reminders", load)
+    monkeypatch.setattr(lifecycle, "load_event_cache", lambda: None)
+    monkeypatch.setattr(lifecycle, "is_cache_stale", lambda: stale)
+    monkeypatch.setattr(
+        lifecycle,
+        "get_upcoming_event_cache_snapshot",
+        lambda: SimpleNamespace(ok=available, events=(), stale=stale, persistence="saved"),
     )
-
-    assert loaded == {"event-1"}
-    assert calls == [
-        "load_active_reminders",
-        "load_event_cache",
-        "refresh_event_cache",
-        "schedule_bg:refresh_event_cache_once:10.0",
-    ]
+    monkeypatch.setattr(lifecycle, "refresh_event_cache_result", refresh)
+    loaded = await lifecycle.run_ready_event_cache_rehydration(
+        bot=object(), schedule_bg=lambda *a, **kw: pytest.fail("second refresh scheduled")
+    )
+    assert loaded == {"original"}
+    assert calls == [{"observation_seconds": 10.0}] * expected
 
 
 @pytest.mark.asyncio
-async def test_ready_event_cache_rehydration_schedules_one_shot_when_empty(monkeypatch):
-    calls: list[str] = []
+async def test_empty_loaded_snapshot_is_ready_without_provider(monkeypatch):
+    from types import SimpleNamespace
 
-    async def fake_load_active_reminders(_bot):
-        return set()
-
-    def fake_schedule_bg(name, timeout, coro_factory, **observation):
-        calls.append(f"schedule_bg:{name}:{timeout}")
-
-    monkeypatch.setattr(lifecycle, "load_active_reminders", fake_load_active_reminders)
-    monkeypatch.setattr(lifecycle, "load_event_cache", lambda: None)
-    monkeypatch.setattr(lifecycle, "is_cache_stale", lambda: False)
-    monkeypatch.setattr(lifecycle, "get_all_upcoming_events", lambda: [])
-
-    async def fake_refresh_event_cache():
-        calls.append("refresh_event_cache")
-        return 0
-
-    monkeypatch.setattr(lifecycle, "refresh_event_cache", fake_refresh_event_cache)
-
-    loaded = await lifecycle.run_ready_event_cache_rehydration(
-        bot=object(),
-        schedule_bg=fake_schedule_bg,
+    monkeypatch.setattr(
+        lifecycle, "get_upcoming_event_cache_snapshot", lambda: SimpleNamespace(ok=True, events=())
     )
-
-    assert loaded == set()
-    assert calls == [
-        "refresh_event_cache",
-        "schedule_bg:refresh_event_cache_once:10.0",
-    ]
+    assert await lifecycle.wait_for_events(1)
 
 
 @pytest.mark.asyncio

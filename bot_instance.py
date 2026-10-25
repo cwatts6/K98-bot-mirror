@@ -78,15 +78,12 @@ from core.startup_lifecycle import StartupPhase, run_startup_phases
 from crystaltech_di import init_crystaltech_service
 from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
 from embed_utils import expire_old_event_embeds, send_summary_embed
-from event_cache import refresh_event_cache
 from event_calendar.pinned_embed import update_calendar_embed
 from event_calendar.reminders import run_calendar_reminder_loop
 from event_calendar.service import get_calendar_service
 from event_embed_manager import rehydrate_live_event_views, update_live_event_embeds
 from event_scheduler import (
     cleanup_orphaned_reminders,
-    load_dm_scheduled_tracker,
-    load_dm_sent_tracker,
     refresh_reminder_format,
     reminder_cleanup_loop,
     schedule_event_reminders,
@@ -284,57 +281,60 @@ async def calendar_reminder_task():
     await run_calendar_reminder_loop(bot)
 
 
+def _event_bundle():
+    from core.scheduler_lifecycle import EventTaskBundle, EventTaskMember, install_event_bundle
+    from event_cache import get_upcoming_event_cache_snapshot
+
+    return install_event_bundle(
+        EventTaskBundle(
+            [
+                EventTaskMember(
+                    "periodic_live_embed_update",
+                    lambda: task_monitor.create(
+                        "periodic_live_embed_update", periodic_live_embed_update
+                    ),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "daily_kvk_overview",
+                    lambda: task_monitor.create("daily_kvk_overview", schedule_daily_KVK_overview),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "schedule_event_reminders",
+                    lambda: task_monitor.create(
+                        "schedule_event_reminders",
+                        lambda: schedule_event_reminders(
+                            bot, KVK_NOTIFICATION_CHANNEL_ID, test_mode=False
+                        ),
+                    ),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "refresh_reminder_format",
+                    lambda: refresh_reminder_format(bot, KVK_NOTIFICATION_CHANNEL_ID),
+                    needs_events=True,
+                    observation_seconds=8.0,
+                ),
+                EventTaskMember(
+                    "rehydrate_live_event_views",
+                    lambda: rehydrate_live_event_views(bot, KVK_EVENT_CHANNEL_ID),
+                    needs_events=True,
+                ),
+                EventTaskMember(
+                    "event_embed_expiry",
+                    lambda: task_monitor.create("event_embed_expiry", schedule_event_embed_expiry),
+                    registration=True,
+                ),
+            ],
+            snapshot=get_upcoming_event_cache_snapshot,
+            is_running=task_monitor.is_running,
+        )
+    )
+
+
 async def _start_event_scheduler_tasks():
-    """Start tasks that require a ready event cache."""
-    # Live embeds
-    task_monitor.create("periodic_live_embed_update", periodic_live_embed_update)
-    logger.info("[BOOT] Live event embed updater scheduled")
-
-    # Daily KVK overview
-    try:
-        task_monitor.create("daily_kvk_overview", schedule_daily_KVK_overview)
-        logger.info("[BOOT] Daily KVK overview embed updater scheduled")
-    except Exception as e:
-        logger.error(f"[BOOT] Failed to start Daily KVK overview embed updater: {e}")
-
-    # Reminders
-    try:
-        task_monitor.create(
-            "schedule_event_reminders",
-            lambda: schedule_event_reminders(bot, KVK_NOTIFICATION_CHANNEL_ID, test_mode=False),
-        )
-        logger.info("[BOOT] Event reminder scheduler started")
-    except Exception as e:
-        logger.error(f"[BOOT] Failed to start schedule_event_reminders: {e}")
-
-    # Refresh reminder formatting
-    try:
-        await _with_timeout(
-            refresh_reminder_format(bot, KVK_NOTIFICATION_CHANNEL_ID),
-            8.0,
-            "refresh_reminder_format",
-        )
-        logger.info("Reminders refreshed")
-    except Exception as e:
-        logger.error(f"[BOOT] Failed to start refresh_reminder_format: {e}")
-
-    # Rehydrate views that depend on events
-    try:
-        await _with_timeout(
-            rehydrate_live_event_views(bot, KVK_EVENT_CHANNEL_ID),
-            10.0,
-            "rehydrate_live_event_views",
-        )
-        logger.info("[BOOT] rehydrate_live_event_views complete")
-    except Exception:
-        logger.exception("[BOOT] Failed to start rehydrate_live_event_views")
-
-    # Scheduled expiry
-    try:
-        task_monitor.create("event_embed_expiry", schedule_event_embed_expiry)
-        logger.info("[BOOT] Event embed expiry task scheduled for 08:00 UTC daily")
-    except Exception as e:
-        logger.error(f"[BOOT] Failed to start event_embed_expiry task: {e}")
+    return await _event_bundle().tick()
 
 
 # wrap blockers
@@ -1259,7 +1259,9 @@ async def _before_daily_summary():
 async def refresh_event_cache_task():
     try:
         logger.info("[TASK] Starting event cache refresh...")
-        await refresh_event_cache()
+        from event_cache import refresh_event_cache_result
+
+        await refresh_event_cache_result()
     except Exception as e:
         logger.warning(f"[TASK] Event cache refresh failed: {e}")
 
@@ -1381,6 +1383,10 @@ async def _graceful_teardown():
     if _shutdown_once.is_set():
         return
     _shutdown_once.set()
+    from event_cache import refresh_service
+
+    refresh_service.close_admission()
+    _event_bundle().close_admission()
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
     from services.export_coordination_service import stop_export_admission
 
@@ -1430,6 +1436,10 @@ async def _graceful_teardown():
         await _flush_live_queue_state()
     except Exception:
         logger.exception("[SHUTDOWN] Live queue flush failed.")
+
+    # Drain event-owned work before cancelling its observers/client users.
+    await _event_bundle().shutdown()
+    await refresh_service.shutdown()
 
     # Cancel supervised tasks
     try:
@@ -1576,13 +1586,8 @@ async def on_ready():
 
         await cleanup_orphaned_reminders(_startup_loaded_reminder_ids)
 
-        try:
-            load_dm_sent_tracker()
-            logger.info("[DM_SENT_TRACKER] loaded successfully.")
-            load_dm_scheduled_tracker()
-            logger.info("[DM_SCHEDULED_TRACKER] loaded successfully.")
-        except Exception as e:
-            logger.error(f"[DM_TRACKERS] Failed to load at startup: {e}")
+        # The reminder scheduler owns DM tracker initialization. Do not reload
+        # its mappings after it has started restoring/scheduling work.
 
         # Ensure subscription cache is loaded
         try:

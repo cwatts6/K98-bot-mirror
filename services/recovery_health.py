@@ -94,7 +94,10 @@ def record_failure(error):
 
 
 def report():
+    from core.scheduler_lifecycle import event_startup_report
     from core.startup_diagnostics import report as startup_report
+    from event_cache import refresh_service
+    from event_scheduler import dm_startup_report
 
     healthy, text = status()
     return {
@@ -106,6 +109,9 @@ def report():
         "cycle": dict(_cycle) if _cycle else None,
         "checks": deepcopy(_checks),
         "startup": startup_report(),
+        "event_cache": refresh_service.report(),
+        "event_startup": event_startup_report(),
+        "event_dm_startup": dm_startup_report(),
     }
 
 

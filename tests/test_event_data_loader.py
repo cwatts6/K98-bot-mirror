@@ -5,6 +5,8 @@ import logging
 import threading
 import time
 
+import pytest
+
 import event_data_loader as edl
 import gsheet_module as gm
 
@@ -63,37 +65,43 @@ def test_fetch_values_emits_empty_range_telemetry_and_returns_empty(monkeypatch)
     assert any(ev.get("event") == "sheets_fetch_empty" for ev in emitted)
 
 
-def test_loader_normalizes_offload_return_shapes_and_receives_timeout(monkeypatch):
-    """
-    Ensure that when start_callable_offload returns (result, metadata), the loader
-    returns the normalized result (not the metadata tuple) and that timeout param
-    is propagated to the offload helper.
-    """
-    now = datetime.now(UTC).replace(microsecond=0)
-    fake_events = [
-        {
-            "name": "FakeRuins",
-            "type": "ruins",
-            "start_time": now,
-            "end_time": now + edl.timedelta(minutes=15),
-        }
-    ]
+def test_loader_uses_one_real_worker(monkeypatch):
+    calls = []
+    main_thread = threading.get_ident()
 
-    received = {}
+    def fetch(rng, **kwargs):
+        assert kwargs["timeout"] == 5.0
+        calls.append((rng, threading.get_ident()))
+        return []
 
-    async def fake_start_callable_offload(func, **kwargs):
-        # capture kwargs for assertion
-        received.update(kwargs)
-        return (fake_events, {"meta": "ok"})
+    monkeypatch.setattr(edl, "_fetch_values", fetch)
+    assert asyncio.run(edl.load_upcoming_ruins_events(timeout=5.0)) == []
+    assert len(calls) == 1
+    assert calls[0][0] == edl.RANGES["ruins"]
+    assert calls[0][1] != main_thread
 
-    monkeypatch.setattr(edl, "start_callable_offload", fake_start_callable_offload)
 
-    # Call loader with an explicit timeout and assert the fake was called with timeout
-    res = asyncio.run(edl.load_upcoming_ruins_events(timeout=5.0))
-    assert isinstance(res, list)
-    assert res == fake_events
-    assert "timeout" in received
-    assert received["timeout"] == 5.0
+@pytest.mark.parametrize(
+    "rows,valid",
+    [
+        ([], True),
+        ([[]], True),
+        ([["2020-01-01T12:00:00Z"]], True),
+        ([["bad-date"]], False),
+        ([["2020-01-01T12:00:00Z"], ["bad-date"]], False),
+        (None, False),
+        ({"values": []}, False),
+    ],
+)
+def test_invalid_sources_never_become_healthy_empty(monkeypatch, rows, valid):
+    monkeypatch.setattr(edl, "_fetch_values", lambda *args, **kwargs: rows)
+    if valid:
+        assert edl._load_upcoming_ruins_sync() == []
+    elif rows is None:
+        assert edl._load_upcoming_ruins_sync() is None
+    else:
+        with pytest.raises((ValueError, TypeError)):
+            edl._load_upcoming_ruins_sync()
 
 
 def test_concurrent_fetch_values_does_not_raise(monkeypatch):
@@ -206,10 +214,7 @@ def test_loaders_use_real_sync_helpers_no_placeholder(caplog, monkeypatch):
     """
     caplog.set_level(logging.WARNING)
     # Avoid network by making _fetch_values return empty list synchronously
-    monkeypatch.setattr(edl, "_fetch_values", lambda rng: [])
-    # Force direct to-thread execution path (no start_callable_offload/run_blocking_in_thread)
-    monkeypatch.setattr(edl, "start_callable_offload", None)
-    monkeypatch.setattr(edl, "run_blocking_in_thread", None)
+    monkeypatch.setattr(edl, "_fetch_values", lambda rng, **kwargs: [])
 
     # Run the loader
     asyncio.run(edl.load_upcoming_ruins_events())

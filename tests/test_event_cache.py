@@ -44,7 +44,7 @@ def test_refresh_preserves_cache_on_empty(monkeypatch):
     # Capture save_event_cache calls
     saved = {"called": False}
 
-    def fake_save():
+    def fake_save(rows, stamp):
         saved["called"] = True
 
     monkeypatch.setattr(ec, "save_event_cache", fake_save)
@@ -85,7 +85,7 @@ def test_refresh_overwrites_cache_if_stale_and_empty(monkeypatch):
     # Capture save_event_cache calls
     saved = {"called": False}
 
-    def fake_save():
+    def fake_save(rows, stamp):
         saved["called"] = True
 
     monkeypatch.setattr(ec, "save_event_cache", fake_save)

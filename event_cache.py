@@ -1,7 +1,6 @@
 # event_cache.py
 import asyncio
 import copy
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
 import logging
@@ -15,9 +14,7 @@ from constants import CACHE_FILE_PATH, GSHEETS_CALL_TIMEOUT
 
 # Keep typed Event import for type hints but call loader functions dynamically via module
 from event_data_loader import Event as LoaderEvent
-
-# Optional: allow partial success (default False keeps current behavior)
-ALLOW_PARTIAL_EVENT_CACHE = False
+from services.event_cache_service import EventCacheService, UpcomingEventCacheSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +34,9 @@ PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS = int(
 EVENT_CACHE_MIN_REFRESH_TIMEOUT = float(os.getenv("EVENT_CACHE_MIN_REFRESH_TIMEOUT", "5.0"))
 
 
-@dataclass(frozen=True, slots=True)
-class UpcomingEventCacheSnapshot:
-    """One locked, read-only KVK occurrence/cache-health snapshot."""
-
-    ok: bool
-    events: tuple[dict[str, Any], ...]
-    last_refreshed: datetime | None
-    stale: bool
-    error: str | None = None
+_generation = 0
+_source = "unknown"
+_persistence = "unknown"
 
 
 # ---- Helpers -----------------------------------------------------------------
@@ -65,18 +56,6 @@ def _parse_dt(s: Any) -> datetime:
     # Support both '+00:00' and legacy 'Z'
     s2 = s.replace("Z", "+00:00")
     return _aware(datetime.fromisoformat(s2))
-
-
-def _as_list(x: Any) -> tuple[list[Any], bool]:
-    """Return (list_value, ok_flag). ok_flag=False if loader looks failed (None/non-list)."""
-    if isinstance(x, list):
-        return x, True
-    if x is None:
-        return [], False
-    try:
-        return list(x), True
-    except Exception:
-        return [], False
 
 
 def get_last_refreshed() -> datetime | None:
@@ -105,307 +84,155 @@ def get_next_events_by_type(event_type: str, n: int = 3) -> list[dict[str, Any]]
         return items[: max(0, n)]
 
 
-# === Load from disk ===
-def load_event_cache() -> list[dict[str, Any]]:
-    global event_cache, last_refreshed
-    try:
-        with open(CACHE_FILE_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-
-        raw_events = data.get("events", []) or []
-        last_refreshed_str = data.get("last_refreshed")
-
-        parsed: list[dict[str, Any]] = []
-        for e in raw_events:
-            try:
-                # normalize/validate
-                st = _parse_dt(e.get("start_time"))
-                et = _parse_dt(e.get("end_time"))
-                if et <= st:
-                    logger.warning(
-                        "[EVENT_CACHE] Skipping cached event with non-positive duration: %r", e
-                    )
-                    continue
-                normalized = {
-                    **e,
-                    "start_time": st,
-                    "end_time": et,
-                }
-                # normalize event type for consistent filtering
-                if "type" in normalized and isinstance(normalized["type"], str):
-                    normalized["type"] = normalized["type"].lower()
-                parsed.append(normalized)
-            except Exception as ex:
-                logger.warning("[EVENT_CACHE] Skipping malformed cached event: %r (%s)", e, ex)
-
-        with _CACHE_LOCK:
-            # Replace in place to preserve external references
-            event_cache[:] = sorted(parsed, key=lambda ev: ev["start_time"])
-            last_refreshed = _parse_dt(last_refreshed_str) if last_refreshed_str else None
-
-        logger.info(
-            "[EVENT_CACHE] Loaded %d events from disk (last refreshed %s).",
-            len(event_cache),
-            last_refreshed,
-        )
-        return event_cache
-
-    except FileNotFoundError:
-        logger.warning("[EVENT_CACHE] Cache file not found.")
-        with _CACHE_LOCK:
-            event_cache.clear()
-            last_refreshed = None
-        return event_cache
-    except Exception as e:
-        logger.error("[EVENT_CACHE] Failed to load cache: %s", e)
-        # Do not clear an existing in-memory cache if we had one already.
-        return event_cache
+def _normalize(rows):
+    if not isinstance(rows, list):
+        raise ValueError("Incomplete event source")
+    result, seen = [], set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Invalid event row")
+        start, end = _parse_dt(row.get("start_time")), _parse_dt(row.get("end_time"))
+        if end <= start:
+            raise ValueError("Invalid event duration")
+        kind = str(row.get("type") or "").lower()
+        key = kind, str(row.get("name") or ""), start
+        if key not in seen:
+            seen.add(key)
+            result.append(
+                {**copy.deepcopy(row), "type": kind, "start_time": start, "end_time": end}
+            )
+    return sorted(result, key=lambda row: row["start_time"])
 
 
-# === Save to disk ===
-def save_event_cache() -> None:
-    global last_refreshed
-    try:
-        with _CACHE_LOCK:
-            snapshot = [
-                {
-                    **e,
-                    "start_time": _aware(e["start_time"]).isoformat(),
-                    "end_time": _aware(e["end_time"]).isoformat(),
-                }
-                for e in event_cache
-            ]
-
-        now_ts = _aware(utcnow())
-        payload = {"last_refreshed": now_ts.isoformat(), "events": snapshot}
-
-        # Backup previous cache if present (best-effort)
-        try:
-            if os.path.exists(CACHE_FILE_PATH):
-                bak = f"{CACHE_FILE_PATH}.bak"
-                with open(CACHE_FILE_PATH, "rb") as src, open(bak, "wb") as dst:
-                    dst.write(src.read())
-        except Exception:
-            pass
-
-        # Lazy import to avoid circular dependency during startup
-        from file_utils import atomic_write_json  # type: ignore
-
-        atomic_write_json(CACHE_FILE_PATH, payload, ensure_parent_dir=True)
-
-        with _CACHE_LOCK:
-            last_refreshed = now_ts
-
-        logger.info("[EVENT_CACHE] Saved %d events to disk.", len(snapshot))
-    except Exception as e:
-        logger.error("[EVENT_CACHE] Failed to save cache: %s", e)
-
-
-# === Check if stale ===
-def is_cache_stale(max_age_hours: int = 12) -> bool:
+def _publish(rows, stamp, persistence, *, source="provider"):
+    global last_refreshed, _generation, _source, _persistence
     with _CACHE_LOCK:
-        lr = last_refreshed
-    if not lr:
-        return True
+        event_cache[:] = copy.deepcopy(rows)
+        last_refreshed = stamp
+        _generation += 1
+        _source, _persistence = source, persistence
+
+
+def load_event_cache():
+    """Validate the entire disk candidate before publishing any of it."""
     try:
-        return _aware(utcnow()) - _aware(lr) > timedelta(hours=max_age_hours)
-    except Exception:
-        # Defensive: if anything off with timestamps, treat as stale.
-        return True
+        with open(CACHE_FILE_PATH, encoding="utf-8") as stream:
+            data = json.load(stream)
+        if not isinstance(data, dict) or not isinstance(data.get("events"), list):
+            raise ValueError("Invalid cache envelope")
+        stamp = _parse_dt(data.get("last_refreshed"))
+        if stamp > _aware(utcnow()) + timedelta(minutes=5):
+            raise ValueError("Cache timestamp is in the future")
+        rows = _normalize(data["events"])
+        _publish(rows, stamp, "saved", source="disk")
+        logger.info("[EVENT_CACHE] Loaded validated disk snapshot count=%d", len(rows))
+    except FileNotFoundError:
+        logger.info("[EVENT_CACHE] Disk cache missing; retaining current availability")
+    except Exception as exc:
+        logger.warning("[EVENT_CACHE] Disk cache unavailable error_type=%s", type(exc).__name__)
+    with _CACHE_LOCK:
+        return copy.deepcopy(event_cache)
 
 
-# === Refresh from GSheet ===
-async def refresh_event_cache() -> int:
-    """
-    Refresh from Google Sheet loaders.
-
-    RETURNS:
-        int: number of events now in-memory.
-
-    BEHAVIOR:
-    - If all loaders succeed (or partial allowed and at least one succeeded), replace cache and save.
-    - If required loaders failed (and partial not allowed), preserve previous cache and do not save.
-    - If merge yields zero events but previous cache had items and was refreshed recently,
-      PRESERVE previous in-memory cache (do not overwrite with empty).
-    """
-    global event_cache
+def save_event_cache(rows=None, stamp=None):
+    """Persist an exact snapshot; failures propagate and never change its time."""
+    if rows is None:
+        with _CACHE_LOCK:
+            rows, stamp = copy.deepcopy(event_cache), last_refreshed
+    if stamp is None:
+        raise ValueError("Cannot persist unvalidated cache")
+    payload = {
+        "last_refreshed": _aware(stamp).isoformat(),
+        "events": [
+            {
+                **row,
+                "start_time": _aware(row["start_time"]).isoformat(),
+                "end_time": _aware(row["end_time"]).isoformat(),
+            }
+            for row in rows
+        ],
+    }
     try:
-        # Import loaders at runtime so tests can monkeypatch event_data_loader.* easily
-        import event_data_loader as edl
+        if os.path.exists(CACHE_FILE_PATH):
+            with (
+                open(CACHE_FILE_PATH, "rb") as source,
+                open(f"{CACHE_FILE_PATH}.bak", "wb") as dest,
+            ):
+                dest.write(source.read())
+    except Exception as exc:
+        logger.warning("[EVENT_CACHE] Backup failed error_type=%s", type(exc).__name__)
+    from file_utils import atomic_write_json
 
-        # Build loader coroutines with per-loader timeout param
-        per_loader_timeout = float(GSHEETS_CALL_TIMEOUT or 30.0)
-        tasks = [
-            edl.load_upcoming_ruins_events(timeout=per_loader_timeout),
-            edl.load_upcoming_altar_events(timeout=per_loader_timeout),
-            edl.load_upcoming_major_events(timeout=per_loader_timeout),
-            edl.load_upcoming_chronicle_events(timeout=per_loader_timeout),
-        ]
+    atomic_write_json(CACHE_FILE_PATH, payload, ensure_parent_dir=True)
 
-        # Bound the entire refresh so a misbehaving loader can't hang forever.
-        overall_timeout = max(EVENT_CACHE_MIN_REFRESH_TIMEOUT, per_loader_timeout * 1.5)
-        try:
-            ruins_raw, altars_raw, majors_raw, chronicles_raw = await asyncio.wait_for(
-                asyncio.gather(*tasks), timeout=overall_timeout
+
+async def _persist(rows, stamp):
+    from services.legacy_export_snapshot_service import drain_thread
+
+    await drain_thread(save_event_cache, rows, stamp)
+
+
+async def _fetch():
+    import event_data_loader as loaders
+
+    timeout = float(GSHEETS_CALL_TIMEOUT or 30.0)
+    tasks = [
+        asyncio.create_task(loader(timeout=timeout))
+        for loader in (
+            loaders.load_upcoming_ruins_events,
+            loaders.load_upcoming_altar_events,
+            loaders.load_upcoming_major_events,
+            loaders.load_upcoming_chronicle_events,
+        )
+    ]
+    try:
+        _done, pending = await asyncio.wait(
+            tasks, timeout=max(EVENT_CACHE_MIN_REFRESH_TIMEOUT, timeout * 1.5)
+        )
+        if pending:
+            logger.warning("[EVENT_CACHE] Refresh timed out; draining original loaders")
+            raise TimeoutError("Event loaders exceeded observation budget")
+        results = [task.result() for task in tasks]
+        if any(not isinstance(result, list) for result in results):
+            raise ValueError("One or more event loaders unavailable")
+        return [row for result in results for row in result]
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        drained = asyncio.gather(*tasks, return_exceptions=True)
+        while not drained.done():
+            try:
+                await asyncio.shield(drained)
+            except asyncio.CancelledError:
+                continue
+
+
+def _preserve(rows):
+    with _CACHE_LOCK:
+        return bool(
+            not rows
+            and event_cache
+            and (
+                last_refreshed is None
+                or (_aware(utcnow()) - _aware(last_refreshed)).total_seconds()
+                < PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS
             )
-        except TimeoutError:
-            logger.warning(
-                "[EVENT_CACHE] Refresh timed out after %.1fs; preserving previous cache.",
-                overall_timeout,
-            )
-            return len(event_cache)
-
-        ruins, ok_r = _as_list(ruins_raw)
-        altars, ok_a = _as_list(altars_raw)
-        majors, ok_m = _as_list(majors_raw)
-        chronicles, ok_c = _as_list(chronicles_raw)
-
-        logger.info(
-            "[EVENT_CACHE] Loader counts — ruins=%d altars=%d majors=%d chronicles=%d",
-            len(ruins),
-            len(altars),
-            len(majors),
-            len(chronicles),
         )
 
-        loaders_ok = ok_r and ok_a and ok_m and ok_c
-        if not loaders_ok:
-            bad = [
-                name
-                for name, ok in [
-                    ("ruins", ok_r),
-                    ("altars", ok_a),
-                    ("majors", ok_m),
-                    ("chronicles", ok_c),
-                ]
-                if not ok
-            ]
-            if not ALLOW_PARTIAL_EVENT_CACHE:
-                logger.warning(
-                    "[EVENT_CACHE] One or more loaders failed: %s — preserving previous cache.",
-                    ", ".join(bad),
-                )
-                return len(event_cache)
-            else:
-                logger.warning(
-                    "[EVENT_CACHE] Partial refresh; failed: %s — proceeding with available data.",
-                    ", ".join(bad),
-                )
 
-        # Merge available (even if some are empty)
-        new_events_raw: list[dict[str, Any]] = []
-        if ok_r:
-            new_events_raw += ruins
-        if ok_a:
-            new_events_raw += altars
-        if ok_m:
-            new_events_raw += majors
-        if ok_c:
-            new_events_raw += chronicles
+def is_cache_stale(max_age_hours=12):
+    stamp = get_last_refreshed()
+    return stamp is None or _aware(utcnow()) - _aware(stamp) > timedelta(hours=max_age_hours)
 
-        # Normalize, validate, and de-duplicate
-        seen: set[tuple] = set()
-        normalized: list[dict[str, Any]] = []
-        for e in new_events_raw:
-            try:
-                st = _parse_dt(e.get("start_time"))
-                et = _parse_dt(e.get("end_time"))
-                if et <= st:
-                    logger.warning("[EVENT_CACHE] Dropping event with non-positive duration: %r", e)
-                    continue
 
-                typ = (e.get("type") or "").lower()
-                name = str(e.get("name") or "")
-                key = (typ, name, st.isoformat())
+async def refresh_event_cache_result(*, observation_seconds=None):
+    return await refresh_service.refresh(observation_seconds=observation_seconds)
 
-                if key in seen:
-                    continue
-                seen.add(key)
 
-                row = {**e, "type": typ, "start_time": st, "end_time": et}
-                normalized.append(row)
-            except Exception as ex:
-                logger.warning(
-                    "[EVENT_CACHE] Dropping malformed event from loaders: %r (%s)", e, ex
-                )
-
-        normalized.sort(key=lambda ev: ev["start_time"])
-
-        # PROTECT: do not overwrite non-empty cache with an empty refresh if the previous cache
-        # was refreshed recently (configurable).
-        with _CACHE_LOCK:
-            prev_count = len(event_cache)
-            prev_lr = last_refreshed
-
-        if len(normalized) == 0 and prev_count > 0:
-            # If we have a previous cache and it was refreshed recently, preserve it.
-            preserve = False
-            try:
-                if prev_lr is not None:
-                    age_seconds = (_aware(utcnow()) - _aware(prev_lr)).total_seconds()
-                    if age_seconds < PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS:
-                        preserve = True
-                else:
-                    # No last_refreshed recorded; be conservative and preserve
-                    preserve = True
-            except Exception:
-                preserve = True
-
-            if preserve:
-                logger.warning(
-                    "[EVENT_CACHE] Refusing to replace non-empty cache with empty refresh (age=%s sec) — preserving previous cache.",
-                    (
-                        (_aware(utcnow()) - _aware(prev_lr)).total_seconds()
-                        if prev_lr
-                        else "unknown"
-                    ),
-                )
-                # Emit telemetry for operators (best-effort)
-                try:
-                    from file_utils import emit_telemetry_event
-
-                    emit_telemetry_event(
-                        {
-                            "event": "event_cache_preserve_on_empty",
-                            "prev_count": prev_count,
-                            "preserve_seconds": PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS,
-                            "last_refreshed": prev_lr.isoformat() if prev_lr else None,
-                        }
-                    )
-                except Exception:
-                    try:
-                        telemetry_logger = logging.getLogger("telemetry")
-                        telemetry_logger.info(
-                            {
-                                "event": "event_cache_preserve_on_empty",
-                                "prev_count": prev_count,
-                                "preserve_seconds": PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS,
-                                "last_refreshed": prev_lr.isoformat() if prev_lr else None,
-                            }
-                        )
-                    except Exception:
-                        pass
-                return len(event_cache)
-
-        with _CACHE_LOCK:
-            event_cache[:] = normalized
-
-        try:
-            from file_utils import run_blocking_in_thread  # type: ignore
-        except Exception:
-            run_blocking_in_thread = None
-
-        if run_blocking_in_thread:
-            await run_blocking_in_thread(save_event_cache, name="save_event_cache")
-        else:
-            await asyncio.to_thread(save_event_cache)
-
-        logger.info("[EVENT_CACHE] Refreshed event data. (%d events)", len(normalized))
-        return len(normalized)
-
-    except Exception as e:
-        logger.error("[EVENT_CACHE] Failed to refresh event cache: %s", e)
-        return len(event_cache)
+async def refresh_event_cache():
+    """Legacy count API; all callers participate in the same refresh owner."""
+    return (await refresh_event_cache_result()).count
 
 
 # === Accessors ===
@@ -442,6 +269,7 @@ def get_upcoming_event_cache_snapshot(
     now = _aware(now_utc or utcnow())
     with _CACHE_LOCK:
         refreshed = last_refreshed
+        generation, source, persistence = _generation, _source, _persistence
         upcoming: list[dict[str, Any]] = []
         for event in event_cache:
             try:
@@ -463,6 +291,9 @@ def get_upcoming_event_cache_snapshot(
         last_refreshed=refreshed,
         stale=stale,
         error=None if ok else "cache_unavailable",
+        generation=generation,
+        source=source,
+        persistence=persistence,
     )
 
 
@@ -478,3 +309,14 @@ def get_upcoming_or_ongoing_events() -> list[dict[str, Any]]:
             except Exception:
                 continue
         return out
+
+
+refresh_service = EventCacheService(
+    snapshot=lambda: get_upcoming_event_cache_snapshot(),
+    fetch=_fetch,
+    normalize=_normalize,
+    preserve=_preserve,
+    persist=_persist,
+    publish=_publish,
+    clock=lambda: _aware(utcnow()),
+)
