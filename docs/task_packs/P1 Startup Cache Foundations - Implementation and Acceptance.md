@@ -156,6 +156,14 @@ Its focused name-cache/transition recheck passed **152 tests** with operational 
 unchanged. Final heads, CI and review receipts are in the release handoff; no further
 full-suite claim is made for that bounded follow-up.
 
+Private review subsequently found a diagnostic caller retaining the old imported
+name-cache dictionary after publication swapped snapshots. The CityHall verification
+script and its opt-in integration test now read through `get_name_cache_rows`.
+Two deterministic regressions import consumers before a simulated snapshot swap and
+verify both readers use the new rows without issuing SQL. The expanded focused run
+passed **154 tests, one skipped**; the live DB test remains intentionally skipped.
+The updater package is unchanged by this caller fix.
+
 All three P1 families remain: Discord/domain delivery and missing posts; non-P0
 files/archives/caches/queues; independent outage monitoring and enabled-writer census.
 

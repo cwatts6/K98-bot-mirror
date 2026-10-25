@@ -4,7 +4,7 @@ import asyncio
 import math
 
 from constants import _conn
-from target_utils import _name_cache, sync_refresh_worker
+from target_utils import get_name_cache_rows, sync_refresh_worker
 
 
 async def _count_view_rows() -> int:
@@ -27,10 +27,10 @@ def _is_missing(val) -> bool:
 
 
 async def main() -> None:
-    # In-process refresh so _name_cache is populated in THIS process
+    # Refresh in this process, then read the newly published snapshot.
     await asyncio.to_thread(sync_refresh_worker)
 
-    rows = _name_cache.get("rows", [])
+    rows = get_name_cache_rows()
     if not rows:
         view_count = await _count_view_rows()
         raise RuntimeError(

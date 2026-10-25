@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from target_utils import _name_cache, sync_refresh_worker
+from target_utils import get_name_cache_rows, sync_refresh_worker
 
 
 def _is_missing(val) -> bool:
@@ -26,8 +26,36 @@ async def test_cityhalllevel_cache_populates():
     # In-process refresh to populate this process' cache
     await asyncio.to_thread(sync_refresh_worker)
 
-    rows = _name_cache.get("rows", [])
+    rows = get_name_cache_rows()
     assert rows, "name_cache rows empty after refresh."
     assert any(
         not _is_missing(r.get("CityHallLevel")) for r in rows
     ), "CityHallLevel missing from all cached rows."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("consumer", ["script", "integration_test"])
+async def test_cityhall_readers_follow_snapshot_publication(monkeypatch, capsys, consumer):
+    import target_utils
+    import verify_cityhalllevel_cache as verifier
+
+    monkeypatch.setattr(target_utils, "_name_cache", {"rows": []})
+
+    def publish():
+        # Reproduce the owner's atomic swap after consumers have imported.
+        target_utils._name_cache = {
+            "rows": [{"GovernorID": "123", "GovernorName": "Example", "CityHallLevel": 25}]
+        }
+
+    async def unexpected_sql():
+        pytest.fail("Published rows must not trigger the empty-cache SQL diagnostic")
+
+    monkeypatch.setattr(verifier, "sync_refresh_worker", publish)
+    monkeypatch.setattr(verifier, "_count_view_rows", unexpected_sql)
+    if consumer == "script":
+        await verifier.main()
+        assert "Total rows: 1" in capsys.readouterr().out
+    else:
+        monkeypatch.setenv("RUN_CITYHALLLEVEL_TEST", "1")
+        monkeypatch.setitem(globals(), "sync_refresh_worker", publish)
+        await test_cityhalllevel_cache_populates()
