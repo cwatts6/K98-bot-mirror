@@ -335,6 +335,25 @@ EVENT_CACHE_READINESS_PATHS = frozenset(
 )
 
 
+STARTUP_CACHE_FOUNDATIONS_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "core/startup_diagnostics.py",
+        "player_stats_cache.py",
+        "profile_cache.py",
+        "target_utils.py",
+        "services/cache_admission_diagnostics.py",
+        "services/cache_outcomes.py",
+        "services/export_contention.py",
+        "services/player_stats_cache_service.py",
+        "services/profile_cache_service.py",
+        "services/profile_cache_startup.py",
+        "services/recovery_health.py",
+        "stats/profile_cache_repository.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -347,7 +366,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 41:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 42:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -395,6 +414,10 @@ def reviewed_transitions():
             )
             fixed_event_cache = (
                 item["id"] == "event_cache_readiness_v1" and path in EVENT_CACHE_READINESS_PATHS
+            )
+            fixed_startup_foundations = (
+                item["id"] == "startup_cache_foundations_v1"
+                and path in STARTUP_CACHE_FOUNDATIONS_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -475,6 +498,7 @@ def reviewed_transitions():
                     or fixed_pipeline_decision
                     or fixed_export_contention
                     or fixed_event_cache
+                    or fixed_startup_foundations
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -588,6 +612,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed export-contention/handoff transition required.")
         if item["id"] == "event_cache_readiness_v1" and paths != EVENT_CACHE_READINESS_PATHS:
             raise ValueError("Complete fixed event-cache readiness transition required.")
+        if (
+            item["id"] == "startup_cache_foundations_v1"
+            and paths != STARTUP_CACHE_FOUNDATIONS_PATHS
+        ):
+            raise ValueError("Complete fixed startup-cache foundations transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS

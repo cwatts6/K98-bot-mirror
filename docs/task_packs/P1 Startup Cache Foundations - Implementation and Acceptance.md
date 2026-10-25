@@ -136,6 +136,16 @@ runtime acceptance, deployment compatibility or measured production speedup.
 
 ## Remaining acceptance and programme scope
 
+### Subsequent PR and release preparation
+
+The operator subsequently authorized both PRs, review-comment management and full
+deployment support. The [release instructions](P1%20Startup%20Cache%20Foundations%20-%20Release%20Instructions.md)
+add one exact updater transition and its package upgrade. This later release-support
+delta supersedes the earlier statement that updater files are unchanged; it preserves
+the original 41 transitions and every source/custody guard. It does not install the
+package or authorize deployment. The final PR handoff records full-suite, final-head
+review/security and private-history compatibility results separately.
+
 All three P1 families remain: Discord/domain delivery and missing posts; non-P0
 files/archives/caches/queues; independent outage monitoring and enabled-writer census.
 
