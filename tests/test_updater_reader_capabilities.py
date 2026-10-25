@@ -81,6 +81,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             "pipeline_decision_bound_v1",
             "authority_diagnostic_capture_v1",
             "export_contention_handoff_v1",
+            "event_cache_readiness_v1",
         }:
             # This successor follows P0's separately reviewed release policies.
             # Prove its delivered image and bridge backwards through P0 before
@@ -88,7 +89,10 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             for member in transition["members"]:
                 path = member["path"]
                 actual = update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
-                if transition["id"] != "export_contention_handoff_v1":
+                if transition["id"] not in {
+                    "export_contention_handoff_v1",
+                    "event_cache_readiness_v1",
+                }:
                     actual = before_contention_hash(root, path)
                 assert actual == member["after_sha256"], path
                 if path in expected:
