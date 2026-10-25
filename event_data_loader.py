@@ -762,4 +762,6 @@ async def load_all_upcoming_events():
     from event_cache import get_all_upcoming_events, refresh_event_cache_result
 
     result = await refresh_event_cache_result()
-    return get_all_upcoming_events() if result.status.startswith("refreshed") else None
+    if result.status in {"refreshed", "refreshed_memory_only", "retained_by_policy"}:
+        return get_all_upcoming_events()
+    return None

@@ -200,8 +200,18 @@ The initial full run above predates this bounded correction. Production full-sui
 results and exact final-head review/check evidence are retained with the PRs;
 do not describe a pre-correction run as final-head execution. Incremental Changes
 scan `00476fb3-4fac-4f97-a957-3a7e09bb795d` covered the correction without findings.
-Final production Changes scan `3c6ce67f-d06c-4166-8369-bd63255c11d7` reconciled all
+Production Changes scan `3c6ce67f-d06c-4166-8369-bd63255c11d7` reconciled all
 ten source files to the reviewed source and correction, also without findings.
+
+A further production review found that the compatibility bulk loader returned
+`None` for `retained_by_policy`, despite a successful fetch and deliberately
+preserved cache. It now returns cached events for the three successful outcomes;
+failed, pending, closed and cancelled outcomes remain `None`. Eight added cases
+cover retained/memory-only/empty availability and failure boundaries. The combined
+cache, loader, startup and command suites passed **68 tests**, with operational
+logs unchanged. Incremental security and final-head CI/re-review receipts for this
+bounded correction are recorded in the PRs; the earlier full-run counts must not
+be attributed to this later source revision.
 
 An unconfirmed DM restoration still requires separately reviewed operator recovery;
 it is not automatically replayed. Existing marker deletion after failed user fetch

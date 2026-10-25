@@ -4,11 +4,60 @@ import importlib
 import logging
 import threading
 import time
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 import event_data_loader as edl
 import gsheet_module as gm
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status,available",
+    [
+        ("refreshed", True),
+        ("refreshed_memory_only", True),
+        ("retained_by_policy", True),
+        ("failed", False),
+        ("pending", False),
+        ("closed", False),
+        ("cancelled", False),
+    ],
+)
+async def test_bulk_loader_distinguishes_retained_cache_from_failed_refresh(
+    monkeypatch, status, available
+):
+    import event_cache
+
+    retained = [{"name": "retained event"}]
+    reads = []
+    refresh = AsyncMock(return_value=SimpleNamespace(status=status))
+    monkeypatch.setattr(event_cache, "refresh_event_cache_result", refresh)
+
+    def read_cache():
+        reads.append(1)
+        return retained
+
+    monkeypatch.setattr(event_cache, "get_all_upcoming_events", read_cache)
+    result = await edl.load_all_upcoming_events()
+    assert result is (retained if available else None)
+    assert reads == ([1] if available else [])
+    refresh.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_bulk_loader_returns_valid_empty_result(monkeypatch):
+    import event_cache
+
+    monkeypatch.setattr(
+        event_cache,
+        "refresh_event_cache_result",
+        AsyncMock(return_value=SimpleNamespace(status="refreshed")),
+    )
+    monkeypatch.setattr(event_cache, "get_all_upcoming_events", lambda: [])
+    assert await edl.load_all_upcoming_events() == []
 
 
 def test_parse_dt_accepts_z_suffix_and_returns_aware_datetime():
