@@ -58,6 +58,16 @@ class ProfileCacheService:
             players = self._players
         return deepcopy(players)
 
+    def name_entries(self):
+        """Copy only search fields from one coherent published snapshot."""
+        with self._state:
+            players = self._players
+        # Publication/invalidation replace the dictionary; readers can project
+        # this retained snapshot outside the lock without copying KVK payloads.
+        return tuple(
+            deepcopy((row.get("GovernorName"), row.get("GovernorID"))) for row in players.values()
+        )
+
     def profile(self, governor_id):
         with self._state:
             value = self._players.get(str(governor_id))

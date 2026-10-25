@@ -272,3 +272,66 @@ def test_unique_atomic_writer_preserves_previous_file(tmp_path, monkeypatch, fai
         file_utils.atomic_json_write(str(path), {"players": {}})
     assert path.read_bytes() == b"previous"
     assert list(tmp_path.glob(".atomic.*")) == [other]
+
+
+def test_name_projection_excludes_payloads_and_detaches_search_fields(cache):
+    service, _ = cache
+
+    class UncopyablePayload:
+        def __deepcopy__(self, memo):
+            raise AssertionError("name search must not copy nested profile payloads")
+
+    service._players = {
+        "1": {"GovernorName": "Ada", "GovernorID": 1, "KVK": UncopyablePayload()},
+        "2": {"GovernorName": ["malformed"], "GovernorID": 2, "KVK": UncopyablePayload()},
+    }
+    entries = service.name_entries()
+    assert entries[0] == ("Ada", 1)
+    entries[1][0].append("caller mutation")
+    assert service._players["2"]["GovernorName"] == ["malformed"]
+
+
+def test_name_projection_does_not_hold_reader_lock_during_iteration(cache):
+    service, _ = cache
+    entered, release = Event(), Event()
+
+    class PausedRow(dict):
+        def get(self, key, default=None):
+            if key == "GovernorName":
+                entered.set()
+                assert release.wait(5)
+            return super().get(key, default)
+
+    service._players = {"1": PausedRow(GovernorName="Ada", GovernorID=1)}
+    with ThreadPoolExecutor(2) as pool:
+        projected = pool.submit(service.name_entries)
+        try:
+            assert entered.wait(5)
+            pool.submit(service.invalidate, 1).result(2)
+        finally:
+            release.set()
+        assert projected.result(5) == (("Ada", 1),)
+    assert service.name_entries() == ()
+
+
+def test_autocomplete_projects_names_without_full_profile_snapshot(cache, monkeypatch):
+    import profile_cache
+
+    service, _ = cache
+    service._players = {
+        "1": {"GovernorName": "Ada", "GovernorID": 1, "KVK": [{"nested": [1, 2, 3]}]},
+        "2": {"GovernorName": "Ada", "GovernorID": "2"},
+        "3": {"GovernorName": None, "GovernorID": 3},
+        "4": {"GovernorName": "Ada", "GovernorID": "invalid"},
+        "5": {"GovernorName": ["malformed"], "GovernorID": 5},
+    }
+    monkeypatch.setattr(profile_cache, "_service", service)
+    monkeypatch.setattr(profile_cache, "warm_cache", lambda: None)
+    monkeypatch.setattr(profile_cache, "HAVE_RAPIDFUZZ", False)
+
+    def full_snapshot_forbidden():
+        raise AssertionError("autocomplete must not deep-copy the full profile cache")
+
+    monkeypatch.setattr(service, "snapshot", full_snapshot_forbidden)
+    assert profile_cache.autocomplete_choices("Ada") == [("Ada (1)", "1"), ("Ada (2)", "2")]
+    assert profile_cache.autocomplete_choices("Ada", limit=1) == [("Ada (1)", "1")]

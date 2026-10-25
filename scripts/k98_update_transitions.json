@@ -1212,7 +1212,7 @@
         {
           "path": "profile_cache.py",
           "before_sha256": "a6819d25bd650f95bccbf5ee64c759cd78b00a4dbf6a3630b2cf84b30ff33fbb",
-          "after_sha256": "272711c0b47750c895cf16c3c369936a65127d738ac734c6548549d11362783e"
+          "after_sha256": "fed6628d6cec5dba90dbd95118b9b76c09edf3b9850b7b27d3402ae80485e1eb"
         },
         {
           "path": "services/cache_admission_diagnostics.py",
@@ -1237,7 +1237,7 @@
         {
           "path": "services/profile_cache_service.py",
           "before_sha256": null,
-          "after_sha256": "2d5811e7b9285c6173adec5c0229843ee9b9e3b86c9867167319d5a93be40431"
+          "after_sha256": "3c5316aedab78e723d307f7ac5e564e072047779c4575673d64b8abca5d415c3"
         },
         {
           "path": "services/profile_cache_startup.py",

@@ -164,6 +164,17 @@ verify both readers use the new rows without issuing SQL. The expanded focused r
 passed **154 tests, one skipped**; the live DB test remains intentionally skipped.
 The updater package is unchanged by this caller fix.
 
+
+A final private Copilot review identified avoidable full-profile deep copies on the
+autocomplete path. Name iteration now projects only copied name/ID pairs from one
+retained published snapshot outside the reader lock. Nested KVK payloads are not
+copied. Three deterministic regressions cover excluded payloads, detached search
+fields, concurrent invalidation and duplicate/malformed-name behavior. The focused
+profile/lookup/transition run passed **95 tests** with operational logs unchanged.
+The two protected target pins and packaged updater hashes were regenerated; the
+previous release archive was withdrawn. Final replacement-head CI and review
+receipts belong in the replacement release handoff.
+
 All three P1 families remain: Discord/domain delivery and missing posts; non-P0
 files/archives/caches/queues; independent outage monitoring and enabled-writer census.
 

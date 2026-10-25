@@ -146,15 +146,13 @@ def _iter_name_entries():
     Yield (display_name, gid, normalized_name) for all cached players.
     Preserves duplicates (multiple players sharing same display name).
 
-    Implementation note: snapshot the cache under lock to avoid iterator races
-    if another thread replaces or mutates the global cache.
+    Project only name/ID fields from one published snapshot. Nested profile
+    payloads are not copied for autocomplete or name lookup.
     """
     warm_cache()
-    snapshot = list(_service.snapshot().values())
-    for v in snapshot:
+    for display_name, gid_raw in _service.name_entries():
         try:
-            name = (v.get("GovernorName") or "").strip()
-            gid_raw = v.get("GovernorID")
+            name = (display_name or "").strip()
             # ensure governor id is an int (skip malformed entries)
             if name and gid_raw is not None:
                 try:
