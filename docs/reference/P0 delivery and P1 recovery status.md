@@ -124,10 +124,27 @@ Report 42, generated 21:30:25 UTC, carries the same structured completion, a hea
 monitor and all 17,612 recorded incidents resolved. This is recorded coverage at
 that observation, not a transactional census of every possible failure.
 
-Remaining functional checks: a safe existing-message interaction on a restored
-view and confirmation of the inaccessible overview's intended disposition. The
-summary does not distinguish a deleted message from unavailable access. Do not
-automatically repost it or declare it obsolete; preserve original identities.
+Operator screenshots on 25 October confirm the three suggested Ark examples
+are historical registration posts: two show signups closed and one is cancelled,
+all without buttons. This matches Ark's disabled-registration presentation.
+They are unsuitable callback-test candidates; missing buttons on these posts
+are not evidence that startup restoration failed.
+
+In the normal restoration path, 'attached' means bot.add_view registered handlers
+against a saved message ID. It does not establish visible components or reopen a
+retired workflow. The count of 20 must not be presented as 20 active, clickable
+messages. The existing compatibility edit path is separate.
+
+Live callback acceptance requires an eligible existing post with visible controls
+that survived a restart. These screenshots do not demonstrate such an example.
+Do not reopen historical matches, repost messages or restart solely to manufacture
+this check; retain it for a natural eligible observation.
+
+The operator also reports no Daily KVK Overview in the configured channel. The
+diagnostic supplied a channel link, not an overview message link. Absence is
+consistent with a stale tracker, but neither this observation nor the generic
+'inaccessible' reason proves deletion rather than an access problem. The exact
+pruned-message disposition remains unconfirmed; no automatic repost is justified.
 
 The updater retained degraded import/export classification:
 `fresh_import_export_health_evidence_unavailable`. Startup cache/configuration

@@ -60,7 +60,7 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 - Area: `core/event_rehydration_lifecycle.py`, `bot_instance.py` tracked-view scheduling and `rehydrate_views.py`
 - Type: architecture
 - Description: Historical generic-view cancellation is fixed in merged #439/#688 and deployed private d127cb6e08aaecf0a397b9f5a3d41279280b245c. Successor logs and report 42 verify a complete 21-entry pass beyond the ten-second deadline: 20 attached, one inaccessible daily overview pruned, zero failed/unconfirmed/unattempted. Existing-message callbacks and the overview disposition remain to be accepted; task completion and incident counts alone do not replace those checks.
-- Suggested Fix: Complete safe original-message callback acceptance and confirm the overview disposition without automatic reposting or repeated imports. Retain completed restoration evidence and keep remaining WS3 readiness and scheduler work separate.
+- Suggested Fix: Complete callback acceptance only on an eligible existing message with visible controls after a natural restart. The three operator-inspected Ark examples are historical closed/cancelled posts without buttons and are unsuitable tests. Confirm the overview disposition without automatic reposting or repeated imports. Retain handler-registration evidence and keep remaining WS3 readiness and scheduler work separate.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
@@ -640,3 +640,15 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: low
 - Dependencies: Preserve the protected updater acceptance tests and immutable deployed transition hashes.
+
+
+### Deferred Optimisation
+- Area: rehydrate_views.py Ark restoration, ark/registration_messages.py retirement and tracked-view reporting
+- Type: consistency
+- Description: The 24 October startup registers handlers for retained historical Ark message IDs and reports them as attached even when Discord has no visible controls. The operator verified three closed/cancelled examples on 25 October. This is a lifecycle/reporting gap, not a demonstrated failed callback or permission bypass: the normal add_view path does not edit public messages or reopen registration.
+- Suggested Fix: Reconcile tracker retirement with authoritative domain state and observed components; distinguish handler registration, eligible interactive restoration and historical/inactive retention in diagnostics. Preserve historical messages and identity/concurrency protections; do not infer eligibility solely from age. Review the compatibility edit fallback against the same lifecycle contract before changing behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate WS3/P1 lifecycle slice; domain-state/component validation, permissions and restart/concurrency tests, and Changes review for implementation. This entry authorizes no production mutation.
+- Status: Captured; no runtime change; owner Chris Watts
+- Last verified: 2026-10-25
