@@ -146,6 +146,16 @@ the original 41 transitions and every source/custody guard. It does not install 
 package or authorize deployment. The final PR handoff records full-suite, final-head
 review/security and private-history compatibility results separately.
 
+Fresh PR validation passed: mirror **9,434 passed, 1,080 skipped** and private
+**9,435 passed, 1,079 skipped**, each with eight passing subtests and one dependency
+warning. Mirror operational-log isolation passed; private operational logs remained
+absent. These runs covered mirror `1cee8975` and its private equivalent `2f0cfe61`.
+The subsequent review correction changes only name-builder comments/docstring and
+its exception log label, with the exact transition pin and package hashes updated.
+Its focused name-cache/transition recheck passed **152 tests** with operational logs
+unchanged. Final heads, CI and review receipts are in the release handoff; no further
+full-suite claim is made for that bounded follow-up.
+
 All three P1 families remain: Discord/domain delivery and missing posts; non-P0
 files/archives/caches/queues; independent outage monitoring and enabled-writer census.
 

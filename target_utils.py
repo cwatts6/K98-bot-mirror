@@ -42,16 +42,12 @@ def _normalize_name(name: str) -> str:
 
 
 # ----------------------------------------------------------------------
-# Module-level synchronous worker for name cache refresh
+# Synchronous candidate builder for the owned name-cache refresh
 # ----------------------------------------------------------------------
-# This function is intentionally module-level so it can be referenced as
-# "target_utils:sync_refresh_worker" by subprocess-based maintenance workers.
+# The compatibility entry point remains sync_refresh_worker below; this builder
+# returns an unpublished snapshot to the in-process refresh owner.
 def _build_name_candidate() -> dict[str, Any]:
-    """
-    Module-level wrapper that performs the synchronous refresh work that was
-    previously implemented as a nested function. Being module-level allows
-    the maintenance subprocess to import and call it via 'target_utils:sync_refresh_worker'.
-    """
+    """Read and normalize name rows without publishing the shared snapshot."""
     try:
         logger.debug("[TARGET_UTILS] Starting SQL name cache refresh (module-level worker)")
         fetched = kvk_targets_dal.fetch_governor_lookup_rows()
@@ -84,7 +80,7 @@ def _build_name_candidate() -> dict[str, Any]:
             "last_updated": int(time.time()),
         }
     except Exception:
-        logger.exception("[TARGET_UTILS] sync_refresh_worker failed")
+        logger.exception("[TARGET_UTILS] name candidate build failed")
         raise
 
 

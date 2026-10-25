@@ -58,8 +58,8 @@ Run only after merge and the final compatibility gate above:
 $ErrorActionPreference = 'Stop'
 $packageDirectory = 'C:\Users\cwatt\Downloads\P1-startup-foundations-release\package'
 $expectedHashes = @{
-    'Install-K98UpdateTool.ps1' = 'c32614cee88844a9008e37542fee91e6940352d3f496fce9257b4bd1d95e3d28'
-    'Upgrade-K98InstalledUpdater.ps1' = 'a41a631edd4df43025d599b431370fe02dd27aee9c81c3ec5ff66ff9215adf1d'
+    'Install-K98UpdateTool.ps1' = '75b25597a2911123c224b09b43e8a330e1c9b8396e24e3a05834466f98579d0a'
+    'Upgrade-K98InstalledUpdater.ps1' = '7457fbc68946404b7db5826a51b3f361a2ba01fc1959c6d5ba4a67c650e7b7eb'
 }
 foreach ($member in $expectedHashes.Keys) {
     $memberPath = Join-Path $packageDirectory $member
@@ -75,7 +75,7 @@ Use the upgrade helper, not Install directly over an existing updater. It verifi
 the exact old/new pair, custody, account, operator lock and absence of active release;
 it retains the previous package and supports resuming that same pair. Expected:
 `UPGRADE COMPLETE`. The installed `update-tool.json` SHA256 must then be
-`544eacb530595866474388124b12ea31a1a5325246ded5e7c65805a288a7bc11`.
+`0c9f5b2341dd08b6a2ecfc49289b87fd44b80a605710cbfd549c217ac66c74e2`.
 
 ## Deploy and verify
 
