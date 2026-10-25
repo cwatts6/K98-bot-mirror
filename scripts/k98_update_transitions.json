@@ -1135,6 +1135,61 @@
           "after_sha256": "fe5040b763941bebe741c232910ab96dcf29b6bbc8690c0fd64f99c62f185e10"
         }
       ]
+    },
+    {
+      "id": "event_cache_readiness_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "730c2c21743d67750576b366f9c49d7ca1e6b62104fd62c1f9767bec016ac14d",
+          "after_sha256": "ee3aea3c49f14808cc95b43aa1f4aaae716634a9ea3ea39713b2ab5c952b4e03"
+        },
+        {
+          "path": "commands/events_cmds.py",
+          "before_sha256": "66fa978adfbed3503a4867533d789149d67c99f1423d830277054c4be3bd3261",
+          "after_sha256": "582d5ad08df48f4ce9e550d2a4ffed1a27a1b11fbc9106838e9b40cba4660b3c"
+        },
+        {
+          "path": "core/event_rehydration_lifecycle.py",
+          "before_sha256": "a48cfcc41f1b3875af1136be40435ff7e3fa86a648fa7eb5ff3d61ca6f55a0ff",
+          "after_sha256": "6cc4ea794aea6cab5cc35e9b1cb9f18f2af4a80b5d5c420d78a17da34ca1d7ec"
+        },
+        {
+          "path": "core/scheduler_lifecycle.py",
+          "before_sha256": "4356e94bf1f200c68db29630d30394e472599bdda2966af64b29280afee741ba",
+          "after_sha256": "66c718b5d5ed249d929f14e779299cdc93367b8f5664bff17f4f886f9345cfe3"
+        },
+        {
+          "path": "event_cache.py",
+          "before_sha256": "122de57cf5ab8554721a31432c4bcd5bacf63021481233c4090abe6d8f486db6",
+          "after_sha256": "f76d22e584ab08a482344f72cc40cad67a526da3966e5809dec9893535fb605a"
+        },
+        {
+          "path": "event_data_loader.py",
+          "before_sha256": "a4dece7209aa6623da8eed48296f723674fdb98ec6d9b6c798a5cf8d5693c30d",
+          "after_sha256": "41cd620908cad3ae659e2965d0cb52a5f992927ec67e62718376fdf6a34896b5"
+        },
+        {
+          "path": "event_embed_manager.py",
+          "before_sha256": "2ff863789dc296ca83d37acf8754a0551e0ddbb55e47fb55644f6914ebff4d0a",
+          "after_sha256": "0d57b92d2f0e6f0c65da5f967a266b19c34088e17d38e884774e5e49cbd2368c"
+        },
+        {
+          "path": "event_scheduler.py",
+          "before_sha256": "5707d0e091e1cd1495981c581e8c93bb61ee266671b3aa71cf02f35e3dfbc96b",
+          "after_sha256": "7413c86590cae9c4a0dc72a0471edf7f98d4a1f9735d0ab78c77649de0bd7f77"
+        },
+        {
+          "path": "services/event_cache_service.py",
+          "before_sha256": null,
+          "after_sha256": "7e10c7f9190eca04a6e450d419ad22304d4ca67a3673efae960ba2896e66cf1d"
+        },
+        {
+          "path": "services/recovery_health.py",
+          "before_sha256": "c275cec2f40189f8a306fc6e544f1d9bcfbe1de2cedb40528e0e8d35e31c7b19",
+          "after_sha256": "7d98039061a89beed90eb0a3d558bc3f222c34385fb3818928e24215e55e88b4"
+        }
+      ]
     }
   ]
 }

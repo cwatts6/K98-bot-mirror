@@ -319,6 +319,21 @@ EXPORT_CONTENTION_HANDOFF_PATHS = frozenset(
     }
 )
 
+EVENT_CACHE_READINESS_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "commands/events_cmds.py",
+        "core/event_rehydration_lifecycle.py",
+        "core/scheduler_lifecycle.py",
+        "event_cache.py",
+        "event_data_loader.py",
+        "event_embed_manager.py",
+        "event_scheduler.py",
+        "services/event_cache_service.py",
+        "services/recovery_health.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -332,7 +347,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 40:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 41:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -377,6 +392,9 @@ def reviewed_transitions():
             fixed_export_contention = (
                 item["id"] == "export_contention_handoff_v1"
                 and path in EXPORT_CONTENTION_HANDOFF_PATHS
+            )
+            fixed_event_cache = (
+                item["id"] == "event_cache_readiness_v1" and path in EVENT_CACHE_READINESS_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -456,6 +474,7 @@ def reviewed_transitions():
                     or fixed_authority_diagnostics
                     or fixed_pipeline_decision
                     or fixed_export_contention
+                    or fixed_event_cache
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -567,6 +586,8 @@ def reviewed_transitions():
             and paths != EXPORT_CONTENTION_HANDOFF_PATHS
         ):
             raise ValueError("Complete fixed export-contention/handoff transition required.")
+        if item["id"] == "event_cache_readiness_v1" and paths != EVENT_CACHE_READINESS_PATHS:
+            raise ValueError("Complete fixed event-cache readiness transition required.")
         if (
             item["id"] == "guided_replacement_release_v1"
             and paths != REPLACEMENT_WORKFLOW_TRANSITION_PATHS
