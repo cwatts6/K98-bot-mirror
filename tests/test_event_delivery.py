@@ -537,3 +537,59 @@ async def test_conflicting_public_projection_survives_save_and_restart(isolated,
     await scheduler.load_active_reminders(bot)
     assert scheduler._unresolved_active[eid]["message_id"] == 80
     bot.fetch_channel.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure", ["absent", "channel_absent", "other_404", "forbidden", "transient"]
+)
+async def test_restore_releases_only_exact_confirmed_message_absence(
+    isolated, monkeypatch, failure
+):
+    occurrence = event()
+    eid = scheduler.make_event_id(occurrence)
+    original = {eid: {"message_id": 80, "channel_id": 91}}
+    (isolated / "active.json").write_text(json.dumps(original))
+    code = 10008 if failure in {"absent", "channel_absent"} else 10003
+    if failure == "forbidden":
+        error = discord.Forbidden(
+            SimpleNamespace(status=403, reason="Forbidden"), {"code": 50013, "message": "denied"}
+        )
+    elif failure == "transient":
+        error = OSError("network unavailable")
+    else:
+        error = discord.NotFound(
+            SimpleNamespace(status=404, reason="Not Found"), {"code": code, "message": "missing"}
+        )
+    msg = SimpleNamespace(id=81, channel=SimpleNamespace(id=91), edit=AsyncMock())
+    channel = SimpleNamespace(
+        fetch_message=AsyncMock(side_effect=error), send=AsyncMock(return_value=msg)
+    )
+    bot = SimpleNamespace(
+        fetch_channel=AsyncMock(return_value=channel),
+        get_channel=lambda _: channel,
+        add_view=Mock(),
+    )
+    if failure == "channel_absent":
+        bot.fetch_channel.side_effect = error
+    monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [occurrence])
+    await scheduler.load_active_reminders(bot)
+    if failure == "absent":
+        assert eid not in scheduler._unresolved_active
+        assert json.loads((isolated / "active.json").read_text()) == {}
+        receipt = delivery.store.get(delivery_key("public-delete", 91, 80))
+        assert receipt["state"] == "not_found"
+        # Later eligible window can send; original send is not replayed.
+        assert (
+            await scheduler.send_reminder_at(bot, 91, occurrence, timedelta(hours=1))
+            == "acknowledged"
+        )
+        channel.send.assert_awaited_once()
+    else:
+        assert scheduler._unresolved_active[eid]["message_id"] == 80
+        assert delivery.store.rows() == []
+        assert (
+            await scheduler.send_reminder_at(bot, 91, occurrence, timedelta(hours=1))
+            == "restoration_unconfirmed"
+        )
+        channel.send.assert_not_awaited()

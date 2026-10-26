@@ -703,7 +703,40 @@ async def load_active_reminders(bot):
 
             try:
                 channel = await bot.fetch_channel(data["channel_id"])
-                msg = await channel.fetch_message(data["message_id"])
+                try:
+                    msg = await channel.fetch_message(data["message_id"])
+                except discord.NotFound as exc:
+                    if exc.code != 10008:
+                        raise
+                    # Only this exact message fetch proves absence. A channel
+                    # failure or other 404 cannot release the retained identity.
+                    key = delivery_key("public-delete", data["channel_id"], data["message_id"])
+                    if await delivery.begin(
+                        key,
+                        kind="public-delete",
+                        target=data["channel_id"],
+                        event=eid,
+                        message_id=data["message_id"],
+                    ):
+                        await delivery.finish(
+                            key,
+                            "not_found",
+                            message_id=data["message_id"],
+                            channel_id=data["channel_id"],
+                        )
+                    receipt = await delivery.read(key)
+                    if receipt and receipt["state"] in {"acknowledged", "not_found"}:
+                        current = active_reminders.get(eid)
+                        if current is not None and (
+                            current.id != data["message_id"]
+                            or current.channel.id != data["channel_id"]
+                        ):
+                            continue
+                        active_reminders.pop(eid, None)
+                        _unresolved_active.pop(eid, None)
+                        save_active_reminders()
+                        logger.info("[REMINDER_CACHE] restoration disposition=confirmed_absent")
+                    continue
 
                 # Try to match from live event cache
                 matched_event = next(
