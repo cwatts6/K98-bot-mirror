@@ -84,6 +84,7 @@ class EventDeliveryStore:
         message_id=None,
         event_data=None,
         generation=None,
+        revision=None,
     ):
         def mutate(rows):
             if key in rows:
@@ -103,6 +104,8 @@ class EventDeliveryStore:
                 rows[key]["event_data"] = deepcopy(event_data)
             if generation is not None:
                 rows[key]["generation"] = int(generation)
+            if revision is not None:
+                rows[key]["revision"] = str(revision)
             return True
 
         return self._access(mutate, write=True)

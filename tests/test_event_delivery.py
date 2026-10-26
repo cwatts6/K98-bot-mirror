@@ -614,3 +614,37 @@ async def test_restore_indexes_receipts_without_reparsing_per_retired_message(
     assert await scheduler.load_active_reminders(bot) == set()
     read_one.assert_not_awaited()
     bot.fetch_channel.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_overview_reverted_revision_edits_again_and_restart_reuses_only_latest(isolated):
+    state = {"desired": None, "visible": None, "projected": None}
+    adapter = overview_adapter()
+    adapter.identity.return_value = 81
+
+    async def edit(message_id):
+        state["visible"] = state["desired"]
+        return message_id
+
+    async def save(message_id):
+        state["projected"] = state["desired"]
+
+    adapter.edit.side_effect = edit
+    adapter.save_projection.side_effect = save
+    for revision in ["A", "B", "A"]:
+        state["desired"] = revision
+        assert (
+            await publish(adapter, 91, enabled=True, has_events=True, revision=revision)
+            == "updated"
+        )
+        assert state["visible"] == state["projected"] == revision
+    assert adapter.edit.await_count == 3
+    rows = [row for row in delivery.store.rows() if row["kind"] == "overview-edit"]
+    assert [row["generation"] for row in rows] == [0, 1, 2]
+    assert [row["revision"] for row in rows] == ["A", "B", "A"]
+    # Process-local locks and store instances disappear; durable latest edit remains.
+    delivery._locks.clear()
+    delivery.store = EventDeliveryStore(delivery.store.path)
+    assert await publish(adapter, 91, enabled=True, has_events=True, revision="A") == "updated"
+    assert adapter.edit.await_count == 3
+    adapter.send.assert_not_awaited()

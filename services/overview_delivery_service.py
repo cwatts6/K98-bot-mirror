@@ -13,10 +13,17 @@ class MessageAbsent(Exception):
     """Exact message fetch/delete returned Discord Unknown Message (10008)."""
 
 
-async def _step(kind, channel_id, identity, invoke, *, message_id=None, generation=None):
+async def _step(
+    kind, channel_id, identity, invoke, *, message_id=None, generation=None, revision=None
+):
     key = delivery_key(kind, channel_id, identity)
     if not await delivery.begin(
-        key, kind=kind, target=channel_id, message_id=message_id, generation=generation
+        key,
+        kind=kind,
+        target=channel_id,
+        message_id=message_id,
+        generation=generation,
+        revision=revision,
     ):
         receipt = await delivery.read(key)
         if receipt and receipt["state"] in {"acknowledged", "not_found"}:
@@ -34,6 +41,15 @@ async def _step(kind, channel_id, identity, invoke, *, message_id=None, generati
     )
 
 
+def _latest_generation(rows):
+    generations = [row.get("generation") for row in rows]
+    if any(type(value) is not int for value in generations) or sorted(generations) != list(
+        range(len(rows))
+    ):
+        raise DeliveryHeld("Overview generation evidence is incomplete")
+    return max(rows, key=lambda row: row["generation"]) if rows else None
+
+
 async def publish(adapter, channel_id, *, enabled, has_events, revision):
     async with delivery.operation_lock(("overview", channel_id)):
         if delivery.is_closed():
@@ -46,12 +62,7 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
             return "unconfirmed_previous_operation"
         message_id = await adapter.identity()
         sends = [r for r in selected if r["kind"] == "overview-send"]
-        generations = [row.get("generation") for row in sends]
-        if any(type(value) is not int for value in generations) or sorted(generations) != list(
-            range(len(sends))
-        ):
-            raise DeliveryHeld("Overview generation evidence is incomplete")
-        latest = max(sends, key=lambda row: row["generation"]) if sends else None
+        latest = _latest_generation(sends)
         if latest and latest["state"] == "acknowledged":
             deleted = await delivery.read(
                 delivery_key("overview-delete", channel_id, latest["message_id"])
@@ -110,13 +121,24 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
             message_id = sent["message_id"]
             created = True
         if not created:
-            edited = await _step(
-                "overview-edit",
-                channel_id,
-                [message_id, revision],
-                lambda: adapter.edit(message_id),
-                message_id=message_id,
-            )
+            edits = [
+                row
+                for row in selected
+                if row["kind"] == "overview-edit" and row.get("message_id") == message_id
+            ]
+            edited = _latest_generation(edits)
+            # Only the latest applied edit can suppress this revision. A
+            # historical A receipt does not authorize skipping A after B.
+            if not edited or edited.get("revision") != revision:
+                edited = await _step(
+                    "overview-edit",
+                    channel_id,
+                    [message_id, len(edits)],
+                    lambda: adapter.edit(message_id),
+                    message_id=message_id,
+                    generation=len(edits),
+                    revision=revision,
+                )
             if not edited or edited["state"] != "acknowledged":
                 return "edit_unconfirmed"
         pinned = await _step(
