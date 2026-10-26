@@ -223,7 +223,7 @@ class EvidenceRecovery:
     def dispatch(self, message):
         operation = message.get("operation")
         fields = {"version", "action", "operation"}
-        if operation == "pending":
+        if operation in {"pending", "pending_page"}:
             fields.add("after")
         elif operation in {"inspect", "restore", "attest", "attest_registration"}:
             fields.add("reference")
@@ -246,12 +246,16 @@ class EvidenceRecovery:
             raise SourceConflict("Exact evidence recovery selector required.")
         self.broker.boundary.recheck()
         with self.broker.authority._lock:
-            if operation == "pending":
+            if operation in {"pending", "pending_page"}:
                 after = message["after"]
                 if after is not None:
                     uuid_text(after)
                 page = self.catalog.page(after)
-                return page or self.catalog.page()
+                wrapped = not page and after is not None
+                page = page or self.catalog.page()
+                if operation == "pending_page":
+                    return dict(references=page, wrapped=wrapped)
+                return page
             current = self.inspect(message["reference"])
             if operation == "attest_registration":
                 from services.export_registration_attestation import apply, open_recovery
@@ -315,6 +319,10 @@ class EvidenceRecoveryAdapter:
 
     def pending_recovery(self, *, after=None):
         return self.client.evidence_recovery("pending", after=after)
+
+    def discovery_page(self, *, after=None):
+        """Read-only page with SQL-order wrap evidence, without guessing UUID order."""
+        return self.client.evidence_recovery("pending_page", after=after)
 
     def inspect(self, source_id):
         result = self.client.evidence_recovery("inspect", reference=source_id)

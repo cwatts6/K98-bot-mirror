@@ -20,8 +20,23 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_event_delivery_hash(root, path):
+def before_monitoring_hash(root, path):
+    """Exact test-only successor proof; never an installed updater capability."""
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/p1_monitoring_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "a577cf1182e0424426189263411c96ff426d99e894894ca2899e7837e2188a99"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
+def before_event_delivery_hash(root, path):
+    actual = before_monitoring_hash(root, path)
     fixture = root / "tests/fixtures/p1_event_delivery_source_pairs.json"
     if not fixture.exists():
         return actual

@@ -20,7 +20,25 @@ def startup_context(label):
         "warm_profile_cache": "profile",
         "warm_name_cache": "name",
     }.get(label, "startup_other")
-    token = _context.set({"operation": operation, "origin": "startup"})
+    with observation_context(operation, "startup"):
+        yield
+
+
+@contextmanager
+def observation_context(operation, origin):
+    """Only code-owned labels; correlation is never SQL authority or identity."""
+    if operation not in {
+        "player_stats",
+        "profile",
+        "name",
+        "startup_other",
+        "recovery",
+        "health_probe",
+    }:
+        raise ValueError("Known admission observation required.")
+    if origin not in {"startup", "monitor", "health"}:
+        raise ValueError("Known admission origin required.")
+    token = _context.set({"operation": operation, "origin": origin, "invocation_id": uuid4().hex})
     try:
         yield
     finally:

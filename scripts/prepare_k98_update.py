@@ -376,6 +376,23 @@ EVENT_DELIVERY_PATHS = frozenset(
 )
 
 
+MONITORING_RELIABILITY_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "core/interaction_safety.py",
+        "core/private_status_response.py",
+        "core/recovery_lifecycle.py",
+        "services/cache_admission_diagnostics.py",
+        "services/export_evidence_recovery.py",
+        "services/export_runtime_composition.py",
+        "services/gsheets_health_service.py",
+        "services/recovery_backlog_dal.py",
+        "services/recovery_health.py",
+        "services/recovery_runtime.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -388,7 +405,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 43:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 44:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -443,6 +460,10 @@ def reviewed_transitions():
             )
             fixed_event_delivery = (
                 item["id"] == "p1_event_delivery_v1" and path in EVENT_DELIVERY_PATHS
+            )
+            fixed_monitoring_reliability = (
+                item["id"] == "p1_monitoring_reliability_v1"
+                and path in MONITORING_RELIABILITY_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -525,6 +546,7 @@ def reviewed_transitions():
                     or fixed_event_cache
                     or fixed_startup_foundations
                     or fixed_event_delivery
+                    or fixed_monitoring_reliability
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -640,6 +662,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed event-cache readiness transition required.")
         if item["id"] == "p1_event_delivery_v1" and paths != EVENT_DELIVERY_PATHS:
             raise ValueError("Complete fixed event-delivery transition required.")
+        if item["id"] == "p1_monitoring_reliability_v1" and paths != MONITORING_RELIABILITY_PATHS:
+            raise ValueError("Complete fixed monitoring-reliability transition required.")
         if (
             item["id"] == "startup_cache_foundations_v1"
             and paths != STARTUP_CACHE_FOUNDATIONS_PATHS

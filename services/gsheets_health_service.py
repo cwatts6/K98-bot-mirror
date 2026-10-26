@@ -77,16 +77,19 @@ async def check_health(credentials_file, sheet_id, *, timeout=5.0):
     """Share one retained health operation across dashboard and admin requests."""
     from file_utils import run_blocking_in_thread
     from gsheet_module import check_basic_gsheets_access
+    from services.cache_admission_diagnostics import observation_context
 
     if not sheet_id:
         return None, "No sheet configured for probe"
-    return await _probe.observe(
-        lambda: run_blocking_in_thread(
-            check_basic_gsheets_access,
-            credentials_file,
-            sheet_id,
-            name="check_basic_gsheets_access",
-            meta={"sheet_id": sheet_id},
-        ),
-        timeout=timeout,
-    )
+
+    async def run():
+        with observation_context("health_probe", "health"):
+            return await run_blocking_in_thread(
+                check_basic_gsheets_access,
+                credentials_file,
+                sheet_id,
+                name="check_basic_gsheets_access",
+                meta={"sheet_id": sheet_id},
+            )
+
+    return await _probe.observe(run, timeout=timeout)

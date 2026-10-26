@@ -45,18 +45,14 @@ from bot_startup_gate import claim_startup_once
 from constants import (
     CREDENTIALS_FILE,
     CSV_LOG,
-    DATABASE,
     FAILED_LOG,
     INPUT_LOG,
     KVK_SHEET_ID,
     LAST_RESTART_INFO,
     LAST_SHUTDOWN_INFO,
-    PASSWORD,
     RESTART_LOG_FILE,
-    SERVER,
     STATS_SHEET_ID,
     SUMMARY_LOG,
-    USERNAME,
 )
 from core.command_lifecycle import run_ready_command_sync
 from core.event_rehydration_lifecycle import (
@@ -90,7 +86,7 @@ from event_scheduler import (
 )
 
 # added emit_telemetry_event import
-from file_utils import append_csv_line, emit_telemetry_event, fetch_one_dict
+from file_utils import append_csv_line, emit_telemetry_event
 from logging_setup import (
     LOG_DIR,
     clean_old_lock_files,
@@ -731,99 +727,11 @@ async def _count_errors_last_minutes(
         return 0
 
 
-async def _check_sql_health(timeout_sec: float = 3.0) -> tuple[bool, str | None]:
-    """
-    Probe SQL health.
+async def _check_sql_health(timeout_sec: float = 3.0) -> tuple[bool | None, str]:
+    """Share the retained SQL worker with operator status; never block the loop."""
+    from services.operator_status_service import check_sql
 
-    Strategy:
-    1) If pyodbc isn't installed, skip the probe (treat as OK).
-    2) Prefer using the shared constants._conn() helper (single source of truth).
-       If that succeeds, we're healthy.
-    3) If constants._conn() is unavailable or fails, fall back to attempting configured
-       driver names. Only try drivers that appear installed via pyodbc.drivers() when possible.
-    4) Keep per-driver failures at DEBUG to avoid log noise; emit a single WARNING only
-       if all attempts fail.
-    """
-    try:
-        import pyodbc
-    except Exception:
-        # Can't probe without pyodbc — avoid noisy warnings on hosts that don't have DB deps.
-        logger.debug("pyodbc not available; skipping SQL health probe")
-        return True, None
-
-    # Prefer the project's canonical connector if available
-    try:
-        from constants import _conn as _default_conn  # lazy import
-    except Exception:
-        _default_conn = None
-
-    last_err: str | None = None
-
-    if _default_conn is not None:
-        try:
-            conn = _default_conn()
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                _ = fetch_one_dict(cur)  # value not used, use helper for consistency
-            conn.close()
-            return True, None
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}"
-            logger.warning("[HEALTH][SQL] Probe via constants._conn failed: %s", last_err)
-            # fall through to driver-based fallback
-
-    # Fallback: try known driver names, but only those actually installed when possible
-    dsn_list = [
-        "ODBC Driver 18 for SQL Server",
-        "ODBC Driver 17 for SQL Server",
-        "SQL Server",
-    ]
-
-    installed_drivers: list[str] = []
-    try:
-        installed_drivers = [d for d in pyodbc.drivers() if d]
-    except Exception:
-        # enumeration failed — we'll try the configured dsn_list as a best-effort
-        logger.debug("pyodbc.drivers() failed or unavailable; attempting configured driver names")
-
-    if installed_drivers:
-        to_try = [d for d in dsn_list if d in installed_drivers]
-        if not to_try:
-            # No matching drivers installed; skip probe to avoid repeated IM002 noise.
-            logger.info(
-                "No matching ODBC drivers installed (expected: %s, installed: %s); skipping SQL probe",
-                dsn_list,
-                installed_drivers,
-            )
-            return True, None
-    else:
-        to_try = dsn_list
-
-    int_timeout = int(timeout_sec)
-
-    for driver in to_try:
-        try:
-            conn = pyodbc.connect(
-                f"DRIVER={{{driver}}};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD};"
-                "Encrypt=yes;TrustServerCertificate=Yes;",
-                timeout=int_timeout,
-                autocommit=True,
-            )
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                _ = fetch_one_dict(cur)
-            conn.close()
-            return True, None
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}"
-            # Keep per-driver failures at DEBUG to reduce noise
-            logger.debug("[HEALTH][SQL] Probe failed via '%s': %s", driver, last_err)
-
-    # All attempts failed — emit single warning with final error
-    logger.warning(
-        "[HEALTH][SQL] All SQL driver probes failed: %s", last_err or "Unknown SQL error"
-    )
-    return False, last_err or "Unknown SQL error"
+    return await check_sql(timeout=timeout_sec)
 
 
 def _pick_health_sheet_id() -> str | None:
@@ -925,8 +833,8 @@ class HealthView(discord.ui.View):
                 f"**Discord:** {sess}"
                 + (f" • ping ~{latency_ms} ms" if latency_ms is not None else "")
                 + "\n"
-                f"**Database:** {'🟢 OK' if sql_ok else '🔴 Error'}"
-                + (f" — `{(sql_reason or '')[:120]}`" if not sql_ok else "")
+                f"**Database:** {'🟢 OK' if sql_ok is True else '🟠 Pending' if sql_ok is None else '🔴 Error'}"
+                + (f" — `{(sql_reason or '')[:120]}`" if sql_ok is not True else "")
                 + "\n"
                 f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
                 f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
@@ -942,7 +850,7 @@ class HealthView(discord.ui.View):
                 color = (
                     0xE74C3C
                     if (
-                        not sql_ok
+                        sql_ok is False
                         or gs_ok is False
                         or err_60m >= ERROR_SPIKE_THRESHOLD
                         or sess != "🟢 connected"
@@ -1093,8 +1001,8 @@ async def _update_health_embed():
         f"**Discord:** {sess}"
         + (f" • ping ~{latency_ms} ms" if latency_ms is not None else "")
         + "\n"
-        f"**Database:** {'🟢 OK' if sql_ok else '🔴 Error'}"
-        + (f" — `{(sql_reason or '')[:120]}`" if not sql_ok else "")
+        f"**Database:** {'🟢 OK' if sql_ok is True else '🟠 Pending' if sql_ok is None else '🔴 Error'}"
+        + (f" — `{(sql_reason or '')[:120]}`" if sql_ok is not True else "")
         + "\n"
         f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
         f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
@@ -1114,7 +1022,7 @@ async def _update_health_embed():
         color = (
             0xE74C3C
             if (
-                not sql_ok
+                sql_ok is False
                 or gs_ok is False
                 or err_60m >= ERROR_SPIKE_THRESHOLD
                 or sess != "🟢 connected"

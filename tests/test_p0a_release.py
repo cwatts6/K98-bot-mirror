@@ -259,6 +259,8 @@ def test_candidate_preserves_old_evidence_until_actual_observation(monkeypatch):
 
 
 def test_reviewed_source_inventory_matches_current_runtime():
+    from tests.updater_source_assertions import before_monitoring_hash
+
     root = Path(__file__).resolve().parents[1]
     expected = {row["path"]: row["after"] for row in recovery.specification()["sources"]}
     # P0a's original pins remain immutable. Later source releases may install a
@@ -273,8 +275,7 @@ def test_reviewed_source_inventory_matches_current_runtime():
         ):
             expected.update({m["path"]: m["after_sha256"] for m in members})
     for relative, checksum in expected.items():
-        path = root / relative
-        assert recovery.sha(path.read_bytes().replace(b"\r\n", b"\n")) == checksum, relative
+        assert before_monitoring_hash(root, relative) == checksum, relative
 
 
 def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch):

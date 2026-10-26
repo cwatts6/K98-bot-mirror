@@ -13,6 +13,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISHER = ROOT / ".github/workflows/publish-mirror.yml"
 COMMAND_GOVERNANCE = ".github/workflows/command-governance.yml"
+PRIVATE_STATUS_PATHS = ("core/private_status_response.py", "tests/test_private_status_response.py")
 WORKFLOW_INCLUDES = (".github/workflows/", COMMAND_GOVERNANCE)
 BUILD_STEP = "Build publishable tree (exclude secrets)"
 RSYNC_ARGUMENTS = (
@@ -109,11 +110,19 @@ class MirrorPublishPolicyTests(unittest.TestCase):
         lines = (ROOT / ".publishignore").read_text(encoding="utf-8").splitlines()
         includes = [line for line in lines if line.startswith("+ ")]
         self.assertEqual(
-            includes, [f"+ /{path}" for path in (*AUTHORITY_PATHS, *WORKFLOW_INCLUDES)]
+            includes,
+            [
+                f"+ /{path}"
+                for path in (*AUTHORITY_PATHS, *PRIVATE_STATUS_PATHS, *WORKFLOW_INCLUDES)
+            ],
         )
         for path in AUTHORITY_PATHS:
             self.assertTrue((ROOT / path).is_file(), path)
             self.assertLess(lines.index(f"+ /{path}"), lines.index("**/*auth*"))
+
+        for path in PRIVATE_STATUS_PATHS:
+            self.assertTrue((ROOT / path).is_file(), path)
+            self.assertLess(lines.index(f"+ /{path}"), lines.index("**/*private*"))
 
         self.assertTrue((ROOT / COMMAND_GOVERNANCE).is_file())
         for path in WORKFLOW_INCLUDES:
@@ -140,6 +149,7 @@ class MirrorPublishPolicyTests(unittest.TestCase):
         arguments = self.publisher_arguments() or list(RSYNC_ARGUMENTS)
         allowed = (
             *AUTHORITY_PATHS,
+            *PRIVATE_STATUS_PATHS,
             COMMAND_GOVERNANCE,
             "services/ordinary.py",
             "README.md",
@@ -158,6 +168,9 @@ class MirrorPublishPolicyTests(unittest.TestCase):
             "nested/auth.json",
             "services/other_authority.py",
             "nested/private.json",
+            *(f"nested/{path}" for path in PRIVATE_STATUS_PATHS),
+            *(f"{path}.bak" for path in PRIVATE_STATUS_PATHS),
+            *(f"{path}.key" for path in PRIVATE_STATUS_PATHS),
             "nested/id_rsa-test",
             "nested/key.pem",
             "nested/key.key",
