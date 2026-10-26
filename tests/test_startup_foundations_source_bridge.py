@@ -19,6 +19,8 @@ def test_exact_successor_bridge_rejects_unreviewed_changes(tmp_path, damage):
     (tmp_path / successor).write_bytes((root / successor).read_bytes())
     monitoring = Path("tests/fixtures/p1_monitoring_source_pairs.json")
     (tmp_path / monitoring).write_bytes((root / monitoring).read_bytes())
+    attempt = Path("tests/fixtures/procconfig_admission_source_pairs.json")
+    (tmp_path / attempt).write_bytes((root / attempt).read_bytes())
     member = json.loads(raw)[0]
     path = member["path"]
     (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
