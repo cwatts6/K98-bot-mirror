@@ -26,7 +26,7 @@ def before_procconfig_admission_hash(root, path):
     raw = (root / "tests/fixtures/procconfig_admission_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "bc65829616219b8644cac4b796bfd97a29168d75c431c8c1cb06f8426fe6438f"
+        == "9a22fddadd7829b98f07f0628a4bdc1f78a8f75a0bc7e00c548a05df5ba3c4c4"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

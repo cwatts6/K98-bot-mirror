@@ -3,12 +3,13 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
 from threading import Event
+import time
 from uuid import uuid4
 
 import pytest
 
 from kvk.dal.new_source_import_dal import UncertainCommit
-from services.export_contention import CoordinationLockRefused
+from services.export_contention import CoordinationLockRefused, coordination_retry_window
 from services.export_coordination_dal import _mutex
 from services.legacy_export_snapshot_dal import LegacySnapshotDAL
 from tests.test_import_capture_recovery_sql import recovery as recovery
@@ -33,8 +34,9 @@ def arguments():
     )
 
 
+@pytest.mark.parametrize("slow_first_connection", [False, True])
 def test_configuration_request_waits_for_rolled_back_contention_then_saves_once(
-    recovery, monkeypatch
+    recovery, monkeypatch, slow_first_connection
 ):
     from services import legacy_export_snapshot_dal as module
 
@@ -52,12 +54,29 @@ def test_configuration_request_waits_for_rolled_back_contention_then_saves_once(
 
     monkeypatch.setattr(module, "_mutex", observe)
     args = arguments()
+    original_connect = recovery.runtime.dal.connect
+    connections = []
+
+    def connect():
+        if slow_first_connection and not connections:
+            time.sleep(1.05)  # Reproduce a first attempt exceeding the old budget.
+        connection = original_connect()
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(recovery.runtime.dal, "connect", connect)
+
+    def request():
+        with coordination_retry_window(5):
+            return recovery.runtime.dal.request(**args)
+
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
-            pending = pool.submit(recovery.runtime.dal.request, **args)
+            pending = pool.submit(request)
             assert refused.wait(3)
             holder.rollback()
             identifier = pending.result(timeout=4)
+        assert len(connections) >= 2
         assert recovery.runtime.dal.request(**args) == identifier
         row = recovery.owner.execute(
             recovery.rewrite(

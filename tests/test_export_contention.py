@@ -411,3 +411,32 @@ def test_monitor_snapshot_retries_only_after_close(monkeypatch):
     assert dal.snapshot(dal.source_id) == {"resource": None}
     assert len(connections) == 2
     connections[1].commit.assert_called_once()
+
+
+def test_refusal_timings_separate_connect_body_and_cleanup(monkeypatch):
+    now = clock(monkeypatch)
+    connection = Mock(autocommit=False)
+
+    def advance(seconds):
+        now[0] += seconds
+
+    def connect():
+        advance(0.25)
+        return connection
+
+    connection.rollback.side_effect = lambda: advance(0.5)
+    connection.close.side_effect = lambda: advance(0.75)
+    with pytest.raises(module.CoordinationLockRefused) as caught:
+        with module.transaction(connect):
+            advance(1)
+            raise refusal()
+    facts = module.sql_error_facts(caught.value)
+    assert facts["transaction_released"]
+    assert facts["phase_timings_ms"] == {
+        "connect": 250,
+        "cursor": 0,
+        "transaction_body": 1000,
+        "rollback": 500,
+        "close": 750,
+    }
+    assert "commit" not in facts["phase_timings_ms"]

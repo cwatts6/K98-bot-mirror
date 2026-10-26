@@ -60,8 +60,9 @@ identity is retained. No provider read, import callback, writer execution or
 whole import is enclosed in this new retry scope.
 
 Existing admission diagnostics retain requesting-session identity separately
-from blocker identity. SQL connect, execute, rollback and close timing stays in
-the existing SQL diagnostic mechanism. The startup operation now has an explicit
+from blocker identity. The refused transaction now records connect, cursor acquisition, transaction-body,
+rollback and close durations. Transaction-body time includes DAL Python work and
+SQL execution; it is not a measurement of lock-held time. The startup operation now has an explicit
 configuration-import label. Persisted lock facts contain no driver prose or SQL.
 
 ## SQL and deployment contract

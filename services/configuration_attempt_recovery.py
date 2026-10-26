@@ -76,7 +76,7 @@ class AttemptJournal:
                 raise ValueError()
             failure = value.get("admission_failure")
             if failure is not None:
-                if set(failure) != {
+                if set(failure) - {"phase_timings_ms"} != {
                     "error_type",
                     "sqlstate",
                     "native_errors",
@@ -99,6 +99,14 @@ class AttemptJournal:
                         type(failure[k]) is not int
                         for k in ("sql_session_id", "xact_state", "transaction_count")
                     )
+                ):
+                    raise ValueError()
+                timings = failure.get("phase_timings_ms")
+                if timings is not None and (
+                    not isinstance(timings, dict)
+                    or set(timings)
+                    - {"connect", "cursor", "transaction_body", "commit", "rollback", "close"}
+                    or any(type(v) is not int or v < 0 for v in timings.values())
                 ):
                     raise ValueError()
         except (KeyError, TypeError, ValueError, AttributeError) as exc:

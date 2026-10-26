@@ -31,6 +31,7 @@ class CoordinationLockRefused(RuntimeError):
         self.transaction_count = transaction_count
         self.resource_hash = resource_hash
         self.transaction_released = False
+        self.phase_timings_ms = None
 
 
 def sql_error_facts(error):
@@ -57,19 +58,51 @@ def sql_error_facts(error):
             resource_sha256=error.resource_hash,
             transaction_released=error.transaction_released,
         )
+    if isinstance(error, CoordinationLockRefused) and error.phase_timings_ms is not None:
+        result["phase_timings_ms"] = dict(error.phase_timings_ms)
     return result
 
 
 @contextmanager
 def transaction(connect):
     """Mark only failures whose rollback AND connection close acknowledged."""
+    timings = {}
+
+    def timed(phase, call, *args):
+        started = time.monotonic()
+        try:
+            return call(*args)
+        finally:
+            timings[phase] = timings.get(phase, 0) + max(
+                0, int((time.monotonic() - started) * 1000)
+            )
+
+    class Connection:
+        # The body receives the original cursor. Only source_transaction's
+        # connection lifecycle calls are observed; their semantics are unchanged.
+        def __init__(self, connection):
+            self.connection = connection
+
+        def __getattr__(self, name):
+            value = getattr(self.connection, name)
+            if name in {"cursor", "commit", "rollback", "close"}:
+                return lambda *args: timed(name, value, *args)
+            return value
+
     try:
-        with source_transaction(connect) as cursor:
-            yield cursor
+        with source_transaction(lambda: Connection(timed("connect", connect))) as cursor:
+            started = time.monotonic()
+            try:
+                yield cursor
+            finally:
+                # Includes DAL Python work as well as SQL execution; this is
+                # deliberately not labelled lock-held or exact statement time.
+                timings["transaction_body"] = max(0, int((time.monotonic() - started) * 1000))
     except CoordinationLockRefused as error:
         # Any rollback/close exception replaces the refusal in source_transaction
         # and cannot reach here. A failed commit is UncertainCommit, not this type.
         error.transaction_released = True
+        error.phase_timings_ms = timings
         raise
 
 
