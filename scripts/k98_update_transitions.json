@@ -1287,7 +1287,7 @@
         {
           "path": "daily_KVK_overview_embed.py",
           "before_sha256": "1f58466cbc2cedccc6f9bb2529069c1a6cd84a02bd12ab1787b77bd8fde7f7e6",
-          "after_sha256": "5b221a1f30f87ddbf62d843931ed0ae0b0f90c0b82f9818ce63b1d1ad826ee87"
+          "after_sha256": "7b3eaf9156e8f1a3c0c30351801793dbfab0a51c5dd35f88b24ee5e40944578e"
         },
         {
           "path": "event_scheduler.py",

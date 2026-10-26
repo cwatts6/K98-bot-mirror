@@ -116,6 +116,9 @@ class _OverviewAdapter:
         return message.id
 
     async def save_projection(self, message_id):
+        # Durable edit acknowledgement does not restore process-local callback
+        # handlers. Rebind current events even when the remote edit is reused.
+        self.bot.add_view(self.prepared_payload["view"], message_id=message_id)
         store = _tracker_store()
         async with store.locked():
             data = await store.snapshot()

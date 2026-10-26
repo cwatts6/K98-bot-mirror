@@ -301,7 +301,7 @@ async def test_overview_real_projections_create_and_remove_together(isolated, mo
     channel = SimpleNamespace(
         id=91, send=AsyncMock(return_value=msg), fetch_message=AsyncMock(return_value=msg)
     )
-    bot = SimpleNamespace(fetch_channel=AsyncMock(return_value=channel))
+    bot = SimpleNamespace(fetch_channel=AsyncMock(return_value=channel), add_view=Mock())
     assert await overview.post_or_update_daily_KVK_overview(bot, 91) == "created"
     assert json.loads(daily_path.read_text()) == {"message_id": 81}
     assert (await store.snapshot())["daily_kvk_overview"]["message_id"] == 81
@@ -648,3 +648,49 @@ async def test_overview_reverted_revision_edits_again_and_restart_reuses_only_la
     assert await publish(adapter, 91, enabled=True, has_events=True, revision="A") == "updated"
     assert adapter.edit.await_count == 3
     adapter.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tracker_state", ["missing", "stale"])
+async def test_overview_reused_edit_registers_current_callback_after_restart(
+    isolated, monkeypatch, tracker_state
+):
+    import daily_KVK_overview_embed as overview
+    from services.tracked_view_store import TrackedViewStore
+
+    store = TrackedViewStore(isolated / "views.json", str(isolated / "views.lock"))
+    monkeypatch.setattr(overview, "_tracker_store", lambda: store)
+    monkeypatch.setattr(overview, "DAILY_KVK_OVERVIEW_TRACKER", str(isolated / "daily.json"))
+    occurrence = event()
+    msg = SimpleNamespace(id=81, edit=AsyncMock(), pin=AsyncMock())
+    channel = SimpleNamespace(fetch_message=AsyncMock(return_value=msg))
+    old_bot = SimpleNamespace(fetch_channel=AsyncMock(return_value=channel), add_view=Mock())
+    key = delivery_key("overview-send", 91, 0)
+    delivery.store.begin(key, kind="overview-send", target=91, generation=0)
+    delivery.store.finish(key, "acknowledged", message_id=81, channel_id=91)
+    if tracker_state == "stale":
+        previous = overview._OverviewAdapter(old_bot, 91, [{**occurrence, "name": "Prior events"}])
+        await previous.prepare()
+        await previous.save_projection(81)
+    first = overview._OverviewAdapter(old_bot, 91, [occurrence])
+    first.identity = AsyncMock(return_value=81)
+    first.save_projection = AsyncMock(side_effect=OSError("projection unavailable"))
+    with pytest.raises(OSError):
+        await publish(first, 91, enabled=True, has_events=True, revision="new-events")
+    msg.edit.assert_awaited_once()
+    # The new process must replace stale handlers or register absent handlers,
+    # using durable identity without repeating the acknowledged remote edit.
+    new_bot = SimpleNamespace(fetch_channel=AsyncMock(return_value=channel), add_view=Mock())
+    restarted = overview._OverviewAdapter(new_bot, 91, [occurrence])
+    delivery._locks.clear()
+    delivery.store = EventDeliveryStore(delivery.store.path)
+    assert (
+        await publish(restarted, 91, enabled=True, has_events=True, revision="new-events")
+        == "updated"
+    )
+    msg.edit.assert_awaited_once()
+    new_bot.add_view.assert_called_once()
+    assert new_bot.add_view.call_args.kwargs == {"message_id": 81}
+    assert new_bot.add_view.call_args.args[0].events == [occurrence]
+    assert new_bot.add_view.call_args.args[0].is_persistent()
+    assert (await store.snapshot())["daily_kvk_overview"]["message_id"] == 81
