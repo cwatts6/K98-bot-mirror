@@ -1049,7 +1049,7 @@ async def _update_health_embed():
         if is_pytest_logging_mode():
             return
 
-        if not sql_ok:
+        if sql_ok is False:
             need_alert = True
             reasons.append("DB check failed" + (f": {sql_reason}" if sql_reason else ""))
 

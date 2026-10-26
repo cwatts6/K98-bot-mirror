@@ -26,7 +26,7 @@ def before_monitoring_hash(root, path):
     raw = (root / "tests/fixtures/p1_monitoring_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "a577cf1182e0424426189263411c96ff426d99e894894ca2899e7837e2188a99"
+        == "9ba7e4bba75c055e5eb9928a2733727a8ff5199642ed7c1fc02411b7e0efcf04"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

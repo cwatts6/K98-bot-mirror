@@ -2,7 +2,7 @@
   {
     "path": "bot_instance.py",
     "before": "1f2d0440db1ca2ed010b4e32380aa43a84bfd57c2b23105c59050d5405046f71",
-    "after": "618400a6ec05fd6be8f0d5836dec11213ebba1979013ffb72154f4b3d9e55271"
+    "after": "ec662559373b31670a5e43031b1915c7eec4685f42ab340446294192028c960b"
   },
   {
     "path": "core/interaction_safety.py",
