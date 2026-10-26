@@ -48,7 +48,18 @@ def test_real_pycord_interaction_creation_time_and_context():
     for ctx in (raw, SimpleNamespace(interaction=raw)):
         age, source = PrivateStatusResponse(ctx).age_observation()
         assert 9 <= age <= 12
-        assert source == "created_at"
+        # Supported Pycord revisions expose either the property or only the ID.
+        assert source in {"created_at", "interaction_id"}
+
+
+def test_aware_created_at_is_preferred_over_snowflake():
+    now = datetime.now(UTC)
+    ctx = interaction()
+    ctx.created_at = now - timedelta(seconds=10)
+    ctx.id = discord.utils.time_snowflake(now - timedelta(minutes=10))
+    age, source = PrivateStatusResponse(ctx).age_observation()
+    assert 9 <= age <= 12
+    assert source == "created_at"
 
 
 def test_missing_created_property_uses_local_snowflake_without_logging_identity():
