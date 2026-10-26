@@ -55,6 +55,30 @@ class RecoveryBacklogDAL:
             actions = rows(cursor)
         return dict(groups=groups, actions=actions)
 
+    def active_summary(self):
+        """Notification counts only; full historical reports still use summary()."""
+        with transaction(self.store.connect) as cursor:
+            cursor.execute(
+                "SELECT SourceKind,COUNT_BIG(*) AS Total FROM dbo.RecoveryIncident "
+                "WHERE ScopeKey=? AND State='open' AND SourceKind<>'recovery_overview' "
+                "GROUP BY SourceKind ORDER BY SourceKind",
+                self.store.scope,
+            )
+            groups = rows(cursor)
+            cursor.execute(
+                "SELECT COUNT_BIG(*) AS Total FROM dbo.RecoveryAction a "
+                "JOIN dbo.RecoveryIncident i ON i.IncidentID=a.IncidentID "
+                "WHERE i.ScopeKey=? AND a.State IN ('dispatched','unknown')",
+                self.store.scope,
+            )
+            pending = one(cursor)["Total"]
+        return dict(
+            open_count=sum(row["Total"] for row in groups),
+            copies=sum(row["Total"] for row in groups if row["SourceKind"] == "private_evidence"),
+            pending=pending,
+            groups=groups,
+        )
+
     def _candidates(self, cursor, through, *, lock=False):
         hint = " WITH (UPDLOCK,HOLDLOCK)" if lock else ""
         cursor.execute(

@@ -1,7 +1,9 @@
 """Composition and bounded independent discovery for the recovery centre."""
 
 from contextlib import contextmanager
+from datetime import UTC, datetime
 import logging
+import time
 
 from kvk.dal.new_source_import_dal import SourceConflict
 from services import recovery_health
@@ -16,6 +18,8 @@ _cursors = {}
 _incident_cursor = None
 _priority_incident_cursor = None
 _failed_incident_cursor = None
+HISTORY_SLICE_SECONDS = 10.0
+_history_coverage = {}
 
 
 @contextmanager
@@ -224,6 +228,8 @@ def _retry_admission():
 def observe_recovery():
     global _incident_cursor, _priority_incident_cursor, _failed_incident_cursor
     failures = []
+    visited = set()
+    visited_sources = set()
     recovery_health.record_progress("opening_recovery_scope")
     with recovery_service() as service:
         from services.recovery_backlog_dal import RecoveryBacklogDAL
@@ -234,7 +240,10 @@ def observe_recovery():
             recovery_health.record_progress("accepted_evidence_repairs")
             for incident_id in RecoveryBacklogDAL(service.store).pending_repairs():
                 try:
-                    service.refresh(incident_id)
+                    visited.add(incident_id)
+                    row = service.refresh(incident_id)
+                    if isinstance(row, dict) and row.get("SourceID") is not None:
+                        visited_sources.add((row["SourceKind"], str(row["SourceID"])))
                 except ImportExecutionActive as exc:
                     recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
@@ -249,7 +258,10 @@ def observe_recovery():
             recovery_health.record_progress("accepted_historical_retirements")
             for incident_id in RecoveryBacklogDAL(service.store).pending_repairs("stats_import"):
                 try:
-                    service.refresh(incident_id)
+                    visited.add(incident_id)
+                    row = service.refresh(incident_id)
+                    if isinstance(row, dict) and row.get("SourceID") is not None:
+                        visited_sources.add((row["SourceKind"], str(row["SourceID"])))
                 except ImportExecutionActive as exc:
                     recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
@@ -259,34 +271,6 @@ def observe_recovery():
                 finally:
                     service.store.touch_pending(incident_id)
                     recovery_health.record_progress("accepted_historical_retirements")
-        for kind, adapter in service.adapters.items():
-            recovery_health.record_progress("discovery:" + kind)
-            try:
-                after = _cursors.get((scope, kind))
-                for source_id in adapter.pending_recovery(after=after):
-                    _cursors[(scope, kind)] = source_id
-                    try:
-                        evidence, token, resolved = adapter.inspect(source_id)
-                        if resolved and not getattr(adapter, "observe_healthy", True):
-                            # Existing open incidents are reconciled below. A
-                            # healthy receipt is not a new admin notification.
-                            continue
-                        row = service.store.observe(
-                            kind, source_id, evidence, token, resolved=resolved
-                        )
-                        if getattr(adapter, "automatic_action", None):
-                            service.recover_automatic(row["IncidentID"])
-                    except ImportExecutionActive as exc:
-                        recovery_health.record_check("discovery:" + kind, exc, waiting=True)
-                        continue
-                    except Exception as exc:
-                        recovery_health.record_check("discovery:" + kind, exc)
-                        failures.append(type(exc).__name__)
-            except ImportExecutionActive as exc:
-                recovery_health.record_check("discovery:" + kind, exc, waiting=True)
-            except Exception as exc:
-                recovery_health.record_check("discovery:" + kind, exc)
-                failures.append(type(exc).__name__)
         # Existing operational incidents must still be checked after their source
         # leaves discovery (for example a domain closes a queued preparation).
         # A separate bounded cursor prevents evidence-copy backlogs delaying them.
@@ -313,11 +297,12 @@ def observe_recovery():
         _failed_incident_cursor = (
             (scope, failed_checks[-1]["IncidentID"]) if failed_checks else None
         )
-        visited = set()
         for incident in failed_checks + priority + incidents:
             if incident["IncidentID"] in visited:
                 continue
             visited.add(incident["IncidentID"])
+            if incident.get("SourceID") is not None:
+                visited_sources.add((incident["SourceKind"], str(incident["SourceID"])))
             if incident["SourceKind"] not in service.adapters:
                 # Evidence repair remains available while other domain adapters
                 # await authenticated registration. Do not mutate their history.
@@ -339,6 +324,142 @@ def observe_recovery():
                     incident["IncidentID"],
                     detail,
                 )
+            finally:
+                recovery_health.record_progress("existing_incident_checks")
+        for kind, adapter in sorted(
+            service.adapters.items(), key=lambda item: item[0] == "private_evidence"
+        ):
+            recovery_health.record_progress("discovery:" + kind)
+            history = kind == "private_evidence"
+            started = time.monotonic()
+            inspected = 0
+            exhausted = False
+            wrapped = False
+            history_failures = 0
+            history_waiting = 0
+            page_observed = False
+            sources = []
+            last_history_failure = None
+            consumed = 0
+            try:
+                after = _cursors.get((scope, kind))
+                if history and hasattr(adapter, "discovery_page"):
+                    page = adapter.discovery_page(after=after)
+                    sources, wrapped = page["references"], page["wrapped"]
+                else:
+                    sources = adapter.pending_recovery(after=after)
+                page_observed = True
+                for source_id in sources:
+                    if history and consumed and time.monotonic() - started >= HISTORY_SLICE_SECONDS:
+                        exhausted = True
+                        break
+                    # Advance attempted references so one bad item cannot starve
+                    # the catalog. A failure stays unconfirmed until a clean
+                    # wrap-to-wrap sweep; another page cannot clear it.
+                    _cursors[(scope, kind)] = source_id
+                    consumed += 1
+                    if (kind, str(source_id)) in visited_sources:
+                        # The active path may have deferred to existing work;
+                        # deduplication is not proof of a successful hash check.
+                        if history:
+                            history_waiting += 1
+                        continue
+                    inspected += 1
+                    try:
+                        evidence, token, resolved = adapter.inspect(source_id)
+                        recovery_health.record_progress("discovery:" + kind)
+                        if resolved and not getattr(adapter, "observe_healthy", True):
+                            # Existing open incidents were reconciled above. A
+                            # healthy receipt is not a new admin notification.
+                            continue
+                        row = service.store.observe(
+                            kind, source_id, evidence, token, resolved=resolved
+                        )
+                        if row["IncidentID"] not in visited and getattr(
+                            adapter, "automatic_action", None
+                        ):
+                            visited.add(row["IncidentID"])
+                            service.recover_automatic(row["IncidentID"])
+                    except ImportExecutionActive as exc:
+                        recovery_health.record_check("discovery:" + kind, exc, waiting=True)
+                        history_waiting += 1
+                        continue
+                    except Exception as exc:
+                        last_history_failure = recovery_health.record_check(
+                            "discovery:" + kind, exc
+                        )
+                        failures.append(type(exc).__name__)
+                        history_failures += 1
+            except ImportExecutionActive as exc:
+                recovery_health.record_check("discovery:" + kind, exc, waiting=True)
+                history_waiting += 1
+            except Exception as exc:
+                last_history_failure = recovery_health.record_check("discovery:" + kind, exc)
+                failures.append(type(exc).__name__)
+                history_failures += 1
+            finally:
+                recovery_health.record_progress("discovery_finished:" + kind)
+                if history:
+                    # Keep only this runtime scope. This is diagnostic coverage,
+                    # never authority to skip a receipt or certify a full report.
+                    prior = _history_coverage.get(scope, {})
+                    now = datetime.now(UTC).isoformat()
+                    empty_catalog = page_observed and not sources and after is None
+                    coverage = dict(
+                        prior,
+                        last_slice_utc=now,
+                        attempted=inspected,
+                        consumed=consumed,
+                        elapsed_seconds=time.monotonic() - started,
+                        budget_seconds=HISTORY_SLICE_SECONDS,
+                        budget_exhausted=exhausted,
+                        coverage="rotating_catalog_not_transactional",
+                        complete=False,
+                        sweep_failures=(
+                            0 if wrapped or empty_catalog else prior.get("sweep_failures", 0)
+                        )
+                        + history_failures,
+                        sweep_waiting=(
+                            0 if wrapped or empty_catalog else prior.get("sweep_waiting", 0)
+                        )
+                        + history_waiting,
+                        unconfirmed_failure=bool(
+                            not empty_catalog
+                            and (
+                                history_failures
+                                or (
+                                    prior.get("sweep_failures", 0)
+                                    or (
+                                        prior.get("sweep_waiting", 0)
+                                        and prior.get("unconfirmed_failure", False)
+                                    )
+                                    if wrapped
+                                    else prior.get("unconfirmed_failure", False)
+                                )
+                            )
+                        ),
+                    )
+                    if not prior or after is None or wrapped:
+                        coverage["sweep_started_utc"] = now
+                    coverage["sweep_age_seconds"] = max(
+                        0.0,
+                        (
+                            datetime.now(UTC)
+                            - datetime.fromisoformat(coverage["sweep_started_utc"])
+                        ).total_seconds(),
+                    )
+                    if last_history_failure:
+                        coverage["last_failure"] = last_history_failure
+                    elif not coverage["unconfirmed_failure"]:
+                        coverage.pop("last_failure", None)
+                    if wrapped:
+                        coverage["last_wrap_utc"] = now
+                        coverage["wraps"] = prior.get("wraps", 0) + 1
+                    _history_coverage.clear()
+                    _history_coverage[scope] = coverage
+                    recovery_health.record_history(coverage)
+                    if coverage["unconfirmed_failure"]:
+                        failures.append("HistoricalChecksUnconfirmed")
         if service.store.has_failed_checks():
             failures.append("PersistedCheckUnavailable")
     recovery_health.record_progress("registration_admission")
@@ -355,20 +476,12 @@ def alert_rows():
     from services.recovery_backlog_dal import RecoveryBacklogDAL
 
     with recovery_service() as service:
-        summary = RecoveryBacklogDAL(service.store).summary()
-        open_count = sum(g["Total"] for g in summary["groups"] if g["State"] == "open")
-        copies = sum(
-            g["Total"]
-            for g in summary["groups"]
-            if g["State"] == "open" and g["SourceKind"] == "private_evidence"
-        )
-        pending = sum(
-            a["Total"] for a in summary["actions"] if a["State"] in {"dispatched", "unknown"}
-        )
+        summary = RecoveryBacklogDAL(service.store).active_summary()
+        open_count, copies, pending = summary["open_count"], summary["copies"], summary["pending"]
         evidence = dict(
             title="Recovery overview",
             actions={},
-            outcome="attention_required" if open_count else "clear",
+            outcome="attention_required" if open_count or pending else "clear",
             summary_sha256=digest(_wire(summary)).hex(),
             explanation=(
                 f"{open_count} open recovery records, including {copies} evidence-copy incidents. "
@@ -380,7 +493,7 @@ def alert_rows():
             str(uuid5(NAMESPACE_URL, service.store.scope + ":overview")),
             evidence,
             digest(evidence).hex(),
-            resolved=open_count == 0,
+            resolved=open_count == 0 and pending == 0,
         )
         return [service.present(service.store.get(key)) for key in service.store.alerts_due()]
 

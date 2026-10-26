@@ -331,6 +331,8 @@ def test_historical_hash_bridge_rejects_foreign_runtime_bytes(tmp_path, path):
     fixture = Path("tests/fixtures/p1_startup_source_pairs.json")
     (tmp_path / fixture).parent.mkdir(parents=True)
     (tmp_path / fixture).write_bytes(fixture.read_bytes())
+    monitoring = Path("tests/fixtures/p1_monitoring_source_pairs.json")
+    (tmp_path / monitoring).write_bytes(monitoring.read_bytes())
 
     source = tmp_path / path
     source.parent.mkdir(parents=True, exist_ok=True)

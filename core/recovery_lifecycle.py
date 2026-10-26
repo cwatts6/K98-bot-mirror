@@ -6,6 +6,7 @@ import logging
 import discord
 
 from services import recovery_health
+from services.cache_admission_diagnostics import observation_context
 from services.legacy_export_snapshot_service import drain_thread
 from services.recovery_runtime import observe_recovery
 from stats_alerts.recovery_notifications import publish_recovery_alerts
@@ -22,7 +23,8 @@ async def observe_recovery_outcomes(bot):
     while True:
         recovery_health.begin_cycle()
         try:
-            failures = await drain_thread(observe_recovery)
+            with observation_context("recovery", "monitor"):
+                failures = await drain_thread(observe_recovery)
             if failures:
                 raise RuntimeError("One or more incident checks are unavailable")
             recovery_health.record_success()
@@ -42,8 +44,9 @@ async def observe_recovery_outcomes(bot):
         # Notification delivery is independent of incident inspection and repair.
         # A malformed historical message cannot invalidate completed SQL checks.
         notification_error = None
+        recovery_health.begin_notifications()
         try:
-            if unavailable and outage_message is None:
+            if unavailable and outage_message is None and recovery_health.outage_notification_due():
                 channel = bot.get_channel(bot_config.NOTIFY_CHANNEL_ID) or await bot.fetch_channel(
                     bot_config.NOTIFY_CHANNEL_ID
                 )

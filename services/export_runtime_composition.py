@@ -2669,10 +2669,17 @@ class AuthorityClient:
         result = self._invoke(
             dict(version=1, action="evidence_recovery", operation=operation, **values)
         )
-        if operation == "pending":
-            if not isinstance(result, list) or len(result) > 100:
+        if operation in {"pending", "pending_page"}:
+            if operation == "pending_page" and (
+                not isinstance(result, dict)
+                or set(result) != {"references", "wrapped"}
+                or type(result["wrapped"]) is not bool
+            ):
+                raise ExecutionUncertain("Evidence page acknowledgement differs.")
+            references = result["references"] if operation == "pending_page" else result
+            if not isinstance(references, list) or len(references) > 100:
                 raise ExecutionUncertain("Evidence inventory acknowledgement differs.")
-            for reference in result:
+            for reference in references:
                 uuid_text(reference)
         elif (
             not isinstance(result, dict)

@@ -216,6 +216,7 @@ async def test_deleted_outage_alert_does_not_block_monitor_recovery(monkeypatch)
     unhealthy = Mock()
     monkeypatch.setattr(module.recovery_health, "record_success", healthy)
     monkeypatch.setattr(module.recovery_health, "record_failure", unhealthy)
+    monkeypatch.setattr(module.recovery_health, "outage_notification_due", lambda: True)
     monkeypatch.setattr(
         module.asyncio, "sleep", AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
     )
@@ -293,7 +294,7 @@ async def test_outage_message_failure_never_blocks_due_incident_alerts(monkeypat
         guild=SimpleNamespace(id=2),
         send=AsyncMock(side_effect=error) if failure == "send" else AsyncMock(return_value=message),
     )
-    checks = [TimeoutError(), [], [], []] if failure == "edit" else [TimeoutError()] * 4
+    checks = [ValueError(), [], [], []] if failure == "edit" else [TimeoutError() for _ in range(4)]
     monkeypatch.setattr(module, "drain_thread", AsyncMock(side_effect=checks))
     publish = AsyncMock()
     notifications = Mock()

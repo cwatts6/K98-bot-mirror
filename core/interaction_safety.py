@@ -9,6 +9,7 @@ the full command registration monolith.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import functools
 import logging
 from typing import Any
@@ -117,23 +118,42 @@ async def edit_or_followup(
         return await interaction.followup.send(content, ephemeral=ephemeral, **kwargs)
 
 
-async def safe_defer(ctx, *, ephemeral: bool = True) -> bool:
-    """Defer a context or raw interaction; fail closed if acknowledgement fails."""
+@dataclass(frozen=True)
+class DeferResult:
+    acknowledged: bool
+    disposition: str
+    error_type: str | None = None
+    status: int | None = None
+    code: int | None = None
+
+
+async def defer_result(ctx, *, ephemeral: bool = True) -> DeferResult:
+    """One defer with allowlisted diagnostics; never retain exception text/token."""
     try:
         ir = getattr(ctx, "interaction", None) or ctx
         if ir and hasattr(ir, "response") and not ir.response.is_done():
             await ir.response.defer(ephemeral=ephemeral)
-            return True
+            return DeferResult(True, "acknowledged")
         # discord.py variants also expose ctx.defer()
         if hasattr(ctx, "defer"):
             await ctx.defer(ephemeral=ephemeral)
-            return True
-    except (NotFound, HTTPException):
-        # Interaction expired or the bot disconnected mid-flight
-        pass
-    except Exception:
-        pass
-    return False
+            return DeferResult(True, "acknowledged")
+    except (NotFound, HTTPException) as exc:
+        return DeferResult(
+            False,
+            "unconfirmed",
+            type(exc).__name__,
+            exc.status if type(exc.status) is int else None,
+            exc.code if type(exc.code) is int else None,
+        )
+    except Exception as exc:
+        return DeferResult(False, "unconfirmed", type(exc).__name__[:64])
+    return DeferResult(False, "unavailable")
+
+
+async def safe_defer(ctx, *, ephemeral: bool = True) -> bool:
+    """Compatible Boolean wrapper for callers that do not consume diagnostics."""
+    return (await defer_result(ctx, ephemeral=ephemeral)).acknowledged
 
 
 async def global_cmd_error_handler(ctx, error):

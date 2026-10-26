@@ -77,6 +77,31 @@ def damage(r, mode="missing"):
     return r.service.review_source(ACTOR, "private_evidence", r.reference)
 
 
+def test_read_only_page_contract_retains_wrap_and_legacy_inventory(recovery):
+    r = recovery
+    assert r.adapter.discovery_page() == dict(references=[r.reference], wrapped=False)
+    assert r.adapter.discovery_page(after=r.reference) == dict(
+        references=[r.reference], wrapped=True
+    )
+    assert r.adapter.pending_recovery(after=r.reference) == [r.reference]
+    assert not r.incidents.actions
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        [],
+        {"references": [], "wrapped": 1},
+        {"references": ["invalid"], "wrapped": False},
+        {"references": [], "wrapped": False, "extra": True},
+    ],
+)
+def test_inventory_page_rejects_malformed_acknowledgement(recovery, monkeypatch, result):
+    monkeypatch.setattr(recovery.client, "_invoke", lambda _: result)
+    with pytest.raises((ExecutionUncertain, ValueError)):
+        recovery.adapter.discovery_page()
+
+
 def restore(r, row):
     return r.service.execute(
         ACTOR,

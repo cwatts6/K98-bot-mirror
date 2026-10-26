@@ -46,6 +46,30 @@ if os.getenv("TEST_FAKE_HEAVY_DEPS", "0") == "1":
 # Test helpers / fixtures
 # ----------------------------
 @pytest.fixture(autouse=True)
+def _isolate_recovery_observation(monkeypatch):
+    module = sys.modules.get("services.recovery_health")
+    if module is not None:
+        for name in (
+            "_last_success",
+            "_failure",
+            "_failure_detail",
+            "_notification_failure",
+            "_cycle",
+            "_last_completed_cycle",
+            "_last_failed_cycle",
+            "_cycle_started",
+            "_progress_at",
+            "_stage_started",
+            "_notifications_started",
+            "_history",
+            "_episode_fingerprint",
+        ):
+            monkeypatch.setattr(module, name, None)
+        monkeypatch.setattr(module, "_checks", [])
+        monkeypatch.setattr(module, "_failure_streak", 0)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_event_delivery_evidence(monkeypatch, tmp_path):
     # New persistence must never reach developer/operational data during tests.
     module = sys.modules.get("services.event_delivery_service")

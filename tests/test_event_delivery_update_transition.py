@@ -8,6 +8,7 @@ import pytest
 
 from scripts import prepare_k98_update as updater
 from scripts.validate_k98_update_compatibility import classify
+from tests.updater_source_assertions import before_monitoring_hash
 
 
 def transition():
@@ -33,10 +34,7 @@ def test_complete_bundle_pins_current_source():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in item["members"]} == updater.EVENT_DELIVERY_PATHS
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_monitoring_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 
