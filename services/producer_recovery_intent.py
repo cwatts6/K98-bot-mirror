@@ -9,6 +9,7 @@ from uuid import uuid4
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_coordination_dal import identity
 from services.fallback_import_service import is_completed_filename
+from services.producer_admission import producer_turn
 
 _intent = ContextVar("producer_recovery_intent", default=None)
 METADATA = frozenset(
@@ -94,10 +95,12 @@ def atomic_producer_intent(kind, *, cache_refresh=False, configuration_refresh=F
                 # Guided continuations already have a durable approved request.
                 # Do not reinterpret its missing disposition at execution time.
                 if configuration_refresh and "export_disposition" not in current:
-                    return function(*args, **kwargs)
+                    with producer_turn():
+                        return function(*args, **kwargs)
                 if disposition and current.get("export_disposition") != disposition:
                     raise SourceConflict("Execution cannot change its original export intent.")
-                return function(*args, **kwargs)
+                with producer_turn():
+                    return function(*args, **kwargs)
             from services.processing_pipeline_receipts import producer_operation
 
             value = dict(
@@ -107,7 +110,8 @@ def atomic_producer_intent(kind, *, cache_refresh=False, configuration_refresh=F
                 value["export_disposition"] = disposition
             token = _intent.set(value)
             try:
-                return function(*args, **kwargs)
+                with producer_turn():
+                    return function(*args, **kwargs)
             finally:
                 _intent.reset(token)
 
@@ -164,7 +168,8 @@ def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=N
     if current is not None and action_id is None:
         if current["kind"] != "stats_import" or current["inputs"] != inputs:
             raise SourceConflict("Inherited producer recovery differs from its saved inputs.")
-        yield current
+        with producer_turn():
+            yield current
         return
     from services.processing_pipeline_receipts import producer_operation
 
@@ -181,6 +186,7 @@ def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=N
         value["registration_recovery"] = dict(registration_recovery)
     token = _intent.set(value)
     try:
-        yield value
+        with producer_turn():
+            yield value
     finally:
         _intent.reset(token)

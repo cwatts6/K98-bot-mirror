@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import logging
 
 from kvk.dal.new_source_import_dal import SourceConflict
-from services.recovery_execution_guard import execution_progress, recovery_execution
+from services.recovery_execution_guard import execution_progress, operation_key, recovery_execution
 from services.recovery_failure_diagnostics import action_failure, action_result, retained_failure
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class RecoveryService:
                 "Normal recovery checks will resume after registration verifies."
             )
         adapter = self.adapters[row["SourceKind"]]
-        with recovery_execution(incident_id) as acquired:
+        with recovery_execution(incident_id, operation=self._execution_key(row)) as acquired:
             if not acquired:
                 return self.present(row)
             for action in self.store.pending_actions(incident_id):
@@ -63,7 +63,9 @@ class RecoveryService:
                 "Normal recovery checks will resume after registration verifies."
             )
         adapter = self.adapters[row["SourceKind"]]
-        evidence, token, resolved = adapter.inspect(row["SourceID"])
+        from core.sql_observation import observe_call
+
+        evidence, token, resolved = observe_call(adapter.inspect, row["SourceID"])
         current = self.store.observe(
             row["SourceKind"], row["SourceID"], evidence, token, resolved=resolved
         )
@@ -75,7 +77,11 @@ class RecoveryService:
         row["pending_action"] = (
             {"state": pending[0]["State"], "kind": pending[0]["ActionKind"]} if pending else None
         )
-        row["execution_progress"] = execution_progress(row["IncidentID"]) if pending else None
+        row["execution_progress"] = (
+            execution_progress(row["IncidentID"], operation=self._execution_key(row))
+            if pending
+            else None
+        )
         if row["SourceKind"] == "export_job":
             from services.recovery_publication_result import publication_result
 
@@ -83,6 +89,9 @@ class RecoveryService:
                 row, self.store.latest_publication_action(row["IncidentID"])
             )
         return self.presentation_policy(row) if self.presentation_policy else row
+
+    def _execution_key(self, row):
+        return operation_key(getattr(self.store, "scope", None), row["SourceID"])
 
     def review(self, actor, incident_id):
         self.authorize(actor)
@@ -193,7 +202,9 @@ class RecoveryService:
 
     def review_source(self, actor, kind, source_id):
         self.authorize(actor)
-        evidence, token, resolved = self.adapters[kind].inspect(source_id)
+        from core.sql_observation import observe_call
+
+        evidence, token, resolved = observe_call(self.adapters[kind].inspect, source_id)
         row = self.store.observe(kind, source_id, evidence, token, resolved=resolved)
         return self.refresh(row["IncidentID"])
 
@@ -330,7 +341,9 @@ class RecoveryService:
         payload=None,
         draft_version=None,
     ):
-        with recovery_execution(incident_id) as acquired:
+        with recovery_execution(
+            incident_id, operation=self._execution_key(self.store.get(incident_id))
+        ) as acquired:
             if not acquired:
                 return self.present(self.store.get(incident_id))
             self._dispatch(

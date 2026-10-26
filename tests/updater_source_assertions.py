@@ -20,9 +20,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_coordination_lifecycle_hash(root, path):
+    """Authenticate the exact successor; this fixture grants no install authority."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/coordination_lifecycle_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "1e4315ae7d917b07f99c92bfae4791b6e9fa1b32aed0bff4ba16398ac4b8819f"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_procconfig_admission_hash(root, path):
     """Test-only proof of this successor; never deployment authority."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_coordination_lifecycle_hash(root, path)
     raw = (root / "tests/fixtures/procconfig_admission_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

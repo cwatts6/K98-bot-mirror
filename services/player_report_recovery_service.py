@@ -110,7 +110,7 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                 cache_only = self._no_export(preview)
                 if cache_only:
                     producer = self.dal.request(preview["preparation"])["request"]["producer"]
-                    if producer.get("parent"):
+                    if producer.get("parent") and self.kind == "player_report":
                         evidence.setdefault("recovery_links", []).append(
                             dict(
                                 label="Return to report and cache",
@@ -121,7 +121,7 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                 if cache_only and resolved and evidence["outcome"] == "export_skipped":
                     evidence["outcome"] = self.no_export_outcome
                     evidence["explanation"] = self.no_export_explanation
-                    if producer.get("parent"):
+                    if producer.get("parent") and self.kind == "player_report":
                         evidence["explanation"] = (
                             "The SQL report step is complete: its committed output, captured "
                             "evidence and no-export disposition are verified. This green card "

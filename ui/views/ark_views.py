@@ -889,14 +889,24 @@ class ArkRegistrationView(LocalTimeToggleView):
             await self.on_join_player(interaction)
         except Exception:
             logger.exception("[ARK] Join as Player handler failed")
-            await interaction.followup.send("❌ Failed to join as player.", ephemeral=True)
+            from core.interaction_safety import send_ephemeral
+
+            await send_ephemeral(
+                interaction,
+                "Could not confirm the signup result. Check the roster before trying again.",
+            )
 
     async def _on_join_sub(self, interaction: discord.Interaction):
         try:
             await self.on_join_sub(interaction)
         except Exception:
             logger.exception("[ARK] Join as Sub handler failed")
-            await interaction.followup.send("❌ Failed to join as sub.", ephemeral=True)
+            from core.interaction_safety import send_ephemeral
+
+            await send_ephemeral(
+                interaction,
+                "Could not confirm the signup result. Check the roster before trying again.",
+            )
 
     async def _on_leave(self, interaction: discord.Interaction):
         try:

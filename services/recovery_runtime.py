@@ -5,13 +5,13 @@ from datetime import UTC, datetime
 import logging
 import time
 
-from kvk.dal.new_source_import_dal import SourceConflict
+from core.sql_observation import ObservationBusy, observe_call
+from kvk.dal.new_source_import_dal import SourceBusy, SourceConflict
 from services import recovery_health
 from services.import_recovery_service import ImportRecoveryAdapter
 from services.recovery_dal import RecoveryDAL
 from services.recovery_release_policy import p0a_presentation
 from services.recovery_service import RecoveryService
-from services.stats_import_outcome_dal import ImportExecutionActive
 
 logger = logging.getLogger(__name__)
 _cursors = {}
@@ -20,6 +20,17 @@ _priority_incident_cursor = None
 _failed_incident_cursor = None
 HISTORY_SLICE_SECONDS = 10.0
 _history_coverage = {}
+
+
+def _inspect_discovered(service, adapter, source_id):
+    from services.recovery_execution_guard import operation_key, recovery_execution
+
+    with recovery_execution(
+        source_id, operation=operation_key(service.store.scope, source_id)
+    ) as acquired:
+        if not acquired:
+            raise SourceBusy("The original recovery operation is active; waiting for its receipt.")
+        return observe_call(adapter.inspect, source_id)
 
 
 @contextmanager
@@ -184,6 +195,9 @@ def recovery_service():
             ConfigurationReadContinuationDAL(runtime, config_outcomes), config_adapter
         )
         adapters[read_continuation.kind] = read_continuation
+        from services.configuration_attempt_recovery import attempt_resolver
+
+        attempts.resolver = attempt_resolver(runtime, adapters)
         for export_adapter in getattr(runtime, "recovery_adapters", ()):
             adapters[export_adapter.kind] = export_adapter
         if runtime.recovery_client is not None:
@@ -223,7 +237,7 @@ def _retry_admission():
     try:
         retry_recovery_admission()
         return True
-    except ImportExecutionActive as exc:
+    except (SourceBusy, ObservationBusy) as exc:
         recovery_health.record_check("registration_admission", exc, waiting=True)
         return True
     except Exception as exc:
@@ -251,7 +265,7 @@ def observe_recovery():
                     row = service.refresh(incident_id)
                     if isinstance(row, dict) and row.get("SourceID") is not None:
                         visited_sources.add((row["SourceKind"], str(row["SourceID"])))
-                except ImportExecutionActive as exc:
+                except (SourceBusy, ObservationBusy) as exc:
                     recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
                     detail = recovery_health.record_check("accepted_repairs", exc)
@@ -269,7 +283,7 @@ def observe_recovery():
                     row = service.refresh(incident_id)
                     if isinstance(row, dict) and row.get("SourceID") is not None:
                         visited_sources.add((row["SourceKind"], str(row["SourceID"])))
-                except ImportExecutionActive as exc:
+                except (SourceBusy, ObservationBusy) as exc:
                     recovery_health.record_check("accepted_repairs", exc, waiting=True)
                 except Exception as exc:
                     detail = recovery_health.record_check("accepted_repairs", exc)
@@ -316,7 +330,7 @@ def observe_recovery():
                 continue
             try:
                 service.recover_automatic(incident["IncidentID"])
-            except ImportExecutionActive as exc:
+            except (SourceBusy, ObservationBusy) as exc:
                 recovery_health.record_check(
                     "existing_incident_checks:" + incident["SourceKind"], exc, waiting=True
                 )
@@ -354,7 +368,7 @@ def observe_recovery():
                     page = adapter.discovery_page(after=after)
                     sources, wrapped = page["references"], page["wrapped"]
                 else:
-                    sources = adapter.pending_recovery(after=after)
+                    sources = observe_call(adapter.pending_recovery, after=after)
                 page_observed = True
                 for source_id in sources:
                     if history and consumed and time.monotonic() - started >= HISTORY_SLICE_SECONDS:
@@ -373,7 +387,7 @@ def observe_recovery():
                         continue
                     inspected += 1
                     try:
-                        evidence, token, resolved = adapter.inspect(source_id)
+                        evidence, token, resolved = _inspect_discovered(service, adapter, source_id)
                         recovery_health.record_progress("discovery:" + kind)
                         if resolved and not getattr(adapter, "observe_healthy", True):
                             # Existing open incidents were reconciled above. A
@@ -387,7 +401,7 @@ def observe_recovery():
                         ):
                             visited.add(row["IncidentID"])
                             service.recover_automatic(row["IncidentID"])
-                    except ImportExecutionActive as exc:
+                    except (SourceBusy, ObservationBusy) as exc:
                         recovery_health.record_check("discovery:" + kind, exc, waiting=True)
                         history_waiting += 1
                         continue
@@ -397,7 +411,7 @@ def observe_recovery():
                         )
                         failures.append(type(exc).__name__)
                         history_failures += 1
-            except ImportExecutionActive as exc:
+            except (SourceBusy, ObservationBusy) as exc:
                 recovery_health.record_check("discovery:" + kind, exc, waiting=True)
                 history_waiting += 1
             except Exception as exc:

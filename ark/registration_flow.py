@@ -514,7 +514,10 @@ class ArkRegistrationController:
         return match
 
     async def join_player(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
+        from core.interaction_safety import safe_defer
+
+        if not await safe_defer(interaction, ephemeral=True):
+            return
         match = await self._ensure_open_match(interaction)
         if not match:
             return
@@ -541,7 +544,10 @@ class ArkRegistrationController:
         )
 
     async def join_sub(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
+        from core.interaction_safety import safe_defer
+
+        if not await safe_defer(interaction, ephemeral=True):
+            return
         match = await self._ensure_open_match(interaction)
         if not match:
             return
@@ -589,6 +595,14 @@ class ArkRegistrationController:
                 await interaction.followup.send(message, ephemeral=True)
             else:
                 await interaction.response.send_message(message, ephemeral=True)
+
+        from core.interaction_safety import safe_defer, send_ephemeral
+
+        # A select callback is a new interaction with its own response deadline.
+        # Acknowledge before any SQL/validation or message refresh can delay it.
+        if not self._response_is_done(interaction):
+            if not await safe_defer(interaction, ephemeral=True):
+                return
 
         if any(str(r.get("GovernorId")) == str(governor_id) for r in roster):
             await _send_ephemeral("❌ That governor is already signed up for this match.")
@@ -688,10 +702,7 @@ class ArkRegistrationController:
         )
 
         await self.refresh_registration_message(interaction.client)
-        if self._response_is_done(interaction):
-            await interaction.followup.send("✅ You’re signed up!", ephemeral=True)
-        else:
-            await interaction.response.send_message("✅ You’re signed up!", ephemeral=True)
+        await send_ephemeral(interaction, "✅ You’re signed up!")
 
     async def leave(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)

@@ -32,8 +32,15 @@ class UnownedSqlHoldDAL:
             raise SourceConflict("Exact account-scoped SQL hold required.")
 
     def pending(self, after=None):
-        state = self.snapshot(self.source_id)
-        return [self.source_id] if state["resource"] and state["resource"]["BlockedReason"] else []
+        # Discovery is a hint, not a release decision. Avoid locking every active
+        # producer/import merely to discover that no blocked resource exists.
+        # inspect/action still take the complete authoritative locked snapshot.
+        with transaction(self.connect) as cursor:
+            cursor.execute(
+                "SELECT BlockedReason FROM dbo.ExportResource WHERE ResourceKey=?", RESOURCE
+            )
+            resource = one(cursor)
+        return [self.source_id] if resource and resource["BlockedReason"] else []
 
     def _snapshot(self, cursor):
         _mutex(cursor, "account:" + self.account)

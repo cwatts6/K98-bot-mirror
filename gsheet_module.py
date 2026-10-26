@@ -1783,6 +1783,18 @@ def check_basic_gsheets_access(
             logger.info("[HEALTH][S11] Probe deferred: account admission unavailable")
             return None, "S11 probe deferred; account busy or retained work requires reconciliation"
         except Exception as exc:
+            from services.export_contention import CoordinationLockRefused
+
+            if (
+                stage == "admission"
+                and isinstance(exc, CoordinationLockRefused)
+                and exc.result == -1
+                and exc.transaction_released
+            ):
+                return (
+                    None,
+                    "S11 probe waiting for coordination admission; no provider request started",
+                )
             error_type = type(exc).__name__
             if len(error_type) > 64 or not error_type.isascii() or not error_type.isidentifier():
                 error_type = "Exception"

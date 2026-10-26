@@ -402,6 +402,25 @@ def _writer_runtime():
 
 @contextmanager
 def writer_scope(kind, *, owner_token=None):
+    from services.producer_admission import producer_turn
+
+    # Preserve the public stale-owner refusal before considering local scheduling.
+    current = _owner.get()
+    if owner_token is not None and current is not None and owner_token is not current:
+        raise SnapshotUnavailable("Explicit writer owner differs from the inherited owner.")
+    inherited = owner_token if owner_token is not None else current
+    runtime = _writer_runtime()
+    if inherited is not None and runtime is not None:
+        runtime._require_writer(inherited)
+        if inherited.closed:
+            raise SnapshotUnavailable("Writer admission has ended.")
+    with producer_turn():
+        with _writer_scope(kind, owner_token=owner_token) as owner:
+            yield owner
+
+
+@contextmanager
+def _writer_scope(kind, *, owner_token=None):
     runtime = _writer_runtime()
     current = _owner.get()
     if owner_token is not None and current is not None and owner_token is not current:
@@ -962,12 +981,20 @@ class LegacyExportRuntime:
             connection.autocommit = True
             guard = self.dal.session(claim, connection)
             guard.__enter__()
-        except BaseException:
+        except BaseException as original:
             try:
-                self.dal.uncertain(claim)
-            finally:
                 if connection is not None:
                     connection.close()
+                # The guard has not yielded and no owner/body has been exposed.
+                # After its connection closes, exact CAS can close this live
+                # unstarted attempt. Unknown cleanup leaves ownership retained.
+                self.dal.transition(claim, expected="writing", state="unavailable", release=True)
+            except BaseException as cleanup:
+                logger.warning(
+                    "writer_admission_cleanup_unconfirmed error_type=%s original_type=%s",
+                    type(cleanup).__name__,
+                    type(original).__name__,
+                )
             raise
         owner = WriterOwner(claim, connection, guard, kind, self)
         _writer_event(owner, "writer_admission", "confirmed")

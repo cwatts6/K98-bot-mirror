@@ -214,8 +214,9 @@ def record_configuration_attempt(*, data_dir, report_sink):
 class ConfigurationAttemptRecovery:
     kind = "configuration_attempt"
 
-    def __init__(self, journal):
+    def __init__(self, journal, resolver=None):
         self.journal = journal
+        self.resolver = resolver
 
     def pending_recovery(self, *, after=None):
         return self.journal.pending(after)
@@ -234,7 +235,7 @@ class ConfigurationAttemptRecovery:
             outcome=outcome,
             explanation=explanation,
             actions={},
-            failure_context=value,
+            failure_context=dict(value, summary=explanation),
             required_evidence=(
                 []
                 if outcome == "reported_success"
@@ -243,7 +244,57 @@ class ConfigurationAttemptRecovery:
                 ]
             ),
         )
-        return evidence, digest(value).hex(), outcome == "reported_success"
+        resolution = None
+        if self.resolver is not None and outcome.startswith("failed_"):
+            resolution = self.resolver(value["operation_id"], value["phase"])
+            if resolution:
+                evidence["recovery_links"] = resolution["links"]
+                if resolution["resolved"]:
+                    evidence.update(
+                        outcome="verified_recovery",
+                        original_outcome=outcome,
+                        explanation=(
+                            "The original attempt failed. Its exact linked recovery now has a "
+                            "verified disposition: " + resolution["outcome"] + ". "
+                            "The original failure remains in history; no import was replayed "
+                            "to close this incident. Provider delivery remains separately verified."
+                        ),
+                        required_evidence=[],
+                    )
+        return (
+            evidence,
+            digest(dict(attempt=value, resolution=resolution)).hex(),
+            outcome == "reported_success" or bool(resolution and resolution["resolved"]),
+        )
+
+
+def attempt_resolver(runtime, adapters):
+    from services.configuration_attempt_dal import ConfigurationAttemptDAL
+
+    dal = ConfigurationAttemptDAL(runtime)
+
+    def resolve(operation, phase):
+        matches = dal.links(operation)
+        # A pre-input failure can only be closed through its never-admitted read
+        # and saved continuation. A later failure must verify its actual producer.
+        consumer = "config" if phase == "before_inputs" else "scan_data"
+        source = matches.get(consumer)
+        if source is None:
+            return None
+        kind = (
+            "configuration_read_continuation" if consumer == "config" else "configuration_producer"
+        )
+        evidence, token, resolved = adapters[kind].inspect(source)
+        return dict(
+            resolved=resolved,
+            outcome=evidence["outcome"],
+            token=token,
+            links=[
+                dict(kind=kind, source_id=source, label="Review verified configuration recovery")
+            ],
+        )
+
+    return resolve
 
 
 class ProcConfigImportFailed(RuntimeError):

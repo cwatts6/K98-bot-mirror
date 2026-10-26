@@ -175,14 +175,18 @@ class PipelineReceiptDAL:
                 isinstance(error, CoordinationLockRefused)
                 or 1222 in sql_error_facts(error)["native_errors"]
             ):
-                raise SourceConflict(
+                from kvk.dal.new_source_import_dal import SourceBusy
+
+                raise SourceBusy(
                     "Pipeline evidence is busy; wait for the active worker and reopen the review."
                 ) from error
             raise
 
     def assert_review_current(self, current, reviewed):
         if self.token(current) != self.token({key: reviewed[key] for key in current}):
-            raise SourceConflict("Pipeline evidence changed; reopen the confirmation.")
+            from kvk.dal.new_source_import_dal import SourceBusy
+
+            raise SourceBusy("Pipeline evidence changed; reopen the confirmation.")
 
     @contextmanager
     def guard(self, run_id):

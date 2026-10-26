@@ -17,6 +17,8 @@ def test_monitoring_bridge_requires_exact_mapping_and_source(tmp_path, damage):
     (tmp_path / fixture).write_bytes(raw)
     attempt = Path("tests/fixtures/procconfig_admission_source_pairs.json")
     (tmp_path / attempt).write_bytes((root / attempt).read_bytes())
+    lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")
+    (tmp_path / lifecycle).write_bytes((root / lifecycle).read_bytes())
     member = json.loads(raw)[0]
     path = member["path"]
     (tmp_path / path).write_bytes((root / path).read_bytes())

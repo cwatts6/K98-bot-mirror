@@ -1434,7 +1434,7 @@ def test_success_without_completion_evidence_cannot_capture(tmp_path):
 
 
 @pytest.mark.parametrize("failure", ["connect", "session", "close"])
-def test_writer_setup_failure_marks_durable_claim_uncertain(tmp_path, failure):
+def test_writer_setup_failure_releases_only_acknowledged_nonentry(tmp_path, failure):
     from services.legacy_export_snapshot_service import _captures, use_runtime
 
     runtime, dal = producer_runtime(tmp_path)
@@ -1451,7 +1451,9 @@ def test_writer_setup_failure_marks_durable_claim_uncertain(tmp_path, failure):
         assert _captures.get()[-1] == ("all_kvk", 7, None)
     finally:
         _captures.reset(token)
-    dal.uncertain.assert_called_once_with(dal.claim.return_value)
+    dal.uncertain.assert_not_called()
+    releases = [c for c in dal.transition.call_args_list if c.kwargs.get("state") == "unavailable"]
+    assert bool(releases) is (failure != "close")
     dal.captured.assert_not_called()
     runtime.capture.assert_not_called()
 

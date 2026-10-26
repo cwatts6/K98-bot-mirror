@@ -26,6 +26,10 @@ class SourceConflict(ValueError):
     """A stale, conflicting or unauthorized transition; safe to show without row data."""
 
 
+class SourceBusy(SourceConflict):
+    """Known active work or changed observation; recheck without replaying it."""
+
+
 class UncertainCommit(RuntimeError):
     """Read the durable operation identity before deciding whether to retry."""
 
@@ -105,6 +109,9 @@ def rows(cursor):
 
 @contextmanager
 def transaction(connect):
+    from core.sql_observation import ObservationBusy, lock_timeout, observing
+
+    refused = None
     connection = diagnostic_call("connect", connect)
     try:
         if connection.autocommit:
@@ -113,16 +120,29 @@ def transaction(connect):
         cursor.execute("SET XACT_ABORT ON; SET NOCOUNT ON;")
         try:
             yield cursor
-        except BaseException:
+        except BaseException as error:
             diagnostic_call("rollback", connection.rollback)
-            raise
-        try:
-            diagnostic_call("commit", connection.commit)
-        except Exception as exc:
-            # Do not replay, or claim rollback when COMMIT may have succeeded.
-            raise UncertainCommit("Read the durable operation before retrying.") from exc
+            from services.export_contention import CoordinationLockRefused
+
+            if observing() and (
+                lock_timeout(error)
+                or (isinstance(error, CoordinationLockRefused) and error.result == -1)
+            ):
+                refused = error
+            else:
+                raise
+        if refused is None:
+            try:
+                diagnostic_call("commit", connection.commit)
+            except Exception as exc:
+                # Do not replay, or claim rollback when COMMIT may have succeeded.
+                raise UncertainCommit("Read the durable operation before retrying.") from exc
     finally:
         diagnostic_call("close", connection.close)
+    if refused is not None:
+        raise ObservationBusy(
+            "Evidence is busy with active SQL work; recheck after it progresses."
+        ) from refused
 
 
 def lock_scope(cursor, kvk_no: int):

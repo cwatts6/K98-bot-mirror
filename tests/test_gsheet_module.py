@@ -640,3 +640,27 @@ def test_s11_health_busy_is_deferred_without_warning_or_provider_call(monkeypatc
         assert ok is None and "deferred" in message
     forbidden.assert_not_called()
     assert not [r for r in caplog.records if r.levelno >= 30]
+
+
+@pytest.mark.parametrize(
+    "result,released,waiting", [(-1, True, True), (-1, False, False), (-3, True, False)]
+)
+def test_health_only_defers_proven_pre_dispatch_timeout(monkeypatch, result, released, waiting):
+    from unittest.mock import Mock
+
+    from services.export_contention import CoordinationLockRefused
+    import services.legacy_export_snapshot_service as legacy
+
+    runtime = Mock()
+    runtime.configuration_health_destination.return_value = "registered-config"
+    monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
+    error = CoordinationLockRefused(
+        result=result, session=1, transaction_state=1, transaction_count=1, resource_hash="a" * 64
+    )
+    error.transaction_released = released
+    monkeypatch.setattr(legacy, "configuration_requests", Mock(side_effect=error))
+    forbidden = Mock(side_effect=AssertionError("Provider must not start"))
+    monkeypatch.setattr(gm, "current_provider", forbidden)
+    ok, _ = gm.check_basic_gsheets_access.__wrapped__("unused", "registered-config")
+    assert ok is (None if waiting else False)
+    forbidden.assert_not_called()

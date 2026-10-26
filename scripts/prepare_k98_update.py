@@ -408,6 +408,35 @@ PROCCONFIG_ADMISSION_PATHS = frozenset(
 )
 
 
+COORDINATION_LIFECYCLE_PATHS = frozenset(
+    {
+        "ark/registration_flow.py",
+        "core/sql_observation.py",
+        "gsheet_module.py",
+        "kvk/dal/new_source_import_dal.py",
+        "scripts/run_export_authority.py",
+        "services/configuration_attempt_dal.py",
+        "services/configuration_attempt_recovery.py",
+        "services/export_contention.py",
+        "services/export_coordination_dal.py",
+        "services/failed_export_recovery_authority.py",
+        "services/import_capture_recovery_dal.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/player_report_recovery_service.py",
+        "services/processing_pipeline_receipt_dal.py",
+        "services/producer_admission.py",
+        "services/producer_recovery_intent.py",
+        "services/recovery_execution_guard.py",
+        "services/recovery_runtime.py",
+        "services/recovery_service.py",
+        "services/stats_import_outcome_dal.py",
+        "services/unowned_sql_hold_dal.py",
+        "ui/views/ark_views.py",
+        "ui/views/recovery_view.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -415,18 +444,22 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 73728:
+    if len(raw) > 81920:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 45:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 46:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
         if set(item) != {"id", "members"} or not re.fullmatch(r"[a-z0-9_]{1,80}", item["id"]):
             raise ValueError("Exact installed transition required.")
-        if item["id"] in identities or not 1 <= len(item["members"]) <= 16:
+        # This larger reviewed family is indivisible; all other bounds remain 16.
+        member_limit = (
+            len(COORDINATION_LIFECYCLE_PATHS) if item["id"] == "coordination_lifecycle_v1" else 16
+        )
+        if item["id"] in identities or not 1 <= len(item["members"]) <= member_limit:
             raise ValueError("Unique bounded transition required.")
         identities.add(item["id"])
         paths = set()
@@ -475,6 +508,9 @@ def reviewed_transitions():
             )
             fixed_event_delivery = (
                 item["id"] == "p1_event_delivery_v1" and path in EVENT_DELIVERY_PATHS
+            )
+            fixed_coordination_lifecycle = (
+                item["id"] == "coordination_lifecycle_v1" and path in COORDINATION_LIFECYCLE_PATHS
             )
             fixed_procconfig_admission = (
                 item["id"] == "procconfig_admission_recovery_v1"
@@ -565,6 +601,7 @@ def reviewed_transitions():
                     or fixed_event_cache
                     or fixed_startup_foundations
                     or fixed_event_delivery
+                    or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
                     or fixed_replacement
@@ -682,6 +719,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed event-cache readiness transition required.")
         if item["id"] == "p1_event_delivery_v1" and paths != EVENT_DELIVERY_PATHS:
             raise ValueError("Complete fixed event-delivery transition required.")
+        if item["id"] == "coordination_lifecycle_v1" and paths != COORDINATION_LIFECYCLE_PATHS:
+            raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
         if item["id"] == "p1_monitoring_reliability_v1" and paths != MONITORING_RELIABILITY_PATHS:

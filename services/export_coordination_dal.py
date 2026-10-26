@@ -21,10 +21,14 @@ from kvk.dal.new_source_import_dal import (
     digest,
     one,
     rows,
-    transaction,
 )
 from kvk.models.source_integration import identity
-from services.export_contention import CoordinationLockRefused, sql_error_facts
+from services.export_contention import (
+    CoordinationLockRefused,
+    retry_coordination,
+    sql_error_facts,
+    transaction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -406,6 +410,7 @@ class ExportCoordinationDAL:
                 raise SourceConflict("Export intent has no retained configuration members.")
             require_current_export_weights(cursor, intent, vector)
 
+    @retry_coordination(budget_seconds=5)
     def enqueue(
         self,
         spec,
@@ -824,6 +829,7 @@ class ExportCoordinationDAL:
                 )
             return pending
 
+    @retry_coordination(budget_seconds=5)
     def refresh_output_preflight(self, job_id, expected_version, proof):
         from kvk.dal.source_output_pool_dal import assert_registration
 
@@ -878,6 +884,7 @@ class ExportCoordinationDAL:
                 job_id,
             )
 
+    @retry_coordination(budget_seconds=5)
     def claim_next(self, account, *, storage_owner=None):
         from services.export_target_admission_dal import (
             AVAILABLE_JOB_TARGETS_SQL,
@@ -1086,6 +1093,7 @@ class ExportCoordinationDAL:
                 raise SourceConflict("Immutable resource membership changed.")
             yield cursor, job
 
+    @retry_coordination(budget_seconds=5)
     def authorize(self, claim, *, mutation=False):
         with self._owned(claim) as (cursor, job):
             if mutation:
@@ -1099,6 +1107,7 @@ class ExportCoordinationDAL:
                     raise SourceConflict("A durable attempt must precede every mutation.")
             return job
 
+    @retry_coordination(budget_seconds=5)
     def request_safe_retry(
         self, job_id, account, *, expected_version, expected_epoch, actor, reason
     ):
@@ -1170,6 +1179,7 @@ class ExportCoordinationDAL:
                 expected_version,
             )
 
+    @retry_coordination(budget_seconds=5)
     def skip_unstarted(self, job_id, account, *, storage_owner, expected_version, actor, reason):
         """Close a legacy export with no provider history, retaining its identity and input."""
         if (
@@ -1274,6 +1284,7 @@ class ExportCoordinationDAL:
                 job["Fence"],
             )
 
+    @retry_coordination(budget_seconds=5)
     def begin_attempt(self, claim, manifest, parts, *, legacy=None):
         with self._owned(claim) as (cursor, job):
             destinations = [
@@ -1375,6 +1386,7 @@ class ExportCoordinationDAL:
         checked_attempt_manifest(attempt, parts)
         return attempt, parts
 
+    @retry_coordination(budget_seconds=5)
     def verified(self, claim, attempt_id, *, audience="private"):
         if audience not in {"private", "public_viewer", "legacy_registered"}:
             raise ValueError("Verified audience required.")
@@ -1420,6 +1432,7 @@ class ExportCoordinationDAL:
                 attempt["Version"],
             )
 
+    @retry_coordination(budget_seconds=5)
     def publication_pending(self, claim, attempt_id):
         with self._owned(claim) as (cursor, _):
             attempt, _ = self._attempt(cursor, claim, attempt_id)
@@ -1430,6 +1443,7 @@ class ExportCoordinationDAL:
                 attempt["Version"],
             )
 
+    @retry_coordination(budget_seconds=5)
     def confirm(self, claim, attempt_id, receipt):
         encoded = bounded_json(receipt)
         with self._owned(claim) as (cursor, job):
@@ -1478,6 +1492,7 @@ class ExportCoordinationDAL:
                 finish_export_parts(cursor, claim, attempt_id)
             self._finish(cursor, claim, job, "confirmed", release=True)
 
+    @retry_coordination(budget_seconds=5)
     def fail(self, claim, *, retain_claims=False, diagnostic=None):
         """Conservative stop. An attempt means mutations may have escaped; keep claims."""
         with self._owned(claim) as (cursor, job):
@@ -1624,6 +1639,7 @@ class ExportCoordinationDAL:
         with transaction(self.connect) as cursor:
             return self._operator_snapshot(cursor, identity(job_id))
 
+    @retry_coordination(budget_seconds=5)
     def reconcile_operator(self, snapshot, proof, *, actor):
         job = snapshot["job"]
 
@@ -1788,6 +1804,7 @@ class ExportCoordinationDAL:
                 channel=plan["channel"],
             )
 
+    @retry_coordination(budget_seconds=5)
     def admit_repair(self, repair_id, plan):
         snapshot, proof = plan["snapshot"], plan["proof"]
         original = snapshot["job"]
@@ -1911,6 +1928,7 @@ class ExportCoordinationDAL:
             )
             return dict(job_id=str(row["JobID"]).lower(), repair_id=repair_id, state=row["State"])
 
+    @retry_coordination(budget_seconds=5)
     def reserve_request(self, account):
         with transaction(self.connect) as cursor:
             _mutex(cursor, "budget:" + account)
@@ -1947,6 +1965,7 @@ class ExportCoordinationDAL:
                 "WaitSeconds": max(0, (reserved - now).total_seconds()),
             }
 
+    @retry_coordination(budget_seconds=5)
     def refresh_reservation(self, account, reserved):
         with transaction(self.connect) as cursor:
             _mutex(cursor, "budget:" + account)
@@ -1977,6 +1996,7 @@ class ExportCoordinationDAL:
                 "WaitSeconds": max(0, (reserved - now).total_seconds()),
             }
 
+    @retry_coordination(budget_seconds=5)
     def complete_request(self, account):
         """Persist a full interval after actual completion, before releasing admission."""
         with transaction(self.connect) as cursor:
@@ -2001,6 +2021,7 @@ class ExportCoordinationDAL:
                 row["Version"],
             )
 
+    @retry_coordination(budget_seconds=5)
     def extend_cooldown(self, account, seconds):
         absolute = isinstance(seconds, datetime)
         if absolute and seconds.tzinfo is None:

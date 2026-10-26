@@ -18,6 +18,9 @@ admission_diagnostics_enabled = ContextVar("export_admission_diagnostics", defau
 # shared across retries, not another 1000ms allowance for every lock/attempt.
 LOCK_BUDGET_SECONDS = 1.0
 MAX_ATTEMPTS = 8
+# Connection establishment has its own driver timeout. It must not consume the
+# entire short-lock retry allowance, but credit is capped by this total horizon.
+MAX_ELAPSED_SECONDS = 15.0
 
 
 class CoordinationLockRefused(RuntimeError):
@@ -138,12 +141,16 @@ def retry_coordination(function=None, *, budget_seconds=None):
 
     @wraps(function)
     def run(*args, **kwargs):
-        if kwargs.get("external_cursor") is not None:
+        if kwargs.get("external_cursor") is not None or kwargs.get("_cursor") is not None:
             return function(*args, **kwargs)
         from services.cache_admission_diagnostics import identity, record
 
         correlation = identity()
         started = time.monotonic()
+        inherited_deadline = _deadline.get()
+        total_deadline = started + MAX_ELAPSED_SECONDS
+        if inherited_deadline is not None:
+            total_deadline = min(total_deadline, inherited_deadline)
 
         def emit(outcome, attempt, error=None):
             facts = dict(
@@ -168,8 +175,19 @@ def retry_coordination(function=None, *, budget_seconds=None):
                 try:
                     value = function(*args, **kwargs)
                 except CoordinationLockRefused as error:
-                    remaining = _deadline.get() - time.monotonic()
                     safe = error.result == -1 and error.transaction_released
+                    from core.sql_observation import ObservationBusy, observing
+
+                    if safe and observing():
+                        # Discovery never competes repeatedly with an active
+                        # producer. The next monitor cycle performs a fresh read.
+                        raise ObservationBusy(
+                            "Coordination is busy; waiting for active work."
+                        ) from error
+                    if safe and error.phase_timings_ms:
+                        connection_seconds = error.phase_timings_ms.get("connect", 0) / 1000
+                        _deadline.set(min(total_deadline, _deadline.get() + connection_seconds))
+                    remaining = min(_deadline.get(), total_deadline) - time.monotonic()
                     if not safe or remaining <= 0 or attempt >= MAX_ATTEMPTS:
                         emit("exhausted" if safe else "not_retryable", attempt, error)
                         raise

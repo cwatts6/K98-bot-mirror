@@ -103,7 +103,10 @@ def incident_embed(row):
         context = evidence["failure_context"]
         embed.add_field(
             name="Failure details",
-            value=discord.utils.escape_markdown(context["summary"])[:1024],
+            value=discord.utils.escape_markdown(
+                context.get("summary")
+                or "Original diagnostic evidence is retained. Review the recorded outcome and linked recovery."
+            )[:1024],
             inline=False,
         )
     if evidence.get("evidence_reference"):
@@ -169,10 +172,12 @@ def incident_embed(row):
 
 
 async def report_error(interaction, exc):
+    from core.sql_observation import ObservationBusy
+
     logger.warning("recovery_interaction_unavailable error_type=%s", type(exc).__name__)
     text = (
         str(exc)
-        if isinstance(exc, SourceConflict)
+        if isinstance(exc, (SourceConflict, ObservationBusy))
         else "Recovery is temporarily unavailable. The incident is retained. Reopen Review & fix to recheck; a submitted repair will be verified before any further action."
     )
     await send_ephemeral(interaction, text, allowed_mentions=discord.AllowedMentions.none())

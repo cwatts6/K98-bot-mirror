@@ -82,10 +82,19 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     for transition in update.reviewed_transitions():
-        if transition["id"] == "procconfig_admission_recovery_v1":
+        if transition["id"] == "coordination_lifecycle_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
+        if transition["id"] == "procconfig_admission_recovery_v1":
+            from tests.updater_source_assertions import before_coordination_lifecycle_hash
+
+            for member in transition["members"]:
+                assert (
+                    before_coordination_lifecycle_hash(root, member["path"])
+                    == member["after_sha256"]
+                )
             continue
         if transition["id"] == "p1_monitoring_reliability_v1":
             for member in transition["members"]:

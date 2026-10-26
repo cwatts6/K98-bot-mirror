@@ -69,5 +69,7 @@ def dispatch(broker, message):
             ):
                 raise SourceConflict("Exact immutable recovery action required.")
             return service.reconcile(job_id, action)
-        evidence, token, resolved = service.inspect(job_id)
+        from core.sql_observation import observe_call
+
+        evidence, token, resolved = observe_call(service.inspect, job_id)
         return dict(evidence=evidence, token=token, resolved=resolved)

@@ -335,6 +335,8 @@ def test_historical_hash_bridge_rejects_foreign_runtime_bytes(tmp_path, path):
     (tmp_path / monitoring).write_bytes(monitoring.read_bytes())
     attempt = Path("tests/fixtures/procconfig_admission_source_pairs.json")
     (tmp_path / attempt).write_bytes(attempt.read_bytes())
+    lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")
+    (tmp_path / lifecycle).write_bytes(lifecycle.read_bytes())
 
     source = tmp_path / path
     source.parent.mkdir(parents=True, exist_ok=True)

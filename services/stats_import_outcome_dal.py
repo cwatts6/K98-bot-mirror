@@ -6,11 +6,11 @@ import hashlib
 import json
 import re
 
-from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
+from kvk.dal.new_source_import_dal import SourceBusy, SourceConflict, one, rows, transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 
 
-class ImportExecutionActive(SourceConflict):
+class ImportExecutionActive(SourceBusy):
     """An execution still owns its SQL session guard; not an abandoned import."""
 
 

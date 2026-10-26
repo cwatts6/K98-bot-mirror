@@ -83,6 +83,29 @@ def _account_summary(accounts: dict[str, dict[str, str]]):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("entry", ["join_player", "join_sub", "selection"])
+async def test_expired_join_response_never_starts_sql(monkeypatch, entry):
+    from unittest.mock import AsyncMock
+
+    import discord
+
+    controller = ArkRegistrationController(match_id=1, config={"PlayersCap": 30, "SubsCap": 15})
+    interaction = DummyInteraction()
+    response = type("Response", (), {"status": 404, "reason": "Not Found"})()
+    interaction.response.defer = AsyncMock(
+        side_effect=discord.NotFound(response, {"code": 10062, "message": "Unknown Interaction"})
+    )
+    query = AsyncMock(side_effect=AssertionError("Expired response must stop before SQL"))
+    monkeypatch.setattr("ark.registration_flow.get_match", query)
+    monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", query)
+    if entry == "selection":
+        await controller._apply_join(interaction, {}, [], None, "1", slot_type="Player")
+    else:
+        await getattr(controller, entry)(interaction)
+    query.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_ensure_registration_message_migrates_json_to_sql(monkeypatch, caplog):
     controller = ArkRegistrationController(match_id=91, config={"PlayersCap": 30, "SubsCap": 15})
 
@@ -234,9 +257,20 @@ async def test_ensure_registration_message_logs_missing_destination(monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_join_player_adds_signup(monkeypatch):
+@pytest.mark.parametrize("lost_response", [False, True])
+async def test_join_player_adds_signup(monkeypatch, lost_response):
     controller = ArkRegistrationController(match_id=1, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
+    interaction.response = DoneAfterDeferResponse()
+    if lost_response:
+        from unittest.mock import AsyncMock
+
+        import discord
+
+        response = type("Response", (), {"status": 404, "reason": "Not Found"})()
+        interaction.followup.send = AsyncMock(
+            side_effect=discord.NotFound(response, {"code": 10015, "message": "Unknown Webhook"})
+        )
 
     async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         if only_governor_ids:
@@ -267,6 +301,7 @@ async def test_join_player_adds_signup(monkeypatch):
     called = {"add": False, "audit": False, "refresh": False}
 
     async def _add_signup(**kwargs):
+        assert interaction.response.is_done()
         called["add"] = True
         return 123
 
@@ -301,7 +336,10 @@ async def test_join_player_adds_signup(monkeypatch):
     assert called["add"] is True
     assert called["audit"] is True
     assert called["refresh"] is True
-    assert interaction.response.sent or interaction.followup.sent
+    if lost_response:
+        interaction.followup.send.assert_awaited_once()
+    else:
+        assert interaction.response.sent or interaction.followup.sent
 
 
 @pytest.mark.asyncio

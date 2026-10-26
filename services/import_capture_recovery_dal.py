@@ -36,9 +36,9 @@ class ImportCaptureRecoveryDAL:
                     )
                     result = one(cursor)
                     if not result or result["LockResult"] < 0:
-                        raise SourceConflict(
-                            "The original producer is still active. Recheck later."
-                        )
+                        from kvk.dal.new_source_import_dal import SourceBusy
+
+                        raise SourceBusy("The original producer is still active. Recheck later.")
                 yield connection
             finally:
                 # Explicit release also covers drivers which pool closed connections.
