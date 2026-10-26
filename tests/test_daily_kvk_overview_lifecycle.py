@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 import daily_KVK_overview_embed as overview
@@ -7,18 +9,13 @@ import daily_KVK_overview_embed as overview
 
 @pytest.mark.asyncio
 async def test_daily_overview_is_removed_outside_broad_kvk_window(monkeypatch) -> None:
-    removed: list[tuple[object, int]] = []
-
-    async def remove(bot, channel_id):
-        removed.append((bot, channel_id))
-
     monkeypatch.setattr(overview, "is_currently_kvk", lambda: False)
-    monkeypatch.setattr(overview, "remove_daily_KVK_overview_embed", remove)
+    publish = AsyncMock(return_value="removed")
+    monkeypatch.setattr(overview, "_publish_overview", publish)
     bot = object()
 
-    await overview.post_or_update_daily_KVK_overview(bot, 123)
-
-    assert removed == [(bot, 123)]
+    assert await overview.post_or_update_daily_KVK_overview(bot, 123) == "removed"
+    publish.assert_awaited_once_with(bot, 123, enabled=False)
 
 
 @pytest.mark.asyncio

@@ -35,6 +35,7 @@ class _OverviewAdapter:
         self.bot, self.channel_id, self.upcoming = bot, channel_id, upcoming
         self.channel = None
         self.messages = {}
+        self.prepared_payload = None
 
     async def identity(self):
         daily_id = await drain_thread(load_existing_daily_KVK_overview_id)
@@ -81,15 +82,18 @@ class _OverviewAdapter:
         )
 
     async def send(self):
-        channel = await self._channel()
-        message = await channel.send(**self.payload())
+        message = await self.channel.send(**self.prepared_payload)
         self.messages[message.id] = message
         return message.id
 
     async def edit(self, message_id):
         message = await self.fetch(message_id)
-        await message.edit(**self.payload())
+        await message.edit(**self.prepared_payload)
         return message.id
+
+    async def prepare(self):
+        await self._channel()
+        self.prepared_payload = self.payload()
 
     async def pin(self, message_id):
         message = await self.fetch(message_id)

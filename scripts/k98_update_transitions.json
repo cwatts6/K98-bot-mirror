@@ -1287,17 +1287,17 @@
         {
           "path": "daily_KVK_overview_embed.py",
           "before_sha256": "1f58466cbc2cedccc6f9bb2529069c1a6cd84a02bd12ab1787b77bd8fde7f7e6",
-          "after_sha256": "44d482aff30c46308c30863e902f239d715bbb9e65b699a0837a5b40cb1b9ea7"
+          "after_sha256": "5b221a1f30f87ddbf62d843931ed0ae0b0f90c0b82f9818ce63b1d1ad826ee87"
         },
         {
           "path": "event_scheduler.py",
           "before_sha256": "7413c86590cae9c4a0dc72a0471edf7f98d4a1f9735d0ab78c77649de0bd7f77",
-          "after_sha256": "6effbda647a71df4e90f47bb0fa6e10c60e5ac0cb784972309d9b3e3ad534559"
+          "after_sha256": "c7fead3380f6c98bfc70aabbc0615e3acebeffcecc263d8983997b2cc56cd720"
         },
         {
           "path": "player_self_service/reminder_service.py",
           "before_sha256": "9a7b88a9a684176ed57682dc2a19b6f1594888aae232135e0deed9a86ba99f71",
-          "after_sha256": "0fb44159f6fbf2b966e67f009dc72cf7c50133a02e8b0cbdd4a9430b54ff6df5"
+          "after_sha256": "5ff53fb1c8ba498f8ccfd08abdbb133b39af0eb49d4d6b030f98be60ecd7de4c"
         },
         {
           "path": "rehydrate_views.py",
@@ -1317,12 +1317,12 @@
         {
           "path": "services/event_delivery_store.py",
           "before_sha256": null,
-          "after_sha256": "1d88e3c82be411214a4d8e5b5fc54ee813b012e5c25c6cf10eb34d5c24c57fd3"
+          "after_sha256": "7bd437b9c25e28d93ba3c2408d84eb0de00a226566e12ce6d443f107087d03c7"
         },
         {
           "path": "services/gsheets_health_service.py",
           "before_sha256": "bf9eb77ae84111980551dce8cc41a8b7e72e5f4ab19a3c6656f1b813072313a6",
-          "after_sha256": "f9c90733693ab754b5ff2f2e5f48d2756690a004294636707c8dcf348bdb2870"
+          "after_sha256": "0fefae6fb8d46ec9d03ac45de762acfb658d551d5ea384834890febac74c5518"
         },
         {
           "path": "services/operator_status_dal.py",
@@ -1337,7 +1337,7 @@
         {
           "path": "services/overview_delivery_service.py",
           "before_sha256": null,
-          "after_sha256": "2e59b3f2bbf0c48739092e16906822e611450b61a238501d4de4ac88fab81f4a"
+          "after_sha256": "7e87dcfa61e30ea53843ccf5cc2080732cb0fbf0dfd9d36bd1f203138ef96216"
         },
         {
           "path": "services/recovery_health.py",

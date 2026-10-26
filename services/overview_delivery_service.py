@@ -5,7 +5,7 @@ never infers that a failed edit means permission to create another message.
 """
 
 from services import event_delivery_service as delivery
-from services.event_delivery_store import delivery_key
+from services.event_delivery_store import DeliveryHeld, delivery_key
 from services.legacy_export_snapshot_service import drain_thread
 
 
@@ -13,9 +13,11 @@ class MessageAbsent(Exception):
     """Exact message fetch/delete returned Discord Unknown Message (10008)."""
 
 
-async def _step(kind, channel_id, identity, invoke, *, message_id=None):
+async def _step(kind, channel_id, identity, invoke, *, message_id=None, generation=None):
     key = delivery_key(kind, channel_id, identity)
-    if not await delivery.begin(key, kind=kind, target=channel_id, message_id=message_id):
+    if not await delivery.begin(
+        key, kind=kind, target=channel_id, message_id=message_id, generation=generation
+    ):
         receipt = await delivery.read(key)
         if receipt and receipt["state"] in {"acknowledged", "not_found"}:
             return receipt
@@ -44,7 +46,12 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
             return "unconfirmed_previous_operation"
         message_id = await adapter.identity()
         sends = [r for r in selected if r["kind"] == "overview-send"]
-        latest = max(sends, key=lambda row: row["entered_at"]) if sends else None
+        generations = [row.get("generation") for row in sends]
+        if any(type(value) is not int for value in generations) or sorted(generations) != list(
+            range(len(sends))
+        ):
+            raise DeliveryHeld("Overview generation evidence is incomplete")
+        latest = max(sends, key=lambda row: row["generation"]) if sends else None
         if latest and latest["state"] == "acknowledged":
             deleted = await delivery.read(
                 delivery_key("overview-delete", channel_id, latest["message_id"])
@@ -57,11 +64,16 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
         if not enabled:
             if not message_id:
                 return "not_in_kvk_no_message"
+            try:
+                await adapter.fetch(message_id)
+                absent = False
+            except MessageAbsent:
+                absent = True
             deleted = await _step(
                 "overview-delete",
                 channel_id,
                 message_id,
-                lambda: adapter.delete(message_id),
+                adapter.absent if absent else lambda: adapter.delete(message_id),
                 message_id=message_id,
             )
             if not deleted:
@@ -70,6 +82,9 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
             return "removed" if deleted["state"] == "acknowledged" else "confirmed_absent"
         if not has_events:
             return "no_upcoming_events"
+        # Resolve read-only destinations and validate payload before recording
+        # entry into a Discord mutation. A read failure is safe to observe again.
+        await adapter.prepare()
         created = False
         if message_id:
             try:
@@ -87,7 +102,9 @@ async def publish(adapter, channel_id, *, enabled, has_events, revision):
                 await adapter.remove_projection(message_id)
                 return "confirmed_absent"
         else:
-            sent = await _step("overview-send", channel_id, len(sends), adapter.send)
+            sent = await _step(
+                "overview-send", channel_id, len(sends), adapter.send, generation=len(sends)
+            )
             if not sent:
                 return "send_unconfirmed"
             message_id = sent["message_id"]

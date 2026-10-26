@@ -25,10 +25,11 @@ class HealthProbe:
 
     async def shutdown(self):
         self.close()
-        if self._task is not None:
-            while not self._task.done():
+        task = self._task
+        if task is not None:
+            while not task.done():
                 try:
-                    await asyncio.shield(self._task)
+                    await asyncio.shield(task)
                 except asyncio.CancelledError:
                     continue
 

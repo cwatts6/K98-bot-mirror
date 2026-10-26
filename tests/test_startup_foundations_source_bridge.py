@@ -15,6 +15,8 @@ def test_exact_successor_bridge_rejects_unreviewed_changes(tmp_path, damage):
     (tmp_path / fixture).parent.mkdir(parents=True)
     raw = (root / fixture).read_bytes()
     (tmp_path / fixture).write_bytes(raw)
+    successor = Path("tests/fixtures/p1_event_delivery_source_pairs.json")
+    (tmp_path / successor).write_bytes((root / successor).read_bytes())
     member = json.loads(raw)[0]
     path = member["path"]
     (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)

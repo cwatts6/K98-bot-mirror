@@ -32,7 +32,7 @@ async def test_refresh_permissions_and_truthful_results(monkeypatch, command_nam
     )
     result = RefreshResult(1, status, "succeeded", "replaced", "saved", 0, 1, stamp)
     refresh = AsyncMock(return_value=result)
-    update = AsyncMock()
+    update = AsyncMock(return_value="not_in_kvk_no_message")
     monkeypatch.setattr(commands, "refresh_event_cache_result", refresh)
     monkeypatch.setattr(commands, "is_cache_stale", lambda: True)
     monkeypatch.setattr(
@@ -79,7 +79,11 @@ async def test_refresh_permissions_and_truthful_results(monkeypatch, command_nam
             assert "still running" in text
         else:
             update.assert_awaited_once()
-            assert "delivery is not independently verified" in text
+            if command_name == "refresh_kvk_overview":
+                assert "Overview disposition: not_in_kvk_no_message" in text
+                assert "Live visual acceptance is separate" in text
+            else:
+                assert "delivery is not independently verified" in text
         if case == "failed":
             assert "failed or was interrupted" in text
         if case == "memory_only":

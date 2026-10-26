@@ -28,7 +28,7 @@ def before_event_delivery_hash(root, path):
     raw = fixture.read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "bf69305c5eb72859f986f3ce88303df36b15fc36cdb7ca37fc9c1e7afb2f298a"
+        == "da85162a33b3c20d0149d9b6edb10683b7b7555ebfa91c9b761690ccfa046376"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

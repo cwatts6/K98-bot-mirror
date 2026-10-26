@@ -93,7 +93,9 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
             shutdown=AsyncMock(side_effect=RuntimeError("diagnostic shutdown failed"))
         )
     )
-    reminders = SimpleNamespace(cancel_all_and_wait=AsyncMock(return_value=0))
+    reminders = SimpleNamespace(
+        close_admission=Mock(), cancel_all_and_wait=AsyncMock(return_value=0)
+    )
     cache_owner = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
     profile_owner = SimpleNamespace(close=Mock())
     name_close = Mock()

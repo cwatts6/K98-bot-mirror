@@ -396,6 +396,34 @@ async def save_dm_scheduled_tracker_async():
         await drain_thread(save_dm_scheduled_tracker, snapshot)
 
 
+async def release_cancelled_dm_schedules(user_id):
+    """Release only undispatched, unowned windows after subscription removal."""
+    from reminder_task_registry import user_task_snapshot
+
+    uid = str(user_id)
+    async with _DM_TRACKER_IO_LOCK:
+        rows = await delivery.receipt_rows()
+        retained = {
+            (row.get("event"), row.get("window"))
+            for row in rows
+            if row["kind"] == "dm-send" and row["target"] == uid
+        }
+        owners = user_task_snapshot(uid).get(uid, [])
+        # Unknown owner metadata cannot establish that any window is unowned.
+        if any("event_id" not in meta or "delta_seconds" not in meta for meta in owners):
+            return
+        retained.update((meta["event_id"], meta["delta_seconds"]) for meta in owners)
+        for eid, per_user in dm_scheduled_tracker.items():
+            if uid in per_user:
+                per_user[uid] = {
+                    window
+                    for window in per_user[uid]
+                    if (eid, window) in retained
+                    or window in dm_sent_tracker.get(eid, {}).get(uid, [])
+                }
+        await drain_thread(save_dm_scheduled_tracker, copy.deepcopy(dm_scheduled_tracker))
+
+
 def log_failed_dm(user_id, event, delta, reason):
     log_entry = {
         "user_id": str(user_id),
@@ -616,7 +644,9 @@ async def load_active_reminders(bot):
         if not isinstance(raw, dict):
             raise ValueError("Invalid active reminder tracker")
         rows = await delivery.receipt_rows()
-        for row in sorted(rows, key=lambda item: item["entered_at"]):
+        live_ids = {}
+        conflicts = set()
+        for row in rows:
             if row["kind"] != "public-send" or row["state"] != "acknowledged":
                 continue
             deleted = await delivery.read(
@@ -628,6 +658,23 @@ async def load_active_reminders(bot):
                     raw.pop(row["event"], None)
                 continue
             old = raw.get(row["event"], {})
+            identity = (row["channel_id"], row["message_id"])
+            if row["event"] in live_ids and live_ids[row["event"]] != identity:
+                conflicts.add(row["event"])
+            live_ids[row["event"]] = identity
+            if isinstance(old, dict) and old.get("message_id") not in {None, row["message_id"]}:
+                previous_delete = await delivery.read(
+                    delivery_key("public-delete", old.get("channel_id"), old["message_id"])
+                )
+                if not previous_delete or previous_delete["state"] not in {
+                    "acknowledged",
+                    "not_found",
+                }:
+                    conflicts.add(row["event"])
+            if row["event"] in conflicts:
+                # The journal already retains its competing identity. Preserve
+                # the original projection across unrelated saves and restarts.
+                continue
             raw[row["event"]] = {
                 **(old if isinstance(old, dict) else {}),
                 "channel_id": row["channel_id"],
@@ -642,6 +689,9 @@ async def load_active_reminders(bot):
 
         for eid, data in raw.items():
             raw_ids.add(eid)  # Track even if broken
+            if eid in conflicts:
+                logger.warning("[REMINDER_CACHE] Conflicting receipt identities; restoration held")
+                continue
 
             if not isinstance(data, dict):
                 logger.warning(f"[REMINDER_CACHE] Invalid data type for {eid}: {data}")
@@ -706,6 +756,8 @@ async def load_active_reminders(bot):
                         receipt = await delivery.read(restore_key)
                         if not receipt or receipt["state"] != "acknowledged":
                             raise RuntimeError("Previous restoration edit unconfirmed")
+                    # Remote edit receipts survive restart; Python handlers do not.
+                    bot.add_view(view, message_id=msg.id)
                     logger.info(
                         f"[REMINDER_CACHE_REHYDRATE] Re-attached reminder view for {eid} with prefix {prefix}"
                     )
@@ -854,6 +906,46 @@ async def _send_reminder_at(bot, channel_id, event, delta):
         if not channel:
             logger.warning("[REMINDER_CACHE] channel_unavailable; no replacement attempted")
             return "channel_unavailable"
+        # A settled send can outlive cancellation before the legacy projection
+        # is saved. Recover that exact identity before considering replacement.
+        live = []
+        indexed = {row["key"]: row for row in rows}
+        for row in rows:
+            if (
+                row["kind"] != "public-send"
+                or row.get("event") != event_id
+                or row["target"] != str(channel_id)
+                or row["state"] != "acknowledged"
+            ):
+                continue
+            deleted = indexed.get(delivery_key("public-delete", channel_id, row["message_id"]))
+            if not deleted or deleted["state"] not in {"acknowledged", "not_found"}:
+                live.append(row)
+        if len(live) > 1:
+            return "identity_conflict"
+        if live:
+            message_id = live[0]["message_id"]
+            previous = active_reminders.get(event_id)
+            if previous and previous.id != message_id:
+                return "identity_conflict"
+            if not previous:
+                try:
+                    active_reminders[event_id] = await channel.fetch_message(message_id)
+                except discord.NotFound as exc:
+                    if exc.code != 10008:
+                        return "unconfirmed"
+                    delete_key = delivery_key("public-delete", channel_id, message_id)
+                    if not await delivery.begin(
+                        delete_key,
+                        kind="public-delete",
+                        target=channel_id,
+                        event=event_id,
+                        message_id=message_id,
+                    ):
+                        return "unconfirmed"
+                    await delivery.finish(
+                        delete_key, "not_found", message_id=message_id, channel_id=channel_id
+                    )
         # Delete previous reminder only after ruling out duplicate delivery.
         prev_msg = active_reminders.get(event_id)
         if prev_msg:
@@ -1499,8 +1591,8 @@ async def reminder_cleanup_loop():
                     raise ValueError(f"Failed to extract timestamp for {eid}")
                 event_time = parse_isoformat_utc(ts)
                 if now > event_time + timedelta(minutes=15):
-                    await safe_delete_reminder(eid)
-                    expired.append(eid)
+                    if await safe_delete_reminder(eid) == "removed":
+                        expired.append(eid)
             except Exception as e:
                 logger.error(
                     f"[SCHEDULE_CACHE_CLEANUP] Failed to parse or clean reminder {eid}: {e}"

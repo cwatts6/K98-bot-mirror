@@ -22,7 +22,11 @@ TaskCanceller = Callable[[int | str], Awaitable[int]]
 
 
 async def _cancel_user_tasks_for_unsubscribe(user_id: int | str) -> int:
-    return await cancel_and_wait_user_tasks(user_id, timeout=2.0)
+    from event_scheduler import release_cancelled_dm_schedules
+
+    count = await cancel_and_wait_user_tasks(user_id, timeout=2.0)
+    await release_cancelled_dm_schedules(user_id)
+    return count
 
 
 @dataclass(frozen=True, slots=True)

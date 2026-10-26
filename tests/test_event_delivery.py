@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import json
 import threading
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import discord
 import pytest
@@ -145,6 +145,7 @@ async def test_delete_failure_retains_original_and_blocks_reentry(isolated):
 
 def overview_adapter():
     return SimpleNamespace(
+        prepare=AsyncMock(),
         identity=AsyncMock(return_value=None),
         send=AsyncMock(return_value=81),
         fetch=AsyncMock(),
@@ -243,7 +244,9 @@ async def test_public_ack_restores_exact_message_after_projection_loss_and_empty
         send=AsyncMock(return_value=msg), fetch_message=AsyncMock(return_value=msg)
     )
     bot = SimpleNamespace(
-        get_channel=lambda _: channel, fetch_channel=AsyncMock(return_value=channel)
+        get_channel=lambda _: channel,
+        fetch_channel=AsyncMock(return_value=channel),
+        add_view=Mock(),
     )
     monkeypatch.setattr(
         scheduler, "save_active_reminders", lambda: (_ for _ in ()).throw(OSError("disk full"))
@@ -318,3 +321,219 @@ async def test_passive_report_does_not_read_or_replay(isolated, monkeypatch):
     monkeypatch.setattr(delivery.store, "rows", forbidden)
     report = delivery.report()
     assert "Not visual or end-to-end acceptance" in report["verification"]
+
+
+@pytest.mark.asyncio
+async def test_public_second_restart_registers_handler_without_second_edit(isolated, monkeypatch):
+    occurrence = event()
+    eid = scheduler.make_event_id(occurrence)
+    key = delivery_key("public-send", 91, eid, 3600)
+    delivery.store.begin(key, kind="public-send", target=91, event=eid, window=3600)
+    delivery.store.finish(key, "acknowledged", message_id=81, channel_id=91)
+    msg = SimpleNamespace(id=81, channel=SimpleNamespace(id=91), edit=AsyncMock())
+    channel = SimpleNamespace(fetch_message=AsyncMock(return_value=msg))
+    monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [occurrence])
+    for _ in range(2):
+        scheduler.active_reminders.clear()
+        bot = SimpleNamespace(fetch_channel=AsyncMock(return_value=channel), add_view=Mock())
+        await scheduler.load_active_reminders(bot)
+        bot.add_view.assert_called_once()
+        assert bot.add_view.call_args.kwargs == {"message_id": 81}
+        assert bot.add_view.call_args.args[0].is_persistent()
+    msg.edit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_releases_only_unowned_undispatched_windows(isolated, monkeypatch):
+    from player_self_service import reminder_service
+    import reminder_task_registry as registry
+
+    occurrence = event()
+    eid = scheduler.make_event_id(occurrence)
+    scheduler.dm_scheduled_tracker[eid] = {"17": {3600, 1800, 600, 300, 60}}
+    scheduler.dm_sent_tracker[eid] = {"17": [60]}
+    for window, state in [(1800, "entered"), (600, "acknowledged")]:
+        key = delivery_key("dm-send", "17", eid, window)
+        delivery.store.begin(key, kind="dm-send", target=17, event=eid, window=window)
+        if state == "acknowledged":
+            delivery.store.finish(key, state, message_id=81, channel_id=91)
+    sleeper = asyncio.create_task(asyncio.Event().wait())
+    registry.register_user_task(17, sleeper, meta={"event_id": eid, "delta_seconds": 3600})
+    # A still-active owner must remain retained even after cancellation observation.
+    original_snapshot = registry.user_task_snapshot
+    monkeypatch.setattr(
+        registry,
+        "user_task_snapshot",
+        lambda uid: {**original_snapshot(uid), "17": [{"event_id": eid, "delta_seconds": 300}]},
+    )
+    await reminder_service._cancel_user_tasks_for_unsubscribe(17)
+    assert sleeper.done()
+    assert scheduler.dm_scheduled_tracker[eid]["17"] == {1800, 600, 300, 60}
+    recipient = user()
+    # A resubscription can now schedule/send the cancelled unsent window in this process.
+    scheduler.dm_scheduled_tracker[eid]["17"].add(3600)
+    await scheduler.send_user_reminder(recipient, occurrence, timedelta(hours=1))
+    recipient.send.assert_awaited_once()
+    assert 3600 in scheduler.dm_sent_tracker[eid]["17"]
+
+
+@pytest.mark.asyncio
+async def test_public_settlement_cancellation_recovers_identity_before_next_window(
+    isolated, monkeypatch
+):
+    occurrence = event()
+    eid = scheduler.make_event_id(occurrence)
+    old = SimpleNamespace(id=81, channel=SimpleNamespace(id=91), delete=AsyncMock())
+    new = SimpleNamespace(id=82, channel=SimpleNamespace(id=91))
+    channel = SimpleNamespace(
+        send=AsyncMock(side_effect=[old, new]), fetch_message=AsyncMock(return_value=old)
+    )
+    bot = SimpleNamespace(get_channel=lambda _: channel)
+    original_finish = delivery.store.finish
+    entered, release = threading.Event(), threading.Event()
+
+    def finish(key, state, **kwargs):
+        result = original_finish(key, state, **kwargs)
+        if kwargs.get("message_id") == 81 and delivery.store.get(key)["kind"] == "public-send":
+            entered.set()
+            assert release.wait(5)
+        return result
+
+    monkeypatch.setattr(delivery.store, "finish", finish)
+    first = asyncio.create_task(scheduler.send_reminder_at(bot, 91, occurrence, timedelta(hours=1)))
+    assert await asyncio.to_thread(entered.wait, 5)
+    first.cancel()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    assert eid not in scheduler.active_reminders
+    monkeypatch.setattr(
+        scheduler, "utcnow", lambda: occurrence["start_time"] - timedelta(minutes=30)
+    )
+    assert (
+        await scheduler.send_reminder_at(bot, 91, occurrence, timedelta(minutes=30))
+        == "acknowledged"
+    )
+    channel.fetch_message.assert_awaited_once_with(81)
+    old.delete.assert_awaited_once()
+    assert scheduler.active_reminders[eid].id == 82
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("removal", [False, True])
+async def test_overview_read_failure_before_dispatch_is_retryable(isolated, monkeypatch, removal):
+    import daily_KVK_overview_embed as overview
+
+    adapter = overview._OverviewAdapter(
+        SimpleNamespace(fetch_channel=AsyncMock(side_effect=OSError())), 91, [event()]
+    )
+    adapter.identity = AsyncMock(return_value=81 if removal else None)
+    adapter.save_projection = AsyncMock()
+    adapter.remove_projection = AsyncMock()
+    with pytest.raises(OSError):
+        await publish(adapter, 91, enabled=not removal, has_events=True, revision="r1")
+    assert delivery.store.rows() == []
+    msg = SimpleNamespace(id=81, pin=AsyncMock(), delete=AsyncMock())
+    channel = SimpleNamespace(
+        send=AsyncMock(return_value=msg), fetch_message=AsyncMock(return_value=msg)
+    )
+    adapter.bot.fetch_channel = AsyncMock(return_value=channel)
+    assert await publish(adapter, 91, enabled=not removal, has_events=True, revision="r1") == (
+        "removed" if removal else "created"
+    )
+
+
+@pytest.mark.asyncio
+async def test_overview_generation_survives_clock_rollback_and_projection_loss(
+    isolated, monkeypatch
+):
+    from services import event_delivery_store as journal
+
+    for generation, message_id, stamp in [(0, 81, 200), (1, 82, 100)]:
+        monkeypatch.setattr(journal.time, "time", lambda: stamp)
+        key = delivery_key("overview-send", 91, generation)
+        delivery.store.begin(key, kind="overview-send", target=91, generation=generation)
+        delivery.store.finish(key, "acknowledged", message_id=message_id, channel_id=91)
+    key = delivery_key("overview-delete", 91, 81)
+    delivery.store.begin(key, kind="overview-delete", target=91, message_id=81)
+    delivery.store.finish(key, "acknowledged", message_id=81, channel_id=91)
+    adapter = overview_adapter()
+    adapter.edit.return_value = adapter.pin.return_value = 82
+    assert await publish(adapter, 91, enabled=True, has_events=True, revision="r2") == "updated"
+    adapter.send.assert_not_awaited()
+    adapter.fetch.assert_awaited_once_with(82)
+    adapter.save_projection.assert_awaited_once_with(82)
+
+
+def test_journal_capacity_reserves_actual_serialized_settlement_bytes(isolated, monkeypatch):
+    from services import event_delivery_store as journal
+
+    monkeypatch.setattr(journal, "MAX_JOURNAL_BYTES", 1600)
+    accepted = []
+    for index in range(20):
+        key = str(index)
+        try:
+            delivery.store.begin(key, kind="dm-send", target=17, event="é" * 20, window=3600)
+            accepted.append(key)
+        except journal.DeliveryHeld:
+            break
+    assert 0 < len(accepted) < 20
+    for key in accepted:
+        delivery.store.finish(key, "acknowledged", message_id=2**64 - 1, channel_id=2**64 - 1)
+        assert delivery.store.path.stat().st_size <= 1600
+    assert all(row["state"] == "acknowledged" for row in delivery.store.rows())
+
+
+@pytest.mark.asyncio
+async def test_cleanup_does_not_report_held_deletion_as_removed(isolated, monkeypatch, caplog):
+    caplog.set_level("INFO", logger="event_scheduler")
+    occurrence = event()
+    occurrence["start_time"] = datetime.now(UTC) - timedelta(hours=1)
+    scheduler.active_reminders[scheduler.make_event_id(occurrence)] = object()
+    monkeypatch.setattr(scheduler, "safe_delete_reminder", AsyncMock(return_value="unconfirmed"))
+    monkeypatch.setattr(scheduler.asyncio, "sleep", AsyncMock(side_effect=asyncio.CancelledError()))
+    with pytest.raises(asyncio.CancelledError):
+        await scheduler.reminder_cleanup_loop()
+    assert "Cleanup loop removed" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_health_shutdown_keeps_reference_when_observer_clears_task():
+    from services.gsheets_health_service import HealthProbe
+
+    probe = HealthProbe()
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def run():
+        started.set()
+        await release.wait()
+        return True, "healthy"
+
+    observer = asyncio.create_task(probe.observe(run, timeout=5))
+    await started.wait()
+    shutdown = asyncio.create_task(probe.shutdown())
+    await asyncio.sleep(0)
+    release.set()
+    assert await observer == (True, "healthy")
+    await shutdown
+    assert probe._task is None
+
+
+@pytest.mark.asyncio
+async def test_conflicting_public_projection_survives_save_and_restart(isolated, monkeypatch):
+    occurrence = event()
+    eid = scheduler.make_event_id(occurrence)
+    original = {eid: {"message_id": 80, "channel_id": 91}}
+    (isolated / "active.json").write_text(json.dumps(original))
+    key = delivery_key("public-send", 91, eid, 3600)
+    delivery.store.begin(key, kind="public-send", target=91, event=eid, window=3600)
+    delivery.store.finish(key, "acknowledged", message_id=81, channel_id=91)
+    bot = SimpleNamespace(fetch_channel=AsyncMock(), add_view=Mock())
+    monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [occurrence])
+    await scheduler.load_active_reminders(bot)
+    scheduler.save_active_reminders()
+    assert json.loads((isolated / "active.json").read_text()) == original
+    scheduler._unresolved_active.clear()
+    await scheduler.load_active_reminders(bot)
+    assert scheduler._unresolved_active[eid]["message_id"] == 80
+    bot.fetch_channel.assert_not_awaited()

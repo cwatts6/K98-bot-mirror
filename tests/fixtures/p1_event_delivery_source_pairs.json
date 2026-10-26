@@ -17,17 +17,17 @@
   {
     "path": "daily_KVK_overview_embed.py",
     "before": "1f58466cbc2cedccc6f9bb2529069c1a6cd84a02bd12ab1787b77bd8fde7f7e6",
-    "after": "44d482aff30c46308c30863e902f239d715bbb9e65b699a0837a5b40cb1b9ea7"
+    "after": "5b221a1f30f87ddbf62d843931ed0ae0b0f90c0b82f9818ce63b1d1ad826ee87"
   },
   {
     "path": "event_scheduler.py",
     "before": "7413c86590cae9c4a0dc72a0471edf7f98d4a1f9735d0ab78c77649de0bd7f77",
-    "after": "6effbda647a71df4e90f47bb0fa6e10c60e5ac0cb784972309d9b3e3ad534559"
+    "after": "c7fead3380f6c98bfc70aabbc0615e3acebeffcecc263d8983997b2cc56cd720"
   },
   {
     "path": "player_self_service/reminder_service.py",
     "before": "9a7b88a9a684176ed57682dc2a19b6f1594888aae232135e0deed9a86ba99f71",
-    "after": "0fb44159f6fbf2b966e67f009dc72cf7c50133a02e8b0cbdd4a9430b54ff6df5"
+    "after": "5ff53fb1c8ba498f8ccfd08abdbb133b39af0eb49d4d6b030f98be60ecd7de4c"
   },
   {
     "path": "rehydrate_views.py",
@@ -42,7 +42,7 @@
   {
     "path": "services/gsheets_health_service.py",
     "before": "bf9eb77ae84111980551dce8cc41a8b7e72e5f4ab19a3c6656f1b813072313a6",
-    "after": "f9c90733693ab754b5ff2f2e5f48d2756690a004294636707c8dcf348bdb2870"
+    "after": "0fefae6fb8d46ec9d03ac45de762acfb658d551d5ea384834890febac74c5518"
   },
   {
     "path": "services/recovery_health.py",
