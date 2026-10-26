@@ -49,6 +49,12 @@ call can be interrupted at the deadline. Existing driver timeouts and runtime dr
 remain in force. Already accepted runtime calls drain; shutdown refuses new roots.
 No age-based ownership expiry, lock deletion or blanket timeout extension is added.
 
+Stats recovery intent crosses the asynchronous offload boundary as data only. Its
+worker acquires the scheduling turn inside `admitted_writer`, retaining it through
+capture and settlement. The event loop never waits on the synchronous producer
+queue. Regression coverage uses the real offload for normal stats execution and
+lost-capture acknowledgement, plus a queued-worker test proving loop progress.
+
 ## Family and wait-edge coverage
 
 The scope inventory examined 774 tracked application Python files, routing explicit

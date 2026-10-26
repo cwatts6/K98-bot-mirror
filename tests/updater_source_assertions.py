@@ -26,7 +26,7 @@ def before_coordination_lifecycle_hash(root, path):
     raw = (root / "tests/fixtures/coordination_lifecycle_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "1e4315ae7d917b07f99c92bfae4791b6e9fa1b32aed0bff4ba16398ac4b8819f"
+        == "5994d9946eb523c4c50977c9b6ca805ab094e13336180f126300fe5992fd395f"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

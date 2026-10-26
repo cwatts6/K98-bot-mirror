@@ -621,9 +621,6 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         def close(self):
             pass
 
-    async def direct_offload(fn, *args, **kwargs):
-        return fn(*args)
-
     def execute_wrapper(cur, *, param1, param2, completed_filename, export_preparation_id=None):
         assert connection.autocommit is True
         assert (export_preparation_id is not None) is coordinated
@@ -638,7 +635,6 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
 
     metadata = _published_metadata(source_type="full_fallback_snapshot")
     connection = FakeConnection()
-    monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
     monkeypatch.setattr(stats_module, "_conn_trusted", lambda: connection)
     factory = Mock(return_value=connection)
     monkeypatch.setattr(export_sql_connection, "producer_connection", factory)

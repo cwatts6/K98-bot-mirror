@@ -1,5 +1,6 @@
 """Cross-stage waiting, receipt closure and no-replay lifecycle regressions."""
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from datetime import UTC, datetime
@@ -15,6 +16,47 @@ from services import export_contention as contention
 from services.configuration_attempt_recovery import AttemptJournal, ConfigurationAttemptRecovery
 from services.producer_admission import producer_turn
 from services.recovery_execution_guard import operation_key, recovery_execution
+
+
+@pytest.mark.asyncio
+async def test_stats_intent_crosses_offload_without_blocking_event_loop(monkeypatch):
+    from services import legacy_export_snapshot_service as snapshots
+    from services.producer_recovery_intent import current_intent, stats_inputs, stats_intent
+    import stats_module
+
+    entered, release, worker_entered = Event(), Event(), Event()
+    monkeypatch.setattr(snapshots, "_writer_runtime", lambda: None)
+
+    def report():
+        with producer_turn():
+            entered.set()
+            assert release.wait(5)
+
+    @snapshots.admitted_writer("scan_data")
+    def stats_worker():
+        assert current_intent()["kind"] == "stats_import"
+        worker_entered.set()
+        return "executed-once"
+
+    report_task = asyncio.create_task(asyncio.to_thread(report))
+    assert await asyncio.to_thread(entered.wait, 5)
+    inputs = stats_inputs(None, None, "stats_0123456789abcdef0123456789abcdef.ready.csv", 600, {})
+
+    async def run_stats():
+        with stats_intent(inputs), stats_intent(inputs):
+            return await stats_module._offload_callable_py(stats_worker)
+
+    task = asyncio.create_task(run_stats())
+    try:
+        # The loop can make progress while the worker waits before SQL admission.
+        await asyncio.sleep(0.03)
+        assert not task.done()
+        assert not worker_entered.is_set()
+    finally:
+        release.set()
+        await report_task
+    assert await task == "executed-once"
+    assert worker_entered.is_set()
 
 
 class SqlTimeout(Exception):

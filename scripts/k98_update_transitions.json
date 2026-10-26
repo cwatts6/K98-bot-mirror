@@ -1537,7 +1537,7 @@
         {
           "path": "services/producer_recovery_intent.py",
           "before_sha256": "546f15e88fa46a76b4d9d2d404a06d713a42c3541bd10c1820321bfb043d3730",
-          "after_sha256": "724c05c4ecc113d996ce03e540b3ed32198c85f974779d0f5ae2f4d06a6740fb"
+          "after_sha256": "5256d04ac0587b473d748eaebcc07dc296689f61e4765008d699501a363ef976"
         },
         {
           "path": "services/recovery_execution_guard.py",

@@ -163,13 +163,15 @@ def configuration_retry_intent(action_id, parent, *, export_disposition=None):
 
 @contextmanager
 def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=None):
+    # Intent crosses the async-to-thread boundary; scheduling ownership must not.
+    # The synchronous admitted_writer acquires its turn in the worker and holds
+    # it through capture/settlement. Never block the event loop on that queue.
     validate_inputs(inputs)
     current = _intent.get()
     if current is not None and action_id is None:
         if current["kind"] != "stats_import" or current["inputs"] != inputs:
             raise SourceConflict("Inherited producer recovery differs from its saved inputs.")
-        with producer_turn():
-            yield current
+        yield current
         return
     from services.processing_pipeline_receipts import producer_operation
 
@@ -186,7 +188,6 @@ def stats_intent(inputs, *, action_id=None, parent=None, registration_recovery=N
         value["registration_recovery"] = dict(registration_recovery)
     token = _intent.set(value)
     try:
-        with producer_turn():
-            yield value
+        yield value
     finally:
         _intent.reset(token)
