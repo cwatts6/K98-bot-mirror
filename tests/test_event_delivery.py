@@ -593,3 +593,24 @@ async def test_restore_releases_only_exact_confirmed_message_absence(
             == "restoration_unconfirmed"
         )
         channel.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restore_indexes_receipts_without_reparsing_per_retired_message(
+    isolated, monkeypatch
+):
+    for index in range(20):
+        key = delivery_key("public-send", 91, f"event-{index}", 3600)
+        delivery.store.begin(
+            key, kind="public-send", target=91, event=f"event-{index}", window=3600
+        )
+        delivery.store.finish(key, "acknowledged", message_id=100 + index, channel_id=91)
+        key = delivery_key("public-delete", 91, 100 + index)
+        delivery.store.begin(key, kind="public-delete", target=91, message_id=100 + index)
+        delivery.store.finish(key, "acknowledged", message_id=100 + index, channel_id=91)
+    read_one = AsyncMock(side_effect=AssertionError("Per-receipt full journal read"))
+    monkeypatch.setattr(delivery, "read", read_one)
+    bot = SimpleNamespace(fetch_channel=AsyncMock())
+    assert await scheduler.load_active_reminders(bot) == set()
+    read_one.assert_not_awaited()
+    bot.fetch_channel.assert_not_awaited()

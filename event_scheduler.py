@@ -644,12 +644,13 @@ async def load_active_reminders(bot):
         if not isinstance(raw, dict):
             raise ValueError("Invalid active reminder tracker")
         rows = await delivery.receipt_rows()
+        indexed = {row["key"]: row for row in rows}
         live_ids = {}
         conflicts = set()
         for row in rows:
             if row["kind"] != "public-send" or row["state"] != "acknowledged":
                 continue
-            deleted = await delivery.read(
+            deleted = indexed.get(
                 delivery_key("public-delete", row["channel_id"], row["message_id"])
             )
             if deleted and deleted["state"] in {"acknowledged", "not_found"}:
@@ -663,7 +664,7 @@ async def load_active_reminders(bot):
                 conflicts.add(row["event"])
             live_ids[row["event"]] = identity
             if isinstance(old, dict) and old.get("message_id") not in {None, row["message_id"]}:
-                previous_delete = await delivery.read(
+                previous_delete = indexed.get(
                     delivery_key("public-delete", old.get("channel_id"), old["message_id"])
                 )
                 if not previous_delete or previous_delete["state"] not in {
