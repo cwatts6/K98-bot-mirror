@@ -144,8 +144,15 @@ async def test_dm_loads_once_and_restores_before_normal_admission(monkeypatch):
     monkeypatch.setattr(scheduler, "_dm_startup_state", "not_started")
     monkeypatch.setattr(scheduler, "_dm_startup_error", None)
     monkeypatch.setattr(scheduler, "_dm_startup_lock", asyncio.Lock())
-    monkeypatch.setattr(scheduler, "load_dm_sent_tracker", lambda: calls.append("sent"))
-    monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker", lambda: calls.append("scheduled"))
+
+    async def load_sent():
+        calls.append("sent")
+
+    async def load_scheduled():
+        calls.append("scheduled")
+
+    monkeypatch.setattr(scheduler, "load_dm_sent_tracker_async", load_sent)
+    monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker_async", load_scheduled)
     monkeypatch.setattr(event_cache, "get_upcoming_event_cache_snapshot", lambda: current)
 
     async def restore(_bot):
@@ -209,8 +216,12 @@ async def test_dm_cleanup_admits_startup_only_after_confirmed_disposition(
     monkeypatch.setattr(scheduler, "_dm_startup_state", "not_started")
     monkeypatch.setattr(scheduler, "_dm_startup_error", None)
     monkeypatch.setattr(scheduler, "_dm_startup_lock", asyncio.Lock())
-    monkeypatch.setattr(scheduler, "load_dm_sent_tracker", lambda: None)
-    monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker", lambda: None)
+
+    async def loaded():
+        pass
+
+    monkeypatch.setattr(scheduler, "load_dm_sent_tracker_async", loaded)
+    monkeypatch.setattr(scheduler, "load_dm_scheduled_tracker_async", loaded)
     monkeypatch.setattr(scheduler, "utcnow", lambda: now)
     monkeypatch.setattr(scheduler, "make_event_id", lambda _event: "event")
     monkeypatch.setattr(
@@ -228,6 +239,7 @@ async def test_dm_cleanup_admits_startup_only_after_confirmed_disposition(
     async def reminder(*_args):
         pass
 
+    monkeypatch.setattr(scheduler, "_dm_eligible", lambda *_: True)
     monkeypatch.setattr(scheduler, "delayed_user_dm", reminder)
     monkeypatch.setattr(scheduler, "send_user_reminder", reminder)
     monkeypatch.setattr(
@@ -235,7 +247,7 @@ async def test_dm_cleanup_admits_startup_only_after_confirmed_disposition(
     )
     if failure == "save":
 
-        def fail_save():
+        def fail_save(*args):
             raise PermissionError("test persistence failure")
 
         monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker", fail_save)
@@ -247,9 +259,12 @@ async def test_dm_cleanup_admits_startup_only_after_confirmed_disposition(
         assert scheduler.dm_startup_report()["state"] == (
             "complete" if failure is None else "unconfirmed"
         )
-        assert markers == {"event": {"2": {3600 - seconds_until}}}
+        expected = {"event": {"2": {3600 - seconds_until}}}
+        if failure == "item":
+            expected["event"]["1"] = {"invalid"}
+        assert markers == expected
         assert len(tasks) == 1
-        if failure != "save":
+        if failure is None:
             assert json.loads(path.read_text(encoding="utf-8")) == {
                 "event": {"2": [3600 - seconds_until]}
             }

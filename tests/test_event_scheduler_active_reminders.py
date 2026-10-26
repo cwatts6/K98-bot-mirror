@@ -216,13 +216,15 @@ async def test_fetch_failure_preserves_raw_ids(monkeypatch, isolated_tracker, bo
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["deleted", "missing", "error", "cancelled"])
-async def test_delete_finally_persists_removal(isolated_tracker, outcome):
+async def test_delete_preserves_uncertainty_and_persists_only_confirmed_removal(
+    isolated_tracker, outcome
+):
     msg = message()
     scheduler.active_reminders["old"] = msg
     scheduler.active_reminders["keep"] = message(102)
     if outcome == "missing":
         msg.delete.side_effect = discord.NotFound(
-            SimpleNamespace(status=404, reason="Not Found"), "missing"
+            SimpleNamespace(status=404, reason="Not Found"), {"code": 10008, "message": "missing"}
         )
     elif outcome == "error":
         msg.delete.side_effect = RuntimeError("delete failed")
@@ -235,10 +237,14 @@ async def test_delete_finally_persists_removal(isolated_tracker, outcome):
     else:
         await scheduler.safe_delete_reminder("old")
 
-    assert set(scheduler.active_reminders) == {"keep"}
-    assert json.loads(isolated_tracker.read_text()) == {
-        "keep": {"channel_id": 42, "message_id": 102}
-    }
+    if outcome in {"error", "cancelled"}:
+        assert set(scheduler.active_reminders) == {"old", "keep"}
+        assert not isolated_tracker.exists()
+    else:
+        assert set(scheduler.active_reminders) == {"keep"}
+        assert json.loads(isolated_tracker.read_text()) == {
+            "keep": {"channel_id": 42, "message_id": 102}
+        }
 
 
 @pytest.mark.asyncio
@@ -259,7 +265,7 @@ async def test_orphan_cleanup_uses_raw_ids_and_skips_empty_cache(monkeypatch, is
     monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [live])
     loaded = await scheduler.load_active_reminders(bot_for(msg))
     await scheduler.cleanup_orphaned_reminders(loaded)
-    assert set(json.loads(isolated_tracker.read_text())) == {eid}
+    assert set(json.loads(isolated_tracker.read_text())) == set(raw)
     assert scheduler.active_reminders == {eid: msg}
     msg.delete.assert_not_awaited()
 
@@ -285,8 +291,8 @@ async def test_public_send_preserves_order_mentions_and_saved_identity(
 
     async def send(**kwargs):
         calls.append("send")
-        assert scheduler.active_reminders[eid] is previous
-        assert not isolated_tracker.exists()
+        assert eid not in scheduler.active_reminders
+        assert json.loads(isolated_tracker.read_text()) == {}
         assert kwargs["content"] == ("@everyone" if hours in (0, 1) else None)
         assert set(kwargs) == {"content", "embed", "view"}
         assert kwargs["view"].prefix == "reminder_major"
@@ -297,7 +303,6 @@ async def test_public_send_preserves_order_mentions_and_saved_identity(
 
     def save():
         calls.append("save")
-        assert scheduler.active_reminders[eid] is new
         original_save()
 
     previous.delete.side_effect = delete
@@ -305,8 +310,12 @@ async def test_public_send_preserves_order_mentions_and_saved_identity(
     channel = SimpleNamespace(send=AsyncMock(side_effect=send))
     bot = SimpleNamespace(get_channel=Mock(return_value=channel))
     await scheduler.send_reminder_at(bot, 42, live, timedelta(hours=hours))
-    assert calls == ["delete", "send", "save"]
-    assert json.loads(isolated_tracker.read_text())[eid]["message_id"] == 101
+    if delete_fails:
+        assert calls == ["delete"]
+        assert scheduler.active_reminders[eid] is previous
+    else:
+        assert calls == ["delete", "save", "send", "save"]
+        assert json.loads(isolated_tracker.read_text())[eid]["message_id"] == 101
 
 
 @pytest.mark.asyncio
@@ -328,9 +337,13 @@ async def test_public_send_failure_keeps_existing_contract(
         monkeypatch.setattr(scheduler, "atomic_json_write", Mock(side_effect=OSError("disk full")))
     bot = SimpleNamespace(get_channel=Mock(return_value=None if failure == "channel" else channel))
     await scheduler.send_reminder_at(bot, 42, live, timedelta(0))
-    assert isolated_tracker.read_bytes() == old_bytes
-    assert scheduler.active_reminders[eid] is (new if failure == "save" else previous)
-    if failure == "false-t0":
+    if failure == "send":
+        assert json.loads(isolated_tracker.read_text()) == {}
+        assert eid not in scheduler.active_reminders
+    else:
+        assert isolated_tracker.read_bytes() == old_bytes
+        assert scheduler.active_reminders[eid] is (new if failure == "save" else previous)
+    if failure in {"false-t0", "channel"}:
         previous.delete.assert_not_awaited()
         channel.send.assert_not_awaited()
     else:
@@ -384,7 +397,7 @@ async def test_t0_expiry_preserves_end_time_delay_and_persists_deletion(
     bot = SimpleNamespace(get_channel=Mock(return_value=channel))
     pending = []
     monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [live])
-    monkeypatch.setattr(scheduler.asyncio, "create_task", pending.append)
+    monkeypatch.setattr(scheduler.delivery, "own", lambda coro, **kw: pending.append(coro))
     sleep = AsyncMock()
     monkeypatch.setattr(scheduler.asyncio, "sleep", sleep)
 

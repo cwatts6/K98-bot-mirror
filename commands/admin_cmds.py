@@ -1130,14 +1130,17 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @is_admin_and_notify_channel()
     @track_usage()
     async def status_command(ctx):
-        await safe_defer(ctx, ephemeral=True)
+        from core.private_status_response import PrivateStatusResponse
+        from services.operator_status_service import check_sql
+
+        response = PrivateStatusResponse(ctx)
+        if not await response.acknowledge():
+            return
 
         # --- Check DB connection
         try:
-            with _conn() as conn:
-                conn.execute("SELECT 1")  # architecture-check: allow
-            db_ok = True
-            db_status = "🟢 SQL connected"
+            db_ok, db_message = await check_sql()
+            db_status = f"{'🟢' if db_ok is True else '🟠' if db_ok is None else '🔴'} {db_message}"
         except Exception as e:
             db_ok = False
             db_status = _safe_operator_field(
@@ -1170,7 +1173,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
         ws_latency_ms = int(getattr(bot, "latency", 0) * 1000)
 
         # Overall status colour
-        if db_ok and gsheets_ok:
+        if db_ok is None or gsheets_ok is None:
+            colour = discord.Color.orange()
+            headline = "Health checks still in progress"
+        elif db_ok and gsheets_ok:
             colour = discord.Color.green()
             headline = "All systems operational ✅"
         elif db_ok or gsheets_ok:
@@ -1196,9 +1202,12 @@ def register_admin(bot: ext_commands.Bot) -> None:
         if not recovery_ok:
             embed.description = "Recovery monitoring needs attention"
             embed.colour = discord.Color.orange()
-        await ctx.interaction.edit_original_response(
-            embed=_validated_operator_embed(embed), view=RecoveryEntryView()
+        from services.event_delivery_service import evidence_summary
+
+        embed.add_field(
+            name="Event delivery evidence", value=await evidence_summary(), inline=False
         )
+        await response.complete(embed=_validated_operator_embed(embed), view=RecoveryEntryView())
 
     @ops_group.command(
         name="logs",

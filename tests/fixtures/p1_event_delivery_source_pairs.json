@@ -1,0 +1,52 @@
+[
+  {
+    "path": "bot_instance.py",
+    "before": "14a70a0f1ad2482f09087aa9537611d4f123303ba0f57b783e74a3a7c91a67d7",
+    "after": "1f2d0440db1ca2ed010b4e32380aa43a84bfd57c2b23105c59050d5405046f71"
+  },
+  {
+    "path": "commands/admin_cmds.py",
+    "before": "127ba295ff0867ce4ab436ac1ac6b81ee9ea705d81e3212d89abf87a62f96902",
+    "after": "ef6381ff09fa80e74351b3416bc96b8e4f8c0cebcf17cb04cbe1858f348e0208"
+  },
+  {
+    "path": "commands/events_cmds.py",
+    "before": "582d5ad08df48f4ce9e550d2a4ffed1a27a1b11fbc9106838e9b40cba4660b3c",
+    "after": "6d3a6e1a3040d0e7c622933564192232fa3ae552ab4d5a759c6aee61b0696d9b"
+  },
+  {
+    "path": "daily_KVK_overview_embed.py",
+    "before": "1f58466cbc2cedccc6f9bb2529069c1a6cd84a02bd12ab1787b77bd8fde7f7e6",
+    "after": "44d482aff30c46308c30863e902f239d715bbb9e65b699a0837a5b40cb1b9ea7"
+  },
+  {
+    "path": "event_scheduler.py",
+    "before": "7413c86590cae9c4a0dc72a0471edf7f98d4a1f9735d0ab78c77649de0bd7f77",
+    "after": "6effbda647a71df4e90f47bb0fa6e10c60e5ac0cb784972309d9b3e3ad534559"
+  },
+  {
+    "path": "player_self_service/reminder_service.py",
+    "before": "9a7b88a9a684176ed57682dc2a19b6f1594888aae232135e0deed9a86ba99f71",
+    "after": "0fb44159f6fbf2b966e67f009dc72cf7c50133a02e8b0cbdd4a9430b54ff6df5"
+  },
+  {
+    "path": "rehydrate_views.py",
+    "before": "6a198123398afcf5563429e8209fab4dda8648021b4286e0c430512eaa626e2e",
+    "after": "25ccb6739752c75c24477301289a8bcdad52fb1b3505e66f2fbdf7f3d88f6cf6"
+  },
+  {
+    "path": "reminder_task_registry.py",
+    "before": "90bc1bb92391d37021a588ef8bfb8f196029d3511d73f1a04b262c9635084ab2",
+    "after": "2a20d33151718f43553c29aaee267e8acd63749aee4ec7443be19343a83d2a38"
+  },
+  {
+    "path": "services/gsheets_health_service.py",
+    "before": "bf9eb77ae84111980551dce8cc41a8b7e72e5f4ab19a3c6656f1b813072313a6",
+    "after": "f9c90733693ab754b5ff2f2e5f48d2756690a004294636707c8dcf348bdb2870"
+  },
+  {
+    "path": "services/recovery_health.py",
+    "before": "7fd60207865daa42f82dfe4fbcbc5cda37e7e109c0f18967f985a4d30b1b2b18",
+    "after": "e012fdbf52824262ae26c2cf4170d77b40e26d8ad1acd78a06e1c12326bd4422"
+  }
+]

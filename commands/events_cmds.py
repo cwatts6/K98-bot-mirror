@@ -229,9 +229,11 @@ def register_events(bot: ext_commands.Bot) -> None:
             if snapshot.ok and (
                 result is None or result.status not in {"pending", "closed", "cancelled"}
             ):
-                await post_or_update_daily_KVK_overview(bot, event_channel_id=KVK_EVENT_CHANNEL_ID)
+                disposition = await post_or_update_daily_KVK_overview(
+                    bot, event_channel_id=KVK_EVENT_CHANNEL_ID
+                )
                 publication = (
-                    "Overview publication attempted; delivery is not independently verified."
+                    f"Overview disposition: {disposition}. Live visual acceptance is separate."
                 )
             ts_text = (
                 snapshot.last_refreshed.strftime("%Y-%m-%d %H:%M:%S UTC")

@@ -1,0 +1,102 @@
+"""Local event-delivery receipts. Existing SQL/export authority is unrelated.
+
+An entered operation is never retried implicitly, even after restart. This is an
+evidence journal, not a queue. Unknown and acknowledged receipts are not aged out.
+"""
+
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
+import time
+
+from filelock import FileLock
+
+from file_utils import atomic_json_write
+
+
+class DeliveryHeld(RuntimeError):
+    """Retained evidence does not authorize dispatch."""
+
+
+def delivery_key(*parts):
+    return hashlib.sha256(json.dumps(parts, separators=(",", ":")).encode()).hexdigest()
+
+
+class EventDeliveryStore:
+    def __init__(self, path):
+        self.path = Path(path)
+
+    def _read(self):
+        if not self.path.exists():
+            return {"schema": 1, "operations": {}}
+        if self.path.stat().st_size > 8 * 1024 * 1024:
+            raise DeliveryHeld("Event delivery journal is full; retain and inspect evidence.")
+        data = json.loads(self.path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("schema") != 1:
+            raise DeliveryHeld("Invalid event delivery journal.")
+        rows = data.get("operations")
+        if not isinstance(rows, dict) or any(
+            not isinstance(row, dict)
+            or row.get("state") not in {"entered", "acknowledged", "not_found", "refused"}
+            for row in rows.values()
+        ):
+            raise DeliveryHeld("Invalid event delivery receipts.")
+        return data
+
+    def _access(self, operation, *, write=False):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with FileLock(str(self.path) + ".lck", timeout=5):
+            data = self._read()
+            result = operation(data["operations"])
+            if write:
+                if len(json.dumps(data).encode()) > 8 * 1024 * 1024:
+                    raise DeliveryHeld("Event delivery journal is full.")
+                atomic_json_write(str(self.path), data)
+            return deepcopy(result)
+
+    def get(self, key):
+        return self._access(lambda rows: rows.get(key))
+
+    def rows(self):
+        return self._access(lambda rows: list(rows.values()))
+
+    def begin(
+        self, key, *, kind, target, event=None, window=None, message_id=None, event_data=None
+    ):
+        def mutate(rows):
+            if key in rows:
+                return False
+            rows[key] = dict(
+                key=key,
+                kind=kind,
+                target=str(target),
+                event=event,
+                window=window,
+                state="entered",
+                entered_at=time.time(),
+            )
+            if message_id is not None:
+                rows[key]["message_id"] = int(message_id)
+            if event_data is not None:
+                rows[key]["event_data"] = deepcopy(event_data)
+            return True
+
+        return self._access(mutate, write=True)
+
+    def finish(self, key, state, *, message_id=None, channel_id=None):
+        if state not in {"acknowledged", "not_found", "refused"}:
+            raise ValueError("Invalid terminal delivery state")
+
+        def mutate(rows):
+            row = rows[key]
+            if row["state"] != "entered":
+                raise DeliveryHeld("Delivery receipt already settled.")
+            row.update(state=state, completed_at=time.time())
+            if message_id is not None:
+                row["message_id"] = int(message_id)
+            if channel_id is not None:
+                row["channel_id"] = int(channel_id)
+            return row
+
+        return self._access(mutate, write=True)

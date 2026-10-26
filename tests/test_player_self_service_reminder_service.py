@@ -301,7 +301,7 @@ async def test_confirm_unsubscribe_revalidates_stale_confirmation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_confirm_unsubscribe_cleans_trackers_before_removing_config() -> None:
+async def test_confirm_unsubscribe_closes_eligibility_before_cancellation() -> None:
     calls = []
     confirmation = reminder_service.ReminderUnsubscribeConfirmation(
         event_types=("ruins",),
@@ -318,17 +318,13 @@ async def test_confirm_unsubscribe_cleans_trackers_before_removing_config() -> N
         config_loader=lambda _uid: {"subscriptions": ["ruins"], "reminder_times": ["24h", "1h"]},
         remover=lambda uid: calls.append(("remove", uid)) or True,
         task_canceller=task_canceller,
-        scheduled_purger=lambda uid: calls.append(("scheduled", uid)) or 3,
-        sent_purger=lambda uid: calls.append(("sent", uid)) or 4,
     )
 
     assert result.ok is True
     assert result.action == "unsubscribe"
     assert calls == [
-        ("cancel", 42),
-        ("scheduled", 42),
-        ("sent", 42),
         ("remove", 42),
+        ("cancel", 42),
     ]
     assert result.dm_message is not None
 
@@ -356,32 +352,25 @@ async def test_confirm_unsubscribe_keeps_tracker_access_on_event_loop_thread() -
         config_loader=config_loader,
         remover=lambda _uid: calls.append(("remove", threading.get_ident())) or True,
         task_canceller=task_canceller,
-        scheduled_purger=lambda _uid: calls.append(("scheduled", threading.get_ident())) or 2,
-        sent_purger=lambda _uid: calls.append(("sent", threading.get_ident())) or 3,
     )
 
     assert result.ok is True
     assert calls == [
         ("loader", loop_thread),
-        ("cancel", loop_thread),
-        ("scheduled", loop_thread),
-        ("sent", loop_thread),
         ("remove", loop_thread),
+        ("cancel", loop_thread),
     ]
 
 
 @pytest.mark.asyncio
-async def test_confirm_unsubscribe_reports_tracker_failure() -> None:
+async def test_confirm_unsubscribe_reports_committed_removal_if_cancellation_fails() -> None:
     confirmation = reminder_service.ReminderUnsubscribeConfirmation(
         event_types=("ruins",),
         reminder_times=("24h",),
     )
 
     async def task_canceller(_uid):
-        return 0
-
-    def scheduled_purger(_uid):
-        raise OSError("tracker locked")
+        raise OSError("cancellation observation failed")
 
     result = await reminder_service.confirm_unsubscribe(
         42,
@@ -389,12 +378,10 @@ async def test_confirm_unsubscribe_reports_tracker_failure() -> None:
         config_loader=lambda _uid: {"subscriptions": ["ruins"], "reminder_times": ["24h"]},
         remover=lambda _uid: True,
         task_canceller=task_canceller,
-        scheduled_purger=scheduled_purger,
-        sent_purger=lambda _uid: 0,
     )
 
-    assert result.ok is False
-    assert "Failed to unsubscribe" in result.message
+    assert result.ok is True
+    assert "unsubscribed" in result.message and "may still complete" in result.message
 
 
 def test_reminder_service_has_no_ui_framework_dependency() -> None:

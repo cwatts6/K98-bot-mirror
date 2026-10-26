@@ -43,7 +43,7 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
     monkeypatch.setattr(scheduler, "rehydrate_dm_scheduled_tasks", no_op_async)
     monkeypatch.setattr(scheduler, "cleanup_dm_scheduled_tracker_async", no_op_async)
     monkeypatch.setattr(scheduler, "cleanup_dm_sent_tracker_async", no_op_async)
-    monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker", lambda: None)
+    monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker", lambda *_: None)
     monkeypatch.setattr(scheduler, "REMINDER_WINDOWS", ())
     monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [event])
     monkeypatch.setattr(

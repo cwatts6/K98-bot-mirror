@@ -354,6 +354,28 @@ STARTUP_CACHE_FOUNDATIONS_PATHS = frozenset(
 )
 
 
+EVENT_DELIVERY_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "commands/admin_cmds.py",
+        "commands/events_cmds.py",
+        "core/private_status_response.py",
+        "daily_KVK_overview_embed.py",
+        "event_scheduler.py",
+        "player_self_service/reminder_service.py",
+        "rehydrate_views.py",
+        "reminder_task_registry.py",
+        "services/event_delivery_service.py",
+        "services/event_delivery_store.py",
+        "services/gsheets_health_service.py",
+        "services/operator_status_dal.py",
+        "services/operator_status_service.py",
+        "services/overview_delivery_service.py",
+        "services/recovery_health.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -366,7 +388,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 42:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 43:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -418,6 +440,9 @@ def reviewed_transitions():
             fixed_startup_foundations = (
                 item["id"] == "startup_cache_foundations_v1"
                 and path in STARTUP_CACHE_FOUNDATIONS_PATHS
+            )
+            fixed_event_delivery = (
+                item["id"] == "p1_event_delivery_v1" and path in EVENT_DELIVERY_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -499,6 +524,7 @@ def reviewed_transitions():
                     or fixed_export_contention
                     or fixed_event_cache
                     or fixed_startup_foundations
+                    or fixed_event_delivery
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -612,6 +638,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed export-contention/handoff transition required.")
         if item["id"] == "event_cache_readiness_v1" and paths != EVENT_CACHE_READINESS_PATHS:
             raise ValueError("Complete fixed event-cache readiness transition required.")
+        if item["id"] == "p1_event_delivery_v1" and paths != EVENT_DELIVERY_PATHS:
+            raise ValueError("Complete fixed event-delivery transition required.")
         if (
             item["id"] == "startup_cache_foundations_v1"
             and paths != STARTUP_CACHE_FOUNDATIONS_PATHS

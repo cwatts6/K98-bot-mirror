@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,7 +14,7 @@ class _DummyUser:
         self.display_name = f"user-{uid}"
 
     async def send(self, embed=None):
-        return None
+        return SimpleNamespace(id=88, channel=SimpleNamespace(id=99))
 
 
 @pytest.mark.asyncio
@@ -55,6 +56,9 @@ async def test_save_trackers_coalesced_noop_when_no_flags(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_send_user_reminder_coalesced_single_persist(monkeypatch):
+    monkeypatch.setattr(
+        es, "get_user_config", lambda _: {"subscriptions": ["all"], "reminder_times": ["1h"]}
+    )
     # isolate globals
     es.dm_sent_tracker.clear()
     es.dm_scheduled_tracker.clear()

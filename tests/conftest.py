@@ -45,6 +45,26 @@ if os.getenv("TEST_FAKE_HEAVY_DEPS", "0") == "1":
 # ----------------------------
 # Test helpers / fixtures
 # ----------------------------
+@pytest.fixture(autouse=True)
+def _isolate_event_delivery_evidence(monkeypatch, tmp_path):
+    # New persistence must never reach developer/operational data during tests.
+    module = sys.modules.get("services.event_delivery_service")
+    if module is not None:
+        from services.event_delivery_store import EventDeliveryStore
+
+        monkeypatch.setattr(module, "store", EventDeliveryStore(tmp_path / "event-receipts.json"))
+        monkeypatch.setattr(module, "_locks", {})
+        monkeypatch.setattr(module, "_children", set())
+        monkeypatch.setattr(module, "_closed", False)
+    scheduler = sys.modules.get("event_scheduler")
+    if scheduler is not None:
+        monkeypatch.setattr(scheduler, "_unresolved_active", {})
+        monkeypatch.setattr(scheduler, "_active_load_failed", False)
+    registry = sys.modules.get("reminder_task_registry")
+    if registry is not None:
+        monkeypatch.setattr(registry, "_CLOSED", False)
+
+
 @pytest.fixture
 def async_return_factory():
     """

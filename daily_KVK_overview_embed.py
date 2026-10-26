@@ -6,8 +6,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-import os
-
 import discord
 
 from constants import DAILY_KVK_OVERVIEW_TRACKER
@@ -20,125 +18,167 @@ from core.discord_embed_limits import (
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
 from event_utils import serialize_event
+from file_utils import atomic_json_write
 
 # Use the safer, centralized retrying save helper (delegates to file_utils.run_with_retries)
-from rehydrate_views import save_view_tracker_with_retries
+from rehydrate_views import _tracker_store
+from services import event_delivery_service as delivery
+from services.event_delivery_store import DeliveryHeld, delivery_key
+from services.legacy_export_snapshot_service import drain_thread
+from services.overview_delivery_service import MessageAbsent, publish
 from stats_alerts.kvk_meta import is_currently_kvk
 from utils import utcnow  # tz-aware UTC
 
 
-async def post_or_update_daily_KVK_overview(bot, event_channel_id):
-    if not is_currently_kvk():
-        logger.info("[DAILY_KVK_OVERVIEW] Kingdom is not in KVK. Skipping daily KVK overview.")
-        await remove_daily_KVK_overview_embed(bot, event_channel_id)
-        return
+class _OverviewAdapter:
+    def __init__(self, bot, channel_id, upcoming):
+        self.bot, self.channel_id, self.upcoming = bot, channel_id, upcoming
+        self.channel = None
+        self.messages = {}
 
-    try:
-        now = utcnow()
-        next_days = now + timedelta(days=4)
-        # Use future-only list (already sorted) from in-memory cache
-        events = get_all_upcoming_events()
-        upcoming = [e for e in events if e["start_time"] <= next_days]
+    async def identity(self):
+        daily_id = await drain_thread(load_existing_daily_KVK_overview_id)
+        tracked = (await _tracker_store().snapshot()).get("daily_kvk_overview")
+        if tracked:
+            receipt = tracked.get("_restoration_edit")
+            if receipt is not None and (
+                not isinstance(receipt, dict) or receipt.get("state") != "acknowledged"
+            ):
+                raise DeliveryHeld("Overview restoration edit unresolved")
+            if tracked.get("channel_id") != self.channel_id:
+                raise DeliveryHeld("Overview channel identity conflict")
+            tracked_id = tracked["message_id"]
+            if daily_id and daily_id != tracked_id:
+                raise DeliveryHeld("Overview tracker identity conflict")
+            return daily_id or tracked_id
+        return daily_id
 
-        if not upcoming:
-            logger.info(
-                "[DAILY_KVK_OVERVIEW] No upcoming KVK events in next 4 days. Skipping update."
-            )
-            return
+    async def _channel(self):
+        if self.channel is None:
+            self.channel = await self.bot.fetch_channel(self.channel_id)
+        return self.channel
 
-        embed = build_daily_KVK_overview_embed(upcoming)
-        if not isinstance(embed, discord.Embed):
-            logger.error("[DAILY_KVK_OVERVIEW] Embed builder returned None or invalid type!")
-            return
-        channel = await bot.fetch_channel(event_channel_id)
-        msg_id = load_existing_daily_KVK_overview_id()
-
-        if msg_id:
+    async def fetch(self, message_id):
+        if message_id not in self.messages:
+            channel = await self._channel()
             try:
-                msg = await channel.fetch_message(msg_id)
-                prefix = "daily_kvk_overview"
-                await msg.edit(
-                    embed=embed,
-                    view=LocalTimeToggleView(
-                        events=upcoming,
-                        prefix=prefix,
-                        timeout=None,
-                        complete_event_packing=True,
-                    ),
-                )
+                self.messages[message_id] = await channel.fetch_message(message_id)
+            except discord.NotFound as exc:
+                if exc.code == 10008:
+                    raise MessageAbsent() from exc
+                raise
+        return self.messages[message_id]
 
-                # Save view for rehydration (use centralized retrying helper)
-                await save_view_tracker_with_retries(
-                    "daily_kvk_overview",
-                    {
-                        "message_id": msg.id,
-                        "channel_id": channel.id,
-                        "created_at": utcnow().isoformat(),
-                        "events": [serialize_event(e) for e in upcoming],
-                        "prefix": prefix,
-                    },
-                )
-
-                logger.info("[DAILY_KVK_OVERVIEW] Updated existing daily KVK overview embed.")
-                return
-            except discord.NotFound:
-                logger.warning(
-                    "[DAILY_KVK_OVERVIEW] Previous KVK overview message not found. Reposting."
-                )
-
-        # Create new message if not found
-        prefix = "daily_kvk_overview"
-        new_msg = await channel.send(
-            embed=embed,
+    def payload(self):
+        return dict(
+            embed=build_daily_KVK_overview_embed(self.upcoming),
             view=LocalTimeToggleView(
-                events=upcoming,
-                prefix=prefix,
+                events=self.upcoming,
+                prefix="daily_kvk_overview",
                 timeout=None,
                 complete_event_packing=True,
             ),
         )
-        await new_msg.pin()
-        save_daily_KVK_overview_id(new_msg.id)
 
-        # Save view for rehydration (use centralized retrying helper)
-        await save_view_tracker_with_retries(
-            "daily_kvk_overview",
-            {
-                "message_id": new_msg.id,
-                "channel_id": channel.id,
+    async def send(self):
+        channel = await self._channel()
+        message = await channel.send(**self.payload())
+        self.messages[message.id] = message
+        return message.id
+
+    async def edit(self, message_id):
+        message = await self.fetch(message_id)
+        await message.edit(**self.payload())
+        return message.id
+
+    async def pin(self, message_id):
+        message = await self.fetch(message_id)
+        await message.pin()
+        return message.id
+
+    async def absent(self):
+        raise MessageAbsent()
+
+    async def delete(self, message_id):
+        message = await self.fetch(message_id)
+        try:
+            # Deletion also removes a pin. No independent unpin operation whose
+            # failure could hide the disposition of the deletion.
+            await message.delete()
+        except discord.NotFound as exc:
+            if exc.code == 10008:
+                raise MessageAbsent() from exc
+            raise
+        return message.id
+
+    async def save_projection(self, message_id):
+        store = _tracker_store()
+        async with store.locked():
+            data = await store.snapshot()
+            old = data.get("daily_kvk_overview")
+            if old and old.get("message_id") != message_id:
+                raise DeliveryHeld("Overview tracker changed during delivery")
+            if old and old.get("_restoration_edit", {}).get("state") not in {None, "acknowledged"}:
+                raise DeliveryHeld("Overview restoration edit unresolved")
+            data["daily_kvk_overview"] = {
+                "message_id": message_id,
+                "channel_id": self.channel_id,
                 "created_at": utcnow().isoformat(),
-                "events": [serialize_event(e) for e in upcoming],
-                "prefix": prefix,
-            },
+                "events": [serialize_event(e) for e in self.upcoming],
+                "prefix": "daily_kvk_overview",
+            }
+            await store.write(data)
+        await drain_thread(save_daily_KVK_overview_id, message_id)
+
+    async def remove_projection(self, message_id):
+        store = _tracker_store()
+        async with store.locked():
+            data = await store.snapshot()
+            old = data.get("daily_kvk_overview")
+            if old:
+                if old.get("message_id") != message_id or old.get("channel_id") != self.channel_id:
+                    raise DeliveryHeld("Overview tracker changed during removal")
+                data.pop("daily_kvk_overview")
+                await store.write(data)
+        current = await drain_thread(load_existing_daily_KVK_overview_id)
+        if current and current != message_id:
+            raise DeliveryHeld("Daily overview identity changed during removal")
+        if current:
+            await drain_thread(atomic_json_write, DAILY_KVK_OVERVIEW_TRACKER, {})
+
+
+async def _publish_overview(bot, event_channel_id, *, enabled):
+    now = utcnow()
+    upcoming = [e for e in get_all_upcoming_events() if e["start_time"] <= now + timedelta(days=4)]
+    revision = delivery_key(now.date().isoformat(), [serialize_event(e) for e in upcoming])
+    try:
+        return await publish(
+            _OverviewAdapter(bot, event_channel_id, upcoming),
+            event_channel_id,
+            enabled=enabled,
+            has_events=bool(upcoming),
+            revision=revision,
         )
+    except Exception as exc:
+        logger.warning(
+            "[DAILY_KVK_OVERVIEW] disposition=unconfirmed error_type=%s", type(exc).__name__
+        )
+        return "unconfirmed"
 
-        logger.info("[DAILY_KVK_OVERVIEW] Posted new daily KVK overview embed.")
 
-    except Exception:
-        logger.exception("[DAILY_KVK_OVERVIEW] Failed to post or update embed")
+async def post_or_update_daily_KVK_overview(bot, event_channel_id):
+    task = delivery.own(
+        _publish_overview(bot, event_channel_id, enabled=is_currently_kvk()),
+        name="daily-kvk-overview",
+    )
+    return await task if task else "closed"
 
 
 async def remove_daily_KVK_overview_embed(bot, event_channel_id):
-    msg_id = load_existing_daily_KVK_overview_id()
-    if not msg_id:
-        return
-    try:
-        channel = await bot.fetch_channel(event_channel_id)
-        msg = await channel.fetch_message(msg_id)
-        await msg.unpin()
-        await msg.delete()
-        logger.info("[DAILY_KVK_OVERVIEW] Unpinned and deleted outdated KVK overview embed.")
-    except discord.Forbidden:
-        logger.warning("[DAILY_OVERVIEW] Missing permissions to unpin/delete daily overview.")
-    except discord.NotFound:
-        logger.warning("[DAILY_OVERVIEW] Message already gone when attempting to remove.")
-    except Exception:
-        logger.exception("[DAILY_OVERVIEW] Failed to remove embed")
-    finally:
-        try:
-            os.remove(DAILY_KVK_OVERVIEW_TRACKER)
-        except Exception:
-            pass
+    task = delivery.own(
+        _publish_overview(bot, event_channel_id, enabled=False), name="daily-kvk-overview-removal"
+    )
+    return await task if task else "closed"
 
 
 # ---- Embed Generator ----
@@ -274,15 +314,18 @@ def build_daily_KVK_overview_embed(events):
 
 # ---- Tracker for pin/update ----
 def load_existing_daily_KVK_overview_id():
-    if os.path.exists(DAILY_KVK_OVERVIEW_TRACKER):
-        try:
-            with open(DAILY_KVK_OVERVIEW_TRACKER) as f:
-                return json.load(f).get("message_id")
-        except Exception:
-            pass
-    return None
+    try:
+        with open(DAILY_KVK_OVERVIEW_TRACKER, encoding="utf-8") as stream:
+            data = json.load(stream)
+    except FileNotFoundError:
+        return None
+    if not isinstance(data, dict):
+        raise DeliveryHeld("Invalid daily overview tracker")
+    message_id = data.get("message_id")
+    if message_id is not None and (type(message_id) is not int or message_id <= 0):
+        raise DeliveryHeld("Invalid daily overview message identity")
+    return message_id
 
 
 def save_daily_KVK_overview_id(msg_id):
-    with open(DAILY_KVK_OVERVIEW_TRACKER, "w") as f:
-        json.dump({"message_id": msg_id}, f)
+    atomic_json_write(DAILY_KVK_OVERVIEW_TRACKER, {"message_id": int(msg_id)})

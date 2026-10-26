@@ -8,10 +8,6 @@ import logging
 from typing import Any, Literal
 
 from constants import DEFAULT_REMINDER_TIMES, VALID_TYPES
-from dm_tracker_utils import (
-    purge_user_from_dm_scheduled_tracker,
-    purge_user_from_dm_sent_tracker,
-)
 from reminder_task_registry import cancel_and_wait_user_tasks
 from subscription_tracker import get_user_config, remove_user, set_user_config
 
@@ -23,7 +19,6 @@ ConfigLoader = Callable[[int | str], dict[str, Any] | None]
 ConfigWriter = Callable[[int | str, str, list[str], list[str]], None]
 ConfigRemover = Callable[[int | str], bool]
 TaskCanceller = Callable[[int | str], Awaitable[int]]
-TrackerPurger = Callable[[int | str], int]
 
 
 async def _cancel_user_tasks_for_unsubscribe(user_id: int | str) -> int:
@@ -286,8 +281,6 @@ async def confirm_unsubscribe(
     config_loader: ConfigLoader = get_user_config,
     remover: ConfigRemover = remove_user,
     task_canceller: TaskCanceller = _cancel_user_tasks_for_unsubscribe,
-    scheduled_purger: TrackerPurger = purge_user_from_dm_scheduled_tracker,
-    sent_purger: TrackerPurger = purge_user_from_dm_sent_tracker,
 ) -> ReminderMutationResult:
     state = await build_reminder_centre_state(
         int(discord_user_id),
@@ -316,9 +309,6 @@ async def confirm_unsubscribe(
         )
 
     try:
-        cancelled = await task_canceller(int(discord_user_id))
-        scheduled_removed = scheduled_purger(int(discord_user_id))
-        sent_removed = sent_purger(int(discord_user_id))
         removed = remover(int(discord_user_id))
     except Exception:
         logger.exception(
@@ -337,12 +327,22 @@ async def confirm_unsubscribe(
             message="You are already unsubscribed.",
         )
 
+    # Close eligibility durably before yielding to task cancellation. Preserve
+    # sent/uncertain receipts so resubscribing cannot repeat an accepted window.
+    try:
+        cancelled = await task_canceller(int(discord_user_id))
+    except Exception as exc:
+        logger.warning("reminder_unsubscribe_drain_unconfirmed error_type=%s", type(exc).__name__)
+        return ReminderMutationResult(
+            ok=True,
+            action="unsubscribe",
+            message="You are unsubscribed. A reminder already in progress may still complete.",
+        )
+
     logger.info(
-        "player_self_service_reminders_unsubscribed user_id=%s tasks_cancelled=%s scheduled_removed=%s sent_removed=%s",
+        "player_self_service_reminders_unsubscribed user_id=%s tasks_cancelled=%s evidence=retained",
         discord_user_id,
         cancelled,
-        scheduled_removed,
-        sent_removed,
     )
     return ReminderMutationResult(
         ok=True,

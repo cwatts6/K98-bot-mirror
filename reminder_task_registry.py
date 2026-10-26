@@ -34,6 +34,12 @@ _META: weakref.WeakKeyDictionary[asyncio.Task[Any], dict[str, Any]] = weakref.We
 
 # Thread-safe guard for internal structures (re-entrant)
 _LOCK = threading.RLock()
+_CLOSED = False
+
+
+def close_admission():
+    global _CLOSED
+    _CLOSED = True
 
 
 def _uid(user_id) -> str:
@@ -54,6 +60,9 @@ def register_user_task(
       it completes. The callback is defensive and logs failures.
     """
     uid = _uid(user_id)
+
+    if _CLOSED:
+        task.cancel()
 
     with _LOCK:
         bucket = _TASKS.setdefault(uid, set())
@@ -76,6 +85,10 @@ def register_user_task(
 
     def _cleanup(t: asyncio.Task[Any]):
         try:
+            if not t.cancelled() and t.exception() is not None:
+                logger.error(
+                    "[TASK_REGISTRY] child_failed error_type=%s", type(t.exception()).__name__
+                )
             with _LOCK:
                 # discard from the set; if empty remove the bucket
                 bucket.discard(t)
@@ -353,21 +366,16 @@ async def cancel_all_and_wait(timeout: float | None = None) -> int:
         except Exception:
             logger.exception("[TASK_REGISTRY] cancel_all_and_wait: failed to cancel task %s", t)
 
-    try:
-        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=timeout)
-    except TimeoutError:
-        logger.warning("[TASK_REGISTRY] cancel_all_and_wait timed out timeout=%s", timeout)
-        emit_telemetry_event(
-            {
-                "event": "cancel_all_and_wait",
-                "status": "timeout",
-                "timeout": timeout,
-                "tasks_may_still_run": True,
-                "orphaned_offload_possible": False,
-            }
-        )
-    except Exception:
-        logger.exception("[TASK_REGISTRY] cancel_all_and_wait encountered an error")
+    waiter = asyncio.gather(*tasks, return_exceptions=True)
+    # Observation timeout never authorizes abandoning a persistence finalizer.
+    while not waiter.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout)
+        except TimeoutError:
+            logger.warning("[TASK_REGISTRY] drain pending; retaining tasks and client")
+            timeout = None
+        except asyncio.CancelledError:
+            continue
 
     # count how many were requested to cancel (best-effort)
     cancelled = sum(1 for t in tasks if t.cancelled() or t.done())

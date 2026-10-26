@@ -100,6 +100,7 @@ def report():
     from event_scheduler import dm_startup_report
     from profile_cache import get_cache_stats
     from services.cache_admission_diagnostics import report as admission_report
+    from services.event_delivery_service import report as event_delivery_report
     from services.player_stats_cache_service import report as stats_report
     from target_utils import name_outcome_report
 
@@ -122,6 +123,7 @@ def report():
         "event_cache": refresh_service.report(),
         "event_startup": event_startup_report(),
         "event_dm_startup": dm_startup_report(),
+        "event_delivery_v1": event_delivery_report(),
     }
 
 

@@ -333,6 +333,15 @@ def _tracker_store():
 
 
 async def _restore_tracked_entry(bot, store, key, entry):
+    if key == "daily_kvk_overview" and isinstance(entry, dict):
+        from services.event_delivery_service import operation_lock
+
+        async with operation_lock(("overview", entry.get("channel_id"))):
+            return await _restore_tracked_entry_unlocked(bot, store, key, entry)
+    return await _restore_tracked_entry_unlocked(bot, store, key, entry)
+
+
+async def _restore_tracked_entry_unlocked(bot, store, key, entry):
     async def prune(reason):
         receipt = entry.get(EDIT_RECEIPT) if isinstance(entry, dict) else None
         if receipt is not None and (
@@ -353,7 +362,16 @@ async def _restore_tracked_entry(bot, store, key, entry):
         )
     except Exception as exc:
         if _is_prunable_fetch_exception(exc):
-            return await prune("inaccessible")
+            reason = (
+                "message_not_found"
+                if getattr(exc, "code", None) == 10008
+                else (
+                    "forbidden"
+                    if isinstance(exc, discord.Forbidden)
+                    else "inaccessible_unclassified"
+                )
+            )
+            return await prune(reason)
         return EntryOutcome("failed", "fetch_" + type(exc).__name__)
 
     safe_prefix = sanitize_view_prefix(normalized.get("prefix") or key, max_len=_PREFIX_MAX_LEN)
@@ -376,6 +394,10 @@ async def _restore_tracked_entry(bot, store, key, entry):
         try:
             # No await between final identity check and local registration.
             bot.add_view(view, message_id=normalized["message_id"])
+            logger.info(
+                "[VIEW] registered_handler visible_component_count=%s callback_acceptance=unverified",
+                len(getattr(message, "components", ()) or ()),
+            )
             return EntryOutcome("attached")
         except (TypeError, AttributeError):
             pass  # The historical compatibility path below is receipt guarded.

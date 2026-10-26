@@ -32,7 +32,7 @@ from core.discord_embed_limits import (
 )
 from embed_utils import LocalTimeToggleView, fmt_short
 from event_cache import get_all_upcoming_events
-from file_utils import atomic_json_write, atomic_write_json, run_blocking_in_thread
+from file_utils import atomic_json_write, atomic_write_json
 from registry.governor_registry import load_registry
 from reminder_domain.kvk_candidates import (
     build_kvk_alert_projection,
@@ -42,7 +42,10 @@ from reminder_domain.kvk_candidates import (
     subscription_matches_event as _subscription_matches_event,
 )
 from reminder_task_registry import register_user_task
-from subscription_tracker import get_all_subscribers
+from services import event_delivery_service as delivery
+from services.event_delivery_store import delivery_key
+from services.legacy_export_snapshot_service import drain_thread
+from subscription_tracker import get_all_subscribers, get_user_config
 from utils import ensure_aware_utc, parse_isoformat_utc, utcnow
 
 
@@ -127,6 +130,8 @@ def _extract_event_ts(event_id: str) -> str | None:
 
 sent_reminders = {}  # {event_id: set[timedelta]}
 active_reminders = {}  # {event_id: discord.Message}
+_unresolved_active = {}
+_active_load_failed = False
 
 EXPIRY_DELAY = 3600  # 1 hour in seconds
 
@@ -275,7 +280,6 @@ def _read_dm_snapshot(path):
 async def _ensure_dm_startup(bot):
     global _dm_startup_state, _dm_startup_error
     from event_cache import get_upcoming_event_cache_snapshot
-    from services.legacy_export_snapshot_service import drain_thread
 
     async with _dm_startup_lock:
         if _dm_startup_state == "complete":
@@ -285,8 +289,8 @@ async def _ensure_dm_startup(bot):
         try:
             if _dm_startup_state == "not_started":
                 _dm_startup_state = "loading"
-                await drain_thread(load_dm_sent_tracker)
-                await drain_thread(load_dm_scheduled_tracker)
+                await load_dm_sent_tracker_async()
+                await load_dm_scheduled_tracker_async()
                 _dm_startup_state = "waiting_for_events"
             while True:
                 snapshot = get_upcoming_event_cache_snapshot()
@@ -312,10 +316,7 @@ async def _ensure_dm_startup(bot):
             return False
 
 
-def load_dm_sent_tracker():
-    """Load and migrate dm_sent_tracker to per-user nested dict."""
-    global dm_sent_tracker
-    raw = _read_dm_snapshot(DM_SENT_TRACKER_FILE)
+def _normalize_dm_snapshot(raw, *, scheduled=False):
     migrated = {}
     for event_id, value in (raw.items() if isinstance(raw, dict) else []):
         if isinstance(value, list):
@@ -323,20 +324,26 @@ def load_dm_sent_tracker():
         elif isinstance(value, dict):
             per_user = {}
             for uid, lst in value.items():
-                per_user[str(uid)] = list(lst) if isinstance(lst, list) else []
+                values = lst if isinstance(lst, list) else []
+                per_user[str(uid)] = set(values) if scheduled else list(values)
             migrated[event_id] = per_user
         else:
             migrated[event_id] = {}
-    dm_sent_tracker = migrated
+    return migrated
+
+
+def load_dm_sent_tracker():
+    """Synchronous compatibility entry; async startup publishes on the bot loop."""
+    migrated = _normalize_dm_snapshot(_read_dm_snapshot(DM_SENT_TRACKER_FILE))
+    dm_sent_tracker.clear()
+    dm_sent_tracker.update(migrated)
     logger.info("[DM_TRACKER] Loaded dm_sent_tracker with migration.")
 
 
-def save_dm_sent_tracker():
+def save_dm_sent_tracker(snapshot=None):
     """Persist dm_sent_tracker ensuring inner values are lists."""
     serializable = {}
-    for event_id, per_user in (
-        dm_sent_tracker.items() if isinstance(dm_sent_tracker, dict) else []
-    ):
+    for event_id, per_user in (dm_sent_tracker if snapshot is None else snapshot).items():
         serializable[event_id] = {}
         for uid, lst in (per_user.items() if isinstance(per_user, dict) else []):
             serializable[event_id][str(uid)] = list(lst or [])
@@ -344,12 +351,10 @@ def save_dm_sent_tracker():
     logger.info("[DM_TRACKER] Saved dm_sent_tracker to disk.")
 
 
-def save_dm_scheduled_tracker():
+def save_dm_scheduled_tracker(snapshot=None):
     """Persist dm_scheduled_tracker ensuring inner sets are serialized to lists."""
     serializable = {}
-    for event_id, per_user in (
-        dm_scheduled_tracker.items() if isinstance(dm_scheduled_tracker, dict) else []
-    ):
+    for event_id, per_user in (dm_scheduled_tracker if snapshot is None else snapshot).items():
         serializable[event_id] = {}
         for uid, s in (per_user.items() if isinstance(per_user, dict) else []):
             serializable[event_id][str(uid)] = list(s or set())
@@ -359,57 +364,36 @@ def save_dm_scheduled_tracker():
 
 def load_dm_scheduled_tracker():
     """Load and migrate dm_scheduled_tracker to per-user nested dict with sets."""
-    global dm_scheduled_tracker
-    raw = _read_dm_snapshot(DM_SCHEDULED_TRACKER_FILE)
-    migrated = {}
-    for event_id, value in (raw.items() if isinstance(raw, dict) else []):
-        if isinstance(value, list):
-            migrated[event_id] = {}
-        elif isinstance(value, dict):
-            per_user = {}
-            for uid, lst in value.items():
-                per_user[str(uid)] = set(lst) if isinstance(lst, list) else set()
-            migrated[event_id] = per_user
-        else:
-            migrated[event_id] = {}
-    dm_scheduled_tracker = migrated
+    migrated = _normalize_dm_snapshot(_read_dm_snapshot(DM_SCHEDULED_TRACKER_FILE), scheduled=True)
+    dm_scheduled_tracker.clear()
+    dm_scheduled_tracker.update(migrated)
     logger.info("[DM_TRACKER] Loaded dm_scheduled_tracker with migration.")
 
 
 async def load_dm_sent_tracker_async():
-    if run_blocking_in_thread:
-        await run_blocking_in_thread(load_dm_sent_tracker, name="load_dm_sent_tracker")
-        return
-
-    await asyncio.to_thread(load_dm_sent_tracker)
+    raw = await drain_thread(_read_dm_snapshot, DM_SENT_TRACKER_FILE)
+    dm_sent_tracker.clear()
+    dm_sent_tracker.update(_normalize_dm_snapshot(raw))
 
 
 async def save_dm_sent_tracker_async():
     # lock is centralized here so ALL callsites are protected
     async with _DM_TRACKER_IO_LOCK:
-        if run_blocking_in_thread:
-            await run_blocking_in_thread(save_dm_sent_tracker, name="save_dm_sent_tracker")
-            return
-        await asyncio.to_thread(save_dm_sent_tracker)
+        snapshot = copy.deepcopy(dm_sent_tracker)
+        await drain_thread(save_dm_sent_tracker, snapshot)
 
 
 async def load_dm_scheduled_tracker_async():
-    if run_blocking_in_thread:
-        await run_blocking_in_thread(load_dm_scheduled_tracker, name="load_dm_scheduled_tracker")
-        return
-
-    await asyncio.to_thread(load_dm_scheduled_tracker)
+    raw = await drain_thread(_read_dm_snapshot, DM_SCHEDULED_TRACKER_FILE)
+    dm_scheduled_tracker.clear()
+    dm_scheduled_tracker.update(_normalize_dm_snapshot(raw, scheduled=True))
 
 
 async def save_dm_scheduled_tracker_async():
     # lock is centralized here so ALL callsites are protected
     async with _DM_TRACKER_IO_LOCK:
-        if run_blocking_in_thread:
-            await run_blocking_in_thread(
-                save_dm_scheduled_tracker, name="save_dm_scheduled_tracker"
-            )
-            return
-        await asyncio.to_thread(save_dm_scheduled_tracker)
+        snapshot = copy.deepcopy(dm_scheduled_tracker)
+        await drain_thread(save_dm_scheduled_tracker, snapshot)
 
 
 def log_failed_dm(user_id, event, delta, reason):
@@ -550,9 +534,11 @@ def get_event_thumbnail(event_type: str) -> str:
 
 def save_active_reminders():
     try:
+        if _active_load_failed:
+            raise RuntimeError("Active reminder load unresolved; preserve original file")
         dirpath = os.path.dirname(REMINDER_TRACKING_FILE) or "."
         os.makedirs(dirpath, exist_ok=True)
-        to_save = {}
+        to_save = copy.deepcopy(_unresolved_active)
 
         for eid, msg in active_reminders.items():
             base = {"channel_id": msg.channel.id, "message_id": msg.id}
@@ -582,32 +568,75 @@ def save_active_reminders():
         logger.warning(f"[REMINDER_CACHE] Failed to save: {e}")
 
 
-async def safe_delete_reminder(event_id: str):
-    msg = active_reminders.get(event_id)
-    if not msg:
-        return
+async def safe_delete_reminder(event_id: str, expected_message_id=None):
+    async with delivery.operation_lock(("public", event_id)):
+        return await _delete_reminder(event_id, expected_message_id)
 
-    try:
-        await msg.delete()
-        logger.debug(f"[REMINDER_CACHE] Deleted reminder for {event_id}")
-    except discord.NotFound:
-        logger.warning(f"[REMINDER_CACHE] Reminder already deleted for {event_id}")
-    except Exception as e:
-        logger.warning(f"[REMINDER_CACHE] Error deleting reminder for {event_id}: {e}")
-    finally:
+
+async def _delete_reminder(event_id, expected_message_id=None):
+    msg = active_reminders.get(event_id)
+    if event_id in _unresolved_active:
+        return "unconfirmed"
+    if not msg or (expected_message_id is not None and msg.id != expected_message_id):
+        return "not_current"
+    key = delivery_key("public-delete", msg.channel.id, msg.id)
+    if not await delivery.begin(
+        key, kind="public-delete", target=msg.channel.id, event=event_id, message_id=msg.id
+    ):
+        receipt = await delivery.read(key)
+        if not receipt or receipt["state"] not in {"acknowledged", "not_found"}:
+            return "unconfirmed"
+    else:
+        try:
+            await msg.delete()
+        except discord.NotFound as exc:
+            if exc.code != 10008:
+                return "unconfirmed"
+            await delivery.finish(key, "not_found", message_id=msg.id, channel_id=msg.channel.id)
+        except Exception as exc:
+            logger.warning("[REMINDER_CACHE] delete_unconfirmed error_type=%s", type(exc).__name__)
+            return "unconfirmed"
+        else:
+            await delivery.finish(key, "acknowledged", message_id=msg.id, channel_id=msg.channel.id)
+    if active_reminders.get(event_id) is msg:
         active_reminders.pop(event_id, None)
         save_active_reminders()
+    return "removed"
 
 
 async def load_active_reminders(bot):
+    global _unresolved_active, _active_load_failed
     raw_ids = set()
 
     try:
-        if not os.path.exists(REMINDER_TRACKING_FILE):
-            return set()
-
-        with open(REMINDER_TRACKING_FILE, encoding="utf-8") as f:
-            raw = json.load(f)
+        raw = {}
+        if os.path.exists(REMINDER_TRACKING_FILE):
+            with open(REMINDER_TRACKING_FILE, encoding="utf-8") as f:
+                raw = json.load(f)
+        if not isinstance(raw, dict):
+            raise ValueError("Invalid active reminder tracker")
+        rows = await delivery.receipt_rows()
+        for row in sorted(rows, key=lambda item: item["entered_at"]):
+            if row["kind"] != "public-send" or row["state"] != "acknowledged":
+                continue
+            deleted = await delivery.read(
+                delivery_key("public-delete", row["channel_id"], row["message_id"])
+            )
+            if deleted and deleted["state"] in {"acknowledged", "not_found"}:
+                old = raw.get(row["event"], {})
+                if isinstance(old, dict) and old.get("message_id") == row["message_id"]:
+                    raw.pop(row["event"], None)
+                continue
+            old = raw.get(row["event"], {})
+            raw[row["event"]] = {
+                **(old if isinstance(old, dict) else {}),
+                "channel_id": row["channel_id"],
+                "message_id": row["message_id"],
+            }
+            if row.get("event_data"):
+                raw[row["event"]]["event"] = row["event_data"]
+        _unresolved_active = copy.deepcopy(raw)
+        _active_load_failed = False
 
         required_keys = {"channel_id", "message_id"}
 
@@ -636,7 +665,8 @@ async def load_active_reminders(bot):
                     try:
                         event_data = data["event"]
                         event_data["start_time"] = parse_isoformat_utc(event_data["start_time"])
-                        event_data["end_time"] = parse_isoformat_utc(event_data["end_time"])
+                        if event_data.get("end_time"):
+                            event_data["end_time"] = parse_isoformat_utc(event_data["end_time"])
                         matched_event = event_data
                         logger.debug(f"[REMINDER_CACHE] Used stored event data for {eid}")
                     except Exception as parse_error:
@@ -657,7 +687,25 @@ async def load_active_reminders(bot):
                     view = LocalTimeToggleView(
                         events=[matched_event], prefix=prefix, complete_event_packing=True
                     )
-                    await msg.edit(view=view)
+                    restore_key = delivery_key("public-restore", msg.channel.id, msg.id, prefix)
+                    if await delivery.begin(
+                        restore_key,
+                        kind="public-restore",
+                        target=msg.channel.id,
+                        event=eid,
+                        message_id=msg.id,
+                    ):
+                        await msg.edit(view=view)
+                        await delivery.finish(
+                            restore_key,
+                            "acknowledged",
+                            message_id=msg.id,
+                            channel_id=msg.channel.id,
+                        )
+                    else:
+                        receipt = await delivery.read(restore_key)
+                        if not receipt or receipt["state"] != "acknowledged":
+                            raise RuntimeError("Previous restoration edit unconfirmed")
                     logger.info(
                         f"[REMINDER_CACHE_REHYDRATE] Re-attached reminder view for {eid} with prefix {prefix}"
                     )
@@ -667,6 +715,7 @@ async def load_active_reminders(bot):
                     )
 
                 active_reminders[eid] = msg
+                _unresolved_active.pop(eid, None)
                 logger.debug(f"[REMINDER_CACHE] Restored message {data['message_id']} for {eid}")
 
             except discord.NotFound:
@@ -678,6 +727,7 @@ async def load_active_reminders(bot):
         return raw_ids
 
     except Exception as e:
+        _active_load_failed = True
         logger.warning(f"[REMINDER_CACHE] Failed to load reminders from disk: {e}")
         return set()
 
@@ -745,6 +795,18 @@ async def cleanup_orphaned_reminders(loaded_ids: set):
 
 
 async def send_reminder_at(bot, channel_id, event, delta):
+    delay = (ensure_aware_utc(event["start_time"]) - delta - utcnow()).total_seconds()
+    if delay > 0:
+        await asyncio.sleep(delay)
+    async with delivery.operation_lock(("public", make_event_id(event))):
+        if delivery.is_closed():
+            return "closed"
+        if _active_load_failed or make_event_id(event) in _unresolved_active:
+            return "restoration_unconfirmed"
+        return await _send_reminder_at(bot, channel_id, event, delta)
+
+
+async def _send_reminder_at(bot, channel_id, event, delta):
     event_start = ensure_aware_utc(event["start_time"])
     seconds_until = (event_start - delta - utcnow()).total_seconds()
     if seconds_until > 0:
@@ -776,25 +838,47 @@ async def send_reminder_at(bot, channel_id, event, delta):
 
         mention = "@everyone" if delta in [timedelta(hours=1), timedelta(minutes=0)] else None
 
-        # Delete previous reminder for this event
-        prev_msg = active_reminders.get(event_id)
-        if prev_msg:
-            try:
-                await prev_msg.delete()
-                logger.debug(f"[REMINDER_CACHE] Deleted previous reminder for {event_id}")
-            except Exception as e:
-                logger.warning(
-                    f"[REMINDER_CACHE] Failed to delete previous reminder for {event_id}: {e}"
-                )
-
+        key = delivery_key("public-send", channel_id, event_id, int(delta.total_seconds()))
+        if await delivery.read(key):
+            return "retained"
+        rows = await drain_thread(delivery.store.rows)
+        if any(
+            r["kind"] == "public-send"
+            and r["event"] == event_id
+            and r["target"] == str(channel_id)
+            and r["state"] == "entered"
+            for r in rows
+        ):
+            return "unconfirmed"
         channel = bot.get_channel(channel_id)
         if not channel:
-            logger.warning(f"[REMINDER_CACHE_WARNING] Channel {channel_id} not found.")
-            return
+            logger.warning("[REMINDER_CACHE] channel_unavailable; no replacement attempted")
+            return "channel_unavailable"
+        # Delete previous reminder only after ruling out duplicate delivery.
+        prev_msg = active_reminders.get(event_id)
+        if prev_msg:
+            if await _delete_reminder(event_id, prev_msg.id) != "removed":
+                return "unconfirmed"
 
         prefix = f"reminder_{event['type'].replace(' ', '_')}"
         view = LocalTimeToggleView(events=[event], prefix=prefix, complete_event_packing=True)
+        if not await delivery.begin(
+            key,
+            kind="public-send",
+            target=channel_id,
+            event=event_id,
+            window=int(delta.total_seconds()),
+            event_data={
+                k: (ensure_aware_utc(v).isoformat() if isinstance(v, datetime) else v)
+                for k, v in event.items()
+                if k in {"name", "type", "start_time", "end_time"}
+            },
+        ):
+            return "retained"
+        if delivery.is_closed():
+            return "closed"
         msg = await channel.send(content=mention, embed=embed, view=view)
+        await delivery.finish(key, "acknowledged", message_id=msg.id, channel_id=msg.channel.id)
         active_reminders[event_id] = msg
         save_active_reminders()
         logger.debug(f"[REMINDER_CACHE] Sent new reminder for {event_id} at T-{delta}")
@@ -803,7 +887,11 @@ async def send_reminder_at(bot, channel_id, event, delta):
             expiry_seconds = (
                 ensure_aware_utc(event["end_time"]) - utcnow()
             ).total_seconds() + EXPIRY_DELAY
-            asyncio.create_task(expire_single_reminder(event_id, expiry_seconds))
+            delivery.own(
+                expire_single_reminder(event_id, expiry_seconds, msg.id),
+                name="public-reminder-expiry",
+            )
+        return "acknowledged"
 
     except Exception as e:
         logger.error(
@@ -811,9 +899,9 @@ async def send_reminder_at(bot, channel_id, event, delta):
         )
 
 
-async def expire_single_reminder(event_id, delay_seconds):
+async def expire_single_reminder(event_id, delay_seconds, expected_message_id=None):
     await asyncio.sleep(delay_seconds)
-    await safe_delete_reminder(event_id)
+    await safe_delete_reminder(event_id, expected_message_id)
 
 
 # Insert the new rehydration function somewhere near the top-level async helpers
@@ -840,6 +928,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
     if not snapshot.ok or not snapshot.events:
         return {"status": "deferred", "reason": "event_data_unavailable_or_empty"}
     failed = 0
+    held = 0
     try:
         if not dm_scheduled_tracker:
             logger.debug("[DM_REHYDRATE] No persisted scheduled DM markers to rehydrate.")
@@ -896,6 +985,21 @@ async def rehydrate_dm_scheduled_tasks(bot):
                 for delta_seconds in list(delta_set):
                     try:
                         delta = timedelta(seconds=int(delta_seconds))
+                        receipt = await delivery.read(
+                            delivery_key("dm-send", str(uid), event_id, int(delta_seconds))
+                        )
+                        if receipt and receipt["state"] == "entered":
+                            held += 1
+                            continue
+                        if receipt and receipt["state"] == "acknowledged":
+                            sent = dm_sent_tracker.setdefault(event_id, {}).setdefault(str(uid), [])
+                            if int(delta_seconds) not in sent:
+                                sent.append(int(delta_seconds))
+                            await save_dm_sent_tracker_async()
+                        if receipt or not _dm_eligible(uid, event, delta):
+                            delta_set.discard(delta_seconds)
+                            removed_any = True
+                            continue
                         seconds_until = (start_time - delta - utcnow()).total_seconds()
 
                         # Case: in future -> recreate a delayed task
@@ -964,7 +1068,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
                                 meta={"event_id": event_id, "delta_seconds": int(delta_seconds)},
                             )
                             logger.info(
-                                "[DM_REHYDRATE] Performed immediate rehydrated DM to user %s for %s at T-%s (late by %ds)",
+                                "[DM_REHYDRATE] Scheduled immediate rehydrated DM to user %s for %s at T-%s (late by %ds)",
                                 uid,
                                 event_id,
                                 delta,
@@ -997,14 +1101,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
                             delta_seconds,
                             e,
                         )
-                        # Best-effort: remove the problematic marker to avoid permanent blocking
-                        try:
-                            dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(
-                                delta_seconds
-                            )
-                            removed_any = True
-                        except Exception:
-                            pass
+                        # Preserve unresolved markers; failure is not disposal evidence.
 
                 # If user's set is empty, remove the uid entry
                 if not dm_scheduled_tracker.get(event_id, {}).get(uid):
@@ -1018,7 +1115,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
 
         if removed_any:
             try:
-                save_dm_scheduled_tracker()
+                await save_dm_scheduled_tracker_async()
             except Exception as e:
                 failed += 1
                 logger.warning(
@@ -1034,6 +1131,7 @@ async def rehydrate_dm_scheduled_tasks(bot):
             "status": "partial" if failed else "complete",
             "restored": restored_count,
             "failed": failed,
+            "held": held,
         }
     except Exception as e:
         # Fail-safe: never crash the scheduler due to rehydrate errors
@@ -1067,11 +1165,8 @@ async def delayed_user_dm(bot, user, event, delta, seconds_until):
             delta,
             e,
         )
-    finally:
-        try:
-            dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(delta_seconds)
-        finally:
-            await save_dm_scheduled_tracker_async()
+    # Cancellation while sleeping keeps the durable schedule for restart. At send
+    # entry the current subscription is checked again; unsubscribe cannot replay it.
 
 
 def build_user_reminder_embed(*, event, discord_name, main_governor, quote):
@@ -1112,12 +1207,31 @@ def build_user_reminder_embed(*, event, discord_name, main_governor, quote):
 
 
 async def send_user_reminder(user, event, delta):
+    scope = ("dm", make_event_id(event), str(user.id), int(delta.total_seconds()))
+    async with delivery.operation_lock(scope):
+        if delivery.is_closed():
+            return "closed"
+        return await _send_user_reminder(user, event, delta)
+
+
+def _dm_eligible(user_id, event, delta):
+    config = get_user_config(user_id)
+    return bool(
+        config
+        and subscription_matches_event(config.get("subscriptions", []), event)
+        and any(REMINDER_MAP.get(key) == delta for key in config.get("reminder_times", []))
+    )
+
+
+async def _send_user_reminder(user, event, delta):
     event_id = make_event_id(event)
     uid = str(user.id)
     delta_seconds = int(delta.total_seconds())
 
     sent_changed = False
     sched_changed = False
+    settled = False
+    key = delivery_key("dm-send", uid, event_id, delta_seconds)
 
     try:
         # 🚫 SKIP IF ALREADY SENT (per-user)
@@ -1126,6 +1240,19 @@ async def send_user_reminder(user, event, delta):
                 "[DM_REMINDER] ⚠️ Skipping duplicate DM to %s for %s at T-%s", user, event_id, delta
             )
             return
+
+        receipt = await delivery.read(key)
+        if receipt:
+            if receipt["state"] == "acknowledged":
+                dm_sent_tracker.setdefault(event_id, {}).setdefault(uid, []).append(delta_seconds)
+                sent_changed = True
+                settled = True
+            elif receipt["state"] == "refused":
+                settled = True
+            return receipt["state"]
+        if not _dm_eligible(user.id, event, delta):
+            settled = True
+            return "not_subscribed"
 
         # Names for personalization
         discord_name = getattr(user, "display_name", None) or str(user)
@@ -1144,7 +1271,17 @@ async def send_user_reminder(user, event, delta):
             quote=quote,
         )
 
-        await user.send(embed=embed)
+        if not await delivery.begin(
+            key, kind="dm-send", target=uid, event=event_id, window=delta_seconds
+        ):
+            return "retained"
+        if not _dm_eligible(user.id, event, delta) or delivery.is_closed():
+            await delivery.finish(key, "refused")
+            settled = True
+            return "cancelled_before_send"
+        msg = await user.send(embed=embed)
+        await delivery.finish(key, "acknowledged", message_id=msg.id, channel_id=msg.channel.id)
+        settled = True
 
         # ✅ Record successful send (per-user)
         dm_sent_tracker.setdefault(event_id, {}).setdefault(uid, [])
@@ -1162,6 +1299,8 @@ async def send_user_reminder(user, event, delta):
             )
 
     except discord.Forbidden:
+        await delivery.finish(key, "refused")
+        settled = True
         logger.warning("[DM_REMINDER] Cannot DM user %s — DMs disabled.", user)
         reminder_stats["dm_dm_disabled"] += 1
         log_failed_dm(user.id, event, delta, "DMs disabled")
@@ -1170,9 +1309,9 @@ async def send_user_reminder(user, event, delta):
         reminder_stats["dm_failed"] += 1
         log_failed_dm(user.id, event, delta, str(e))
     finally:
-        # Always clear scheduled marker for this (event,user,delta)
+        # Ambiguous/cancelled sends retain both journal and scheduled evidence.
         per_user_sched = dm_scheduled_tracker.get(event_id, {}).get(uid, set())
-        if delta_seconds in per_user_sched:
+        if settled and delta_seconds in per_user_sched:
             per_user_sched.discard(delta_seconds)
             sched_changed = True
 
@@ -1228,7 +1367,10 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
                 if delta in sent_reminders[event_id]:
                     continue
 
-                asyncio.create_task(send_reminder_at(bot, notify_channel_id, event, delta))
+                delivery.own(
+                    send_reminder_at(bot, notify_channel_id, event, delta),
+                    name="public-reminder-send",
+                )
                 sent_reminders[event_id].add(delta)
                 logger.debug("[SCHEDULE_CACHE] Reminder for %s scheduled at T-%s", event_id, delta)
 
@@ -1294,7 +1436,7 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
                     )
 
                     user_sched.add(delta_seconds)
-                    save_dm_scheduled_tracker()
+                    await save_dm_scheduled_tracker_async()
 
                     if seconds_until <= 0:
                         logger.info(
@@ -1402,7 +1544,28 @@ async def refresh_reminder_format(bot, notify_channel_id):
             )
 
             try:
-                await msg.edit(embed=embed)  # keep existing view
+                async with delivery.operation_lock(("public", event_id)):
+                    if active_reminders.get(event_id) is not msg or delivery.is_closed():
+                        continue
+                    # One format restoration per physical message; never re-edit
+                    # an uncertain original through a different generated quote.
+                    key = delivery_key("public-format", msg.channel.id, msg.id)
+                    if await delivery.begin(
+                        key,
+                        kind="public-format",
+                        target=msg.channel.id,
+                        event=event_id,
+                        message_id=msg.id,
+                    ):
+                        await msg.edit(embed=embed)  # keep existing view
+                        await delivery.finish(
+                            key, "acknowledged", message_id=msg.id, channel_id=msg.channel.id
+                        )
+                    else:
+                        receipt = await delivery.read(key)
+                        if not receipt or receipt["state"] != "acknowledged":
+                            failed += 1
+                            continue
                 updated += 1
             except Exception as e:
                 failed += 1

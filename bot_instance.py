@@ -1296,8 +1296,10 @@ async def schedule_daily_KVK_overview():
         delay = (target - now).total_seconds()
         await asyncio.sleep(delay)
         try:
-            await post_or_update_daily_KVK_overview(bot, event_channel_id=KVK_EVENT_CHANNEL_ID)
-            logger.info("[SCHEDULE] Daily KVK overview posted/updated.")
+            disposition = await post_or_update_daily_KVK_overview(
+                bot, event_channel_id=KVK_EVENT_CHANNEL_ID
+            )
+            logger.info("[SCHEDULE] Daily KVK overview disposition=%s", disposition)
         except Exception:
             logger.exception("[SCHEDULE] Failed to post/update Daily KVK overview")
 
@@ -1386,6 +1388,14 @@ async def _graceful_teardown():
     close_name_admission()
     refresh_service.close_admission()
     _event_bundle().close_admission()
+    import reminder_task_registry
+    from services import event_delivery_service, operator_status_service
+    from services.gsheets_health_service import _probe as sheets_probe
+
+    event_delivery_service.close_admission()
+    operator_status_service.close_admission()
+    sheets_probe.close()
+    reminder_task_registry.close_admission()
     logger.info("[SHUTDOWN] Graceful teardown initiated.")
     from services.export_coordination_service import stop_export_admission
 
@@ -1439,6 +1449,9 @@ async def _graceful_teardown():
     # Drain event-owned work before cancelling its observers/client users.
     await _event_bundle().shutdown()
     await refresh_service.shutdown()
+    await event_delivery_service.shutdown()
+    await operator_status_service.shutdown()
+    await sheets_probe.shutdown()
 
     # Cancel supervised tasks
     try:
