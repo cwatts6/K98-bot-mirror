@@ -11,6 +11,7 @@ from tests.updater_source_assertions import (
     before_contention_hash,
     before_event_delivery_hash,
     before_monitoring_hash,
+    before_procconfig_admission_hash,
     before_startup_foundations_hash,
     historical_runtime_hash,
 )
@@ -81,10 +82,16 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     for transition in update.reviewed_transitions():
-        if transition["id"] == "p1_monitoring_reliability_v1":
+        if transition["id"] == "procconfig_admission_recovery_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
+        if transition["id"] == "p1_monitoring_reliability_v1":
+            for member in transition["members"]:
+                assert (
+                    before_procconfig_admission_hash(root, member["path"]) == member["after_sha256"]
+                ), member["path"]
             continue
         if transition["id"] == "p1_event_delivery_v1":
             for member in transition["members"]:
