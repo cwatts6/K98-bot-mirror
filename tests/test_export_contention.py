@@ -344,3 +344,70 @@ def test_configuration_terminal_refusal_withdraws_without_provider_entry(tmp_pat
     dal.withdraw_unstarted.assert_called_once_with(dal.request.return_value)
     dal.transition.assert_not_called()
     dal.uncertain.assert_not_called()
+
+
+def test_selected_window_recovers_after_slow_first_refusal(monkeypatch):
+    now = clock(monkeypatch)
+    calls = []
+
+    @module.retry_coordination
+    def request():
+        calls.append(now[0])
+        if len(calls) == 1:
+            now[0] += 1.046
+            error = refusal()
+            error.transaction_released = True
+            raise error
+        return "admitted"
+
+    with module.coordination_retry_window(5):
+        assert request() == "admitted"
+    assert len(calls) == 2 and now[0] < 5
+    assert module._retry_window.get() is None
+
+
+def test_longer_window_cannot_extend_parent_deadline(monkeypatch):
+    now = clock(monkeypatch)
+    calls = []
+
+    @module.retry_coordination(budget_seconds=5)
+    def request():
+        calls.append(1)
+        now[0] += 1.046
+        error = refusal()
+        error.transaction_released = True
+        raise error
+
+    with module.contention_budget(0.5), pytest.raises(module.CoordinationLockRefused):
+        request()
+    assert calls == [1]
+
+
+def test_monitor_snapshot_retries_only_after_close(monkeypatch):
+    from types import SimpleNamespace
+
+    from services.unowned_sql_hold_dal import UnownedSqlHoldDAL
+
+    clock(monkeypatch)
+    connections = []
+
+    def connect():
+        if connections:
+            connections[-1].close.assert_called_once()
+            connections[-1].rollback.assert_called_once()
+        cn = Mock(autocommit=False)
+        connections.append(cn)
+        return cn
+
+    dal = UnownedSqlHoldDAL(
+        SimpleNamespace(
+            dal=SimpleNamespace(connect=connect),
+            account="a",
+            store=SimpleNamespace(storage_owner="s"),
+        )
+    )
+    snapshots = Mock(side_effect=[refusal(), {"resource": None}])
+    monkeypatch.setattr(dal, "_snapshot", snapshots)
+    assert dal.snapshot(dal.source_id) == {"resource": None}
+    assert len(connections) == 2
+    connections[1].commit.assert_called_once()

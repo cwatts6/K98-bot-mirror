@@ -20,9 +20,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_procconfig_admission_hash(root, path):
+    """Test-only proof of this successor; never deployment authority."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/procconfig_admission_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "bc65829616219b8644cac4b796bfd97a29168d75c431c8c1cb06f8426fe6438f"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_monitoring_hash(root, path):
     """Exact test-only successor proof; never an installed updater capability."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_procconfig_admission_hash(root, path)
     raw = (root / "tests/fixtures/p1_monitoring_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

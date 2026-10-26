@@ -57,6 +57,7 @@ P0A_ACTIONS = MappingProxyType(
         "private_evidence": frozenset(
             {"protect_evidence", "restore_evidence", "attest_containment", "attest_registration"}
         ),
+        "configuration_attempt": frozenset(),
         "configuration_read": frozenset({"release_read", "contain_read"}),
         "producer_refusal": frozenset(
             {

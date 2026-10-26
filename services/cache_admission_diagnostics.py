@@ -19,6 +19,7 @@ def startup_context(label):
         "build_player_stats_cache": "player_stats",
         "warm_profile_cache": "profile",
         "warm_name_cache": "name",
+        "proc_config_import": "configuration_import",
     }.get(label, "startup_other")
     with observation_context(operation, "startup"):
         yield
@@ -32,6 +33,7 @@ def observation_context(operation, origin):
         "profile",
         "name",
         "startup_other",
+        "configuration_import",
         "recovery",
         "health_probe",
     }:

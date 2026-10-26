@@ -1966,7 +1966,14 @@ async def full_startup_sequence():
                         raise
 
                 # Give it a generous envelope (e.g., 180s) to cover Sheets/SQL work
-                schedule_bg("proc_config_import", 180.0, _proc_import_wrapper)
+                from services.configuration_attempt_recovery import verify_startup_import
+
+                schedule_bg(
+                    "proc_config_import",
+                    180.0,
+                    _proc_import_wrapper,
+                    completion_check=verify_startup_import,
+                )
             except Exception as e:
                 logger.error("[BOOT] Failed to schedule ProcConfig import: %s", e)
 

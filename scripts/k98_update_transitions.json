@@ -1405,6 +1405,56 @@
           "after_sha256": "d561ef8c9f20d04ed340ad70353ee4bf270e5e38a98640c6bb650921af6d9231"
         }
       ]
+    },
+    {
+      "id": "procconfig_admission_recovery_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "ec662559373b31670a5e43031b1915c7eec4685f42ab340446294192028c960b",
+          "after_sha256": "d9ccf92cd8435493e48a4ccb997335f569aa2e7db9e47eb845bd628eb0b03b95"
+        },
+        {
+          "path": "proc_config_import.py",
+          "before_sha256": "f892587be3236900e88fbf3a2898c93c4b4d66a8a7ff3c7494c68ef7da4fa343",
+          "after_sha256": "c9cab77d57e4c0a271a6b5c5044862709e214784159a202631cdb0d51baa42eb"
+        },
+        {
+          "path": "services/cache_admission_diagnostics.py",
+          "before_sha256": "f9fd223d703d37e286bec811bb4b4b644b7ae81765a616375dd843ab5454fe64",
+          "after_sha256": "d81b389379481fd29f61d644ec3c5b757646026e5a58c733f552720db6420239"
+        },
+        {
+          "path": "services/configuration_attempt_recovery.py",
+          "before_sha256": null,
+          "after_sha256": "6d9229f90cd24162f4b8d221ec832d272572c235048e81b8b3e78ecc862cda9a"
+        },
+        {
+          "path": "services/export_contention.py",
+          "before_sha256": "8a3e79836b11d1ae3bc8b7b7c457ed9a7ed1ca9b190df5a214e00d8a597cfb76",
+          "after_sha256": "369a326495f692764aaacdbd3c58c6f107ce509e35a85c18d315f4fbc6d1fe52"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "0b7a78046b0d2a96d82735f98f07c939f08ae4e8f0dc1a4c38991575b5a7a306",
+          "after_sha256": "4a456a48b2f3474add718d644b477c6c048ecb97dcccdab3b4e80b7da088bdbe"
+        },
+        {
+          "path": "services/recovery_release_policy.py",
+          "before_sha256": "2dc09fee705b1efb39f97f161a8474c552d477f094ed75d408b719f9169a76db",
+          "after_sha256": "54c35dba648b054b2ff89aa22265e7524a7859c4f43b7f39db66352e3ae55938"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "d561ef8c9f20d04ed340ad70353ee4bf270e5e38a98640c6bb650921af6d9231",
+          "after_sha256": "6b5dd9ce61fe6a54b37fe77f736126b2da3511c403519d2c28bd86af36cdbca2"
+        },
+        {
+          "path": "services/unowned_sql_hold_dal.py",
+          "before_sha256": "f3330c677020e161adb5991437e066e3d97d5d6f6cb6d2d84f02a9df6dc4621a",
+          "after_sha256": "b38434cfd6c775fe0d81079b6f2a5e0620224bce8bd6a0505c0b4193848ceabd"
+        }
+      ]
     }
   ]
 }

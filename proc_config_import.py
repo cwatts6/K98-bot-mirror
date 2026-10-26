@@ -35,6 +35,8 @@ from gsheet_module import (
     _normalize_headers,
     _safe_execute,
 )
+from services.configuration_attempt_recovery import attempt_phase, record_configuration_attempt
+from services.export_contention import CoordinationLockRefused, sql_error_facts
 from services.legacy_export_snapshot_service import ConfigurationAdmissionDeferred, bound_runtime
 from services.producer_recovery_intent import configuration_import_intent
 
@@ -610,6 +612,9 @@ def _validate_sheet_schemas(sheet) -> tuple[bool, list[str]]:
 # ---------------------------------------------------------------------------
 @bound_runtime
 @configuration_import_intent
+@record_configuration_attempt(
+    data_dir=lambda: DATA_DIR, report_sink=lambda report: _set_last_import_report(report)
+)
 def run_proc_config_import(
     dry_run: bool = False, *, source_actor: str | None = None, source_provenance: dict | None = None
 ) -> tuple[bool, dict]:
@@ -694,6 +699,7 @@ def run_proc_config_import(
         from services.legacy_export_snapshot_service import read_configuration, writer_scope
 
         def collect_inputs():
+            attempt_phase("reading_inputs")
             from services.legacy_export_snapshot_service import configuration_destination
 
             sheet = _get_sheet_service()
@@ -728,6 +734,7 @@ def run_proc_config_import(
         df = df[df["KVK_NO"].notna()]
         admission = writer_scope("scan_data")
         admission.__enter__()
+        attempt_phase("writes_may_start")
         conn = _get_import_connection_with_retry()
         cursor = conn.cursor()
         from services.legacy_export_snapshot_service import verify_producer_cursor
@@ -1291,6 +1298,15 @@ def run_proc_config_import(
             logger.info("[IMPORT] Import completed successfully in %.1fs", report["duration_sec"])
         return success, report
 
+    except CoordinationLockRefused as error:
+        report["admission_failure"] = sql_error_facts(error)
+        report["errors"].append(
+            "Configuration admission lock retry exhausted; inspect the recorded attempt phase."
+        )
+        report["success"] = False
+        _set_last_import_report(report)
+        return False, report
+
     except ConfigurationAdmissionDeferred:
         message = (
             "Configuration import deferred before reading inputs: account admission unavailable. "
@@ -1363,6 +1379,9 @@ def run_proc_config_import_payload(payload):
             else ["ProcConfig import reported errors; inspect the persisted import report."]
         ),
     }
+    for key in ("attempt_id", "attempt_recording", "attempt_outcome", "import_reported_success"):
+        if key in report:
+            summary[key] = report[key]
     persisted = report.get("persisted_to") or report.get("manifest_path")
     if isinstance(persisted, str):
         summary["manifest_path"] = persisted

@@ -11,6 +11,7 @@ import time
 from kvk.dal.new_source_import_dal import transaction as source_transaction
 
 logger = logging.getLogger(__name__)
+_retry_window = ContextVar("coordination_retry_window", default=None)
 _deadline = ContextVar("export_coordination_deadline", default=None)
 admission_diagnostics_enabled = ContextVar("export_admission_diagnostics", default=True)
 # Match the existing dedicated SQL connection's 1000ms lock budget. This is
@@ -82,8 +83,25 @@ def contention_budget(deadline):
         _deadline.reset(token)
 
 
-def retry_coordination(function):
+@contextmanager
+def coordination_retry_window(seconds):
+    """Opt in a single admission call; inherited deadlines still take precedence."""
+    if not 0 < seconds <= 5:
+        raise ValueError("Admission retry window must be between zero and five seconds.")
+    token = _retry_window.set(seconds)
+    try:
+        yield
+    finally:
+        _retry_window.reset(token)
+
+
+def retry_coordination(function=None, *, budget_seconds=None):
     """Retry only explicit timeout refusals from our dedicated transaction wrapper."""
+
+    if function is None:
+        return lambda target: retry_coordination(target, budget_seconds=budget_seconds)
+    if budget_seconds is not None and not 0 < budget_seconds <= 5:
+        raise ValueError("Bounded coordination retry policy required.")
 
     @wraps(function)
     def run(*args, **kwargs):
@@ -108,7 +126,9 @@ def retry_coordination(function):
             log = logger.warning if error is not None else logger.info
             log("export_contention_result %s", json.dumps(facts, sort_keys=True))
 
-        with contention_budget(started + LOCK_BUDGET_SECONDS):
+        with contention_budget(
+            started + (budget_seconds or _retry_window.get() or LOCK_BUDGET_SECONDS)
+        ):
             attempt = 0
             while True:
                 attempt += 1

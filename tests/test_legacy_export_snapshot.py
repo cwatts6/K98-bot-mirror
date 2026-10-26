@@ -622,7 +622,20 @@ def test_configuration_import_association_is_saved_before_read_admission(
         "scan_data": {"destinations": ["output"]},
     }
     runtime, dal = producer_runtime(tmp_path, configuration=configuration)
-    dal.claim.return_value = None
+    from services.export_contention import _retry_window
+
+    windows = []
+
+    def requested(**kwargs):
+        windows.append(("request", _retry_window.get()))
+        return str(uuid4())
+
+    def claimed(*args, **kwargs):
+        windows.append(("claim", _retry_window.get()))
+        return None
+
+    dal.request.side_effect = requested
+    dal.claim.side_effect = claimed
 
     @atomic_producer_intent("configuration_import")
     def attempt():
@@ -635,6 +648,7 @@ def test_configuration_import_association_is_saved_before_read_admission(
                 attempt()
         else:
             attempt()
+    assert windows == [("request", 5 if publication_intent else None), ("claim", None)]
     saved = dal.request.call_args.kwargs["request"]
     assert ("configuration_import" in saved) is (publication_intent and not recovery_child)
     if publication_intent and not recovery_child:

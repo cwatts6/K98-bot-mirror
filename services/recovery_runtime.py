@@ -40,8 +40,15 @@ def recovery_service():
             storage_owner=runtime.store.storage_owner,
             guild_id=bot_config.GUILD_ID,
         )
+        from constants import DATA_DIR
+        from services.configuration_attempt_recovery import (
+            AttemptJournal,
+            ConfigurationAttemptRecovery,
+            journal_root,
+        )
         from services.recovery_backlog_service import EvidenceBatchAdapter
 
+        attempts = ConfigurationAttemptRecovery(AttemptJournal(journal_root(DATA_DIR, runtime)))
         batch = EvidenceBatchAdapter(store)
         if getattr(runtime, "recovery_only", False):
             from services.export_evidence_recovery import EvidenceRecoveryAdapter
@@ -49,7 +56,7 @@ def recovery_service():
             adapter = EvidenceRecoveryAdapter(runtime.recovery_client)
             yield RecoveryService(
                 store,
-                {adapter.kind: adapter, batch.kind: batch},
+                {adapter.kind: adapter, batch.kind: batch, attempts.kind: attempts},
                 admin_id=bot_config.ADMIN_USER_ID,
                 guild_id=bot_config.GUILD_ID,
                 channel_id=bot_config.NOTIFY_CHANNEL_ID,
@@ -58,7 +65,7 @@ def recovery_service():
             return
         outcomes = outcome_dal(runtime)
         adapter = ImportRecoveryAdapter(outcomes, ImportCaptureRecovery(runtime, outcomes))
-        adapters = {adapter.kind: adapter, batch.kind: batch}
+        adapters = {adapter.kind: adapter, batch.kind: batch, attempts.kind: attempts}
         from services.unowned_sql_hold_dal import UnownedSqlHoldDAL
         from services.unowned_sql_hold_recovery import UnownedSqlHoldRecovery
 

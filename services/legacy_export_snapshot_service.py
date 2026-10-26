@@ -724,15 +724,28 @@ class LegacyExportRuntime:
                 sources=scope,
                 outputs=json.loads(self.configuration)["scan_data"],
             )
-        identifier = self.dal.request(
-            account=self.account,
-            consumer="config",
-            kvk_no=None,
-            request=request,
-            storage_owner=self.store.storage_owner,
-            actor="system:configuration",
-            reason="Read immutable configuration inputs",
+        from contextlib import nullcontext
+
+        from services.export_contention import coordination_retry_window
+
+        # Only a publishing configuration import receives this extra admission
+        # allowance. The request identity stays fixed, and no provider read or
+        # producer execution is inside this retry scope.
+        window = (
+            coordination_retry_window(5)
+            if publication_intent and producer and producer.get("kind") == "configuration_import"
+            else nullcontext()
         )
+        with window:
+            identifier = self.dal.request(
+                account=self.account,
+                consumer="config",
+                kvk_no=None,
+                request=request,
+                storage_owner=self.store.storage_owner,
+                actor="system:configuration",
+                reason="Read immutable configuration inputs",
+            )
         keys = tuple(
             sorted(
                 {"account:" + self.account, *("destination:" + d for d in scope["destinations"])}

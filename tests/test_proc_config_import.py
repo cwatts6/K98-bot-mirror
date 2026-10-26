@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -28,7 +29,7 @@ def test_admission_refusal_is_actionable_but_unexpected_failure_stays_critical(
     monkeypatch.setattr(snapshots, "read_configuration", Mock(side_effect=error))
     connection = Mock(side_effect=AssertionError("SQL must not start"))
     monkeypatch.setattr(pci, "_get_import_connection_with_retry", connection)
-    success, report = pci.run_proc_config_import.__wrapped__.__wrapped__(dry_run=dry_run)
+    success, report = inspect.unwrap(pci.run_proc_config_import)(dry_run=dry_run)
     assert not success
     if deferred or not dry_run:
         assert report["success"] is False

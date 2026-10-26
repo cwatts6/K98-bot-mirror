@@ -5,6 +5,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
 from kvk.dal.source_output_pool_dal import _wire
+from services.export_contention import retry_coordination, transaction as retry_transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
@@ -70,9 +71,10 @@ class UnownedSqlHoldDAL:
             dict(resource=resource, producers=producers, streams=streams, disposition=one(cursor))
         )
 
+    @retry_coordination(budget_seconds=5)
     def snapshot(self, source):
         self._scope(source)
-        with transaction(self.connect) as cursor:
+        with retry_transaction(self.connect) as cursor:
             return self._snapshot(cursor)
 
     @staticmethod

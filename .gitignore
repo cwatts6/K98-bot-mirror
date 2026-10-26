@@ -203,3 +203,6 @@ tools/rg.exe
 .codex_artifacts/
 .codex_security_scans/
 .codex-security-scans/
+
+# Retained private configuration-attempt receipts
+/data/proc_config_attempts/

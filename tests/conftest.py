@@ -46,6 +46,18 @@ if os.getenv("TEST_FAKE_HEAVY_DEPS", "0") == "1":
 # Test helpers / fixtures
 # ----------------------------
 @pytest.fixture(autouse=True)
+def _isolate_configuration_attempt_receipts(monkeypatch, tmp_path):
+    from services import configuration_attempt_recovery as attempts
+
+    original = attempts.journal_root
+    monkeypatch.setattr(
+        attempts,
+        "journal_root",
+        lambda data_dir, runtime: original(tmp_path / "configuration-attempts", runtime),
+    )
+
+
+@pytest.fixture(autouse=True)
 def _isolate_recovery_observation(monkeypatch):
     module = sys.modules.get("services.recovery_health")
     if module is not None:

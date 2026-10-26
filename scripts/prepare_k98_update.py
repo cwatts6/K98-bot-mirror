@@ -393,6 +393,21 @@ MONITORING_RELIABILITY_PATHS = frozenset(
 )
 
 
+PROCCONFIG_ADMISSION_PATHS = frozenset(
+    {
+        "services/cache_admission_diagnostics.py",
+        "bot_instance.py",
+        "services/unowned_sql_hold_dal.py",
+        "proc_config_import.py",
+        "services/export_contention.py",
+        "services/recovery_runtime.py",
+        "services/configuration_attempt_recovery.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/recovery_release_policy.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -400,12 +415,12 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 65536:
+    if len(raw) > 73728:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 44:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 45:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -460,6 +475,10 @@ def reviewed_transitions():
             )
             fixed_event_delivery = (
                 item["id"] == "p1_event_delivery_v1" and path in EVENT_DELIVERY_PATHS
+            )
+            fixed_procconfig_admission = (
+                item["id"] == "procconfig_admission_recovery_v1"
+                and path in PROCCONFIG_ADMISSION_PATHS
             )
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
@@ -546,6 +565,7 @@ def reviewed_transitions():
                     or fixed_event_cache
                     or fixed_startup_foundations
                     or fixed_event_delivery
+                    or fixed_procconfig_admission
                     or fixed_monitoring_reliability
                     or fixed_replacement
                     or fixed_publication
@@ -662,6 +682,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed event-cache readiness transition required.")
         if item["id"] == "p1_event_delivery_v1" and paths != EVENT_DELIVERY_PATHS:
             raise ValueError("Complete fixed event-delivery transition required.")
+        if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
+            raise ValueError("Complete fixed ProcConfig admission transition required.")
         if item["id"] == "p1_monitoring_reliability_v1" and paths != MONITORING_RELIABILITY_PATHS:
             raise ValueError("Complete fixed monitoring-reliability transition required.")
         if (
