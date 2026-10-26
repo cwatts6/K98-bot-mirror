@@ -1,5 +1,14 @@
 # K98 Bot Reference Docs
 
+> **Current checkpoint — 26 October 2026:** Startup Cache Foundations is merged,
+> deployed at private `a68089b6bccf766e9aabb182c582d486130145dc` and closed for
+> exercised paths. All six packages are delivered; the eligible original Ark callback
+> passed. Natural event transition, exact Daily KVK Overview disposition, SQL 51400
+> cause, the status-command 10015 follow-up, all remaining WS1–WS6 and P0 F01–F05
+> remain separate. Older dated pending/deployment wording below is historical.
+
+> Read the [current closeout](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md), [next scope](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md) and [new-chat starter](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Chat%20Starter%20-%202026-10-26.md).
+
 > **Required for Windows files, deployment and repair:** [Ownership and access contract](Windows%20ownership%20and%20access%20contract.md) defines execution context, operation boundaries and validation. Read it before proposing custody or ACL changes.
 
 > **P0/P1 checkpoint — 2026-10-24:** Read [current delivery and acceptance](P0%20delivery%20and%20P1%20recovery%20status.md)

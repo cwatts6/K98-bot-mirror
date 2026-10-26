@@ -1,5 +1,14 @@
 # P1 Startup Cache Foundations — implementation and acceptance
 
+> **Current checkpoint — 26 October 2026:** Startup Cache Foundations is merged,
+> deployed at private `a68089b6bccf766e9aabb182c582d486130145dc` and closed for
+> exercised paths. All six packages are delivered; the eligible original Ark callback
+> passed. Natural event transition, exact Daily KVK Overview disposition, SQL 51400
+> cause, the status-command 10015 follow-up, all remaining WS1–WS6 and P0 F01–F05
+> remain separate. Older dated pending/deployment wording below is historical.
+
+> Read the [current closeout](P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md), [next scope](P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md) and [new-chat starter](P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Chat%20Starter%20-%202026-10-26.md).
+
 25 October 2026. Operator-approved local implementation; not deployed or runtime accepted.
 Mirror baseline: `cb723927b5a68da733ad19fc9878743978bcf2f3`, the scrubbed snapshot of
 private deployed `35d8b7e58a5c248c22552b8ae506e1d03ccc6afe`. Do not reapply the

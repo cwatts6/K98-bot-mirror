@@ -1,5 +1,14 @@
 # Developer Quickstart
 
+> **Current checkpoint — 26 October 2026:** Startup Cache Foundations is merged,
+> deployed at private `a68089b6bccf766e9aabb182c582d486130145dc` and closed for
+> exercised paths. All six packages are delivered; the eligible original Ark callback
+> passed. Natural event transition, exact Daily KVK Overview disposition, SQL 51400
+> cause, the status-command 10015 follow-up, all remaining WS1–WS6 and P0 F01–F05
+> remain separate. Older dated pending/deployment wording below is historical.
+
+> Read the [current closeout](docs/task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md), [next scope](docs/task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md) and [new-chat starter](docs/task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Chat%20Starter%20-%202026-10-26.md).
+
 > **P0/P1 checkpoint — 2026-10-24:** [Current delivery and acceptance](docs/reference/P0%20delivery%20and%20P1%20recovery%20status.md)
 > records verified P0 deployment, accepted normal import/export and delivered
 > #438/#687. Natural eligible rollover and final P0 receipt reconciliation remain

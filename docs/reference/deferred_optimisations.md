@@ -1,10 +1,11 @@
 # Deferred Optimisations
 
-25 October overlay: the event-cache feature/compatibility phase is deployed. Its
-natural transition and original-message acceptance remain open. The approved
-[Startup Cache Foundations phase](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Implementation%20and%20Acceptance.md)
-now has a local implementation; no production acceptance or whole-workstream closure
-follows. The pack preserves each WS1–WS6 residual and P0 reconciliation separately.
+26 October overlay: the six Startup Cache Foundations packages are delivered,
+deployed and closed for exercised paths. The original eligible Ark callback passed.
+Natural event transition and exact Daily KVK Overview disposition remain open.
+See the [closeout / R01–R18 ledger](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md) and
+[next-phase scope](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md). Current P0 defects remain F03/F05;
+this register does not turn them into optional debt or erase earlier accepted work.
 
 ### Deferred Optimisation
 - Area: profile cache invalidation across process restart and remaining cache callers
@@ -29,7 +30,7 @@ The [24 October P0/P1 reconciliation](P0%20delivery%20and%20P1%20recovery%20stat
 supersedes historical design-only status: selected WS1–WS6 capabilities were delivered
 in P0, while their residual scope remains open. Tracked-view restoration is the first
 P1 slice; its approved runtime implementation and local review are complete, with
-deployed acceptance still outstanding. Completed portions are recorded in the resolved history without closing
+eligible original callback accepted on 26 October; exact overview disposition and other residuals remain open. Completed portions are recorded in the resolved history without closing
 whole workstreams. Full P0 acceptance, including natural rollover, remains separate.
 Natural Pre-KVK/off-season and Phase 2F public-save observations remain independent. The incoming
 inventory upload privacy finding belongs in security triage, not this optimisation register.
@@ -75,13 +76,13 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 ### Deferred Optimisation
 - Area: `core/event_rehydration_lifecycle.py`, `bot_instance.py` tracked-view scheduling and `rehydrate_views.py`
 - Type: architecture
-- Description: Historical generic-view cancellation is fixed in merged #439/#688 and deployed private d127cb6e08aaecf0a397b9f5a3d41279280b245c. Successor logs and report 42 verify a complete 21-entry pass beyond the ten-second deadline: 20 attached, one inaccessible daily overview pruned, zero failed/unconfirmed/unattempted. Existing-message callbacks and the overview disposition remain to be accepted; task completion and incident counts alone do not replace those checks.
-- Suggested Fix: Complete callback acceptance only on an eligible existing message with visible controls after a natural restart. The three operator-inspected Ark examples are historical closed/cancelled posts without buttons and are unsuitable tests. Confirm the overview disposition without automatic reposting or repeated imports. Retain handler-registration evidence and keep remaining WS3 readiness and scheduler work separate.
+- Description: Historical generic-view cancellation is fixed in merged #439/#688 and deployed private d127cb6e08aaecf0a397b9f5a3d41279280b245c. Successor logs and report 42 verify a complete 21-entry pass beyond the ten-second deadline: 20 attached, one inaccessible daily overview pruned, zero failed/unconfirmed/unattempted. The eligible original Ark local-time callback passed on 26 October; exact overview disposition and other historical-message eligibility remain open. Task completion and incident counts do not replace message evidence.
+- Suggested Fix: Preserve the passed eligible original-message callback; do not repeat it. Assess other message families only when required by their own scope. The three operator-inspected Ark examples are historical closed/cancelled posts without buttons and are unsuitable tests. Confirm the overview disposition without automatic reposting or repeated imports. Retain handler-registration evidence and keep remaining WS3 readiness and scheduler work separate.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate lifecycle scope; preserve view permissions, identity and shutdown semantics; not a Pre-KVK diagnostic dependency.
-- Status: WS3 first slice deployed; source/startup and restoration inventory verified; callback acceptance and overview disposition remain open; owner Chris Watts
-- Last verified: 2026-10-24
+- Status: WS3 first slice deployed; source/startup and restoration inventory verified; eligible original callback passed 26 October; overview disposition and broader coverage remain open; owner Chris Watts
+- Last verified: 2026-10-26
 - Plan: [P1 tracked-view restoration](../task_packs/P1%20Tracked%20View%20Restoration%20-%20Architecture%20and%20Implementation%20Plan.md)
 
 ## Status model
@@ -123,13 +124,13 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: `scripts/prepare_k98_update.py` protected updater transition registry
 - Type: architecture
-- Description: The registry has a finite 40-transition limit. Future releases may need additional capacity or receipt-compatible retirement; this reconciliation does not establish exhaustion today.
+- Description: The reviewed registry now retains 42 exact transitions, including startup_cache_foundations_v1. Historical 40-entry capacity wording is superseded by delivered release support. General capacity management/receipt-compatible retirement remains a separate design question; no current exhaustion is established.
 - Suggested Fix: Check actual occupancy before adding a transition beyond capacity. Design bounded growth or explicit compatible retirement while preserving old authenticated pins and resumable release receipts; do not silently discard entries.
 - Impact: medium
 - Risk: medium
 - Dependencies: Next release requirements, protected package rehearsal and updater Changes review for any implementation.
 - Status: conditional capacity follow-up
-- Last verified: 2026-10-24
+- Last verified: 2026-10-26
 
 ### Deferred Optimisation
 - Area: SQL session-lock acquisition acknowledgement and connection cleanup
@@ -145,13 +146,13 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: `core/event_rehydration_lifecycle.py::wait_for_events` and dependent scheduler readiness
 - Type: consistency
-- Description: The latest supplied startup fetched event data successfully but future-only filtering left zero upcoming events. Readiness tests collection truthiness, so a legitimate empty result is reported as not ready and dependent tasks are deferred. This is separate from the generic tracked-view cancellation.
-- Suggested Fix: Model fetch/readiness state independently of event count and supervise the dependent startup tasks using existing lifecycle ownership. Test loaded-empty, unavailable, stale and subsequently refreshed states without manufacturing calendar events or repeated unready tasks.
+- Description: The former empty-result readiness defect is delivered through #441/#690 and #442/#691. Reports 43–45 naturally show loaded_empty, not stale, with registration loops running and data-dependent one-shots/DM restoration waiting_for_events. Natural empty-to-populated transition remains unobserved.
+- Suggested Fix: Preserve the delivered distinction and deterministic tests. Accept the natural populated transition only with each deferred member and DM restoration completing without duplicate entry; do not force events, refresh or restart.
 - Impact: medium
 - Risk: medium
 - Dependencies: Separate WS3/readiness slice after tracked-view restoration; preserve reminder eligibility and public-save semantics.
-- Status: Expanded local implementation complete with affected-suite validation; see [implementation and acceptance](../task_packs/P1%20Event%20Cache%20Readiness%20-%20Implementation%20and%20Acceptance.md) for the full-run failures and test-only corrections. Not deployed or runtime-accepted; remaining WS3 obligations stay separate.
-- Last verified: 2026-10-25
+- Status: Deployed; natural loaded-empty behavior accepted, populated-transition acceptance pending. Retain [implementation history](../task_packs/P1%20Event%20Cache%20Readiness%20-%20Implementation%20and%20Acceptance.md) and remaining WS3 obligations separately.
+- Last verified: 2026-10-26
 
 ### Deferred Optimisation
 - Area: `event_calendar/reminder_state.py`, `player_self_service/service.py`, `event_calendar/reminder_candidates.py`
@@ -668,3 +669,25 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Dependencies: Separate WS3/P1 lifecycle slice; domain-state/component validation, permissions and restart/concurrency tests, and Changes review for implementation. This entry authorizes no production mutation.
 - Status: Captured; no runtime change; owner Chris Watts
 - Last verified: 2026-10-25
+
+## 26 October follow-ups linked to the closeout
+
+### Deferred Optimisation
+- Area: startup player-stats admission, services/export_contention.py, services/legacy_export_snapshot_dal.py, services/export_coordination_dal.py and recovery discovery in services/unowned_sql_hold_dal.py (R01)
+- Type: architecture
+- Description: Startup SP_Stats_for_Upload-path admission retained CoordinationLockRefused / SQL 51400 before producer entry; Report 44 separately recorded a recovery discovery refusal. Report 45 monitoring recovered. The requesting session and nearby activity do not establish the blocker, shared cause or a corrected contention defect. This is not process singleton locking.
+- Suggested Fix: In N1/N2, map callers, resource/owner order and exact entry boundaries using retained timelines and static SQL definitions. Propose ordering or bounded handling only after deterministic causal evidence, retaining existing authority, budgets, no-reentry and unknown outcomes. No live probes or lock bypass.
+- Impact: high
+- Risk: high
+- Dependencies: Next-phase architecture agreement; authoritative SQL repository; return demonstrated current pipeline/monitor correctness defects to F03/F05.
+- Status: evidence review required; diagnostic attribution delivered, cause unresolved
+
+### Deferred Optimisation
+- Area: commands/admin_cmds.py::status_command and core/interaction_safety.py (R02)
+- Type: consistency
+- Description: On 26 October at 09:02:46 UTC the status command failed its original-response edit with HTTP 404 / Discord 10015 Unknown Webhook; a later request succeeded. This is separate from successful Location tests. Source still does synchronous connectivity work and an active provider health check before the edit; no causal attribution to either is established.
+- Suggested Fix: In N4, trace defer/acknowledgement and response ownership, timing and helper behavior. Reuse private safe-response helpers and service/DAL ownership for blocking work where appropriate; add deterministic unavailable-response, permission/privacy and no-duplicate-probe tests. Preserve uncertainty rather than blindly retrying or publishing a private result publicly.
+- Impact: medium
+- Risk: medium
+- Dependencies: R01 correlation only if evidence connects it; proposed N4 scope agreement. No token-expiry assumption and no claim the successful retry fixed the cause.
+- Status: observed failure; root cause and implementation pending

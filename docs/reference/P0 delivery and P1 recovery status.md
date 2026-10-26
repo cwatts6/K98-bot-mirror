@@ -1,5 +1,14 @@
 # P0 delivery and P1 recovery status
 
+> **Current checkpoint — 26 October 2026:** Startup Cache Foundations is merged,
+> deployed at private `a68089b6bccf766e9aabb182c582d486130145dc` and closed for
+> exercised paths. All six packages are delivered; the eligible original Ark callback
+> passed. Natural event transition, exact Daily KVK Overview disposition, SQL 51400
+> cause, the status-command 10015 follow-up, all remaining WS1–WS6 and P0 F01–F05
+> remain separate. Older dated pending/deployment wording below is historical.
+
+> Read the [current closeout](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md), [next scope](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md) and [new-chat starter](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Chat%20Starter%20-%202026-10-26.md).
+
 ## 25 October startup-foundations overlay
 
 Latest verified deployment is private `35d8b7e58a5c248c22552b8ae506e1d03ccc6afe`.
@@ -175,6 +184,8 @@ a successful one-time repair does not establish those installed capabilities.
 
 ## Next phase
 
-Use the [25 October handoff](../task_packs/P1%20Next%20Phase%20-%20Handoff%20-%202026-10-25.md)
-for the review-first boundary, remaining live-button check and complete P1/P0
-carry-forward. Documentation merge state must be checked before starting work.
+Use the [26 October scope](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md)
+and [new-chat starter](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Chat%20Starter%20-%202026-10-26.md).
+The eligible original Ark callback has passed; do not repeat it. The closeout's
+R01–R18 ledger owns the complete current P1/P0 carry-forward. Verify local versus
+published documentation state before beginning the next review-only scope.

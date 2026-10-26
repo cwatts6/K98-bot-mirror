@@ -1,5 +1,23 @@
 # Diagnostics Runbook
 
+## Startup cache checkpoint — 26 October 2026
+
+The six-package Startup Cache Foundations phase is deployed and verified for exercised
+paths. Profile/name deadlines observe the original operation; completed-after-deadline
+is not cancellation or a request to replay. Report cache execution, source, persistence
+and verification independently. SQL 51400 admission and process singleton locks are
+distinct; requester's SQL session does not identify the holder. Expected off-season
+scan 1193 data does not require refresh. Event loaded-empty waiting remains valid.
+
+Report 45's healthy cycle and successful eligible original-message callback are
+accepted observations. `/ops dl_bot_status` separately had an Unknown Webhook response
+edit failure, then recovered on a later request; root cause remains open. That command
+performs active health work, unlike passive report serialization. Do not repeatedly
+invoke it to manufacture health/provider evidence or a quiet updater interval.
+
+See [current closeout and residual ledger](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md). No restart,
+import, provider probe or repost is needed for this documentation checkpoint.
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the
