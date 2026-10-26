@@ -129,7 +129,9 @@ def test_waiting_sweep_cannot_clear_prior_failure(workload):
     assert runtime.observe_recovery()
 
     def waiting(_):
-        raise runtime.ImportExecutionActive("existing work")
+        from services.stats_import_outcome_dal import ImportExecutionActive
+
+        raise ImportExecutionActive("existing work")
 
     original = w.adapter.inspect
     w.adapter.inspect = waiting

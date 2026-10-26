@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_coordination_lifecycle_hash
 
 
 def pipeline_transition():
@@ -20,10 +21,7 @@ def test_pipeline_transition_pins_reviewed_runtime_file():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in transition["members"]} == updater.PIPELINE_DECISION_BOUND_PATHS
     for member in transition["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_coordination_lifecycle_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 
