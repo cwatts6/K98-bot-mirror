@@ -284,7 +284,25 @@ async def observe_notifications(bot):
         try:
             # Each Discord operation has its own durable compare-and-set boundary.
             await drain_thread(validate_runtime_scope, row)
-            row, recovered_cache = await drain_thread(observe_pipeline, row)
+            recovered_cache = None
+            if not sql_unavailable:
+                try:
+                    row, recovered_cache = await drain_thread(observe_pipeline, row)
+                except (asyncio.CancelledError, NotificationHeld):
+                    raise
+                except Exception as exc:
+                    sql_unavailable = type(exc).__name__ in {
+                        "OperationalError",
+                        "InterfaceError",
+                        "TimeoutError",
+                    }
+                    event(
+                        row["run_id"],
+                        "pipeline_observation",
+                        "held",
+                        "inspect_SQL_connectivity_and_exact_pipeline_receipt",
+                        error=exc,
+                    )
             if recovered_cache is not None:
                 await bot_data_ready(bot, row["run_id"], recovered_cache)
                 row = await drain_thread(store.get, row["run_id"])

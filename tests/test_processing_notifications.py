@@ -763,3 +763,49 @@ async def test_intervention_uses_real_sender_contract(monkeypatch):
     await pipeline._notification_intervention("user", "admin channel", run_id)
     assert sender.call_args.args[2]["Processing run"] == run_id
     assert "Do not repeat" in sender.call_args.args[2]["Admin action"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error_name", ["OperationalError", "InterfaceError", "TimeoutError", "RuntimeError"]
+)
+async def test_pipeline_observation_failure_preserves_verified_stats(
+    journal, monkeypatch, error_name
+):
+    from stats_alerts import processing_notifications as service
+
+    rows = [new_run(journal, pipeline_run_id=str(uuid4()), stats="ready") for _ in range(2)]
+    observe = Mock(side_effect=type(error_name, (Exception,), {})("SQL unavailable"))
+    publish = AsyncMock()
+    export = Mock(side_effect=lambda row: row)
+    monkeypatch.setattr(service, "observe_pipeline", observe)
+    monkeypatch.setattr(service, "publish_stats", publish)
+    monkeypatch.setattr(service, "observe_export", export)
+    monkeypatch.setattr(service, "bot_data_ready", AsyncMock())
+    bot, _ = client()
+    await service.observe_notifications(bot)
+    assert {call.args[1]["run_id"] for call in publish.await_args_list} == {
+        row["run_id"] for row in rows
+    }
+    assert observe.call_count == (2 if error_name == "RuntimeError" else 1)
+    assert export.call_count == (2 if error_name == "RuntimeError" else 0)
+    service.bot_data_ready.assert_not_awaited()
+    assert all(journal.get(row["run_id"])["sheets"] == "pending" for row in rows)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [NotificationHeld("binding mismatch"), asyncio.CancelledError()])
+async def test_pipeline_scope_failure_or_cancellation_cannot_publish(journal, monkeypatch, error):
+    from stats_alerts import processing_notifications as service
+
+    new_run(journal, pipeline_run_id=str(uuid4()), stats="ready")
+    monkeypatch.setattr(service, "observe_pipeline", Mock(side_effect=error))
+    publish = AsyncMock()
+    monkeypatch.setattr(service, "publish_stats", publish)
+    bot, _ = client()
+    if isinstance(error, asyncio.CancelledError):
+        with pytest.raises(asyncio.CancelledError):
+            await service.observe_notifications(bot)
+    else:
+        await service.observe_notifications(bot)
+    publish.assert_not_awaited()

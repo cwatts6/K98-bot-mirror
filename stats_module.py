@@ -254,9 +254,9 @@ def _unwrap_offload_result(res):
     return res
 
 
-def _normalize_step_result(raw) -> tuple[bool, str, str]:
+def _normalize_step_result(raw) -> tuple[bool | CaptureCheckpointPending, str, str]:
     """
-    Normalize a step result into (success: bool, stdout: str, stderr: str).
+    Preserve completed SQL awaiting capture alongside ordinary boolean results.
     """
     try:
         r = _unwrap_offload_result(raw)
