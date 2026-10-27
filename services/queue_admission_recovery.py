@@ -9,6 +9,8 @@ from services.export_coordination_dal import identity
 class QueueAdmissionRecovery:
     kind = "queue_admission"
     observe_healthy = False
+    automatic_action = "withdraw_health_probe"
+    automatic_reason = "Explicit disposable health probe with verified absence of execution"
 
     def __init__(self, dal, domains=None):
         self.dal = dal
@@ -39,7 +41,8 @@ class QueueAdmissionRecovery:
                 effect="Recheck the exact request, initial withdrawal fence and absence of execution, captured output and held access. Save your decision and verify it independently. No provider request, SQL import or release of another owner's access occurs.",
             )
         elif self.dal.eligible(state):
-            actions["withdraw_queued"] = dict(
+            action = "withdraw_health_probe" if self.dal.health_probe(state) else "withdraw_queued"
+            actions[action] = dict(
                 label="Cancel unstarted queue entry",
                 check="Confirm this queued request should be cancelled. It has never acquired admission: no execution stream, SQL receipt, resource membership, held reservation or captured output exists.",
                 effect="Recheck the exact initial state under the account lock, fence the old ticket and preserve an audit receipt. A late worker cannot claim it. No business write is replayed and no other owner's access is released.",
@@ -149,14 +152,31 @@ class QueueAdmissionRecovery:
         )
 
     def execute(self, source_id, action, token, actor, reason):
-        if action not in {"withdraw_queued", "close_withdrawn_read"} or not actor.startswith(
-            "recovery:"
-        ):
+        if action not in {
+            "withdraw_queued",
+            "close_withdrawn_read",
+            "withdraw_health_probe",
+        } or not actor.startswith("recovery:"):
             raise SourceConflict("A confirmed queue withdrawal is required.")
-        apply = (
-            self.dal.close_withdrawn_read if action == "close_withdrawn_read" else self.dal.withdraw
-        )
-        apply(source_id, token, actor.removeprefix("recovery:"))
+        apply = {
+            "close_withdrawn_read": self.dal.close_withdrawn_read,
+            "withdraw_queued": self.dal.withdraw,
+            "withdraw_health_probe": self.dal.withdraw_health_probe,
+        }[action]
+        try:
+            apply(source_id, token, actor.removeprefix("recovery:"))
+        except Exception as exc:
+            from core.sql_observation import ObservationBusy
+            from services.export_contention import CoordinationLockRefused
+
+            if (
+                action == "withdraw_health_probe"
+                and isinstance(exc, CoordinationLockRefused)
+                and exc.result == -1
+                and exc.transaction_released
+            ):
+                raise ObservationBusy("Health cleanup is waiting for coordination.") from exc
+            raise
 
     def reconcile(self, source_id, action):
         state = self.dal.snapshot(source_id)

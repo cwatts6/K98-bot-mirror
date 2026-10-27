@@ -86,9 +86,14 @@ reparses the workbook for the actual database ingest.
   `COMPLETE` with `CompletionBasis = LEGACY_ASSUMED_ZERO`.
 - New uploads preserve explicit zero values and separately count missing and invalid Building/Tech
   cells.
-- The latest complete kingdom scan at or before the snapshot supplies the expected allied-governor
-  cohort. Extra valid workbook rows are allowed; a missing expected governor makes the snapshot
-  `PARTIAL`.
+- The workbook covers the top ten alliances and is an independent snapshot. Its filters differ
+  from the kingdom scan; no kingdom roster is used to judge import completion.
+- ExpectedGovernorCount is the supplied file's row count; ObservedGovernorCount is the number
+  of valid rows written. MissingExpectedGovernorCount counts supplied rows without valid required
+  metrics. All supplied rows must be written with valid Building/Tech values for COMPLETE.
+- A governor absent from this snapshot stays absent, never an invented zero-activity row.
+- Older SOURCE_VALIDATED/PARTIAL headers may reflect the superseded kingdom-roster check.
+  They require an evidence-checked metadata reconciliation; restarting does not relabel history.
 - Completion evidence is written through `dbo.usp_SetAllianceActivitySnapshotCompletion` in the
   same transaction as the snapshot rows and daily rebuild, using `CompletionBasis =
   SOURCE_VALIDATED`.

@@ -437,6 +437,19 @@ COORDINATION_LIFECYCLE_PATHS = frozenset(
 )
 
 
+HEALTH_ACTIVITY_PATHS = frozenset(
+    {
+        "services/queue_admission_recovery_dal.py",
+        "services/queue_admission_recovery.py",
+        "services/recovery_service.py",
+        "services/recovery_release_policy.py",
+        "services/legacy_export_snapshot_service.py",
+        "weekly_activity_importer.py",
+        "gsheet_module.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -449,7 +462,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 46:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 47:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -508,6 +521,9 @@ def reviewed_transitions():
             )
             fixed_event_delivery = (
                 item["id"] == "p1_event_delivery_v1" and path in EVENT_DELIVERY_PATHS
+            )
+            fixed_health_activity = (
+                item["id"] == "health_activity_completion_v1" and path in HEALTH_ACTIVITY_PATHS
             )
             fixed_coordination_lifecycle = (
                 item["id"] == "coordination_lifecycle_v1" and path in COORDINATION_LIFECYCLE_PATHS
@@ -601,6 +617,7 @@ def reviewed_transitions():
                     or fixed_event_cache
                     or fixed_startup_foundations
                     or fixed_event_delivery
+                    or fixed_health_activity
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
@@ -719,6 +736,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed event-cache readiness transition required.")
         if item["id"] == "p1_event_delivery_v1" and paths != EVENT_DELIVERY_PATHS:
             raise ValueError("Complete fixed event-delivery transition required.")
+        if item["id"] == "health_activity_completion_v1" and paths != HEALTH_ACTIVITY_PATHS:
+            raise ValueError("Complete fixed health/activity transition required.")
         if item["id"] == "coordination_lifecycle_v1" and paths != COORDINATION_LIFECYCLE_PATHS:
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:

@@ -19,6 +19,7 @@ import math
 import time
 from uuid import UUID
 
+from kvk.dal.new_source_import_dal import SourceConflict
 from services.export_contention import (
     CoordinationLockRefused,
     admission_diagnostics_enabled,
@@ -336,7 +337,9 @@ def record_writer_stage(stage):
 
 
 @contextmanager
-def configuration_requests(*, wait_for_admission=False, publication_intent=False):
+def configuration_requests(
+    *, wait_for_admission=False, publication_intent=False, health_probe=False
+):
     runtime = _writer_runtime()
     if runtime is None:
         yield
@@ -344,12 +347,16 @@ def configuration_requests(*, wait_for_admission=False, publication_intent=False
         if current_owner() is not None and not current_owner().closed:
             raise SnapshotUnavailable("Collect provider configuration before SQL writer admission.")
         with runtime.configuration_requests(
-            wait_for_admission=wait_for_admission, publication_intent=publication_intent
+            wait_for_admission=wait_for_admission,
+            publication_intent=publication_intent,
+            health_probe=health_probe,
         ):
             yield
 
 
-def read_configuration(read, *, wait_for_admission=True, attempts=3, publication_intent=False):
+def read_configuration(
+    read, *, wait_for_admission=True, attempts=3, publication_intent=False, health_probe=False
+):
     """Retry only after authority-proven read-only settlement, with fresh admission.
 
     The callback must collect provider inputs only, before SQL/business writes.
@@ -360,6 +367,8 @@ def read_configuration(read, *, wait_for_admission=True, attempts=3, publication
     for attempt in range(attempts):
         try:
             options = {"wait_for_admission": True} if wait_for_admission else {}
+            if health_probe:
+                options["health_probe"] = True
             if publication_intent is True:
                 options["publication_intent"] = True
             scope = configuration_requests(**options)
@@ -692,7 +701,9 @@ class LegacyExportRuntime:
         return preferred if preferred in destinations else min(destinations)
 
     @contextmanager
-    def configuration_requests(self, *, wait_for_admission=False, publication_intent=False):
+    def configuration_requests(
+        self, *, wait_for_admission=False, publication_intent=False, health_probe=False
+    ):
         from contextlib import nullcontext
 
         admission = (
@@ -705,12 +716,16 @@ class LegacyExportRuntime:
         # on one another's reservations.
         with admission:
             with self._configuration_requests(
-                wait_for_admission=wait_for_admission, publication_intent=publication_intent
+                wait_for_admission=wait_for_admission,
+                publication_intent=publication_intent,
+                health_probe=health_probe,
             ):
                 yield
 
     @contextmanager
-    def _configuration_requests(self, *, wait_for_admission, publication_intent):
+    def _configuration_requests(
+        self, *, wait_for_admission, publication_intent, health_probe=False
+    ):
         from uuid import uuid4
 
         from services.export_provider_adapter import ProviderAdapter, use_provider
@@ -724,6 +739,10 @@ class LegacyExportRuntime:
         ):
             raise SnapshotUnavailable("Authority probe requires the matching SQL evidence gate.")
 
+        if health_probe and (publication_intent or wait_for_admission):
+            raise ValueError(
+                "A health probe is disposable and cannot publish or wait for admission."
+            )
         scope = json.loads(self.configuration)["config"]
         from services.producer_recovery_intent import current_intent
 
@@ -762,7 +781,7 @@ class LegacyExportRuntime:
                 kvk_no=None,
                 request=request,
                 storage_owner=self.store.storage_owner,
-                actor="system:configuration",
+                actor="system:health_probe:v1" if health_probe else "system:configuration",
                 reason="Read immutable configuration inputs",
             )
         keys = tuple(
@@ -770,16 +789,40 @@ class LegacyExportRuntime:
                 {"account:" + self.account, *("destination:" + d for d in scope["destinations"])}
             )
         )
-        claim = self._claim_unstarted(
-            identifier,
-            account=self.account,
-            storage_owner=self.store.storage_owner,
-            stage="preflight",
-            resource_keys=keys,
-            wait_for_admission=wait_for_admission,
-        )
+        withdraw = self.dal.withdraw_unstarted
+        if health_probe:
+            from services.queue_admission_recovery_dal import QueueAdmissionDAL
+
+            queue = QueueAdmissionDAL(self)
+            withdraw = queue.withdraw_health_probe
+        try:
+            claim = self._claim_unstarted(
+                identifier,
+                account=self.account,
+                storage_owner=self.store.storage_owner,
+                stage="preflight",
+                resource_keys=keys,
+                wait_for_admission=wait_for_admission,
+                withdraw=withdraw,
+            )
+        except SourceConflict:
+            if health_probe and queue.health_withdrawn(queue.snapshot(identifier)):
+                raise ConfigurationAdmissionDeferred(
+                    "Health probe was safely withdrawn by recovery."
+                )
+            raise
         if claim is None:
-            self.dal.withdraw_unstarted(identifier)
+            try:
+                withdraw(identifier)
+            except CoordinationLockRefused as exc:
+                if not health_probe or exc.result != -1 or not exc.transaction_released:
+                    raise
+                # The persisted health identity is discoverable after restart.
+                # Recovery rechecks full non-entry evidence before cancelling.
+                logger.info("health_probe_cleanup_pending preparation=%s", identifier)
+                raise ConfigurationAdmissionDeferred(
+                    "Health probe cleanup is waiting for coordination; recovery will reconcile."
+                ) from exc
             raise ConfigurationAdmissionDeferred(
                 "Configuration read unavailable: account admission refused."
             )
@@ -832,7 +875,7 @@ class LegacyExportRuntime:
                         ) from original
             raise
 
-    def _claim_unstarted(self, identifier, *, wait_for_admission=True, **kwargs):
+    def _claim_unstarted(self, identifier, *, wait_for_admission=True, withdraw=None, **kwargs):
         """Wait only after an acknowledged refusal, before any execution starts.
 
         Keep the same durable queue ticket. An exception can mean an unknown
@@ -841,6 +884,7 @@ class LegacyExportRuntime:
         """
         from services.legacy_export_snapshot_dal import _diagnostic_uuid
 
+        withdraw = withdraw or self.dal.withdraw_unstarted
         started = time.monotonic()
         deadline = started + 60.0
 
@@ -875,7 +919,7 @@ class LegacyExportRuntime:
                     # abandoning its exact ticket; leave no pending queue blocker.
                     # The DAL CAS still rejects admitted/owned or captured work.
                     try:
-                        self.dal.withdraw_unstarted(identifier)
+                        withdraw(identifier)
                     except BaseException as cleanup:
                         report(
                             "withdrawal_unknown", attempt, time.monotonic(), type(cleanup).__name__
@@ -913,7 +957,7 @@ class LegacyExportRuntime:
                 # provider/SQL execution or subsequent claim began, so the
                 # existing guarded CAS can withdraw this unstarted ticket.
                 try:
-                    self.dal.withdraw_unstarted(identifier)
+                    withdraw(identifier)
                 except BaseException as cleanup:
                     report("withdrawal_unknown", attempt, time.monotonic(), type(cleanup).__name__)
                     raise

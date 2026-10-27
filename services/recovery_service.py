@@ -222,6 +222,7 @@ class RecoveryService:
             (row["SourceKind"], action)
             not in {
                 ("configuration_read", "release_read"),
+                ("queue_admission", "withdraw_health_probe"),
                 ("player_report", "complete_cache_only"),
                 ("configuration_producer", "complete_configuration_only"),
             }

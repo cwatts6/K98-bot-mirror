@@ -24,7 +24,9 @@ P0A_ACTIONS = MappingProxyType(
             }
         ),
         "recovery_overview": frozenset(),
-        "queue_admission": frozenset({"withdraw_queued", "close_withdrawn_read"}),
+        "queue_admission": frozenset(
+            {"withdraw_queued", "close_withdrawn_read", "withdraw_health_probe"}
+        ),
         "unowned_sql_hold": frozenset({"clear_unowned_hold"}),
         "player_report": frozenset(
             {

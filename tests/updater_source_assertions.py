@@ -20,9 +20,23 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_health_activity_hash(root, path):
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/health_activity_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "106af81ec95787d6286314722f6001edfe3c424de7c29c1391e21d537df4fab6"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_coordination_lifecycle_hash(root, path):
     """Authenticate the exact successor; this fixture grants no install authority."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_health_activity_hash(root, path)
     raw = (root / "tests/fixtures/coordination_lifecycle_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

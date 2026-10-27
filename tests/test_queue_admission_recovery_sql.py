@@ -470,3 +470,128 @@ def test_terminal_queue_is_refreshed_ahead_of_evidence_backlog(
     result = recovery_store.get(queue["IncidentID"])
     assert result["State"] == ("resolved" if verified else "open")
     domain.inspect.assert_called_once_with(r.source)
+
+
+def health_request(r, actor="system:health_probe:v1"):
+    return r.runtime.dal.request(
+        account=r.runtime.account,
+        consumer="config",
+        kvk_no=None,
+        request=dict(read_configuration=str(uuid4())),
+        storage_owner=r.runtime.store.storage_owner,
+        actor=actor,
+        reason="Read immutable configuration inputs",
+    )
+
+
+def test_health_cleanup_keeps_other_export_owner_and_fences_late_claim(refused):
+    r = refused
+    r.source = health_request(r)
+    before = r.f.sql.execute(
+        "SELECT Version,Fence,ActiveJobID FROM #ExportResource WHERE ResourceKey='account:test-account'"
+    ).fetchone()
+    dal = QueueAdmissionDAL(r.runtime)
+    dal.withdraw_health_probe(r.source)
+    assert r.runtime.dal.read(r.source)["State"] == "unavailable"
+    assert tuple(
+        r.f.sql.execute(
+            "SELECT Version,Fence,ActiveJobID FROM #ExportResource WHERE ResourceKey='account:test-account'"
+        ).fetchone()
+    ) == tuple(before)
+    unblock(r)
+    with pytest.raises(SourceConflict):
+        r.runtime.dal.claim(
+            r.source,
+            account=r.runtime.account,
+            storage_owner="disk",
+            stage="preflight",
+            resource_keys=("account:test-account",),
+        )
+
+
+def test_health_restart_discovers_and_automatically_withdraws(refused):
+    r = refused
+    r.source = health_request(r)
+    adapter, store, service, row = service_for(r)
+    assert r.source in adapter.pending_recovery()
+    assert set(row["evidence"]["actions"]) == {"withdraw_health_probe"}
+    result = service.recover_automatic(row["IncidentID"])
+    assert result["State"] == "resolved"
+    assert store.actions[-1]["State"] == "verified"
+    # Fresh objects have no in-memory identity or request handle to rely on.
+    fresh = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime))
+    assert fresh.inspect(r.source)[2]
+    assert r.source not in fresh.pending_recovery()
+
+
+def test_health_lost_cleanup_reply_is_reconciled_without_second_write(refused, monkeypatch):
+    r = refused
+    r.source = health_request(r)
+    adapter, store, service, row = service_for(r)
+    original = adapter.dal.withdraw_health_probe
+    calls = []
+
+    def lost(*args):
+        calls.append(args)
+        original(*args)
+        raise TimeoutError("lost reply")
+
+    monkeypatch.setattr(adapter.dal, "withdraw_health_probe", lost)
+    result = service.recover_automatic(row["IncidentID"])
+    assert result["State"] == "resolved"
+    assert len(calls) == 1
+    assert store.actions[-1]["State"] == "verified"
+
+
+def test_health_pending_cleanup_retries_after_restart(refused, monkeypatch):
+    from services.export_contention import CoordinationLockRefused
+
+    r = refused
+    r.source = health_request(r)
+    adapter, store, service, row = service_for(r)
+    error = CoordinationLockRefused(
+        result=-1, session=1, transaction_state=1, transaction_count=1, resource_hash="a" * 64
+    )
+    error.transaction_released = True
+    monkeypatch.setattr(
+        adapter.dal, "withdraw_health_probe", lambda *a: (_ for _ in ()).throw(error)
+    )
+    from core.sql_observation import ObservationBusy
+
+    with pytest.raises(ObservationBusy):
+        service.recover_automatic(row["IncidentID"])
+    assert r.runtime.dal.read(r.source)["State"] == "pending"
+    service.adapters[adapter.kind] = QueueAdmissionRecovery(QueueAdmissionDAL(r.runtime))
+    assert service.recover_automatic(row["IncidentID"])["State"] == "resolved"
+
+
+def test_ordinary_config_stays_guided_and_cannot_use_health_action(refused):
+    r = refused
+    r.source = health_request(r, "system:configuration")
+    adapter, store, service, row = service_for(r)
+    assert set(row["evidence"]["actions"]) == {"withdraw_queued"}
+    service.recover_automatic(row["IncidentID"])
+    assert not store.actions
+    with pytest.raises(SourceConflict):
+        adapter.dal.withdraw_health_probe(r.source)
+
+
+def test_health_claim_wins_race_and_cleanup_retains_ownership(refused):
+    r = refused
+    r.source = health_request(r)
+    dal = QueueAdmissionDAL(r.runtime)
+    from kvk.dal.new_source_import_dal import digest
+
+    token = digest(dal.snapshot(r.source)).hex()
+    unblock(r)
+    claim = r.runtime.dal.claim(
+        r.source,
+        account=r.runtime.account,
+        storage_owner="disk",
+        stage="preflight",
+        resource_keys=("account:test-account",),
+    )
+    assert claim
+    with pytest.raises(SourceConflict):
+        dal.withdraw_health_probe(r.source, token)
+    assert r.runtime.dal.read(r.source)["State"] == "preflight"

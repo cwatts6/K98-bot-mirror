@@ -1774,7 +1774,7 @@ def check_basic_gsheets_access(
                 )
                 stage = "closure"
 
-            read_configuration(probe, wait_for_admission=False)
+            read_configuration(probe, wait_for_admission=False, health_probe=True)
             return (
                 True,
                 "GSheets access confirmed through the S11 authority (registered configuration)",

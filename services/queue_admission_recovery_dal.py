@@ -8,6 +8,7 @@ import json
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
 from kvk.dal.source_output_pool_dal import _wire
+from services.export_contention import retry_coordination, transaction as coordination_transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 
 
@@ -85,6 +86,69 @@ class QueueAdmissionDAL:
             and prep["RequestHash"].lower() == digest(request).hex()
         )
 
+    @staticmethod
+    def health_probe(state):
+        """Durable explicit opt-in, never infer health purpose from age or consumer."""
+        prep = state["preparation"]
+        request = json.loads(prep["RequestJson"])
+        inner = request.get("request", {})
+        try:
+            identity(inner.get("read_configuration"))
+        except (TypeError, ValueError):
+            return False
+        return (
+            prep.get("Actor") == "system:health_probe:v1"
+            and prep["ConsumerKind"] == "config"
+            and prep["KVK_NO"] is None
+            and set(inner) == {"read_configuration"}
+            and request
+            == dict(
+                consumer="config", kvk_no=None, request=inner, storage_owner=prep["StorageOwner"]
+            )
+            and prep["RequestHash"].lower() == digest(request).hex()
+        )
+
+    @classmethod
+    def health_withdrawn(cls, state):
+        prep = state["preparation"]
+        marker = json.loads(prep["GenerationJson"] or "{}").get("queue_withdrawal")
+        return (
+            cls.health_probe(state)
+            and isinstance(marker, dict)
+            and set(marker) == {"action", "token"}
+            and marker["action"] == prep["OwnerID"]
+            and isinstance(marker["token"], str)
+            and len(marker["token"]) == 64
+            and prep["State"] == "unavailable"
+            and prep["Version"] == 2
+            and prep["Fence"] == 1
+            and all(prep[k] is None for k in ("SpoolKey", "SpoolBytes", "SpoolHash", "JobID"))
+            and not any(state["counts"].values())
+        )
+
+    @retry_coordination(budget_seconds=5)
+    def withdraw_health_probe(self, source_id, token=None, action_id=None):
+        """Fence only an explicitly disposable, never-admitted health request.
+
+        A lost commit acknowledgement is not retried. Discovery finds the durable
+        purpose even if request creation's acknowledgement was lost. Its later
+        snapshot either proves withdrawal or rechecks the untouched initial state.
+        """
+        from uuid import uuid4
+
+        with coordination_transaction(self.connect) as cursor:
+            state = self._snapshot(cursor, source_id)
+            if token is None and self.health_withdrawn(state):
+                return
+            actual = digest(state).hex()
+            if (
+                not self.health_probe(state)
+                or not self.eligible(state)
+                or (token is not None and token != actual)
+            ):
+                raise SourceConflict("Health probe changed or has execution evidence; retain it.")
+            self._withdraw(cursor, source_id, actual, action_id or str(uuid4()))
+
     def withdraw(self, source_id, token, action_id):
         with transaction(self.connect) as cursor:
             state = self._snapshot(cursor, source_id)
@@ -92,18 +156,20 @@ class QueueAdmissionDAL:
                 raise SourceConflict(
                     "Queue admission changed. Review its current execution evidence."
                 )
-            marker = json.dumps(
-                dict(queue_withdrawal=dict(action=identity(action_id), token=token))
-            )
-            _cas(
-                cursor,
-                "UPDATE dbo.ExportPreparation SET State='unavailable',OwnerID=?,Fence=1,Version=2,"
-                "GenerationJson=?,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version "
-                "WHERE PreparationID=? AND State='pending' AND Version=1 AND Fence=0 AND OwnerID IS NULL",
-                identity(action_id),
-                marker,
-                identity(source_id),
-            )
+            self._withdraw(cursor, source_id, token, action_id)
+
+    @staticmethod
+    def _withdraw(cursor, source_id, token, action_id):
+        marker = json.dumps(dict(queue_withdrawal=dict(action=identity(action_id), token=token)))
+        _cas(
+            cursor,
+            "UPDATE dbo.ExportPreparation SET State='unavailable',OwnerID=?,Fence=1,Version=2,"
+            "GenerationJson=?,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version "
+            "WHERE PreparationID=? AND State='pending' AND Version=1 AND Fence=0 AND OwnerID IS NULL",
+            identity(action_id),
+            marker,
+            identity(source_id),
+        )
 
     @staticmethod
     def configuration_read_continuation_candidate(state):

@@ -198,37 +198,14 @@ def parse_activity_excel(content: bytes) -> pd.DataFrame:
     return df
 
 
-def _load_expected_allied_governors(cur, snapshot_ts_utc: datetime) -> set[int]:
-    """Return allied governors from the latest complete scan at or before the snapshot."""
-    cur.execute(
-        """
-        SELECT DISTINCT scan.GovernorID
-        FROM dbo.KingdomScanData4 AS scan
-        WHERE scan.SCANORDER =
-        (
-            SELECT MAX(candidate.SCANORDER)
-            FROM dbo.KingdomScanData4 AS candidate
-            WHERE candidate.AsOfDate <= CONVERT(date, ?)
-        )
-          AND NULLIF(LTRIM(RTRIM(scan.Alliance)), N'') IS NOT NULL
-        """,
-        snapshot_ts_utc.replace(tzinfo=None),
-    )
-    return {int(row[0]) for row in cur.fetchall()}
-
-
-def _completion_evidence(
-    df: pd.DataFrame, expected_governors: set[int]
-) -> ActivityCompletionEvidence:
-    if not expected_governors:
-        raise RuntimeError("Alliance Activity completion cannot resolve an expected scan cohort.")
-
-    source_governors = {int(value) for value in df["GovernorID"].tolist()}
+def _completion_evidence(df: pd.DataFrame) -> ActivityCompletionEvidence:
+    """Validate the supplied top-ten-alliance snapshot, not a kingdom-scan roster."""
+    source_count = len(df)
     valid_metric_rows = df["BuildingTotal"].notna() & df["TechDonationTotal"].notna()
     missing_metric_count = int(df.attrs.get("missing_metric_count", 0))
     invalid_metric_count = int(df.attrs.get("invalid_metric_count", 0))
-    missing_expected_count = len(expected_governors - source_governors)
     observed_count = int(valid_metric_rows.sum())
+    missing_expected_count = source_count - observed_count
     completion_state = (
         "COMPLETE"
         if missing_expected_count == 0 and missing_metric_count == 0 and invalid_metric_count == 0
@@ -236,7 +213,7 @@ def _completion_evidence(
     )
     return ActivityCompletionEvidence(
         completion_state=completion_state,
-        expected_governor_count=len(expected_governors),
+        expected_governor_count=source_count,
         observed_governor_count=observed_count,
         missing_expected_governor_count=missing_expected_count,
         missing_metric_count=missing_metric_count,
@@ -464,8 +441,7 @@ def ingest_weekly_activity_excel(
                     cxn.rollback()
                     return (0, 0)
 
-            expected_governors = _load_expected_allied_governors(cur, snapshot_ts_utc)
-            completion = _completion_evidence(df, expected_governors)
+            completion = _completion_evidence(df)
             valid_df = df[df["BuildingTotal"].notna() & df["TechDonationTotal"].notna()].copy()
 
             # Insert header

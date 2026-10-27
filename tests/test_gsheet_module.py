@@ -501,7 +501,7 @@ def test_s11_health_uses_one_owned_authority_request_without_credential_fallback
     runtime = Mock()
     runtime.configuration_health_destination.return_value = "registered-config"
     monkeypatch.setattr(legacy, "_writer_runtime", lambda: runtime)
-    monkeypatch.setattr(legacy, "configuration_requests", lambda: nullcontext())
+    monkeypatch.setattr(legacy, "configuration_requests", lambda **kwargs: nullcontext())
     sheets = Mock()
     adapter = Mock()
     if failed:
@@ -556,7 +556,8 @@ def test_s11_health_selects_registered_probe_before_admission(monkeypatch, prefe
     boundaries = []
 
     @contextmanager
-    def admitted():
+    def admitted(**kwargs):
+        assert kwargs == {"health_probe": True}
         boundaries.append("entered")
         try:
             with provider.use_provider(adapter):

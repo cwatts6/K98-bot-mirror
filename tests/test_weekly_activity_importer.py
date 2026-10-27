@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from io import BytesIO
 
 import pandas as pd
@@ -8,32 +7,8 @@ import pytest
 
 from weekly_activity_importer import (
     _completion_evidence,
-    _load_expected_allied_governors,
     parse_activity_excel,
 )
-
-
-def test_expected_allied_governors_uses_schema_native_columns() -> None:
-    class Cursor:
-        def __init__(self):
-            self.executed = None
-
-        def execute(self, sql, *params):
-            self.executed = (sql, params)
-
-        def fetchall(self):
-            return [(123,), (456,)]
-
-    cursor = Cursor()
-    snapshot = datetime(2026, 7, 28, tzinfo=UTC)
-
-    assert _load_expected_allied_governors(cursor, snapshot) == {123, 456}
-    sql, params = cursor.executed
-    assert "SELECT DISTINCT scan.GovernorID" in sql
-    assert "LTRIM(RTRIM(scan.Alliance))" in sql
-    assert "TRY_CONVERT(bigint, scan.GovernorID)" not in sql
-    assert "CONVERT(nvarchar(255), scan.Alliance)" not in sql
-    assert params == (snapshot.replace(tzinfo=None),)
 
 
 def _workbook(rows: list[dict[str, object]]) -> bytes:
@@ -71,10 +46,10 @@ def test_explicit_zero_is_valid_and_extra_source_rows_are_allowed():
     assert parsed.attrs["missing_metric_count"] == 0
     assert parsed.attrs["invalid_metric_count"] == 0
 
-    evidence = _completion_evidence(parsed, {1})
+    evidence = _completion_evidence(parsed)
 
     assert evidence.completion_state == "COMPLETE"
-    assert evidence.expected_governor_count == 1
+    assert evidence.expected_governor_count == 2
     assert evidence.observed_governor_count == 2
     assert evidence.missing_expected_governor_count == 0
 
@@ -85,22 +60,23 @@ def test_missing_and_invalid_metrics_are_distinguished_and_partial():
     assert parsed.attrs["missing_metric_count"] == 1
     assert parsed.attrs["invalid_metric_count"] == 1
 
-    evidence = _completion_evidence(parsed, {1, 2})
+    evidence = _completion_evidence(parsed)
 
     assert evidence.completion_state == "PARTIAL"
     assert evidence.observed_governor_count == 0
-    assert evidence.missing_expected_governor_count == 0
+    assert evidence.missing_expected_governor_count == 2
     assert evidence.missing_metric_count == 1
     assert evidence.invalid_metric_count == 1
 
 
-def test_missing_expected_governor_marks_snapshot_partial():
+def test_top_ten_snapshot_is_complete_independently_of_kingdom_roster():
     parsed = parse_activity_excel(_workbook([_row(1, building=10, tech=20)]))
 
-    evidence = _completion_evidence(parsed, {1, 2})
+    evidence = _completion_evidence(parsed)
 
-    assert evidence.completion_state == "PARTIAL"
-    assert evidence.missing_expected_governor_count == 1
+    assert evidence.completion_state == "COMPLETE"
+    assert evidence.expected_governor_count == 1
+    assert evidence.missing_expected_governor_count == 0
     assert evidence.observed_governor_count == 1
 
 
@@ -115,8 +91,9 @@ def test_duplicate_governor_id_is_rejected():
         parse_activity_excel(_workbook([_row(1), _row(1)]))
 
 
-def test_completion_requires_expected_scan_cohort():
-    parsed = parse_activity_excel(_workbook([_row(1)]))
-
-    with pytest.raises(RuntimeError, match="expected scan cohort"):
-        _completion_evidence(parsed, set())
+def test_all_855_supplied_rows_define_completion():
+    parsed = parse_activity_excel(_workbook([_row(i) for i in range(1, 856)]))
+    evidence = _completion_evidence(parsed)
+    assert evidence.completion_state == "COMPLETE"
+    assert evidence.expected_governor_count == evidence.observed_governor_count == 855
+    assert evidence.missing_expected_governor_count == 0
