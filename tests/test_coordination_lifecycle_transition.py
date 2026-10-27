@@ -34,10 +34,7 @@ def test_complete_bundle_pins_current_source():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in item["members"]} == updater.COORDINATION_LIFECYCLE_PATHS
     for member in item["members"]:
-        assert (
-            before_health_activity_hash(root, member["path"])
-            == member["after_sha256"]
-        )
+        assert before_health_activity_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 
