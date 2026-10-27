@@ -7,11 +7,41 @@ from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import identity
 
 
+def read_pipeline_notification_evidence(runtime, run):
+    """Read only the exact registered pipeline; stage evidence is not delivery."""
+    from core.sql_observation import observation
+
+    scope = (runtime.account, runtime.store.storage_owner)
+    if (run["account"], run["storage_owner"]) != scope:
+        raise SourceConflict("Notification belongs to another protected runtime.")
+    with observation(), transaction(runtime.dal.connect) as cursor:
+        cursor.execute(
+            "SELECT r.AccountKey,r.StorageOwner,r.InputsJson,s.Stage,s.State,s.EvidenceJson "
+            "FROM dbo.ProcessingPipelineRun r JOIN dbo.ProcessingPipelineStage s ON s.RunID=r.RunID "
+            "WHERE r.RunID=? AND s.Stage IN ('player_cache','export')",
+            identity(run["pipeline_run_id"]),
+        )
+        found = rows(cursor)
+    if len(found) != 2 or {row["Stage"] for row in found} != {"player_cache", "export"}:
+        raise SourceConflict("Exact pipeline notification stages are unavailable.")
+    result = {}
+    for row in found:
+        if (row["AccountKey"], row["StorageOwner"]) != scope or json.loads(row["InputsJson"]).get(
+            "notification_run_id"
+        ) != run["run_id"]:
+            raise SourceConflict("Pipeline notification association differs.")
+        if row["State"] == "observed":
+            result[row["Stage"]] = json.loads(row["EvidenceJson"])
+    return result
+
+
 def read_export_outcome(runtime, run):
+    from core.sql_observation import observation
+
     scope = (runtime.account, runtime.store.storage_owner, "scan_data")
     if (run["account"], run["storage_owner"], "scan_data") != scope:
         raise SourceConflict("Notification belongs to another protected runtime.")
-    with transaction(runtime.dal.connect) as cursor:
+    with observation(), transaction(runtime.dal.connect) as cursor:
         cursor.execute(
             "SELECT AccountKey,StorageOwner,ConsumerKind,JobID FROM dbo.ExportPreparation WHERE PreparationID=?",
             identity(run["preparation_id"]),

@@ -45,6 +45,21 @@
     "after": "24b46575681799f33e059ae05bbdae6bce9f5d008789f3837a1f46d7406ffb59"
   },
   {
+    "path": "services/processing_notification_dal.py",
+    "before": "8ce88a5bc3fcdb83bc9a1afc33914bf804b750b948e4dc680ceb2075e14ed368",
+    "after": "41a3b96d3048a2f872b9185342b302a4153579d1c398f60f58b4025f3946796f"
+  },
+  {
+    "path": "services/processing_notification_service.py",
+    "before": "62e00d22fd9528a260a70e5d36ca323a9a96c360faadfaa3b072c89e5491dfd2",
+    "after": "1afa19ff6053a05c5b9f2a1bb6910e429890908b104e13d4018db6f4924f7434"
+  },
+  {
+    "path": "services/processing_pipeline_receipts.py",
+    "before": "56b709eb82e0ff2b8a31189320657de7572e7c73f34e6a6421a24aa93301ae3c",
+    "after": "5d18b266516e76d1502b502b2aaed67ff0ff4ed52aac48d738f9d320942c6925"
+  },
+  {
     "path": "services/recovery_health.py",
     "before": "bb7b2c74c8d57b8aeddd73de9b5d0e178076defc0d41566518afba5ddf5bba8d",
     "after": "5c0dad5e932a001d3541ce2985a264a9bbc039014f53af917e6d1715a0de4d36"
@@ -53,6 +68,11 @@
     "path": "services/stats_import_outcome_dal.py",
     "before": "e255dcee2f8674819de98375416239b565f02f21fc301fd8149a84b9f5f07a2d",
     "after": "bbfe61528dad2ba4725379bd864a9f2217bc63839a8fc4db846cf6f5156ae2d9"
+  },
+  {
+    "path": "stats_alerts/processing_notifications.py",
+    "before": "a83de75cbc8afad7642d01e7c2a683f6ffbc656e3a3d8d41f860e81a9da337c8",
+    "after": "662c2774f7739d9d4afbfc0424ad743dc4a4cd72f330399c61bf87f82dff40b4"
   },
   {
     "path": "stats_module.py",

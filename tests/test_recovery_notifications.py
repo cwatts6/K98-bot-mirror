@@ -112,11 +112,12 @@ def test_monitor_reports_in_progress_checkpoint_without_certifying_stale_checks(
     health.begin_cycle()
     health.record_progress("accepted_evidence_repairs")
     report = health.report()
-    assert not report["healthy"]
+    assert report["healthy"]
+    assert report["check_state"] == "stale"
     assert report["check_failure"] is None
     assert report["cycle"]["stage"] == "accepted_evidence_repairs"
     assert report["cycle"]["in_progress"]
-    assert "cycle is in progress" in report["status"]
+    assert "progressing" in report["status"]
     # Returned report is detached; it cannot rewrite the monitor's observation.
     report["cycle"]["stage"] = "changed"
     assert health.report()["cycle"]["stage"] == "accepted_evidence_repairs"

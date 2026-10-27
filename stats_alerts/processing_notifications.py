@@ -14,6 +14,7 @@ from services.processing_notification_service import (
     cache_generation,
     event,
     observe_export,
+    observe_pipeline,
     patch_run,
     validate_runtime_scope,
 )
@@ -283,6 +284,10 @@ async def observe_notifications(bot):
         try:
             # Each Discord operation has its own durable compare-and-set boundary.
             await drain_thread(validate_runtime_scope, row)
+            row, recovered_cache = await drain_thread(observe_pipeline, row)
+            if recovered_cache is not None:
+                await bot_data_ready(bot, row["run_id"], recovered_cache)
+                row = await drain_thread(store.get, row["run_id"])
             try:
                 await publish_stats(bot, row)
             except asyncio.CancelledError:

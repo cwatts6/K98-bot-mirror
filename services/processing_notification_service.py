@@ -1,6 +1,7 @@
 """Durable processing facts and exact export observation; no Discord rendering."""
 
 import asyncio
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -163,6 +164,50 @@ def observe_export(row):
             duration=updated["duration_seconds"],
         )
     return updated
+
+
+def observe_pipeline(row):
+    """Reconnect recovered pipeline receipts without starting business work."""
+    if not row.get("pipeline_run_id"):
+        return row, None
+    from core.sql_observation import ObservationBusy
+    from services.processing_notification_dal import read_pipeline_notification_evidence
+
+    try:
+        with caller_runtime() as runtime:
+            if runtime is None:
+                raise NotificationHeld("Protected runtime unavailable.")
+            evidence = read_pipeline_notification_evidence(runtime, row)
+    except ObservationBusy:
+        return row, None
+    export = evidence.get("export", {})
+    if export.get("outcome") == "queued":
+        from services.export_coordination_dal import identity
+
+        binding = {key: identity(export[key]) for key in ("preparation_id", "job_id")}
+        if any(row.get(key) and row[key] != value for key, value in binding.items()):
+            raise NotificationHeld("Recovered export differs from the registered notification.")
+        if any(row.get(key) != value for key, value in binding.items()):
+            row = notification_store().patch(row["run_id"], **binding)
+    cache = evidence.get("player_cache", {})
+    if (
+        row.get("stats") == "ready"
+        or row.get("stats_delivery") == "superseded"
+        or cache.get("outcome") != "cache_bytes_verified"
+    ):
+        return row, None
+    from constants import PLAYER_STATS_CACHE
+
+    try:
+        with Path(PLAYER_STATS_CACHE).open("rb") as source:
+            raw = source.read(64 * 1024 * 1024 + 1)
+        if len(raw) > 64 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != cache.get("sha256"):
+            return row, None
+        output = json.loads(raw)
+    except (OSError, ValueError):
+        # Cache readiness cannot prevent independent export receipt observation.
+        return row, None
+    return row, output if cache_generation(output) is not None else None
 
 
 def validate_runtime_scope(row):

@@ -137,6 +137,41 @@ async def test_registration_ack_loss_never_starts_business_work(monkeypatch):
     assert calls == ["run_committed"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("binding_lost", [False, True])
+async def test_notification_pipeline_binding_precedes_business_work(monkeypatch, binding_lost):
+    from services import processing_notification_service as notifications
+
+    calls = []
+    pipeline_id, notification_id = str(uuid4()), str(uuid4())
+    monkeypatch.setattr(receipts, "pipeline_runtime", lambda: object())
+    monkeypatch.setattr(
+        receipts, "PipelineReceiptDAL", lambda _: SimpleNamespace(create=lambda inputs: pipeline_id)
+    )
+
+    async def patch(run_id, **changes):
+        assert run_id == notification_id and changes == {"pipeline_run_id": pipeline_id}
+        calls.append("bound")
+        if binding_lost:
+            raise notifications.NotificationTransitionFailed("reply lost")
+
+    monkeypatch.setattr(notifications, "patch_run", patch)
+
+    @receipts.record_pipeline
+    async def pipeline(*args, **kwargs):
+        calls.append("business")
+
+    if binding_lost:
+        with pytest.raises(notifications.NotificationTransitionFailed):
+            await pipeline(
+                1, seed="A", filename="x", channel_id=1, notification_run_id=notification_id
+            )
+        assert calls == ["bound"]
+    else:
+        await pipeline(1, seed="A", filename="x", channel_id=1, notification_run_id=notification_id)
+        assert calls == ["bound", "business"]
+
+
 def test_released_reservation_and_boolean_success_cannot_certify_import():
     dal = SimpleNamespace(preparation=lambda _: None)
     proof, complete = receipts.result_evidence(dal, "import", str(uuid4()), True)
@@ -148,6 +183,44 @@ def test_generic_cache_wrapper_return_is_not_a_cache_receipt():
     proof, complete = receipts.result_evidence(None, "player_cache", str(uuid4()), None)
     assert not complete
     assert proof["outcome"] == "cache_unconfirmed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("busy_kind", ["row", "producer"])
+@pytest.mark.parametrize("pending", [False, True])
+async def test_receipt_observer_contention_preserves_returned_business_facts(
+    monkeypatch, busy_kind, pending
+):
+    from unittest.mock import Mock
+
+    from core.sql_observation import ObservationBusy
+    from services.stats_import_outcome_dal import ImportExecutionActive
+
+    @contextmanager
+    def guard(_):
+        yield
+
+    dal = SimpleNamespace(guard=guard, start=lambda *a, **k: str(uuid4()), observe=Mock())
+    result = (
+        not pending,
+        "SQL completed",
+        {"sql": True, **({"capture_pending": True} if pending else {})},
+    )
+    work = Mock(return_value=result)
+    failure = (
+        ObservationBusy("rows busy")
+        if busy_kind == "row"
+        else ImportExecutionActive("other producer")
+    )
+    monkeypatch.setattr(receipts, "result_evidence", Mock(side_effect=failure))
+    token = receipts._pipeline.set((dal, str(uuid4())))
+    try:
+        assert await receipts.stage("import", work) is result
+        work.assert_called_once()
+        assert dal.observe.call_args.args[3]["outcome"] == "observation_pending"
+        assert dal.observe.call_args.kwargs["verified"] is False
+    finally:
+        receipts._pipeline.reset(token)
 
 
 @pytest.mark.asyncio

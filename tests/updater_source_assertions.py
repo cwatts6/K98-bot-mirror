@@ -25,7 +25,7 @@ def before_checkpoint_observation_hash(root, path):
     raw = (root / "tests/fixtures/checkpoint_observation_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "13eee2e350af61289061738edbff1f12b155b9ae39bdc42cdf873e29e2aaa8e4"
+        == "d2418a4cf214974fa5ead65e5c6aa9e0e47f590c3b9ccba878d51128f3854928"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

@@ -424,6 +424,102 @@ def test_late_handoff_cannot_overwrite_terminal_confirmation(journal):
 
 
 @pytest.mark.asyncio
+async def test_recovered_pipeline_updates_original_notification_once(journal, monkeypatch):
+    from contextlib import nullcontext
+
+    from services import processing_notification_dal as dal, processing_notification_service as core
+    from stats_alerts import processing_notifications as service
+
+    row = new_run(
+        journal,
+        pipeline_run_id=str(uuid4()),
+        handoff=True,
+        sheets="waiting",
+        stats="ready",
+        stats_delivery="complete",
+    )
+    binding = dict(outcome="queued", preparation_id=str(uuid4()), job_id=str(uuid4()))
+    evidence = {}
+    monkeypatch.setattr(core, "caller_runtime", lambda: nullcontext(object()))
+    monkeypatch.setattr(dal, "read_pipeline_notification_evidence", lambda *_: evidence)
+
+    def exact_outcome(runtime, observed):
+        assert observed["preparation_id"] == binding["preparation_id"]
+        assert observed["job_id"] == binding["job_id"]
+        return dict(state="confirmed", job_id=binding["job_id"], links=[])
+
+    monkeypatch.setattr(dal, "read_export_outcome", exact_outcome)
+    monkeypatch.setattr(service, "update_queue", AsyncMock())
+    bot, channels = client()
+    await service.observe_notifications(bot)
+    assert journal.get(row["run_id"])["sheets"] == "waiting"
+    evidence["export"] = binding
+    await service.observe_notifications(bot)
+    await service.observe_notifications(bot)
+    current = journal.get(row["run_id"])
+    assert current["sheets"] == "confirmed" and current["closed"] is True
+    assert channels[20].send.await_count == 1
+    assert channels[10].send.await_count == 1
+    assert channels[10].message.edit.await_count == 1
+
+
+@pytest.mark.parametrize(
+    "defect", [None, "changed_cache", "missing_cache", "preserved_cache", "other_job", "busy"]
+)
+def test_recovered_pipeline_requires_exact_cache_and_job_evidence(
+    journal, monkeypatch, tmp_path, defect
+):
+    from contextlib import nullcontext
+    import hashlib
+
+    import constants
+    from core.sql_observation import ObservationBusy
+    from services import processing_notification_dal as dal, processing_notification_service as core
+
+    row = new_run(journal, pipeline_run_id=str(uuid4()))
+    output = {
+        "_meta": dict(
+            source="SQL:dbo.STATS_FOR_UPLOAD",
+            source_refresh_status="refreshed",
+            source_refresh_succeeded=True,
+            cache_write_status="written",
+            generated_at="exact-generation",
+        )
+    }
+    if defect == "preserved_cache":
+        output["_meta"]["cache_write_status"] = "preserved_existing"
+    raw = json.dumps(output).encode()
+    path = tmp_path / "cache.json"
+    path.write_bytes(raw)
+    monkeypatch.setattr(constants, "PLAYER_STATS_CACHE", str(path))
+    evidence = {
+        "player_cache": dict(
+            outcome="cache_bytes_verified", sha256=hashlib.sha256(raw).hexdigest()
+        ),
+        "export": dict(outcome="queued", preparation_id=str(uuid4()), job_id=str(uuid4())),
+    }
+    monkeypatch.setattr(core, "caller_runtime", lambda: nullcontext(object()))
+    monkeypatch.setattr(
+        dal,
+        "read_pipeline_notification_evidence",
+        Mock(side_effect=ObservationBusy("busy")) if defect == "busy" else lambda *_: evidence,
+    )
+    if defect == "changed_cache":
+        path.write_bytes(b"{}")
+    if defect == "missing_cache":
+        path.unlink()
+    if defect == "other_job":
+        row = journal.patch(row["run_id"], job_id=str(uuid4()))
+        with pytest.raises(NotificationHeld):
+            core.observe_pipeline(row)
+        return
+    observed, cache = core.observe_pipeline(row)
+    assert (cache == output) is (defect is None)
+    assert observed["stats"] == "pending"
+    assert observed["sheets"] == "pending"
+
+
+@pytest.mark.asyncio
 async def test_wrong_runtime_does_not_publish_any_notification(journal, monkeypatch):
     from stats_alerts import processing_notifications as service
 

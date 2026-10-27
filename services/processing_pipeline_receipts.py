@@ -61,6 +61,12 @@ def record_pipeline(function):
         # Registration is the first protected action. If its acknowledgement is
         # lost, no import is dispatched; discovery retains the saved run.
         run_id = await drain_thread(dal.create, inputs)
+        if inputs["notification_run_id"]:
+            from services.processing_notification_service import patch_run
+
+            # Bind before any business stage so later recovery can follow this
+            # exact pipeline even when the original coroutine never reaches export.
+            await patch_run(inputs["notification_run_id"], pipeline_run_id=run_id)
         token = _pipeline.set((dal, run_id))
         try:
             return await function(rank, **kwargs)
@@ -90,9 +96,20 @@ async def stage(name, function):
             try:
                 result = strict_work(name, function)
                 result = await result if inspect.isawaitable(result) else result
-                evidence, verified = await drain_thread(
-                    result_evidence, dal, name, operation, result
-                )
+                from core.sql_observation import ObservationBusy
+                from kvk.dal.new_source_import_dal import SourceBusy
+
+                try:
+                    evidence, verified = await drain_thread(
+                        result_evidence, dal, name, operation, result
+                    )
+                except (ObservationBusy, SourceBusy) as exc:
+                    # Business work already returned. Later observer contention
+                    # must not erase that result or replay the work.
+                    evidence, verified = (
+                        dict(outcome="observation_pending", error_type=type(exc).__name__),
+                        False,
+                    )
                 await drain_thread(
                     dal.observe, run_id, name, operation, evidence, verified=verified
                 )

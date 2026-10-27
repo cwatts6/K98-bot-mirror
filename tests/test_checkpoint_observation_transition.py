@@ -58,7 +58,8 @@ def test_registry_rejects_partial_or_widened_bundle(monkeypatch, defect):
     raw = json.dumps(dict(version=1, transitions=[item])).encode()
     monkeypatch.setattr(Path, "read_bytes", lambda self: raw)
     with pytest.raises(
-        ValueError, match=r"Complete fixed checkpoint observation|Unique export protocol"
+        ValueError,
+        match=r"Complete fixed checkpoint observation|Unique export protocol|Unique bounded transition",
     ):
         updater.reviewed_transitions()
 

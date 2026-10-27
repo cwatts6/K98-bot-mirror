@@ -22,7 +22,9 @@ attribution remains unconfirmed.
 | Configuration recovery, unowned SQL hold, target containment, failed-export closeout and rollover containment | Account/resource mutexes precede locked ownership rows | Preserve ownership checks; new whole-request observation context covers initial discovery reads as well as final inspection. Mutations retain uncertainty semantics. |
 | Source output pool / rollover | Mutation paths acquire account/resource/pool mutexes; initial discovery uses ordinary reads | No demonstrated inverse locked snapshot cycle. Shared nonblocking observation policy covers waits in supporting reads. Preserve exact CAS and provider proof gates. |
 | Failed/replacement/rollover/configuration/target/evidence authority inspections | Process boundary loses caller context; initial selection read preceded observe_call | Explicit fixed read-only selector gets context around the whole broker dispatch. Execute, reconcile, context/sealing, malformed requests and lost replies are excluded. |
-| Monitor status | Successful 164â€“217 second cycles exceeded 90-second completed-check freshness | Advancing bounded cycle is operationally healthy while check_state stays stale and completed_check_age_seconds remains explicit. Genuine check failure, stall or maximum cycle duration still degrades status. |
+| Stage receipt observation | A newly admitted producer can make post-import inspection busy after business work returned | Retain the returned facts, persist observation_pending as unconfirmed, and never replay business work because its later observer was busy. |
+| Recovery notification correlation | An interrupted caller could miss the later export association and cache readiness publication | Bind the exact pipeline before dispatch; read scoped stage receipts nonblockingly, verify current cache bytes, and require existing exact export delivery proof. |
+| Monitor status | Successful 164-217 second cycles exceeded 90-second completed-check freshness | Advancing bounded cycle is operationally healthy while check_state stays stale and completed_check_age_seconds remains explicit. Genuine check failure, stall or maximum cycle duration still degrades status. |
 
 No command, view, permission, activation flag or persistent evidence schema changes.
 Existing helpers reused: transaction, observation/observe_call, retry_coordination,
@@ -50,6 +52,11 @@ If SQL completion is exact but capture still needs reconciliation, the import
 audit records completed SQL and retains the capture preparation reference. The
 pipeline, queue and notification handoff show capture pending, stop dependent
 stages, and neither report a failed import nor claim an export was submitted.
+The notification journal binds its exact pipeline before business work. Subsequent
+observation can recover the queued export association and verify current cache
+bytes against that pipeline receipt, independently, without dispatching work.
+Both notification SQL readers yield on contention. Changed/missing cache bytes
+cannot certify readiness or block independently verified export delivery.
 
 Recovered checkpoint logging retains the redacted native error and requester
 session ID, attempt count and elapsed time at INFO level. A requester ID is not
@@ -69,7 +76,7 @@ Validation counts and final PR heads are recorded in the release handoff.
 This is a source-only bot release. The SQL companion is optional read-only
 diagnostics; there is no migration or reconcile apply to run. The protected updater
 must first receive the reviewed checkpoint_observation_lifecycle_v1 transition.
-Its twelve runtime members are indivisible and pinned to predecessor/successor bytes;
+Its sixteen runtime members are indivisible and pinned to predecessor/successor bytes;
 target code cannot authorize its own installation. Use the release package's
 verified installer hashes and compatibility result against the installed private
 commit, then the usual Update-K98.ps1 and requested /ops graceful_restart flow.

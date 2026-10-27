@@ -87,3 +87,43 @@ def test_unrelated_or_incomplete_evidence_cannot_announce_success(monkeypatch, t
         attempt["ReceiptJson"] = "{}"
     with pytest.raises(SourceConflict):
         dal.read_export_outcome(runtime, run)
+
+
+@pytest.mark.parametrize("mismatch", [None, "account", "notification", "missing", "unconfirmed"])
+def test_pipeline_evidence_is_exact_scoped_read_only_and_nonblocking(monkeypatch, mismatch):
+    from core.sql_observation import observing
+
+    runtime, run, *_, cursor = setup(monkeypatch)
+    run.update(run_id=str(uuid4()), pipeline_run_id=str(uuid4()))
+    found = [
+        dict(
+            AccountKey="a",
+            StorageOwner="disk",
+            InputsJson=json.dumps({"notification_run_id": run["run_id"]}),
+            Stage=stage,
+            State="observed",
+            EvidenceJson=json.dumps({"outcome": "queued"}),
+        )
+        for stage in ("player_cache", "export")
+    ]
+    if mismatch == "account":
+        found[0]["AccountKey"] = "other"
+    elif mismatch == "notification":
+        found[0]["InputsJson"] = "{}"
+    elif mismatch == "missing":
+        found.pop()
+    elif mismatch == "unconfirmed":
+        found[1]["State"] = "unconfirmed"
+    monkeypatch.setattr(dal, "rows", lambda _: found)
+    cursor.execute.side_effect = lambda *args: observing() or (_ for _ in ()).throw(
+        AssertionError("Must be nonblocking")
+    )
+    if mismatch in {"account", "notification", "missing"}:
+        with pytest.raises(SourceConflict):
+            dal.read_pipeline_notification_evidence(runtime, run)
+    else:
+        result = dal.read_pipeline_notification_evidence(runtime, run)
+        assert ("export" in result) is (mismatch is None)
+    assert cursor.execute.call_count == 1
+    assert cursor.execute.call_args.args[0].startswith("SELECT ")
+    assert not observing()

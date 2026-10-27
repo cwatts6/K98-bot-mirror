@@ -14,6 +14,7 @@ credentials/**
 **/*api_key*
 # Exact reviewed S11/P0 source/test paths; keep broad credential exclusions below.
 + /scripts/run_export_authority.py
++ /services/authority_observation.py
 + /services/config_recovery_authority.py
 + /services/export_authority_diagnostics.py
 + /services/export_execution_authority.py

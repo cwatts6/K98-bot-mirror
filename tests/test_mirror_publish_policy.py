@@ -27,6 +27,7 @@ RSYNC_ARGUMENTS = (
 )
 AUTHORITY_PATHS = (
     "scripts/run_export_authority.py",
+    "services/authority_observation.py",
     "services/config_recovery_authority.py",
     "services/export_authority_diagnostics.py",
     "services/export_execution_authority.py",
