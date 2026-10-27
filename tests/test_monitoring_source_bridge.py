@@ -19,6 +19,8 @@ def test_monitoring_bridge_requires_exact_mapping_and_source(tmp_path, damage):
     (tmp_path / attempt).write_bytes((root / attempt).read_bytes())
     lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")
     (tmp_path / lifecycle).write_bytes((root / lifecycle).read_bytes())
+    health = Path("tests/fixtures/health_activity_source_pairs.json")
+    (tmp_path / health).write_bytes((root / health).read_bytes())
     member = json.loads(raw)[0]
     path = member["path"]
     (tmp_path / path).write_bytes((root / path).read_bytes())

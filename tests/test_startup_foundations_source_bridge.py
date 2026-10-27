@@ -23,6 +23,8 @@ def test_exact_successor_bridge_rejects_unreviewed_changes(tmp_path, damage):
     (tmp_path / attempt).write_bytes((root / attempt).read_bytes())
     lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")
     (tmp_path / lifecycle).write_bytes((root / lifecycle).read_bytes())
+    health = Path("tests/fixtures/health_activity_source_pairs.json")
+    (tmp_path / health).write_bytes((root / health).read_bytes())
     member = json.loads(raw)[0]
     path = member["path"]
     (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
