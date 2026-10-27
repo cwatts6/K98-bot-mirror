@@ -13,6 +13,37 @@ import stats_module
 
 
 @pytest.mark.asyncio
+async def test_completed_sql_pending_capture_keeps_import_audit_complete(monkeypatch, caplog):
+    from unittest.mock import Mock
+
+    pending = stats_module.CaptureCheckpointPending("exact-preparation")
+
+    async def procedure(*args, **kwargs):
+        return pending, "[WAITING] SQL completed; capture pending", None
+
+    monkeypatch.setattr(stats_module, "run_sql_procedure", procedure)
+    monkeypatch.setattr(stats_module, "_load_import_metadata", lambda: _published_metadata())
+    monkeypatch.setattr(
+        stats_module.import_audit_service, "start_batch_best_effort", lambda **kw: 42
+    )
+    phases, complete, fail = Mock(), Mock(), Mock()
+    monkeypatch.setattr(stats_module.import_audit_service, "record_phase_best_effort", phases)
+    monkeypatch.setattr(stats_module.import_audit_service, "complete_batch_best_effort", complete)
+    monkeypatch.setattr(stats_module.import_audit_service, "fail_batch_best_effort", fail)
+    caplog.set_level("INFO", logger="stats_module")
+    success, message, steps = await stats_module.run_stats_copy_archive()
+    assert success is False
+    assert steps["sql"] is True and steps["capture_pending"] is True
+    assert "⏳" in message and "❌" not in message
+    assert "-> WAITING" in caplog.text and "-> FAIL" not in caplog.text
+    assert phases.call_args.kwargs["phase_status"] == "completed"
+    assert phases.call_args.kwargs["error_type"] is None
+    complete.assert_called_once()
+    assert complete.call_args.kwargs["details"]["capture_checkpoint_pending"] == "exact-preparation"
+    fail.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_coordinated_sql_offload_never_retries_uncertain_producer():
     from services.legacy_export_snapshot_service import use_runtime
 
@@ -570,10 +601,11 @@ async def test_run_sql_procedure_reconciles_terminal_identity_without_retry(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "coordinated, lost_capture_ack", [(False, False), (True, False), (True, True)]
+    "coordinated, lost_capture_ack, capture_pending",
+    [(False, False, False), (True, False, False), (True, True, False), (True, False, True)],
 )
 async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(
-    monkeypatch, tmp_path, coordinated, lost_capture_ack, caplog
+    monkeypatch, tmp_path, coordinated, lost_capture_ack, capture_pending, caplog
 ):
     from unittest.mock import Mock
 
@@ -666,6 +698,22 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         claim = dal.claim.return_value
         dal.read.return_value = {"State": "captured", "OwnerID": claim.owner, "Fence": claim.fence}
         dal.captured.side_effect = OSError("commit acknowledgment lost")
+    if capture_pending:
+        transition = dal.transition.side_effect
+
+        def block_checkpoint(claim, **kwargs):
+            if kwargs.get("expected") == "writing":
+                raise RuntimeError("checkpoint contention exhausted")
+            return transition(claim, **kwargs)
+
+        dal.transition.side_effect = block_checkpoint
+        dal.read.return_value = {"State": "writing"}
+        immutable = Mock(
+            return_value=ImmutableImportOutcome(
+                COMPLETED_FILENAME, "archived", "ab", 123, "archived"
+            )
+        )
+        monkeypatch.setattr(stats_module, "_fetch_immutable_import_outcome", immutable)
     captures = []
     token = snapshots._captures.set(captures)
     with snapshots.use_runtime(runtime if coordinated else None):
@@ -677,6 +725,14 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         )
     snapshots._captures.reset(token)
 
+    if capture_pending:
+        assert isinstance(success, stats_module.CaptureCheckpointPending)
+        assert not success
+        assert "[WAITING] SQL completed" in message
+        assert wrapper_calls == [(1, "A", COMPLETED_FILENAME)]
+        immutable.assert_not_called()
+        assert "SQL execution failed" not in message
+        return
     assert success is True
     if lost_capture_ack:
         assert "SQL procedure execution failed" not in caplog.text

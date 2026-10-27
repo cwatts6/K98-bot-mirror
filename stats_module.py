@@ -20,6 +20,7 @@ Apply this file in place of the existing stats_module.py.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime
 import json
 import logging
@@ -32,6 +33,17 @@ from services.legacy_export_snapshot_service import bound_runtime
 
 logger = logging.getLogger(__name__)
 telemetry_logger = logging.getLogger("telemetry")
+
+
+@dataclass(frozen=True)
+class CaptureCheckpointPending:
+    """SQL completed, but dependent stages must await durable capture."""
+
+    preparation_id: str
+
+    def __bool__(self):
+        return False
+
 
 from constants import DOWNLOAD_FOLDER, _conn_trusted
 from file_utils import (  # run_step/run_blocking_in_thread imported dynamically later
@@ -251,7 +263,11 @@ def _normalize_step_result(raw) -> tuple[bool, str, str]:
         if isinstance(r, (tuple, list)):
             if len(r) == 3:
                 success, stdout, stderr = r
-                return bool(success), str(stdout or ""), str(stderr or "")
+                return (
+                    success if isinstance(success, CaptureCheckpointPending) else bool(success),
+                    str(stdout or ""),
+                    str(stderr or ""),
+                )
             if len(r) == 2:
                 success, stdout = r
                 return bool(success), str(stdout or ""), ""
@@ -547,7 +563,8 @@ async def run_sql_procedure(
             if sql_state == "completed"
             else "failed" if sql_state in {"rolled_back", "partial"} else "outcome_unconfirmed"
         )
-        logger.error("[SQL_PROC] outcome=%s; diagnostics=%s", classification, sql_error_facts(e))
+        log_outcome = logger.info if sql_state == "completed" else logger.error
+        log_outcome("[SQL_PROC] outcome=%s; diagnostics=%s", classification, sql_error_facts(e))
         emit_telemetry_event(
             {
                 "event": "sql_proc",
@@ -557,6 +574,12 @@ async def run_sql_procedure(
                 "completed_filename": completed_filename,
             }
         )
+        if sql_state == "completed":
+            return (
+                CaptureCheckpointPending(str(preparation_id)),
+                "[WAITING] SQL completed; capture checkpoint requires reconciliation. The import must not be repeated.",
+                None,
+            )
         try:
             outcome = await _offload_callable_py(
                 _fetch_immutable_import_outcome,
@@ -583,12 +606,6 @@ async def run_sql_procedure(
                 False,
                 "[ERROR] SQL execution failed after the immutable import reached its "
                 f"archived terminal state: {e}",
-                None,
-            )
-        if sql_state == "completed":
-            return (
-                False,
-                "[WAITING] SQL completed; capture checkpoint requires reconciliation. The import must not be repeated.",
                 None,
             )
         return (
@@ -827,6 +844,7 @@ async def _run_stats_copy_archive_unlocked(
     ]
 
     all_success = True
+    checkpoint_pending = None
     combined_log_parts = []
     step_results = {}
 
@@ -880,7 +898,14 @@ async def _run_stats_copy_archive_unlocked(
 
             step_completed_at_utc = _audit_timestamp_utc()
             duration_ms = int((time.monotonic() - step_started_monotonic) * 1000)
-            logger.info("[STEP] %s -> %s", title, "SUCCESS" if success else "FAIL")
+            pending = success if isinstance(success, CaptureCheckpointPending) else None
+            if pending is not None:
+                checkpoint_pending = pending
+            logger.info(
+                "[STEP] %s -> %s",
+                title,
+                "WAITING" if pending is not None else "SUCCESS" if success else "FAIL",
+            )
             key = None
             if title == excel_title:
                 key = "excel"
@@ -890,7 +915,7 @@ async def _run_stats_copy_archive_unlocked(
                 key = "sql"
 
             if key:
-                step_results[key] = bool(success)
+                step_results[key] = bool(success) or pending is not None
                 if key == "excel" and success:
                     current_import_metadata = _load_import_metadata()
                     # Bind the SQL-affecting inputs to the immutable Ready-file
@@ -910,7 +935,7 @@ async def _run_stats_copy_archive_unlocked(
             await _record_audit_phase(
                 key=key,
                 title=title,
-                success=success,
+                success=bool(success) or pending is not None,
                 stdout=stdout,
                 stderr=stderr,
                 started_at_utc=step_started_at_utc,
@@ -920,7 +945,7 @@ async def _run_stats_copy_archive_unlocked(
             if key == "sql":
                 await _record_update_all2_subphases(update_all2_phase_rows)
 
-            status_icon = "✅" if success else "❌"
+            status_icon = "⏳" if pending is not None else "✅" if success else "❌"
             message = _step_display_message(success, stdout, stderr)
             combined_log_parts.append(f"{status_icon} **{title}**\n{message}")
 
@@ -943,7 +968,11 @@ async def _run_stats_copy_archive_unlocked(
             "rank": rank,
             "seed": seed,
         }
-        if all_success:
+        if checkpoint_pending is not None:
+            completion_details["capture_checkpoint_pending"] = checkpoint_pending.preparation_id
+        # This audit describes the SQL import. Its exact completion is independent
+        # of the separately retained capture preparation and downstream export.
+        if all_success or checkpoint_pending is not None:
             await _offload_callable_py(
                 lambda: import_audit_service.complete_batch_best_effort(
                     audit_ref,
@@ -1003,5 +1032,6 @@ async def _run_stats_copy_archive_unlocked(
             "excel": bool(step_results.get("excel")),
             "archive": bool(step_results.get("archive")),
             "sql": bool(step_results.get("sql")),
+            **({"capture_pending": True} if checkpoint_pending is not None else {}),
         },
     )

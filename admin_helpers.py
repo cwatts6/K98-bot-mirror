@@ -109,7 +109,7 @@ async def log_processing_result(
     success_excel: bool | None,
     success_archive: bool | None,
     success_sql: bool | None,
-    success_export: bool | Literal["pending"] | None,
+    success_export: bool | Literal["pending", "capture_pending"] | None,
     success_proc_import: bool | None,
     combined_log: str,
     start_time: datetime,
@@ -205,18 +205,23 @@ async def log_processing_result(
         logger.exception("[LOG] Failed to append to summary log")
 
     export_pending = success_export == "pending"
+    capture_pending = success_export == "capture_pending"
 
     # Determine embed metadata
     attempted: dict[str, bool | None] = {
         "Excel": success_excel,
         "Archive": success_archive,
         "SQL": success_sql,
-        "Export": None if export_pending else success_export,
+        "Export": None if export_pending or capture_pending else success_export,
         "ProcConfig": success_proc_import,
     }
     attempted = {k: v for k, v in attempted.items() if v is not None}
 
-    if export_pending and all(attempted.values()):
+    if capture_pending and all(attempted.values()):
+        title = "⏳ Processing Awaiting Capture Checkpoint"
+        color = 0xF1C40F
+        mention = None
+    elif export_pending and all(attempted.values()):
         title = "⏳ Processing Awaiting Export"
         color = 0xF1C40F
         mention = None
@@ -260,7 +265,9 @@ async def log_processing_result(
                     "Excel Success": str(success_excel),
                     "Archive Success": str(success_archive),
                     "SQL Success": str(success_sql),
-                    "Export Status" if export_pending else "Export Success": str(success_export),
+                    "Export Status" if export_pending or capture_pending else "Export Success": str(
+                        success_export
+                    ),
                     "ProcConfig Import": str(success_proc_import),
                     "Duration": f"{duration:.1f} sec",
                 },

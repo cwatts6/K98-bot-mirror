@@ -452,7 +452,9 @@ HEALTH_ACTIVITY_PATHS = frozenset(
 
 CHECKPOINT_OBSERVATION_PATHS = frozenset(
     {
+        "admin_helpers.py",
         "core/sql_observation.py",
+        "processing_pipeline.py",
         "kvk/dal/new_source_import_dal.py",
         "scripts/run_export_authority.py",
         "services/all_kvk_capture_recovery_dal.py",

@@ -9,7 +9,7 @@ from stats_alerts.delivery_outcomes import DeliveryAttempt, DeliveryResult
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("export", [True, False, None, "pending"])
+@pytest.mark.parametrize("export", [True, False, None, "pending", "capture_pending"])
 async def test_processing_gate_and_truthful_delivery_log(monkeypatch, caplog, export):
     result = DeliveryResult(
         (
@@ -51,7 +51,10 @@ async def test_processing_gate_and_truthful_delivery_log(monkeypatch, caplog, ex
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sql_success", [True, False])
-async def test_pending_export_is_truthful_in_logs_and_notifications(monkeypatch, sql_success):
+@pytest.mark.parametrize("outcome", ["pending", "capture_pending"])
+async def test_pending_export_is_truthful_in_logs_and_notifications(
+    monkeypatch, sql_success, outcome
+):
     append, send, stats = AsyncMock(), AsyncMock(), AsyncMock()
     monkeypatch.setattr(helpers, "append_csv_line", append)
     monkeypatch.setattr(helpers, "send_embed", send)
@@ -67,18 +70,20 @@ async def test_pending_export_is_truthful_in_logs_and_notifications(monkeypatch,
         success_excel=True,
         success_archive=True,
         success_sql=sql_success,
-        success_export="pending",
-        success_proc_import=True,
+        success_export=outcome,
+        success_proc_import=True if outcome == "pending" else None,
         combined_log="queued exact-job",
         start_time=datetime.now(UTC),
         summary_log_path="summary-fixture",
     )
     summary = next(c.args[1] for c in append.call_args_list if c.args[0] == "summary-fixture")
-    assert summary[8] == "pending"
+    assert summary[8] == outcome
     assert sum(c.args[0] == helpers.FAILED_LOG for c in append.call_args_list) == int(
         not sql_success
     )
-    assert send.call_args.args[2]["Export Status"] == "pending"
+    assert send.call_args.args[2]["Export Status"] == outcome
     if sql_success:
-        assert "Awaiting Export" in send.call_args.args[1]
+        assert (
+            "Awaiting Export" if outcome == "pending" else "Awaiting Capture Checkpoint"
+        ) in send.call_args.args[1]
     stats.assert_not_awaited()

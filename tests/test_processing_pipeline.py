@@ -7,6 +7,36 @@ pytest_plugins = ("pytest_asyncio",)
 
 
 @pytest.mark.asyncio
+async def test_completed_sql_pending_capture_stops_dependents_without_failure(monkeypatch):
+    import processing_pipeline as pp
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
+    monkeypatch.setattr(
+        pp,
+        "run_stats_copy_archive",
+        AsyncMock(
+            return_value=(
+                False,
+                "capture pending",
+                {"excel": True, "archive": True, "sql": True, "capture_pending": True},
+            )
+        ),
+    )
+    downstream = AsyncMock(side_effect=AssertionError("Dependent stage must wait"))
+    for name in ("build_player_stats_cache", "_run_proc_config_step", "run_all_exports"):
+        monkeypatch.setattr(pp, name, downstream)
+    sent = AsyncMock()
+    monkeypatch.setattr(pp, "send_status_embed", sent)
+    result = await pp.execute_processing_pipeline(
+        1, seed=1, user=AsyncMock(), filename="fixture.xlsx", channel_id=0
+    )
+    assert result[:5] == (True, True, True, "capture_pending", None)
+    downstream.assert_not_called()
+    assert sent.call_args.args[0] == "⏳ Capture Checkpoint Pending"
+    assert sent.call_args.args[2] is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failed_stage", ["sql", "proc_config", None])
 async def test_each_pipeline_outcome_emits_one_truthful_summary(monkeypatch, failed_stage):
     import processing_pipeline as pp
@@ -150,7 +180,13 @@ def _patch_lightweight_pipeline_boundaries(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_handler_preserves_pending_export_in_live_queue_and_summary(monkeypatch):
+@pytest.mark.parametrize(
+    "outcome,label",
+    [("pending", "⏳ Export pending"), ("capture_pending", "⏳ Capture checkpoint pending")],
+)
+async def test_handler_preserves_pending_export_in_live_queue_and_summary(
+    monkeypatch, outcome, label
+):
     import asyncio
     from types import SimpleNamespace
 
@@ -167,13 +203,22 @@ async def test_handler_preserves_pending_export_in_live_queue_and_summary(monkey
     monkeypatch.setattr(
         pp,
         "execute_processing_pipeline",
-        AsyncMock(return_value=(True, True, True, "pending", True, "queued job")),
+        AsyncMock(
+            return_value=(
+                True,
+                True,
+                True,
+                outcome,
+                True if outcome == "pending" else None,
+                "retained job",
+            )
+        ),
     )
     log = AsyncMock()
     monkeypatch.setattr(pp, "log_processing_result", log)
     await pp.handle_file_processing(AsyncMock(), message, "fixture.xlsx", None)
-    assert log.call_args.args[10] == "pending"
-    assert queue["jobs"][0]["status"].startswith("⏳ Export pending")
+    assert log.call_args.args[10] == outcome
+    assert queue["jobs"][0]["status"].startswith(label)
 
 
 @pytest.mark.asyncio

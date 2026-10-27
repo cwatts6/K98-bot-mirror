@@ -1620,6 +1620,11 @@
       "id": "checkpoint_observation_lifecycle_v1",
       "members": [
         {
+          "path": "admin_helpers.py",
+          "before_sha256": "51d919b30385425b866a9d4aa874884d20e91c35396e08cc1dcd29b40ceece49",
+          "after_sha256": "f74f8a463a55fa13d3a3ea7a00c75ee16e3b2118f6194c90ec3fa9536020c142"
+        },
+        {
           "path": "core/sql_observation.py",
           "before_sha256": "1852cffc8bbd7374b14e47be6f592cabee42ce98334f63d78bc8590d6c2cecd0",
           "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
@@ -1628,6 +1633,11 @@
           "path": "kvk/dal/new_source_import_dal.py",
           "before_sha256": "70e4a88569d0ae9da32d78164899d03805730ba489a576e4863815db6adac151",
           "after_sha256": "8d623702c01660eb97aa2de63cc5333103a721ba164df82229b9b3f23887c48f"
+        },
+        {
+          "path": "processing_pipeline.py",
+          "before_sha256": "7a23e7481c169447a1719177c3e93a16394e97c4d8b3d627ce7d294cebed3227",
+          "after_sha256": "9dabd901761be2b5f1f2c08769ed955247136efb02f1199a6ee8f27fbc0d2ad4"
         },
         {
           "path": "scripts/run_export_authority.py",
@@ -1667,7 +1677,7 @@
         {
           "path": "stats_module.py",
           "before_sha256": "330816dcfd27efa907d7d1e5890e02b397a357ffc0139efa05586dd85a258bb5",
-          "after_sha256": "26e2d660503a7a717d16a1bc54e3ff91df6e8f979557f2ff9edede4bb6f82c1c"
+          "after_sha256": "7163b985dc09469b18615a3c97ef01c9c42a6a4831a7f100f37b48e9f718a6b4"
         }
       ]
     }

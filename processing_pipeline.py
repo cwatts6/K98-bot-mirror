@@ -227,7 +227,7 @@ async def execute_processing_pipeline(
     channel_id: int,
     save_path: str | None = None,
     notification_run_id: str | None = None,
-) -> tuple[bool, bool, bool, bool | Literal["pending"] | None, bool | None, str]:
+) -> tuple[bool, bool, bool, bool | Literal["pending", "capture_pending"] | None, bool | None, str]:
     """
     Orchestrates the file -> SQL -> Sheets processing pipeline.
 
@@ -363,6 +363,28 @@ async def execute_processing_pipeline(
 
     # Prepare a compact context field to include in embeds so humans can correlate
     context_field = build_context_field(filename=filename, rank=rank, seed=seed)
+
+    if success_sql and steps.get("capture_pending") is True:
+        logger.info(
+            "processing_pipeline_waiting stage=capture_checkpoint sql=completed "
+            "dependent_stages=cache,maintenance,proc_config,export import_replayed=false"
+        )
+        await send_status_embed(
+            "⏳ Capture Checkpoint Pending",
+            {
+                "SQL Procedure": "✅ Completed; the import must not be repeated.",
+                "Capture": "Waiting for exact receipt reconciliation.",
+                "Dependent steps": "Cache refresh, ProcConfig and export have not started.",
+                "Log": out_archive,
+            },
+            None,
+            user,
+            notify_channel,
+            context_field=context_field,
+        )
+        return finish(
+            success_excel, success_archive, True, "capture_pending", None, str(out_archive or "")
+        )
 
     if notify_channel is None:
         logger.info(
@@ -1028,9 +1050,13 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
         try:
             current = await drain_thread(notification_store().get, notification_run_id)
             sheets_state = (
-                "pending"
-                if success_export == "pending"
-                else ("uncertain" if success_proc_import is True else "failed")
+                "waiting"
+                if success_export == "capture_pending"
+                else (
+                    "pending"
+                    if success_export == "pending"
+                    else ("uncertain" if success_proc_import is True else "failed")
+                )
             )
             handoff = await patch_run(
                 notification_run_id,
@@ -1089,7 +1115,9 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     )
 
     # Status icon based on archive/export results
-    if success_export == "pending":
+    if success_export == "capture_pending":
+        status_icon = "⏳ Capture checkpoint pending"
+    elif success_export == "pending":
         failed = any(
             value is False
             for value in (success_excel, success_archive, success_sql, success_proc_import)
@@ -1136,21 +1164,25 @@ async def handle_file_processing(user, message, filename: str, save_path: str | 
     logger.info(
         "processing_handoff outcome=%s export=%s duration_seconds=%.1f action=%s",
         (
-            "awaiting_export"
-            if success_export == "pending"
+            "awaiting_capture_checkpoint"
+            if success_export == "capture_pending"
             else (
-                "completed"
-                if all(
-                    value is True
-                    for value in (
-                        success_excel,
-                        success_archive,
-                        success_sql,
-                        success_export,
-                        success_proc_import,
+                "awaiting_export"
+                if success_export == "pending"
+                else (
+                    "completed"
+                    if all(
+                        value is True
+                        for value in (
+                            success_excel,
+                            success_archive,
+                            success_sql,
+                            success_export,
+                            success_proc_import,
+                        )
                     )
+                    else "incomplete"
                 )
-                else "incomplete"
             )
         ),
         success_export,
