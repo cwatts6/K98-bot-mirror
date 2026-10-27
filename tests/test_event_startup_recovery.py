@@ -338,6 +338,8 @@ def test_historical_hash_bridge_rejects_foreign_runtime_bytes(tmp_path, path):
     lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")
     (tmp_path / lifecycle).write_bytes(lifecycle.read_bytes())
 
+    checkpoint = Path("tests/fixtures/checkpoint_observation_source_pairs.json")
+    (tmp_path / checkpoint).write_bytes(checkpoint.read_bytes())
     health = Path("tests/fixtures/health_activity_source_pairs.json")
     (tmp_path / health).write_bytes(health.read_bytes())
 

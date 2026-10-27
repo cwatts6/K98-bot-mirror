@@ -18,7 +18,7 @@ from services.export_contention import (
     retry_coordination,
     transaction,
 )
-from services.export_coordination_dal import _cas, _mutex, bounded_json
+from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
 
 logger = logging.getLogger(__name__)
 
@@ -501,7 +501,7 @@ class LegacySnapshotDAL:
         with transaction(self.connect) as cursor:
             return self._authorize(cursor, claim)
 
-    @retry_coordination
+    @retry_coordination(budget_seconds=5)
     def transition(
         self, claim, *, expected, state, generation=None, release=False, external_cursor=None
     ):
@@ -521,14 +521,44 @@ class LegacySnapshotDAL:
         # A producer may append its completion to its existing transaction. This
         # DAL neither commits nor closes that cursor; UPDATE_ALL2 uses no ambient
         # transaction and records its acknowledged completion separately.
+        metadata_checkpoint = (
+            external_cursor is None
+            and expected == "writing"
+            and state == "committed"
+            and isinstance(generation, dict)
+            and generation.get("producer", {}).get("procedure") == "dbo.UPDATE_ALL2"
+        )
         with (
             nullcontext(external_cursor)
             if external_cursor is not None
-            else transaction(self.connect)
+            else transaction(self.connect, retry_metadata=metadata_checkpoint)
         ) as cursor:
             row = self._authorize(cursor, claim)
             if row["State"] != expected:
                 raise SourceConflict("Preparation phase changed.")
+            if metadata_checkpoint:
+                # Revalidate after every rollback, under the same ownership locks.
+                # This receipt is written by SQL, never by the retry policy.
+                cursor.execute(
+                    "SELECT State,OwnerID,Fence,Resolution,CompletedFileName "
+                    "FROM dbo.StatsImportExecution WITH (UPDLOCK,HOLDLOCK) "
+                    "WHERE PreparationID=?",
+                    claim.preparation_id,
+                )
+                execution = one(cursor)
+                if (
+                    row["ConsumerKind"] != "scan_data"
+                    or not execution
+                    or execution["State"] != "completed"
+                    or identity(execution["OwnerID"]) != claim.owner
+                    or execution["Fence"] != claim.fence
+                    or execution["Resolution"] is not None
+                    or execution["CompletedFileName"]
+                    != generation["producer"].get("completed_filename")
+                ):
+                    raise SourceConflict(
+                        "Exact completed SQL receipt required for checkpoint retry."
+                    )
             if expected == state == "committed":
                 previous = json.loads(row["GenerationJson"])
                 if (

@@ -484,7 +484,9 @@ async def run_sql_procedure(
     except asyncio.CancelledError:
         raise
     except Exception as e:
-        logger.exception("SQL procedure execution failed")
+        # A checkpoint/capture exception can follow committed SQL. Establish the
+        # exact outcome before describing the operation as a failure.
+        sql_state = None
         preparation_id = execution_id
         if preparation_id is not None:
             from services.legacy_export_snapshot_service import require_runtime
@@ -497,6 +499,7 @@ async def run_sql_procedure(
                     preparation_id,
                     name="exact_import_outcome",
                 )
+                sql_state = outcome.get("State") if outcome else None
                 preparation = await _offload_callable_py(
                     runtime.dal.read, preparation_id, name="exact_capture_outcome"
                 )
@@ -518,6 +521,12 @@ async def run_sql_procedure(
                         action="continue dependent stages",
                         import_replayed=False,
                     )
+                    from services.export_contention import sql_error_facts
+
+                    logger.info(
+                        "[SQL_PROC] Completed SQL and capture reconciled; import_replayed=false; original_stage_error=%s",
+                        sql_error_facts(e),
+                    )
                     return (
                         True,
                         "[SUCCESS] Exact SQL completion and captured output verified after lost acknowledgment; import was not repeated.",
@@ -531,10 +540,18 @@ async def run_sql_procedure(
                     action="ops import_resolution: status",
                     error=recovery_error,
                 )
+        from services.export_contention import sql_error_facts
+
+        classification = (
+            "checkpoint_pending"
+            if sql_state == "completed"
+            else "failed" if sql_state in {"rolled_back", "partial"} else "outcome_unconfirmed"
+        )
+        logger.error("[SQL_PROC] outcome=%s; diagnostics=%s", classification, sql_error_facts(e))
         emit_telemetry_event(
             {
                 "event": "sql_proc",
-                "status": "failed",
+                "status": classification,
                 "task_name": TASK_NAME,
                 "orphaned_offload_possible": False,
                 "completed_filename": completed_filename,
@@ -568,7 +585,17 @@ async def run_sql_procedure(
                 f"archived terminal state: {e}",
                 None,
             )
-        return False, f"[ERROR] SQL execution failed: {e}", None
+        if sql_state == "completed":
+            return (
+                False,
+                "[WAITING] SQL completed; capture checkpoint requires reconciliation. The import must not be repeated.",
+                None,
+            )
+        return (
+            False,
+            "[ERROR] SQL completion is not verified; retained work requires reconciliation.",
+            None,
+        )
 
     if execution_id is not None:
         # The exact execution receipt was checked before checkpointing and the

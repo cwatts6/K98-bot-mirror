@@ -1,8 +1,9 @@
 """Discover and fence retained all-KVK captures using their atomic producer checkpoint."""
 
+from core.sql_observation import observation
 from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import identity
-from services.stats_import_outcome_dal import ImportExecutionActive, StatsImportOutcomeDAL
+from services.stats_import_outcome_dal import StatsImportOutcomeDAL
 
 
 class AllKvkCaptureRecoveryDAL:
@@ -70,17 +71,10 @@ class AllKvkCaptureRecoveryDAL:
         return "resume_capture"
 
     def inspect(self, preparation_id):
-        with transaction(self.connect) as cursor:
+        with observation(), transaction(self.connect) as cursor:
             # Conflicts with every legacy producer/capture session, including work
             # still running after a client timeout. Age is only a discovery hint.
-            cursor.execute(
-                "DECLARE @r int; EXEC @r=sys.sp_getapplock "
-                "@Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',"
-                "@LockOwner='Transaction',@LockTimeout=0; SELECT @r AS LockResult"
-            )
-            result = one(cursor)
-            if not result or result["LockResult"] < 0:
-                raise ImportExecutionActive("A SQL producer or capture is still active.")
+            StatsImportOutcomeDAL._observe_idle(cursor, self.account)
             prep, execution, resources = self._snapshot(cursor, identity(preparation_id))
             self._scope(prep)
             explanation = None

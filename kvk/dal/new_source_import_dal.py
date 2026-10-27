@@ -109,7 +109,7 @@ def rows(cursor):
 
 @contextmanager
 def transaction(connect):
-    from core.sql_observation import ObservationBusy, lock_timeout, observing
+    from core.sql_observation import ObservationBusy, lock_contention, observing
 
     refused = None
     connection = diagnostic_call("connect", connect)
@@ -118,6 +118,10 @@ def transaction(connect):
             raise ValueError("Source operations require a dedicated transactional connection.")
         cursor = diagnostic_cursor(diagnostic_call("cursor", connection.cursor))
         cursor.execute("SET XACT_ABORT ON; SET NOCOUNT ON;")
+        if observing():
+            # Dedicated connection: recovery reads must yield instead of holding
+            # earlier row locks while waiting on a later producer-owned row.
+            cursor.execute("SET LOCK_TIMEOUT 0;")
         try:
             yield cursor
         except BaseException as error:
@@ -125,7 +129,7 @@ def transaction(connect):
             from services.export_contention import CoordinationLockRefused
 
             if observing() and (
-                lock_timeout(error)
+                lock_contention(error)
                 or (isinstance(error, CoordinationLockRefused) and error.result == -1)
             ):
                 refused = error

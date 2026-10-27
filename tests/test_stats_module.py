@@ -492,7 +492,7 @@ async def test_run_sql_procedure_does_not_publish_control_id_when_update_fails(m
     )
 
     assert success is False
-    assert "update failed" in message
+    assert "SQL completion is not verified" in message
     assert control_calls == []
     assert "_fallback_import_control_id" not in metadata
 
@@ -573,7 +573,7 @@ async def test_run_sql_procedure_reconciles_terminal_identity_without_retry(
     "coordinated, lost_capture_ack", [(False, False), (True, False), (True, True)]
 )
 async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(
-    monkeypatch, tmp_path, coordinated, lost_capture_ack
+    monkeypatch, tmp_path, coordinated, lost_capture_ack, caplog
 ):
     from unittest.mock import Mock
 
@@ -662,6 +662,7 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     receipts.read.return_value = {"State": "completed"}
     monkeypatch.setattr(outcomes, "outcome_dal", lambda _runtime: receipts)
     if lost_capture_ack:
+        caplog.set_level("INFO", logger="stats_module")
         claim = dal.claim.return_value
         dal.read.return_value = {"State": "captured", "OwnerID": claim.owner, "Fence": claim.fence}
         dal.captured.side_effect = OSError("commit acknowledgment lost")
@@ -677,6 +678,9 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     snapshots._captures.reset(token)
 
     assert success is True
+    if lost_capture_ack:
+        assert "SQL procedure execution failed" not in caplog.text
+        assert "Completed SQL and capture reconciled" in caplog.text
     assert ("Exact SQL completion" if coordinated else "Counter reached 8") in message
     assert wrapper_calls == [(1, "A", COMPLETED_FILENAME)]
     assert connection.autocommit is True

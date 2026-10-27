@@ -37,8 +37,21 @@ class CoordinationLockRefused(RuntimeError):
         self.phase_timings_ms = None
 
 
+class MetadataContention(RuntimeError):
+    """A short checkpoint body rolled back and closed; no producer was replayed."""
+
+    def __init__(self, facts, timings):
+        super().__init__("Completion metadata is busy after verified rollback and close.")
+        self.facts = facts
+        self.phase_timings_ms = timings
+        self.transaction_released = True
+        self.result = -1
+
+
 def sql_error_facts(error):
     """Never include driver prose, SQL values, credentials or filenames."""
+    if isinstance(error, MetadataContention):
+        return dict(error.facts, transaction_released=True, phase_timings_ms=error.phase_timings_ms)
     args = getattr(error, "args", ())
     state = args[0] if args and isinstance(args[0], str) else None
     numbers = set()
@@ -67,14 +80,19 @@ def sql_error_facts(error):
 
 
 @contextmanager
-def transaction(connect):
+def transaction(connect, *, retry_metadata=False):
     """Mark only failures whose rollback AND connection close acknowledged."""
     timings = {}
+    acknowledged = set()
+    body_error = None
+    requester = None
 
     def timed(phase, call, *args):
         started = time.monotonic()
         try:
-            return call(*args)
+            result = call(*args)
+            acknowledged.add(phase)
+            return result
         finally:
             timings[phase] = timings.get(phase, 0) + max(
                 0, int((time.monotonic() - started) * 1000)
@@ -94,9 +112,17 @@ def transaction(connect):
 
     try:
         with source_transaction(lambda: Connection(timed("connect", connect))) as cursor:
+            if retry_metadata:
+                cursor.execute("SELECT @@SPID AS RequestSessionId")
+                row = cursor.fetchone()
+                if row is not None and type(row[0]) is int:
+                    requester = row[0]
             started = time.monotonic()
             try:
                 yield cursor
+            except BaseException as error:
+                body_error = error
+                raise
             finally:
                 # Includes DAL Python work as well as SQL execution; this is
                 # deliberately not labelled lock-held or exact statement time.
@@ -106,6 +132,20 @@ def transaction(connect):
         # and cannot reach here. A failed commit is UncertainCommit, not this type.
         error.transaction_released = True
         error.phase_timings_ms = timings
+        raise
+    except Exception as error:
+        facts = sql_error_facts(error)
+        if requester is not None:
+            facts.update(sql_session_id=requester, session_role="requester")
+        if (
+            retry_metadata
+            and error is body_error
+            and {"rollback", "close"} <= acknowledged
+            and "commit" not in timings
+            and (facts["sqlstate"], tuple(facts["native_errors"]))
+            in {("42000", (1222,)), ("40001", (1205,))}
+        ):
+            raise MetadataContention(facts, timings) from error
         raise
 
 
@@ -163,18 +203,20 @@ def retry_coordination(function=None, *, budget_seconds=None):
             if error is not None:
                 facts.update(sql_error_facts(error))
             record(facts)
-            log = logger.warning if error is not None else logger.info
+            log = logger.warning if error is not None and outcome != "recovered" else logger.info
             log("export_contention_result %s", json.dumps(facts, sort_keys=True))
 
         with contention_budget(
             started + (budget_seconds or _retry_window.get() or LOCK_BUDGET_SECONDS)
         ):
             attempt = 0
+            last_refusal = None
             while True:
                 attempt += 1
                 try:
                     value = function(*args, **kwargs)
-                except CoordinationLockRefused as error:
+                except (CoordinationLockRefused, MetadataContention) as error:
+                    last_refusal = error
                     safe = error.result == -1 and error.transaction_released
                     from core.sql_observation import ObservationBusy, observing
 
@@ -197,7 +239,7 @@ def retry_coordination(function=None, *, budget_seconds=None):
                         raise
                 else:
                     if attempt > 1:
-                        emit("recovered", attempt)
+                        emit("recovered", attempt, last_refusal)
                     return value
 
     return run

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 
+from core.sql_observation import observation
 from kvk.dal.new_source_import_dal import SourceBusy, SourceConflict, one, rows, transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 
@@ -162,7 +163,8 @@ class StatsImportOutcomeDAL:
 
     def inspect(self, preparation_id):
         preparation_id = identity(preparation_id)
-        with transaction(self.connect) as cursor:
+        with observation(), transaction(self.connect) as cursor:
+            self._observe_idle(cursor, self.account)
             self._idle(cursor, preparation_id)
             prep, execution, resources = self._snapshot(cursor, preparation_id)
             self._scope(prep)
@@ -180,6 +182,26 @@ class StatsImportOutcomeDAL:
                 explanation=explanation,
                 captured=self.capture_completed(prep, execution, resources),
             )
+
+    @staticmethod
+    def _observe_idle(cursor, account):
+        """Admit recovery reads before any row locks, including checkpoint gaps.
+
+        The global producer guard spans SQL completion through capture. The
+        account mutex also serializes admission/teardown before that guard exists.
+        Every acquisition is nonblocking: observers never retain row locks while
+        waiting for a producer or a different account's shared snapshot resource.
+        """
+        cursor.execute("SET LOCK_TIMEOUT 0;")
+        cursor.execute(
+            "DECLARE @r int; EXEC @r=sys.sp_getapplock "
+            "@Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',"
+            "@LockOwner='Transaction',@LockTimeout=0; SELECT @r AS LockResult"
+        )
+        result = one(cursor)
+        if not result or result["LockResult"] < 0:
+            raise ImportExecutionActive("A SQL producer or capture is still active.")
+        _mutex(cursor, "account:" + account)
 
     @staticmethod
     def capture_completed(prep, execution, resources):

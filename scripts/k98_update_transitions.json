@@ -1615,6 +1615,61 @@
           "after_sha256": "9c6484d5bd96d5a77af04f939dba986787084920281341b86ab8d40d2a3b323e"
         }
       ]
+    },
+    {
+      "id": "checkpoint_observation_lifecycle_v1",
+      "members": [
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "1852cffc8bbd7374b14e47be6f592cabee42ce98334f63d78bc8590d6c2cecd0",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "kvk/dal/new_source_import_dal.py",
+          "before_sha256": "70e4a88569d0ae9da32d78164899d03805730ba489a576e4863815db6adac151",
+          "after_sha256": "8d623702c01660eb97aa2de63cc5333103a721ba164df82229b9b3f23887c48f"
+        },
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "a64e74ef6ecca6406c43bd63b5a354781185c6f5f300fd2903658b07e155fcea",
+          "after_sha256": "d37037d8caaa6961b75fb9d0c65c5f243cf4d7af3b658c3f711b7a9bb17e67a3"
+        },
+        {
+          "path": "services/all_kvk_capture_recovery_dal.py",
+          "before_sha256": "60f84f753a33067f7ceac84f1512ffd870b9ab2ebcd76200fc86e7f0d27a7d12",
+          "after_sha256": "ad627f0822a0e7424d4ed3c15322cbca5d22c718dcb43653c981481636d22924"
+        },
+        {
+          "path": "services/authority_observation.py",
+          "before_sha256": null,
+          "after_sha256": "bd53cffeeeb80f9ff74df1b3498eb6d1e37de65d8cd6e3971df4df4bc6fa1da1"
+        },
+        {
+          "path": "services/export_contention.py",
+          "before_sha256": "92e78ec520abbc8e6c22a68903cb179105e0b8d569c414baae4fcc78391ea870",
+          "after_sha256": "b9ba30bd80c040ae3a158f4d6eee0dc1429d66baa4261d2e5841dc2cfe394463"
+        },
+        {
+          "path": "services/legacy_export_snapshot_dal.py",
+          "before_sha256": "c11c2bdcbb55af07abf8f0c1b8dc88d76c8e334154b73c40bca39bb3737ce3fd",
+          "after_sha256": "24b46575681799f33e059ae05bbdae6bce9f5d008789f3837a1f46d7406ffb59"
+        },
+        {
+          "path": "services/recovery_health.py",
+          "before_sha256": "bb7b2c74c8d57b8aeddd73de9b5d0e178076defc0d41566518afba5ddf5bba8d",
+          "after_sha256": "5c0dad5e932a001d3541ce2985a264a9bbc039014f53af917e6d1715a0de4d36"
+        },
+        {
+          "path": "services/stats_import_outcome_dal.py",
+          "before_sha256": "e255dcee2f8674819de98375416239b565f02f21fc301fd8149a84b9f5f07a2d",
+          "after_sha256": "bbfe61528dad2ba4725379bd864a9f2217bc63839a8fc4db846cf6f5156ae2d9"
+        },
+        {
+          "path": "stats_module.py",
+          "before_sha256": "330816dcfd27efa907d7d1e5890e02b397a357ffc0139efa05586dd85a258bb5",
+          "after_sha256": "26e2d660503a7a717d16a1bc54e3ff91df6e8f979557f2ff9edede4bb6f82c1c"
+        }
+      ]
     }
   ]
 }

@@ -262,6 +262,19 @@ def _checks_failed():
     return bool(_failure or (_cycle and _cycle.get("failed_checks")))
 
 
+def _fresh():
+    return (
+        _last_success is not None
+        and (datetime.now(UTC) - _last_success).total_seconds() <= FRESH_SECONDS
+    )
+
+
+def _advancing(now):
+    return bool(
+        _cycle and _cycle.get("in_progress") and _progress_at is not None and not _stalled(now)
+    )
+
+
 @synchronized
 def observation():
     """Detached coherent monitor snapshot; no SQL, provider or cache work."""
@@ -287,7 +300,12 @@ def observation():
             check_state=(
                 "failed"
                 if _checks_failed()
-                else "fresh" if healthy else "unestablished" if _last_success is None else "stale"
+                else "fresh" if _fresh() else "unestablished" if _last_success is None else "stale"
+            ),
+            completed_check_age_seconds=(
+                max(0.0, (datetime.now(UTC) - _last_success).total_seconds())
+                if _last_success
+                else None
             ),
             last_completed_cycle=_last_completed_cycle,
             last_failed_cycle=_last_failed_cycle,
@@ -337,7 +355,7 @@ def status():
     healthy = (
         _last_success is not None
         and not _checks_failed()
-        and (datetime.now(UTC) - _last_success).total_seconds() <= FRESH_SECONDS
+        and (_fresh() or _advancing(time.monotonic()))
     )
     text = (
         "Monitoring active"
@@ -348,6 +366,8 @@ def status():
             else "Monitoring results are stale or not yet established"
         )
     )
+    if healthy and not _fresh():
+        text = "Monitoring progressing; current checks are still running, previous completed results are older"
     if _stalled(time.monotonic()):
         healthy = False
         text = "Monitoring stalled; original work remains owned and requires investigation"

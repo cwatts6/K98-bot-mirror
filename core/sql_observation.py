@@ -15,12 +15,16 @@ def observing():
     return _observing.get()
 
 
-def lock_timeout(error):
+def lock_contention(error):
     args = getattr(error, "args", ())
     return bool(
         args
-        and args[0] == "42000"
-        and any(isinstance(v, str) and re.search(r"\(1222\)", v[:8192]) for v in args[1:5])
+        and args[0] in {"42000", "40001"}
+        and any(
+            isinstance(v, str)
+            and re.search(r"\(1222\)" if args[0] == "42000" else r"\(1205\)", v[:8192])
+            for v in args[1:5]
+        )
     )
 
 

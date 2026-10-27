@@ -450,6 +450,22 @@ HEALTH_ACTIVITY_PATHS = frozenset(
 )
 
 
+CHECKPOINT_OBSERVATION_PATHS = frozenset(
+    {
+        "core/sql_observation.py",
+        "kvk/dal/new_source_import_dal.py",
+        "scripts/run_export_authority.py",
+        "services/all_kvk_capture_recovery_dal.py",
+        "services/authority_observation.py",
+        "services/export_contention.py",
+        "services/legacy_export_snapshot_dal.py",
+        "services/recovery_health.py",
+        "services/stats_import_outcome_dal.py",
+        "stats_module.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -462,7 +478,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 47:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 48:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -524,6 +540,10 @@ def reviewed_transitions():
             )
             fixed_health_activity = (
                 item["id"] == "health_activity_completion_v1" and path in HEALTH_ACTIVITY_PATHS
+            )
+            fixed_checkpoint_observation = (
+                item["id"] == "checkpoint_observation_lifecycle_v1"
+                and path in CHECKPOINT_OBSERVATION_PATHS
             )
             fixed_coordination_lifecycle = (
                 item["id"] == "coordination_lifecycle_v1" and path in COORDINATION_LIFECYCLE_PATHS
@@ -618,6 +638,7 @@ def reviewed_transitions():
                     or fixed_startup_foundations
                     or fixed_event_delivery
                     or fixed_health_activity
+                    or fixed_checkpoint_observation
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
@@ -738,6 +759,11 @@ def reviewed_transitions():
             raise ValueError("Complete fixed event-delivery transition required.")
         if item["id"] == "health_activity_completion_v1" and paths != HEALTH_ACTIVITY_PATHS:
             raise ValueError("Complete fixed health/activity transition required.")
+        if (
+            item["id"] == "checkpoint_observation_lifecycle_v1"
+            and paths != CHECKPOINT_OBSERVATION_PATHS
+        ):
+            raise ValueError("Complete fixed checkpoint observation transition required.")
         if item["id"] == "coordination_lifecycle_v1" and paths != COORDINATION_LIFECYCLE_PATHS:
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:

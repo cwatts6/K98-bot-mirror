@@ -427,7 +427,9 @@ class AuthorityBroker:
             and action != "ready"
         ):
             raise AuthorityProofBusy("Publication verification is in progress.")
-        return self._dispatch(message)
+        from services.authority_observation import dispatch_observation
+
+        return dispatch_observation(self._dispatch, message)
 
     def _dispatch(self, message):
         from services.export_execution_protocol import ProviderRequest, uuid_text
@@ -750,14 +752,9 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                 except Exception as exc:
                     # A lost reply is uncertainty to the caller. Never include SQL,
                     # provider, credential or private evidence prose in IPC errors.
-                    from core.sql_observation import ObservationBusy
-                    from kvk.dal.new_source_import_dal import SourceBusy
                     from services.export_proof_progress import AuthorityProofBusy
 
-                    if isinstance(exc, AuthorityProofBusy) or (
-                        message.get("operation") == "inspect"
-                        and isinstance(exc, (ObservationBusy, SourceBusy))
-                    ):
+                    if isinstance(exc, AuthorityProofBusy):
                         reply = {"version": 1, "error": "authority_busy"}
                     else:
                         report_dispatch_failure(message, exc)

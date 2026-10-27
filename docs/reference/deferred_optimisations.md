@@ -691,3 +691,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Risk: medium
 - Dependencies: R01 correlation only if evidence connects it; proposed N4 scope agreement. No token-expiry assumption and no claim the successful retry fixed the cause.
 - Status: observed failure; root cause and implementation pending
+
+### Deferred Optimisation
+- Area: ExportResource ActivePreparationID lookup and recovery discovery (checkpoint lifecycle, 2026-10-27)
+- Type: performance
+- Description: The canonical schema lacks an ActivePreparationID index and successful discovery cycles can exceed 90 seconds. The checkpoint correction removes blocking observer waits and separates progress from completed-check freshness; query-plan performance has not been measured in production.
+- Suggested Fix: Collect bounded wait/index observations and actual plan/row-count evidence before selecting a narrow index or discovery batching change. Keep uncertain outcomes and ownership checks intact.
+- Impact: medium
+- Risk: medium
+- Dependencies: Production measurement; separate SQL contract and deployment review for any index change. See checkpoint-observation-lifecycle.md for the audited conflict map.

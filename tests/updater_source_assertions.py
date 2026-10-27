@@ -20,8 +20,22 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_health_activity_hash(root, path):
+def before_checkpoint_observation_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/checkpoint_observation_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "e1d882c11a67e50d8891532ca314f552a3de215bdc60201f1add919bd7e9c130"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
+def before_health_activity_hash(root, path):
+    actual = before_checkpoint_observation_hash(root, path)
     raw = (root / "tests/fixtures/health_activity_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

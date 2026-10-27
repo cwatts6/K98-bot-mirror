@@ -35,7 +35,9 @@ def test_long_progress_is_live_but_does_not_certify_old_results(monkeypatch):
     health.record_progress("registration_admission")
     row = health.observation()
     assert row["observer_state"] == "progressing"
-    assert row["check_state"] == "stale" and not row["healthy"]
+    assert row["check_state"] == "stale" and row["healthy"]
+    assert row["completed_check_age_seconds"] >= 131
+    assert "current checks are still running" in row["status"]
     assert "unavailable" not in row["status"]
     assert not health.outage_notification_due()
     health.record_success()
