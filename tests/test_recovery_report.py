@@ -203,7 +203,12 @@ def test_resolved_reports_preserve_configuration_continuation_only(complete_arch
 
 
 @pytest.mark.parametrize("text", ["x", "é\n"])
-def test_size_split_resumes_at_last_included_incident_without_omissions(text):
+def test_size_split_resumes_at_last_included_incident_without_omissions(text, monkeypatch):
+    from services import recovery_report as module
+
+    # Pagination's fixed attachment budget must not depend on process-global
+    # monitor history populated by unrelated tests earlier in the full suite.
+    monkeypatch.setattr(module.recovery_health, "report", lambda: {"status": "fixture"})
     service, _, records = report_service(10)
     for row in records:
         row["evidence"]["explanation"] = text * 12000
@@ -216,6 +221,16 @@ def test_size_split_resumes_at_last_included_incident_without_omissions(text):
         if after is None:
             break
     assert identifiers == [r["IncidentID"] for r in records]
+
+
+def test_report_refuses_budget_consumed_by_monitor_history(monkeypatch):
+    from services import recovery_report as module
+
+    service, _, records = report_service()
+    records[0]["evidence"]["explanation"] = "é\n" * 12000
+    monkeypatch.setattr(module.recovery_health, "report", lambda: {"history": "x" * 65536})
+    with pytest.raises(SourceConflict, match="attachment budget"):
+        service.download_report(ACTOR, max_bytes=65536)
 
 
 def test_report_serialization_is_linear_and_uses_paged_pending_action(monkeypatch):
