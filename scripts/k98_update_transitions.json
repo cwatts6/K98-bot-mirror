@@ -1712,7 +1712,7 @@
         {
           "path": "core/coalesced_work.py",
           "before_sha256": null,
-          "after_sha256": "2ad9cd8d09bc8d2c3c2eebf779a3af8e4a009f4c25fba42f5a2b49b81dee9e1e"
+          "after_sha256": "a006612284d342599698a3372cc5e9082b430965c563285b9459ea1c31a753d1"
         },
         {
           "path": "core/interaction_safety.py",

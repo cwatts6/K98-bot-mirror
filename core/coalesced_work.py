@@ -36,7 +36,16 @@ class CoalescedWork:
                 while True:
                     revision = current["revision"]
                     self.counts["passes"] += 1
-                    result = await current["factory"]()
+                    try:
+                        result = await current["factory"]()
+                    except Exception as exc:
+                        self.counts["failed_passes"] += 1
+                        self.counts["exceptions"] += 1
+                        logger.warning("coalesced_refresh_failed error_type=%s", type(exc).__name__)
+                        if revision == current["revision"]:
+                            raise
+                        # A newer request owns another pass; do not replay this one.
+                        continue
                     if result is False:
                         self.counts["failed_passes"] += 1
                     if revision == current["revision"]:
@@ -49,11 +58,8 @@ class CoalescedWork:
         self._pending[key] = current
 
         def observe(done):
-            if not done.cancelled() and done.exception() is not None:
-                self.counts["exceptions"] += 1
-                logger.warning(
-                    "coalesced_refresh_failed error_type=%s", type(done.exception()).__name__
-                )
+            if not done.cancelled():
+                done.exception()  # Every failing pass is recorded inside run().
 
         task.add_done_callback(observe)
         return task

@@ -202,12 +202,50 @@ async def test_refresh_failure_is_observed_and_new_request_can_recover():
 
     with pytest.raises(ValueError):
         await work.run("event", fail)
+    assert work.snapshot()["passes"] == 1  # No automatic replay of a failed pass.
+    assert work.snapshot()["exceptions"] == 1
 
     async def recover():
         return True
 
     assert await work.run("event", recover)
     assert work.snapshot()["pending"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("newer_fails", [False, True])
+async def test_newer_refresh_survives_failure_of_inflight_pass(newer_fails, caplog):
+    work = CoalescedWork()
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = []
+
+    async def first():
+        calls.append("first")
+        entered.set()
+        await release.wait()
+        raise ValueError("first failed")
+
+    async def latest():
+        calls.append("latest")
+        if newer_fails:
+            raise RuntimeError("latest failed")
+        return True
+
+    task = work.request("event", first)
+    await entered.wait()
+    assert work.request("event", latest) is task
+    release.set()
+    if newer_fails:
+        with pytest.raises(RuntimeError, match="latest failed"):
+            await task
+    else:
+        assert await task is True
+    assert calls == ["first", "latest"]
+    assert work.snapshot()["passes"] == 2
+    assert work.snapshot()["pending"] == 0
+    assert work.snapshot()["failed_passes"] == 1 + int(newer_fails)
+    assert work.snapshot()["exceptions"] == 1 + int(newer_fails)
+    assert "coalesced_refresh_failed error_type=ValueError" in caplog.text
 
 
 @pytest.mark.asyncio
