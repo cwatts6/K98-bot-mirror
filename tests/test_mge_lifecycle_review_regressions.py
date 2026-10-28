@@ -236,3 +236,72 @@ def test_insert_rechecks_rank_and_capacity_under_event_lock(monkeypatch, ranks, 
     assert "MGE_Events WITH (UPDLOCK, HOLDLOCK)" in calls[0]
     assert "MGE_Awards WITH (UPDLOCK, HOLDLOCK)" in calls[2]
     assert any("INSERT INTO" in call for call in calls) == (expected is not None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "button_name, operation",
+    [
+        ("set_rank", "set_rank"),
+        ("to_waitlist", "move_to_waitlist"),
+        ("move_to_roster", "promote_waitlist_to_roster"),
+        ("set_waitlist_order", "set_waitlist_order"),
+        ("update_notes", "update_internal_notes"),
+    ],
+)
+async def test_actual_roster_form_submission_uses_parent_event(monkeypatch, button_name, operation):
+    from ui.views import mge_roster_builder_view as views
+
+    monkeypatch.setattr(views, "is_admin_or_leadership_interaction", lambda _: True)
+    parent = views.MgeRosterBuilderView(42, 1)
+    row = dict(AwardId=7, GovernorId=100, AwardedRank=1, AwardStatus="awarded")
+
+    async def state():
+        return service.RosterState(
+            awarded=[row], waitlist=[dict(row, AwardStatus="waitlist")], other=[]
+        )
+
+    async def snapshot(_):
+        return dict(row)
+
+    async def embed():
+        return None
+
+    monkeypatch.setattr(parent, "_load_state", state)
+    monkeypatch.setattr(parent, "_award_snapshot", snapshot)
+    monkeypatch.setattr(parent, "_load_embed", embed)
+    shown = []
+
+    async def send(content, **kwargs):
+        shown.append(kwargs)
+
+    async def offer(interaction, modal):
+        assert interaction.done
+        shown.append({"modal": modal})
+
+    monkeypatch.setattr(views, "offer_prepared_modal", offer)
+    opening = Interaction()
+    opening.followup.send = send
+    await getattr(parent, button_name).callback(opening)
+    selector = shown[-1]["view"].children[0]
+    selector._selected_values = ["7"]
+    selector._interaction = SimpleNamespace(data={"values": ["7"]})
+    await selector.callback(Interaction())
+    modal = shown[-1]["modal"]
+    for child in modal.children:
+        child.value = "2"
+    called = []
+    original = views.run_roster_mutation
+
+    async def run(event_key, function, **kwargs):
+        assert event_key == 42
+        return await original(event_key, function, **kwargs)
+
+    def mutate(**kwargs):
+        called.append(kwargs["award_id"])
+        return service.RosterResult(True, "saved", 7)
+
+    monkeypatch.setattr(views, "run_roster_mutation", run)
+    monkeypatch.setattr(service, operation, mutate)
+    await modal.callback(Interaction())
+    assert called == [7]

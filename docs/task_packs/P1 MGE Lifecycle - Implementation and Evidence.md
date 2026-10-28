@@ -1,11 +1,12 @@
 # P1 MGE lifecycle: implementation and evidence
 
-Date: 28 October 2026. Status: local implementation under validation; not deployed.
+Date: 28 October 2026. Status: implemented and qualified locally; not deployed.
 
 The operator approved the expanded MGE scope, reusable P1 foundations, a second
 caller compatibility check and measured optimisation. The accepted monitoring/
-import/export phase and R18 remain closed. No production operation, restart,
-SQL installation or acceptance replay is part of this work.
+import/export phase and R18 remain closed. The operator separately approved the
+exact isolated native SQL target; its seven-table fixture is installed and retained.
+No production operation, restart or acceptance replay is part of this work.
 
 ## Baseline and implementation slices
 
@@ -32,6 +33,7 @@ automatic recovery command is introduced.
 | Publish/unpublish | Existing event-first DAL locks order with signup admission | Provider publication protocol remains its own service contract |
 | Complete/reopen | Event-row update conflicts with held event lock | Existing completion semantics retained |
 | Roster insertion | Event -> active exact signup -> award insert | Other roster operations retain existing outcome contracts |
+| Legacy roster UI writers | Both UIs share whole-service event ownership before off-loop entry; SQL insert rechecks rank and capacity | Process-local ownership; cross-process/audit contract adoption remains separate |
 | Board scheduler/manual sync | Event-scoped serialized read/render/edit | Process lock is not cross-process ownership |
 | Background refresh callback | Coalesced owned request; dirty-during-run guarantees another pass | Authoritative state reread after restart; no persisted refresh queue |
 | Board creation | Existing durable delivery journal before send, receipt before SQL ID save | Unknown send held; missing known message requires disposition |
@@ -50,20 +52,24 @@ MGE additionally consumes the existing durable delivery journal for board creati
 Restart fixtures verify exact-ID recovery after acknowledgement and refusal to
 resend after a lost send acknowledgement or failed receipt write.
 
-## Measurement method and initial results
+## Measurement method and results
 
 `scripts/benchmark_mge_lifecycle.py` executes the real callback and board sync
 with deterministic simulated SQL/service/Discord delays. No live database or
 Discord call occurs. Raw measurements and source hashes are retained locally in
-`.codex_artifacts/mge-*.json`; these are development evidence, not runtime receipts.
+the [retained benchmark data](../benchmarks/p1_mge_lifecycle_20261028.json).
+These are development evidence, not runtime receipts. Baseline source was verified
+byte-for-byte after newline normalization against the pinned mirror revision.
 
-Initial 20-sample callback fixture, 50 ms blocking service:
+Final 20-sample callback fixture, 50 ms blocking service:
 
 | Metric | Before | After |
 |---|---:|---:|
-| Median acknowledgement | 50.35 ms | 0.007 ms |
-| Median total callback | 50.37 ms | 51.12 ms |
-| Median maximum event-loop lag | 49.46 ms | 15.38 ms |
+| Median acknowledgement | 50.31 ms | 0.019 ms |
+| p95 acknowledgement | 50.63 ms | 0.026 ms |
+| Median total callback | 50.32 ms | 51.08 ms |
+| p95 total callback | 50.65 ms | 51.46 ms |
+| Median maximum event-loop lag | 49.39 ms | 15.89 ms |
 | Mutation / reply / refresh requests per submission | 1 / 1 / 1 | 1 / 1 / 1 |
 
 The improvement is responsiveness and ownership, not faster business SQL. Windows
@@ -75,37 +81,111 @@ Same-turn burst of 20 board-refresh requests, 50 ms simulated IO per pass:
 | Metric | Before | After |
 |---|---:|---:|
 | Event reads / roster reads / Discord edits / ID writes | 20 / 20 / 20 / 20 | 1 / 1 / 1 / 1 |
-| Fixture elapsed time | 560.02 ms | 81.25 ms |
+| Fixture elapsed time | 556.31 ms | 81.62 ms |
 
 The baseline excludes its old fixed 0.5-second dispatch delay. This is a burst
 fixture, not a claim that all refresh traffic reduces by 95%. A separate test
 injects another burst during execution and requires two passes with the latest
 revision displayed. Source hashes distinguish uncommitted after-code from baseline.
 
-Native SQL execution/plan measurements are not established by these fixtures.
-The event audit lookup uses the existing EventId index and JSON receipt filtering;
-no unmeasured index or SQL speedup claim is made. Before native execution, prepare
-and approve a distinct disposable target under the local SQL development contract;
-retained S11 databases and production are excluded.
+Native SQL qualification subsequently passed all 15 named cases in the explicitly
+approved target. Real competing sessions showed `LCK_M_U` behind the exact event
+owner; an unrelated event committed in 4.79 ms while that owner remained held.
+Required-write failures rolled back; lost commit acknowledgement remained unknown
+and an exact persisted receipt reconciled it without another mutation.
+
+Twenty measured native persistence cycles per mode, after two warm-ups:
+
+| Metric | Before create / edit / withdraw | After create / edit / withdraw |
+|---|---:|---:|
+| Median duration, ms | 1.760 / 1.579 / 1.891 | 1.739 / 1.737 / 1.479 |
+| p95 duration, ms | 2.268 / 1.921 / 2.473 | 2.431 / 1.993 / 2.092 |
+| Connections and commits | 2 / 2 / 3 | 1 / 1 / 1 |
+| Statements | 3 / 2 / 3 | 5 / 5 / 6 |
+| Median logical reads, separate instrumented pass | 46 / 30 / 37 | 87 / 84 / 80.5 |
+
+This reconstructs the original separate DAL workflow using preserved statements,
+not the full UI/service/provider path. Withdrawal timing uses an empty award lookup;
+award deletion/audit is separately proven by native failure cases. The separate
+read-cost pass started with 1,142 audit rows and used 20 cycles per mode. Median
+session CPU was below the millisecond reporting resolution, not zero CPU work.
+Local timings show fewer connection/commit boundaries, not universal SQL speedup;
+the stronger ownership/receipt checks add statements and reads.
+
+Actual receipt plans chose a clustered index scan, despite the available EventId
+index: 15 / 17 / 31 logical reads at 0 / 100 / 1,000 event-audit rows (142 / 242 /
+1,142 total rows). The JSON predicate remains a measured scaling follow-up; no
+schema/index change was made. All observed connections closed. The fixture retains
+1,262 audit rows, below its 2,000-row bound. See the
+[native qualification packet](P1%20MGE%20-%20Native%20SQL%20Qualification%20Packet.md)
+and [retained native measurements](../benchmarks/p1_mge_native_sql_20261028.json).
 
 ## Validation
 
 - Initial focused lifecycle/transaction/second-caller suite: 79 passed.
 - Expanded MGE, interaction and legacy-worker suite: 457 passed, one dependency warning.
+- Subsequent focused suite before review amendments: 464 passed; operational logs unchanged.
+- Review amendments: competing rank additions, stale notes/rank interleaving,
+  cancellation ownership, unrelated-event progress, cancel-after-entry, actual
+  reminders-modal submission, locked rank/cap checks and five actual roster modal
+  submissions pass (13 tests).
 - Architecture, import smoke (isolated test configuration), command registration
   and security-routing gates passed during implementation.
-- Full-suite/log-isolation and final Changes review results are recorded below
-  when complete. The current document does not assert those gates have passed.
+- Final focused MGE/shared lifecycle suite: 480 passed, one dependency warning;
+  production operational logs unchanged.
+- Full suite and resolution evidence are recorded below; final Changes review
+  completed with zero reportable security findings.
 
 Fault injection covers required write/audit failure, confirmed rollback, rollback
 failure, lost commit acknowledgement, exact receipt reconciliation, identity
 mismatch, inactive/stale signup, locked event, unknown acknowledgement, current
 form owner, repeated clicks, worker cancellation, reply failure, refresh ordering
-and restart after uncertain board delivery. These are offline tests; native SQL
-locking, live callbacks and operator visual acceptance remain distinct.
+and restart after uncertain board delivery. Offline and native SQL evidence are
+identified separately; live callbacks and operator visual acceptance remain open.
 
 Security target: Changes review of this branch against the pinned mirror baseline,
 Deep off. No repository-wide audit is selected. SQL source remains unchanged.
+
+Completed source-review chain (all with zero reportable security findings):
+
+- Initial 27-source-file patch: `fda91c12-6fdf-42aa-a557-9713821ac1e5`, retained in
+  commit `9d3ef829cd61ea50877b1e251a444d8d5947124f`.
+- Six-source-file correctness amendment: `a863930d-791d-4de7-8bd4-a5f4da60bba0`,
+  retained in commit `3ef186b50abcef660aa1d6401bc31247ed62ca3a`.
+- Final five-line parent-event correction: `bbde3b53-1c00-411f-b395-b1502b9c99cd`.
+
+Ordinary review found and corrected double acknowledgement in legacy publish,
+misleading cancellation after entry, new roster concurrency exposure and nested
+modal event wiring. Security results do not stand in for correctness checks.
+Subsequent documentation/evidence-only edits do not change a security boundary.
+
+The first full run had 10,026 passes, 1,100 skips and 36 failures. Eighteen failures
+were the interpreter guard correctly refusing a different checkout's interpreter;
+the worktree now has its own `.venv` interpreter, with the existing development
+packages exposed through a local `.pth` file. Eighteen were historical exact-source
+assertions requiring an authenticated successor bridge. The new test-only bridge
+pins exact before/after bytes and rejects changed/missing mappings; it does not
+alter production updater capability. This development environment is not a
+production environment build.
+
+The subsequent full run recorded 10,049 passes, 1,101 skips, five failures and 25
+setup errors. Two temporary-fixture mapping omissions and one direct historical
+hash assertion were corrected. The remaining failures/setup errors came from
+pywin32 package paths not being initialized by the local dependency bridge;
+`site.addsitedir` now processes its package path files. Every affected test file
+was rerun: **117 passed**, with production operational logs unchanged. The final
+480-test focused run also passed after the source corrections. This is a full run
+plus successful targeted resolution, not a claim of one uninterrupted green full
+run. A third full run was not repeated after the bounded fixture/environment fixes.
+
+Final architecture, deferred-item, test-selection, security-routing, Ruff, Black,
+import smoke, command-registration and diff-whitespace checks passed. Test-only
+historical-source mapping corrections and documentation/measurement additions
+after the sealed source reviews do not change runtime or security boundaries.
+
+No protected-updater transition has been authorized or installed by this work.
+Before promotion, prepare and review the complete source/dependency transition;
+the installed protected updater must continue refusing an unreviewed image.
 
 ## Operator evidence and acceptance
 

@@ -711,3 +711,21 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: Production measurement; separate SQL contract and deployment review for any index change. See checkpoint-observation-lifecycle.md for the audited conflict map.
+
+### Deferred Optimisation
+- Area: `mge/mge_roster_service.py`, `mge/mge_simplified_leadership_service.py`, `mge/dal/mge_roster_dal.py`
+- Type: architecture
+- Description: The MGE lifecycle change gives both roster UIs whole-operation ownership per event before off-loop entry and rechecks insertion rank/capacity under SQL locks. Legacy roster add/audit and swap/reset paths still contain multiple database calls with their existing Boolean outcomes; process ownership does not make those writes atomic or establish cross-process settlement. The new strict signup transaction does not automatically upgrade these separate writers.
+- Suggested Fix: In the remaining R12 writer census, map every roster writer and conflict order. Adopt one narrowly scoped atomic writer family at a time, grouping required audit and domain changes and distinguishing rollback from lost commit acknowledgement. Prove stale snapshots, competing writers, second-caller participation and unknown outcomes with native SQL qualification; preserve existing rank and publication policy.
+- Impact: high
+- Risk: high
+- Dependencies: MGE lifecycle source and tests; authoritative SQL schema; explicit bounded writer scope and native qualification target; Changes-only review. No production or policy change is authorized by this capture.
+
+### Deferred Optimisation
+- Area: `mge/dal/mge_signup_mutation_dal.py::SQL_RECEIPT` and `dbo.MGE_SignupAudit`
+- Type: performance
+- Description: Approved native qualification on 28 October chose a clustered scan for exact JSON operation-receipt lookup despite the existing EventId index. At 0/100/1,000 event audit rows, actual plans read 15/17/31 pages across 142/242/1,142 total rows. The atomic writer reduced connections/commits while adding checks and logical reads. These small warm-cache results establish a scaling question, not a production regression or index prescription.
+- Suggested Fix: Measure representative event/total cardinalities and hit/miss distributions in a separately bounded synthetic target; compare existing plans with an explicit receipt-key/index design and retention constraints. Preserve exact operation identity, fingerprint checks and unknown-outcome handling. Select a schema change only from measured reads, write overhead and plan stability.
+- Impact: medium
+- Risk: medium
+- Dependencies: R16 performance work; authoritative SQL contract and independent migration review; retained `docs/benchmarks/p1_mge_native_sql_20261028.json` evidence; approved fixture bounds. No schema or production operation authorized by this capture.

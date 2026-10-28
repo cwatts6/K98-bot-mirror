@@ -84,4 +84,27 @@ owned refresh and durable delivery evidence; for WS5/WS6 it supplies a writer-ma
 template and final-admission pattern. Each domain still needs its own authority,
 policy and persistence review. External monitoring remains separate.
 
+## Concrete remaining-scope adoption
+
+| Stable ledger item | Foundation to carry forward | Still required in that area |
+|---|---|---|
+| R02 / R07 Discord and domain callbacks | `private_operation`, prepared forms, commit/reply separation and real callback tests | Trace each response owner and preserve domain eligibility; no claim that historical 10015/10062 has one cause |
+| R06 remaining public/DM persistence | `drain_awaitable` / `drain_thread`, existing delivery journal, exact-ID recovery tests | Inventory child tasks, storage boundaries and destination identity; preserve natural acceptance |
+| R08 / R09 legacy execution paths | Explicit mutation outcomes, fault-injection matrix, no-reentry evidence | Map the actual legacy wrapper and resources before adoption; keep accepted coordinated routes closed |
+| R10 cache callers | Owned refresh, dirty-during-run test, source revision template | Durable invalidation/revision design remains unimplemented |
+| R11 domain policy / persistence | Final-admission and writer-conflict checklist | Agree policy before changing fighting caps, preclaim or legacy replacement |
+| R12 writer census | MGE writer map and two-caller cancellation evidence | Enumerate every enabled writer and prove participation in the chosen owner/lock |
+| R15 / R16 delivery and performance | Exact source evidence, repeatable benchmark, explicit uncertainty | Protected updater release admission and actual SQL/provider measurements |
+
+`mge/mge_roster_execution.py` owns the whole legacy roster service operation per
+event across both roster UIs. This prevents newly off-loop read/modify/write calls
+from racing; other events can progress independently. Every async roster mutation
+adapter must participate. It is neither a cross-process lock nor a substitute for
+atomic database writes. The signup writer supplies its own SQL transaction; legacy
+roster audit grouping retains the separately captured adoption work.
+
+R03/R04/R13 natural and historical disposition, R05 process singleton, R14 external
+monitoring, P0 R17 and closed R18 keep their existing status. No ledger item is
+closed merely because a shared helper is available.
+
 See [MGE implementation and evidence](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md).

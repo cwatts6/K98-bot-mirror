@@ -1,5 +1,11 @@
 # K98 Bot Reference Docs
 
+The approved local MGE implementation establishes the
+[P1 operation lifecycle contract](p1-operation-lifecycle.md). See its
+[implementation and measured evidence](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md)
+for current local validation and remaining qualification; deployment and acceptance
+are separate from the historical scope/closeout notes below.
+
 > **Current status - 28 October 2026:** Monitoring and import/export reliability is
 > accepted and complete for the deployed private `f6a929c0597ce257ce18380af1ab6f7ad8ddcc5d`
 > runtime. Report 59, correct-data confirmation and `/stats player` acceptance close
