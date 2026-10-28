@@ -1,6 +1,6 @@
 # Startup Runbook
 
-## Current A1a deployment observation - 28 October 2026
+## Current A1a deployment observation — 28 October 2026
 
 Private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed and Discord online.
 Report 62 records 21/21 tracked views restored and player-cache completion after
