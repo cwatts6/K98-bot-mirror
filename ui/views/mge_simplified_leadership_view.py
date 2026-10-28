@@ -22,6 +22,7 @@ from mge import (
 # architecture-check: allow - existing leadership view reads signup DAL for admin-add gating.
 from mge.dal import mge_signup_dal
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
+from mge.mge_roster_execution import run_roster_mutation
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
 from ui.views.prepared_modal_view import offer_prepared_modal
 
@@ -150,7 +151,8 @@ class _AdjustRankModal(discord.ui.Modal):
             await send_ephemeral(interaction, "❌ Invalid rank.")
             return
 
-        result = await drain_thread(
+        result = await run_roster_mutation(
+            self.event_id,
             mge_roster_service.set_rank,
             award_id=self.award_id,
             new_rank=new_rank,
@@ -299,7 +301,8 @@ class _ResetRanksConfirmView(_SingleActionConfirmView):
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
-        result = await drain_thread(
+        result = await run_roster_mutation(
+            self.event_id,
             mge_simplified_leadership_service.reset_active_ranks,
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
@@ -606,7 +609,8 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             award_id = int(value)
 
             async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                result = await drain_thread(
+                result = await run_roster_mutation(
+                    self.event_id,
                     mge_roster_service.move_to_waitlist,
                     award_id=award_id,
                     actor_discord_id=int(j.user.id),
@@ -669,7 +673,8 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             if can_direct and not can_swap:
 
                 async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                    result = await drain_thread(
+                    result = await run_roster_mutation(
+                        self.event_id,
                         mge_simplified_leadership_service.move_waitlist_to_roster_with_optional_demote,
                         event_id=self.event_id,
                         promote_award_id=promote_award_id,
@@ -703,7 +708,8 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                 demote_award_id = int(demote_value)
 
                 async def _submit(k: discord.Interaction, notes: str | None) -> None:
-                    result = await drain_thread(
+                    result = await run_roster_mutation(
+                        self.event_id,
                         mge_simplified_leadership_service.move_waitlist_to_roster_with_optional_demote,
                         event_id=self.event_id,
                         promote_award_id=promote_award_id,
@@ -776,7 +782,8 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             signup_id = int(value)
 
             async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                result = await drain_thread(
+                result = await run_roster_mutation(
+                    self.event_id,
                     mge_roster_service.reject_signup,
                     event_id=self.event_id,
                     signup_id=signup_id,

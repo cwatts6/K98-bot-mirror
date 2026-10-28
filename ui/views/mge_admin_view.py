@@ -78,6 +78,11 @@ class ConfirmSwitchOpenView(discord.ui.View):
     )
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
+        if getattr(self, "_private_operations", None):
+            await send_ephemeral(
+                interaction, "The switch is already processing and cannot be cancelled."
+            )
+            return
         if self._completed:
             await send_ephemeral(interaction, "⚠️ This switch confirmation has already been used.")
             return
@@ -142,6 +147,11 @@ class ConfirmSwitchFixedView(discord.ui.View):
     )
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
+        if getattr(self, "_private_operations", None):
+            await send_ephemeral(
+                interaction, "The switch is already processing and cannot be cancelled."
+            )
+            return
         if self._completed:
             await send_ephemeral(interaction, "⚠️ This switch confirmation has already been used.")
             return

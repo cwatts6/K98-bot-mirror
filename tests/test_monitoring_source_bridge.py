@@ -15,6 +15,8 @@ def test_monitoring_bridge_requires_exact_mapping_and_source(tmp_path, damage):
     raw = (root / fixture).read_bytes()
     (tmp_path / fixture).parent.mkdir(parents=True)
     (tmp_path / fixture).write_bytes(raw)
+    mge = Path("tests/fixtures/p1_mge_lifecycle_source_pairs.json")
+    (tmp_path / mge).write_bytes((root / mge).read_bytes())
     attempt = Path("tests/fixtures/procconfig_admission_source_pairs.json")
     (tmp_path / attempt).write_bytes((root / attempt).read_bytes())
     lifecycle = Path("tests/fixtures/coordination_lifecycle_source_pairs.json")

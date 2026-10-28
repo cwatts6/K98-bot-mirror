@@ -10,6 +10,7 @@ from core.mge_permissions import is_admin_or_leadership_interaction
 from core.owned_work import drain_thread
 from mge import mge_roster_service
 from mge.mge_review_service import get_signup_review_pool
+from mge.mge_roster_execution import run_roster_mutation
 from ui.views.prepared_modal_view import offer_prepared_modal
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,8 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ That rank is already occupied.")
                         return
 
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.parent.event_id,
                         mge_roster_service.add_signup_with_rank,
                         event_id=self.parent.event_id,
                         signup_id=int(self.snapshot["SignupId"]),
@@ -371,7 +373,8 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ That rank is already occupied.")
                         return
 
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.event_id,
                         mge_roster_service.set_rank,
                         award_id=self.award_id,
                         new_rank=rank,
@@ -443,7 +446,8 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ Invalid waitlist order.")
                         return
 
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.event_id,
                         mge_roster_service.move_to_waitlist,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -504,7 +508,8 @@ class MgeRosterBuilderView(discord.ui.View):
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.event_id,
                         mge_roster_service.promote_waitlist_to_roster,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -569,7 +574,8 @@ class MgeRosterBuilderView(discord.ui.View):
                     except Exception:
                         await send_ephemeral(modal_interaction, "❌ Invalid waitlist order.")
                         return
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.event_id,
                         mge_roster_service.set_waitlist_order,
                         award_id=self.award_id,
                         waitlist_order=order,
@@ -627,7 +633,8 @@ class MgeRosterBuilderView(discord.ui.View):
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.event_id,
                         mge_roster_service.update_internal_notes,
                         award_id=self.award_id,
                         notes=str(self.notes.value or "").strip() or None,
@@ -684,7 +691,8 @@ class MgeRosterBuilderView(discord.ui.View):
                     if not await self.parent._guard(modal_interaction):
                         return
                     reason = str(self.reason.value or "").strip() or None
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.parent.event_id,
                         mge_roster_service.remove_award_hard_delete,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -717,7 +725,8 @@ class MgeRosterBuilderView(discord.ui.View):
         del button
         if not await self._guard(interaction):
             return
-        res = await drain_thread(
+        res = await run_roster_mutation(
+            self.event_id,
             mge_roster_service.undo_last_removal_in_session,
             event_id=self.event_id,
             actor_discord_id=self.actor_discord_id,
@@ -762,7 +771,8 @@ class MgeRosterBuilderView(discord.ui.View):
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await drain_thread(
+                    res = await run_roster_mutation(
+                        self.parent.event_id,
                         mge_roster_service.reject_signup_audit_only,
                         event_id=self.parent.event_id,
                         signup_id=int(snap["SignupId"]),

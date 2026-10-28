@@ -20,8 +20,23 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_checkpoint_observation_hash(root, path):
+def before_mge_lifecycle_hash(root, path):
+    """Exact test-only successor bridge; grants no installation capability."""
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    raw = (root / "tests/fixtures/p1_mge_lifecycle_source_pairs.json").read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "e191e881c76d1351c93c07d817be827f16e0326cc10a5909b0a84f5eb03635ca"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
+def before_checkpoint_observation_hash(root, path):
+    actual = before_mge_lifecycle_hash(root, path)
     raw = (root / "tests/fixtures/checkpoint_observation_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

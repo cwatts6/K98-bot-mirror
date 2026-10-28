@@ -341,7 +341,6 @@ class MgePublishView(discord.ui.View):
                         )
                         return
 
-                    await modal_interaction.response.defer(ephemeral=True)
                     await self.parent._run_publish(
                         interaction=modal_interaction,
                         reminders_text_override=entered,

@@ -241,6 +241,17 @@ def insert_award(
         current = cur.fetchone()
         if not current or int(current[0]) != int(governor_id) or not current[1]:
             return None
+        if str(award_status).lower() == "awarded":
+            cur.execute(
+                "SELECT AwardedRank FROM dbo.MGE_Awards WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE EventId = ? AND AwardStatus = 'awarded';",
+                (event_id,),
+            )
+            ranks = [row[0] for row in cur.fetchall()]
+            if awarded_rank is None or not 1 <= int(awarded_rank) <= 15:
+                return None
+            if len(ranks) >= 15 or int(awarded_rank) in ranks:
+                return None
         cur.execute(
             SQL_INSERT_AWARD,
             (
