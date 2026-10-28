@@ -325,3 +325,28 @@ async def test_real_modal_and_confirmation_reply_privately_on_dataset_failure(
     assert reply.kwargs["ephemeral"] is True
     assert "could not be verified" in reply.args[0]
     assert dataset["writes"] == []
+
+
+@pytest.mark.parametrize("defect", ["readback", "identity"])
+def test_placement_diagnostic_preserves_failed_stage(dataset, monkeypatch, defect):
+    dataset["awards"] = []
+    calls = 0
+
+    def read(*_):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return []
+        if defect == "readback":
+            raise RuntimeError("private SQL details")
+        rows = deepcopy(dataset["awards"])
+        rows[0]["EventId"] = 88
+        return rows
+
+    monkeypatch.setattr(roster, "run_query", read)
+    with pytest.raises(MgeDatasetError) as error:
+        flow.get_ordered_leadership_rows(77)
+    assert error.value.state == "incomplete"
+    assert error.value.stage == "placement_" + defect
+    assert "private SQL details" not in str(error.value)
+    assert len(dataset["writes"]) == 1

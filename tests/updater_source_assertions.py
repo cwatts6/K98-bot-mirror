@@ -28,7 +28,7 @@ def before_a1a_hash(root, path):
         return actual  # Unchanged historical fixtures still authenticate themselves.
     raw = fixture.read_bytes()
     assert hashlib.sha256(raw).hexdigest() == (
-        "5d2e32f79349e181a9d46cf8ccc373bad1df76fc7a217a279280f864963ad2ea"
+        "4a341c7110b40ce6b679f7b53de7dc114ebc03f8681ac831c50cf56e6bf8c124"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

@@ -37,7 +37,7 @@
   {
     "path": "mge/mge_simplified_flow_service.py",
     "before": "ad02bc14def0cb98821a7b7b109f86d046b413302657bce55d49c94377d8afcb",
-    "after": "c692f110bd42932b92ee370899a1b17c353615984b13e5b55870e9de5f65efa3"
+    "after": "b6cea5c3b7b88cd63de25eabe588c88b5ff744a6482bcde7ca83038e557f5cdf"
   },
   {
     "path": "mge/mge_simplified_leadership_service.py",

@@ -236,3 +236,13 @@ Initial release-policy regression: 256 passed, including exact source pins,
 historical preservation, registry limits, every member tamper/absence, complete
 bundle admission and target-policy refusal. The full repository suite is run again
 for the final release delta; results are recorded in the PR handoff.
+
+### PR review correction
+
+Copilot identified that wrong-event placement readback was correctly refused but
+its `placement_identity` label was caught and rewritten to `placement_readback`.
+The catch now covers only the DAL read. Paired tests preserve the distinct labels,
+incomplete state, redacted message and one attempted placement. The unreleased
+A1a successor pin and exact test bridge are updated; all 49 historical release
+entries remain unchanged. Stored before/after benchmark observations predate this
+diagnostic-only correction; no new production-latency claim follows from it.
