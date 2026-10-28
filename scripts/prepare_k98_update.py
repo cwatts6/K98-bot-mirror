@@ -505,6 +505,24 @@ MGE_LIFECYCLE_PATHS = frozenset(
 )
 
 
+MGE_A1A_PATHS = frozenset(
+    {
+        "core/interaction_safety.py",
+        "core/operation_timing.py",
+        "core/owned_work.py",
+        "mge/dal/mge_review_dal.py",
+        "mge/dal/mge_roster_dal.py",
+        "mge/dataset_errors.py",
+        "mge/mge_embed_manager.py",
+        "mge/mge_publish_service.py",
+        "mge/mge_roster_execution.py",
+        "mge/mge_simplified_flow_service.py",
+        "mge/mge_simplified_leadership_service.py",
+        "ui/views/mge_simplified_leadership_view.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -517,7 +535,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 49:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 50:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -597,6 +615,7 @@ def reviewed_transitions():
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
             )
+            fixed_mge_a1a = item["id"] == "p1_mge_a1a_v1" and path in MGE_A1A_PATHS
             fixed_mge_lifecycle = (
                 item["id"] == "p1_mge_lifecycle_v1" and path in MGE_LIFECYCLE_PATHS
             )
@@ -686,6 +705,7 @@ def reviewed_transitions():
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
+                    or fixed_mge_a1a
                     or fixed_mge_lifecycle
                     or fixed_replacement
                     or fixed_publication
@@ -813,6 +833,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p1_mge_a1a_v1" and paths != MGE_A1A_PATHS:
+            raise ValueError("Complete fixed MGE A1a transition required.")
         if item["id"] == "p1_mge_lifecycle_v1" and paths != MGE_LIFECYCLE_PATHS:
             raise ValueError("Complete fixed MGE lifecycle transition required.")
         if item["id"] == "p1_monitoring_reliability_v1" and paths != MONITORING_RELIABILITY_PATHS:

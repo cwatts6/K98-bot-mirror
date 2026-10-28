@@ -10,8 +10,10 @@ import logging
 from typing import Any, Protocol
 
 from mge.dal import mge_publish_dal
+from mge.dataset_errors import MgeDatasetError
 from mge.mge_constants import DEFAULT_TARGET_DECREMENT_SCORE
 from mge.mge_embed_manager import build_publish_change_summary_lines
+from mge.mge_roster_execution import run_roster_mutation
 from mge.mge_simplified_flow_service import evaluate_publish_readiness, get_ordered_leadership_rows
 
 logger = logging.getLogger(__name__)
@@ -314,7 +316,10 @@ def generate_targets_from_rank1(
         )
 
     now = _now_utc(now_utc)
-    dataset = _current_award_dataset(event_id)
+    try:
+        dataset = _current_award_dataset(event_id)
+    except MgeDatasetError as exc:
+        return PublishResult(False, str(exc))
     roster_rows = _current_roster_rows_from_dataset(dataset)
     if not roster_rows:
         return PublishResult(False, "No roster rows found for target generation.")
@@ -397,7 +402,7 @@ async def publish_event_awards(
     now_utc: datetime | None = None,
 ) -> PublishResult:
     now = _now_utc(now_utc)
-    readiness = await asyncio.to_thread(evaluate_publish_readiness, event_id)
+    readiness = await run_roster_mutation(event_id, evaluate_publish_readiness, event_id)
     if not readiness.get("publish_ready", False):
         logger.warning(
             "mge_publish_blocked_not_ready event_id=%s actor_discord_id=%s reasons=%s",
@@ -411,9 +416,12 @@ async def publish_event_awards(
     if not ctx:
         return PublishResult(False, "Event not found.")
 
-    publish_rows, waitlist_rows, clear_rank_award_ids = await asyncio.to_thread(
-        _build_publish_sets, event_id
-    )
+    try:
+        publish_rows, waitlist_rows, clear_rank_award_ids = await run_roster_mutation(
+            event_id, _build_publish_sets, event_id
+        )
+    except MgeDatasetError:
+        return PublishResult(False, "MGE data could not be verified. Publication has not started.")
     if not publish_rows and not waitlist_rows:
         return PublishResult(False, "No awarded or waitlist rows available to publish.")
 

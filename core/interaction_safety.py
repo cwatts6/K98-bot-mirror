@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import functools
 import inspect
 import logging
@@ -17,6 +18,8 @@ from typing import Any
 
 import discord
 from discord import HTTPException, NotFound
+
+from core.operation_timing import record_timing, timed_stage, timing_scope
 
 logger = logging.getLogger(__name__)
 _private_children = set()
@@ -87,10 +90,11 @@ async def send_ephemeral(
     """
     try:
         kwargs.pop("ephemeral", None)  # this helper always owns private visibility
-        if interaction.response.is_done():
-            await interaction.followup.send(content, ephemeral=True, **kwargs)
-        else:
-            await interaction.response.send_message(content, ephemeral=True, **kwargs)
+        with timed_stage("private_response"):
+            if interaction.response.is_done():
+                await interaction.followup.send(content, ephemeral=True, **kwargs)
+            else:
+                await interaction.response.send_message(content, ephemeral=True, **kwargs)
     except asyncio.CancelledError:
         # Preserve cooperative cancellation semantics
         raise
@@ -219,7 +223,22 @@ def private_operation(function):
     async def run(self, *args, **kwargs):
         interaction = signature.bind(self, *args, **kwargs).arguments[interaction_parameter]
         started = perf_counter()
-        if not await acknowledge_private(interaction):
+        already_done = response_is_done(interaction)
+        created = getattr(interaction, "created_at", None)
+        if isinstance(created, datetime) and created.tzinfo is not None:
+            record_timing(
+                "interaction_age_at_entry",
+                (datetime.now(UTC) - created).total_seconds(),
+                "observed",
+            )
+        ack_started = perf_counter()
+        admitted = await acknowledge_private(interaction)
+        record_timing(
+            "acknowledgement",
+            perf_counter() - ack_started,
+            "already_acknowledged" if already_done else "confirmed" if admitted else "unconfirmed",
+        )
+        if not admitted:
             return None
         if _private_admission_closed:
             await send_ephemeral(
@@ -249,7 +268,12 @@ def private_operation(function):
                 (perf_counter() - started) * 1000,
             )
 
-    return run
+    @functools.wraps(function)
+    async def measured(self, *args, **kwargs):
+        with timing_scope(), timed_stage("private_callback"):
+            return await run(self, *args, **kwargs)
+
+    return measured
 
 
 async def global_cmd_error_handler(ctx, error):

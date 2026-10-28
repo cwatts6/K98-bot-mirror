@@ -120,3 +120,59 @@ monitoring, P0 R17 and closed R18 keep their existing status. No ledger item is
 closed merely because a shared helper is available.
 
 See [MGE implementation and evidence](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md).
+
+## A1a qualified datasets and measurement framework
+
+The local A1a implementation distinguishes successful `loaded_empty` and `loaded`
+leadership preparations from `unavailable` reads and `incomplete` preparation.
+The adopted strict DAL callers propagate read failure; legacy callers retain their
+existing list contract. A failed preparation is never a valid empty roster.
+Leadership board refresh retains its existing message and identity on failure;
+fresh publication readiness blocks before publication. Private leadership actions
+report that data could not be verified. Successful empty-data policy is unchanged.
+
+Preparation is not read-only: existing automatic placement can insert awards. Its
+reentrant event thread owner is shared with `run_roster_mutation`, including both
+roster UIs. Lock order is async roster owner (where applicable), then thread owner,
+then existing DAL transactions. Board owner precedes thread owner on board refresh;
+no thread owner is held across Discord IO or an await. Keep all synchronous callers
+off the event loop. This does not serialize signup SQL writers or other processes.
+An unconfirmed insert or failed readback stops the preparation without replay;
+previous writes are not represented as rolled back. Cross-writer atomicity remains R12.
+
+One prepared snapshot supplies both leadership rendering and displayed readiness.
+It is never cached across actions or reused as publication authority. Publication
+still reloads at its own boundary; whole-publication atomicity is not established.
+Public signup rendering is outside this strict-dataset adoption and retains its
+legacy failed-read contract; qualify it before any A1b refresh-policy change.
+
+`core/operation_timing.py` adds random local correlation references. Context flows
+through owned tasks and workers. Stages record interaction age, acknowledgement,
+worker queue/execution, roster owner wait, dataset/DAL reads, board ownership and
+Discord fetch/edit, private response and complete callback. Times are **inclusive**:
+they may overlap and must not be summed. `completed` means the timed call returned,
+not that a domain write committed or delivery succeeded. Nested acknowledgements
+are `already_acknowledged`, never another network-ack sample. Acknowledgement
+failure remains non-entry. No token, payload, connection string or exception text
+is added to these structured timing records. Existing logs retain their contracts.
+
+### Required adoption record for each follow-on slice
+
+| Field | Required evidence |
+|---|---|
+| Target / authority | Exact actor, domain identity, current eligibility and final admission owner |
+| Data | Valid empty/populated, unavailable and incomplete states; reader and hidden writer census |
+| Execution | Real entrypoints, competing writers, lock order, child draining and restart limits |
+| Mutation | Confirmed commit/rollback, non-entry and unknown outcomes kept distinct; exact reconciliation receipt |
+| Presentation | Response, DM and each public destination independently settled; message IDs retained |
+| Failure tests | Failed ack/read, partial write/readback, stale state, repeated click/cancel, overlapping caller, failed reply/refresh after commit |
+| Measurement | Source/fixture hashes, same harness and workload, repetitions, counts, p50/p95 and loop delay; simulated IO explicitly labelled |
+| Closure | Local tests/review, release readiness, deployment, runtime readiness and natural acceptance separately recorded |
+
+Demonstrate one real second caller before changing shared helpers. Signup and rank
+callbacks exercise A1a timing; both roster UIs, board preparation and publication
+exercise the owner contract. Do not adopt MGE's event key, placement policy or
+notification semantics automatically in Ark, voting or calendar.
+
+See [A1a implementation and validation](../task_packs/P1%20MGE%20A1a%20-%20Implementation%20and%20Validation%20-%202026-10-28.md)
+for the concrete caller matrix, repeatable measurements and remaining gates.

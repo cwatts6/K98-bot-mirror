@@ -21,6 +21,7 @@ from mge import (
 
 # architecture-check: allow - existing leadership view reads signup DAL for admin-add gating.
 from mge.dal import mge_signup_dal
+from mge.dataset_errors import MgeDatasetError
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_roster_execution import run_roster_mutation
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
@@ -397,6 +398,15 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             mge_simplified_leadership_service.get_leadership_board_payload, self.event_id
         )
 
+    async def on_error(self, error, item, interaction):
+        if isinstance(error, MgeDatasetError):
+            logger.warning(
+                "mge_leadership_data_unverified state=%s stage=%s", error.state, error.stage
+            )
+            await send_ephemeral(interaction, str(error))
+            return
+        await super().on_error(error, item, interaction)
+
     @discord.ui.button(
         label="Edit Rules",
         style=discord.ButtonStyle.secondary,
@@ -470,13 +480,20 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         del button
         if not await self._guard(interaction):
             return
-        await mge_embed_manager.refresh_mge_boards(
+        results = await mge_embed_manager.refresh_mge_boards(
             bot=interaction.client,
             event_id=self.event_id,
             refresh_public=False,
             refresh_leadership=True,
         )
-        await send_ephemeral(interaction, "✅ Leadership embed refreshed.")
+        await send_ephemeral(
+            interaction,
+            (
+                "✅ Leadership embed refreshed."
+                if results["leadership"]
+                else "The leadership board could not be refreshed. Its saved identity has been retained."
+            ),
+        )
 
     @discord.ui.button(
         label="Admin Add Signup",

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
 import logging
+from time import perf_counter
 from typing import Any
 from weakref import WeakValueDictionary
 
@@ -18,6 +19,7 @@ from bot_config import (
     MGE_SIMPLIFIED_FLOW_ENABLED,
 )
 from core.coalesced_work import CoalescedWork
+from core.operation_timing import record_timing, timed_stage, timing_scope
 from core.owned_work import drain_awaitable, drain_thread
 from embed_utils import fmt_short
 from mge.dal.mge_event_dal import (
@@ -34,6 +36,7 @@ from mge.dal.mge_publish_dal import (
     fetch_event_publish_context,
     update_award_embed_ids,
 )
+from mge.dataset_errors import MgeDatasetError
 from mge.mge_board_delivery_adapter import send_board_once
 from mge.mge_content_renderer import render_mge_content_to_embed_fields
 from mge.mge_simplified_leadership_service import get_leadership_board_payload
@@ -53,10 +56,14 @@ def _serialize_board(function):
         lock = _board_locks.setdefault(key, asyncio.Lock())
 
         async def owned():
+            started = perf_counter()
             async with lock:
-                return await function(**kwargs)
+                record_timing("mge_board_owner_wait", perf_counter() - started)
+                with timed_stage(function.__name__):
+                    return await function(**kwargs)
 
-        return await drain_awaitable(owned())
+        with timing_scope():
+            return await drain_awaitable(owned())
 
     return run
 
@@ -671,12 +678,16 @@ async def sync_event_signup_embed(
 
     if msg_id:
         try:
-            message = await channel.fetch_message(int(msg_id))
-            await message.edit(
-                embed=embed,
-                view=view,
-                allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
-            )
+            with timed_stage("discord_message_fetch"):
+                message = await channel.fetch_message(int(msg_id))
+            with timed_stage("discord_message_edit"):
+                await message.edit(
+                    embed=embed,
+                    view=view,
+                    allowed_mentions=discord.AllowedMentions(
+                        everyone=False, roles=False, users=True
+                    ),
+                )
             view_attached = view is not None
             logger.info(
                 "mge_embed_sync_updated event_id=%s message_id=%s channel_id=%s view_attached=%s lifecycle_state=%s",
@@ -795,8 +806,10 @@ async def sync_event_awards_embed(
 
     if msg_id > 0:
         try:
-            message = await channel.fetch_message(msg_id)
-            await message.edit(embed=embed, allowed_mentions=allowed_mentions)
+            with timed_stage("discord_message_fetch"):
+                message = await channel.fetch_message(msg_id)
+            with timed_stage("discord_message_edit"):
+                await message.edit(embed=embed, allowed_mentions=allowed_mentions)
         except discord.NotFound:
             logger.warning(
                 "mge_board_missing_requires_disposition event_id=%s message_id=%s", event_id, msg_id
@@ -856,7 +869,11 @@ async def sync_event_leadership_embed(
         logger.warning("mge_leadership_sync_skip reason=no_channel event_id=%s", event_id)
         return False
 
-    board_payload = await drain_thread(get_leadership_board_payload, event_id)
+    try:
+        board_payload = await drain_thread(get_leadership_board_payload, event_id)
+    except MgeDatasetError as exc:
+        logger.warning("mge_board_preserved dataset_state=%s stage=%s", exc.state, exc.stage)
+        return False
     embed = build_mge_leadership_embed(event_row=event_row, board_payload=board_payload)
     view = _build_leadership_view(event_id=event_id, board_payload=board_payload)
 
@@ -885,12 +902,14 @@ async def sync_event_leadership_embed(
     message = None
     if msg_id > 0:
         try:
-            message = await channel.fetch_message(msg_id)
-            await message.edit(
-                embed=embed,
-                view=view,
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
+            with timed_stage("discord_message_fetch"):
+                message = await channel.fetch_message(msg_id)
+            with timed_stage("discord_message_edit"):
+                await message.edit(
+                    embed=embed,
+                    view=view,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
         except discord.NotFound:
             logger.warning(
                 "mge_board_missing_requires_disposition event_id=%s message_id=%s", event_id, msg_id

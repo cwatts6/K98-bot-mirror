@@ -6,8 +6,11 @@ from datetime import UTC, datetime
 import logging
 from typing import Any
 
+from core.operation_timing import timed_stage
 from mge.dal import mge_review_dal, mge_roster_dal
+from mge.dataset_errors import MgeDatasetError
 from mge.mge_priority_rank_map import get_sort_weight
+from mge.mge_roster_execution import roster_thread_owner
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +123,8 @@ def sort_review_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _self_heal_assign_unassigned(
     review_rows: list[dict[str, Any]],
     award_rows: list[dict[str, Any]],
+    *,
+    strict: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Ensure active non-rejected signups are persisted as roster/waitlist rows.
@@ -176,6 +181,8 @@ def _self_heal_assign_unassigned(
         sid = _as_int(rr.get("SignupId"))
         gid = _as_int(rr.get("GovernorId"))
         if sid is None or gid is None or sid <= 0 or gid <= 0:
+            if strict:
+                raise MgeDatasetError("incomplete", "signup_identity")
             continue
 
         existing = existing_by_signup.get(sid)
@@ -210,6 +217,9 @@ def _self_heal_assign_unassigned(
             if aid is not None:
                 roster_count += 1
                 used_ranks.add(rank)
+            elif strict:
+                # Boolean legacy writer cannot prove rollback or safe replay.
+                raise MgeDatasetError("incomplete", "placement_unconfirmed")
         else:
             order = _next_waitlist_order()
             aid = mge_roster_dal.insert_award(
@@ -231,10 +241,19 @@ def _self_heal_assign_unassigned(
             )
             if aid is not None:
                 used_waitlist.add(order)
+            elif strict:
+                raise MgeDatasetError("incomplete", "placement_unconfirmed")
 
-    return mge_roster_dal.fetch_event_awards(
-        _as_int(review_rows[0].get("EventId")) if review_rows else 0
-    )
+    event_id = _as_int(review_rows[0].get("EventId")) if review_rows else 0
+    if strict:
+        try:
+            rows = mge_roster_dal.fetch_event_awards(event_id, strict=True)
+            if any(_as_int(row.get("EventId")) != event_id for row in rows):
+                raise MgeDatasetError("incomplete", "placement_identity")
+            return rows
+        except MgeDatasetError:
+            raise MgeDatasetError("incomplete", "placement_readback") from None
+    return mge_roster_dal.fetch_event_awards(event_id)
 
 
 def merge_review_and_award_rows(
@@ -360,10 +379,13 @@ def _assign_waitlist_positions(rows: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def build_leadership_ordered_dataset(
-    review_rows: list[dict[str, Any]], award_rows: list[dict[str, Any]]
+    review_rows: list[dict[str, Any]],
+    award_rows: list[dict[str, Any]],
+    *,
+    strict: bool = False,
 ) -> dict[str, Any]:
     if review_rows:
-        healed_awards = _self_heal_assign_unassigned(review_rows, award_rows)
+        healed_awards = _self_heal_assign_unassigned(review_rows, award_rows, strict=strict)
     else:
         healed_awards = award_rows
 
@@ -384,6 +406,8 @@ def build_leadership_ordered_dataset(
         key=signup_auto_sort_key,
     )
     active_rows = roster_rows + waitlist_rows
+    if strict and unassigned_rows:
+        raise MgeDatasetError("incomplete", "placement_readback")
 
     return {
         "rows": merged,
@@ -432,13 +456,43 @@ def get_public_signup_rows(event_id: int) -> list[dict[str, Any]]:
 
 
 def get_ordered_leadership_rows(event_id: int) -> dict[str, Any]:
-    review_rows = mge_review_dal.fetch_signup_review_rows(event_id)
-    award_rows = mge_roster_dal.fetch_event_awards(event_id)
-    return build_leadership_ordered_dataset(review_rows, award_rows)
+    """Fresh qualified preparation, including legacy automatic placement.
+
+    An error is never an empty snapshot. A partial placement is not rollback
+    evidence and is not retried by this operation.
+    """
+    with roster_thread_owner(event_id), timed_stage("mge_dataset_prepare"):
+        review_rows = mge_review_dal.fetch_signup_review_rows(event_id, strict=True)
+        award_rows = mge_roster_dal.fetch_event_awards(event_id, strict=True)
+        if any(_as_int(row.get("EventId")) != int(event_id) for row in review_rows + award_rows):
+            raise MgeDatasetError("unavailable", "event_identity")
+        try:
+            dataset = build_leadership_ordered_dataset(review_rows, award_rows, strict=True)
+        except MgeDatasetError:
+            raise
+        except Exception:
+            raise MgeDatasetError("incomplete", "preparation") from None
+        dataset["availability"] = "loaded" if review_rows else "loaded_empty"
+        dataset["event_id"] = int(event_id)
+        return dataset
 
 
 def evaluate_publish_readiness(event_id: int) -> dict[str, Any]:
-    dataset = get_ordered_leadership_rows(event_id)
+    """Publication admission always reloads; a displayed snapshot is not authority."""
+    try:
+        dataset = get_ordered_leadership_rows(event_id)
+    except MgeDatasetError as exc:
+        return {
+            "publish_ready": False,
+            "dataset_availability": exc.state,
+            "publish_status_text": "MGE data could not be verified. Publication has not started.",
+            "publish_block_reason_codes": ["dataset_" + exc.state],
+        }
+    return evaluate_dataset_readiness(dataset)
+
+
+def evaluate_dataset_readiness(dataset: dict[str, Any]) -> dict[str, Any]:
+    """Pure policy calculation over one successfully prepared, caller-owned snapshot."""
 
     rows = dataset.get("rows") or dataset.get("roster_rows", [])
     published_roster_rows = [row for row in rows if _is_persisted_awarded_row(row)]

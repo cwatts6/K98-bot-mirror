@@ -717,7 +717,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ### Deferred Optimisation
 - Area: `mge/mge_roster_service.py`, `mge/mge_simplified_leadership_service.py`, `mge/dal/mge_roster_dal.py`
 - Type: architecture
-- Description: The MGE lifecycle change gives both roster UIs whole-operation ownership per event before off-loop entry and rechecks insertion rank/capacity under SQL locks. Legacy roster add/audit and swap/reset paths still contain multiple database calls with their existing Boolean outcomes; process ownership does not make those writes atomic or establish cross-process settlement. The new strict signup transaction does not automatically upgrade these separate writers.
+- Description: The MGE lifecycle change gives both roster UIs whole-operation ownership per event before off-loop entry and rechecks insertion rank/capacity under SQL locks. A1a also identifies leadership preparation as a writer through automatic placement and shares its process thread owner with roster workers. Legacy roster add/audit and swap/reset paths still contain multiple database calls with their existing Boolean outcomes; process ownership does not make those writes atomic or establish cross-process settlement. The new strict signup transaction does not automatically upgrade these separate writers.
 - Suggested Fix: In the remaining R12 writer census, map every roster writer and conflict order. Adopt one narrowly scoped atomic writer family at a time, grouping required audit and domain changes and distinguishing rollback from lost commit acknowledgement. Prove stale snapshots, competing writers, second-caller participation and unknown outcomes with native SQL qualification; preserve existing rank and publication policy.
 - Impact: high
 - Risk: high
@@ -735,6 +735,16 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ## 28 October MGE acceptance and remaining Batch A follow-ups
 
 ### Deferred Optimisation
+- Area: ARK-A2-ADMIN-ADD; ui/views/ark_views.py slot selection and ark/registration_flow.py admin-add response
+- Type: architecture
+- Description: Operator evidence on 28 October confirms a player appeared in the roster while the private slot-selection interaction timed out. Supplied logs show an existing registration message edited successfully at 18:08:06.971, followed at 18:08:07.552 by Discord 404/10062 Unknown interaction from the final response.edit_message in the admin-add callback. The earlier identity_not_found entry and scheduler overlap do not establish the delay cause. Exact SQL commit/audit, callback-entry time and acknowledgement timing were not supplied. This is separate from the already accepted original Ark callback.
+- Suggested Fix: In A2 map admin-add slot callback admission, response ownership, worker/SQL duration, roster mutation receipt and registration refresh. Establish early private acknowledgement and independent mutation/presentation outcomes only after domain and cancellation review. Test committed add with failed response/refresh, failed acknowledgement with non-entry, duplicate clicks, delayed IO and expiry. Reconcile the existing roster entry before any retry; do not replay the operation for measurement.
+- Impact: high
+- Risk: medium
+- Dependencies: Sanitized operator screenshot/log evidence; Ark eligibility and permissions; authoritative SQL contracts; A1a lifecycle/adoption framework. A2 implementation requires its own bounded approval.
+- Status: Captured for A2; no Ark runtime change or proven latency root cause.
+
+### Deferred Optimisation
 - Area: MGE-PERF; core/interaction_safety.py, ui/views/mge_simplified_leadership_view.py and mge/mge_embed_manager.py
 - Type: performance
 - Description: Accepted production rank selection measured ack 3.091s/total 6.410s and submission ack 0.974s/total 16.834s. Leadership rendering/readiness repeats the dataset read; final rank response awaits board refresh. Scheduler activity overlaps, but stage cost, contention cause and regression remain unproven.
@@ -742,7 +752,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: Accepted MGE closeout and remaining Batch A scope; receipt-query scaling and cross-process roster contracts stay separately scoped.
-- Status: Captured; proposed first remaining Batch A slice; no runtime change
+- Status: A1a local implementation adds qualified dataset reuse and stage timing; local evidence is in the A1a validation packet. A1b saved-response/refresh coordination and production performance acceptance remain open.
 
 ### Deferred Optimisation
 - Area: CFG-51421; proc_config_import.py and services/legacy_export_snapshot_service.py::begin_writer / legacy_export_snapshot_dal.py::session

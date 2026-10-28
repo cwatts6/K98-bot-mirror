@@ -20,9 +20,26 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_a1a_hash(root, path):
+    """Local source bridge only; production admission remains unchanged."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/p1_a1a_source_pairs.json"
+    if not fixture.exists():
+        return actual  # Unchanged historical fixtures still authenticate themselves.
+    raw = fixture.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == (
+        "5d2e32f79349e181a9d46cf8ccc373bad1df76fc7a217a279280f864963ad2ea"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_mge_lifecycle_hash(root, path):
     """Exact test-only successor bridge; grants no installation capability."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_a1a_hash(root, path)
     raw = (root / "tests/fixtures/p1_mge_lifecycle_source_pairs.json").read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()

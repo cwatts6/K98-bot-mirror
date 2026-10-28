@@ -1,6 +1,9 @@
 # Remaining Batch A: Discord/domain lifecycle completion
 
-Date: 28 October 2026. **Stage: next-phase review/scope approved; implementation not yet approved.**
+Date: 28 October 2026. **Status update: amended A1a local implementation and
+validation approved.** See the [A1a implementation packet](P1%20MGE%20A1a%20-%20Implementation%20and%20Validation%20-%202026-10-28.md).
+The original scope below remains the wider programme boundary; other slices and
+promotion/deployment are not included in A1a approval.
 Read the [accepted MGE closeout and complete ledger](P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md)
 first. The operator accepts the exercised MGE flows and requests a new focused chat.
 Start from current verified mirror/private source; deployed runtime is private

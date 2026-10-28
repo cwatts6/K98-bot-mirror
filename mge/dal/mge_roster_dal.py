@@ -7,6 +7,8 @@ import json
 import logging
 from typing import Any
 
+from core.operation_timing import timed_stage
+from mge.dataset_errors import MgeDatasetError
 from stats_alerts.db import exec_with_cursor, run_query
 
 logger = logging.getLogger(__name__)
@@ -149,10 +151,13 @@ def _naive_utc(dt: datetime) -> datetime:
     return aware.replace(tzinfo=None)
 
 
-def fetch_event_awards(event_id: int) -> list[dict[str, Any]]:
+def fetch_event_awards(event_id: int, *, strict: bool = False) -> list[dict[str, Any]]:
     try:
-        return run_query(SQL_SELECT_EVENT_AWARDS, (event_id,))
+        with timed_stage("mge_awards_read"):
+            return run_query(SQL_SELECT_EVENT_AWARDS, (event_id,))
     except Exception:
+        if strict:
+            raise MgeDatasetError("unavailable", "awards_read") from None
         logger.exception("mge_roster_dal_fetch_event_awards_failed event_id=%s", event_id)
         return []
 

@@ -48,7 +48,7 @@ def test_board_payload_includes_summary_guidance_and_rows(monkeypatch):
     )
     monkeypatch.setattr(
         svc,
-        "evaluate_publish_readiness",
+        "evaluate_dataset_readiness",
         lambda event_id: {"publish_ready": True, "publish_status_text": "Ready to publish."},
     )
 
@@ -85,7 +85,7 @@ def test_button_state_logic_for_waitlist_and_roster(monkeypatch):
     )
     monkeypatch.setattr(
         svc,
-        "evaluate_publish_readiness",
+        "evaluate_dataset_readiness",
         lambda event_id: {"publish_ready": False, "publish_status_text": "Blocked"},
     )
     payload = svc.get_leadership_board_payload(20)
@@ -195,7 +195,7 @@ def test_board_payload_exposes_swap_flags(monkeypatch: pytest.MonkeyPatch) -> No
     )
     monkeypatch.setattr(
         svc,
-        "evaluate_publish_readiness",
+        "evaluate_dataset_readiness",
         lambda event_id: {"publish_ready": False, "publish_status_text": "Blocked"},
     )
 

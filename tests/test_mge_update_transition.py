@@ -8,6 +8,7 @@ import pytest
 
 from scripts import prepare_k98_update as updater
 from scripts.validate_k98_update_compatibility import classify
+from tests.updater_source_assertions import before_a1a_hash
 
 
 def transition():
@@ -33,23 +34,20 @@ def test_complete_bundle_pins_current_source():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in item["members"]} == updater.MGE_LIFECYCLE_PATHS
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_a1a_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 49
+    assert len(items) == 50
     # Independent review pins: original 48 entries and exact 27-file addition.
     # These include predecessor hashes, including required absence for new files.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    assert updater.sha256(canonical(items[:-1])) == (
+    assert updater.sha256(canonical(items[:48])) == (
         "5bbe2914a2e3027ab3c5a8b927d8145ffd4e5761780ab54c0489dee4a1a187cf"
     )
-    assert updater.sha256(canonical(items[-1])) == (
+    assert updater.sha256(canonical(items[48])) == (
         "8acc3139b49d7b6e03650d9c0b5e29f404a14116140c59442574028697c33611"
     )
 
@@ -63,10 +61,10 @@ def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
         with pytest.raises(ValueError, match="registry exceeds bound"):
             updater.reviewed_transitions()
     else:
-        assert len(updater.reviewed_transitions()) == 49
+        assert len(updater.reviewed_transitions()) == 50
 
 
-def test_fiftieth_registry_entry_is_rejected(monkeypatch):
+def test_fifty_first_registry_entry_is_rejected(monkeypatch):
     items = updater.reviewed_transitions()
     items.append(deepcopy(items[0]))
     raw = json.dumps(dict(version=1, transitions=items)).encode()

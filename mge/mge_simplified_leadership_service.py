@@ -9,9 +9,10 @@ from typing import Any
 from embed_utils import fmt_short
 from mge import mge_roster_service
 from mge.dal import mge_publish_dal, mge_roster_dal
+from mge.dataset_errors import MgeDatasetError
 from mge.mge_constants import DEFAULT_TARGET_DECREMENT_SCORE
 from mge.mge_simplified_flow_service import (
-    evaluate_publish_readiness,
+    evaluate_dataset_readiness,
     get_ordered_leadership_rows,
     normalize_priority,
 )
@@ -228,7 +229,7 @@ def _maybe_regenerate_targets(
 def get_leadership_board_payload(event_id: int) -> dict[str, Any]:
     """Return leadership embed/view payload using simplified-flow service outputs."""
     dataset = get_ordered_leadership_rows(event_id)
-    readiness = evaluate_publish_readiness(event_id)
+    readiness = evaluate_dataset_readiness(dataset)
     counts = dict(dataset.get("counts", {}))
 
     ordered_rows: list[dict[str, Any]] = (
@@ -305,7 +306,10 @@ def move_waitlist_to_roster_with_optional_demote(
     If roster is full (>=15), requires demote_award_id and performs one-step swap:
       - demoted roster row appended to waitlist end.
     """
-    dataset = get_ordered_leadership_rows(event_id)
+    try:
+        dataset = get_ordered_leadership_rows(event_id)
+    except MgeDatasetError as exc:
+        return mge_roster_service.RosterResult(False, str(exc))
     roster_rows = list(dataset.get("roster_rows", []))
     waitlist_rows = list(dataset.get("waitlist_rows", []))
 
@@ -452,7 +456,10 @@ def move_waitlist_to_roster_with_optional_demote(
 
 def reset_active_ranks(*, event_id: int, actor_discord_id: int) -> mge_roster_service.RosterResult:
     """Reset active roster/waitlist ordering to simplified-flow order and clear manual overrides."""
-    dataset = get_ordered_leadership_rows(event_id)
+    try:
+        dataset = get_ordered_leadership_rows(event_id)
+    except MgeDatasetError as exc:
+        return mge_roster_service.RosterResult(False, str(exc))
     now = datetime.now(UTC)
 
     affected = 0
