@@ -128,7 +128,7 @@ def test_compatibility_requires_both_installed_policy_and_registry(monkeypatch, 
 
 def test_registry_retains_a_bounded_inventory(monkeypatch):
     raw = json.loads(Path(updater.__file__).with_name("k98_update_transitions.json").read_bytes())
-    assert len(raw["transitions"]) == 48
+    assert len(raw["transitions"]) == 49
     raw["transitions"].append(deepcopy(raw["transitions"][-1]))
     monkeypatch.setattr(Path, "read_bytes", lambda self: json.dumps(raw).encode())
     with pytest.raises(ValueError, match="Bounded installed transitions"):
