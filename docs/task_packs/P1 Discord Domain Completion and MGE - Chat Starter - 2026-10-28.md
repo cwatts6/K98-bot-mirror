@@ -1,14 +1,13 @@
 # New chat starter: P1 Discord/domain completion, MGE first
 
-> **Current status - 28 October 2026, MGE closeout:** The bounded MGE phase is
-> delivered and accepted for exercised signup/edit/withdrawal and leadership flows
-> on private `4c8ca0d5fada35c7a32d31846bad6cc492aa92a9`. Next: remaining Batch A
-> Discord/domain scope, starting with measured MGE responsiveness/refresh work.
-> ProcConfig cancellation is verified; its continuation choice and separate reliability
-> follow-ups remain open. Exact audit/cleanup readback and unexercised MGE cases remain
-> explicit. Full P1, natural acceptance and P0 rollover are not closed.
-> See [accepted closeout and complete ledger](P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md),
-> [next scope](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md) and [chat starter](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Chat%20Starter%20-%202026-10-28.md).
+> **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
+> PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
+> and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
+> datasets and timing are delivered; next is focused A1b scope/design in a new chat.
+> Rank confirmation still waits for board refresh. Report 62 queue closure, the older
+> configuration decision and separate Discord lag remain follow-ups. Exact audit/cleanup,
+> unexercised cases, fresh import/export, natural acceptance and P0 remain explicit.
+> See [deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b scope/handoff](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
 > Earlier dated status and next-action text is historical where superseded.
 > This documentation update requires no deployment, restart, SQL apply or repeat import.
 

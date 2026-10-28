@@ -1,5 +1,17 @@
 # Diagnostics Runbook
 
+## Current A1a deployment observation - 28 October 2026
+
+Private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed and Discord online.
+Report 62 records 21/21 tracked views restored and player-cache completion after
+observation deadlines; do not replay those tasks. Two actionable open records are
+queue closure awaiting recheck after linked cache-only completion and an older
+configuration decision. Separate gateway lag warnings remain unassigned.
+See the [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) for timings, evidence boundaries and
+[A1b handoff](../task_packs/P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md) for next scope. No restart or import is required
+for this documentation checkpoint; new-runtime import/export remains unproven.
+
+
 ## Startup cache checkpoint — 26 October 2026
 
 The six-package Startup Cache Foundations phase is deployed and verified for exercised

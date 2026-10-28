@@ -1,5 +1,12 @@
 # P1 MGE A1a: implementation and validation
 
+> **Superseding release/deployment checkpoint:** A1a is merged and deployed on private
+> `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`, with exercised MGE flows verified.
+> See [final validation and deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md).
+> Results below retain their original local-validation chronology; the closeout
+> supplies the subsequent full-suite, final-review and deployment evidence.
+> Next: [A1b scope and handoff](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
+
 Date: 28 October 2026. Scope: operator-approved local implementation and validation
 of amended A1a, including the dataset-validity prerequisite and framework additions.
 Branch: `codex/p1-mge-a1a-dataset-validity` from mirror
@@ -123,7 +130,7 @@ Security decision: Changes review of this Bot working-tree patch, Deep off, beca
 DAL, interactions and logging changed. SQL repository review is not applicable to
 an unchanged SQL tree. Tests do not substitute for the security review.
 
-### Final local results
+### Historical local results before final release qualification
 
 - Final broad sweep: **9,841 passed, 1,100 skipped, eight subtests passed, one
   failed historical source assertion**, 492.10 seconds. The failing

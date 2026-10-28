@@ -1,5 +1,13 @@
 # P1 MGE lifecycle: accepted closeout and remaining ledger
 
+> **Current overlay:** The accepted lifecycle release below is the predecessor.
+> A1a is now deployed at `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`; see
+> [deployed evidence and remaining obligations](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and
+> [A1b scope](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md). Earlier acceptance is retained.
+> The later successful startup configuration attempt does not settle the earlier
+> continuation decision. The ledger below is carried forward with this overlay.
+
+
 Date: 28 October 2026. **Status: delivered and accepted for the exercised MGE flows.**
 The operator accepted signup, two edits, withdrawal, refusal when no signup exists,
 and leadership rank adjustment, and approved moving to the remaining Batch A scope.
@@ -97,7 +105,7 @@ retains historical receipts; this table is the current disposition overlay.
 | ID | Current disposition and next obligation |
 |---|---|
 | MGE-01 | Delivered, deployed and accepted for exercised flows; carry exact audit/cleanup readback and unexercised scenarios without repeating accepted activity |
-| MGE-PERF | Remaining Batch A focused PR: stage attribution, duplicate leadership reads and coordinated refresh/final response |
+| MGE-PERF | A1a qualified dataset reuse/timing deployed; A1b saved-response and refresh coordination next; production percentile/speedup claims remain unproven |
 | R01 | Prior bounded conflict correction accepted; CFG-51421 is a separate new recurrence with unknown blocker; do not conflate refusals |
 | R02 | Status lifecycle correction delivered; remaining related Discord lifecycle adoption in Batch A |
 | R03 | Natural loaded-empty to populated transition, deferred views and subscribed DMs remain pending |
@@ -112,10 +120,10 @@ retains historical receipts; this table is the current disposition overlay.
 | R12 | Shared lifecycle foundations and selected conflict map delivered; enabled admin/startup/pipeline/domain writer census remains A/B |
 | R13 | Natural Pre-KVK/off-season dispatch and Phase 2F public-save evidence pending |
 | R14 | Independent out-of-process monitoring/outage recovery remains Batch C |
-| R15 | Protected updater delivered with 49 transitions; supported provider-stream diagnostics and guarded stranded-export tooling remain C |
+| R15 | Protected updater now delivered with 50 transitions (49 historical entries preserved); supported provider-stream diagnostics and guarded stranded-export tooling remain C |
 | R16 | Measured history/readback/quota, ActivePreparationID plan, acquisition-ack fixture and MGE receipt-query scaling follow-ups remain |
 | R17 | Separate P0 natural eligible F04 rollover and every-row F01-F05 reconciliation remain open |
-| R18 | Accepted on predecessor f6a929c; not erased or repeated. New 4c8ca0d runtime has no supplied fresh end-to-end import/export acceptance |
+| R18 | Accepted on predecessor f6a929c; not erased or repeated. Current 87c1b393 runtime has no supplied fresh end-to-end import/export acceptance |
 | CFG-51421 | Failed attempt closed; continuation decision outstanding; separate lock/admission investigation linked to existing caller audit |
 | CFG-OVERVIEW | Reconcile overview versus continuation detail, including collection-time effects |
 

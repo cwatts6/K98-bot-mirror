@@ -1,13 +1,12 @@
 # Remaining Batch A: Discord/domain lifecycle completion
 
-Date: 28 October 2026. **Status update: amended A1a local implementation and
-validation approved.** See the [A1a implementation packet](P1%20MGE%20A1a%20-%20Implementation%20and%20Validation%20-%202026-10-28.md).
-The original scope below remains the wider programme boundary; other slices and
-promotion/deployment are not included in A1a approval.
-Read the [accepted MGE closeout and complete ledger](P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md)
-first. The operator accepts the exercised MGE flows and requests a new focused chat.
-Start from current verified mirror/private source; deployed runtime is private
-`4c8ca0d5fada35c7a32d31846bad6cc492aa92a9`. Do not repeat deployment, restart or accepted tests.
+Date: 28 October 2026. **Current status: A1a deployed and exercised flows verified.**
+Private runtime: `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`. Read the
+[deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and
+[focused A1b scope/handoff](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md) first.
+This document retains the wider programme boundary. A1a dataset reuse/timing is
+delivered; the new chat prepares A1b architecture and implementation scope before
+runtime changes. Do not repeat deployment, restart or accepted business actions.
 
 ## A1: focused MGE responsiveness and refresh proposal
 
@@ -17,7 +16,7 @@ ownership wait, DAL work, public/leadership payload reads, Discord fetch/edit, a
 final response. Preserve a correlation reference without logging tokens or private payloads.
 Do not equate nested acknowledged callbacks with fresh network acknowledgements.
 
-Evaluate one reusable leadership dataset for rendering/readiness, and the boundary
+A1a now reuses a qualified leadership dataset for rendering/readiness. Evaluate the boundary
 between a saved mutation result and pending/failed board delivery. Inventory scheduler,
 manual and mutation refresh callers before changing serialization or coalescing.
 Existing event-scoped ownership, current-state rereads, original message identity,
@@ -52,7 +51,7 @@ Do not presume an index or schema migration is needed from small fixture timings
 CFG-51421: correlate the startup import's durable admission, session applock and
 cleanup boundaries with the actual blocking owner if evidence permits. The exact
 attempt was cancelled and released, but its keep-prior/fresh-publication decision
-remains open in Report 61. Do not choose or execute that decision automatically.
+remains open in Reports 61 and 62. Do not choose or execute that decision automatically.
 Review the existing ProcConfig entrypoint census before adding another backlog item.
 Only propose bounded waiting/retry after non-entry, cleanup and ownership are proven;
 never replay an uncertain write. Distinguish this from the prior 51400 and deployment

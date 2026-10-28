@@ -1,14 +1,13 @@
 # Deferred Optimisations
 
-> **Current status - 28 October 2026, MGE closeout:** The bounded MGE phase is
-> delivered and accepted for exercised signup/edit/withdrawal and leadership flows
-> on private `4c8ca0d5fada35c7a32d31846bad6cc492aa92a9`. Next: remaining Batch A
-> Discord/domain scope, starting with measured MGE responsiveness/refresh work.
-> ProcConfig cancellation is verified; its continuation choice and separate reliability
-> follow-ups remain open. Exact audit/cleanup readback and unexercised MGE cases remain
-> explicit. Full P1, natural acceptance and P0 rollover are not closed.
-> See [accepted closeout and complete ledger](../task_packs/P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md),
-> [next scope](../task_packs/P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md) and [chat starter](../task_packs/P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Chat%20Starter%20-%202026-10-28.md).
+> **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
+> PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
+> and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
+> datasets and timing are delivered; next is focused A1b scope/design in a new chat.
+> Rank confirmation still waits for board refresh. Report 62 queue closure, the older
+> configuration decision and separate Discord lag remain follow-ups. Exact audit/cleanup,
+> unexercised cases, fresh import/export, natural acceptance and P0 remain explicit.
+> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b scope/handoff](../task_packs/P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
 > Earlier dated status and next-action text is historical where superseded.
 > This documentation update requires no deployment, restart, SQL apply or repeat import.
 
@@ -747,12 +746,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ### Deferred Optimisation
 - Area: MGE-PERF; core/interaction_safety.py, ui/views/mge_simplified_leadership_view.py and mge/mge_embed_manager.py
 - Type: performance
-- Description: Accepted production rank selection measured ack 3.091s/total 6.410s and submission ack 0.974s/total 16.834s. Leadership rendering/readiness repeats the dataset read; final rank response awaits board refresh. Scheduler activity overlaps, but stage cost, contention cause and regression remain unproven.
-- Suggested Fix: Scope the first remaining Batch A PR around stage timing, shared dataset reuse and refresh/confirmation coordination. Inventory every refresh caller; retain exact outcomes, same-message ownership and cancellation semantics. Compare representative repeated fixtures and a second caller; do not replay live operations for a benchmark.
+- Description: Earlier production rank selection measured ack 3.091s/total 6.410s and submission ack 0.974s/total 16.834s. A1a removed duplicate leadership preparation and deployed stage timing. The new 87c1b393 rank callback took 11.311s including sequential public/leadership refreshes of 4.809s/3.820s before replying. Single samples do not establish a speedup, p95 or global contention cause.
+- Suggested Fix: Use the A1b scope/handoff for strict public-data qualification, truthful saved responses and existing refresh-coordinator adoption. Inventory every caller; prove dirty follow-up, owned shutdown, same-message delivery and failed refresh after confirmed mutation. Extend repeated A1a benchmarks and second-caller tests without live replay.
 - Impact: medium
 - Risk: medium
 - Dependencies: Accepted MGE closeout and remaining Batch A scope; receipt-query scaling and cross-process roster contracts stay separately scoped.
-- Status: A1a local implementation adds qualified dataset reuse and stage timing; local evidence is in the A1a validation packet. A1b saved-response/refresh coordination and production performance acceptance remain open.
+- Status: A1a merged/deployed and exercised paths verified; A1b scope/design authorized. See the A1a deployed closeout and A1b scope/handoff in docs/task_packs. Production percentile/performance acceptance remains separate.
 
 ### Deferred Optimisation
 - Area: CFG-51421; proc_config_import.py and services/legacy_export_snapshot_service.py::begin_writer / legacy_export_snapshot_dal.py::session
@@ -762,7 +761,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: high
 - Dependencies: Existing ProcConfig caller census and authoritative SQL validation; separate reliability PR if warranted.
-- Status: Captured; original attempt resolved, continuation decision open in Report 61; no new publication verified
+- Status: Original attempt resolved; continuation decision remains open in Report 62. A separate new startup configuration import reported success; it does not select or close the older continuation.
 
 ### Deferred Optimisation
 - Area: CFG-OVERVIEW; services/recovery_runtime.py, services/recovery_report.py and configuration continuation reporting
@@ -773,3 +772,36 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Risk: low
 - Dependencies: Report 61 and configuration recovery lifecycle; separate from MGE performance and actual SQL blocker diagnosis.
 - Status: Captured; evidence reconciliation pending
+
+
+## A1a deployed observations carried into A1b handoff
+
+### Deferred Optimisation
+- Area: MGE-SELECTION-OBSERVATION; ui/views/mge_simplified_signup_form_view.py dropdown callbacks and telemetry batching
+- Type: consistency
+- Description: The 21:14 screenshot displays a priority while the first submit reports missing priority. The refusal precedes any mutation worker; priority usage flushes in a later telemetry batch after the successful creation log. Batched logs do not prove callback arrival or state order, and the screenshot does not establish an A1a regression.
+- Suggested Fix: Review actual select/submit dispatch, form identity and state mutation with deterministic ordering fixtures. Preserve missing-selection refusal. Add minimal redacted state/sequence observations only if evidence warrants; propose a fix after reproduction rather than choosing a default or replaying signup.
+- Impact: medium
+- Risk: medium
+- Dependencies: A1b caller review and existing form-owner/private-response checks; no proven cause yet.
+- Status: Evidence question, not an accepted defect; separate from committed signup acceptance.
+
+### Deferred Optimisation
+- Area: RECOVERY-QUEUE-62; services/queue_admission_recovery.py, services/player_report_recovery_service.py and recovery observation ordering
+- Type: consistency
+- Description: Report 62 retains a startup queue incident last checked at 21:14:30, while the exact linked cache-only player report resolves at 21:16:52. Collection is nontransactional; the saved queue state predates domain closure. This does not prove an active blocker or a persistent reconciliation defect.
+- Suggested Fix: Recheck the existing incident once through the normal operator flow. If still open, correlate exact post-completion preparation/domain state and check timestamps, then reproduce ordering deterministically. Preserve durable receipts and ownership; no forced release, cancellation or business replay.
+- Impact: medium
+- Risk: medium
+- Dependencies: Exact linked operation evidence in private Report 62; distinct from CFG-OVERVIEW and the older configuration decision.
+- Status: Queue closure not yet verified; linked cache-only outcome verified.
+
+### Deferred Optimisation
+- Area: GATEWAY-LAG-62; Discord event loop, recovery/report observation and callback responsiveness
+- Type: performance
+- Description: Supplied post-deployment logs show gateway delays of 41.7s and 42.4s at 21:16:33 and 21:17:16. Report 62's monitoring cycle completed in 216.875s and was fresh/healthy at collection. These observations do not establish a common cause or implicate the MGE callback.
+- Suggested Fix: Conduct a bounded passive-evidence review of loop-blocking work, scheduling and diagnostic/report callers. Identify exact stacks or deterministic reproductions before remediation. Separate network delay, off-loop work duration and event-loop starvation; do not increase timeouts, repeat status probes or restart to manufacture a clean sample.
+- Impact: high
+- Risk: medium
+- Dependencies: Separate reliability scope; only proven directly related blocking work belongs in A1b. SQL 51400, singleton ownership and earlier configuration 51421 remain distinct.
+- Status: Confirmed delay observation; cause unassigned. No runtime fix authorized by the documentation handoff.
