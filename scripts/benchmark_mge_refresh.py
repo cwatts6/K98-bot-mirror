@@ -320,7 +320,10 @@ async def measure(args):
                     finally:
                         await boards.drain_refreshes()
                         work = boards._refreshes.snapshot()
+                        calls["refresh_requests"] = work.get("requests", 0)
+                        calls["coalesced_requests"] = work.get("coalesced", 0)
                         calls["refresh_passes"] = work.get("passes", 0)
+                        calls["failed_refresh_passes"] = work.get("failed_passes", 0)
                         calls["outstanding_children"] = work.get("pending", 0) + work.get(
                             "direct", 0
                         )
@@ -377,6 +380,7 @@ def main():
         os.environ[key] = value
     result = {
         "kind": "offline simulated IO; no production latency or native SQL claims",
+        "measurement_notes": "result_ms is private reply attempt completion, not delivery confirmation; total_ms includes refresh drain; zero reply latency means no private reply in that case",
         "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "simulated_io_ms": args.delay_ms,
         "cases": asyncio.run(measure(args)),

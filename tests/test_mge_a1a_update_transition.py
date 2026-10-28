@@ -32,10 +32,7 @@ def test_complete_bundle_pins_current_source():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in item["members"]} == updater.MGE_A1A_PATHS
     for member in item["members"]:
-        assert (
-            before_a1b_hash(root, member["path"])
-            == member["after_sha256"]
-        )
+        assert before_a1b_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 
