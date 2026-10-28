@@ -18,8 +18,8 @@ status columns without erasing their original acceptance requirements.
 | Private bot | [PR #698](https://github.com/cwatts6/k98-bot/pull/698), reviewed head `d271af5cc001bd759d69da231df2bda0026d00a4` | Merged and deployed as `f6a929c0597ce257ce18380af1ab6f7ad8ddcc5d` |
 | SQL | [PR #133](https://github.com/cwatts6/K98-bot-SQL-Server/pull/133), merge `7e91989f619deb46836194c7e705b0a9eb2ebe11` | Read-only checkpoint blocking diagnostic; no migration/apply required |
 
-Private source was promoted from private main, with the same final file tree as the reviewed
-mirror change. The deployed predecessor was `756cbd18d7044897783d01f3a0093aaf6e2d03a7`.
+Private source was patch-promoted from private main with the reviewed mirror changes.
+The scrubbed mirror and private repository retain different baseline-only files. The deployed predecessor was `756cbd18d7044897783d01f3a0093aaf6e2d03a7`.
 The preceding ProcConfig failure recording, safe health-probe cleanup/reconciliation and
 row-based Alliance Activity completion changes are included in the accepted deployed baseline.
 
