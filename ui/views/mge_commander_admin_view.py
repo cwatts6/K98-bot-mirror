@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_interaction
+from core.owned_work import drain_thread
 from mge import mge_commander_service
 
 
@@ -57,6 +57,7 @@ class _CommanderEditModal(discord.ui.Modal):
         self.add_item(self.active)
         self.add_item(self.variant)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await self.parent_view._guard(interaction):
             return
@@ -70,7 +71,7 @@ class _CommanderEditModal(discord.ui.Modal):
             await send_ephemeral(interaction, "Variant id must be numeric.")
             return
 
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_commander_service.save_commander_assignment,
             commander_id=self.commander_id,
             commander_name=str(self.name.value or ""),
@@ -98,6 +99,7 @@ class _VariantSelect(discord.ui.Select):
         )
         self.parent_view = parent
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await self.parent_view._guard(interaction):
             return
@@ -106,7 +108,7 @@ class _VariantSelect(discord.ui.Select):
             await send_ephemeral(interaction, "No active MGE variants are configured.")
             return
         self.parent_view.variant_id = variant_id
-        rows = await asyncio.to_thread(
+        rows = await drain_thread(
             mge_commander_service.list_commanders_by_variant,
             variant_id,
             include_inactive=True,

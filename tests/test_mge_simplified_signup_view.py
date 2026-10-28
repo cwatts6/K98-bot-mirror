@@ -43,6 +43,7 @@ class _FakeResponse:
 
 class _FakeInteraction:
     def __init__(self, user_id: int = 1):
+        self.id = 1234
         self.user = SimpleNamespace(id=user_id)
         self.guild = None
         self.response = _FakeResponse()

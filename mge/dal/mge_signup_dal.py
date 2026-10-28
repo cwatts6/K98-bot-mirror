@@ -215,6 +215,7 @@ def insert_signup(
     armament_text: str | None,
     source: str,
     now_utc: datetime,
+    cursor=None,
 ) -> int | None:
     def _callback(cur):
         cur.execute(
@@ -279,6 +280,9 @@ def insert_signup(
         row = cur.fetchone()
         return int(row[0]) if row else None
 
+    if cursor is not None:
+        return _callback(cursor)
+
     try:
         return exec_with_cursor(_callback)
     except Exception:
@@ -302,6 +306,7 @@ def update_signup(
     gear_text: str | None,
     armament_text: str | None,
     now_utc: datetime,
+    cursor=None,
 ) -> bool:
     def _callback(cur):
         cur.execute(
@@ -333,6 +338,9 @@ def update_signup(
             ),
         )
         return int(cur.rowcount or 0) > 0
+
+    if cursor is not None:
+        return _callback(cursor)
 
     try:
         result = exec_with_cursor(_callback)
@@ -414,7 +422,7 @@ def update_signup_armament_attachment(
         return False
 
 
-def withdraw_signup(*, signup_id: int, now_utc: datetime) -> bool:
+def withdraw_signup(*, signup_id: int, now_utc: datetime, cursor=None) -> bool:
     def _callback(cur):
         cur.execute(
             """
@@ -426,6 +434,9 @@ def withdraw_signup(*, signup_id: int, now_utc: datetime) -> bool:
             (_naive_utc(now_utc), signup_id),
         )
         return int(cur.rowcount or 0) > 0
+
+    if cursor is not None:
+        return _callback(cursor)
 
     try:
         result = exec_with_cursor(_callback)
@@ -444,9 +455,10 @@ def insert_signup_audit(
     actor_discord_id: int | None,
     details: dict[str, Any] | None,
     now_utc: datetime,
+    cursor=None,
 ) -> bool:
     def _callback(cur):
-        details_json = json.dumps(details or {}, ensure_ascii=False)
+        details_json = json.dumps(details or {}, ensure_ascii=False, default=str)
         cur.execute(
             """
             INSERT INTO dbo.MGE_SignupAudit
@@ -473,6 +485,9 @@ def insert_signup_audit(
             ),
         )
         return True
+
+    if cursor is not None:
+        return _callback(cursor)
 
     try:
         result = exec_with_cursor(_callback)

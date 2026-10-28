@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+from core.operation_outcome import MutationOutcome
 from mge import mge_signup_service
+from mge.dal.mge_signup_mutation_dal import SignupMutationResult
 from ui.views.mge_signup_view import _member_role_ids
 
 
@@ -151,8 +153,9 @@ def test_admin_signup_resolves_discord_identity_from_registry(monkeypatch):
         lambda governor_id: {"DiscordUserID": 777777, "DiscordName": "Player"},
     )
     monkeypatch.setattr(
-        "mge.dal.mge_signup_dal.insert_signup",
-        lambda **kwargs: captured.update(kwargs) or 42,
+        "mge.dal.mge_signup_mutation_dal.mutate_signup",
+        lambda **kwargs: captured.update(kwargs["values"])
+        or SignupMutationResult(MutationOutcome.COMMITTED, "fixture", 42),
     )
 
     result = mge_signup_service.create_signup(
@@ -184,8 +187,9 @@ def test_admin_signup_leaves_discord_identity_null_when_registry_missing(monkeyp
         lambda governor_id: None,
     )
     monkeypatch.setattr(
-        "mge.dal.mge_signup_dal.insert_signup",
-        lambda **kwargs: captured.update(kwargs) or 42,
+        "mge.dal.mge_signup_mutation_dal.mutate_signup",
+        lambda **kwargs: captured.update(kwargs["values"])
+        or SignupMutationResult(MutationOutcome.COMMITTED, "fixture", 42),
     )
 
     result = mge_signup_service.create_signup(
@@ -221,8 +225,9 @@ def test_self_signup_keeps_actor_discord_identity(monkeypatch):
         lambda governor_id: {"DiscordUserID": 777777, "DiscordName": "Someone else"},
     )
     monkeypatch.setattr(
-        "mge.dal.mge_signup_dal.insert_signup",
-        lambda **kwargs: captured.update(kwargs) or 42,
+        "mge.dal.mge_signup_mutation_dal.mutate_signup",
+        lambda **kwargs: captured.update(kwargs["values"])
+        or SignupMutationResult(MutationOutcome.COMMITTED, "fixture", 42),
     )
 
     result = mge_signup_service.create_signup(

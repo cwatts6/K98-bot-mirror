@@ -23,7 +23,9 @@ import logging
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import member_role_ids, private_operation, send_ephemeral
+from core.operation_outcome import MutationOutcome
+from core.owned_work import drain_thread
 from mge import mge_signup_service
 from mge.mge_priority_rank_map import (
     PRIORITY_RANK_OPTIONS,
@@ -71,8 +73,21 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
         custom_id="mge_simplified_signup_submit",
         row=2,
     )
+    @private_operation
     async def submit_btn(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
+
+        if (
+            self.payload.owner_discord_id is not None
+            and self.payload.owner_discord_id != interaction.user.id
+        ):
+            await send_ephemeral(interaction, "This form belongs to another user.")
+            return
+        if getattr(self, "_submitted", False):
+            await send_ephemeral(
+                interaction, "This form has already been submitted. Refresh to view its outcome."
+            )
+            return
 
         # --- Validate selections ---
         if not self.selected_priority_rank_value:
@@ -99,10 +114,13 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
         # --- Call service ---
         try:
             if self.payload.signup_id is None:
-                result = mge_signup_service.create_signup(
+                result = await drain_thread(
+                    mge_signup_service.create_signup,
                     event_id=self.payload.event_id,
                     actor_discord_id=interaction.user.id,
-                    actor_role_ids=self.payload.actor_role_ids,
+                    actor_role_ids=member_role_ids(interaction),
+                    operation_id=str(interaction.id),
+                    expected_signup=self.payload.expected_signup,
                     admin_role_ids=self.payload.admin_role_ids,
                     governor_id=self.payload.governor_id,
                     governor_name_snapshot=self.payload.governor_name,
@@ -117,34 +135,44 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
                     armament_text=None,
                 )
             else:
-                result = mge_signup_service.edit_signup(
+                result = await drain_thread(
+                    mge_signup_service.edit_signup,
                     signup_id=self.payload.signup_id,
                     event_id=self.payload.event_id,
                     actor_discord_id=interaction.user.id,
-                    actor_role_ids=self.payload.actor_role_ids,
+                    actor_role_ids=member_role_ids(interaction),
+                    operation_id=str(interaction.id),
+                    expected_signup=self.payload.expected_signup,
                     admin_role_ids=self.payload.admin_role_ids,
                     existing_governor_id=self.payload.governor_id,
                     request_priority=resolved_priority,
                     preferred_rank_band=resolved_rank_band,
                     requested_commander_id=self.selected_commander_id,
                     # When editing through the simplified view, these legacy fields are
-                    # reset to defaults.  The original values remain in the DB audit log.
+                    # reset to defaults; the atomic audit retains the previous snapshot.
                     current_heads=0,
                     kingdom_role=None,
                     gear_text=None,
                     armament_text=None,
                 )
         except Exception:
+            self._submitted = True
             logger.exception(
                 "mge_simplified_signup_submit_exception event_id=%s actor_discord_id=%s",
                 self.payload.event_id,
                 interaction.user.id,
             )
-            await send_ephemeral(interaction, "❌ Failed to submit signup.")
+            await send_ephemeral(
+                interaction,
+                "The signup outcome could not be confirmed. Do not submit again until it has been checked.",
+            )
             return
 
+        self._submitted = result.success or result.outcome == MutationOutcome.UNKNOWN
+
         # --- Respond ---
-        await interaction.response.send_message(
+        await send_ephemeral(
+            interaction,
             ("✅ " if result.success else "❌ ") + result.message,
             ephemeral=True,
         )
@@ -207,6 +235,9 @@ def build_simplified_signup_form_view(
             initial_commander_id = int(existing_signup_row.get("RequestedCommanderId"))
         except Exception:
             initial_commander_id = None
+
+    if existing_signup_row:
+        payload.expected_signup = dict(existing_signup_row)
 
     return MgeSimplifiedSignupFormView(
         payload=payload,

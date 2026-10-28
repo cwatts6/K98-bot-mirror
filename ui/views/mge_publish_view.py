@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import acknowledge_private, private_operation, send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
+from core.owned_work import drain_thread
 from mge import mge_publish_service
 
 # architecture-check: allow - existing publish view reads DAL state for UI prompts.
 from mge.dal import mge_publish_dal
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
+from ui.views.prepared_modal_view import offer_prepared_modal
 
 MAX_REMINDERS_TEXT_LENGTH = 4000
 
@@ -76,6 +77,7 @@ class _ConfirmUnpublishView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="mge_confirm_unpublish",
     )
+    @private_operation
     async def confirm_unpublish(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -83,7 +85,7 @@ class _ConfirmUnpublishView(discord.ui.View):
         if not await self._guard(interaction):
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await acknowledge_private(interaction)
         res = await mge_publish_service.unpublish_event_awards(
             adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
@@ -127,7 +129,7 @@ class MgePublishView(discord.ui.View):
         Use the same publish-roster source as the published embed flow, then filter to awarded rows.
         This avoids relying on target-generation-only helpers that may not reflect the current roster.
         """
-        rows = await asyncio.to_thread(mge_publish_dal.fetch_awards_with_signup_user, self.event_id)
+        rows = await drain_thread(mge_publish_dal.fetch_awards_with_signup_user, self.event_id)
         return [r for r in rows if _status(r.get("AwardStatus")) == "awarded"]
 
     @discord.ui.button(label="Generate Targets", style=discord.ButtonStyle.primary, row=0)
@@ -150,6 +152,7 @@ class MgePublishView(discord.ui.View):
                 )
                 self.add_item(self.rank1)
 
+            @private_operation
             async def callback(self, modal_interaction: discord.Interaction) -> None:
                 if not await self.parent._guard(modal_interaction):
                     return
@@ -164,7 +167,7 @@ class MgePublishView(discord.ui.View):
                     )
                     return
 
-                res = await asyncio.to_thread(
+                res = await drain_thread(
                     mge_publish_service.generate_targets_from_rank1,
                     event_id=self.parent.event_id,
                     rank1_target_millions=rank1_m,
@@ -177,6 +180,7 @@ class MgePublishView(discord.ui.View):
         await interaction.response.send_modal(_GenerateModal(self))
 
     @discord.ui.button(label="Override Target", style=discord.ButtonStyle.secondary, row=0)
+    @private_operation
     async def override_target(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -238,6 +242,7 @@ class MgePublishView(discord.ui.View):
                     )
                     self.add_item(self.target)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -247,7 +252,7 @@ class MgePublishView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ Invalid target score.")
                         return
 
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_publish_service.override_target_score,
                         award_id=self.award_id,
                         target_score=target,
@@ -262,18 +267,20 @@ class MgePublishView(discord.ui.View):
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(_AwardSelect(options=options, on_pick=_after_pick))
-        await interaction.response.send_message(
+        await send_ephemeral(
+            interaction,
             "Select the awarded player whose target you want to override:",
             view=view,
             ephemeral=True,
         )
 
     @discord.ui.button(label="Publish / Republish", style=discord.ButtonStyle.success, row=1)
+    @private_operation
     async def publish(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if not await self._guard(interaction):
             return
-        ctx = await asyncio.to_thread(mge_publish_dal.fetch_event_publish_context, self.event_id)
+        ctx = await drain_thread(mge_publish_dal.fetch_event_publish_context, self.event_id)
         if not ctx:
             await send_ephemeral(interaction, "❌ Event not found.")
             return
@@ -283,7 +290,7 @@ class MgePublishView(discord.ui.View):
 
         if should_prompt_for_reminders:
             mode = str(ctx.get("RuleMode") or "").strip().lower()
-            default_text = await asyncio.to_thread(
+            default_text = await drain_thread(
                 mge_publish_dal.fetch_default_award_reminders_text,
                 mode,
             )
@@ -315,6 +322,7 @@ class MgePublishView(discord.ui.View):
                     )
                     self.add_item(self.reminders_text)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -339,10 +347,10 @@ class MgePublishView(discord.ui.View):
                         reminders_text_override=entered,
                     )
 
-            await interaction.response.send_modal(_PublishWithRemindersModal(self, default_text))
+            await offer_prepared_modal(interaction, _PublishWithRemindersModal(self, default_text))
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await acknowledge_private(interaction)
         await self._run_publish(interaction=interaction, reminders_text_override=None)
 
     async def _run_publish(
@@ -382,7 +390,8 @@ class MgePublishView(discord.ui.View):
         if not await self._guard(interaction):
             return
 
-        await interaction.response.send_message(
+        await send_ephemeral(
+            interaction,
             "Are you sure you want to unpublish this MGE event? This will remove the published embed "
             "if possible and roll the event back to an editable state.",
             view=_ConfirmUnpublishView(event_id=self.event_id, parent_view=self),

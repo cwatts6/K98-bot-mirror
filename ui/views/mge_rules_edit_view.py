@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
+from core.owned_work import drain_thread
 from mge import mge_embed_manager, mge_rules_service
+from ui.views.prepared_modal_view import offer_prepared_modal
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class _RulesEditModal(discord.ui.Modal):
         )
         self.add_item(self.rules_text)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await self.parent_view._guard(interaction):
             return
@@ -60,7 +62,7 @@ class _RulesEditModal(discord.ui.Modal):
             )
             return
 
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_rules_service.update_event_rules_text,
             event_id=self.parent_view.event_id,
             new_rules_text=new_text,
@@ -91,7 +93,7 @@ class MgeRulesEditView(discord.ui.View):
         return True
 
     async def _refresh_signup_embed(self, bot: discord.Client) -> bool:
-        ctx = await asyncio.to_thread(mge_rules_service.get_event_rules_context, self.event_id)
+        ctx = await drain_thread(mge_rules_service.get_event_rules_context, self.event_id)
         if not ctx:
             return False
         channel_id = ctx.get("SignupEmbedChannelId")
@@ -112,13 +114,14 @@ class MgeRulesEditView(discord.ui.View):
         style=discord.ButtonStyle.primary,
         custom_id="mge_rules_edit_text",
     )
+    @private_operation
     async def edit_rules_text(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
         if not await self._guard(interaction):
             return
 
-        ctx = await asyncio.to_thread(mge_rules_service.get_event_rules_context, self.event_id)
+        ctx = await drain_thread(mge_rules_service.get_event_rules_context, self.event_id)
         if not ctx:
             await send_ephemeral(interaction, "❌ Event not found.")
             return
@@ -146,20 +149,21 @@ class MgeRulesEditView(discord.ui.View):
             )
             return
 
-        await interaction.response.send_modal(_RulesEditModal(self, current_text))
+        await offer_prepared_modal(interaction, _RulesEditModal(self, current_text))
 
     @discord.ui.button(
         label="Reset To Mode Default",
         style=discord.ButtonStyle.secondary,
         custom_id="mge_rules_reset_mode_default",
     )
+    @private_operation
     async def reset_to_mode_default(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
         if not await self._guard(interaction):
             return
 
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_rules_service.reset_event_rules_to_mode_default,
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),

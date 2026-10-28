@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_interaction
+from core.owned_work import drain_thread
 from mge import mge_completion_service, mge_report_service
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ class MgeAdminCompletionView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="mge_admin_complete_event",
     )
+    @private_operation
     async def complete_event_button(  # type: ignore[override]
         self,
         button: discord.ui.Button,
@@ -39,7 +40,7 @@ class MgeAdminCompletionView(discord.ui.View):
             return
 
         try:
-            result = await asyncio.to_thread(
+            result = await drain_thread(
                 mge_completion_service.complete_event,
                 event_id=self.event_id,
                 actor_discord_id=int(interaction.user.id),
@@ -60,6 +61,7 @@ class MgeAdminCompletionView(discord.ui.View):
         style=discord.ButtonStyle.primary,
         custom_id="mge_admin_reopen_event",
     )
+    @private_operation
     async def reopen_event_button(  # type: ignore[override]
         self,
         button: discord.ui.Button,
@@ -70,7 +72,7 @@ class MgeAdminCompletionView(discord.ui.View):
             return
 
         try:
-            result = await asyncio.to_thread(
+            result = await drain_thread(
                 mge_completion_service.reopen_event,
                 event_id=self.event_id,
                 actor_discord_id=int(interaction.user.id),
@@ -90,6 +92,7 @@ class MgeAdminCompletionView(discord.ui.View):
         style=discord.ButtonStyle.secondary,
         custom_id="mge_admin_post_summary",
     )
+    @private_operation
     async def post_summary_button(  # type: ignore[override]
         self,
         button: discord.ui.Button,
@@ -100,7 +103,7 @@ class MgeAdminCompletionView(discord.ui.View):
             return
 
         try:
-            summary = await asyncio.to_thread(
+            summary = await drain_thread(
                 mge_report_service.build_post_event_summary,
                 self.event_id,
             )

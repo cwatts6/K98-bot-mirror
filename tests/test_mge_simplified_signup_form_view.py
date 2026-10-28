@@ -54,7 +54,7 @@ class _FakeResponse:
         self.modal = modal
         self._done = True
 
-    async def defer(self) -> None:
+    async def defer(self, **kwargs) -> None:
         self._done = True
 
     def is_done(self) -> bool:
@@ -63,6 +63,7 @@ class _FakeResponse:
 
 class _FakeInteraction:
     def __init__(self, user_id: int = 1) -> None:
+        self.id = 1234
         self.user = SimpleNamespace(id=user_id)
         self.guild = None
         self.response = _FakeResponse()
@@ -231,7 +232,7 @@ async def test_no_modal_is_opened_on_submit(monkeypatch) -> None:
     # Modal must NOT have been sent
     assert interaction.response.modal is None
     # Response should have been a message (success/failure text)
-    assert len(interaction.response.sent_messages) == 1
+    assert len(interaction.followup_messages) == 1
 
 
 @pytest.mark.asyncio

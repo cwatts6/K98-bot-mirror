@@ -222,6 +222,25 @@ def insert_award(
     now_utc: datetime,
 ) -> int | None:
     def _callback(cur):
+        # Same event-first order as signup withdrawal and event mode/publish writers.
+        cur.execute(
+            "SELECT EventMode, Status FROM dbo.MGE_Events WITH (UPDLOCK, HOLDLOCK) WHERE EventId = ?;",
+            (event_id,),
+        )
+        event = cur.fetchone()
+        if (
+            not event
+            or str(event[0]).lower() != "controlled"
+            or str(event[1]).lower() in {"published", "completed"}
+        ):
+            return None
+        cur.execute(
+            "SELECT GovernorId, IsActive FROM dbo.MGE_Signups WITH (UPDLOCK, HOLDLOCK) WHERE SignupId = ? AND EventId = ?;",
+            (signup_id, event_id),
+        )
+        current = cur.fetchone()
+        if not current or int(current[0]) != int(governor_id) or not current[1]:
+            return None
         cur.execute(
             SQL_INSERT_AWARD,
             (
@@ -429,6 +448,7 @@ def delete_award_by_event_governor_with_audit_atomic(
     action_type: str,
     details: dict[str, Any] | None,
     now_utc: datetime,
+    cursor=None,
 ) -> dict[str, Any] | None:
     def _callback(cur):
         cur.execute(SQL_SELECT_AWARD_BY_EVENT_GOVERNOR, (event_id, governor_id))
@@ -440,6 +460,8 @@ def delete_award_by_event_governor_with_audit_atomic(
 
         cur.execute(SQL_DELETE_AWARD, (int(snapshot["AwardId"]),))
         if int(cur.rowcount or 0) <= 0:
+            if cursor is not None:
+                raise RuntimeError("Required award cleanup did not complete")
             return None
 
         details_json = json.dumps(details or {}, ensure_ascii=False)
@@ -463,6 +485,8 @@ def delete_award_by_event_governor_with_audit_atomic(
         )
         return snapshot
 
+    if cursor is not None:
+        return _callback(cursor)
     return exec_with_cursor(_callback)
 
 

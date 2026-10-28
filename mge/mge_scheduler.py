@@ -7,6 +7,7 @@ import logging
 import discord
 
 from bot_config import MGE_SIMPLIFIED_FLOW_ENABLED
+from core.owned_work import drain_thread
 from mge import mge_completion_service
 from mge.mge_embed_manager import (
     resolve_public_signup_channel_id,
@@ -51,7 +52,7 @@ async def schedule_mge_lifecycle(bot: discord.Client) -> None:
             now = datetime.now(UTC)
 
             try:
-                result, event_ids = sync_mge_events_from_calendar(now_utc=now)
+                result, event_ids = await drain_thread(sync_mge_events_from_calendar, now_utc=now)
                 synced = 0
                 for event_id in event_ids:
                     try:
@@ -88,7 +89,9 @@ async def schedule_mge_lifecycle(bot: discord.Client) -> None:
                 logger.exception("mge_scheduler_tick_failed")
 
             try:
-                completion_result = mge_completion_service.auto_complete_due_events(as_of_utc=now)
+                completion_result = await drain_thread(
+                    mge_completion_service.auto_complete_due_events, as_of_utc=now
+                )
                 logger.info(
                     "mge_scheduler_completion_tick due=%s completed=%s",
                     completion_result.get("due_count", 0),

@@ -6,7 +6,9 @@ import logging
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import member_role_ids, private_operation, send_ephemeral
+from core.operation_outcome import MutationOutcome
+from core.owned_work import drain_thread
 from mge import mge_dm_followup, mge_signup_service
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ class MgeSignupModalPayload:
     admin_role_ids: set[int]
     signup_id: int | None = None
     on_success_refresh: Callable[[int], None] | None = None
+    expected_signup: dict | None = None
+    owner_discord_id: int | None = None
 
 
 class MgeSignupFinalModal(discord.ui.Modal):
@@ -95,12 +99,26 @@ class MgeSignupFinalModal(discord.ui.Modal):
         self.add_item(self.gear_text)
         self.add_item(self.armament_text)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
+        if (
+            self.payload.owner_discord_id is not None
+            and self.payload.owner_discord_id != interaction.user.id
+        ):
+            await send_ephemeral(interaction, "This form belongs to another user.")
+            return
+        if getattr(self, "_submitted", False):
+            await send_ephemeral(
+                interaction, "This form has already been submitted. Refresh to view its outcome."
+            )
+            return
+        result = None
         try:
             try:
                 heads = int(str(self.current_heads.value).strip())
             except ValueError:
-                await interaction.response.send_message(
+                await send_ephemeral(
+                    interaction,
                     "❌ Current heads must be a valid integer.",
                     ephemeral=True,
                 )
@@ -111,10 +129,13 @@ class MgeSignupFinalModal(discord.ui.Modal):
             armament_text = str(self.armament_text.value or "").strip() or None
 
             if self.payload.signup_id is None:
-                result = mge_signup_service.create_signup(
+                result = await drain_thread(
+                    mge_signup_service.create_signup,
                     event_id=self.payload.event_id,
                     actor_discord_id=interaction.user.id,
-                    actor_role_ids=self.payload.actor_role_ids,
+                    actor_role_ids=member_role_ids(interaction),
+                    operation_id=str(interaction.id),
+                    expected_signup=self.payload.expected_signup,
                     admin_role_ids=self.payload.admin_role_ids,
                     governor_id=self.payload.governor_id,
                     governor_name_snapshot=self.payload.governor_name,
@@ -127,11 +148,14 @@ class MgeSignupFinalModal(discord.ui.Modal):
                     armament_text=armament_text,
                 )
             else:
-                result = mge_signup_service.edit_signup(
+                result = await drain_thread(
+                    mge_signup_service.edit_signup,
                     signup_id=self.payload.signup_id,
                     event_id=self.payload.event_id,
                     actor_discord_id=interaction.user.id,
-                    actor_role_ids=self.payload.actor_role_ids,
+                    actor_role_ids=member_role_ids(interaction),
+                    operation_id=str(interaction.id),
+                    expected_signup=self.payload.expected_signup,
                     admin_role_ids=self.payload.admin_role_ids,
                     existing_governor_id=self.payload.governor_id,
                     request_priority=self.selected_priority,
@@ -143,7 +167,9 @@ class MgeSignupFinalModal(discord.ui.Modal):
                     armament_text=armament_text,
                 )
 
-            await interaction.response.send_message(
+            self._submitted = result.success or result.outcome == MutationOutcome.UNKNOWN
+            await send_ephemeral(
+                interaction,
                 "✅ " + result.message if result.success else "❌ " + result.message,
                 ephemeral=True,
             )
@@ -157,7 +183,10 @@ class MgeSignupFinalModal(discord.ui.Modal):
                     )
 
             if result.success and result.signup_id is not None:
-                event = mge_signup_service.get_event_context(self.payload.event_id) or {}
+                event = (
+                    await drain_thread(mge_signup_service.get_event_context, self.payload.event_id)
+                    or {}
+                )
                 event_name = str(event.get("EventName") or f"MGE Event {self.payload.event_id}")
                 ok, dm_msg = await mge_dm_followup.open_dm_followup(
                     user=interaction.user,
@@ -184,7 +213,16 @@ class MgeSignupFinalModal(discord.ui.Modal):
                     )
 
         except Exception:
+            if result is None:
+                self._submitted = True
             logger.exception(
                 "mge_signup_final_modal_submit_failed event_id=%s", self.payload.event_id
             )
-            await send_ephemeral(interaction, "❌ Failed to submit signup.")
+            await send_ephemeral(
+                interaction,
+                (
+                    "Your signup was saved, but a follow-up step failed."
+                    if result and result.success
+                    else "The signup outcome could not be confirmed. Do not submit again until it has been checked."
+                ),
+            )

@@ -9,8 +9,8 @@ from pathlib import Path
 from weakref import WeakValueDictionary
 
 from constants import DATA_DIR
+from core.owned_work import drain_thread
 from services.event_delivery_store import EventDeliveryStore
-from services.legacy_export_snapshot_service import drain_thread
 
 logger = logging.getLogger(__name__)
 store = EventDeliveryStore(Path(DATA_DIR) / "event_delivery_receipts.json")

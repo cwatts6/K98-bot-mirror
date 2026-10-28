@@ -29,6 +29,7 @@ class _FakeClient:
 
 class _FakeInteraction:
     def __init__(self, user_id: int):
+        self.id = 1234
         self.user = _FakeUser(user_id)
         self.client = _FakeClient()
 
@@ -36,6 +37,7 @@ class _FakeInteraction:
         self.response = SimpleNamespace(
             is_done=Mock(return_value=False),
             send_message=AsyncMock(),
+            defer=AsyncMock(),
         )
         self.followup = SimpleNamespace(send=AsyncMock())
 

@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 import logging
 from typing import Any
 
-from mge.dal import mge_roster_dal, mge_signup_dal
+from core.operation_outcome import MutationOutcome
+from mge.dal import mge_signup_dal, mge_signup_mutation_dal
 from mge.mge_cache import get_commanders_for_variant
 from mge.mge_validation import (
     normalize_priority,
@@ -30,6 +31,71 @@ class ServiceResult:
     success: bool
     message: str
     signup_id: int | None = None
+    outcome: MutationOutcome = MutationOutcome.NOT_ENTERED
+    operation_id: str | None = None
+
+    def __post_init__(self):
+        if self.success and self.outcome == MutationOutcome.NOT_ENTERED:
+            self.outcome = MutationOutcome.COMMITTED
+
+
+def _persist(
+    action,
+    *,
+    event_id,
+    governor_id,
+    actor_discord_id,
+    is_admin,
+    event,
+    values=None,
+    signup_id=None,
+    expected_signup=None,
+    operation_id=None,
+    now_utc=None,
+):
+    def validate_current(current, now):
+        for check in (
+            validate_event_not_open_mode(current),
+            validate_event_is_mutable_for_anyone(current),
+        ):
+            if not check.valid:
+                return check.message
+        if current.get("VariantName") != event.get("VariantName"):
+            return "Event variant changed. Refresh before trying again."
+        if not is_admin:
+            check = validate_self_service_window(current, _now_utc(now))
+            if not check.valid:
+                return check.message
+        return None
+
+    result = mge_signup_mutation_dal.mutate_signup(
+        action=action,
+        event_id=event_id,
+        governor_id=governor_id,
+        actor_discord_id=actor_discord_id,
+        is_admin=is_admin,
+        values=values,
+        signup_id=signup_id,
+        expected_signup=expected_signup,
+        operation_id=operation_id,
+        now_utc=now_utc,
+        validate_event=validate_current,
+    )
+    if result.outcome == MutationOutcome.COMMITTED:
+        message = {
+            "create": "Signup created.",
+            "edit": "Signup updated.",
+            "withdraw": "Signup withdrawn.",
+        }[action]
+        return ServiceResult(True, message, result.signup_id, result.outcome, result.operation_id)
+    if result.outcome == MutationOutcome.UNKNOWN:
+        message = (
+            "The signup outcome is not yet confirmed. Do not submit again; ask an administrator to check this reference: "
+            + result.operation_id
+        )
+    else:
+        message = result.reason or "No signup change was saved. Please refresh before trying again."
+    return ServiceResult(False, message, result.signup_id, result.outcome, result.operation_id)
 
 
 def _now_utc(now_utc: datetime | None) -> datetime:
@@ -118,6 +184,14 @@ def get_event_context(event_id: int) -> dict[str, Any] | None:
     return mge_signup_dal.fetch_event_signup_context(event_id)
 
 
+def get_active_signup(event_id: int, governor_id: int) -> dict[str, Any] | None:
+    return mge_signup_dal.fetch_active_signup_by_event_governor(event_id, governor_id)
+
+
+def get_signup_for_edit(signup_id: int) -> dict[str, Any] | None:
+    return mge_signup_dal.fetch_signup_by_id(signup_id)
+
+
 def create_signup(
     *,
     event_id: int,
@@ -134,6 +208,8 @@ def create_signup(
     gear_text: str | None,
     armament_text: str | None,
     now_utc: datetime | None = None,
+    operation_id: str | None = None,
+    expected_signup: dict | None = None,
 ) -> ServiceResult:
     now = _now_utc(now_utc)
     event = mge_signup_dal.fetch_event_signup_context(event_id)
@@ -173,39 +249,30 @@ def create_signup(
     if not commander_name:
         return ServiceResult(False, "Requested commander is not eligible for this event variant.")
 
-    signup_id = mge_signup_dal.insert_signup(
+    return _persist(
+        "create",
         event_id=event_id,
         governor_id=governor_id,
-        governor_name_snapshot=governor_name_snapshot,
-        discord_user_id=_resolve_signup_discord_user_id(
-            is_admin=is_admin,
-            actor_discord_id=actor_discord_id,
-            governor_id=governor_id,
-        ),
-        request_priority=normalize_priority(request_priority).title(),
-        preferred_rank_band=normalize_rank_band(preferred_rank_band),
-        requested_commander_id=requested_commander_id,
-        requested_commander_name=commander_name,
-        current_heads=int(current_heads),
-        kingdom_role=kingdom_role,
-        gear_text=gear_text,
-        armament_text=armament_text,
-        source="admin" if is_admin else "discord",
-        now_utc=now,
-    )
-    if signup_id is None:
-        return ServiceResult(False, "Failed to create signup.")
-
-    mge_signup_dal.insert_signup_audit(
-        signup_id=signup_id,
-        event_id=event_id,
-        governor_id=governor_id,
-        action_type="create" if not is_admin else "admin_add",
         actor_discord_id=actor_discord_id,
-        details={"source": "admin" if is_admin else "discord"},
-        now_utc=now,
+        is_admin=is_admin,
+        event=event,
+        operation_id=operation_id,
+        now_utc=now_utc,
+        values=dict(
+            governor_name_snapshot=governor_name_snapshot,
+            discord_user_id=_resolve_signup_discord_user_id(
+                is_admin=is_admin, actor_discord_id=actor_discord_id, governor_id=governor_id
+            ),
+            request_priority=normalize_priority(request_priority).title(),
+            preferred_rank_band=normalize_rank_band(preferred_rank_band),
+            requested_commander_id=requested_commander_id,
+            requested_commander_name=commander_name,
+            current_heads=int(current_heads),
+            kingdom_role=kingdom_role,
+            gear_text=gear_text,
+            armament_text=armament_text,
+        ),
     )
-    return ServiceResult(True, "Signup created.", signup_id=signup_id)
 
 
 def edit_signup(
@@ -224,6 +291,8 @@ def edit_signup(
     gear_text: str | None,
     armament_text: str | None,
     now_utc: datetime | None = None,
+    operation_id: str | None = None,
+    expected_signup: dict | None = None,
 ) -> ServiceResult:
     now = _now_utc(now_utc)
     event = mge_signup_dal.fetch_event_signup_context(event_id)
@@ -259,31 +328,28 @@ def edit_signup(
     if not commander_name:
         return ServiceResult(False, "Requested commander is not eligible for this event variant.")
 
-    ok = mge_signup_dal.update_signup(
-        signup_id=signup_id,
-        request_priority=normalize_priority(request_priority).title(),
-        preferred_rank_band=normalize_rank_band(preferred_rank_band),
-        requested_commander_id=requested_commander_id,
-        requested_commander_name=commander_name,
-        current_heads=int(current_heads),
-        kingdom_role=kingdom_role,
-        gear_text=gear_text,
-        armament_text=armament_text,
-        now_utc=now,
-    )
-    if not ok:
-        return ServiceResult(False, "Failed to update signup.")
-
-    mge_signup_dal.insert_signup_audit(
+    return _persist(
+        "edit",
         signup_id=signup_id,
         event_id=event_id,
         governor_id=existing_governor_id,
-        action_type="edit" if not is_admin else "admin_edit",
         actor_discord_id=actor_discord_id,
-        details={"source": "admin" if is_admin else "discord"},
-        now_utc=now,
+        is_admin=is_admin,
+        event=event,
+        operation_id=operation_id,
+        now_utc=now_utc,
+        expected_signup=expected_signup,
+        values=dict(
+            request_priority=normalize_priority(request_priority).title(),
+            preferred_rank_band=normalize_rank_band(preferred_rank_band),
+            requested_commander_id=requested_commander_id,
+            requested_commander_name=commander_name,
+            current_heads=int(current_heads),
+            kingdom_role=kingdom_role,
+            gear_text=gear_text,
+            armament_text=armament_text,
+        ),
     )
-    return ServiceResult(True, "Signup updated.", signup_id=signup_id)
 
 
 def withdraw_signup(
@@ -295,6 +361,8 @@ def withdraw_signup(
     actor_role_ids: set[int],
     admin_role_ids: set[int],
     now_utc: datetime | None = None,
+    operation_id: str | None = None,
+    expected_signup: dict | None = None,
 ) -> ServiceResult:
     now = _now_utc(now_utc)
     event = mge_signup_dal.fetch_event_signup_context(event_id)
@@ -316,35 +384,14 @@ def withdraw_signup(
         if not _is_governor_linked_to_user(actor_discord_id, governor_id):
             return ServiceResult(False, "You can only withdraw your own linked governor signup.")
 
-    ok = mge_signup_dal.withdraw_signup(signup_id=signup_id, now_utc=now)
-    if not ok:
-        return ServiceResult(False, "Failed to withdraw signup.")
-
-    award_cleanup = mge_roster_dal.delete_award_by_event_governor_with_audit_atomic(
-        event_id=event_id,
-        governor_id=governor_id,
-        actor_discord_id=actor_discord_id,
-        action_type="withdraw_cleanup",
-        details={"signup_id": signup_id, "source": "signup_withdraw"},
-        now_utc=now,
-    )
-
-    if award_cleanup is not None:
-        logger.info(
-            "mge_signup_service_withdraw_cleanup_award_deleted event_id=%s signup_id=%s governor_id=%s award_id=%s",
-            event_id,
-            signup_id,
-            governor_id,
-            award_cleanup.get("AwardId"),
-        )
-
-    mge_signup_dal.insert_signup_audit(
+    return _persist(
+        "withdraw",
         signup_id=signup_id,
         event_id=event_id,
         governor_id=governor_id,
-        action_type="withdraw" if not is_admin else "admin_remove",
         actor_discord_id=actor_discord_id,
-        details={"source": "admin" if is_admin else "discord"},
-        now_utc=now,
+        is_admin=is_admin,
+        event=event,
+        operation_id=operation_id,
+        now_utc=now_utc,
     )
-    return ServiceResult(True, "Signup withdrawn.", signup_id=signup_id)

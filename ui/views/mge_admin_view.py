@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import private_operation, send_ephemeral
+from core.owned_work import drain_thread
 from mge.mge_event_service import (
     SwitchToFixedResult,
     SwitchToOpenResult,
@@ -39,6 +40,7 @@ class ConfirmSwitchOpenView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="mge_confirm_switch_open",
     )
+    @private_operation
     async def confirm_switch(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -54,7 +56,8 @@ class ConfirmSwitchOpenView(discord.ui.View):
             return
 
         actor_id = int(interaction.user.id)
-        result: SwitchToOpenResult = switch_event_to_open(
+        result: SwitchToOpenResult = await drain_thread(
+            switch_event_to_open,
             event_id=self.event_id,
             actor_discord_id=actor_id,
         )
@@ -100,6 +103,7 @@ class ConfirmSwitchFixedView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="mge_confirm_switch_fixed",
     )
+    @private_operation
     async def confirm_switch(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -115,7 +119,8 @@ class ConfirmSwitchFixedView(discord.ui.View):
             return
 
         actor_id = int(interaction.user.id)
-        result: SwitchToFixedResult = switch_event_to_fixed(
+        result: SwitchToFixedResult = await drain_thread(
+            switch_event_to_fixed,
             event_id=self.event_id,
             actor_discord_id=actor_id,
         )

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
+from core.owned_work import drain_thread
 from mge import mge_roster_service
 from mge.mge_review_service import get_signup_review_pool
+from ui.views.prepared_modal_view import offer_prepared_modal
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class _SelectRow(discord.ui.Select):
         )
         self._on_pick = on_pick
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction):
         await self._on_pick(interaction, self.values[0])
 
@@ -126,10 +128,10 @@ class MgeRosterBuilderView(discord.ui.View):
         return True
 
     async def _load_state(self) -> mge_roster_service.RosterState:
-        return await asyncio.to_thread(mge_roster_service.load_roster_state, self.event_id)
+        return await drain_thread(mge_roster_service.load_roster_state, self.event_id)
 
     async def _load_review_rows(self) -> list[dict[str, Any]]:
-        return await asyncio.to_thread(get_signup_review_pool, self.event_id)
+        return await drain_thread(get_signup_review_pool, self.event_id)
 
     async def _load_embed(self) -> discord.Embed:
         state = await self._load_state()
@@ -179,11 +181,10 @@ class MgeRosterBuilderView(discord.ui.View):
         return None
 
     async def _award_snapshot(self, award_id: int) -> dict[str, Any] | None:
-        return await asyncio.to_thread(
-            mge_roster_service.mge_roster_dal.fetch_award_by_id, award_id
-        )
+        return await drain_thread(mge_roster_service.mge_roster_dal.fetch_award_by_id, award_id)
 
     @discord.ui.button(label="Show Current Roster", style=discord.ButtonStyle.secondary, row=0)
+    @private_operation
     async def show_roster(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -194,6 +195,7 @@ class MgeRosterBuilderView(discord.ui.View):
         await send_ephemeral(interaction, "Roster snapshot:", embed=embed)
 
     @discord.ui.button(label="Add Signup To Roster", style=discord.ButtonStyle.success, row=0)
+    @private_operation
     async def add_signup(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if not await self._guard(interaction):
@@ -234,6 +236,7 @@ class MgeRosterBuilderView(discord.ui.View):
                     self.add_item(self.rank)
                     self.add_item(self.internal_notes)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -254,7 +257,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ That rank is already occupied.")
                         return
 
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.add_signup_with_rank,
                         event_id=self.parent.event_id,
                         signup_id=int(self.snapshot["SignupId"]),
@@ -269,7 +272,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_AddModal(self, snap))
+            await offer_prepared_modal(inter, _AddModal(self, snap))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -279,9 +282,7 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_applicant(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select an applicant to add:", view=view, ephemeral=True
-        )
+        await send_ephemeral(interaction, "Select an applicant to add:", view=view, ephemeral=True)
 
     async def _on_pick_applicant(
         self,
@@ -289,6 +290,8 @@ class MgeRosterBuilderView(discord.ui.View):
         signup_id_value: str,
         after_pick,
     ) -> None:
+        if not await self._guard(interaction):
+            return
         try:
             signup_id = int(signup_id_value)
         except Exception:
@@ -307,6 +310,8 @@ class MgeRosterBuilderView(discord.ui.View):
         award_id_value: str,
         after_pick,
     ) -> None:
+        if not await self._guard(interaction):
+            return
         try:
             award_id = int(award_id_value)
         except Exception:
@@ -320,6 +325,7 @@ class MgeRosterBuilderView(discord.ui.View):
         await after_pick(interaction, snap)
 
     @discord.ui.button(label="Adjust Rank", style=discord.ButtonStyle.primary, row=1)
+    @private_operation
     async def set_rank(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if not await self._guard(interaction):
@@ -345,6 +351,7 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.rank)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -364,7 +371,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ That rank is already occupied.")
                         return
 
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.set_rank,
                         award_id=self.award_id,
                         new_rank=rank,
@@ -377,7 +384,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_SetRankModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _SetRankModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -387,11 +394,10 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select a row to re-rank:", view=view, ephemeral=True
-        )
+        await send_ephemeral(interaction, "Select a row to re-rank:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Move To Waitlist", style=discord.ButtonStyle.primary, row=1)
+    @private_operation
     async def to_waitlist(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -426,6 +432,7 @@ class MgeRosterBuilderView(discord.ui.View):
                     self.add_item(self.order)
                     self.add_item(self.notes)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -436,7 +443,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ Invalid waitlist order.")
                         return
 
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.move_to_waitlist,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -450,7 +457,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_WaitlistModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _WaitlistModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -460,11 +467,12 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select a row to move to waitlist:", view=view, ephemeral=True
+        await send_ephemeral(
+            interaction, "Select a row to move to waitlist:", view=view, ephemeral=True
         )
 
     @discord.ui.button(label="Move To Roster", style=discord.ButtonStyle.primary, row=1)
+    @private_operation
     async def move_to_roster(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -492,10 +500,11 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.notes)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.promote_waitlist_to_roster,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -508,7 +517,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_PromoteModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _PromoteModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -518,11 +527,12 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select a waitlist row to promote:", view=view, ephemeral=True
+        await send_ephemeral(
+            interaction, "Select a waitlist row to promote:", view=view, ephemeral=True
         )
 
     @discord.ui.button(label="Adjust Waitlist Order", style=discord.ButtonStyle.secondary, row=2)
+    @private_operation
     async def set_waitlist_order(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -550,6 +560,7 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.order)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
@@ -558,7 +569,7 @@ class MgeRosterBuilderView(discord.ui.View):
                     except Exception:
                         await send_ephemeral(modal_interaction, "❌ Invalid waitlist order.")
                         return
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.set_waitlist_order,
                         award_id=self.award_id,
                         waitlist_order=order,
@@ -571,7 +582,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_SetWaitOrderModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _SetWaitOrderModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -581,9 +592,10 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message("Select a waitlist row:", view=view, ephemeral=True)
+        await send_ephemeral(interaction, "Select a waitlist row:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Update Internal Notes", style=discord.ButtonStyle.secondary, row=2)
+    @private_operation
     async def update_notes(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -611,10 +623,11 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.notes)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.update_internal_notes,
                         award_id=self.award_id,
                         notes=str(self.notes.value or "").strip() or None,
@@ -625,7 +638,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         ("✅ " if res.success else "❌ ") + res.message,
                     )
 
-            await inter.response.send_modal(_NotesModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _NotesModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -635,11 +648,10 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select a row to annotate:", view=view, ephemeral=True
-        )
+        await send_ephemeral(interaction, "Select a row to annotate:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Remove Award", style=discord.ButtonStyle.danger, row=2)
+    @private_operation
     async def remove_award(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -667,11 +679,12 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.reason)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
                     reason = str(self.reason.value or "").strip() or None
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.remove_award_hard_delete,
                         award_id=self.award_id,
                         actor_discord_id=int(modal_interaction.user.id),
@@ -686,7 +699,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         embed=embed,
                     )
 
-            await inter.response.send_modal(_RemoveModal(self, int(snap["AwardId"])))
+            await offer_prepared_modal(inter, _RemoveModal(self, int(snap["AwardId"])))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -696,16 +709,15 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_award(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select a row to remove:", view=view, ephemeral=True
-        )
+        await send_ephemeral(interaction, "Select a row to remove:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Undo Last Removal", style=discord.ButtonStyle.secondary, row=3)
+    @private_operation
     async def undo_last(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if not await self._guard(interaction):
             return
-        res = await asyncio.to_thread(
+        res = await drain_thread(
             mge_roster_service.undo_last_removal_in_session,
             event_id=self.event_id,
             actor_discord_id=self.actor_discord_id,
@@ -719,6 +731,7 @@ class MgeRosterBuilderView(discord.ui.View):
         await send_ephemeral(interaction, msg, embed=embed)
 
     @discord.ui.button(label="Reject Signup (Audit)", style=discord.ButtonStyle.danger, row=3)
+    @private_operation
     async def reject_signup(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -745,10 +758,11 @@ class MgeRosterBuilderView(discord.ui.View):
                     )
                     self.add_item(self.reason)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not await self.parent._guard(modal_interaction):
                         return
-                    res = await asyncio.to_thread(
+                    res = await drain_thread(
                         mge_roster_service.reject_signup_audit_only,
                         event_id=self.parent.event_id,
                         signup_id=int(snap["SignupId"]),
@@ -760,7 +774,7 @@ class MgeRosterBuilderView(discord.ui.View):
                         ("✅ " if res.success else "❌ ") + res.message,
                     )
 
-            await inter.response.send_modal(_RejectModal(self))
+            await offer_prepared_modal(inter, _RejectModal(self))
 
         view = discord.ui.View(timeout=120.0)
         view.add_item(
@@ -770,6 +784,6 @@ class MgeRosterBuilderView(discord.ui.View):
                 on_pick=lambda i, v: self._on_pick_applicant(i, v, _after_pick),
             )
         )
-        await interaction.response.send_message(
-            "Select an applicant to reject:", view=view, ephemeral=True
+        await send_ephemeral(
+            interaction, "Select an applicant to reject:", view=view, ephemeral=True
         )

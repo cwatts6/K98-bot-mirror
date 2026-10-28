@@ -24,6 +24,14 @@ def _make_interaction():
     """Build a minimal fake interaction that satisfies the view callbacks."""
 
     class _Response:
+        done = False
+
+        def is_done(self):
+            return self.done
+
+        async def defer(self, **kwargs):
+            self.done = True
+
         def __init__(self):
             self.modal = None
 
@@ -35,6 +43,7 @@ def _make_interaction():
 
     class _Interaction:
         def __init__(self):
+            self.id = 1234
             self.user = _User()
             self.client = object()
             self.response = _Response()
@@ -203,9 +212,14 @@ async def test_publish_confirm_view_rejects_repeated_use(monkeypatch: pytest.Mon
         def is_done(self):
             return False
 
+        async def defer(self, **kwargs):
+            self.done = True
+
     class _Interaction:
         def __init__(self):
+            self.id = 1234
             self.response = _Response()
+            self.user = types.SimpleNamespace(id=1)
 
     await view.children[0].callback(_Interaction())
 

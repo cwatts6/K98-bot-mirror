@@ -8,8 +8,9 @@ import discord
 
 from account_picker import build_unique_gov_options
 from bot_config import MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_ENABLED
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import member_role_ids, private_operation, send_ephemeral
 from core.mge_permissions import is_admin_interaction, is_admin_or_leadership_interaction
+from core.owned_work import drain_thread
 from mge import mge_dm_followup, mge_signup_service
 
 # architecture-check: allow
@@ -37,12 +38,7 @@ _LOCK_MESSAGE = "❌ This MGE is published or completed and is locked. Please co
 
 
 def _member_role_ids(interaction: discord.Interaction) -> set[int]:
-    member = interaction.user if isinstance(interaction.user, discord.Member) else None
-    if not member and interaction.guild:
-        member = interaction.guild.get_member(interaction.user.id)
-    if not member:
-        return set()
-    return {int(r.id) for r in getattr(member, "roles", []) if getattr(r, "id", None)}
+    return member_role_ids(interaction)
 
 
 class MGESignupView(discord.ui.View):
@@ -105,6 +101,7 @@ class MGESignupView(discord.ui.View):
             return True
         return False
 
+    @private_operation
     async def _open_signup_modal(
         self,
         interaction: discord.Interaction,
@@ -155,6 +152,7 @@ class MGESignupView(discord.ui.View):
             return
 
         payload = MgeSignupModalPayload(
+            owner_discord_id=interaction.user.id,
             event_id=self.event_id,
             governor_id=int(governor_id),
             governor_name=governor_name,
@@ -175,6 +173,7 @@ class MGESignupView(discord.ui.View):
         if signup_id is not None:
             row = await asyncio.to_thread(mge_signup_dal.fetch_signup_by_id, int(signup_id))
             if row:
+                payload.expected_signup = dict(row)
                 initial_priority = str(row.get("RequestPriority") or "").strip() or None
                 initial_rank_band = str(row.get("PreferredRankBand") or "").strip() or None
                 try:
@@ -242,6 +241,7 @@ class MGESignupView(discord.ui.View):
         )
 
     @discord.ui.button(label="Sign Up", style=discord.ButtonStyle.primary, custom_id="mge_signup")
+    @private_operation
     async def sign_up(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._block_if_signup_closed(interaction):
@@ -280,6 +280,7 @@ class MGESignupView(discord.ui.View):
                 )
                 self.parent_view = parent_view
 
+            @private_operation
             async def callback(self, select_interaction: discord.Interaction):
                 if await self.parent_view._block_if_locked(select_interaction):
                     return
@@ -301,6 +302,7 @@ class MGESignupView(discord.ui.View):
     @discord.ui.button(
         label="Withdraw", style=discord.ButtonStyle.secondary, custom_id="mge_withdraw"
     )
+    @private_operation
     async def withdraw(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._block_if_signup_closed(interaction):
@@ -319,14 +321,15 @@ class MGESignupView(discord.ui.View):
 
         if len(rows) == 1:
             row = rows[0]
-            result = mge_signup_service.withdraw_signup(
+            result = await drain_thread(
+                mge_signup_service.withdraw_signup,
                 signup_id=int(row["SignupId"]),
                 event_id=int(row["EventId"]),
                 governor_id=int(row["GovernorId"]),
                 actor_discord_id=interaction.user.id,
+                operation_id=str(interaction.id),
                 actor_role_ids=_member_role_ids(interaction),
                 admin_role_ids=self._admin_role_ids(),
-                now_utc=datetime.now(UTC),
             )
             await send_ephemeral(
                 interaction, "✅ " + result.message if result.success else "❌ " + result.message
@@ -356,6 +359,7 @@ class MGESignupView(discord.ui.View):
                 )
                 self.parent_view = parent_view
 
+            @private_operation
             async def callback(self, select_interaction: discord.Interaction) -> None:
                 if await self.parent_view._block_if_locked(select_interaction):
                     return
@@ -368,14 +372,15 @@ class MGESignupView(discord.ui.View):
                     await send_ephemeral(select_interaction, "❌ Failed to parse selection.")
                     return
 
-                result = mge_signup_service.withdraw_signup(
+                result = await drain_thread(
+                    mge_signup_service.withdraw_signup,
                     signup_id=signup_id,
                     event_id=event_id,
                     governor_id=governor_id,
                     actor_discord_id=select_interaction.user.id,
+                    operation_id=str(select_interaction.id),
                     actor_role_ids=_member_role_ids(select_interaction),
                     admin_role_ids=self.parent_view._admin_role_ids(),
-                    now_utc=datetime.now(UTC),
                 )
                 await send_ephemeral(
                     select_interaction,
@@ -397,6 +402,7 @@ class MGESignupView(discord.ui.View):
         style=discord.ButtonStyle.secondary,
         custom_id="mge_edit",
     )
+    @private_operation
     async def edit(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._block_if_signup_closed(interaction):
@@ -444,6 +450,7 @@ class MGESignupView(discord.ui.View):
                 )
                 self.parent_view = parent_view
 
+            @private_operation
             async def callback(self, select_interaction: discord.Interaction) -> None:
                 if await self.parent_view._block_if_locked(select_interaction):
                     return
@@ -541,6 +548,7 @@ class MGESignupView(discord.ui.View):
         custom_id="mge_refresh_embed",
         row=1,
     )
+    @private_operation
     async def refresh_embed_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -552,22 +560,21 @@ class MGESignupView(discord.ui.View):
         try:
             from mge import mge_embed_manager
 
-            # architecture-check: allow
-            from mge.dal import mge_event_dal
-
-            row = mge_event_dal.fetch_event_for_embed(self.event_id)
-            if not row:
-                await send_ephemeral(interaction, "❌ Event not found.")
-                return
-
-            names = mge_event_dal.fetch_public_signup_names(self.event_id)
-            embed = mge_embed_manager.build_mge_signup_embed(row, public_signup_names=names)
-
-            await interaction.message.edit(
-                embed=embed,
-                allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
+            results = await mge_embed_manager.refresh_mge_boards(
+                bot=interaction.client,
+                event_id=self.event_id,
+                refresh_public=True,
+                refresh_leadership=False,
             )
-            await send_ephemeral(interaction, "✅ Embed refreshed.")
+            await send_ephemeral(
+                interaction,
+                (
+                    "✅ Embed refreshed."
+                    if results["public"]
+                    else "The signup board could not be refreshed. Its saved identity has been retained."
+                ),
+            )
+
         except Exception:
             logger.exception("mge_refresh_embed_failed event_id=%s", self.event_id)
             await send_ephemeral(interaction, "❌ Failed to refresh embed.")
@@ -578,6 +585,7 @@ class MGESignupView(discord.ui.View):
         row=1,
         custom_id="mge_open_leadership_board",
     )
+    @private_operation
     async def leadership(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if not is_admin_or_leadership_interaction(interaction):

@@ -5,8 +5,8 @@ import logging
 
 import discord
 
-from core.interaction_safety import send_ephemeral
-from mge.dal import mge_signup_dal
+from core.interaction_safety import private_operation, send_ephemeral
+from mge import mge_signup_service
 from mge.mge_cache import get_commanders_for_variant
 from ui.views.mge_signup_modal import MgeSignupModalPayload
 from ui.views.mge_signup_view import MGESignupView, _member_role_ids
@@ -45,6 +45,7 @@ class MGESimplifiedSignupView(MGESignupView):
         if edit_button is not None:
             edit_button.label = "Edit Sign Up"
 
+    @private_operation
     async def _open_signup_modal(
         self,
         interaction: discord.Interaction,
@@ -62,14 +63,14 @@ class MGESimplifiedSignupView(MGESignupView):
         if await self._block_if_locked(interaction):
             return
 
-        event = await asyncio.to_thread(mge_signup_dal.fetch_event_signup_context, self.event_id)
+        event = await asyncio.to_thread(mge_signup_service.get_event_context, self.event_id)
         if not event:
             await send_ephemeral(interaction, "❌ Event not found.")
             return
 
         if signup_id is None:
             existing = await asyncio.to_thread(
-                mge_signup_dal.fetch_active_signup_by_event_governor,
+                mge_signup_service.get_active_signup,
                 self.event_id,
                 int(governor_id),
             )
@@ -101,6 +102,7 @@ class MGESimplifiedSignupView(MGESignupView):
             return
 
         payload = MgeSignupModalPayload(
+            owner_discord_id=interaction.user.id,
             event_id=self.event_id,
             governor_id=int(governor_id),
             governor_name=governor_name,
@@ -113,7 +115,7 @@ class MGESimplifiedSignupView(MGESignupView):
         existing_signup_row: dict | None = None
         if signup_id is not None:
             existing_signup_row = await asyncio.to_thread(
-                mge_signup_dal.fetch_signup_by_id, int(signup_id)
+                mge_signup_service.get_signup_for_edit, int(signup_id)
             )
 
         form_view = build_simplified_signup_form_view(

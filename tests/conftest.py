@@ -196,3 +196,16 @@ def _block_live_ark_db_access_in_unit_tests(monkeypatch):
         pass
 
     yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_private_operation_lifecycle(monkeypatch):
+    module = sys.modules.get("core.interaction_safety")
+    if module is not None:
+        monkeypatch.setattr(module, "_private_admission_closed", False)
+        monkeypatch.setattr(module, "_private_children", set())
+    module = sys.modules.get("mge.mge_embed_manager")
+    if module is not None:
+        from core.coalesced_work import CoalescedWork
+
+        monkeypatch.setattr(module, "_refreshes", CoalescedWork())

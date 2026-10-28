@@ -35,6 +35,9 @@ class _FakeResponse:
     def is_done(self) -> bool:
         return self._done
 
+    async def defer(self, **kwargs):
+        self._done = True
+
 
 class _FakeMessage:
     def __init__(self):
@@ -46,6 +49,7 @@ class _FakeMessage:
 
 class _FakeInteraction:
     def __init__(self, user_id: int, roles: list[int] | None = None):
+        self.id = 1234
         self.user = _FakeMember(user_id, roles)
         self.guild = None
         self.response = _FakeResponse()
@@ -321,35 +325,17 @@ async def test_refresh_embed_button_keeps_base_view_refresh_callable(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_admin_refresh_embed_button_updates_message(monkeypatch):
-    sent: list[str] = []
+async def test_admin_refresh_embed_button_uses_owned_board_refresh(monkeypatch):
+    from unittest.mock import AsyncMock
 
-    async def _fake_send_ephemeral(interaction, message: str, **kwargs):
-        sent.append(message)
-
-    monkeypatch.setattr("ui.views.mge_signup_view.send_ephemeral", _fake_send_ephemeral)
-
-    monkeypatch.setattr(
-        "mge.dal.mge_event_dal.fetch_event_for_embed",
-        lambda event_id: {"EventId": event_id, "EventName": "Test MGE"},
-    )
-    monkeypatch.setattr(
-        "mge.dal.mge_event_dal.fetch_public_signup_names",
-        lambda event_id: ["Gov1", "Gov2"],
-    )
-    fake_embed = object()
-    monkeypatch.setattr(
-        "mge.mge_embed_manager.build_mge_signup_embed",
-        lambda row, public_signup_names=None: fake_embed,
-    )
-
+    refresh = AsyncMock(return_value={"public": True})
+    monkeypatch.setattr("mge.mge_embed_manager.refresh_mge_boards", refresh)
     deps = _FakeAdminDeps(True)
     view = MGESignupView(event_id=101, admin_deps=deps)
     interaction = _FakeInteraction(user_id=123, roles=[9001])
-
+    interaction.client = object()
     await view.refresh_embed_button.callback(interaction)
-
-    assert deps.refreshed_event_ids == []
-    assert interaction.message.edited_embed is fake_embed
-    assert sent
-    assert sent[-1] == "✅ Embed refreshed."
+    refresh.assert_awaited_once_with(
+        bot=interaction.client, event_id=101, refresh_public=True, refresh_leadership=False
+    )
+    assert interaction.followup_messages[-1]["message"] == "✅ Embed refreshed."

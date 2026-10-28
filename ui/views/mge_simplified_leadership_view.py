@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
 import discord
 
-from core.interaction_safety import send_ephemeral
+from core.interaction_safety import acknowledge_private, private_operation, send_ephemeral
 from core.mge_permissions import is_admin_interaction, is_admin_or_leadership_interaction
+from core.owned_work import drain_thread
 from decoraters import (
     LEADERSHIP_ROLE_IDS as _LEADERSHIP_ROLE_IDS,
     _is_admin as _decoraters_is_admin,
@@ -23,6 +23,7 @@ from mge import (
 from mge.dal import mge_signup_dal
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
+from ui.views.prepared_modal_view import offer_prepared_modal
 
 logger = logging.getLogger(__name__)
 
@@ -55,24 +56,9 @@ def _build_leadership_admin_deps(
     """Build refresh/admin dependencies for simplified leadership admin actions."""
 
     def _refresh_embed(target_event_id: int) -> None:
-        async def _runner() -> None:
-            await asyncio.sleep(0.5)
-            await mge_embed_manager.refresh_mge_boards(
-                bot=interaction.client,
-                event_id=int(target_event_id),
-                refresh_public=True,
-                refresh_leadership=True,
-                refresh_awards=False,
-            )
-
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(_runner())
-        except RuntimeError:
-            logger.warning(
-                "mge_simplified_leadership_refresh_schedule_failed event_id=%s",
-                target_event_id,
-            )
+        mge_embed_manager.request_board_refresh(
+            bot=interaction.client, event_id=int(target_event_id)
+        )
 
     return MGEAdminViewDeps(
         refresh_embed=_refresh_embed,
@@ -153,6 +139,7 @@ class _AdjustRankModal(discord.ui.Modal):
         )
         self.add_item(self.rank_value)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
@@ -163,7 +150,7 @@ class _AdjustRankModal(discord.ui.Modal):
             await send_ephemeral(interaction, "❌ Invalid rank.")
             return
 
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_roster_service.set_rank,
             award_id=self.award_id,
             new_rank=new_rank,
@@ -191,7 +178,11 @@ class _NotesOnlyModal(discord.ui.Modal):
         )
         self.add_item(self.reason)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
+        if not is_admin_or_leadership_interaction(interaction):
+            await send_ephemeral(interaction, "Leadership/admin only.")
+            return
         notes = str(self.reason.value or "").strip() or None
         await self._on_submit(interaction, notes)
 
@@ -208,6 +199,7 @@ class _GenerateTargetsModal(discord.ui.Modal):
         )
         self.add_item(self.rank1)
 
+    @private_operation
     async def callback(self, interaction: discord.Interaction) -> None:
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
@@ -222,7 +214,7 @@ class _GenerateTargetsModal(discord.ui.Modal):
             )
             return
 
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_publish_service.generate_targets_from_rank1,
             event_id=self.event_id,
             rank1_target_millions=rank1_target,
@@ -245,6 +237,7 @@ class _PublishConfirmView(_SingleActionConfirmView):
         self.event_id = int(event_id)
 
     @discord.ui.button(label="Confirm Publish / Republish", style=discord.ButtonStyle.success)
+    @private_operation
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._reject_if_completed(interaction):
@@ -252,7 +245,7 @@ class _PublishConfirmView(_SingleActionConfirmView):
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
-        await interaction.response.defer(ephemeral=True)
+        await acknowledge_private(interaction)
         result = await mge_publish_service.publish_event_awards(
             adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
@@ -271,6 +264,7 @@ class _UnpublishConfirmView(_SingleActionConfirmView):
         self.event_id = int(event_id)
 
     @discord.ui.button(label="Confirm Unpublish", style=discord.ButtonStyle.danger)
+    @private_operation
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._reject_if_completed(interaction):
@@ -278,7 +272,7 @@ class _UnpublishConfirmView(_SingleActionConfirmView):
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
-        await interaction.response.defer(ephemeral=True)
+        await acknowledge_private(interaction)
         result = await mge_publish_service.unpublish_event_awards(
             adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
@@ -297,6 +291,7 @@ class _ResetRanksConfirmView(_SingleActionConfirmView):
         self.event_id = int(event_id)
 
     @discord.ui.button(label="Confirm Reset Ranks", style=discord.ButtonStyle.danger)
+    @private_operation
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         del button
         if await self._reject_if_completed(interaction):
@@ -304,7 +299,7 @@ class _ResetRanksConfirmView(_SingleActionConfirmView):
         if not is_admin_or_leadership_interaction(interaction):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
-        result = await asyncio.to_thread(
+        result = await drain_thread(
             mge_simplified_leadership_service.reset_active_ranks,
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
@@ -395,7 +390,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         return True
 
     async def _load_board_payload(self) -> dict[str, Any]:
-        return await asyncio.to_thread(
+        return await drain_thread(
             mge_simplified_leadership_service.get_leadership_board_payload, self.event_id
         )
 
@@ -465,6 +460,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=0,
         custom_id="mge_lead_refresh",
     )
+    @private_operation
     async def refresh_embed(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -485,6 +481,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=0,
         custom_id="mge_lead_admin_add_signup",
     )
+    @private_operation
     async def admin_add_signup(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -493,7 +490,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             return
 
         # Block if event is completed
-        event = await asyncio.to_thread(mge_signup_dal.fetch_event_signup_context, self.event_id)
+        event = await drain_thread(mge_signup_dal.fetch_event_signup_context, self.event_id)
         if event:
             status = str(event.get("Status") or "").strip().lower()
             if status in {"completed", "finished"}:
@@ -515,24 +512,9 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             from ui.views.mge_signup_view import MGESignupView
 
             def _refresh_embed(target_event_id: int) -> None:
-                async def _runner() -> None:
-                    await asyncio.sleep(0.5)
-                    await mge_embed_manager.refresh_mge_boards(
-                        bot=modal_interaction.client,
-                        event_id=int(target_event_id),
-                        refresh_public=True,
-                        refresh_leadership=True,
-                        refresh_awards=False,
-                    )
-
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(_runner())
-                except RuntimeError:
-                    logger.warning(
-                        "mge_lead_admin_add_refresh_schedule_failed event_id=%s",
-                        target_event_id,
-                    )
+                mge_embed_manager.request_board_refresh(
+                    bot=modal_interaction.client, event_id=int(target_event_id)
+                )
 
             from core.mge_permissions import is_admin_interaction as _is_admin_check
 
@@ -548,11 +530,12 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                 governor_name=str(governor_name),
             )
 
-        await interaction.response.send_modal(
+        await offer_prepared_modal(
+            interaction,
             MgeAdminAddLookupModal(
                 author_id=int(interaction.user.id),
                 on_governor_selected=_on_governor_selected,
-            )
+            ),
         )
 
     @discord.ui.button(
@@ -561,6 +544,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=1,
         custom_id="mge_lead_adjust_rank",
     )
+    @private_operation
     async def adjust_rank(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -597,6 +581,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=1,
         custom_id="mge_lead_move_waitlist",
     )
+    @private_operation
     async def move_waitlist(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -621,7 +606,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             award_id = int(value)
 
             async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                result = await asyncio.to_thread(
+                result = await drain_thread(
                     mge_roster_service.move_to_waitlist,
                     award_id=award_id,
                     actor_discord_id=int(j.user.id),
@@ -657,6 +642,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=1,
         custom_id="mge_lead_move_roster",
     )
+    @private_operation
     async def move_roster(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -683,7 +669,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             if can_direct and not can_swap:
 
                 async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                    result = await asyncio.to_thread(
+                    result = await drain_thread(
                         mge_simplified_leadership_service.move_waitlist_to_roster_with_optional_demote,
                         event_id=self.event_id,
                         promote_award_id=promote_award_id,
@@ -717,7 +703,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                 demote_award_id = int(demote_value)
 
                 async def _submit(k: discord.Interaction, notes: str | None) -> None:
-                    result = await asyncio.to_thread(
+                    result = await drain_thread(
                         mge_simplified_leadership_service.move_waitlist_to_roster_with_optional_demote,
                         event_id=self.event_id,
                         promote_award_id=promote_award_id,
@@ -768,6 +754,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=1,
         custom_id="mge_lead_reject",
     )
+    @private_operation
     async def reject_signup(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -789,7 +776,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             signup_id = int(value)
 
             async def _submit(j: discord.Interaction, notes: str | None) -> None:
-                result = await asyncio.to_thread(
+                result = await drain_thread(
                     mge_roster_service.reject_signup,
                     event_id=self.event_id,
                     signup_id=signup_id,
@@ -823,6 +810,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
     @discord.ui.button(
         label="Reset Ranks", style=discord.ButtonStyle.danger, row=1, custom_id="mge_lead_reset"
     )
+    @private_operation
     async def reset_ranks(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -855,6 +843,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         row=2,
         custom_id="mge_lead_override_targets",
     )
+    @private_operation
     async def override_targets(
         self,
         button: discord.ui.Button,
@@ -890,6 +879,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                     )
                     self.add_item(self.target_score)
 
+                @private_operation
                 async def callback(self, modal_interaction: discord.Interaction) -> None:
                     if not is_admin_or_leadership_interaction(modal_interaction):
                         await send_ephemeral(modal_interaction, "❌ Leadership/admin only.")
@@ -900,7 +890,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ Invalid target score.")
                         return
 
-                    result = await asyncio.to_thread(
+                    result = await drain_thread(
                         mge_publish_service.override_target_score,
                         award_id=self.selected_award_id,
                         target_score=target_score,

@@ -19,16 +19,37 @@ class _DummyUser:
 class _DummyResponse:
     def __init__(self):
         self.modal = None
+        self.done = False
+
+    def is_done(self):
+        return self.done
+
+    async def defer(self, **kwargs):
+        self.done = True
 
     async def send_modal(self, modal):
+        assert not self.done
         self.modal = modal
+        self.done = True
 
 
 class _DummyInteraction:
     def __init__(self, user_id: int = 1):
+        self.id = 1234
         self.user = _DummyUser(user_id)
         self.client = _DummyClient()
         self.response = _DummyResponse()
+        self.prepared_view = None
+        self.followup = types.SimpleNamespace(send=self._send)
+
+    async def _send(self, content, **kwargs):
+        self.prepared_view = kwargs.get("view")
+
+    async def open_prepared_form(self):
+        if self.prepared_view is not None:
+            fresh = _DummyInteraction(self.user.id)
+            await self.prepared_view.open_form.callback(fresh)
+            self.response.modal = fresh.response.modal
 
 
 @pytest.mark.asyncio
@@ -55,6 +76,7 @@ async def test_edit_button_opens_modal(monkeypatch):
     button = view.edit_rules_text
 
     await button.callback(interaction)
+    await interaction.open_prepared_form()
     assert interaction.response.modal is not None
     assert interaction.response.modal.rules_text.max_length == 1024
     assert sent == []
@@ -90,6 +112,7 @@ async def test_reset_button_calls_service_and_reports(monkeypatch):
     button = view.reset_to_mode_default
 
     await button.callback(interaction)
+    await interaction.open_prepared_form()
     assert any("✅" in m for m in msgs)
 
 
@@ -132,6 +155,7 @@ async def test_edit_modal_submit_triggers_refresh(monkeypatch):
 
     # Open modal via button callback.
     await view.edit_rules_text.callback(interaction)
+    await interaction.open_prepared_form()
     modal = interaction.response.modal
     assert modal is not None
 
@@ -167,6 +191,7 @@ async def test_edit_modal_submit_reports_embed_limit_details(monkeypatch):
 
     interaction = _DummyInteraction(user_id=42)
     await view.edit_rules_text.callback(interaction)
+    await interaction.open_prepared_form()
     modal = interaction.response.modal
     assert modal is not None
 
@@ -221,6 +246,7 @@ async def test_edit_button_blocks_when_existing_rules_exceed_modal_limit(monkeyp
 
     interaction = _DummyInteraction()
     await view.edit_rules_text.callback(interaction)
+    await interaction.open_prepared_form()
 
     # Should block opening modal and show explicit warning.
     assert interaction.response.modal is None

@@ -607,22 +607,10 @@ def bound_runtime(function):
 
 
 async def drain_thread(function, *args, **kwargs):
-    """Cancellation never releases a writer while its SQL thread is still alive."""
-    pending = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
-    try:
-        return await asyncio.shield(pending)
-    except asyncio.CancelledError:
-        while not pending.done():
-            try:
-                await asyncio.shield(pending)
-            except asyncio.CancelledError:
-                continue
-            except Exception:
-                break
-        # Retrieve exceptions while preserving cancellation as the caller outcome.
-        if pending.done() and not pending.cancelled():
-            pending.exception()
-        raise
+    """Compatibility entry point; ownership lives in the shared primitive."""
+    from core.owned_work import drain_thread as owned_thread
+
+    return await owned_thread(function, *args, **kwargs)
 
 
 @dataclass

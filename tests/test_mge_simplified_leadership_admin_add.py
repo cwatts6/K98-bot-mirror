@@ -53,6 +53,7 @@ def _make_interaction(user_id: int = 9001):
 
     class _Interaction:
         def __init__(self):
+            self.id = 1234
             self.user = _User()
             self.client = object()
             self.response = _Response()
