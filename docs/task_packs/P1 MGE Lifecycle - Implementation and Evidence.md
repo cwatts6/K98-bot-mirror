@@ -8,6 +8,47 @@ import/export phase and R18 remain closed. The operator separately approved the
 exact isolated native SQL target; its seven-table fixture is installed and retained.
 No production operation, restart or acceptance replay is part of this work.
 
+## Reviewed release preparation
+
+[Mirror PR 452](https://github.com/cwatts6/K98-bot-mirror/pull/452) and
+[private PR 700](https://github.com/cwatts6/k98-bot/pull/700) carry the same file
+delta through separate Git histories. The operator explicitly approved the exact
+27-file MGE updater transition and bounded registry increase to 49 entries and
+96 KiB. All 48 historical transitions remain unchanged. The registry is 85,602
+bytes; missing, altered, extra or renamed family members and mismatched installed
+policy/registry versions remain refused. No updater has been installed.
+
+Fresh complete runs supersede the earlier full-run-plus-recheck qualification
+below: **10,085 passed / 1,100 skipped** in the mirror implementation worktree and
+**10,086 passed / 1,099 skipped** in the private promotion worktree, each with eight
+subtests and one dependency warning. After the release amendment and review fix,
+**1,258 focused updater/lifecycle tests passed, 20 skipped**, with production
+operational logs unchanged. Final PR-head CI and review receipts are retained on
+the linked PRs; merging still does not establish deployment or live acceptance.
+
+PR review found a queued-refresh loss when an in-flight pass raised. The corrected
+worker records each failure and runs a newer independently requested revision;
+it never retries a failed revision automatically. Deterministic tests cover a
+successful or failing newer pass, exactly-once execution of each pass, cleared
+pending ownership, and propagation when there is no newer request. The release
+registry pins the corrected source image.
+
+Additional completed Changes security reviews, all with zero reportable findings:
+
+- Private runtime patch: `d121b9a3-f110-4627-8989-6a8de6d2e8df` (28 source entries).
+- Mirror updater amendment: `75e0c44a-5ef3-44a9-a5a0-c1d9115db4a6` (two entries).
+- Private updater amendment: `63d82d1f-5fef-4bd8-b1c4-421fb9c9aa24` (two entries).
+- Mirror refresh correction: `cd7fd325-8608-4ded-91dd-0726e365ba66` (two entries).
+- Private refresh correction: `693208c9-20cd-43b3-9192-66c3704399c6` (two entries).
+
+The final registry-bound assertion and this evidence update are test/documentation
+changes only; they do not alter the reviewed runtime or updater policy. The exact
+upgrade package is checked against the retained accepted runtime and updater
+manifest. Its generated helper must still verify actual installed bytes and
+custody on MINI_AMD. Use the final release handoff for package hashes and the
+merged private target; preserve the prompted graceful restart and natural MGE
+verification boundary.
+
 ## Baseline and implementation slices
 
 Mirror baseline: `50c5e1a4a60a0438dca788298047f7d6dfb66e39` (includes the accepted
@@ -183,9 +224,11 @@ import smoke, command-registration and diff-whitespace checks passed. Test-only
 historical-source mapping corrections and documentation/measurement additions
 after the sealed source reviews do not change runtime or security boundaries.
 
-No protected-updater transition has been authorized or installed by this work.
-Before promotion, prepare and review the complete source/dependency transition;
-the installed protected updater must continue refusing an unreviewed image.
+At the original local implementation checkpoint no protected-updater transition
+had been authorized. The reviewed release-preparation section above records the
+subsequent explicit approval, exact transition and validation. Installation and
+live acceptance remain separate; the old installed updater correctly refuses the
+new source until the reviewed exact-version upgrade is installed.
 
 ## Operator evidence and acceptance
 
