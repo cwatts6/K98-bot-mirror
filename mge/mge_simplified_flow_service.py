@@ -90,7 +90,7 @@ def signup_auto_sort_key(row: dict[str, Any]) -> tuple[int, int, int, datetime, 
     Build the simplified-flow auto ordering key for signup/review rows.
 
     Sort order (ascending):
-      1. sort_weight â€” derived from (RequestPriority, PreferredRankBand) via
+      1. sort_weight — derived from (RequestPriority, PreferredRankBand) via
          PRIORITY_RANK_OPTIONS mapping.  High=1, Medium=2, Low=3, No-preference=4.
          Unrecognised combinations (legacy rows) fall back to weight=99 and sort
          to the bottom of the queue.
