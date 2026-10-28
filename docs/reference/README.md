@@ -1,5 +1,16 @@
 # K98 Bot Reference Docs
 
+> **Current status - 28 October 2026:** Monitoring and import/export reliability is
+> accepted and complete for the deployed private `f6a929c0597ce257ce18380af1ab6f7ad8ddcc5d`
+> runtime. Report 59, correct-data confirmation and `/stats player` acceptance close
+> fresh-runtime R18. MGE signup/withdrawal remains open and leads the next Discord/domain
+> scope. Full P1, natural event/publication checks and P0 rollover acceptance remain separate.
+> See the [accepted closeout and complete remaining ledger](../task_packs/P1%20Monitoring%20and%20Import%20Export%20Reliability%20-%20Closeout%20-%202026-10-28.md),
+> [next scope](../task_packs/P1%20Discord%20Domain%20Completion%20and%20MGE%20-%20Scope%20-%202026-10-28.md) and [new-chat starter](../task_packs/P1%20Discord%20Domain%20Completion%20and%20MGE%20-%20Chat%20Starter%20-%202026-10-28.md).
+> Earlier dated status/next-action statements below are historical where superseded.
+> This documentation update requires no bot restart, repeat import/export or SQL apply.
+
+
 > **Current checkpoint — 26 October 2026:** Startup Cache Foundations is merged,
 > deployed at private `a68089b6bccf766e9aabb182c582d486130145dc` and closed for
 > exercised paths. All six packages are delivered; the eligible original Ark callback
