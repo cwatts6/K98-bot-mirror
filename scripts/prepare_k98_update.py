@@ -472,6 +472,39 @@ CHECKPOINT_OBSERVATION_PATHS = frozenset(
 )
 
 
+MGE_LIFECYCLE_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "core/coalesced_work.py",
+        "core/interaction_safety.py",
+        "core/operation_outcome.py",
+        "core/owned_work.py",
+        "mge/dal/mge_roster_dal.py",
+        "mge/dal/mge_signup_dal.py",
+        "mge/dal/mge_signup_mutation_dal.py",
+        "mge/mge_board_delivery_adapter.py",
+        "mge/mge_embed_manager.py",
+        "mge/mge_roster_execution.py",
+        "mge/mge_scheduler.py",
+        "mge/mge_signup_service.py",
+        "services/event_delivery_service.py",
+        "services/legacy_export_snapshot_service.py",
+        "ui/views/mge_admin_completion_view.py",
+        "ui/views/mge_admin_view.py",
+        "ui/views/mge_commander_admin_view.py",
+        "ui/views/mge_publish_view.py",
+        "ui/views/mge_roster_builder_view.py",
+        "ui/views/mge_rules_edit_view.py",
+        "ui/views/mge_signup_modal.py",
+        "ui/views/mge_signup_view.py",
+        "ui/views/mge_simplified_leadership_view.py",
+        "ui/views/mge_simplified_signup_form_view.py",
+        "ui/views/mge_simplified_signup_view.py",
+        "ui/views/prepared_modal_view.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -479,20 +512,22 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 81920:
+    if len(raw) > 98304:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 48:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 49:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
         if set(item) != {"id", "members"} or not re.fullmatch(r"[a-z0-9_]{1,80}", item["id"]):
             raise ValueError("Exact installed transition required.")
-        # This larger reviewed family is indivisible; all other bounds remain 16.
+        # These larger reviewed families are indivisible; other bounds remain 16.
         member_limit = (
-            len(COORDINATION_LIFECYCLE_PATHS) if item["id"] == "coordination_lifecycle_v1" else 16
+            len(COORDINATION_LIFECYCLE_PATHS)
+            if item["id"] == "coordination_lifecycle_v1"
+            else len(MGE_LIFECYCLE_PATHS) if item["id"] == "p1_mge_lifecycle_v1" else 16
         )
         if item["id"] in identities or not 1 <= len(item["members"]) <= member_limit:
             raise ValueError("Unique bounded transition required.")
@@ -561,6 +596,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_mge_lifecycle = (
+                item["id"] == "p1_mge_lifecycle_v1" and path in MGE_LIFECYCLE_PATHS
             )
             fixed_replacement = (
                 item["id"] == "guided_replacement_release_v1"
@@ -648,6 +686,7 @@ def reviewed_transitions():
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
+                    or fixed_mge_lifecycle
                     or fixed_replacement
                     or fixed_publication
                     or fixed_probe
@@ -774,6 +813,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p1_mge_lifecycle_v1" and paths != MGE_LIFECYCLE_PATHS:
+            raise ValueError("Complete fixed MGE lifecycle transition required.")
         if item["id"] == "p1_monitoring_reliability_v1" and paths != MONITORING_RELIABILITY_PATHS:
             raise ValueError("Complete fixed monitoring-reliability transition required.")
         if (

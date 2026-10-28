@@ -111,6 +111,13 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
                     == member["after_sha256"]
                 )
             continue
+        if transition["id"] == "p1_mge_lifecycle_v1":
+            for member in transition["members"]:
+                assert (
+                    update.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
+                    == member["after_sha256"]
+                )
+            continue
         if transition["id"] == "p1_monitoring_reliability_v1":
             for member in transition["members"]:
                 assert (
