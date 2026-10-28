@@ -1,5 +1,11 @@
 # New chat starter: focused MGE A1b
 
+> **Continuation update:** The requested design pass is complete. Read the
+> [design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
+> before this historical starter. Next is approval of the bounded local implementation;
+> no runtime work, remote publication or deployment has been authorized. Preserve the
+> local documentation and original handover commit instead of repeating this scope pass.
+
 Continue K98 P1 with A1b review/scope and architecture preparation. The operator
 requested a high-quality complete framework and this focused new chat. Read
 AGENTS.md/core references, then [A1a deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and

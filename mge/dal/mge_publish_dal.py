@@ -7,6 +7,8 @@ import json
 import logging
 from typing import Any
 
+from mge.dal.qualified_read import qualified_read
+from mge.dataset_errors import MgeDatasetError
 from stats_alerts.db import exec_with_cursor, execute, run_query
 
 logger = logging.getLogger(__name__)
@@ -118,7 +120,32 @@ ORDER BY RuleKey;
 """
 
 
-def fetch_event_publish_context(event_id: int) -> dict[str, Any] | None:
+def fetch_event_publish_context(event_id: int, *, strict: bool = False) -> dict[str, Any] | None:
+    if strict:
+        rows = qualified_read(
+            SQL_SELECT_EVENT_PUBLISH_CONTEXT,
+            (event_id,),
+            stage="publication_read",
+            columns=(
+                "EventId",
+                "EventName",
+                "Status",
+                "RuleMode",
+                "PublishVersion",
+                "LastPublishedUtc",
+                "AwardEmbedMessageId",
+                "AwardEmbedChannelId",
+                "VariantName",
+                "AwardRemindersText",
+                "AwardRemindersSentUtc",
+                "AwardRemindersSentByDiscordId",
+                "AwardRemindersMessageId",
+                "AwardRemindersChannelId",
+            ),
+        )
+        if len(rows) != 1:
+            raise MgeDatasetError("unavailable", "publication_identity")
+        return rows[0]
     try:
         rows = run_query(SQL_SELECT_EVENT_PUBLISH_CONTEXT, (event_id,))
         return rows[0] if rows else None
@@ -139,7 +166,27 @@ def fetch_refreshable_award_reminder_event_id() -> int | None:
         return None
 
 
-def fetch_awards_with_signup_user(event_id: int) -> list[dict[str, Any]]:
+def fetch_awards_with_signup_user(event_id: int, *, strict: bool = False) -> list[dict[str, Any]]:
+    if strict:
+        return qualified_read(
+            SQL_SELECT_AWARDS_WITH_SIGNUP_USER,
+            (event_id,),
+            stage="awards_user_read",
+            columns=(
+                "AwardId",
+                "EventId",
+                "SignupId",
+                "GovernorId",
+                "GovernorNameSnapshot",
+                "RequestedCommanderName",
+                "AwardedRank",
+                "TargetScore",
+                "AwardStatus",
+                "WaitlistOrder",
+                "PublishVersion",
+                "DiscordUserId",
+            ),
+        )
     try:
         return run_query(SQL_SELECT_AWARDS_WITH_SIGNUP_USER, (event_id,))
     except Exception:

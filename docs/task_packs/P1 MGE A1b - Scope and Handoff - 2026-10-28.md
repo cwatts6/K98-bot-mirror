@@ -1,5 +1,14 @@
 # P1 MGE A1b: scope and handoff
 
+> **Design pass completed:** Read the [approval-ready design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md).
+> It resolves the caller map, outcome wording, qualified-read prerequisites,
+> refresh/recovery ownership, two-PR order and acceptance gates. The final framework
+> review adds shared publication/refresh identity ownership and conditional ID writes;
+> the revised scope awaits approval. This original handover remains evidence and scope history;
+> the 28-document handover is merged through mirror PR 455/private PR 703.
+> This design packet and subsequent amendments remain local. See its custody table
+> for verified merge identities; the documentation merges did not restart the bot.
+
 Date: 28 October 2026. Status: focused review/scope and architecture preparation
 authorized. The operator wants the most effective complete A1b framework, with
 documentation current and a new chat. This handoff does not authorize runtime

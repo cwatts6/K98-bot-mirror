@@ -226,9 +226,11 @@ def _maybe_regenerate_targets(
         return False
 
 
-def get_leadership_board_payload(event_id: int) -> dict[str, Any]:
+def get_leadership_board_payload(event_id: int, *, allow_placement: bool = True) -> dict[str, Any]:
     """Return leadership embed/view payload using simplified-flow service outputs."""
-    dataset = get_ordered_leadership_rows(event_id)
+    dataset = get_ordered_leadership_rows(
+        event_id, **({} if allow_placement else {"allow_placement": False})
+    )
     readiness = evaluate_dataset_readiness(dataset)
     counts = dict(dataset.get("counts", {}))
 

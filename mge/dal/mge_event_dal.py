@@ -7,6 +7,8 @@ import json
 import logging
 from typing import Any
 
+from mge.dal.qualified_read import qualified_read
+from mge.dataset_errors import MgeDatasetError
 from stats_alerts.db import exec_with_cursor, run_query
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ SELECT
     e.Status,
     e.RuleMode,
     e.RulesText,
+    e.PublishVersion,
     e.SignupEmbedMessageId,
     e.SignupEmbedChannelId,
     e.LeadershipEmbedMessageId,
@@ -268,7 +271,35 @@ def fetch_mge_event_by_source(calendar_event_source_id: int) -> dict[str, Any] |
         return None
 
 
-def fetch_event_for_embed(event_id: int) -> dict[str, Any] | None:
+def fetch_event_for_embed(event_id: int, *, strict: bool = False) -> dict[str, Any] | None:
+    if strict:
+        rows = qualified_read(
+            SQL_SELECT_EVENT_FOR_EMBED,
+            (event_id,),
+            stage="event_read",
+            columns=(
+                "EventId",
+                "EventName",
+                "StartUtc",
+                "EndUtc",
+                "SignupCloseUtc",
+                "EventMode",
+                "Status",
+                "RuleMode",
+                "RulesText",
+                "PublishVersion",
+                "SignupEmbedMessageId",
+                "SignupEmbedChannelId",
+                "LeadershipEmbedMessageId",
+                "LeadershipEmbedChannelId",
+                "AwardEmbedMessageId",
+                "AwardEmbedChannelId",
+                "VariantName",
+            ),
+        )
+        if len(rows) != 1:
+            raise MgeDatasetError("unavailable", "event_identity")
+        return rows[0]
     try:
         rows = run_query(SQL_SELECT_EVENT_FOR_EMBED, (event_id,))
         return rows[0] if rows else None
@@ -387,6 +418,16 @@ def fetch_open_rule_template() -> str | None:
         return None
     value = rows[0].get("RuleText")
     return str(value) if value is not None else None
+
+
+def fetch_public_signup_rows(event_id: int) -> list[dict[str, Any]]:
+    return qualified_read(
+        "SELECT EventId, SignupId, GovernorId, GovernorNameSnapshot FROM dbo.MGE_Signups "
+        "WHERE EventId = ? AND IsActive = 1 ORDER BY CreatedUtc ASC;",
+        (event_id,),
+        columns=("EventId", "SignupId", "GovernorId", "GovernorNameSnapshot"),
+        stage="public_signup_read",
+    )
 
 
 def fetch_public_signup_names(event_id: int) -> list[str]:

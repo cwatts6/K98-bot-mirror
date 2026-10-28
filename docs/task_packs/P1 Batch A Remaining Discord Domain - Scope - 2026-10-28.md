@@ -5,8 +5,10 @@ Private runtime: `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`. Read the
 [deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and
 [focused A1b scope/handoff](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md) first.
 This document retains the wider programme boundary. A1a dataset reuse/timing is
-delivered; the new chat prepares A1b architecture and implementation scope before
-runtime changes. Do not repeat deployment, restart or accepted business actions.
+delivered; the [A1b architecture and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
+is now prepared for approval before runtime changes. Do not repeat deployment,
+restart or accepted business actions. The handover documents are merged through
+mirror PR 455/private PR 703; the new A1b design and subsequent amendments remain local.
 
 ## A1: focused MGE responsiveness and refresh proposal
 

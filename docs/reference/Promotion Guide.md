@@ -3,11 +3,11 @@
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
-> datasets and timing are delivered; next is focused A1b scope/design in a new chat.
+> datasets and timing are delivered; the A1b design packet is prepared for approval.
 > Rank confirmation still waits for board refresh. Report 62 queue closure, the older
 > configuration decision and separate Discord lag remain follow-ups. Exact audit/cleanup,
 > unexercised cases, fresh import/export, natural acceptance and P0 remain explicit.
-> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b scope/handoff](../task_packs/P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
+> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b design packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md).
 > Earlier dated status and next-action text is historical where superseded.
 > This documentation update requires no deployment, restart, SQL apply or repeat import.
 

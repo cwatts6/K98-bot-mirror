@@ -24,11 +24,9 @@ from core.owned_work import drain_awaitable, drain_thread
 from embed_utils import fmt_short
 from mge.dal.mge_event_dal import (
     fetch_event_for_embed,
-    fetch_public_signup_names,
     update_event_embed_ids,
 )
 from mge.dal.mge_leadership_dal import (
-    fetch_leadership_embed_state,
     update_leadership_embed_state,
 )
 from mge.dal.mge_publish_dal import (
@@ -38,6 +36,13 @@ from mge.dal.mge_publish_dal import (
 )
 from mge.dataset_errors import MgeDatasetError
 from mge.mge_board_delivery_adapter import send_board_once
+from mge.mge_board_preparation import (
+    public_names,
+    validate_destination,
+    validate_event,
+    validate_payload,
+    validate_rows,
+)
 from mge.mge_content_renderer import render_mge_content_to_embed_fields
 from mge.mge_simplified_leadership_service import get_leadership_board_payload
 from ui.views.mge_admin_view import MGEAdminViewDeps
@@ -60,7 +65,16 @@ def _serialize_board(function):
             async with lock:
                 record_timing("mge_board_owner_wait", perf_counter() - started)
                 with timed_stage(function.__name__):
-                    return await function(**kwargs)
+                    try:
+                        return await function(**kwargs)
+                    except MgeDatasetError as exc:
+                        logger.warning(
+                            "mge_board_qualification_failed event_id=%s state=%s stage=%s",
+                            kwargs["event_id"],
+                            exc.state,
+                            exc.stage,
+                        )
+                        return False
 
         with timing_scope():
             return await drain_awaitable(owned())
@@ -596,11 +610,13 @@ async def sync_event_signup_embed(
     announce_everyone: bool = False,
     is_rehydrate: bool = False,
 ) -> bool:
-    row = await drain_thread(fetch_event_for_embed, event_id)
+    row = await drain_thread(fetch_event_for_embed, event_id, strict=True)
     if not row:
         logger.warning("mge_embed_sync_skip reason=event_not_found event_id=%s", event_id)
         return False
 
+    validate_event(row, event_id)
+    validate_destination(row, "signup", signup_channel_id)
     # Derive lifecycle state
     lifecycle_state = _derive_signup_lifecycle_state(row)
     logger.info(
@@ -609,31 +625,9 @@ async def sync_event_signup_embed(
         lifecycle_state,
     )
 
-    if MGE_SIMPLIFIED_FLOW_ENABLED:
-        from mge.mge_simplified_flow_service import get_public_signup_rows
-
-        public_signup_names = [
-            str(row.get("GovernorNameSnapshot") or "Unknown")
-            for row in (await drain_thread(get_public_signup_rows, event_id))
-        ]
-    else:
-        public_signup_names = await drain_thread(fetch_public_signup_names, event_id)
-
-    channel = bot.get_channel(signup_channel_id)
-    if channel is None:
-        try:
-            channel = await bot.fetch_channel(signup_channel_id)
-        except Exception:
-            logger.exception(
-                "mge_embed_sync_failed reason=channel_unavailable channel_id=%s", signup_channel_id
-            )
-            return False
-
-    if not isinstance(channel, discord.abc.Messageable):
-        logger.error(
-            "mge_embed_sync_failed reason=channel_not_messageable channel_id=%s", signup_channel_id
-        )
-        return False
+    public_signup_names = await drain_thread(
+        public_names, event_id, simplified=MGE_SIMPLIFIED_FLOW_ENABLED
+    )
 
     embed = build_mge_signup_embed(
         row, public_signup_names=public_signup_names, lifecycle_state=lifecycle_state
@@ -656,6 +650,23 @@ async def sync_event_signup_embed(
             lifecycle_state,
             row.get("EventMode"),
         )
+
+    validate_payload(
+        embed.to_dict(),
+        has_view=view is not None,
+        view_required=_should_attach_signup_view(row, lifecycle_state),
+    )
+    channel = bot.get_channel(signup_channel_id)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(signup_channel_id)
+        except Exception:
+            logger.exception(
+                "mge_embed_sync_failed reason=channel_unavailable event_id=%s", event_id
+            )
+            return False
+    if not isinstance(channel, discord.abc.Messageable):
+        return False
 
     # Determine if @everyone mention should be sent on first post
     should_mention = False
@@ -753,12 +764,14 @@ async def sync_event_awards_embed(
     announce_players: bool = False,
     now_utc: datetime | None = None,
 ) -> bool:
-    row = await drain_thread(fetch_event_publish_context, event_id)
+    row = await drain_thread(fetch_event_publish_context, event_id, strict=True)
     if not row:
         logger.warning("mge_awards_sync_skip reason=event_not_found event_id=%s", event_id)
         return False
 
-    rows = await drain_thread(fetch_awards_with_signup_user, event_id)
+    validate_event(row, event_id, publication=True)
+    rows = await drain_thread(fetch_awards_with_signup_user, event_id, strict=True)
+    validate_rows(rows, event_id, awards=True)
     awarded = [r for r in rows if str(r.get("AwardStatus") or "").strip().lower() == "awarded"]
     waitlist = [r for r in rows if str(r.get("AwardStatus") or "").strip().lower() == "waitlist"]
 
@@ -767,6 +780,15 @@ async def sync_event_awards_embed(
         logger.warning("mge_awards_sync_skip reason=no_channel event_id=%s", event_id)
         return False
 
+    old_version = _to_int(row.get("PublishVersion"), 0)
+    embed = build_mge_awards_embed(
+        event_row=row,
+        awarded_rows=awarded,
+        waitlist_rows=waitlist,
+        publish_version=max(old_version, 1),
+        published_utc=now_utc or datetime.now(UTC),
+    )
+    validate_payload(embed.to_dict())
     channel = bot.get_channel(channel_id)
     if channel is None:
         try:
@@ -786,15 +808,6 @@ async def sync_event_awards_embed(
             event_id,
         )
         return False
-
-    old_version = _to_int(row.get("PublishVersion"), 0)
-    embed = build_mge_awards_embed(
-        event_row=row,
-        awarded_rows=awarded,
-        waitlist_rows=waitlist,
-        publish_version=max(old_version, 1),
-        published_utc=now_utc or datetime.now(UTC),
-    )
 
     msg_id = _to_int(row.get("AwardEmbedMessageId"), 0)
     message = None
@@ -859,11 +872,12 @@ async def sync_event_leadership_embed(
     now_utc: datetime | None = None,
 ) -> bool:
     """Create or refresh the persistent leadership-channel embed for an event."""
-    event_row = await drain_thread(fetch_event_for_embed, event_id)
+    event_row = await drain_thread(fetch_event_for_embed, event_id, strict=True)
     if not event_row:
         logger.warning("mge_leadership_sync_skip reason=event_not_found event_id=%s", event_id)
         return False
 
+    validate_event(event_row, event_id)
     resolved_channel_id = _to_int(channel_id or MGE_LEADERSHIP_CHANNEL_ID, 0)
     if resolved_channel_id <= 0:
         logger.warning("mge_leadership_sync_skip reason=no_channel event_id=%s", event_id)
@@ -876,6 +890,8 @@ async def sync_event_leadership_embed(
         return False
     embed = build_mge_leadership_embed(event_row=event_row, board_payload=board_payload)
     view = _build_leadership_view(event_id=event_id, board_payload=board_payload)
+    validate_destination(event_row, "leadership", resolved_channel_id)
+    validate_payload(embed.to_dict(), has_view=view is not None, view_required=True)
 
     channel = bot.get_channel(resolved_channel_id)
     if channel is None:
@@ -897,8 +913,7 @@ async def sync_event_leadership_embed(
         )
         return False
 
-    state = await drain_thread(fetch_leadership_embed_state, event_id)
-    msg_id = _to_int(state.get("message_id"), 0)
+    msg_id = _to_int(event_row.get("LeadershipEmbedMessageId"), 0)
     message = None
     if msg_id > 0:
         try:

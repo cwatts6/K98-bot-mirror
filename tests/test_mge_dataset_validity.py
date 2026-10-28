@@ -21,6 +21,17 @@ from mge.dataset_errors import MgeDatasetError
 from mge.mge_roster_execution import run_roster_mutation
 
 
+@pytest.fixture(autouse=True)
+def qualified_dataset_read_adapter(monkeypatch):
+    # These tests exercise dataset preparation; cursor metadata has its own IO-edge suite.
+    for module in (review, roster):
+        monkeypatch.setattr(
+            module,
+            "qualified_read",
+            lambda sql, params, _module=module, **kw: _module.run_query(sql, params),
+        )
+
+
 def signup(sid=1):
     return dict(
         EventId=77,
@@ -206,7 +217,9 @@ def test_wrong_event_snapshot_never_enters_placement(dataset, bad):
 async def test_unavailable_payload_preserves_board_without_discord_or_identity_writes(
     dataset, monkeypatch
 ):
-    monkeypatch.setattr(boards, "fetch_event_for_embed", lambda _: {"EventId": 77})
+    from tests.test_mge_board_qualification import event
+
+    monkeypatch.setattr(boards, "fetch_event_for_embed", lambda *a, **k: event())
     monkeypatch.setattr(boards, "MGE_LEADERSHIP_CHANNEL_ID", 1)
 
     def fail(*_):

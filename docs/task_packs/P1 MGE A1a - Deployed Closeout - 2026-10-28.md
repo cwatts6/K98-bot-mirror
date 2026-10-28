@@ -1,5 +1,10 @@
 # P1 MGE A1a: deployed closeout and evidence ledger
 
+> **Next step:** The [A1b design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
+> is prepared for implementation approval. This does not alter the deployed
+> evidence below or authorize another deployment. The handover is merged through
+> mirror PR 455/private PR 703; the new A1b design and subsequent amendments remain local.
+
 Date: 28 October 2026. Status: A1a merged, deployed and verified for exercised
 paths. The operator accepted the review and requested documentation closeout and
 a focused A1b scope chat. This is not acceptance of every MGE failure scenario,
@@ -133,9 +138,12 @@ retains every R01-R18 row. Its earlier acceptance remains valid; apply this over
 ## Documentation custody and validation
 
 This closeout is documentation only. It changes no runtime, SQL, config, deployment
-policy, permissions or acceptance evidence. Use the validated local handoff revision
-identified in the new chat; documentation publication and bot-machine source updates
-must be reported separately. No production restart is needed for this documentation.
+policy, permissions or acceptance evidence. The 28-file handover is now merged:
+mirror PR 455 at `8db65da6cc7f4a7b77d0f78944ed4f51fc5d5018` and private PR 703 at
+`07d5dd17fce7384de02c73551a8c5b8f3c15f2ac`. Use the A1b design packet's current
+custody record for subsequent local additions. Documentation publication and
+bot-machine source updates remain separate. No new production restart occurred
+or is needed for these documentation merges.
 Validation passed: architecture (zero Python changes), deferred (28 Markdown files),
 security routing (zero errors/warnings), test selector, all 60 introduced local links
 and whitespace checks. Runtime pytest/smoke/registration and a new security scan are skipped for

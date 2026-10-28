@@ -383,11 +383,16 @@ def build_leadership_ordered_dataset(
     award_rows: list[dict[str, Any]],
     *,
     strict: bool = False,
+    allow_placement: bool = True,
 ) -> dict[str, Any]:
-    if review_rows:
+    if review_rows and allow_placement:
         healed_awards = _self_heal_assign_unassigned(review_rows, award_rows, strict=strict)
     else:
         healed_awards = award_rows
+    if strict and review_rows:
+        from mge.mge_board_preparation import validate_join
+
+        validate_join(review_rows, healed_awards, int(review_rows[0]["EventId"]))
 
     merged = merge_review_and_award_rows(review_rows, healed_awards)
 
@@ -448,14 +453,19 @@ def get_ordered_signup_rows(event_id: int) -> list[dict[str, Any]]:
     return sort_review_rows(rows)
 
 
-def get_public_signup_rows(event_id: int) -> list[dict[str, Any]]:
-    review_rows = sort_review_rows(mge_review_dal.fetch_signup_review_rows(event_id))
-    award_rows = mge_roster_dal.fetch_event_awards(event_id)
+def get_public_signup_rows(event_id: int, *, strict: bool = False) -> list[dict[str, Any]]:
+    options = {"strict": True} if strict else {}
+    review_rows = sort_review_rows(mge_review_dal.fetch_signup_review_rows(event_id, **options))
+    award_rows = mge_roster_dal.fetch_event_awards(event_id, **options)
+    if strict:
+        from mge.mge_board_preparation import validate_join
+
+        validate_join(review_rows, award_rows, event_id)
     merged = merge_review_and_award_rows(review_rows, award_rows)
     return [row for row in merged if not _is_persisted_rejected_row(row)]
 
 
-def get_ordered_leadership_rows(event_id: int) -> dict[str, Any]:
+def get_ordered_leadership_rows(event_id: int, *, allow_placement: bool = True) -> dict[str, Any]:
     """Fresh qualified preparation, including legacy automatic placement.
 
     An error is never an empty snapshot. A partial placement is not rollback
@@ -467,7 +477,12 @@ def get_ordered_leadership_rows(event_id: int) -> dict[str, Any]:
         if any(_as_int(row.get("EventId")) != int(event_id) for row in review_rows + award_rows):
             raise MgeDatasetError("unavailable", "event_identity")
         try:
-            dataset = build_leadership_ordered_dataset(review_rows, award_rows, strict=True)
+            from mge.mge_board_preparation import validate_join
+
+            validate_join(review_rows, award_rows, event_id)
+            dataset = build_leadership_ordered_dataset(
+                review_rows, award_rows, strict=True, allow_placement=allow_placement
+            )
         except MgeDatasetError:
             raise
         except Exception:

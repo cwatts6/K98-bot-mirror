@@ -3,7 +3,7 @@
 > **Current overlay:** The accepted lifecycle release below is the predecessor.
 > A1a is now deployed at `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`; see
 > [deployed evidence and remaining obligations](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and
-> [A1b scope](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md). Earlier acceptance is retained.
+> [approval-ready A1b design](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md). Earlier acceptance is retained.
 > The later successful startup configuration attempt does not settle the earlier
 > continuation decision. The ledger below is carried forward with this overlay.
 

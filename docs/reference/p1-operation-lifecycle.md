@@ -3,11 +3,11 @@
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
-> datasets and timing are delivered; next is focused A1b scope/design in a new chat.
+> datasets and timing are delivered; the A1b design packet is prepared for approval.
 > Rank confirmation still waits for board refresh. Report 62 queue closure, the older
 > configuration decision and separate Discord lag remain follow-ups. Exact audit/cleanup,
 > unexercised cases, fresh import/export, natural acceptance and P0 remain explicit.
-> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b scope/handoff](../task_packs/P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
+> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b design packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md).
 > Earlier dated status and next-action text is historical where superseded.
 > This documentation update requires no deployment, restart, SQL apply or repeat import.
 
@@ -121,6 +121,17 @@ closed merely because a shared helper is available.
 See [MGE implementation and evidence](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md).
 
 ## A1a qualified datasets and measurement framework
+
+The [A1b design packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
+proposes strict public/identity/award reads, truthful legacy partial-result handling,
+reply-independent owned refresh and existing-message restart reconciliation.
+The final framework review also requires publication/refresh identity ownership:
+an older refresh must not overwrite a newer or intentionally cleared board pointer.
+Conditional ID writes and lifecycle-qualified journal recovery are proposed;
+separate coalescing keys alone do not establish this invariant.
+These are proposed additions, not delivered behavior. The present calendar window
+does not guarantee recovery of every persisted board, and a legacy roster Boolean
+does not supply the signup transaction's durable outcome contract.
 
 The deployed A1a implementation distinguishes successful `loaded_empty` and `loaded`
 leadership preparations from `unavailable` reads and `incomplete` preparation.

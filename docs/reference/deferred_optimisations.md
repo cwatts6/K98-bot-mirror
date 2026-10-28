@@ -3,11 +3,11 @@
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
-> datasets and timing are delivered; next is focused A1b scope/design in a new chat.
+> datasets and timing are delivered; the A1b design packet is prepared for approval.
 > Rank confirmation still waits for board refresh. Report 62 queue closure, the older
 > configuration decision and separate Discord lag remain follow-ups. Exact audit/cleanup,
 > unexercised cases, fresh import/export, natural acceptance and P0 remain explicit.
-> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b scope/handoff](../task_packs/P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md).
+> See [deployed closeout](../task_packs/P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and [A1b design packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md).
 > Earlier dated status and next-action text is historical where superseded.
 > This documentation update requires no deployment, restart, SQL apply or repeat import.
 
@@ -720,7 +720,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Suggested Fix: In the remaining R12 writer census, map every roster writer and conflict order. Adopt one narrowly scoped atomic writer family at a time, grouping required audit and domain changes and distinguishing rollback from lost commit acknowledgement. Prove stale snapshots, competing writers, second-caller participation and unknown outcomes with native SQL qualification; preserve existing rank and publication policy.
 - Impact: high
 - Risk: high
-- Dependencies: MGE lifecycle source and tests; authoritative SQL schema; explicit bounded writer scope and native qualification target; Changes-only review. No production or policy change is authorized by this capture.
+- Dependencies: MGE lifecycle source and tests; authoritative SQL schema; explicit bounded writer scope and native qualification target; Changes-only review. A1b proposes exposing acknowledged steps, zero-row updates, audit failures and partial/unknown outcomes without claiming atomicity; see the A1b design packet. The cross-process/transaction redesign remains here. No production or policy change is authorized by this capture.
 
 ### Deferred Optimisation
 - Area: `mge/dal/mge_signup_mutation_dal.py::SQL_RECEIPT` and `dbo.MGE_SignupAudit`
@@ -751,7 +751,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: Accepted MGE closeout and remaining Batch A scope; receipt-query scaling and cross-process roster contracts stay separately scoped.
-- Status: A1a merged/deployed and exercised paths verified; A1b scope/design authorized. See the A1a deployed closeout and A1b scope/handoff in docs/task_packs. Production percentile/performance acceptance remains separate.
+- Status: A1a merged/deployed and exercised paths verified; A1b design completed for approval, runtime not authorized. See the [A1b design and delivery packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md). Proposed order: B1 qualified board data, then B2/B3 result evidence and owned refresh/recovery; B4 proof in both. Source review also found empty-on-missing-cursor-metadata, zero-row success and a calendar-window recovery gap. The final framework review adds shared publication/refresh identity ownership and conditional ID writes to prevent stale saves restoring superseded or cleared bindings; the revised scope awaits approval. These are explicit A1b prerequisites, not silently deferred. Production percentile/performance acceptance remains separate.
 
 ### Deferred Optimisation
 - Area: CFG-51421; proc_config_import.py and services/legacy_export_snapshot_service.py::begin_writer / legacy_export_snapshot_dal.py::session

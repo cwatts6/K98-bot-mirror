@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from core.operation_timing import timed_stage
+from mge.dal.qualified_read import qualified_read
 from mge.dataset_errors import MgeDatasetError
 from stats_alerts.db import exec_with_cursor, run_query
 
@@ -154,7 +155,34 @@ def _naive_utc(dt: datetime) -> datetime:
 def fetch_event_awards(event_id: int, *, strict: bool = False) -> list[dict[str, Any]]:
     try:
         with timed_stage("mge_awards_read"):
+            if strict:
+                return qualified_read(
+                    SQL_SELECT_EVENT_AWARDS,
+                    (event_id,),
+                    stage="awards_read",
+                    columns=(
+                        "AwardId",
+                        "EventId",
+                        "SignupId",
+                        "GovernorId",
+                        "GovernorNameSnapshot",
+                        "AwardStatus",
+                        "AwardedRank",
+                        "WaitlistOrder",
+                        "TargetScore",
+                        "ManualOrderOverride",
+                        "PublishVersion",
+                        "RequestedCommanderId",
+                        "RequestedCommanderName",
+                        "InternalNotes",
+                        "AssignedByDiscordId",
+                        "CreatedUtc",
+                        "UpdatedUtc",
+                    ),
+                )
             return run_query(SQL_SELECT_EVENT_AWARDS, (event_id,))
+    except MgeDatasetError:
+        raise
     except Exception:
         if strict:
             raise MgeDatasetError("unavailable", "awards_read") from None
