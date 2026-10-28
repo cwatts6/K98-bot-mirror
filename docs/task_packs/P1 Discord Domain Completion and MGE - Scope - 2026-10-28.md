@@ -1,5 +1,17 @@
 # P1 Discord/domain completion and MGE: next phase scope
 
+> **Current status - 28 October 2026, MGE closeout:** The bounded MGE phase is
+> delivered and accepted for exercised signup/edit/withdrawal and leadership flows
+> on private `4c8ca0d5fada35c7a32d31846bad6cc492aa92a9`. Next: remaining Batch A
+> Discord/domain scope, starting with measured MGE responsiveness/refresh work.
+> ProcConfig cancellation is verified; its continuation choice and separate reliability
+> follow-ups remain open. Exact audit/cleanup readback and unexercised MGE cases remain
+> explicit. Full P1, natural acceptance and P0 rollover are not closed.
+> See [accepted closeout and complete ledger](P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md),
+> [next scope](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md) and [chat starter](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Chat%20Starter%20-%202026-10-28.md).
+> Earlier dated status and next-action text is historical where superseded.
+> This documentation update requires no deployment, restart, SQL apply or repeat import.
+
 Date: 28 October 2026. **Stage: review/scope only.** The previous monitoring/import/export
 phase is accepted at private `f6a929c0597ce257ce18380af1ab6f7ad8ddcc5d`.
 MGE-01 is first in delivery batch A. Do not reopen completed imports or the original Ark callback.

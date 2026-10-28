@@ -1,14 +1,16 @@
 # Deferred Optimisations
 
-> **Current status - 28 October 2026:** Monitoring and import/export reliability is
-> accepted and complete for the deployed private `f6a929c0597ce257ce18380af1ab6f7ad8ddcc5d`
-> runtime. Report 59, correct-data confirmation and `/stats player` acceptance close
-> fresh-runtime R18. MGE signup/withdrawal remains open and leads the next Discord/domain
-> scope. Full P1, natural event/publication checks and P0 rollover acceptance remain separate.
-> See the [accepted closeout and complete remaining ledger](../task_packs/P1%20Monitoring%20and%20Import%20Export%20Reliability%20-%20Closeout%20-%202026-10-28.md),
-> [next scope](../task_packs/P1%20Discord%20Domain%20Completion%20and%20MGE%20-%20Scope%20-%202026-10-28.md) and [new-chat starter](../task_packs/P1%20Discord%20Domain%20Completion%20and%20MGE%20-%20Chat%20Starter%20-%202026-10-28.md).
-> Earlier dated status/next-action statements below are historical where superseded.
-> This documentation update requires no bot restart, repeat import/export or SQL apply.
+> **Current status - 28 October 2026, MGE closeout:** The bounded MGE phase is
+> delivered and accepted for exercised signup/edit/withdrawal and leadership flows
+> on private `4c8ca0d5fada35c7a32d31846bad6cc492aa92a9`. Next: remaining Batch A
+> Discord/domain scope, starting with measured MGE responsiveness/refresh work.
+> ProcConfig cancellation is verified; its continuation choice and separate reliability
+> follow-ups remain open. Exact audit/cleanup readback and unexercised MGE cases remain
+> explicit. Full P1, natural acceptance and P0 rollover are not closed.
+> See [accepted closeout and complete ledger](../task_packs/P1%20MGE%20Lifecycle%20-%20Accepted%20Closeout%20-%202026-10-28.md),
+> [next scope](../task_packs/P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md) and [chat starter](../task_packs/P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Chat%20Starter%20-%202026-10-28.md).
+> Earlier dated status and next-action text is historical where superseded.
+> This documentation update requires no deployment, restart, SQL apply or repeat import.
 
 
 26 October overlay: the six Startup Cache Foundations packages are delivered,
@@ -729,3 +731,35 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: R16 performance work; authoritative SQL contract and independent migration review; retained `docs/benchmarks/p1_mge_native_sql_20261028.json` evidence; approved fixture bounds. No schema or production operation authorized by this capture.
+
+## 28 October MGE acceptance and remaining Batch A follow-ups
+
+### Deferred Optimisation
+- Area: MGE-PERF; core/interaction_safety.py, ui/views/mge_simplified_leadership_view.py and mge/mge_embed_manager.py
+- Type: performance
+- Description: Accepted production rank selection measured ack 3.091s/total 6.410s and submission ack 0.974s/total 16.834s. Leadership rendering/readiness repeats the dataset read; final rank response awaits board refresh. Scheduler activity overlaps, but stage cost, contention cause and regression remain unproven.
+- Suggested Fix: Scope the first remaining Batch A PR around stage timing, shared dataset reuse and refresh/confirmation coordination. Inventory every refresh caller; retain exact outcomes, same-message ownership and cancellation semantics. Compare representative repeated fixtures and a second caller; do not replay live operations for a benchmark.
+- Impact: medium
+- Risk: medium
+- Dependencies: Accepted MGE closeout and remaining Batch A scope; receipt-query scaling and cross-process roster contracts stay separately scoped.
+- Status: Captured; proposed first remaining Batch A slice; no runtime change
+
+### Deferred Optimisation
+- Area: CFG-51421; proc_config_import.py and services/legacy_export_snapshot_service.py::begin_writer / legacy_export_snapshot_dal.py::session
+- Type: architecture
+- Description: Startup import on the deployed MGE runtime passed durable writer admission but session applock acquisition refused with SQL 51421 before yielding the guard. Report 61 verifies cancellation and exact reservation release. Blocking owner is unknown; earlier 51400 and provider-stream preflight are distinct observations.
+- Suggested Fix: Extend the existing ProcConfig entrypoint/owner audit with this timeline; map lock order and actual blocking ownership. Reproduce startup overlap deterministically. Consider bounded waiting only with verified non-entry/cleanup, preserving cancellation, unknown outcomes and no write replay. Keep the operator continuation decision separate.
+- Impact: medium
+- Risk: high
+- Dependencies: Existing ProcConfig caller census and authoritative SQL validation; separate reliability PR if warranted.
+- Status: Captured; original attempt resolved, continuation decision open in Report 61; no new publication verified
+
+### Deferred Optimisation
+- Area: CFG-OVERVIEW; services/recovery_runtime.py, services/recovery_report.py and configuration continuation reporting
+- Type: consistency
+- Description: Report 61 contains a resolved clear overview and one open configuration-continuation decision. Collection is nontransactional, so this is not yet proof of a persistent reporting defect. Historical startup failure correctly remains recorded after cancellation.
+- Suggested Fix: Trace overview refresh and continuation creation ordering; reproduce with deterministic fixtures. Distinguish an active failure, recovered historical failure and pending operator choice. Explain collection timestamps and keep outstanding decisions visible without replaying imports.
+- Impact: medium
+- Risk: low
+- Dependencies: Report 61 and configuration recovery lifecycle; separate from MGE performance and actual SQL blocker diagnosis.
+- Status: Captured; evidence reconciliation pending
