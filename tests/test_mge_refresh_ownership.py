@@ -8,6 +8,29 @@ from mge.mge_refresh_work import RefreshCoordinator
 
 
 @pytest.mark.asyncio
+async def test_new_gate_joins_pass_already_waiting_before_latest_read():
+    work = RefreshCoordinator()
+    first_gate, second_gate = asyncio.Event(), asyncio.Event()
+    reads = []
+
+    async def read():
+        reads.append(1)
+        return True
+
+    one = work.request(7, read, gate=first_gate)
+    await asyncio.sleep(0)
+    two = work.request(7, read, gate=second_gate)
+    first_gate.set()
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert reads == []
+    second_gate.set()
+    assert (await one).status == (await two).status == "delivered"
+    await work.drain()
+    assert reads and work.snapshot()["reply_gates"] == 0
+
+
+@pytest.mark.asyncio
 async def test_dirty_pass_reads_latest_state_and_waits_for_each_reply():
     work = RefreshCoordinator()
     entered, release, gate = asyncio.Event(), asyncio.Event(), asyncio.Event()

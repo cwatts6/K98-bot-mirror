@@ -482,14 +482,32 @@ async def _publish_primary(
         )
     awarded = [row for row in posted if _status(row.get("AwardStatus")) == "awarded"]
     waitlist = [row for row in posted if _status(row.get("AwardStatus")) == "waitlist"]
-    sent = await adapter.send_awards_embed(
-        channel_id=channel_id,
-        event_row=current,
-        awarded_rows=awarded,
-        waitlist_rows=waitlist,
-        publish_version=new_version,
-        published_utc=now,
-    )
+    try:
+        sent = await adapter.send_awards_embed(
+            channel_id=channel_id,
+            event_row=current,
+            awarded_rows=awarded,
+            waitlist_rows=waitlist,
+            publish_version=new_version,
+            published_utc=now,
+        )
+    except Exception as exc:
+        logger.warning(
+            "mge_publication_saved_board_unconfirmed event_id=%s version=%s error_type=%s",
+            event_id,
+            new_version,
+            type(exc).__name__,
+        )
+        return (
+            PublishResult(
+                False,
+                "Publication was saved, but board delivery could not be confirmed. Have leadership check before repeating it.",
+                publish_version=new_version,
+            ),
+            new_version,
+            awarded,
+            waitlist,
+        )
     if sent.status != "sent" or sent.message_ref is None:
         return (
             PublishResult(

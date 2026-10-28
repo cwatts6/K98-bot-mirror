@@ -49,7 +49,7 @@ def test_reviewed_history_and_mge_hashes_remain_exact():
     )
     assert (
         updater.sha256(canonical(items[50]))
-        == "0fab5be55a9b8539257b2ac5fd259e0ae8cdfe9ffa83779b8348d6ae15594d63"
+        == "05647a03207f0f79a9055c828d6177fe904e3658ed470bc09a26bbe7200e723a"
     )
 
 

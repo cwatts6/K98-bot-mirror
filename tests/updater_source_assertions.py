@@ -29,7 +29,7 @@ def before_a1b_hash(root, path):
     raw = fixture.read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "7b0776ee0f1d527f87a142a9a2e91b2387dfa6749abbbbed048d2ce34f56443e"
+        == "f3dddb07c5f4197af706517a269df5ba9ec1f0b9b75b2b756e15ca97cd6eb5f5"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

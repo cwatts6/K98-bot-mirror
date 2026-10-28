@@ -59,8 +59,7 @@ async def schedule_mge_lifecycle(bot: discord.Client) -> None:
             async def recovery():
                 nonlocal receipts_pending, ongoing
                 if receipts_pending:
-                    await startup.receipts(bot)
-                    receipts_pending = False
+                    receipts_pending = not await startup.receipts(bot)
                 if not startup.complete:
                     await startup.advance(bot)
                 else:

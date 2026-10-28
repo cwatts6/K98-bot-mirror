@@ -63,6 +63,9 @@ async def reply_with_refresh(
                     type(exc).__name__,
                 )
         text = evidence.message(result.message)
+        operation_id = getattr(result, "operation_id", None)
+        if evidence.disposition == ActionDisposition.UNKNOWN and operation_id:
+            text += f" Administrator recovery reference: {operation_id}."
         if evidence.disposition == ActionDisposition.COMPLETED:
             if (
                 register_refresh is not None

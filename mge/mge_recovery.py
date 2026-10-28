@@ -117,7 +117,7 @@ class RecoverySweep:
         except Exception as exc:
             self.counts["failed"] += 1
             logger.warning("mge_recovery_receipts_unavailable error_type=%s", type(exc).__name__)
-            return
+            return False
         from mge.dal.mge_event_dal import fetch_event_for_embed
         from mge.mge_board_preparation import recovered_identity, validate_event
 
@@ -144,3 +144,4 @@ class RecoverySweep:
                 continue
             await self._target(bot, event_id, kind, channel_id, receipt)
         logger.info("mge_recovery_receipt_progress state=%s", self.report())
+        return True

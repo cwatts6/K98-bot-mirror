@@ -125,10 +125,13 @@ class RefreshCoordinator:
             gates.add(gate)
 
         async def run():
-            captured = tuple(gates)
+            captured = set()
             try:
-                if captured:
-                    await asyncio.gather(*(entry.wait() for entry in captured))
+                # Include gates admitted while this pass was waiting. There is no
+                # suspension between the final check and entering the factory.
+                while pending := gates - captured:
+                    await asyncio.gather(*(entry.wait() for entry in pending))
+                    captured.update(pending)
                 return await self._permitted(factory)
             finally:
                 gates.difference_update(captured)

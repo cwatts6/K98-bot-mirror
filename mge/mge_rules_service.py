@@ -82,6 +82,7 @@ def update_event_rules_text(
             False,
             "The rules update could not be confirmed. Have leadership check before repeating it.",
             event_id=int(event_id),
+            signup_channel_id=ctx.get("SignupEmbedChannelId"),
         )
 
     logger.info(
@@ -147,6 +148,7 @@ def reset_event_rules_to_mode_default(
             False,
             "The rules reset could not be confirmed. Have leadership check before repeating it.",
             event_id=int(event_id),
+            signup_channel_id=ctx.get("SignupEmbedChannelId"),
         )
 
     logger.info(

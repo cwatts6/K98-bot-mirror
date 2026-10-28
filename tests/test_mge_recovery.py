@@ -157,3 +157,34 @@ async def test_calendar_failure_and_invalid_default_do_not_disable_recovery(monk
         await scheduler.schedule_mge_lifecycle(SimpleNamespace())
     recovery.assert_awaited_once()
     receipts.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unavailable_receipt_read_remains_pending_for_next_tick(monkeypatch):
+    from mge import mge_scheduler as scheduler
+    from mge.mge_recovery import delivery
+
+    receipt_reads = AsyncMock(side_effect=[OSError("offline"), []])
+    monkeypatch.setattr(delivery, "receipt_rows", receipt_reads)
+    monkeypatch.setattr(dal, "recovery_high_water", lambda: 0)
+    monkeypatch.setattr(dal, "recovery_page", lambda *a, **k: [])
+    monkeypatch.setattr(scheduler, "resolve_public_signup_channel_id", lambda: (0, None, "fixture"))
+    monkeypatch.setattr(
+        scheduler,
+        "sync_mge_events_from_calendar",
+        lambda **_: (_ for _ in ()).throw(OSError("offline")),
+    )
+    monkeypatch.setattr(
+        scheduler.mge_completion_service, "auto_complete_due_events", lambda **_: {}
+    )
+    ticks = []
+
+    async def tick(_):
+        ticks.append(1)
+        if len(ticks) == 3:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(scheduler.asyncio, "sleep", tick)
+    with pytest.raises(asyncio.CancelledError):
+        await scheduler.schedule_mge_lifecycle(SimpleNamespace())
+    assert receipt_reads.await_count == 2

@@ -225,3 +225,43 @@ async def test_real_rules_callers_register_before_reply_and_release_on_transport
     await work.drain()
     assert trace == ["registered", "reply", "refresh"]
     view.stop()
+
+
+@pytest.mark.asyncio
+async def test_unknown_signup_retains_private_reconciliation_reference(monkeypatch):
+    from core.operation_outcome import MutationOutcome
+    from mge.mge_signup_service import ServiceResult
+
+    reply = AsyncMock(return_value=True)
+    monkeypatch.setattr(responses, "send_ephemeral", reply)
+    result = ServiceResult(
+        False,
+        "Unconfirmed",
+        outcome=MutationOutcome.UNKNOWN,
+        operation_id="fixture-recovery-reference",
+    )
+    await responses.reply_with_refresh(
+        object(), result, event_id=7, refresh_public=False, refresh_leadership=False
+    )
+    text = reply.await_args.args[1]
+    assert "fixture-recovery-reference" in text and "✅" not in text
+
+
+@pytest.mark.parametrize("caller", ["edit", "reset"])
+def test_uncertain_rules_write_preserves_refresh_destination(monkeypatch, caller):
+    from mge import mge_rules_service as service
+
+    monkeypatch.setattr(
+        service.mge_rules_dal,
+        "fetch_event_rules_context",
+        lambda _: dict(RuleMode="fixed", RulesText="old", SignupEmbedChannelId=123),
+    )
+    monkeypatch.setattr(service.mge_rules_dal, "fetch_default_rules_text", lambda _: "default")
+    monkeypatch.setattr(service.mge_rules_dal, "exec_with_cursor", lambda **_: None)
+    result = (
+        service.update_event_rules_text(event_id=7, new_rules_text="new", actor_discord_id=1)
+        if caller == "edit"
+        else service.reset_event_rules_to_mode_default(event_id=7, actor_discord_id=1)
+    )
+    assert result.signup_channel_id == 123
+    assert result.action.disposition == D.UNKNOWN and result.action.read_only_refresh

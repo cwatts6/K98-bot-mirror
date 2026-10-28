@@ -14,6 +14,45 @@ from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 
 
 @pytest.mark.asyncio
+async def test_invalid_render_after_settlement_returns_saved_publication(monkeypatch):
+    from mge.dataset_errors import MgeDatasetError
+    from tests.test_mge_publish_service import _qualified_context
+
+    now = datetime(2026, 10, 28, tzinfo=UTC)
+    event = _qualified_context(7, {})
+    committed = []
+    monkeypatch.setattr(
+        service.mge_publish_dal, "fetch_event_publish_context", lambda *a, **k: event
+    )
+    monkeypatch.setattr(
+        service.mge_publish_dal, "fetch_awards_with_signup_user", lambda *a, **k: []
+    )
+
+    def commit(**kwargs):
+        committed.append(1)
+        return 2
+
+    monkeypatch.setattr(service.mge_publish_dal, "apply_publish_atomic", commit)
+    adapter = SimpleNamespace(
+        send_awards_embed=AsyncMock(side_effect=MgeDatasetError("invalid", "payload"))
+    )
+    result, version, _, _ = await service._publish_primary(
+        adapter=adapter,
+        event_id=7,
+        expected=event,
+        channel_id=1,
+        publish_rows=[],
+        waitlist_rows=[],
+        clear_rank_award_ids=[],
+        actor_discord_id=1,
+        now=now,
+    )
+    assert committed == [1] and version == result.publish_version == 2
+    assert not result.success and "Publication was saved" in result.message
+    assert "before repeating" in result.message
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("transition", ["publish", "unpublish"])
 @pytest.mark.parametrize("refresh_first", [True, False])
 async def test_primary_transition_and_refresh_share_owner(monkeypatch, transition, refresh_first):
