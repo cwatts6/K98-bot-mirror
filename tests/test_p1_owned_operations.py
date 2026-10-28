@@ -50,8 +50,10 @@ def form(refresh=None):
 @pytest.mark.asyncio
 async def test_reply_failure_does_not_erase_commit_or_skip_refresh(monkeypatch):
     from mge import mge_signup_service
+    from mge.mge_refresh_work import RefreshCoordinator, registration_options
 
     interaction = Interaction(reply_error=True)
+    work = RefreshCoordinator()
 
     def mutate(**kwargs):
         assert interaction.done
@@ -59,11 +61,26 @@ async def test_reply_failure_does_not_erase_commit_or_skip_refresh(monkeypatch):
         return ServiceResult(True, "Signup created.", 99)
 
     monkeypatch.setattr(mge_signup_service, "create_signup", mutate)
-    view = form(lambda event: interaction.events.append(("refresh", event)))
+
+    def register(event):
+        gate, readonly = registration_options(None, False)
+        assert gate is not None and not gate.is_set() and not readonly
+        interaction.events.append(("register", event))
+
+        async def refresh():
+            interaction.events.append(("refresh", event))
+            return True
+
+        return work.request(event, refresh, gate=gate)
+
+    view = form(register)
     await view.submit_btn.callback(interaction)
     await view.submit_btn.callback(Interaction())
-    assert [e[0] for e in interaction.events] == ["ack", "commit", "reply", "refresh"]
+    await work.drain()
+    assert [e[0] for e in interaction.events] == ["ack", "commit", "register", "reply", "refresh"]
     assert interaction.events[0][1] == {"ephemeral": True, "invisible": False}
+    assert work.snapshot()["pending"] == 0
+    view.stop()
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from scripts.validate_k98_update_compatibility import classify
 from tests.test_update_application_compatibility import installed_manifest
 from tests.updater_source_assertions import (
     before_a1a_hash,
+    before_a1b_hash,
     before_contention_hash,
     before_event_delivery_hash,
     before_monitoring_hash,
@@ -112,10 +113,14 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
                     == member["after_sha256"]
                 )
             continue
-        if transition["id"] == "p1_mge_a1a_v1":
+        if transition["id"] == "p1_mge_a1b_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"]
+                assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
+        if transition["id"] == "p1_mge_a1a_v1":
+            for member in transition["members"]:
+                assert before_a1b_hash(root, member["path"]) == member["after_sha256"]
             continue
         if transition["id"] == "p1_mge_lifecycle_v1":
             for member in transition["members"]:
