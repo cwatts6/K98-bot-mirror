@@ -10,6 +10,8 @@ from typing import Any
 import discord
 
 from bot_config import MGE_AWARD_CHANNEL_ID, MGE_MAIL_DM_USER_IDS
+from mge.mge_board_ownership import presentation_owner
+from mge.mge_board_preparation import validate_payload
 from mge.mge_embed_manager import (
     build_award_notifications_content,
     build_mge_award_reminders_embed,
@@ -44,6 +46,15 @@ class MgePublishDiscordAdapter:
     def __init__(self, bot: discord.Client) -> None:
         self.bot = bot
 
+    async def run_primary(self, event_id, operation):
+        from mge import mge_embed_manager
+
+        async def owned():
+            async with presentation_owner(self.bot, event_id):
+                return await operation()
+
+        return await mge_embed_manager._refreshes.run_direct(owned)
+
     @property
     def default_award_channel_id(self) -> int:
         try:
@@ -74,10 +85,6 @@ class MgePublishDiscordAdapter:
         publish_version: int,
         published_utc: datetime,
     ) -> MessageIoResult:
-        channel = await self._resolve_messageable_channel(channel_id)
-        if channel is None:
-            return MessageIoResult("channel_unavailable")
-
         embed = build_mge_awards_embed(
             event_row=event_row,
             awarded_rows=awarded_rows,
@@ -85,6 +92,11 @@ class MgePublishDiscordAdapter:
             publish_version=publish_version,
             published_utc=published_utc,
         )
+        validate_payload(embed.to_dict())
+        channel = await self._resolve_messageable_channel(channel_id)
+        if channel is None:
+            return MessageIoResult("channel_unavailable")
+
         try:
             mention_content = build_award_notifications_content(awarded_rows + waitlist_rows)
             message = await channel.send(
@@ -250,6 +262,7 @@ class MgePublishDiscordAdapter:
             refresh_public=refresh_public,
             refresh_leadership=refresh_leadership,
             refresh_awards=refresh_awards,
+            observation_timeout=None,
         )
 
     async def send_award_mail(

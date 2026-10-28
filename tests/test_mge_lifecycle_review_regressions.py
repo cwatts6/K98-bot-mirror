@@ -136,7 +136,9 @@ async def test_cancel_after_mode_change_entry_reports_processing(monkeypatch, mo
     def switch(**kwargs):
         entered.set()
         assert release.wait(3)
-        return SimpleNamespace(success=True, deleted_signup_count=2, updated_row_count=1)
+        return SimpleNamespace(
+            success=True, message="Mode changed.", deleted_signup_count=2, updated_row_count=1
+        )
 
     monkeypatch.setattr(views, "switch_event_to_" + mode.lower(), switch)
     deps = views.MGEAdminViewDeps(refresh_embed=lambda _: None, is_admin=lambda _: True)
@@ -254,7 +256,8 @@ async def test_actual_roster_form_submission_uses_parent_event(monkeypatch, butt
 
     monkeypatch.setattr(views, "is_admin_or_leadership_interaction", lambda _: True)
     parent = views.MgeRosterBuilderView(42, 1)
-    row = dict(AwardId=7, GovernorId=100, AwardedRank=1, AwardStatus="awarded")
+    row = dict(EventId=42, AwardId=7, GovernorId=100, AwardedRank=1, AwardStatus="awarded")
+    monkeypatch.setattr(service.mge_roster_dal, "fetch_award_by_id", lambda _: dict(row))
 
     async def state():
         return service.RosterState(

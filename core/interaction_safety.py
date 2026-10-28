@@ -31,6 +31,11 @@ def close_private_operations():
     _private_admission_closed = True
 
 
+def has_private_admission():
+    """Only the already admitted callback task may register its settled follow-up."""
+    return asyncio.current_task() in _private_children
+
+
 async def drain_private_operations():
     from core.owned_work import drain_awaitable
 
@@ -85,6 +90,14 @@ async def send_ephemeral(
     content: str,
     **kwargs: Any,
 ) -> None:
+    await send_ephemeral_result(interaction, content, **kwargs)
+
+
+async def send_ephemeral_result(
+    interaction: discord.Interaction,
+    content: str,
+    **kwargs: Any,
+) -> bool:
     """
     Safely send an ephemeral response for both initial and followup phases.
     """
@@ -95,11 +108,13 @@ async def send_ephemeral(
                 await interaction.followup.send(content, ephemeral=True, **kwargs)
             else:
                 await interaction.response.send_message(content, ephemeral=True, **kwargs)
+        return True
     except asyncio.CancelledError:
         # Preserve cooperative cancellation semantics
         raise
     except Exception:
         logger.exception("interaction_send_ephemeral_failed")
+        return False
 
 
 def response_is_done(interaction: discord.Interaction) -> bool:

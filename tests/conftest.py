@@ -206,6 +206,6 @@ def isolate_private_operation_lifecycle(monkeypatch):
         monkeypatch.setattr(module, "_private_children", set())
     module = sys.modules.get("mge.mge_embed_manager")
     if module is not None:
-        from core.coalesced_work import CoalescedWork
+        from mge.mge_refresh_work import RefreshCoordinator
 
-        monkeypatch.setattr(module, "_refreshes", CoalescedWork())
+        monkeypatch.setattr(module, "_refreshes", RefreshCoordinator())

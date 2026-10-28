@@ -19,6 +19,10 @@ from mge.mge_scheduler import schedule_mge_lifecycle
 async def test_scheduler_runs_and_calls_embed_sync(
     monkeypatch, simplified_flow_enabled, expected_leadership_calls
 ):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr("mge.mge_scheduler.RecoverySweep.advance", AsyncMock())
+    monkeypatch.setattr("mge.mge_scheduler.RecoverySweep.receipts", AsyncMock())
     calls = {"sync": 0, "embed": 0, "leadership": 0, "sleep": 0}
 
     def fake_sync(now_utc=None):

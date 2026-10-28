@@ -4,6 +4,7 @@ import types
 
 import pytest
 
+from mge.mge_action_result import ActionDisposition, ActionEvidence
 from ui.views.mge_rules_edit_view import MgeRulesEditView
 
 
@@ -71,6 +72,7 @@ async def test_edit_button_opens_modal(monkeypatch):
         sent.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction()
     button = view.edit_rules_text
@@ -91,14 +93,19 @@ async def test_reset_button_calls_service_and_reports(monkeypatch):
         lambda interaction: True,
     )
 
-    async def _fake_refresh(bot):
-        return True
+    def _fake_refresh(**kwargs):
+        return types.SimpleNamespace(registered=True)
 
-    monkeypatch.setattr(view, "_refresh_signup_embed", _fake_refresh)
+    monkeypatch.setattr("mge.mge_embed_manager.request_signup_refresh", _fake_refresh)
 
     monkeypatch.setattr(
         "ui.views.mge_rules_edit_view.mge_rules_service.reset_event_rules_to_mode_default",
-        lambda event_id, actor_discord_id: types.SimpleNamespace(success=True, message="done"),
+        lambda event_id, actor_discord_id: types.SimpleNamespace(
+            success=True,
+            message="done",
+            signup_channel_id=999,
+            action=ActionEvidence(ActionDisposition.COMPLETED),
+        ),
     )
 
     msgs: list[str] = []
@@ -107,6 +114,7 @@ async def test_reset_button_calls_service_and_reports(monkeypatch):
         msgs.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction(user_id=123)
     button = view.reset_to_mode_default
@@ -131,16 +139,19 @@ async def test_edit_modal_submit_triggers_refresh(monkeypatch):
 
     refresh_called = {"v": False}
 
-    async def _fake_refresh(bot):
+    def _fake_refresh(**kwargs):
         refresh_called["v"] = True
-        return True
+        return types.SimpleNamespace(registered=True)
 
-    monkeypatch.setattr(view, "_refresh_signup_embed", _fake_refresh)
+    monkeypatch.setattr("mge.mge_embed_manager.request_signup_refresh", _fake_refresh)
 
     monkeypatch.setattr(
         "ui.views.mge_rules_edit_view.mge_rules_service.update_event_rules_text",
         lambda event_id, new_rules_text, actor_discord_id: types.SimpleNamespace(
-            success=True, message="updated"
+            success=True,
+            message="updated",
+            signup_channel_id=444,
+            action=ActionEvidence(ActionDisposition.COMPLETED),
         ),
     )
 
@@ -150,6 +161,7 @@ async def test_edit_modal_submit_triggers_refresh(monkeypatch):
         msgs.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction(user_id=42)
 
@@ -188,6 +200,7 @@ async def test_edit_modal_submit_reports_embed_limit_details(monkeypatch):
         msgs.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction(user_id=42)
     await view.edit_rules_text.callback(interaction)
@@ -217,6 +230,7 @@ async def test_guard_blocks_non_leadership(monkeypatch):
         msgs.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction()
     allowed = await view._guard(interaction)
@@ -243,6 +257,7 @@ async def test_edit_button_blocks_when_existing_rules_exceed_modal_limit(monkeyp
         msgs.append(message)
 
     monkeypatch.setattr("ui.views.mge_rules_edit_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
 
     interaction = _DummyInteraction()
     await view.edit_rules_text.callback(interaction)

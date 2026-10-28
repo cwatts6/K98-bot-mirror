@@ -330,7 +330,11 @@ async def test_refresh_mge_boards_uses_rollout_and_leadership_sync(monkeypatch):
         bot=object(), event_id=55, refresh_public=True, refresh_leadership=True, refresh_awards=True
     )
 
-    assert result == {"public": True, "leadership": True, "awards": True}
+    assert {kind: value.status for kind, value in result.items()} == {
+        "public": "delivered",
+        "leadership": "delivered",
+        "awards": "delivered",
+    }
     assert calls["public"]["signup_channel_id"] == 321
     assert calls["leadership"]["event_id"] == 55
     assert calls["awards"]["event_id"] == 55

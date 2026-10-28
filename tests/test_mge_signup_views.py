@@ -206,6 +206,11 @@ async def test_withdraw_active_signup_success(monkeypatch):
         sent.append(message)
 
     monkeypatch.setattr("ui.views.mge_signup_view.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr("mge.mge_action_response.send_ephemeral", _fake_send_ephemeral)
+    monkeypatch.setattr(
+        "ui.views.mge_signup_view.mge_signup_dal.fetch_event_signup_context",
+        lambda _: {"EventId": 101},
+    )
     monkeypatch.setattr(
         "ui.views.mge_signup_view.mge_signup_dal.fetch_active_signups_by_event_discord",
         lambda event_id, discord_user_id: [
@@ -219,7 +224,9 @@ async def test_withdraw_active_signup_success(monkeypatch):
     )
     monkeypatch.setattr(
         "ui.views.mge_signup_view.mge_signup_service.withdraw_signup",
-        lambda **kwargs: SimpleNamespace(success=True, message="Signup withdrawn."),
+        lambda **kwargs: SimpleNamespace(
+            success=True, message="Signup withdrawn.", outcome="committed"
+        ),
     )
 
     view = MGESignupView(event_id=101, admin_deps=_FakeAdminDeps(False))
@@ -338,4 +345,4 @@ async def test_admin_refresh_embed_button_uses_owned_board_refresh(monkeypatch):
     refresh.assert_awaited_once_with(
         bot=interaction.client, event_id=101, refresh_public=True, refresh_leadership=False
     )
-    assert interaction.followup_messages[-1]["message"] == "✅ Embed refreshed."
+    assert interaction.followup_messages[-1]["message"] == "✅ Signup board refreshed."

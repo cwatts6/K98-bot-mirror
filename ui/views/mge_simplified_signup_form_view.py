@@ -27,6 +27,7 @@ from core.interaction_safety import member_role_ids, private_operation, send_eph
 from core.operation_outcome import MutationOutcome
 from core.owned_work import drain_thread
 from mge import mge_signup_service
+from mge.mge_action_response import reply_with_refresh
 from mge.mge_priority_rank_map import (
     PRIORITY_RANK_OPTIONS,
     get_option_by_priority_rank,
@@ -171,10 +172,13 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
         self._submitted = result.success or result.outcome == MutationOutcome.UNKNOWN
 
         # --- Respond ---
-        await send_ephemeral(
+        await reply_with_refresh(
             interaction,
-            ("✅ " if result.success else "❌ ") + result.message,
-            ephemeral=True,
+            result,
+            event_id=self.payload.event_id,
+            register_refresh=self.payload.on_success_refresh,
+            refresh_public=False,
+            refresh_leadership=False,
         )
 
         # --- Logging ---
@@ -191,16 +195,6 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
                 "outcome": "success" if result.success else "failure",
             },
         )
-
-        # --- Refresh embed if success ---
-        if result.success and self.payload.on_success_refresh is not None:
-            try:
-                self.payload.on_success_refresh(int(self.payload.event_id))
-            except Exception:
-                logger.exception(
-                    "mge_simplified_signup_refresh_callback_failed event_id=%s",
-                    self.payload.event_id,
-                )
 
         # DM follow-up is intentionally suppressed in the simplified flow.
         # MGE_SIGNUP_FLOW_CONFIG.send_dm_followup == False is the live default.

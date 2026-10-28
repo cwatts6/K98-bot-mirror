@@ -1,10 +1,34 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
 from mge import mge_embed_manager, mge_publish_service
+from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
+
+
+def _qualified_context(event_id, row):
+    return {
+        "EventId": event_id,
+        "EventName": "Event",
+        "VariantName": "Infantry",
+        "Status": "signup_closed",
+        "RuleMode": "fixed",
+        "PublishVersion": 0,
+        "UpdatedUtc": datetime(2026, 10, 28, tzinfo=UTC), "UpdatedUtcToken": "2026-10-28T00:00:00.0000001",
+        "AwardEmbedChannelId": None,
+        "AwardEmbedMessageId": None,
+        **row,
+    }
+
+
+def _qualified_awards(event_id, rows):
+    return [
+        {"EventId": event_id, "SignupId": row["AwardId"], "GovernorId": row["AwardId"], **row}
+        for row in rows
+    ]
 
 
 class _MessageRef:
@@ -26,6 +50,8 @@ class _MailResult:
 
 
 class _PublishAdapter:
+    run_primary = MgePublishDiscordAdapter.run_primary
+
     def __init__(
         self,
         bot,
@@ -288,12 +314,15 @@ async def test_publish_increments_version_and_refreshes_all_boards(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E1",
-            "VariantName": "Infantry",
-            "PublishVersion": 0,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E1",
+                "VariantName": "Infantry",
+                "PublishVersion": 0,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -313,16 +342,19 @@ async def test_publish_increments_version_and_refreshes_all_boards(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -385,12 +417,15 @@ async def test_publish_channel_unavailable_before_persist(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E0",
-            "VariantName": "Infantry",
-            "PublishVersion": 0,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E0",
+                "VariantName": "Infantry",
+                "PublishVersion": 0,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -425,12 +460,15 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E1",
-            "VariantName": "Infantry",
-            "PublishVersion": 0,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E1",
+                "VariantName": "Infantry",
+                "PublishVersion": 0,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -455,24 +493,27 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 10,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            },
-            {
-                "AwardId": 20,
-                "AwardStatus": "waitlist",
-                "WaitlistOrder": 1,
-                "GovernorNameSnapshot": "Gov2",
-                "RequestedCommanderName": "Cmd2",
-                "TargetScore": None,
-            },
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 10,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                },
+                {
+                    "AwardId": 20,
+                    "AwardStatus": "waitlist",
+                    "WaitlistOrder": 1,
+                    "GovernorNameSnapshot": "Gov2",
+                    "RequestedCommanderName": "Cmd2",
+                    "TargetScore": None,
+                },
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "fetch_published_snapshot", lambda *args, **kwargs: []
@@ -510,15 +551,18 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E2",
-            "VariantName": "Infantry",
-            "RuleMode": "fixed",
-            "PublishVersion": 0,
-            "AwardRemindersText": None,
-            "AwardRemindersSentUtc": None,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E2",
+                "VariantName": "Infantry",
+                "RuleMode": "fixed",
+                "PublishVersion": 0,
+                "AwardRemindersText": None,
+                "AwardRemindersSentUtc": None,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -538,16 +582,19 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -605,15 +652,18 @@ async def test_republish_skips_reminders_when_already_sent(monkeypatch: pytest.M
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E3",
-            "VariantName": "Cavalry",
-            "RuleMode": "open",
-            "PublishVersion": 1,
-            "AwardRemindersText": "already persisted",
-            "AwardRemindersSentUtc": "2026-01-01T00:00:00",
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E3",
+                "VariantName": "Cavalry",
+                "RuleMode": "open",
+                "PublishVersion": 1,
+                "AwardRemindersText": "already persisted",
+                "AwardRemindersSentUtc": "2026-01-01T00:00:00",
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -633,16 +683,19 @@ async def test_republish_skips_reminders_when_already_sent(monkeypatch: pytest.M
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -685,15 +738,18 @@ async def test_publish_reminders_persist_failure_skips_second_embed(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E4",
-            "VariantName": "Infantry",
-            "RuleMode": "fixed",
-            "PublishVersion": 0,
-            "AwardRemindersText": None,
-            "AwardRemindersSentUtc": None,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E4",
+                "VariantName": "Infantry",
+                "RuleMode": "fixed",
+                "PublishVersion": 0,
+                "AwardRemindersText": None,
+                "AwardRemindersSentUtc": None,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -713,16 +769,19 @@ async def test_publish_reminders_persist_failure_skips_second_embed(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -767,15 +826,18 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E5",
-            "VariantName": "Infantry",
-            "RuleMode": "fixed",
-            "PublishVersion": 0,
-            "AwardRemindersText": None,
-            "AwardRemindersSentUtc": None,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E5",
+                "VariantName": "Infantry",
+                "RuleMode": "fixed",
+                "PublishVersion": 0,
+                "AwardRemindersText": None,
+                "AwardRemindersSentUtc": None,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -795,16 +857,19 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -860,15 +925,18 @@ async def test_publish_reminders_message_id_persist_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E6",
-            "VariantName": "Infantry",
-            "RuleMode": "fixed",
-            "PublishVersion": 0,
-            "AwardRemindersText": None,
-            "AwardRemindersSentUtc": None,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E6",
+                "VariantName": "Infantry",
+                "RuleMode": "fixed",
+                "PublishVersion": 0,
+                "AwardRemindersText": None,
+                "AwardRemindersSentUtc": None,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -888,16 +956,19 @@ async def test_publish_reminders_message_id_persist_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -953,15 +1024,18 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "E7",
-            "VariantName": "Infantry",
-            "RuleMode": "fixed",
-            "PublishVersion": 0,
-            "AwardRemindersText": None,
-            "AwardRemindersSentUtc": None,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "E7",
+                "VariantName": "Infantry",
+                "RuleMode": "fixed",
+                "PublishVersion": 0,
+                "AwardRemindersText": None,
+                "AwardRemindersSentUtc": None,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -981,16 +1055,19 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "GovernorNameSnapshot": "Gov1",
-                "RequestedCommanderName": "Cmd1",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "GovernorNameSnapshot": "Gov1",
+                    "RequestedCommanderName": "Cmd1",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
@@ -1040,11 +1117,14 @@ async def test_unpublish_preserves_state_and_refreshes(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "Status": "published",
-            "PublishVersion": 2,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "Status": "published",
+                "PublishVersion": 2,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
@@ -1118,12 +1198,15 @@ def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
-        lambda event_id: {
-            "EventId": event_id,
-            "EventName": "DMTest",
-            "VariantName": "Infantry",
-            "PublishVersion": 0,
-        },
+        lambda event_id, **kwargs: _qualified_context(
+            event_id,
+            {
+                "EventId": event_id,
+                "EventName": "DMTest",
+                "VariantName": "Infantry",
+                "PublishVersion": 0,
+            },
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service,
@@ -1143,17 +1226,20 @@ def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_awards_with_signup_user",
-        lambda event_id: [
-            {
-                "AwardId": 1,
-                "AwardStatus": "awarded",
-                "AwardedRank": 1,
-                "DiscordUserId": 111222333,
-                "GovernorNameSnapshot": "GovDM",
-                "RequestedCommanderName": "CmdX",
-                "TargetScore": 8_000_000,
-            }
-        ],
+        lambda event_id, **kwargs: _qualified_awards(
+            event_id,
+            [
+                {
+                    "AwardId": 1,
+                    "AwardStatus": "awarded",
+                    "AwardedRank": 1,
+                    "DiscordUserId": 111222333,
+                    "GovernorNameSnapshot": "GovDM",
+                    "RequestedCommanderName": "CmdX",
+                    "TargetScore": 8_000_000,
+                }
+            ],
+        ),
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True

@@ -23,6 +23,7 @@ def event():
         RuleMode="fixed",
         RulesText=None,
         PublishVersion=0,
+        UpdatedUtc=now, UpdatedUtcToken="2026-10-28T00:00:00.0000001",
         StartUtc=now,
         EndUtc=now + timedelta(days=7),
         SignupCloseUtc=now + timedelta(days=1),

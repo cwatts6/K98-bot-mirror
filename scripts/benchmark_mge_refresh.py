@@ -1,4 +1,4 @@
-"""Offline A1a comparison: real callbacks/render preparation; simulated SQL/Discord.
+"""Offline A1b comparison: real callbacks/render preparation; simulated SQL/Discord.
 
 Run this same harness against baseline and candidate source roots. All SQL entry
 is denied except fixture adapters. No source tree or operational logs are written.
@@ -8,6 +8,7 @@ Reported connections are simulated query connections, not a native SQL benchmark
 import argparse
 import asyncio
 from collections import Counter, defaultdict
+from contextlib import ExitStack
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -69,6 +70,10 @@ async def measure(args):
             ("rank_select", 4),
             ("rank_submit", 4),
             ("overlap", 4),
+            ("slow_board", 4),
+            ("reply_failure", 4),
+            ("partial", 4),
+            ("repeated_refresh", 4),
         ]:
             observations = []
             all_stages = defaultdict(list)
@@ -83,6 +88,8 @@ async def measure(args):
                     edits=0,
                     replies=0,
                     mutations=0,
+                    audit_writes=0,
+                    reply_failures=0,
                     simulated_read_connections=0,
                 )
                 review_rows = [
@@ -130,6 +137,16 @@ async def measure(args):
                     EventMode="controlled",
                     Status="signup_open",
                     RulesText="Fixture",
+                    RuleMode="fixed",
+                    PublishVersion=0,
+                    UpdatedUtc=datetime(2026, 10, 28, tzinfo=UTC),
+                    UpdatedUtcToken="2026-10-28T00:00:00.0000001",
+                    StartUtc=datetime(2026, 10, 28, tzinfo=UTC),
+                    EndUtc=datetime(2026, 11, 4, tzinfo=UTC),
+                    LeadershipEmbedChannelId=1,
+                    LeadershipEmbedMessageId=11,
+                    AwardEmbedChannelId=None,
+                    AwardEmbedMessageId=None,
                     SignupCloseUtc=datetime.now(UTC) + timedelta(days=1),
                     SignupEmbedMessageId=10,
                     SignupEmbedChannelId=1,
@@ -143,17 +160,18 @@ async def measure(args):
 
                     async def fetch_message(self, message_id):
                         calls["fetches"] += 1
-                        await asyncio.sleep(delay * 3)
+                        await asyncio.sleep(delay * (30 if mode == "slow_board" else 3))
                         return SimpleNamespace(id=message_id, edit=self.edit)
 
                     async def edit(self, **_):
                         calls["edits"] += 1
-                        await asyncio.sleep(delay * 3)
+                        await asyncio.sleep(delay * (30 if mode == "slow_board" else 3))
 
                 channel = Channel()
                 bot = SimpleNamespace(get_channel=lambda _: channel)
                 started = time.perf_counter()
                 ack = None
+                result_time = None
                 done = False
                 lag = []
 
@@ -176,13 +194,46 @@ async def measure(args):
                         ack = time.perf_counter() - started
 
                     async def send(self, *_, **__):
+                        nonlocal result_time
                         calls["replies"] += 1
                         await asyncio.sleep(delay)
+                        result_time = time.perf_counter() - started
+                        if mode == "reply_failure":
+                            calls["reply_failures"] += 1
+                            raise OSError("simulated response transport failure")
 
                 def mutation(**_):
                     calls["mutations"] += 1
                     time.sleep(delay)
-                    return RosterResult(True, "Rank saved")
+                    calls["audit_writes"] += int(mode != "partial")
+                    value = RosterResult(
+                        mode != "partial",
+                        "Rank saved" if mode != "partial" else "Audit unconfirmed",
+                    )
+                    try:
+                        from mge.mge_action_result import (
+                            ActionDisposition,
+                            ActionEvidence,
+                            WriteEvidence,
+                        )
+                    except ImportError:
+                        return value
+                    value.action = ActionEvidence(
+                        (
+                            ActionDisposition.PARTIAL
+                            if mode == "partial"
+                            else ActionDisposition.COMPLETED
+                        ),
+                        (
+                            WriteEvidence("rank", "confirmed", 1),
+                            WriteEvidence(
+                                "audit",
+                                "unknown" if mode == "partial" else "confirmed",
+                                kind="audit",
+                            ),
+                        ),
+                    )
+                    return value
 
                 async def heartbeat():
                     while not done:
@@ -190,30 +241,53 @@ async def measure(args):
                         await asyncio.sleep(0.001)
                         lag.append(max(0, time.perf_counter() - before - 0.001))
 
-                with (
-                    patch.object(review, "run_query", lambda *_: read("review_reads", review_rows)),
-                    patch.object(roster, "run_query", lambda *_: read("award_reads", awards)),
-                    patch.object(roster, "insert_award", deny),
-                    patch.object(
-                        boards, "fetch_event_for_embed", lambda _: read("event_reads", event)
-                    ),
-                    patch.object(
-                        boards,
-                        "fetch_leadership_embed_state",
-                        lambda _: read("state_reads", {"message_id": 11}),
-                    ),
-                    patch.object(boards, "update_event_embed_ids", identity),
-                    patch.object(boards, "update_leadership_embed_state", identity),
-                    patch.object(
-                        boards, "resolve_public_signup_channel_id", lambda: (1, 1, "fixture")
-                    ),
-                    patch.object(boards, "MGE_LEADERSHIP_CHANNEL_ID", 1),
-                    patch.object(boards, "MGE_SIMPLIFIED_FLOW_ENABLED", True),
-                    patch.object(boards, "_build_signup_view", lambda **_: None),
-                    patch.object(boards, "_build_leadership_view", lambda **_: None),
-                    patch.object(views, "is_admin_or_leadership_interaction", lambda _: True),
-                    patch.object(views.mge_roster_service, "set_rank", mutation),
-                ):
+                with ExitStack() as stack:
+                    for context in (
+                        patch.object(boards, "_refreshes", type(boards._refreshes)()),
+                        patch.object(
+                            review,
+                            "qualified_read",
+                            lambda *a, **k: read("review_reads", review_rows),
+                            create=True,
+                        ),
+                        patch.object(
+                            roster,
+                            "qualified_read",
+                            lambda *a, **k: read("award_reads", awards),
+                            create=True,
+                        ),
+                        patch.object(
+                            roster, "fetch_award_by_id", lambda _: read("award_reads", awards)[0]
+                        ),
+                        patch.object(
+                            review, "run_query", lambda *_: read("review_reads", review_rows)
+                        ),
+                        patch.object(roster, "run_query", lambda *_: read("award_reads", awards)),
+                        patch.object(roster, "insert_award", deny),
+                        patch.object(
+                            boards,
+                            "fetch_event_for_embed",
+                            lambda *a, **k: read("event_reads", event),
+                        ),
+                        patch.object(
+                            boards,
+                            "fetch_leadership_embed_state",
+                            lambda _: read("state_reads", {"message_id": 11}),
+                            create=True,
+                        ),
+                        patch.object(boards, "update_event_embed_ids", identity),
+                        patch.object(boards, "update_leadership_embed_state", identity),
+                        patch.object(
+                            boards, "resolve_public_signup_channel_id", lambda: (1, 1, "fixture")
+                        ),
+                        patch.object(boards, "MGE_LEADERSHIP_CHANNEL_ID", 1),
+                        patch.object(boards, "MGE_SIMPLIFIED_FLOW_ENABLED", True),
+                        patch.object(boards, "_build_signup_view", lambda **_: object()),
+                        patch.object(boards, "_build_leadership_view", lambda **_: object()),
+                        patch.object(views, "is_admin_or_leadership_interaction", lambda _: True),
+                        patch.object(views.mge_roster_service, "set_rank", mutation),
+                    ):
+                        stack.enter_context(context)
                     capture.rows.clear()
                     monitor = asyncio.create_task(heartbeat())
                     await asyncio.sleep(0)
@@ -228,7 +302,15 @@ async def measure(args):
                         else:
                             modal = views._AdjustRankModal(event_id=77, award_id=1001)
                             modal.rank_value = SimpleNamespace(value="2")
-                            if mode == "overlap":
+                            if mode == "repeated_refresh":
+                                handles = [
+                                    boards.request_signup_refresh(
+                                        bot=bot, event_id=77, signup_channel_id=1
+                                    )
+                                    for _ in range(5)
+                                ]
+                                await asyncio.gather(*handles)
+                            elif mode == "overlap":
                                 await asyncio.gather(
                                     modal.callback(Interaction()),
                                     boards.sync_event_leadership_embed(bot=bot, event_id=77),
@@ -236,6 +318,12 @@ async def measure(args):
                             else:
                                 await modal.callback(Interaction())
                     finally:
+                        await boards.drain_refreshes()
+                        work = boards._refreshes.snapshot()
+                        calls["refresh_passes"] = work.get("passes", 0)
+                        calls["outstanding_children"] = work.get("pending", 0) + work.get(
+                            "direct", 0
+                        )
                         elapsed = time.perf_counter() - started
                         done = True
                         await monitor
@@ -243,6 +331,7 @@ async def measure(args):
                     dict(
                         total_ms=elapsed * 1000,
                         ack_ms=(ack or 0) * 1000,
+                        result_ms=(result_time or 0) * 1000,
                         max_loop_lag_ms=max(lag, default=0) * 1000,
                         **calls,
                     )

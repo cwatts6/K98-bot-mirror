@@ -9,6 +9,8 @@ from typing import Any
 
 from mge.dal.qualified_read import qualified_read
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_result import record_write
+from mge.mge_roster_execution import expected_event
 from stats_alerts.db import exec_with_cursor, execute, run_query
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ SELECT
     e.Status,
     e.RuleMode,
     e.PublishVersion,
+    e.UpdatedUtc,
+    CONVERT(VARCHAR(33), e.UpdatedUtc, 126) AS UpdatedUtcToken,
     e.LastPublishedUtc,
     e.AwardEmbedMessageId,
     e.AwardEmbedChannelId,
@@ -132,6 +136,8 @@ def fetch_event_publish_context(event_id: int, *, strict: bool = False) -> dict[
                 "Status",
                 "RuleMode",
                 "PublishVersion",
+                "UpdatedUtc",
+                "UpdatedUtcToken",
                 "LastPublishedUtc",
                 "AwardEmbedMessageId",
                 "AwardEmbedChannelId",
@@ -244,6 +250,9 @@ def apply_generated_targets(
     now_utc: datetime,
 ) -> int:
     """Apply generated roster targets and clear non-roster targets for the event."""
+    expected = set(map(int, roster_targets)) | set(map(int, clear_award_ids))
+    completed = set()
+    audited = set()
 
     def _callback(cur):
         updated = 0
@@ -294,6 +303,7 @@ def apply_generated_targets(
             if int(cur.rowcount or 0) <= 0:
                 continue
             touched_award_ids.add(int(award_id))
+            completed.add(int(award_id))
             details = json.dumps(
                 {
                     "mode": "auto_generate_targets",
@@ -328,6 +338,8 @@ def apply_generated_targets(
                     _naive_utc(now_utc),
                 ),
             )
+            if int(cur.rowcount or 0) > 0:
+                audited.add(int(award_id))
             updated += 1
 
         for award_id in clear_award_ids:
@@ -369,7 +381,7 @@ def apply_generated_targets(
             )
             if int(cur.rowcount or 0) <= 0:
                 continue
-
+            completed.add(int(award_id))
             details = json.dumps(
                 {"mode": "auto_generate_targets_clear_non_roster", "award_id": int(award_id)},
                 ensure_ascii=False,
@@ -400,9 +412,24 @@ def apply_generated_targets(
                     _naive_utc(now_utc),
                 ),
             )
+            if int(cur.rowcount or 0) > 0:
+                audited.add(int(award_id))
         return updated
 
     result = exec_with_cursor(_callback)
+    if result is None:
+        record_write("generated_targets", "unknown", kind="secondary")
+    else:
+        if completed:
+            record_write("generated_targets", "confirmed", count=len(completed))
+        if completed != expected:
+            record_write("generated_targets_missing", "not_entered", kind="secondary")
+        if audited != completed:
+            record_write("generated_targets_audit", "unknown", kind="audit")
+        elif completed:
+            record_write("generated_targets_audit", "confirmed", kind="audit")
+        if not expected:
+            record_write("generated_targets", "not_required", kind="secondary")
     return int(result or 0)
 
 
@@ -413,7 +440,10 @@ def apply_manual_target_override(
     actor_discord_id: int,
     now_utc: datetime,
 ) -> bool:
+    audit_confirmed = False
+
     def _callback(cur):
+        nonlocal audit_confirmed
         cur.execute(
             """
             SELECT TOP (1) AwardId, EventId, GovernorId, AwardStatus, AwardedRank, TargetScore
@@ -427,6 +457,10 @@ def apply_manual_target_override(
             return False
         cols = [d[0] for d in cur.description]
         snap = dict(zip(cols, row, strict=False))
+        if expected_event() is not None and snap.get("EventId") != expected_event():
+            return False
+        if str(snap.get("AwardStatus", "")).lower() != "awarded":
+            return False
         old_target = snap.get("TargetScore")
 
         cur.execute(
@@ -478,9 +512,19 @@ def apply_manual_target_override(
                 _naive_utc(now_utc),
             ),
         )
+        audit_confirmed = getattr(cur, "rowcount", None) == 1
         return True
 
     result = exec_with_cursor(_callback)
+    record_write(
+        "target_override",
+        "confirmed" if result is True else "not_entered" if result is False else "unknown",
+        count=1 if result is True else 0,
+    )
+    if result is True:
+        record_write(
+            "target_override_audit", "confirmed" if audit_confirmed else "unknown", kind="audit"
+        )
     return bool(result)
 
 
@@ -492,11 +536,15 @@ def apply_publish_atomic(
     clear_rank_award_ids: list[int],
     actor_discord_id: int,
     now_utc: datetime,
+    expected_version: int | None = None,
+    expected_binding: dict[str, Any] | None = None,
 ) -> int | None:
     def _callback(cur):
         cur.execute(
             """
-            SELECT TOP (1) EventId, PublishVersion
+            SELECT TOP (1) EventId, PublishVersion, Status, RuleMode,
+                CONVERT(VARCHAR(33), UpdatedUtc, 126) AS UpdatedUtcToken,
+                AwardEmbedMessageId, AwardEmbedChannelId
             FROM dbo.MGE_Events WITH (UPDLOCK, HOLDLOCK)
             WHERE EventId = ?;
             """,
@@ -508,6 +556,19 @@ def apply_publish_atomic(
         cols = [d[0] for d in cur.description]
         event_row = dict(zip(cols, row, strict=False))
         old_version = int(event_row.get("PublishVersion") or 0)
+        if expected_version is not None and old_version != expected_version:
+            return None
+        if expected_binding is not None and any(
+            event_row.get(field) != expected_binding.get(field)
+            for field in (
+                "Status",
+                "RuleMode",
+                "UpdatedUtcToken",
+                "AwardEmbedMessageId",
+                "AwardEmbedChannelId",
+            )
+        ):
+            return None
         new_version = old_version + 1
 
         cur.execute(
@@ -736,12 +797,15 @@ def apply_unpublish_atomic(
     actor_discord_id: int,
     now_utc: datetime,
     restore_status: str,
+    expected_version: int | None = None,
+    expected_binding: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     def _callback(cur):
         cur.execute(
             """
             SELECT TOP (1)
-                EventId, EventName, Status, PublishVersion, LastPublishedUtc,
+                EventId, EventName, Status, PublishVersion, LastPublishedUtc, RuleMode,
+                CONVERT(VARCHAR(33), UpdatedUtc, 126) AS UpdatedUtcToken,
                 AwardEmbedMessageId, AwardEmbedChannelId
             FROM dbo.MGE_Events WITH (UPDLOCK, HOLDLOCK)
             WHERE EventId = ?;
@@ -756,6 +820,19 @@ def apply_unpublish_atomic(
 
         old_status = str(event_row.get("Status") or "")
         old_version = int(event_row.get("PublishVersion") or 0)
+        if expected_version is not None and old_version != expected_version:
+            return None
+        if expected_binding is not None and any(
+            event_row.get(field) != expected_binding.get(field)
+            for field in (
+                "Status",
+                "RuleMode",
+                "UpdatedUtcToken",
+                "AwardEmbedMessageId",
+                "AwardEmbedChannelId",
+            )
+        ):
+            return None
         if old_version <= 0 and old_status.strip().lower() not in {"published", "completed"}:
             return None
 
@@ -837,7 +914,19 @@ def update_award_embed_ids(
     message_id: int,
     channel_id: int,
     now_utc: datetime,
+    expected=None,
 ) -> bool:
+    if expected is not None:
+        from mge.dal.mge_board_identity_dal import persist_identity
+
+        return persist_identity(
+            kind="awards",
+            event_id=event_id,
+            message_id=message_id,
+            channel_id=channel_id,
+            now_utc=now_utc,
+            expected=expected,
+        )
     try:
         execute(
             """

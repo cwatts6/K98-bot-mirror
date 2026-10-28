@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from mge.dal import mge_rules_dal
+from mge.mge_action_result import ActionEvidence, qualified_action
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class RulesServiceResult:
     message: str
     event_id: int | None = None
     signup_channel_id: int | None = None
+    action: ActionEvidence | None = None
 
 
 def get_event_rules_context(event_id: int) -> dict[str, Any] | None:
@@ -25,6 +27,7 @@ def get_event_rules_context(event_id: int) -> dict[str, Any] | None:
     return mge_rules_dal.fetch_event_rules_context(int(event_id))
 
 
+@qualified_action
 def update_event_rules_text(
     *,
     event_id: int,
@@ -77,7 +80,7 @@ def update_event_rules_text(
     if not ok:
         return RulesServiceResult(
             False,
-            "Failed to update rules. Please try again.",
+            "The rules update could not be confirmed. Have leadership check before repeating it.",
             event_id=int(event_id),
         )
 
@@ -98,6 +101,7 @@ def update_event_rules_text(
     )
 
 
+@qualified_action
 def reset_event_rules_to_mode_default(
     *,
     event_id: int,
@@ -141,7 +145,7 @@ def reset_event_rules_to_mode_default(
     if not ok:
         return RulesServiceResult(
             False,
-            "Failed to reset rules. Please try again.",
+            "The rules reset could not be confirmed. Have leadership check before repeating it.",
             event_id=int(event_id),
         )
 

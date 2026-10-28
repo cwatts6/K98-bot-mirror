@@ -10,6 +10,7 @@ from embed_utils import fmt_short
 from mge import mge_roster_service
 from mge.dal import mge_publish_dal, mge_roster_dal
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_result import qualified_action, record_write
 from mge.mge_constants import DEFAULT_TARGET_DECREMENT_SCORE
 from mge.mge_simplified_flow_service import (
     evaluate_dataset_readiness,
@@ -133,7 +134,7 @@ def _maybe_regenerate_targets(
 
     Must be called AFTER rank/order changes are persisted.
     Returns True if regen was attempted and succeeded, False otherwise.
-    Failures are logged as warnings and do NOT propagate.
+    The adopted action evidence retains required secondary-work failures.
     """
     try:
         dataset = get_ordered_leadership_rows(event_id)
@@ -141,6 +142,7 @@ def _maybe_regenerate_targets(
             r for r in dataset.get("roster_rows", []) if _to_int(r.get("AwardId"), 0) > 0
         ]
         if not roster_rows:
+            record_write("target_regeneration", "not_required", kind="secondary")
             return False
 
         # Only regenerate if targets already exist for this event
@@ -149,6 +151,7 @@ def _maybe_regenerate_targets(
             for r in roster_rows
         )
         if not has_targets:
+            record_write("target_regeneration", "not_required", kind="secondary")
             return False
 
         # Find rank1 target from the current roster data
@@ -161,6 +164,7 @@ def _maybe_regenerate_targets(
             None,
         )
         if rank1_row is None or rank1_row.get("TargetScore") is None:
+            record_write("target_regeneration", "unknown", kind="secondary")
             logger.warning(
                 "mge_target_regen_skipped reason=no_rank1_target event_id=%s",
                 event_id,
@@ -169,6 +173,7 @@ def _maybe_regenerate_targets(
 
         rank1_score = _to_int(rank1_row.get("TargetScore"), 0)
         if rank1_score <= 0:
+            record_write("target_regeneration", "unknown", kind="secondary")
             logger.warning(
                 "mge_target_regen_skipped reason=rank1_target_zero event_id=%s",
                 event_id,
@@ -185,6 +190,7 @@ def _maybe_regenerate_targets(
             roster_targets[award_id] = {"target_score": target, "awarded_rank": rank}
 
         if not roster_targets:
+            record_write("target_regeneration", "unknown", kind="secondary")
             return False
 
         # Non-roster award IDs to clear
@@ -203,6 +209,7 @@ def _maybe_regenerate_targets(
             now_utc=now,
         )
         if count <= 0:
+            record_write("target_regeneration", "unknown", kind="secondary")
             logger.warning(
                 "mge_target_regen_failed reason=apply_returned_zero event_id=%s",
                 event_id,
@@ -218,6 +225,7 @@ def _maybe_regenerate_targets(
         return True
 
     except Exception:
+        record_write("target_regeneration", "unknown", kind="secondary")
         logger.exception(
             "mge_target_regen_exception manual_regeneration_required event_id=%s actor_discord_id=%s",
             event_id,
@@ -295,6 +303,7 @@ def get_leadership_board_payload(event_id: int, *, allow_placement: bool = True)
     return payload
 
 
+@qualified_action
 def move_waitlist_to_roster_with_optional_demote(
     *,
     event_id: int,
@@ -456,6 +465,7 @@ def move_waitlist_to_roster_with_optional_demote(
     return result
 
 
+@qualified_action
 def reset_active_ranks(*, event_id: int, actor_discord_id: int) -> mge_roster_service.RosterResult:
     """Reset active roster/waitlist ordering to simplified-flow order and clear manual overrides."""
     try:

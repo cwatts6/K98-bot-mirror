@@ -8,13 +8,14 @@ import discord
 
 from bot_config import MGE_SIMPLIFIED_FLOW_ENABLED
 from core.owned_work import drain_thread
-from mge import mge_completion_service
+from mge import mge_completion_service, mge_embed_manager
 from mge.mge_embed_manager import (
     resolve_public_signup_channel_id,
     sync_event_leadership_embed,
     sync_event_signup_embed,
 )
 from mge.mge_event_service import sync_mge_events_from_calendar
+from mge.mge_recovery import RecoverySweep
 
 logger = logging.getLogger(__name__)
 
@@ -45,60 +46,85 @@ async def schedule_mge_lifecycle(bot: discord.Client) -> None:
             source,
             raw_channel_id,
         )
-        return
+
+    startup = RecoverySweep(include_completed=True)
+    ongoing = None
+    receipts_pending = True
 
     try:
-        while True:
+        while not mge_embed_manager._refreshes.snapshot()["background_closed"]:
             now = datetime.now(UTC)
 
-            try:
-                result, event_ids = await drain_thread(sync_mge_events_from_calendar, now_utc=now)
-                synced = 0
-                for event_id in event_ids:
-                    try:
-                        await sync_event_signup_embed(
-                            bot=bot,
-                            event_id=event_id,
-                            signup_channel_id=channel_id,
-                            now_utc=now,
-                        )
-                        if MGE_SIMPLIFIED_FLOW_ENABLED:
-                            await sync_event_leadership_embed(
+            # Reconciliation is independent of calendar availability and configured destinations.
+            async def recovery():
+                nonlocal receipts_pending, ongoing
+                if receipts_pending:
+                    await startup.receipts(bot)
+                    receipts_pending = False
+                if not startup.complete:
+                    await startup.advance(bot)
+                else:
+                    if ongoing is None or ongoing.complete:
+                        ongoing = RecoverySweep(include_completed=False)
+                    await ongoing.advance(bot)
+
+            await mge_embed_manager._refreshes.run_direct(recovery)
+            if mge_embed_manager._refreshes.snapshot()["background_closed"]:
+                break
+
+            async def lifecycle():
+                try:
+                    result, event_ids = await drain_thread(
+                        sync_mge_events_from_calendar, now_utc=now
+                    )
+                    synced = 0
+                    for event_id in event_ids if channel_id > 0 else []:
+                        try:
+                            public_ok = await sync_event_signup_embed(
                                 bot=bot,
                                 event_id=event_id,
+                                signup_channel_id=channel_id,
                                 now_utc=now,
                             )
-                        synced += 1
-                    except Exception:
-                        logger.exception(
-                            "mge_scheduler_embed_sync_failed event_id=%s signup_channel_id=%s",
-                            event_id,
-                            channel_id,
-                        )
+                            if MGE_SIMPLIFIED_FLOW_ENABLED:
+                                await sync_event_leadership_embed(
+                                    bot=bot,
+                                    event_id=event_id,
+                                    now_utc=now,
+                                )
+                            synced += int(bool(public_ok))
+                        except Exception:
+                            logger.exception(
+                                "mge_scheduler_embed_sync_failed event_id=%s signup_channel_id=%s",
+                                event_id,
+                                channel_id,
+                            )
 
-                logger.info(
-                    "mge_scheduler_tick_complete scanned=%s created=%s existing=%s skipped=%s errors=%s embed_synced=%s",
-                    result.scanned,
-                    result.created,
-                    result.existing,
-                    result.skipped,
-                    result.errors,
-                    synced,
-                )
-            except Exception:
-                logger.exception("mge_scheduler_tick_failed")
+                    logger.info(
+                        "mge_scheduler_tick_complete scanned=%s created=%s existing=%s skipped=%s errors=%s embed_synced=%s",
+                        result.scanned,
+                        result.created,
+                        result.existing,
+                        result.skipped,
+                        result.errors,
+                        synced,
+                    )
+                except Exception:
+                    logger.exception("mge_scheduler_tick_failed")
 
-            try:
-                completion_result = await drain_thread(
-                    mge_completion_service.auto_complete_due_events, as_of_utc=now
-                )
-                logger.info(
-                    "mge_scheduler_completion_tick due=%s completed=%s",
-                    completion_result.get("due_count", 0),
-                    completion_result.get("completed_count", 0),
-                )
-            except Exception:
-                logger.exception("mge_scheduler_completion_tick_failed")
+                try:
+                    completion_result = await drain_thread(
+                        mge_completion_service.auto_complete_due_events, as_of_utc=now
+                    )
+                    logger.info(
+                        "mge_scheduler_completion_tick due=%s completed=%s",
+                        completion_result.get("due_count", 0),
+                        completion_result.get("completed_count", 0),
+                    )
+                except Exception:
+                    logger.exception("mge_scheduler_completion_tick_failed")
+
+            await mge_embed_manager._refreshes.run_direct(lifecycle)
 
             await asyncio.sleep(interval_seconds)
     except asyncio.CancelledError:

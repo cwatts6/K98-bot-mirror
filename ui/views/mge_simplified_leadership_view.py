@@ -22,6 +22,7 @@ from mge import (
 # architecture-check: allow - existing leadership view reads signup DAL for admin-add gating.
 from mge.dal import mge_signup_dal
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_response import refresh_message, reply_with_refresh
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_roster_execution import run_roster_mutation
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
@@ -57,8 +58,8 @@ def _build_leadership_admin_deps(
 ) -> MGEAdminViewDeps:
     """Build refresh/admin dependencies for simplified leadership admin actions."""
 
-    def _refresh_embed(target_event_id: int) -> None:
-        mge_embed_manager.request_board_refresh(
+    def _refresh_embed(target_event_id: int):
+        return mge_embed_manager.request_board_refresh(
             bot=interaction.client, event_id=int(target_event_id)
         )
 
@@ -159,14 +160,13 @@ class _AdjustRankModal(discord.ui.Modal):
             new_rank=new_rank,
             actor_discord_id=int(interaction.user.id),
         )
-        if result.success:
-            await mge_embed_manager.refresh_mge_boards(
-                bot=interaction.client,
-                event_id=self.event_id,
-                refresh_public=True,
-                refresh_leadership=True,
-            )
-        await send_ephemeral(interaction, ("✅ " if result.success else "❌ ") + result.message)
+        await reply_with_refresh(
+            interaction,
+            result,
+            event_id=self.event_id,
+            refresh_public=True,
+            refresh_leadership=True,
+        )
 
 
 class _NotesOnlyModal(discord.ui.Modal):
@@ -217,21 +217,21 @@ class _GenerateTargetsModal(discord.ui.Modal):
             )
             return
 
-        result = await drain_thread(
+        result = await run_roster_mutation(
+            self.event_id,
             mge_publish_service.generate_targets_from_rank1,
             event_id=self.event_id,
             rank1_target_millions=rank1_target,
             actor_discord_id=int(interaction.user.id),
         )
-        if result.success:
-            await mge_embed_manager.refresh_mge_boards(
-                bot=interaction.client,
-                event_id=self.event_id,
-                refresh_public=True,
-                refresh_leadership=True,
-                refresh_awards=True,
-            )
-        await send_ephemeral(interaction, ("✅ " if result.success else "❌ ") + result.message)
+        await reply_with_refresh(
+            interaction,
+            result,
+            event_id=self.event_id,
+            refresh_public=True,
+            refresh_leadership=True,
+            refresh_awards=True,
+        )
 
 
 class _PublishConfirmView(_SingleActionConfirmView):
@@ -308,15 +308,14 @@ class _ResetRanksConfirmView(_SingleActionConfirmView):
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
         )
-        if result.success:
-            await mge_embed_manager.refresh_mge_boards(
-                bot=interaction.client,
-                event_id=self.event_id,
-                refresh_public=True,
-                refresh_leadership=True,
-            )
         self._mark_completed()
-        await send_ephemeral(interaction, ("✅ " if result.success else "❌ ") + result.message)
+        await reply_with_refresh(
+            interaction,
+            result,
+            event_id=self.event_id,
+            refresh_public=True,
+            refresh_leadership=True,
+        )
 
 
 class _Step1SelectionView(discord.ui.View):
@@ -488,11 +487,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
         )
         await send_ephemeral(
             interaction,
-            (
-                "✅ Leadership embed refreshed."
-                if results["leadership"]
-                else "The leadership board could not be refreshed. Its saved identity has been retained."
-            ),
+            refresh_message(results["leadership"], "Leadership board"),
         )
 
     @discord.ui.button(
@@ -531,8 +526,8 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             from ui.views.mge_admin_view import MGEAdminViewDeps
             from ui.views.mge_signup_view import MGESignupView
 
-            def _refresh_embed(target_event_id: int) -> None:
-                mge_embed_manager.request_board_refresh(
+            def _refresh_embed(target_event_id: int):
+                return mge_embed_manager.request_board_refresh(
                     bot=modal_interaction.client, event_id=int(target_event_id)
                 )
 
@@ -633,14 +628,9 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                     actor_discord_id=int(j.user.id),
                     notes=notes,
                 )
-                if result.success:
-                    await mge_embed_manager.refresh_mge_boards(
-                        bot=j.client,
-                        event_id=self.event_id,
-                        refresh_public=True,
-                        refresh_leadership=True,
-                    )
-                await send_ephemeral(j, ("✅ " if result.success else "❌ ") + result.message)
+                await reply_with_refresh(
+                    j, result, event_id=self.event_id, refresh_public=True, refresh_leadership=True
+                )
 
             await i.response.send_modal(
                 _NotesOnlyModal(title="Move to Waitlist", event_id=self.event_id, on_submit=_submit)
@@ -699,14 +689,13 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                         demote_award_id=None,
                         notes=notes,
                     )
-                    if result.success:
-                        await mge_embed_manager.refresh_mge_boards(
-                            bot=j.client,
-                            event_id=self.event_id,
-                            refresh_public=True,
-                            refresh_leadership=True,
-                        )
-                    await send_ephemeral(j, ("✅ " if result.success else "❌ ") + result.message)
+                    await reply_with_refresh(
+                        j,
+                        result,
+                        event_id=self.event_id,
+                        refresh_public=True,
+                        refresh_leadership=True,
+                    )
 
                 await i.response.send_modal(
                     _NotesOnlyModal(
@@ -734,14 +723,13 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                         demote_award_id=demote_award_id,
                         notes=notes,
                     )
-                    if result.success:
-                        await mge_embed_manager.refresh_mge_boards(
-                            bot=k.client,
-                            event_id=self.event_id,
-                            refresh_public=True,
-                            refresh_leadership=True,
-                        )
-                    await send_ephemeral(k, ("✅ " if result.success else "❌ ") + result.message)
+                    await reply_with_refresh(
+                        k,
+                        result,
+                        event_id=self.event_id,
+                        refresh_public=True,
+                        refresh_leadership=True,
+                    )
 
                 await j.response.send_modal(
                     _NotesOnlyModal(
@@ -807,14 +795,9 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                     actor_discord_id=int(j.user.id),
                     reason=notes,
                 )
-                if result.success:
-                    await mge_embed_manager.refresh_mge_boards(
-                        bot=j.client,
-                        event_id=self.event_id,
-                        refresh_public=True,
-                        refresh_leadership=True,
-                    )
-                await send_ephemeral(j, ("✅ " if result.success else "❌ ") + result.message)
+                await reply_with_refresh(
+                    j, result, event_id=self.event_id, refresh_public=True, refresh_leadership=True
+                )
 
             await i.response.send_modal(
                 _NotesOnlyModal(title="Reject Signup", event_id=self.event_id, on_submit=_submit)
@@ -914,23 +897,20 @@ class MGESimplifiedLeadershipView(discord.ui.View):
                         await send_ephemeral(modal_interaction, "❌ Invalid target score.")
                         return
 
-                    result = await drain_thread(
+                    result = await run_roster_mutation(
+                        self.event_id,
                         mge_publish_service.override_target_score,
                         award_id=self.selected_award_id,
                         target_score=target_score,
                         actor_discord_id=int(modal_interaction.user.id),
                     )
-                    if result.success:
-                        await mge_embed_manager.refresh_mge_boards(
-                            bot=modal_interaction.client,
-                            event_id=self.event_id,
-                            refresh_public=True,
-                            refresh_leadership=True,
-                            refresh_awards=True,
-                        )
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if result.success else "❌ ") + result.message,
+                        result,
+                        event_id=self.event_id,
+                        refresh_public=True,
+                        refresh_leadership=True,
+                        refresh_awards=True,
                     )
 
             await i.response.send_modal(

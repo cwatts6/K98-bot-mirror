@@ -1,0 +1,207 @@
+[
+  {
+    "path": "bot_instance.py",
+    "before": "41eb1787fcfd4864fcd14b3d99e33243f94e9b2e97cbd9c80a4e813e17863fb0",
+    "after": "6c1e338c5db4a97d3ba34dd2a2626006b916dbf8226faa9ec56e85a7d78dc691"
+  },
+  {
+    "path": "commands/mge_cmds.py",
+    "before": "56d98e88b4c17881a0de6d487215949ee730d7a52aee6bda19c5a82f8d29d065",
+    "after": "3a5282f7899395511a0c3fe9c8bc380a4f6953ad700b5c4bc46ed02a01007109"
+  },
+  {
+    "path": "core/coalesced_work.py",
+    "before": "a006612284d342599698a3372cc5e9082b430965c563285b9459ea1c31a753d1",
+    "after": "a006612284d342599698a3372cc5e9082b430965c563285b9459ea1c31a753d1"
+  },
+  {
+    "path": "core/interaction_safety.py",
+    "before": "054b144802145e7dae450b1fbcc2a0ac0276ff9147034f98b49b6538bd6e4c88",
+    "after": "c9289a9eaf7efed47abd7b4c4390a5634283dca8ac77c8ca7fb412e018a1e09b"
+  },
+  {
+    "path": "core/operation_outcome.py",
+    "before": "5d03ed01d0aabb6ba874e93b64bdac635a0f939dff9969cf5327ce9708b6376e",
+    "after": "5d03ed01d0aabb6ba874e93b64bdac635a0f939dff9969cf5327ce9708b6376e"
+  },
+  {
+    "path": "core/operation_timing.py",
+    "before": "04c71084a204b366ad16aa65e60bef4d1668ce9ac694bafc82e303c4a75fe6cd",
+    "after": "04c71084a204b366ad16aa65e60bef4d1668ce9ac694bafc82e303c4a75fe6cd"
+  },
+  {
+    "path": "core/owned_work.py",
+    "before": "0ff3ade205877a013ebd3a43f0ea1aafd99e51113e9c23ee73a4148eb2918777",
+    "after": "0ff3ade205877a013ebd3a43f0ea1aafd99e51113e9c23ee73a4148eb2918777"
+  },
+  {
+    "path": "mge/dal/mge_board_identity_dal.py",
+    "before": null,
+    "after": "1eb63bc1621b59aa22cb41a0bc177a1b740736e14f2f12cfce50971657f4334d"
+  },
+  {
+    "path": "mge/dal/mge_event_dal.py",
+    "before": "31d2cf7bfbcad448a02337ed9dad04a2d547f5cfbeeab93b477a4545271b8159",
+    "after": "74b957d1dbfd3ac05f3a5438cc5386903ddc4d8f72e77938873dbeea333ef982"
+  },
+  {
+    "path": "mge/dal/mge_leadership_dal.py",
+    "before": "ef31fba95284529416c08cd9129dbd7acca3eb3c1f4e7aaaca3faefc42fdd7b6",
+    "after": "3fc8b1a94b71a8a4dd9ea3672c2b87c70df0f6a36095237a87002d504315334e"
+  },
+  {
+    "path": "mge/dal/mge_publish_dal.py",
+    "before": "cbefc3876439bfac980faa8d58497ea5e5283a6658f1c6ad615771784384ef5d",
+    "after": "57f2e8ad1d616e449db0ca99a061d1fcfafb11aa5132e00a3a80b4a4e6cef93a"
+  },
+  {
+    "path": "mge/dal/mge_recovery_dal.py",
+    "before": null,
+    "after": "42957717918e524e89d33c3e9f438838fcb656a608467e9ae9994a2242e37146"
+  },
+  {
+    "path": "mge/dal/mge_review_dal.py",
+    "before": "b598da196f413d3778657339b0ede0cd62ad16c63f76a78e4f46b79ea0437f7a",
+    "after": "fc40c616f46a17c1760244ffa1d0607ed7777ed3af8aab3ecd92864909fb8122"
+  },
+  {
+    "path": "mge/dal/mge_roster_dal.py",
+    "before": "ced30fae60b800b67a64dd628cba0ad6ca9d19f2d0aff2f923dd96561cf48ec5",
+    "after": "c3a6b613a6e2852a8f5887aea80f045b8ef51f9383cd99a1f7c6bb5296e1fcd1"
+  },
+  {
+    "path": "mge/dal/mge_rules_dal.py",
+    "before": "2ca00cfd41198cd541818b9c6d273d317e64618276f8e4de1e2d649293b44bbd",
+    "after": "c5f423c34cb3f693820bd7525932f664618c23869c048c1920a728aec5751b4e"
+  },
+  {
+    "path": "mge/dal/qualified_read.py",
+    "before": null,
+    "after": "7e3a01e13295044f1124230ebcd2db923874ae8ade5d16b8f43427d5fe480f28"
+  },
+  {
+    "path": "mge/dataset_errors.py",
+    "before": "89cf56a5f9c617057a4afd1cfd801fe2829e2509a2693f8ab6432c3cf8316b91",
+    "after": "89cf56a5f9c617057a4afd1cfd801fe2829e2509a2693f8ab6432c3cf8316b91"
+  },
+  {
+    "path": "mge/mge_action_response.py",
+    "before": null,
+    "after": "c82c5206c3cd678e41918ab5aa451ef23e9f594249772357d53495c8a34c6232"
+  },
+  {
+    "path": "mge/mge_action_result.py",
+    "before": null,
+    "after": "43ec050a18294b889c58376504d44ac01b1b222fff5cd31569db15d8c5f4bdc5"
+  },
+  {
+    "path": "mge/mge_board_delivery_adapter.py",
+    "before": "b1e4194adcd9d129b148a1131eca7959ffc650f25ec84c6e2364149e8afad209",
+    "after": "b5bde37e83137ced60c9cc92b84a459b21c27e4622c9aa4a4b92eec42039772b"
+  },
+  {
+    "path": "mge/mge_board_ownership.py",
+    "before": null,
+    "after": "f23f8597496e72a319ea0296fc346dea48432c9ced701c0aaebf3e2ce36f0b29"
+  },
+  {
+    "path": "mge/mge_board_preparation.py",
+    "before": null,
+    "after": "4c7e2835192e13c5b0ace219bbeceb3f1a6d99a99039046db13f08d109835a4c"
+  },
+  {
+    "path": "mge/mge_embed_manager.py",
+    "before": "561adbc8d8edb7a497312ab924ff16b3432741a9fc67a472f45b2f4d49008fb8",
+    "after": "794f163435fe9beb5fb5e4f965321ba0a0c7b009bb2a89734a0352697dc4fcf0"
+  },
+  {
+    "path": "mge/mge_event_service.py",
+    "before": "4efff876968fe0ca6dfd2f3f5914d71d76bd90f572fdefc64a8130133acfd5ae",
+    "after": "d2f6f8f1d8965a6e99ac659b479040dadfb27bc6c8fe469e1282cae6c46a1ab8"
+  },
+  {
+    "path": "mge/mge_publish_discord_adapter.py",
+    "before": "41f237d4820e0abf7d69ab3f21b3fbd4f43182a7ba4e7f0f1ce0abde68801410",
+    "after": "2d6ca74563504c4244063fcc8651d861dd22f194f05b097d215f4bb8bfc4b2c1"
+  },
+  {
+    "path": "mge/mge_publish_service.py",
+    "before": "d1f35ad10fbdfe04d4d760e1f79669a4ef29350bc157003805c4f78c5a13eab0",
+    "after": "c991658e12b94b11a87ca52285a16c66b3be7d4ae729afa6f88042b2e3ca495b"
+  },
+  {
+    "path": "mge/mge_recovery.py",
+    "before": null,
+    "after": "ce85decf20bbb8a075bf116824af30a4d6635145a10d63dd7f7d87a8fa0378da"
+  },
+  {
+    "path": "mge/mge_refresh_work.py",
+    "before": null,
+    "after": "e182dc136165606a1e6cfad58d598f796161da22748aa25046dcdab5fd06d0e5"
+  },
+  {
+    "path": "mge/mge_roster_execution.py",
+    "before": "c73f7f5c93624f3e4fcda1b560e584c0651f59545db2c1cea484d58c5f0e224e",
+    "after": "b9167300775d218429d13f37974f3657325380eb53d9a536006a5cbf7f964f44"
+  },
+  {
+    "path": "mge/mge_roster_service.py",
+    "before": "9fc6d9771fcabd9c49b2d398bf7b5067a90b0673e68a6934b77f9ac4608f007d",
+    "after": "cd4a89145a93380d67221443c659e5a8c0fa28e22a6695eeca64532c2f6ffaf2"
+  },
+  {
+    "path": "mge/mge_rules_service.py",
+    "before": "8bdc6bc6860bd2c2093ec00aa895c353bc1ff918fb5a128d32af3fa0fff5541c",
+    "after": "71c5d66046afbe9c3c411b718768a70b72601661c9b18b63b5dea9e6d4070af6"
+  },
+  {
+    "path": "mge/mge_scheduler.py",
+    "before": "9fe21d54283c11fa08a46e9b13ba060d892fa2832cb0bb80fc8b48ba7c9d5846",
+    "after": "d9add9568ad4e85f6ff210203284e4a0bf8709480868f02903516f1bc0419d50"
+  },
+  {
+    "path": "mge/mge_simplified_flow_service.py",
+    "before": "9029e39f1d025c2f3bd4e72192376e50fe20b06fb6c0181347191340a7f46a8d",
+    "after": "7b5cb7588b6c2494c437953278a5edc65120e68defbe35a0748e4ee37df9f259"
+  },
+  {
+    "path": "mge/mge_simplified_leadership_service.py",
+    "before": "3c5728b25ea47d5bb709299c50684fab6c3602aed3ecbf056cc9505e6b2219c5",
+    "after": "e95b83fa07f82b97eea9fb3c8e28b9f4dddd142ccb26db6f58fbd7453e6a5be8"
+  },
+  {
+    "path": "ui/views/mge_admin_view.py",
+    "before": "1d33b7a297363e16a3f6d72c4320952b978e6aceb9f578799d1548705cd199e7",
+    "after": "93450e246ec9f51a827707a1d403d5abdbc1aaa6c70428089d62c980bebff1ae"
+  },
+  {
+    "path": "ui/views/mge_roster_builder_view.py",
+    "before": "d45268d5425c4cf2d01756c6322edd0fb031d8fb8e5b714fa002a57024a2bb54",
+    "after": "656b9b15453ded163a265e9c04561fa60520265c26bbeaa05d711a6f3edce6a5"
+  },
+  {
+    "path": "ui/views/mge_rules_edit_view.py",
+    "before": "9567e2493b0b4e2691b6ec21d2dcf242165eae9502661d52d69538acf3553908",
+    "after": "757b837045f35674fadea99c1a37b6331272dcaca06c7ba963f92425ce2d53e5"
+  },
+  {
+    "path": "ui/views/mge_signup_modal.py",
+    "before": "3ff9b9fd9404e709c10441bba350aef7d15fea63df2df1421967c865addd509c",
+    "after": "5ecd21b9fe10711a314811b85d9007611418e7c03ff0110d4c8cad753ee2cb52"
+  },
+  {
+    "path": "ui/views/mge_signup_view.py",
+    "before": "6ecc07a77a658131d00d936f05b52381762e849b22f47417f2fda52aee3aa6f3",
+    "after": "91946baaf1ea659a81889fd11b3e2f18e4853619c837823a865aab43060178b9"
+  },
+  {
+    "path": "ui/views/mge_simplified_leadership_view.py",
+    "before": "fbac7d0684ca85129815949e8359c83e8927fae15e1c134ea63a9c3ea264f843",
+    "after": "7282340091810181655eaffa7301ee423928ac59d95f773de3e3815fe7c050e2"
+  },
+  {
+    "path": "ui/views/mge_simplified_signup_form_view.py",
+    "before": "5f12f248e002adfbaea75843109e7058ba20ebb64e596d2431b00dc4a24045a8",
+    "after": "d65df25babf41a261d281ae079776a20eeb904922bbc5ebdb7c60276592c2453"
+  }
+]

@@ -9,6 +9,7 @@ from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
 from core.owned_work import drain_thread
 from mge import mge_roster_service
+from mge.mge_action_response import reply_with_refresh
 from mge.mge_review_service import get_signup_review_pool
 from mge.mge_roster_execution import run_roster_mutation
 from ui.views.prepared_modal_view import offer_prepared_modal
@@ -267,11 +268,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         actor_discord_id=int(modal_interaction.user.id),
                         internal_notes=str(self.internal_notes.value or "").strip() or None,
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _AddModal(self, snap))
@@ -380,11 +382,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         new_rank=rank,
                         actor_discord_id=int(modal_interaction.user.id),
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _SetRankModal(self, int(snap["AwardId"])))
@@ -454,11 +457,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         waitlist_order=order,
                         notes=str(self.notes.value or "").strip() or None,
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _WaitlistModal(self, int(snap["AwardId"])))
@@ -515,11 +519,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         actor_discord_id=int(modal_interaction.user.id),
                         notes=str(self.notes.value or "").strip() or None,
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _PromoteModal(self, int(snap["AwardId"])))
@@ -581,11 +586,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         waitlist_order=order,
                         actor_discord_id=int(modal_interaction.user.id),
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _SetWaitOrderModal(self, int(snap["AwardId"])))
@@ -640,9 +646,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         notes=str(self.notes.value or "").strip() or None,
                         actor_discord_id=int(modal_interaction.user.id),
                     )
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _NotesModal(self, int(snap["AwardId"])))
@@ -700,11 +709,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         session_key=self.parent._session_key(),
                         removal_reason=reason,
                     )
-                    embed = await self.parent._load_embed() if res.success else None
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
-                        embed=embed,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _RemoveModal(self, int(snap["AwardId"])))
@@ -731,13 +741,10 @@ class MgeRosterBuilderView(discord.ui.View):
             event_id=self.event_id,
             actor_discord_id=self.actor_discord_id,
         )
-        msg = (
-            ("✅ " if res.success else "❌ ")
-            + res.message
-            + "\n(Undo only works during current session.)"
+        res.message += "\n(Undo only works during current session.)"
+        await reply_with_refresh(
+            interaction, res, event_id=self.event_id, refresh_public=False, refresh_leadership=False
         )
-        embed = await self._load_embed() if res.success else None
-        await send_ephemeral(interaction, msg, embed=embed)
 
     @discord.ui.button(label="Reject Signup (Audit)", style=discord.ButtonStyle.danger, row=3)
     @private_operation
@@ -779,9 +786,12 @@ class MgeRosterBuilderView(discord.ui.View):
                         actor_discord_id=int(modal_interaction.user.id),
                         reason=str(self.reason.value or "").strip() or None,
                     )
-                    await send_ephemeral(
+                    await reply_with_refresh(
                         modal_interaction,
-                        ("✅ " if res.success else "❌ ") + res.message,
+                        res,
+                        event_id=self.parent.event_id,
+                        refresh_public=False,
+                        refresh_leadership=False,
                     )
 
             await offer_prepared_modal(inter, _RejectModal(self))

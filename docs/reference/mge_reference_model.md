@@ -1,5 +1,7 @@
 # MGE Reference Model
 
+> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+
 The delivered MGE lifecycle implementation is described in the
 [implementation and evidence packet](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md).
 Use the [shared P1 adoption contract](p1-operation-lifecycle.md) for acknowledgement,

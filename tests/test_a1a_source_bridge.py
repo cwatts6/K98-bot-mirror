@@ -19,6 +19,9 @@ def test_a1a_bridge_rejects_unknown_successor(tmp_path, damage):
     path = member["path"]
     (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
     (tmp_path / path).write_bytes((root / path).read_bytes())
+    a1b = Path("tests/fixtures/p1_a1b_source_pairs.json")
+    (tmp_path / a1b).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / a1b).write_bytes((root / a1b).read_bytes())
     assert before_a1a_hash(tmp_path, path) == member["before"]
     if damage == "source":
         (tmp_path / path).write_bytes(b"unknown source")

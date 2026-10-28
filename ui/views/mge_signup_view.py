@@ -15,6 +15,7 @@ from mge import mge_dm_followup, mge_signup_service
 
 # architecture-check: allow
 from mge.dal import mge_signup_dal
+from mge.mge_action_response import refresh_message, reply_with_refresh
 from mge.mge_cache import get_commanders_for_variant
 from mge.mge_signup_service import ServiceResult
 from ui.views.mge_admin_completion_view import MgeAdminCompletionView
@@ -331,11 +332,14 @@ class MGESignupView(discord.ui.View):
                 actor_role_ids=_member_role_ids(interaction),
                 admin_role_ids=self._admin_role_ids(),
             )
-            await send_ephemeral(
-                interaction, "✅ " + result.message if result.success else "❌ " + result.message
+            await reply_with_refresh(
+                interaction,
+                result,
+                event_id=self.event_id,
+                register_refresh=self.admin_deps.refresh_embed,
+                refresh_public=False,
+                refresh_leadership=False,
             )
-            if result.success:
-                self.admin_deps.refresh_embed(self.event_id)
             return
 
         class _WithdrawSelect(discord.ui.Select):
@@ -382,12 +386,14 @@ class MGESignupView(discord.ui.View):
                     actor_role_ids=_member_role_ids(select_interaction),
                     admin_role_ids=self.parent_view._admin_role_ids(),
                 )
-                await send_ephemeral(
+                await reply_with_refresh(
                     select_interaction,
-                    "✅ " + result.message if result.success else "❌ " + result.message,
+                    result,
+                    event_id=self.parent_view.event_id,
+                    register_refresh=self.parent_view.admin_deps.refresh_embed,
+                    refresh_public=False,
+                    refresh_leadership=False,
                 )
-                if result.success:
-                    self.parent_view.admin_deps.refresh_embed(self.parent_view.event_id)
 
         picker = discord.ui.View(timeout=180)
         picker.add_item(_WithdrawSelect(self))
@@ -568,11 +574,7 @@ class MGESignupView(discord.ui.View):
             )
             await send_ephemeral(
                 interaction,
-                (
-                    "✅ Embed refreshed."
-                    if results["public"]
-                    else "The signup board could not be refreshed. Its saved identity has been retained."
-                ),
+                refresh_message(results["public"], "Signup board"),
             )
 
         except Exception:
@@ -592,20 +594,17 @@ class MGESignupView(discord.ui.View):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
         if MGE_SIMPLIFIED_FLOW_ENABLED:
-            from mge.mge_embed_manager import sync_event_leadership_embed
+            from mge.mge_embed_manager import request_board_refresh
 
-            refreshed = await sync_event_leadership_embed(
+            results = await request_board_refresh(
                 bot=interaction.client,
                 event_id=self.event_id,
-                channel_id=MGE_LEADERSHIP_CHANNEL_ID,
+                leadership_channel_id=MGE_LEADERSHIP_CHANNEL_ID,
+                refresh_public=False,
+            ).observe(10)
+            await send_ephemeral(
+                interaction, refresh_message(results["leadership"], "Leadership control center")
             )
-            if refreshed:
-                await send_ephemeral(
-                    interaction,
-                    f"✅ Leadership control center refreshed in <#{int(MGE_LEADERSHIP_CHANNEL_ID)}> for event `{self.event_id}`.",
-                )
-            else:
-                await send_ephemeral(interaction, "❌ Failed to refresh leadership control center.")
             return
         from ui.views.mge_leadership_board_view import MgeLeadershipBoardView
 

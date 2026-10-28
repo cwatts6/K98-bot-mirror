@@ -40,6 +40,7 @@ def update_leadership_embed_state(
     message_id: int,
     channel_id: int,
     now_utc: datetime,
+    expected=None,
 ) -> bool:
     """Persist leadership embed message/channel ids on dbo.MGE_Events."""
     try:
@@ -48,6 +49,7 @@ def update_leadership_embed_state(
             message_id=message_id,
             channel_id=channel_id,
             now_utc=now_utc,
+            **({"expected": expected} if expected is not None else {}),
         )
         if not ok:
             logger.error(

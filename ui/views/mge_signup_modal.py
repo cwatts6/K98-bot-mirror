@@ -10,6 +10,7 @@ from core.interaction_safety import member_role_ids, private_operation, send_eph
 from core.operation_outcome import MutationOutcome
 from core.owned_work import drain_thread
 from mge import mge_dm_followup, mge_signup_service
+from mge.mge_action_response import reply_with_refresh
 
 logger = logging.getLogger(__name__)
 
@@ -168,19 +169,14 @@ class MgeSignupFinalModal(discord.ui.Modal):
                 )
 
             self._submitted = result.success or result.outcome == MutationOutcome.UNKNOWN
-            await send_ephemeral(
+            await reply_with_refresh(
                 interaction,
-                "✅ " + result.message if result.success else "❌ " + result.message,
-                ephemeral=True,
+                result,
+                event_id=self.payload.event_id,
+                register_refresh=self.payload.on_success_refresh,
+                refresh_public=False,
+                refresh_leadership=False,
             )
-
-            if result.success and self.payload.on_success_refresh is not None:
-                try:
-                    self.payload.on_success_refresh(int(self.payload.event_id))
-                except Exception:
-                    logger.exception(
-                        "mge_signup_refresh_callback_failed event_id=%s", self.payload.event_id
-                    )
 
             if result.success and result.signup_id is not None:
                 event = (

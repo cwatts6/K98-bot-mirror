@@ -9,6 +9,7 @@ import threading
 from typing import Any
 
 from mge.dal import mge_roster_dal
+from mge.mge_action_result import ActionEvidence, qualified_action
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class RosterResult:
     success: bool
     message: str
     award_id: int | None = None
+    action: ActionEvidence | None = None
 
 
 @dataclass(slots=True)
@@ -134,6 +136,7 @@ def _next_waitlist_order(event_id: int) -> int:
     return max(_to_int(r.get("WaitlistOrder")) for r in state.waitlist) + 1
 
 
+@qualified_action
 def add_signup_to_roster(
     *,
     event_id: int,
@@ -199,6 +202,7 @@ def add_signup_to_roster(
     return RosterResult(True, "Added to awarded roster.", award_id=aid)
 
 
+@qualified_action
 def add_signup_with_rank(
     *,
     event_id: int,
@@ -271,6 +275,7 @@ def add_signup_with_rank(
     return RosterResult(True, "Added to awarded roster.", award_id=aid)
 
 
+@qualified_action
 def set_rank(
     *, award_id: int, new_rank: int, actor_discord_id: int, now_utc: datetime | None = None
 ) -> RosterResult:
@@ -292,6 +297,7 @@ def set_rank(
     return RosterResult(True, "Rank updated.", award_id=award_id)
 
 
+@qualified_action
 def move_rank_up(
     *,
     award_id: int,
@@ -312,6 +318,7 @@ def move_rank_up(
     )
 
 
+@qualified_action
 def move_rank_down(
     *,
     award_id: int,
@@ -332,6 +339,7 @@ def move_rank_down(
     )
 
 
+@qualified_action
 def move_to_waitlist(
     *,
     award_id: int,
@@ -377,6 +385,7 @@ def move_to_waitlist(
     return RosterResult(True, "Moved to waitlist.", award_id=award_id)
 
 
+@qualified_action
 def set_waitlist_order(
     *, award_id: int, waitlist_order: int, actor_discord_id: int, now_utc: datetime | None = None
 ) -> RosterResult:
@@ -403,6 +412,7 @@ def set_waitlist_order(
     return RosterResult(True, "Waitlist order updated.", award_id=award_id)
 
 
+@qualified_action
 def update_internal_notes(
     *, award_id: int, notes: str | None, actor_discord_id: int, now_utc: datetime | None = None
 ) -> RosterResult:
@@ -429,6 +439,7 @@ def update_internal_notes(
     return RosterResult(True, "Internal notes updated.", award_id=award_id)
 
 
+@qualified_action
 def promote_waitlist_to_roster(
     *,
     award_id: int,
@@ -461,6 +472,7 @@ def promote_waitlist_to_roster(
     return RosterResult(True, "Moved from waitlist to roster.", award_id=award_id)
 
 
+@qualified_action
 def remove_award_hard_delete(
     *,
     award_id: int,
@@ -487,6 +499,7 @@ def remove_award_hard_delete(
     return RosterResult(True, "Entry removed.", award_id=award_id)
 
 
+@qualified_action
 def undo_last_removal_in_session(
     *, event_id: int, actor_discord_id: int, now_utc: datetime | None = None
 ) -> RosterResult:
@@ -531,6 +544,7 @@ def undo_last_removal_in_session(
     return RosterResult(True, "Undo complete; entry re-added.", award_id=aid)
 
 
+@qualified_action
 def reject_signup_audit_only(
     *,
     event_id: int,
@@ -563,6 +577,7 @@ def reject_signup_audit_only(
     return RosterResult(True, "Applicant rejected (audit-only).")
 
 
+@qualified_action
 def reject_signup(
     *,
     event_id: int,

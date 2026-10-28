@@ -40,7 +40,7 @@ def test_complete_bundle_pins_current_source():
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 50
+    assert len(items) == 51
     # Independent review pins: original 48 entries and exact 27-file addition.
     # These include predecessor hashes, including required absence for new files.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -55,16 +55,16 @@ def test_reviewed_history_and_mge_hashes_remain_exact():
 @pytest.mark.parametrize("extra_byte", [False, True])
 def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
     raw = Path(updater.__file__).with_name("k98_update_transitions.json").read_bytes()
-    raw += b" " * (98304 - len(raw) + int(extra_byte))
+    raw += b" " * (102400 - len(raw) + int(extra_byte))
     monkeypatch.setattr(Path, "read_bytes", lambda self: raw)
     if extra_byte:
         with pytest.raises(ValueError, match="registry exceeds bound"):
             updater.reviewed_transitions()
     else:
-        assert len(updater.reviewed_transitions()) == 50
+        assert len(updater.reviewed_transitions()) == 51
 
 
-def test_fifty_first_registry_entry_is_rejected(monkeypatch):
+def test_fifty_second_registry_entry_is_rejected(monkeypatch):
     items = updater.reviewed_transitions()
     items.append(deepcopy(items[0]))
     raw = json.dumps(dict(version=1, transitions=items)).encode()

@@ -19,12 +19,24 @@ async def test_acknowledged_send_recovers_exact_message_after_sql_save_failure_a
         id=456, send=AsyncMock(return_value=message), fetch_message=AsyncMock(return_value=message)
     )
     assert (
-        await send_board_once(kind="signup", event_id=42, channel=channel, content="first")
+        await send_board_once(
+            kind="signup",
+            event_id=42,
+            channel=channel,
+            binding={"fixture_revision": 1},
+            content="first",
+        )
         is message
     )
     # SQL ID save failed after send; reconstruct the journal as a fresh process would.
     monkeypatch.setattr(delivery, "store", EventDeliveryStore(path))
-    await send_board_once(kind="signup", event_id=42, channel=channel, content="current")
+    await send_board_once(
+        kind="signup",
+        event_id=42,
+        channel=channel,
+        binding={"fixture_revision": 1},
+        content="current",
+    )
     channel.send.assert_awaited_once()
     channel.fetch_message.assert_awaited_once_with(123)
     assert message.edit.await_args.kwargs["content"] == "current"

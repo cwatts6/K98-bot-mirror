@@ -16,7 +16,8 @@ from decoraters import (
     track_usage,
 )
 from mge import mge_commander_service, mge_publish_service
-from mge.mge_embed_manager import sync_event_leadership_embed
+from mge.mge_action_response import refresh_message
+from mge.mge_embed_manager import request_board_refresh
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_results_import import OverwriteConfirmationRequired, import_results_manual
 from mge.mge_review_service import get_review_pool_with_summary
@@ -81,24 +82,15 @@ def register_mge(bot: ext_commands.Bot) -> None:
         await safe_defer(ctx, ephemeral=True)
 
         if MGE_SIMPLIFIED_FLOW_ENABLED:
-            refreshed = await sync_event_leadership_embed(
+            results = await request_board_refresh(
                 bot=ctx.bot,
                 event_id=int(event_id),
-                channel_id=MGE_LEADERSHIP_CHANNEL_ID,
+                leadership_channel_id=MGE_LEADERSHIP_CHANNEL_ID,
+                refresh_public=False,
+            ).observe(10)
+            await ctx.followup.send(
+                refresh_message(results["leadership"], "Leadership control center"), ephemeral=True
             )
-            if refreshed:
-                await ctx.followup.send(
-                    (
-                        f"✅ Leadership control center refreshed in <#{int(MGE_LEADERSHIP_CHANNEL_ID)}> "
-                        f"for event `{event_id}`."
-                    ),
-                    ephemeral=True,
-                )
-            else:
-                await ctx.followup.send(
-                    "❌ Failed to refresh leadership control center.",
-                    ephemeral=True,
-                )
             return
 
         try:

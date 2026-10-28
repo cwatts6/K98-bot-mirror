@@ -1,5 +1,7 @@
 # P1 MGE A1b: scope and handoff
 
+> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+
 > **Design pass completed:** Read the [approval-ready design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md).
 > It resolves the caller map, outcome wording, qualified-read prerequisites,
 > refresh/recovery ownership, two-PR order and acceptance gates. The final framework

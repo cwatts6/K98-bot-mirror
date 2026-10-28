@@ -1,9 +1,11 @@
 """Qualified MGE presentation inputs; no Discord IO or business mutations."""
 
 from datetime import datetime
+import re
 
 from mge.dal import mge_event_dal
 from mge.dataset_errors import MgeDatasetError
+from services.event_delivery_store import delivery_key
 
 EVENT_STATUSES = {"created", "signup_open", "signup_closed", "published", "completed", "reopened"}
 AWARD_STATUSES = {"pending", "awarded", "waitlist", "rejected", "removed"}
@@ -25,6 +27,17 @@ def validate_event(row, event_id, *, publication=False):
         raise MgeDatasetError("incomplete", "event_lifecycle")
     if not _integer(row.get("PublishVersion"), 0):
         raise MgeDatasetError("incomplete", "publication_version")
+    if not isinstance(row.get("UpdatedUtc"), datetime):
+        raise MgeDatasetError("incomplete", "event_revision")
+    token = row.get("UpdatedUtcToken")
+    if not isinstance(token, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?", token
+    ):
+        raise MgeDatasetError("incomplete", "event_revision_token")
+    try:
+        datetime.fromisoformat(token)
+    except ValueError as exc:
+        raise MgeDatasetError("incomplete", "event_revision_token") from exc
     for field in ("EventName", "VariantName"):
         if not isinstance(row.get(field), str) or not row[field].strip():
             raise MgeDatasetError("incomplete", "event_payload")
@@ -98,6 +111,41 @@ def validate_destination(row, kind, channel_id):
     saved_channel, _ = BOARD_FIELDS[kind]
     if row.get(saved_channel) is not None and row[saved_channel] != channel_id:
         raise MgeDatasetError("incomplete", "destination_conflict")
+
+
+def board_binding(row, kind, destination):
+    channel_field, message_field = BOARD_FIELDS[kind]
+    return {
+        "event_id": row["EventId"],
+        "kind": kind,
+        "destination": int(destination),
+        "status": row["Status"],
+        "rule_mode": row["RuleMode"],
+        "publish_version": row["PublishVersion"],
+        "updated_utc": row["UpdatedUtcToken"],
+        "saved_channel_id": row[channel_field],
+        "saved_message_id": row[message_field],
+    }
+
+
+def recovered_identity(row, kind, destination, receipt=None):
+    _, message_field = BOARD_FIELDS[kind]
+    if receipt is None:
+        return row[message_field]
+    binding = board_binding(row, kind, destination)
+    if (
+        receipt.get("key") != delivery_key("mge_board", kind, row["EventId"], destination)
+        or row[message_field] is not None
+        or receipt.get("state") != "acknowledged"
+        or receipt.get("kind") != f"mge_{kind}_board"
+        or receipt.get("event") != str(row["EventId"])
+        or receipt.get("channel_id") != destination
+        or receipt.get("target") != str(destination)
+        or (receipt.get("event_data") or {}).get("board_binding") != binding
+        or not _integer(receipt.get("message_id"))
+    ):
+        raise MgeDatasetError("incomplete", "receipt_binding_held")
+    return receipt["message_id"]
 
 
 def validate_payload(payload, *, has_view=False, view_required=False):

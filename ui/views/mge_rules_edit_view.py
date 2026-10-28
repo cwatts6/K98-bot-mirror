@@ -8,6 +8,7 @@ from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
 from core.owned_work import drain_thread
 from mge import mge_embed_manager, mge_rules_service
+from mge.mge_action_response import reply_with_refresh
 from ui.views.prepared_modal_view import offer_prepared_modal
 
 logger = logging.getLogger(__name__)
@@ -68,15 +69,18 @@ class _RulesEditModal(discord.ui.Modal):
             new_rules_text=new_text,
             actor_discord_id=int(interaction.user.id),
         )
-        if not result.success:
-            await send_ephemeral(interaction, f"❌ {result.message}")
-            return
-
-        refreshed = await self.parent_view._refresh_signup_embed(interaction.client)
-        msg = f"✅ {result.message}"
-        if not refreshed:
-            msg += "\n⚠️ Rules saved, but embed refresh failed. Use Refresh Embed."
-        await send_ephemeral(interaction, msg)
+        await reply_with_refresh(
+            interaction,
+            result,
+            event_id=self.parent_view.event_id,
+            register_refresh=lambda event_id: mge_embed_manager.request_signup_refresh(
+                bot=interaction.client,
+                event_id=event_id,
+                signup_channel_id=result.signup_channel_id or 0,
+            ),
+            refresh_public=False,
+            refresh_leadership=False,
+        )
 
 
 class MgeRulesEditView(discord.ui.View):
@@ -91,23 +95,6 @@ class MgeRulesEditView(discord.ui.View):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return False
         return True
-
-    async def _refresh_signup_embed(self, bot: discord.Client) -> bool:
-        ctx = await drain_thread(mge_rules_service.get_event_rules_context, self.event_id)
-        if not ctx:
-            return False
-        channel_id = ctx.get("SignupEmbedChannelId")
-        if channel_id is None:
-            return False
-        try:
-            return await mge_embed_manager.sync_event_signup_embed(
-                bot=bot,
-                event_id=self.event_id,
-                signup_channel_id=int(channel_id),
-            )
-        except Exception:
-            logger.exception("mge_rules_refresh_embed_failed event_id=%s", self.event_id)
-            return False
 
     @discord.ui.button(
         label="Edit Rules Text",
@@ -168,15 +155,18 @@ class MgeRulesEditView(discord.ui.View):
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
         )
-        if not result.success:
-            await send_ephemeral(interaction, f"❌ {result.message}")
-            return
-
-        refreshed = await self._refresh_signup_embed(interaction.client)
-        msg = f"✅ {result.message}"
-        if not refreshed:
-            msg += "\n⚠️ Rules reset, but embed refresh failed. Use Refresh Embed."
-        await send_ephemeral(interaction, msg)
+        await reply_with_refresh(
+            interaction,
+            result,
+            event_id=self.event_id,
+            register_refresh=lambda event_id: mge_embed_manager.request_signup_refresh(
+                bot=interaction.client,
+                event_id=event_id,
+                signup_channel_id=result.signup_channel_id or 0,
+            ),
+            refresh_public=False,
+            refresh_leadership=False,
+        )
 
     @discord.ui.button(
         label="Close",

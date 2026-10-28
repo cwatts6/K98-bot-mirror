@@ -1297,12 +1297,13 @@ async def _graceful_teardown():
     refresh_service.close_admission()
     _event_bundle().close_admission()
     from core.interaction_safety import close_private_operations, drain_private_operations
-    from mge.mge_embed_manager import drain_refreshes
+    from mge.mge_embed_manager import close_refresh_admission, drain_refreshes
     import reminder_task_registry
     from services import event_delivery_service, operator_status_service
     from services.gsheets_health_service import _probe as sheets_probe
 
     close_private_operations()
+    close_refresh_admission()
     await drain_private_operations()
     await drain_refreshes()
     event_delivery_service.close_admission()

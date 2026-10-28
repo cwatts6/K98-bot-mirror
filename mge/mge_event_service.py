@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from mge.dal import mge_event_dal
+from mge.mge_action_result import ActionEvidence, qualified_action, record_write
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class SwitchToOpenResult:
     message: str
     deleted_signup_count: int = 0
     changed: bool = True
+    action: ActionEvidence | None = None
 
 
 @dataclass(slots=True)
@@ -38,6 +40,7 @@ class SwitchToFixedResult:
     message: str
     updated_row_count: int = 0
     changed: bool = True
+    action: ActionEvidence | None = None
 
 
 def _ensure_utc(dt: Any) -> datetime | None:
@@ -188,6 +191,7 @@ def sync_mge_events_from_calendar(
     return result, event_ids_for_embed
 
 
+@qualified_action
 def switch_event_to_open(*, event_id: int, actor_discord_id: int) -> SwitchToOpenResult:
     ctx = mge_event_dal.fetch_event_switch_context(event_id)
     if not ctx:
@@ -201,6 +205,7 @@ def switch_event_to_open(*, event_id: int, actor_discord_id: int) -> SwitchToOpe
 
     event_mode = str(ctx.get("EventMode") or "").strip().lower()
     if event_mode in _OPEN_EVENT_MODES:
+        record_write("already_open", "not_required")
         return SwitchToOpenResult(
             True,
             "Event is already in open mode.",
@@ -230,7 +235,7 @@ def switch_event_to_open(*, event_id: int, actor_discord_id: int) -> SwitchToOpe
         )
         return SwitchToOpenResult(
             success=False,
-            message="Failed to switch event to open mode. Please try again later.",
+            message="The mode change could not be confirmed. Have leadership check before repeating it.",
             deleted_signup_count=0,
             changed=False,
         )
@@ -249,6 +254,7 @@ def switch_event_to_open(*, event_id: int, actor_discord_id: int) -> SwitchToOpe
     )
 
 
+@qualified_action
 def switch_event_to_fixed(*, event_id: int, actor_discord_id: int) -> SwitchToFixedResult:
     ctx = mge_event_dal.fetch_event_switch_context(event_id)
     if not ctx:
@@ -262,6 +268,7 @@ def switch_event_to_fixed(*, event_id: int, actor_discord_id: int) -> SwitchToFi
 
     event_mode = str(ctx.get("EventMode") or "").strip().lower()
     if event_mode in _CONTROLLED_EVENT_MODES:
+        record_write("already_fixed", "not_required")
         return SwitchToFixedResult(
             True,
             "Event is already in fixed mode.",
@@ -291,7 +298,7 @@ def switch_event_to_fixed(*, event_id: int, actor_discord_id: int) -> SwitchToFi
         )
         return SwitchToFixedResult(
             success=False,
-            message="Failed to switch event back to fixed mode. Please try again later.",
+            message="The mode change could not be confirmed. Have leadership check before repeating it.",
             updated_row_count=0,
             changed=False,
         )

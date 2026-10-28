@@ -7,6 +7,8 @@ import discord
 
 from core.interaction_safety import private_operation, send_ephemeral
 from core.owned_work import drain_thread
+from mge.mge_action_response import action_evidence, reply_with_refresh
+from mge.mge_action_result import ActionDisposition
 from mge.mge_event_service import (
     SwitchToFixedResult,
     SwitchToOpenResult,
@@ -62,15 +64,18 @@ class ConfirmSwitchOpenView(discord.ui.View):
             actor_discord_id=actor_id,
         )
 
-        if not result.success:
-            await send_ephemeral(interaction, f"❌ {result.message}")
-            return
-
-        self.deps.refresh_embed(self.event_id)
-        self._finish()
-        await send_ephemeral(
+        evidence = action_evidence(result)
+        if evidence.disposition != ActionDisposition.NOT_ENTERED:
+            self._finish()
+        if evidence.disposition == ActionDisposition.COMPLETED and result.changed:
+            result.message += f" Deleted {result.deleted_signup_count} signups."
+        await reply_with_refresh(
             interaction,
-            f"✅ Event switched to open mode. Deleted {result.deleted_signup_count} signups.",
+            result,
+            event_id=self.event_id,
+            register_refresh=self.deps.refresh_embed,
+            refresh_public=False,
+            refresh_leadership=False,
         )
 
     @discord.ui.button(
@@ -130,16 +135,18 @@ class ConfirmSwitchFixedView(discord.ui.View):
             actor_discord_id=actor_id,
         )
 
-        if not result.success:
-            await send_ephemeral(interaction, f"❌ {result.message}")
-            return
-
-        self.deps.refresh_embed(self.event_id)
-        self._finish()
-        await send_ephemeral(
+        evidence = action_evidence(result)
+        if evidence.disposition != ActionDisposition.NOT_ENTERED:
+            self._finish()
+        if evidence.disposition == ActionDisposition.COMPLETED and result.changed:
+            result.message += f" Updated {result.updated_row_count} event row(s)."
+        await reply_with_refresh(
             interaction,
-            "✅ Event switched back to fixed mode. "
-            f"Updated {result.updated_row_count} event row(s).",
+            result,
+            event_id=self.event_id,
+            register_refresh=self.deps.refresh_embed,
+            refresh_public=False,
+            refresh_leadership=False,
         )
 
     @discord.ui.button(

@@ -9,6 +9,7 @@ from typing import Any
 
 from mge.dal.qualified_read import qualified_read
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_result import record_affected, record_write
 from stats_alerts.db import exec_with_cursor, run_query
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,8 @@ SELECT
     e.RuleMode,
     e.RulesText,
     e.PublishVersion,
+    e.UpdatedUtc,
+    CONVERT(VARCHAR(33), e.UpdatedUtc, 126) AS UpdatedUtcToken,
     e.SignupEmbedMessageId,
     e.SignupEmbedChannelId,
     e.LeadershipEmbedMessageId,
@@ -288,6 +291,8 @@ def fetch_event_for_embed(event_id: int, *, strict: bool = False) -> dict[str, A
                 "RuleMode",
                 "RulesText",
                 "PublishVersion",
+                "UpdatedUtc",
+                "UpdatedUtcToken",
                 "SignupEmbedMessageId",
                 "SignupEmbedChannelId",
                 "LeadershipEmbedMessageId",
@@ -353,8 +358,19 @@ def insert_mge_event(
 
 
 def update_event_embed_ids(
-    *, event_id: int, message_id: int, channel_id: int, now_utc: datetime
+    *, event_id: int, message_id: int, channel_id: int, now_utc: datetime, expected=None
 ) -> bool:
+    if expected is not None:
+        from mge.dal.mge_board_identity_dal import persist_identity
+
+        return persist_identity(
+            kind="signup",
+            event_id=event_id,
+            message_id=message_id,
+            channel_id=channel_id,
+            now_utc=now_utc,
+            expected=expected,
+        )
     try:
 
         def _callback(cur):
@@ -372,9 +388,20 @@ def update_event_embed_ids(
 
 
 def update_event_leadership_embed_ids(
-    *, event_id: int, message_id: int, channel_id: int, now_utc: datetime
+    *, event_id: int, message_id: int, channel_id: int, now_utc: datetime, expected=None
 ) -> bool:
     """Persist leadership embed message/channel ids on dbo.MGE_Events."""
+    if expected is not None:
+        from mge.dal.mge_board_identity_dal import persist_identity
+
+        return persist_identity(
+            kind="leadership",
+            event_id=event_id,
+            message_id=message_id,
+            channel_id=channel_id,
+            now_utc=now_utc,
+            expected=expected,
+        )
     try:
 
         def _callback(cur):
@@ -462,6 +489,9 @@ def apply_open_mode_switch_atomic(
     count is embedded in the MGE_SignupAudit DetailsJson payload.
     """
 
+    effects = []
+    audits = []
+
     def _callback(cur):
         cur.execute(
             """
@@ -534,6 +564,8 @@ def apply_open_mode_switch_atomic(
         )
         row = cur.fetchone()
         deleted_award_count = int(row[0]) if row else 0
+        effects.append(deleted_award_count if row else None)
+        audits.append(row is not None)
 
         cur.execute(
             """
@@ -543,6 +575,7 @@ def apply_open_mode_switch_atomic(
             (event_id,),
         )
         deleted_signup_count = int(cur.rowcount or 0)
+        effects.append(getattr(cur, "rowcount", None))
 
         cur.execute(
             """
@@ -556,6 +589,8 @@ def apply_open_mode_switch_atomic(
             (new_rules_text, event_id),
         )
 
+        effects.append(getattr(cur, "rowcount", None))
+
         cur.execute(
             """
             INSERT INTO dbo.MGE_RuleAudit
@@ -565,6 +600,8 @@ def apply_open_mode_switch_atomic(
             """,
             (event_id, actor_discord_id, old_rule_mode, old_rules_text, new_rules_text),
         )
+
+        audits.append(getattr(cur, "rowcount", None) == 1)
 
         details_json = json.dumps(
             {
@@ -584,11 +621,23 @@ def apply_open_mode_switch_atomic(
             """,
             (event_id, actor_discord_id, details_json),
         )
+        audits.append(getattr(cur, "rowcount", None) == 1)
         return deleted_signup_count
 
     result = exec_with_cursor(_callback)
     if result is None:
+        record_write("switch_open", "unknown")
         raise RuntimeError("apply_open_mode_switch_atomic_failed")
+    for index, count in enumerate(effects):
+        if count == 0 and index < 2:
+            record_write("switch_open_empty_cleanup", "not_required", kind="secondary")
+        else:
+            record_affected("switch_open_effect", count)
+    if not effects:
+        record_write("switch_open", "unknown")
+    record_write(
+        "switch_open_audit", "confirmed" if audits and all(audits) else "unknown", kind="audit"
+    )
     return int(result)
 
 
@@ -605,7 +654,10 @@ def apply_fixed_mode_switch_atomic(
     Returns the number of affected rows on the event update.
     """
 
+    audit_confirmed = False
+
     def _callback(cur):
+        nonlocal audit_confirmed
         cur.execute(
             """
             UPDATE dbo.MGE_Events
@@ -630,9 +682,15 @@ def apply_fixed_mode_switch_atomic(
                 (event_id, actor_discord_id, old_rule_mode, old_rules_text, new_rules_text),
             )
 
+        audit_confirmed = getattr(cur, "rowcount", None) == 1 if affected > 0 else False
         return affected
 
     result = exec_with_cursor(_callback)
+    record_affected("switch_fixed", result)
+    if isinstance(result, int) and result > 0:
+        record_write(
+            "switch_fixed_audit", "confirmed" if audit_confirmed else "unknown", kind="audit"
+        )
     if result is None:
         raise RuntimeError("apply_fixed_mode_switch_atomic_failed")
     return int(result)

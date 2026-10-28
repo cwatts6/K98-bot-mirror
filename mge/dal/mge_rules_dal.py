@@ -5,6 +5,7 @@ import json
 import logging
 from typing import Any
 
+from mge.mge_action_result import record_write
 from stats_alerts.db import exec_with_cursor, run_query
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,10 @@ def update_event_rules_text_with_audit(
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """
 
+    audit_confirmed = False
+
     def _op(cursor: Any) -> bool:
+        nonlocal audit_confirmed
         cursor.execute(
             sql_update_with_output,
             (
@@ -120,12 +124,21 @@ def update_event_rules_text_with_audit(
                 ts,
             ),
         )
+        audit_confirmed = getattr(cursor, "rowcount", None) == 1
         return True
 
     try:
         result = exec_with_cursor(callback=_op)
+        record_write(
+            "rules",
+            "confirmed" if result is True else "not_entered" if result is False else "unknown",
+            count=1 if result is True else 0,
+        )
+        if result is True:
+            record_write("rules_audit", "confirmed" if audit_confirmed else "unknown", kind="audit")
         return bool(result)
     except Exception:
+        record_write("rules", "unknown")
         logger.exception(
             "mge_rules_update_with_audit_failed event_id=%s actor_discord_id=%s action_type=%s details=%s",
             event_id,

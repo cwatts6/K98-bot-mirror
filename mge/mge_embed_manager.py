@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
 import logging
-from time import perf_counter
 from typing import Any
-from weakref import WeakValueDictionary
 
 import discord
 
@@ -18,9 +15,8 @@ from bot_config import (
     MGE_SIGNUP_MENTION_TEXT,
     MGE_SIMPLIFIED_FLOW_ENABLED,
 )
-from core.coalesced_work import CoalescedWork
-from core.operation_timing import record_timing, timed_stage, timing_scope
-from core.owned_work import drain_awaitable, drain_thread
+from core.operation_timing import timed_stage, timing_scope
+from core.owned_work import drain_thread
 from embed_utils import fmt_short
 from mge.dal.mge_event_dal import (
     fetch_event_for_embed,
@@ -36,34 +32,50 @@ from mge.dal.mge_publish_dal import (
 )
 from mge.dataset_errors import MgeDatasetError
 from mge.mge_board_delivery_adapter import send_board_once
+from mge.mge_board_ownership import presentation_owner
 from mge.mge_board_preparation import (
+    board_binding,
     public_names,
+    recovered_identity,
     validate_destination,
     validate_event,
     validate_payload,
     validate_rows,
 )
 from mge.mge_content_renderer import render_mge_content_to_embed_fields
+from mge.mge_refresh_work import (
+    RefreshCoordinator,
+    RefreshGroup,
+    RefusedRefresh,
+    registration_options,
+)
 from mge.mge_simplified_leadership_service import get_leadership_board_payload
 from ui.views.mge_admin_view import MGEAdminViewDeps
 
 logger = logging.getLogger(__name__)
 
 
-_refreshes = CoalescedWork()
-_board_locks = WeakValueDictionary()
+_refreshes = RefreshCoordinator()
+
+
+def _request_target(key, factory, *, gate=None):
+    try:
+        return _refreshes.request(key, factory, gate=gate)
+    except Exception as exc:
+        logger.warning(
+            "mge_refresh_refused event_id=%s kind=%s error_type=%s",
+            key[1],
+            key[2],
+            type(exc).__name__,
+        )
+        return RefusedRefresh()
 
 
 def _serialize_board(function):
     @wraps(function)
     async def run(**kwargs):
-        key = (id(kwargs["bot"]), int(kwargs["event_id"]))
-        lock = _board_locks.setdefault(key, asyncio.Lock())
-
         async def owned():
-            started = perf_counter()
-            async with lock:
-                record_timing("mge_board_owner_wait", perf_counter() - started)
+            async with presentation_owner(kwargs["bot"], kwargs["event_id"]):
                 with timed_stage(function.__name__):
                     try:
                         return await function(**kwargs)
@@ -77,31 +89,88 @@ def _serialize_board(function):
                         return False
 
         with timing_scope():
-            return await drain_awaitable(owned())
+            return await _refreshes.run_direct(owned)
 
     return run
 
 
-def request_signup_refresh(*, bot, event_id, signup_channel_id):
-    return _refreshes.request(
-        (id(bot), int(event_id), "signup", int(signup_channel_id)),
+def request_signup_refresh(
+    *, bot, event_id, signup_channel_id, reply_gate=None, existing_only=False, semantic="silent"
+):
+    reply_gate, existing_only = registration_options(reply_gate, existing_only)
+    return _request_target(
+        (id(bot), int(event_id), "signup", int(signup_channel_id), semantic, existing_only),
         lambda: sync_event_signup_embed(
             bot=bot,
             event_id=event_id,
             signup_channel_id=signup_channel_id,
             announce_everyone=False,
             is_rehydrate=True,
+            existing_only=existing_only,
         ),
+        gate=reply_gate,
     )
 
 
-def request_board_refresh(*, bot, event_id):
-    return _refreshes.request(
-        (id(bot), int(event_id), "boards"),
-        lambda: refresh_mge_boards(
-            bot=bot, event_id=event_id, refresh_public=True, refresh_leadership=True
-        ),
-    )
+def request_board_refresh(
+    *,
+    bot,
+    event_id,
+    refresh_public=True,
+    refresh_leadership=True,
+    refresh_awards=False,
+    reply_gate=None,
+    existing_only=False,
+    semantic="silent",
+    signup_channel_id=None,
+    leadership_channel_id=None,
+    awards_channel_id=None,
+):
+    reply_gate, existing_only = registration_options(reply_gate, existing_only)
+    handles = {}
+    if refresh_public:
+        channel_id = (
+            signup_channel_id
+            if signup_channel_id is not None
+            else resolve_public_signup_channel_id()[0]
+        )
+        handles["public"] = request_signup_refresh(
+            bot=bot,
+            event_id=event_id,
+            signup_channel_id=channel_id,
+            reply_gate=reply_gate,
+            existing_only=existing_only,
+            semantic=semantic,
+        )
+    if refresh_leadership:
+        channel_id = (
+            leadership_channel_id
+            if leadership_channel_id is not None
+            else _to_int(MGE_LEADERSHIP_CHANNEL_ID, 0)
+        )
+        handles["leadership"] = _request_target(
+            (id(bot), int(event_id), "leadership", channel_id, semantic, existing_only),
+            lambda destination=channel_id: sync_event_leadership_embed(
+                bot=bot, event_id=event_id, channel_id=destination, existing_only=existing_only
+            ),
+            gate=reply_gate,
+        )
+    if refresh_awards:
+        handles["awards"] = _request_target(
+            (id(bot), int(event_id), "awards", awards_channel_id, semantic, existing_only),
+            lambda: sync_event_awards_embed(
+                bot=bot,
+                event_id=event_id,
+                channel_id=awards_channel_id,
+                existing_only=existing_only,
+            ),
+            gate=reply_gate,
+        )
+    return RefreshGroup(handles)
+
+
+def close_refresh_admission():
+    _refreshes.close_background()
 
 
 async def drain_refreshes():
@@ -193,8 +262,8 @@ def _build_signup_view(
 
     try:
 
-        def _refresh_embed(target_event_id: int) -> None:
-            request_signup_refresh(
+        def _refresh_embed(target_event_id: int):
+            return request_signup_refresh(
                 bot=bot, event_id=int(target_event_id), signup_channel_id=signup_channel_id
             )
 
@@ -609,6 +678,8 @@ async def sync_event_signup_embed(
     now_utc: datetime | None = None,
     announce_everyone: bool = False,
     is_rehydrate: bool = False,
+    existing_only: bool = False,
+    recovery_receipt=None,
 ) -> bool:
     row = await drain_thread(fetch_event_for_embed, event_id, strict=True)
     if not row:
@@ -617,6 +688,9 @@ async def sync_event_signup_embed(
 
     validate_event(row, event_id)
     validate_destination(row, "signup", signup_channel_id)
+    effective_message_id = recovered_identity(row, "signup", signup_channel_id, recovery_receipt)
+    if existing_only and not effective_message_id:
+        return False
     # Derive lifecycle state
     lifecycle_state = _derive_signup_lifecycle_state(row)
     logger.info(
@@ -632,7 +706,7 @@ async def sync_event_signup_embed(
     embed = build_mge_signup_embed(
         row, public_signup_names=public_signup_names, lifecycle_state=lifecycle_state
     )
-    msg_id = row.get("SignupEmbedMessageId")
+    msg_id = effective_message_id
     message = None
 
     view = None
@@ -724,6 +798,7 @@ async def sync_event_signup_embed(
             content = str(MGE_SIGNUP_MENTION_TEXT) if should_mention else None
             message = await send_board_once(
                 kind="signup",
+                binding=board_binding(row, "signup", signup_channel_id),
                 event_id=event_id,
                 channel=channel,
                 content=content,
@@ -753,6 +828,7 @@ async def sync_event_signup_embed(
         message_id=int(message.id),
         channel_id=int(channel.id),
         now_utc=timestamp,
+        expected=row,
     )
 
 
@@ -763,6 +839,9 @@ async def sync_event_awards_embed(
     event_id: int,
     announce_players: bool = False,
     now_utc: datetime | None = None,
+    channel_id: int | None = None,
+    existing_only: bool = False,
+    recovery_receipt=None,
 ) -> bool:
     row = await drain_thread(fetch_event_publish_context, event_id, strict=True)
     if not row:
@@ -770,14 +849,22 @@ async def sync_event_awards_embed(
         return False
 
     validate_event(row, event_id, publication=True)
+    if row["PublishVersion"] <= 0 or row["Status"] not in {"published", "completed"}:
+        return False
+    if channel_id is not None:
+        validate_destination(row, "awards", channel_id)
     rows = await drain_thread(fetch_awards_with_signup_user, event_id, strict=True)
     validate_rows(rows, event_id, awards=True)
     awarded = [r for r in rows if str(r.get("AwardStatus") or "").strip().lower() == "awarded"]
     waitlist = [r for r in rows if str(r.get("AwardStatus") or "").strip().lower() == "waitlist"]
 
-    channel_id = int(row.get("AwardEmbedChannelId") or 0)
+    channel_id = int(row.get("AwardEmbedChannelId") or channel_id or 0)
     if channel_id <= 0:
         logger.warning("mge_awards_sync_skip reason=no_channel event_id=%s", event_id)
+        return False
+
+    effective_message_id = recovered_identity(row, "awards", channel_id, recovery_receipt)
+    if existing_only and not effective_message_id:
         return False
 
     old_version = _to_int(row.get("PublishVersion"), 0)
@@ -809,7 +896,7 @@ async def sync_event_awards_embed(
         )
         return False
 
-    msg_id = _to_int(row.get("AwardEmbedMessageId"), 0)
+    msg_id = _to_int(effective_message_id, 0)
     message = None
     allowed_mentions = discord.AllowedMentions(
         everyone=False,
@@ -843,6 +930,7 @@ async def sync_event_awards_embed(
             )
             message = await send_board_once(
                 kind="awards",
+                binding=board_binding(row, "awards", channel_id),
                 event_id=event_id,
                 channel=channel,
                 content=content if content else None,
@@ -860,6 +948,7 @@ async def sync_event_awards_embed(
         message_id=int(message.id),
         channel_id=int(channel.id),
         now_utc=timestamp,
+        expected=row,
     )
 
 
@@ -870,6 +959,8 @@ async def sync_event_leadership_embed(
     event_id: int,
     channel_id: int | None = None,
     now_utc: datetime | None = None,
+    existing_only: bool = False,
+    recovery_receipt=None,
 ) -> bool:
     """Create or refresh the persistent leadership-channel embed for an event."""
     event_row = await drain_thread(fetch_event_for_embed, event_id, strict=True)
@@ -883,8 +974,16 @@ async def sync_event_leadership_embed(
         logger.warning("mge_leadership_sync_skip reason=no_channel event_id=%s", event_id)
         return False
 
+    effective_message_id = recovered_identity(
+        event_row, "leadership", resolved_channel_id, recovery_receipt
+    )
+    if existing_only and not effective_message_id:
+        return False
+
     try:
-        board_payload = await drain_thread(get_leadership_board_payload, event_id)
+        board_payload = await drain_thread(
+            get_leadership_board_payload, event_id, allow_placement=not existing_only
+        )
     except MgeDatasetError as exc:
         logger.warning("mge_board_preserved dataset_state=%s stage=%s", exc.state, exc.stage)
         return False
@@ -913,7 +1012,7 @@ async def sync_event_leadership_embed(
         )
         return False
 
-    msg_id = _to_int(event_row.get("LeadershipEmbedMessageId"), 0)
+    msg_id = _to_int(effective_message_id, 0)
     message = None
     if msg_id > 0:
         try:
@@ -942,6 +1041,7 @@ async def sync_event_leadership_embed(
         try:
             message = await send_board_once(
                 kind="leadership",
+                binding=board_binding(event_row, "leadership", resolved_channel_id),
                 event_id=event_id,
                 channel=channel,
                 embed=embed,
@@ -959,6 +1059,7 @@ async def sync_event_leadership_embed(
         message_id=int(message.id),
         channel_id=int(channel.id),
         now_utc=timestamp,
+        expected=event_row,
     )
 
 
@@ -969,30 +1070,16 @@ async def refresh_mge_boards(
     refresh_public: bool = True,
     refresh_leadership: bool = True,
     refresh_awards: bool = False,
-) -> dict[str, bool]:
+    observation_timeout: float | None = 10,
+):
     """Refresh public, award, and/or leadership boards using the established routing rules."""
-    results = {"public": False, "leadership": False, "awards": False}
-    if refresh_public:
-        channel_id, _, _ = resolve_public_signup_channel_id()
-        results["public"] = await sync_event_signup_embed(
-            bot=bot,
-            event_id=event_id,
-            signup_channel_id=channel_id,
-            announce_everyone=False,
-            is_rehydrate=True,
-        )
-    if refresh_awards:
-        results["awards"] = await sync_event_awards_embed(
-            bot=bot,
-            event_id=event_id,
-            announce_players=False,
-        )
-    if refresh_leadership:
-        results["leadership"] = await sync_event_leadership_embed(
-            bot=bot,
-            event_id=event_id,
-        )
-    return results
+    return await request_board_refresh(
+        bot=bot,
+        event_id=event_id,
+        refresh_public=refresh_public,
+        refresh_leadership=refresh_leadership,
+        refresh_awards=refresh_awards,
+    ).observe(observation_timeout)
 
 
 def build_mge_main_embed(event: dict, public_signup_names: list[str]) -> discord.Embed:

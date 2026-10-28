@@ -10,6 +10,8 @@ from typing import Any
 from core.operation_timing import timed_stage
 from mge.dal.qualified_read import qualified_read
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_result import record_affected, record_atomic, record_write
+from mge.mge_roster_execution import expected_event
 from stats_alerts.db import exec_with_cursor, run_query
 
 logger = logging.getLogger(__name__)
@@ -309,6 +311,11 @@ def insert_award(
         return int(row[0]) if row else None
 
     result = exec_with_cursor(_callback)
+    record_write(
+        "award_insert",
+        "confirmed" if isinstance(result, int) and result > 0 else "unknown",
+        count=1 if isinstance(result, int) and result > 0 else 0,
+    )
     if result is None:
         logger.error(
             "mge_roster_dal_insert_award_failed event_id=%s signup_id=%s governor_id=%s",
@@ -348,10 +355,11 @@ def update_award(
         return int(cur.rowcount or 0)
 
     affected = exec_with_cursor(_callback)
+    record_affected("award_update", affected)
     if affected is None:
         logger.error("mge_roster_dal_update_award_failed award_id=%s", award_id)
         return False
-    return True
+    return affected > 0
 
 
 def update_manual_order_override(
@@ -380,6 +388,7 @@ def update_manual_order_override(
         return int(cur.rowcount or 0)
 
     affected = exec_with_cursor(_callback)
+    record_affected("manual_order", affected)
     if affected is None:
         logger.error(
             "mge_roster_dal_update_manual_order_override_failed award_id=%s manual_order_override=%s",
@@ -387,7 +396,7 @@ def update_manual_order_override(
             manual_order_override,
         )
         return False
-    return True
+    return affected > 0
 
 
 def insert_award_audit(
@@ -430,6 +439,7 @@ def insert_award_audit(
         return int(cur.rowcount or 0)
 
     affected = exec_with_cursor(_callback)
+    record_affected("award_audit", affected, kind="audit")
     if affected is None:
         logger.error(
             "mge_roster_dal_insert_award_audit_failed award_id=%s action_type=%s",
@@ -437,7 +447,7 @@ def insert_award_audit(
             action_type,
         )
         return False
-    return True
+    return affected > 0
 
 
 def delete_award_with_audit_atomic(
@@ -448,7 +458,10 @@ def delete_award_with_audit_atomic(
     details: dict[str, Any] | None,
     now_utc: datetime,
 ) -> dict[str, Any] | None:
+    audit_confirmed = False
+
     def _callback(cur):
+        nonlocal audit_confirmed
         cur.execute(SQL_SELECT_AWARD_BY_ID, (award_id,))
         row = cur.fetchone()
         if row is None:
@@ -479,9 +492,18 @@ def delete_award_with_audit_atomic(
                 _naive_utc(now_utc),
             ),
         )
+        audit_confirmed = getattr(cur, "rowcount", None) == 1
         return snapshot
 
-    return exec_with_cursor(_callback)
+    result = exec_with_cursor(_callback)
+    record_write(
+        "award_delete", "confirmed" if result is not None else "unknown", count=1 if result else 0
+    )
+    if result is not None:
+        record_write(
+            "award_delete_audit", "confirmed" if audit_confirmed else "unknown", kind="audit"
+        )
+    return result
 
 
 def delete_award_by_event_governor_with_audit_atomic(
@@ -494,7 +516,10 @@ def delete_award_by_event_governor_with_audit_atomic(
     now_utc: datetime,
     cursor=None,
 ) -> dict[str, Any] | None:
+    audit_confirmed = False
+
     def _callback(cur):
+        nonlocal audit_confirmed
         cur.execute(SQL_SELECT_AWARD_BY_EVENT_GOVERNOR, (event_id, governor_id))
         row = cur.fetchone()
         if row is None:
@@ -527,11 +552,22 @@ def delete_award_by_event_governor_with_audit_atomic(
                 _naive_utc(now_utc),
             ),
         )
+        audit_confirmed = getattr(cur, "rowcount", None) == 1
         return snapshot
 
     if cursor is not None:
         return _callback(cursor)
-    return exec_with_cursor(_callback)
+    result = exec_with_cursor(_callback)
+    record_write(
+        "award_delete_by_governor",
+        "confirmed" if result is not None else "unknown",
+        count=1 if result else 0,
+    )
+    if result is not None:
+        record_write(
+            "award_delete_audit", "confirmed" if audit_confirmed else "unknown", kind="audit"
+        )
+    return result
 
 
 def apply_set_rank_atomic(
@@ -566,6 +602,8 @@ def apply_set_rank_atomic(
         target = dict(zip(cols, row, strict=False))
 
         event_id = int(target["EventId"])
+        if expected_event() is not None and event_id != expected_event():
+            return {"error": "event_mismatch"}
         old_rank = target.get("AwardedRank")
         old_status = str(target.get("AwardStatus") or "")
 
@@ -631,7 +669,10 @@ def apply_set_rank_atomic(
             ),
         )
         if int(cur.rowcount or 0) <= 0:
-            return {"error": "target_update_failed"}
+            return {
+                "error": "target_update_failed",
+                "confirmed_count": 1 if conflict is not None else 0,
+            }
 
         details_json = json.dumps({"new_rank": int(new_rank)}, ensure_ascii=False)
         cur.execute(
@@ -652,9 +693,17 @@ def apply_set_rank_atomic(
                 _naive_utc(now_utc),
             ),
         )
-        return {"ok": True, "event_id": event_id, "award_id": int(target["AwardId"])}
+        return {
+            "ok": True,
+            "audit_confirmed": getattr(cur, "rowcount", None) == 1,
+            "event_id": event_id,
+            "award_id": int(target["AwardId"]),
+            "changed_count": 2 if conflict is not None else 1,
+        }
 
-    return exec_with_cursor(_callback)
+    result = exec_with_cursor(_callback)
+    record_atomic("set_rank", result)
+    return result
 
 
 def promote_waitlist_to_awarded_atomic(
@@ -693,6 +742,8 @@ def promote_waitlist_to_awarded_atomic(
             return {"error": "not_waitlist"}
 
         event_id = int(target["EventId"])
+        if expected_event() is not None and event_id != expected_event():
+            return {"error": "event_mismatch"}
 
         cur.execute(
             """
@@ -765,6 +816,9 @@ def promote_waitlist_to_awarded_atomic(
             "event_id": event_id,
             "award_id": int(target["AwardId"]),
             "new_rank": int(new_rank),
+            "audit_confirmed": getattr(cur, "rowcount", None) == 1,
         }
 
-    return exec_with_cursor(_callback)
+    result = exec_with_cursor(_callback)
+    record_atomic("promote", result)
+    return result

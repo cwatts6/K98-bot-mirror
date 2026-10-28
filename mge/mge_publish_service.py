@@ -9,8 +9,11 @@ import inspect
 import logging
 from typing import Any, Protocol
 
+from core.owned_work import drain_thread
 from mge.dal import mge_publish_dal
 from mge.dataset_errors import MgeDatasetError
+from mge.mge_action_result import ActionEvidence, qualified_action
+from mge.mge_board_preparation import validate_event, validate_rows
 from mge.mge_constants import DEFAULT_TARGET_DECREMENT_SCORE
 from mge.mge_embed_manager import build_publish_change_summary_lines
 from mge.mge_roster_execution import run_roster_mutation
@@ -34,6 +37,7 @@ class PublishResult:
     reminders_embed_status: str | None = None
     award_mail_dm_sent: bool | None = None
     award_mail_dm_status: str | None = None
+    action: ActionEvidence | None = None
 
 
 @dataclass(slots=True)
@@ -73,6 +77,7 @@ class _AwardMailResult(Protocol):
 
 
 class MgePublishIoAdapter(Protocol):
+    async def run_primary(self, event_id, operation): ...
     @property
     def default_award_channel_id(self) -> int: ...
 
@@ -298,6 +303,7 @@ def _build_publish_sets(
     return publish_rows, waitlist_rows, clear_rank_award_ids
 
 
+@qualified_action
 def generate_targets_from_rank1(
     *,
     event_id: int,
@@ -361,6 +367,7 @@ def generate_targets_from_rank1(
     return PublishResult(True, f"Generated default targets for {count} roster rows.")
 
 
+@qualified_action
 def override_target_score(
     *,
     award_id: int,
@@ -393,6 +400,138 @@ def override_target_score(
     return PublishResult(True, "Target updated.")
 
 
+def _same_publication_binding(left, right):
+    return all(
+        left.get(field) == right.get(field)
+        for field in (
+            "EventId",
+            "Status",
+            "RuleMode",
+            "PublishVersion",
+            "UpdatedUtcToken",
+            "AwardEmbedMessageId",
+            "AwardEmbedChannelId",
+        )
+    )
+
+
+async def _publish_primary(
+    *,
+    adapter,
+    event_id,
+    expected,
+    channel_id,
+    publish_rows,
+    waitlist_rows,
+    clear_rank_award_ids,
+    actor_discord_id,
+    now,
+):
+    try:
+        current = await drain_thread(
+            mge_publish_dal.fetch_event_publish_context, event_id, strict=True
+        )
+        validate_event(current, event_id, publication=True)
+    except MgeDatasetError:
+        return PublishResult(False, "Publication data could not be verified."), None, [], []
+    if not _same_publication_binding(expected, current):
+        return (
+            PublishResult(
+                False, "The publication state changed. Reopen the current board before continuing."
+            ),
+            None,
+            [],
+            [],
+        )
+    new_version = await drain_thread(
+        mge_publish_dal.apply_publish_atomic,
+        event_id=event_id,
+        publish_rows=publish_rows,
+        waitlist_rows=waitlist_rows,
+        clear_rank_award_ids=clear_rank_award_ids,
+        actor_discord_id=actor_discord_id,
+        now_utc=now,
+        expected_version=current["PublishVersion"],
+        expected_binding=current,
+    )
+    if new_version is None:
+        return (
+            PublishResult(
+                False,
+                "The publication outcome could not be confirmed. Have leadership check before repeating it.",
+            ),
+            None,
+            [],
+            [],
+        )
+    try:
+        posted = await drain_thread(
+            mge_publish_dal.fetch_awards_with_signup_user, event_id, strict=True
+        )
+        validate_rows(posted, event_id, awards=True)
+    except MgeDatasetError:
+        return (
+            PublishResult(
+                False,
+                "Publication was saved, but its board data could not be verified. Have leadership check before repeating it.",
+                publish_version=new_version,
+            ),
+            new_version,
+            [],
+            [],
+        )
+    awarded = [row for row in posted if _status(row.get("AwardStatus")) == "awarded"]
+    waitlist = [row for row in posted if _status(row.get("AwardStatus")) == "waitlist"]
+    sent = await adapter.send_awards_embed(
+        channel_id=channel_id,
+        event_row=current,
+        awarded_rows=awarded,
+        waitlist_rows=waitlist,
+        publish_version=new_version,
+        published_utc=now,
+    )
+    if sent.status != "sent" or sent.message_ref is None:
+        return (
+            PublishResult(
+                False,
+                "Publication was saved, but board delivery could not be confirmed. Have leadership check before repeating it.",
+                publish_version=new_version,
+            ),
+            new_version,
+            awarded,
+            waitlist,
+        )
+    settled = {
+        **current,
+        "PublishVersion": new_version,
+        "Status": "published",
+        "UpdatedUtc": now,
+        "UpdatedUtcToken": now.astimezone(UTC)
+        .replace(tzinfo=None)
+        .isoformat(timespec="microseconds"),
+    }
+    saved = await drain_thread(
+        mge_publish_dal.update_award_embed_ids,
+        event_id=event_id,
+        message_id=int(sent.message_ref.message_id),
+        channel_id=int(sent.message_ref.channel_id),
+        now_utc=now,
+        expected=settled,
+    )
+    if not saved:
+        return (
+            PublishResult(
+                False,
+                "Publication was saved and the board was sent, but its saved identity could not be confirmed. Have leadership check before repeating it.",
+                publish_version=new_version,
+            ),
+            new_version,
+            awarded,
+            waitlist,
+        )
+    return None, new_version, awarded, waitlist
+
+
 async def publish_event_awards(
     *,
     adapter: MgePublishIoAdapter,
@@ -412,9 +551,13 @@ async def publish_event_awards(
         )
         return PublishResult(False, str(readiness.get("publish_status_text") or "Publish blocked."))
 
-    ctx = await asyncio.to_thread(mge_publish_dal.fetch_event_publish_context, event_id)
-    if not ctx:
-        return PublishResult(False, "Event not found.")
+    try:
+        ctx = await drain_thread(mge_publish_dal.fetch_event_publish_context, event_id, strict=True)
+        validate_event(ctx, event_id, publication=True)
+    except MgeDatasetError:
+        return PublishResult(
+            False, "Publication data could not be verified. Publication has not started."
+        )
 
     try:
         publish_rows, waitlist_rows, clear_rank_award_ids = await run_roster_mutation(
@@ -447,52 +590,22 @@ async def publish_event_awards(
     if not await adapter.check_award_channel_available(channel_id):
         return PublishResult(False, "Award channel unavailable.")
 
-    new_version = await asyncio.to_thread(
-        mge_publish_dal.apply_publish_atomic,
-        event_id=event_id,
-        publish_rows=publish_rows,
-        waitlist_rows=waitlist_rows,
-        clear_rank_award_ids=clear_rank_award_ids,
-        actor_discord_id=actor_discord_id,
-        now_utc=now,
+    failure, new_version, awarded, waitlist = await adapter.run_primary(
+        event_id,
+        lambda: _publish_primary(
+            adapter=adapter,
+            event_id=event_id,
+            expected=ctx,
+            channel_id=channel_id,
+            publish_rows=publish_rows,
+            waitlist_rows=waitlist_rows,
+            clear_rank_award_ids=clear_rank_award_ids,
+            actor_discord_id=actor_discord_id,
+            now=now,
+        ),
     )
-    if new_version is None:
-        return PublishResult(False, "Failed to persist publish state.")
-
-    posted_rows = await asyncio.to_thread(mge_publish_dal.fetch_awards_with_signup_user, event_id)
-    awarded = [r for r in posted_rows if _status(r.get("AwardStatus")) == "awarded"]
-    waitlist = [r for r in posted_rows if _status(r.get("AwardStatus")) == "waitlist"]
-
-    awards_send = await adapter.send_awards_embed(
-        channel_id=channel_id,
-        event_row=ctx,
-        awarded_rows=awarded,
-        waitlist_rows=waitlist,
-        publish_version=new_version,
-        published_utc=now,
-    )
-    if awards_send.status == "channel_unavailable":
-        return PublishResult(
-            False,
-            "Publish persisted in DB, but the award channel is unavailable. "
-            "Please fix channel permissions/availability and run republish.",
-            publish_version=new_version,
-        )
-    if awards_send.status != "sent" or awards_send.message_ref is None:
-        return PublishResult(
-            False,
-            "Publish persisted in DB, but posting the Discord embed failed. "
-            "Please fix channel permissions and run republish.",
-            publish_version=new_version,
-        )
-
-    await asyncio.to_thread(
-        mge_publish_dal.update_award_embed_ids,
-        event_id=event_id,
-        message_id=int(awards_send.message_ref.message_id),
-        channel_id=int(awards_send.message_ref.channel_id),
-        now_utc=now,
-    )
+    if failure is not None:
+        return failure
 
     latest_rows = await asyncio.to_thread(
         mge_publish_dal.fetch_published_snapshot, event_id, new_version
@@ -963,34 +1076,57 @@ async def unpublish_event_awards(
     now_utc: datetime | None = None,
 ) -> UnpublishResult:
     now = _now_utc(now_utc)
-    ctx = await asyncio.to_thread(mge_publish_dal.fetch_event_publish_context, event_id)
-    if not ctx:
-        return UnpublishResult(False, "Event not found.")
 
-    old_status = str(ctx.get("Status") or "")
-    old_publish_version = _to_int(ctx.get("PublishVersion"), 0)
-    if old_publish_version <= 0 and old_status.strip().lower() not in {"published", "completed"}:
-        return UnpublishResult(False, "Event is not currently published.")
+    async def primary():
+        try:
+            ctx = await drain_thread(
+                mge_publish_dal.fetch_event_publish_context, event_id, strict=True
+            )
+            validate_event(ctx, event_id, publication=True)
+        except MgeDatasetError:
+            return UnpublishResult(False, "Unpublication data could not be verified.")
 
-    restore_status = "reopened" if old_status == "completed" else "signup_closed"
+        old_status = str(ctx.get("Status") or "")
+        old_publish_version = _to_int(ctx.get("PublishVersion"), 0)
+        if old_publish_version <= 0 and old_status.strip().lower() not in {
+            "published",
+            "completed",
+        }:
+            return UnpublishResult(False, "Event is not currently published.")
 
-    result = await asyncio.to_thread(
-        mge_publish_dal.apply_unpublish_atomic,
-        event_id=event_id,
-        actor_discord_id=actor_discord_id,
-        now_utc=now,
-        restore_status=restore_status,
-    )
-    if not result:
-        return UnpublishResult(False, "Failed to unpublish event.")
+        restore_status = "reopened" if old_status == "completed" else "signup_closed"
 
-    embed_deleted = False
-    channel_id = _to_int(result.get("embed_channel_id"), 0)
-    message_id = _to_int(result.get("embed_message_id"), 0)
+        result = await drain_thread(
+            mge_publish_dal.apply_unpublish_atomic,
+            event_id=event_id,
+            actor_discord_id=actor_discord_id,
+            now_utc=now,
+            restore_status=restore_status,
+            expected_version=old_publish_version,
+            expected_binding=ctx,
+        )
+        if not result:
+            return UnpublishResult(
+                False,
+                "The unpublish outcome could not be confirmed. Have leadership check before repeating it.",
+            )
 
-    if channel_id > 0 and message_id > 0:
-        delete_result = await adapter.delete_message(channel_id=channel_id, message_id=message_id)
-        embed_deleted = delete_result.status == "deleted"
+        embed_deleted = False
+        channel_id = _to_int(result.get("embed_channel_id"), 0)
+        message_id = _to_int(result.get("embed_message_id"), 0)
+
+        if channel_id > 0 and message_id > 0:
+            delete_result = await adapter.delete_message(
+                channel_id=channel_id, message_id=message_id
+            )
+            embed_deleted = delete_result.status == "deleted"
+
+        return (embed_deleted, old_status, restore_status, old_publish_version)
+
+    settled = await adapter.run_primary(event_id, primary)
+    if isinstance(settled, UnpublishResult):
+        return settled
+    embed_deleted, old_status, restore_status, old_publish_version = settled
 
     refresh_result = adapter.refresh_boards(
         event_id=event_id,

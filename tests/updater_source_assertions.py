@@ -20,9 +20,27 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_a1b_hash(root, path):
+    """Authenticate the exact A1b successor before walking historical source pins."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/p1_a1b_source_pairs.json"
+    if not fixture.exists():
+        return actual
+    raw = fixture.read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "7b0776ee0f1d527f87a142a9a2e91b2387dfa6749abbbbed048d2ce34f56443e"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_a1a_hash(root, path):
     """Local source bridge only; production admission remains unchanged."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_a1b_hash(root, path)
     fixture = root / "tests/fixtures/p1_a1a_source_pairs.json"
     if not fixture.exists():
         return actual  # Unchanged historical fixtures still authenticate themselves.

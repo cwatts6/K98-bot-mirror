@@ -607,7 +607,7 @@ engineering decisions, not separate approval requests. Approval does not choose
 the older configuration continuation or authorize R11/R12 redesign, production
 queries, Git publication, merge or deployment.
 
-## Validation of this documentation packet
+## Historical validation of the scope-only documentation packet
 
 Local validation passed: architecture (zero Python changes), deferred register
 (29 Markdown files), security routing (zero errors/warnings), test selector,
@@ -625,6 +625,6 @@ publication overlap is static source evidence with proposed barrier tests, not a
 claimed live reproduction. SQL column availability was rechecked in the authoritative
 `dbo.MGE_Events.Table.sql`; no database was queried and no SQL source was changed.
 
-This branch retains the complete imported handover documentation plus the new
-packet and current navigation/backlog amendments. This task did not modify the
+At the scope-only checkpoint, the design branch retained the complete imported handover documentation plus the new
+packet and current navigation/backlog amendments. That scope-only task did not modify the
 source handover worktree, runtime files, SQL repository or remote push protections.
