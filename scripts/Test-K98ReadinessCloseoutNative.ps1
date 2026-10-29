@@ -11,7 +11,7 @@ if(-not([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Securit
 $text=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1')).Replace("`r`n","`n")
 $hasher=[Security.Cryptography.SHA256]::Create()
 try{$sha=([BitConverter]::ToString($hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)))).Replace('-','').ToLowerInvariant()}finally{$hasher.Dispose()}
-if($sha -cne '76434df2a10e1065706e3941fc403b57d77674130452a4957dfcd4ee06c23310'){throw 'Reviewed library differs'}
+if($sha -cne '03a00255e5cd53cffb900ba2ebb2fcb59935029d16eac7f819ff4b188520f0ab'){throw 'Reviewed library differs'}
 . ([scriptblock]::Create($text)) -Action Library
 $fixture='C:\ProgramData\K98-Readiness-Rehearsal-'+[guid]::NewGuid().ToString('N')
 if(Test-Path -LiteralPath $fixture){throw 'New fixture required'}
