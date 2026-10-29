@@ -19,8 +19,10 @@ The SQL branch now supplies `mge_finalisation_v1` through the existing release
 lock/attempt/transaction/receipt protocol. Its fixed five batches create only the
 finalisation table/index and three freeze triggers, with absent preimages and
 independent structural/trigger postimages. Profiles cannot supply arbitrary SQL,
-objects or grants. Existing migration bytes remain unchanged; partial/manual
-installations are refused.
+objects or grants. Historical migrations remain unchanged; the new MGE migration
+received required comment metadata during CI review, without changing its executable
+body. Its original preparation hash is superseded. Partial/manual installations
+are refused.
 
 The Bot updater adds one exact 20-member finalisation transition (14 changed runtime
 members and six unchanged dependencies), preserving all 51 historical entries.
@@ -56,8 +58,52 @@ The existing combined-updater tools supply the protected stage rehearsal after A
 the new SQL harness does not claim Windows custody or end-to-end deployment evidence.
 
 The original fingerprint JSON below remains a dated preparation snapshot, not the
-new updater's current fingerprints or a deployment manifest. Final review commits,
-CI/security results and native bindings must be retained separately.
+new updater's current fingerprints or a deployment manifest.
+
+### Review and validation closeout
+
+- Draft [Bot mirror PR #459](https://github.com/cwatts6/K98-bot-mirror/pull/459):
+  executable review target `00d3b7fb8e7d6ed40fafbca51b5293bf00855310`. Automated code
+  review found no major issues. Command-governance CI passed. Subsequent changes
+  correct only historical registry-bound test assertions and this evidence record.
+- Draft [SQL PR #134](https://github.com/cwatts6/K98-bot-SQL-Server/pull/134):
+  final review branch `626a1811060f40ad02a74b9030336b29097863db`. CI passed. Review
+  identified an awarded-signup FK masking the intended trigger test; `3c5b7d0`
+  isolates an unreferenced frozen signup, verifies preservation, and the comment
+  was answered/resolved. Re-review found no major issues. Later delta is docs only.
+- Bot Changes scan `44efed4c-c97c-4a32-91b0-9421835b06e3`, base `139038e` to
+  `00d3b7f`: 18 source/configuration files and 12 test/support files covered,
+  no reportable findings. SQL Changes scan `2abbbb8c-8453-4505-9178-a9d9bcba84fd`,
+  base `7e91989` to `8a9be2d`: all 15 changed source files covered, no reportable
+  findings. Deep was off. Exact subsequent deltas are comment metadata/docs,
+  a narrower synthetic delete fixture, and count/byte-bound test expectations;
+  runtime/deployment/authorization policy is unchanged, so repeat scans are skipped
+  for those reviewed deltas. No native acceptance is inferred.
+- Full offline Bot suite: **10640 passed, 1100 skipped, 8 subtests passed; seven
+  failures** were stale 51-entry/102400-byte expectations in three historical test
+  files. They were corrected to the reviewed 52-entry/110592-byte bounds while
+  preserving all historical source hashes. **All 516 affected updater/transition
+  tests then passed**, with production operational logs unchanged. No fresh full
+  all-green run is claimed; only test assertions/docs changed after the full run.
+- Fourteen SQL offline guard/import tests pass; PowerShell 5.1 parser/profile
+  checks pass. Existing combined-updater simulation passes **15 interruption/resume
+  cases**, with no production access. This is not protected Windows/native SQL
+  qualification. Architecture/deferred/security routing, smoke imports, command
+  registration and changed-file pre-commit passed.
+- A candidate updater installer was built locally, **not installed**, from the
+  exact reviewed source. SHA256:
+  `d67b522de984a8bc7de3f42c6f3184be5e6475bc8743bcfd983544bf0f72b9b2`.
+  Candidate tool-manifest SHA256:
+  `8ae43293649ae6100d0a89eb3a2c31ceb2319bb83c4d5a8d3db9487c85c9c5f7`.
+  All 12 embedded tool members were verified against that commit. An authenticated
+  upgrade is intentionally unbound until A4 observes the actual installed manifest.
+
+Remaining decisions are A3 (exact disposable creation/writes/backup and named child
+faults), A4 (bounded production read-only inventory), A5 (isolated protected updater
+rehearsal), A7 (merge/private promotion), A8 (installed-tool upgrade), A9 (production
+preparation/deployment), and A10 (bounded acceptance/cleanup). Backup-directory
+access/capacity is still unresolved; database creation and writes have not occurred.
+Review publication is complete and does not satisfy any of these remaining gates.
 
 Read with the [implementation and validation record](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md),
 [Promotion Guide](../reference/Promotion%20Guide.md),
