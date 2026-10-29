@@ -2,6 +2,49 @@
 
 This supplement supersedes earlier NOT RUN statements only for the cases explicitly recorded below. Source promotion is authorized. Production deployment is still blocked.
 
+## Subsequent qualification closeout
+
+The separately approved results-import correction returns `OUTPUT INSERTED.ImportId`
+from the INSERT execution and raises inside the transaction if no ID is returned.
+The updater transition now binds this exact DAL as its 21st member; the original
+51 historical transitions remain unchanged. Mirror PR 461 owns this correction.
+
+At 15:01 UTC on 29 October, the bounded continuation passed **N14–N16** with Bot
+`f27f373f8e94389dda3f72fc97a3ff4fa1128630` and SQL
+`ec336f0d6af1ce3b48e5a34206ab610163d0680d` against the same approved retained database.
+N14 persisted and read back import ID 2 and one final result on completed event 1.
+N15 preserved previously committed signup/award/completion work while a later award
+delete was rejected with SQL 51830; it does not claim whole-operation atomicity.
+N16 traversed 63 eligible events in two pages without duplicates. Its synthetic
+timings are observations, not a production performance claim.
+
+The original N00–N13 results, failed N14, source bindings, applied release identity
+and migration receipt are retained unchanged. The continuation used Verify only:
+no migration replay, database recreation, restore, cleanup or child termination.
+The earlier exact backup also passed `RESTORE VERIFYONLY WITH CHECKSUM` at
+14:18:55 UTC; no database was restored. This supersedes the earlier unverified-backup
+statement below.
+
+SQL PR 135 additionally binds the durable continuation claim to the canonical
+retained evidence directory, refusing copied evidence before effects. Its guard-only
+correction `3235beb253cbefc3e78fcf4121b4b60bf729af02` has 24 passing offline tests;
+the successful native cases were not replayed. The original full continuation
+Changes review and the incremental guard review are complete with zero findings.
+Bot's results-import/updater Changes review likewise completed with zero findings.
+The deferred identity-return item below is historical and closed by this correction.
+
+Approved RDP inspection retained the actual installed updater manifest, release
+manifest and 09:08 observation. That observation records `ROK_TRACKER` database
+collation `Latin1_General_CI_AS`, tempdb collation `SQL_Latin1_General_CP1_CI_AS`,
+and compatibility 160. These are dated installed observations, not a fresh SQL
+inventory. Current migration history, permissions, backup and protected member
+custody still need verification before release metadata is bound.
+
+Protected Windows U05–U13 remain unqualified. The development execution token is
+not elevated; file-access approval does not confer Windows administrator rights.
+No production updater installation, preparation, SQL write, source update or
+restart was performed. Source merges remain distinct from deployment readiness.
+
 ## Native SQL run
 
 The operator separately approved creation and synthetic writes to the single disposable database `K98_MGE_Finalisation_Qualification_20261029_A` on the development SQL instance, with its exact data/log/backup paths, two-session races and fixture-owned child interruption. Creation metadata, source commits and approval-byte SHA-256 were bound before execution. Fixtures and evidence are retained; production SQL was not touched.
