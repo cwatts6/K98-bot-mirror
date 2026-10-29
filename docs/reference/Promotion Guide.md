@@ -1,6 +1,18 @@
 # K98 promotion and deployment — operator runbook
 
-> **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
+> **Current status — 29 October 2026:** A1b and its updater correction are
+> operator-reported deployed, with the bounded Report63 acceptance and residuals
+> in the [A1b closeout](../task_packs/P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).
+> The approved [MGE finalisation follow-up](../task_packs/P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md)
+> is a separate local bot/SQL change. Before release it requires native disposable
+> SQL qualification, both Changes reviews and exact protected updater qualification.
+> Drain the old bot before installing the freeze triggers; its historical sweep
+> can edit Discord before SQL rejects persistence. Install the qualified new bot
+> before restart. Preserve finalisation receipts and frozen history on recovery.
+> Publication, merge, SQL execution, deployment and natural acceptance remain
+> separate gates. This documentation update authorizes none of those operations.
+
+> **Historical status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
 > datasets and timing are delivered; the A1b design packet is prepared for approval.

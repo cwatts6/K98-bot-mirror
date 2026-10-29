@@ -838,7 +838,7 @@ async def refresh_award_reminders(
     if status == "completed":
         return RefreshAwardRemindersResult(
             False,
-            "Completed MGE events require an explicit admin-selected event id.",
+            "Completed MGE history is frozen; award reminders cannot be refreshed.",
             event_id=resolved_event_id,
             status="completed_not_allowed",
         )

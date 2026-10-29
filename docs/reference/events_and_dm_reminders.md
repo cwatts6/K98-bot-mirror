@@ -3,6 +3,17 @@
 Purpose: describe the current reminder systems and where to look when changing reminder,
 subscription, or event-calendar behaviour.
 
+## Board lifecycle boundary — 29 October 2026
+
+The shared [board lifecycle follow-up](../task_packs/P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md)
+currently implements MGE only. Calendar's rolling 30-day overview must remain live;
+an individual event ending does not finalise that overview. Event-specific messages,
+reminders and private responses retain separate identities and delivery outcomes.
+The [A2 caller scope](../task_packs/P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md)
+captures calendar adoption: broad fetch errors must not clear a saved identity or
+authorize replacement, and an unknown reminder outcome must not authorize resend.
+No calendar/reminder runtime behaviour changes in the MGE finalisation slice.
+
 ## Read-only next-alert projection
 
 `/me reminders` uses the same narrow pure eligibility functions as live KVK and Calendar dispatch.

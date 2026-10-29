@@ -37,7 +37,7 @@
   {
     "path": "mge/mge_publish_service.py",
     "before": "7d7bb853e450a787adefd358ac30c1b5f3105caa23c67881e861adfaf60fb6d9",
-    "after": "90bbdb4e61fa8179557584c0c33779a53bd081503db0c26f3ada4cf2ed95bd71"
+    "after": "410c4c0c8c64b15a55834eacfeebf9769816579cccbf511fb97959307a9c6449"
   },
   {
     "path": "mge/mge_recovery.py",

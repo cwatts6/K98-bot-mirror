@@ -1,5 +1,17 @@
 # Shutdown Runbook
 
+## Local MGE finalisation contract — 29 October 2026
+
+The [approved local follow-up](../task_packs/P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md)
+uses the existing refresh ownership/drain registry for final edits, completion and
+retirement. Shutdown must retain ownership until started work settles; cancellation
+does not release the event owner while a SQL write or Discord edit remains active.
+An uncertain edit keeps its saved original identity and payload for readback after
+restart. Do not replay the business action, replace a message, clear a receipt or
+reopen frozen history to make shutdown appear complete. Legacy completed boards
+receive no routine network work. This is local implementation guidance, not evidence
+of a new deployment or restart. The protected S11 release contract below still applies.
+
 ## Protected S11 restart and release handoff — 2026-10-08
 
 This entry supersedes the older rollout status below. Normal graceful restart is
