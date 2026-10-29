@@ -1,5 +1,7 @@
 # New chat starter: focused MGE A1b
 
+> **Approved implementation update:** A1b is locally implemented and validated on Windows. Read the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md) first. The scope-only instructions below are historical; publication, merge and deployment remain separate.
+
 > **Continuation update:** The requested design pass is complete. Read the
 > [design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
 > before this historical starter. Next is approval of the bounded local implementation;

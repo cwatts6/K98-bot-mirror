@@ -1,6 +1,6 @@
 # K98 Bot Reference Docs
 
-> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+> **Approved local A1b implementation:** The revised scope is implemented locally and validated on Windows. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
 
 The delivered MGE implementation establishes the
 [P1 operation lifecycle contract](p1-operation-lifecycle.md). See its

@@ -1,6 +1,30 @@
 # MGE Reference Model
 
-> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+> **Approved local A1b implementation:** The revised scope is implemented locally and validated on Windows. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+
+## Local A1b implementation contract
+
+Ordinary adopted MGE actions report explicit completed, not-entered, rolled-back,
+partial or unknown outcomes. A confirmed private reply and a delivered public board
+are separate facts. Registered refreshes survive reply failure and cancellation;
+compatible target requests coalesce, and newer work receives a fresh pass. Explicit
+Refresh observes the selected target and reports pending after ten seconds.
+
+Public, leadership and award payloads qualify required data and identity before
+Discord IO. Publish/unpublish primary board transitions share event presentation
+ownership with refresh. Conditional ID persistence compares lifecycle, publication
+version, full SQL revision and previous IDs. Ambiguous or superseded receipts cannot
+restore cleared bindings. This ownership is process-local, not a cross-process
+transaction guarantee.
+
+Startup reconciles known original message IDs through finite high-water pages of
+fifty, at most two event tasks at once, including completed/calendar-missing events.
+Periodic reconciliation covers noncompleted events. Recovery edits existing boards
+only; no replacement, placement or announcement is implied. Failed pages retain the
+cursor; failed targets remain visible while later events progress. Read the counters
+alongside the completion flag. Historical-target completion does not mean delivery
+acceptance. Current implementation evidence and later production acceptance are
+separate; the deployed A1a record below remains the deployed baseline.
 
 The delivered MGE lifecycle implementation is described in the
 [implementation and evidence packet](../task_packs/P1%20MGE%20Lifecycle%20-%20Implementation%20and%20Evidence.md).

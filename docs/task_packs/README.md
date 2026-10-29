@@ -1,6 +1,6 @@
 # Task Packs
 
-> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+> **Approved local A1b implementation:** The revised scope is implemented locally and validated on Windows. See the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
 
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed

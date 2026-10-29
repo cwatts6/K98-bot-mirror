@@ -1,6 +1,6 @@
 # P1 operation lifecycle contract
 
-> **Approved local A1b implementation:** The revised scope is implemented locally and undergoing final validation. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
+> **Approved local A1b implementation:** The revised scope is implemented locally and validated on Windows. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
 
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
@@ -124,16 +124,15 @@ See [MGE implementation and evidence](../task_packs/P1%20MGE%20Lifecycle%20-%20I
 
 ## A1a qualified datasets and measurement framework
 
-The [A1b design packet](../task_packs/P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
-proposes strict public/identity/award reads, truthful legacy partial-result handling,
-reply-independent owned refresh and existing-message restart reconciliation.
-The final framework review also requires publication/refresh identity ownership:
-an older refresh must not overwrite a newer or intentionally cleared board pointer.
-Conditional ID writes and lifecycle-qualified journal recovery are proposed;
-separate coalescing keys alone do not establish this invariant.
-These are proposed additions, not delivered behavior. The present calendar window
-does not guarantee recovery of every persisted board, and a legacy roster Boolean
-does not supply the signup transaction's durable outcome contract.
+The approved local A1b implementation extends qualification to public, identity
+and award reads; adds truthful legacy partial-result handling; and owns refresh
+independently of the private reply. Publication and refresh share event presentation
+ownership, with exact conditional identity writes and qualified journal recovery.
+The startup inventory is a finite existing-message sweep independent of the calendar
+window. These local changes are described and tested in the
+[implementation evidence](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md).
+They have not been published or deployed. A legacy roster result still does not
+claim the signup transaction's durable atomic-outcome contract.
 
 The deployed A1a implementation distinguishes successful `loaded_empty` and `loaded`
 leadership preparations from `unavailable` reads and `incomplete` preparation.
@@ -155,8 +154,9 @@ previous writes are not represented as rolled back. Cross-writer atomicity remai
 One prepared snapshot supplies both leadership rendering and displayed readiness.
 It is never cached across actions or reused as publication authority. Publication
 still reloads at its own boundary; whole-publication atomicity is not established.
-Public signup rendering is outside this strict-dataset adoption and retains its
-legacy failed-read contract; qualify it before any A1b refresh-policy change.
+In deployed A1a, public signup rendering remains outside that strict-dataset
+adoption. The approved local A1b candidate qualifies both public read branches
+before enabling its independent refresh policy; deployment remains separate.
 
 `core/operation_timing.py` adds random local correlation references. Context flows
 through owned tasks and workers. Stages record interaction age, acknowledgement,
