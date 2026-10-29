@@ -15,6 +15,7 @@ from scripts.prepare_k98_update import (
     TOOL_SOURCE_PATHS,
     check_case_aliases,
     check_source_only,
+    check_transition_inventory,
     coordinated_policy,
     sha256,
 )
@@ -45,6 +46,7 @@ def classify(
         if len(paths) > 4096 or len(set(paths)) != len(paths):
             raise ValueError("Bounded unique changed paths required.")
         check_case_aliases(set(paths) | set(inventory_paths or ()))
+        check_transition_inventory(paths, read_blob, before, target, admitted=admitted)
     except ValueError as exc:
         blockers.append(str(exc))
     if installed_tool is not None:

@@ -1326,6 +1326,24 @@ def check_case_aliases(paths):
                 raise ValueError(f"Case-colliding source inventory: {path}")
 
 
+def check_transition_inventory(changes, read_blob, before, target, *, admitted=()):
+    """Require every changed bundle member, authenticating unchanged peers too."""
+    changed = set(changes)
+    for path in (changed & transition_paths()) - set(admitted):
+        if path in APPLICATION_METHODS:
+            try:
+                check_application_change(path, read_blob(before, path), read_blob(target, path))
+            except ValueError:
+                pass  # The complete exact transition must authorize this change.
+            else:
+                continue
+        # This authenticates every predecessor/successor member, including
+        # dependencies omitted from Git's diff because their bytes did not change.
+        bundle = check_protocol_transition(path, read_blob, before, target)
+        if any(read_blob(before, peer) != read_blob(target, peer) for peer in bundle - changed):
+            raise ValueError("Incomplete reviewed protocol transition inventory.")
+
+
 def source_plan(previous, before, target, changes, read_blob, *, tool_sources=None):
     """Build exact source hashes using authenticated Git blobs, not live new bytes.
 
@@ -1344,17 +1362,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     policy = coordinated_policy()
     coordinated = policy.selected(before, target, changes, read_blob) if policy else None
     admitted = {r["path"] for r in coordinated["sources"]} if coordinated else set()
-    for path in (set(changes) & transition_paths()) - admitted:
-        if path in APPLICATION_METHODS:
-            try:
-                check_application_change(path, read_blob(before, path), read_blob(target, path))
-            except ValueError:
-                pass  # The complete exact transition must authorize this change.
-            else:
-                continue
-        bundle = check_protocol_transition(path, read_blob, before, target)
-        if not bundle <= set(changes):
-            raise ValueError("Incomplete reviewed protocol transition inventory.")
+    check_transition_inventory(changes, read_blob, before, target, admitted=admitted)
     check_source_only(
         [p for p in changes if p not in admitted],
         tool_copies=tool_sources,
