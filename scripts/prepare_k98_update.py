@@ -1681,6 +1681,51 @@ def release_seed(previous, pins, gate, *, policy_path=None, policy_sha256=None):
     return payload
 
 
+# Installed updater authority for one independently derived startup-contract delta.
+# These are not acquired target-tree expectations or observed post-deploy hashes.
+MGE_APPLICATION_BEFORE = "814a7e6be4ac3865ee29b65e3c55ec7ad06d4a2ddeb0831f5cf1480d39d9f49f"
+MGE_APPLICATION_AFTER_METADATA = "103e92000529669ec7213a397f1062036a7965ef1d9be4ea7712dcb91e7feb5b"
+MGE_APPLICATION_REVIEW = "26a303f7-e8b6-4be6-9dce-43086c78d98e"
+MGE_APPLICATION_PARENTS = frozenset({"dbo.MGE_Events", "dbo.MGE_Awards", "dbo.MGE_Signups"})
+MGE_APPLICATION_RELEASE = {
+    "version": 1,
+    "profile": "mge_finalisation_v1",
+    "bot_predecessors": ["2c31de42eb91cf6b7f9f61f3aaf3efc3597c4ea6"],
+    "sql_commit": "9344a37656b034dd43867435e7c039ed20ae1c5e",
+    "migrations": [
+        {
+            "id": "20261029_001_mge_board_finalisation",
+            "sha256": "8fea59034c0ac0d14cfb6f72e03a3eda9c823648ec2c0fead6cd208bd4312bb0",
+        }
+    ],
+}
+
+
+def mge_application_contract_transition(previous, description):
+    """Admit only the reviewed three-trigger delta to one exact old contract.
+
+    All source/scope/permission expectations remain byte-for-byte equivalent.
+    Fresh predecessor and successor SQL observations still use the unchanged
+    complete startup comparators. No runtime observation becomes an expectation.
+    """
+    if description != MGE_APPLICATION_RELEASE:
+        raise ValueError("MGE startup contract requires the exact reviewed release.")
+    bot = previous["bot-template.json"]
+    before = bot["application_sql_contract"]
+    if sha256(encode(before)) != MGE_APPLICATION_BEFORE:
+        raise ValueError("MGE predecessor application contract differs from reviewed evidence.")
+    after = deepcopy(before)
+    after["metadata_hash"] = MGE_APPLICATION_AFTER_METADATA
+    after["review_id"] = MGE_APPLICATION_REVIEW
+    return {
+        "contracts": {
+            key: {"before": deepcopy(bot[key]), "after": deepcopy(bot[key])}
+            for key in ("sql_contract", "legacy_sql_contract")
+        }
+        | {"application_sql_contract": {"before": deepcopy(before), "after": after}}
+    }
+
+
 def prepare_update(
     observation,
     changes,
@@ -1722,6 +1767,7 @@ def prepare_update(
     description_raw = read_blob(config["target"], RELEASE_DESCRIPTION)
     previous_description = read_blob(config["before"], RELEASE_DESCRIPTION)
     sql_files = {}
+    mge_contracts = None
     if recovery:
         if description_raw != previous_description:
             raise ValueError("Coordinated recovery cannot combine another SQL descriptor.")
@@ -1746,6 +1792,11 @@ def prepare_update(
             raise ValueError(
                 "Whole-database startup SQL contract needs a separately reviewed upgrade."
             )
+        if description["profile"] == "mge_finalisation_v1":
+            mge_contracts = mge_application_contract_transition(previous, description)
+            # Only application-scope parents receive this reviewed amendment.
+            # Installation/legacy protection remains independent and unchanged.
+            scope = set(scope) - MGE_APPLICATION_PARENTS
         protected = set(INSTALLATION_OBJECTS) | set(scope)
         protected.update(m["name"] for m in bot["legacy_sql_contract"]["source"]["modules"])
         principals = {
@@ -1767,6 +1818,10 @@ def prepare_update(
     )
     if recovery:
         seed = recovery_policy.adapt_candidate(seed, recovery)
+    elif mge_contracts is not None:
+        from scripts.p0a_release import adapt_candidate
+
+        seed = adapt_candidate(seed, mge_contracts)
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
         dict(name=name, sha256=sha256(raw)) for name, raw in sorted(seed.items())
