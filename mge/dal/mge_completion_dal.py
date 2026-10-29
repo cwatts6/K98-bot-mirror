@@ -62,14 +62,40 @@ def mark_event_completed(
                 CompletedByDiscordId = ?,
                 UpdatedUtc = ?
             WHERE EventId = ?
-              AND Status <> 'completed'
+              AND Status IN ('signup_open', 'signup_closed', 'published', 'reopened')
+              AND ((SignupEmbedChannelId IS NULL AND SignupEmbedMessageId IS NULL)
+                   OR (SignupEmbedChannelId > 0 AND SignupEmbedMessageId > 0))
+              AND ((LeadershipEmbedChannelId IS NULL AND LeadershipEmbedMessageId IS NULL)
+                   OR (LeadershipEmbedChannelId > 0 AND LeadershipEmbedMessageId > 0))
+              AND ((AwardEmbedChannelId IS NULL AND AwardEmbedMessageId IS NULL)
+                   OR (AwardEmbedChannelId > 0 AND AwardEmbedMessageId > 0))
             """,
             completed_at,
             actor_discord_id,
             completed_at,
             event_id,
         )
-        return cur.rowcount > 0
+        changed = cur.rowcount > 0
+        if changed:
+            # The domain freeze and original target inventory commit together.
+            # Historical completed events are deliberately not backfilled/edited.
+            cur.execute(
+                """
+                DECLARE @generation uniqueidentifier = NEWID();
+                INSERT dbo.MGE_BoardFinalisation
+                    (EventId, BoardKind, FinalisationId, PublishVersion, ChannelId, MessageId, DeliveryState)
+                SELECT E.EventId, B.Kind, @generation, E.PublishVersion, B.ChannelId, B.MessageId, 'pending'
+                FROM dbo.MGE_Events E
+                CROSS APPLY (VALUES
+                    ('signup', E.SignupEmbedChannelId, E.SignupEmbedMessageId),
+                    ('leadership', E.LeadershipEmbedChannelId, E.LeadershipEmbedMessageId),
+                    ('awards', E.AwardEmbedChannelId, E.AwardEmbedMessageId)
+                ) B(Kind, ChannelId, MessageId)
+                WHERE E.EventId = ? AND B.ChannelId > 0 AND B.MessageId > 0;
+                """,
+                event_id,
+            )
+        return changed
 
     return bool(exec_with_cursor(_op))
 
@@ -79,25 +105,5 @@ def reopen_event(
     actor_discord_id: int,
     reopened_at_utc: datetime,
 ) -> bool:
-    reopened_at = _naive_utc(reopened_at_utc)
-
-    def _op(cur: Any) -> bool:
-        cur.execute(
-            """
-            UPDATE dbo.MGE_Events
-            SET
-                Status = 'reopened',
-                ReopenedAtUtc = ?,
-                ReopenedByDiscordId = ?,
-                UpdatedUtc = ?
-            WHERE EventId = ?
-              AND Status = 'completed'
-            """,
-            reopened_at,
-            actor_discord_id,
-            reopened_at,
-            event_id,
-        )
-        return cur.rowcount > 0
-
-    return bool(exec_with_cursor(_op))
+    # Compatibility entry point for stale callers; completed history is terminal.
+    return False

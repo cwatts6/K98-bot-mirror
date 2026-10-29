@@ -1,38 +1,32 @@
-# New chat starter: focused MGE A1b
+# New chat starter: Remaining Batch A / A2 domain adoption
 
-> **Approved implementation update:** A1b is locally implemented and validated on Windows. Read the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md) first. The scope-only instructions below are historical; publication, merge and deployment remain separate.
+Continue the bounded A2 scope after checking the current focused MGE finalisation
+pack and A1b deployed closeout. Preserve accepted A1a/A1b delivery and existing
+approval for MGE finalisation/shared design. Do not repeat that approval or live
+actions. Read AGENTS.md, core references, the A2 scope and the current local/release
+evidence before choosing an implementation baseline; preserve prior branches.
 
-> **Continuation update:** The requested design pass is complete. Read the
-> [design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
-> before this historical starter. Next is approval of the bounded local implementation;
-> no runtime work, remote publication or deployment has been authorized. Preserve the
-> local documentation and original handover commit instead of repeating this scope pass.
+Map Ark registration, confirmation, team boards, tracked restoration and late
+results; voting/survey deadline and manual close/reopen/delete plus announcements;
+and calendar rolling overview versus event-specific messages/reminders. Reuse the
+small lifecycle contract and existing owned-work/refresh/receipt mechanisms.
+Domain completion, final delivery and retirement remain separate. Unknown sends
+and business outcomes never imply replay authority. No age-based blanket cleanup.
 
-Continue K98 P1 with A1b review/scope and architecture preparation. The operator
-requested a high-quality complete framework and this focused new chat. Read
-AGENTS.md/core references, then [A1a deployed closeout](P1%20MGE%20A1a%20-%20Deployed%20Closeout%20-%202026-10-28.md) and
-[A1b scope and handoff](P1%20MGE%20A1b%20-%20Scope%20and%20Handoff%20-%202026-10-28.md). They supersede the earlier A1a planning starter.
+Ark's old Scheduled/Locked eligibility and already-Completed fallback selector are
+static findings, not a live inventory. Two or three active boards is an expectation,
+not a cap. Resolve ended/awaiting-result versus explicit no-result finalisation as
+a concrete policy choice before Ark adoption. Freeze mutation controls at the
+authoritative boundary while preserving read-only history/results/timezone access.
 
-Private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed, Discord online;
-mirror PR 454/private PR 702 merged. Signup/edit/withdraw have committed application
-logs and operator visual confirmation. Rank adjustment takes 11.311s including
-4.809s public and 3.820s leadership refresh before its private reply. A1a dataset
-reuse/strict leadership reads/timing are delivered. Public signup read validity is
-a prerequisite before changing its refresh policy. Preserve publication freshness,
-automatic-placement ownership, private responses and unknown-send protection.
+Return a domain-sized implementation scope with exact caller/SQL ownership,
+recovery and concurrency semantics, counts-based acceptance, tests and per-repo
+Changes review. MGE's SQL migration, updater qualification and production
+acceptance remain distinct from local source completion. Preserve the Report63
+queue/configuration, audit/cleanup, atomic-writer/cross-process, B/C, natural
+acceptance and P0 residuals. No live deletion, SQL mutation, replay or restart is
+authorized by this starter. PR publication, merge and deployment remain separate.
 
-Prepare one approval-ready scope/design/implementation packet using the detailed
-handoff: caller/owner map, truthful saved-result UX, existing refresh-coordinator
-reuse, dirty follow-up and shutdown/restart semantics, strict public data, failure
-matrix, benchmarks, second-caller compatibility, SQL validation, Changes security
-routing and exact updater-source implications. Make routine choices with evidence.
-A1b runtime implementation is not authorized by this scope handoff.
-
-Carry Report 62 queue closure (linked cache-only report already resolved), the older
-configuration continuation, separate 42s gateway lag and unconfirmed priority-selection
-ordering. Do not infer causality or fix unrelated domains. Preserve the full R01-R18
-ledger, exact audit/cleanup gap, A2 Ark admin-add timeout and P0 natural acceptance.
-No repeated deployment/restart, live SQL/provider operation, forced release or
-business replay is authorized. Fresh import/export on this runtime remains unproven;
-predecessor acceptance remains accepted. Raw private evidence paths and document
-revision are supplied in the new chat prompt; do not publish raw IDs/logs.
+References: [A2 scope](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md),
+[MGE finalisation](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md),
+[A1b deployed closeout](P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).

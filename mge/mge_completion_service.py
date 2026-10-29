@@ -55,29 +55,12 @@ def complete_event(
             "changed": changed,
         },
     )
-    return {"ok": True, "changed": bool(changed), "event_id": event_id}
+    return {"ok": bool(changed), "changed": bool(changed), "event_id": event_id}
 
 
 def reopen_event(event_id: int, actor_discord_id: int) -> dict[str, Any]:
-    """Reopen a completed event for admin correction."""
-    context = mge_completion_dal.fetch_event_completion_context(event_id)
-    if not context:
-        raise ValueError(f"MGE event {event_id} not found")
-
-    status = str(context.get("Status") or "")
-    if status != "completed":
-        return {"ok": False, "changed": False, "reason": "not_completed", "event_id": event_id}
-
-    changed = mge_completion_dal.reopen_event(
-        event_id=event_id,
-        actor_discord_id=actor_discord_id,
-        reopened_at_utc=_now_utc(),
-    )
-    logger.info(
-        "mge_event_reopen",
-        extra={"event_id": event_id, "actor_discord_id": actor_discord_id, "changed": changed},
-    )
-    return {"ok": bool(changed), "changed": bool(changed), "event_id": event_id}
+    """Reject stale reopen controls under the immutable-history policy."""
+    return {"ok": False, "changed": False, "reason": "history_frozen", "event_id": event_id}
 
 
 def auto_complete_due_events(as_of_utc: datetime | None = None) -> dict[str, Any]:

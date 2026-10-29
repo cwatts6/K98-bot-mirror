@@ -145,9 +145,7 @@ async def test_calendar_failure_and_invalid_default_do_not_disable_recovery(monk
         raise OSError("calendar unavailable")
 
     monkeypatch.setattr(scheduler, "sync_mge_events_from_calendar", unavailable)
-    monkeypatch.setattr(
-        scheduler.mge_completion_service, "auto_complete_due_events", lambda **kwargs: {}
-    )
+    monkeypatch.setattr(scheduler.mge_finalisation, "sweep", AsyncMock())
 
     async def stop(_):
         raise asyncio.CancelledError
@@ -174,9 +172,7 @@ async def test_unavailable_receipt_read_remains_pending_for_next_tick(monkeypatc
         "sync_mge_events_from_calendar",
         lambda **_: (_ for _ in ()).throw(OSError("offline")),
     )
-    monkeypatch.setattr(
-        scheduler.mge_completion_service, "auto_complete_due_events", lambda **_: {}
-    )
+    monkeypatch.setattr(scheduler.mge_finalisation, "sweep", AsyncMock())
     ticks = []
 
     async def tick(_):

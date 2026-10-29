@@ -687,6 +687,8 @@ async def sync_event_signup_embed(
         return False
 
     validate_event(row, event_id)
+    if row["Status"] == "completed":
+        return False  # Final edits belong exclusively to durable finalisation.
     validate_destination(row, "signup", signup_channel_id)
     effective_message_id = recovered_identity(row, "signup", signup_channel_id, recovery_receipt)
     if existing_only and not effective_message_id:
@@ -849,6 +851,8 @@ async def sync_event_awards_embed(
         return False
 
     validate_event(row, event_id, publication=True)
+    if row["Status"] == "completed":
+        return False
     if row["PublishVersion"] <= 0 or row["Status"] not in {"published", "completed"}:
         return False
     if channel_id is not None:
@@ -969,6 +973,8 @@ async def sync_event_leadership_embed(
         return False
 
     validate_event(event_row, event_id)
+    if event_row["Status"] == "completed":
+        return False
     resolved_channel_id = _to_int(channel_id or MGE_LEADERSHIP_CHANNEL_ID, 0)
     if resolved_channel_id <= 0:
         logger.warning("mge_leadership_sync_skip reason=no_channel event_id=%s", event_id)

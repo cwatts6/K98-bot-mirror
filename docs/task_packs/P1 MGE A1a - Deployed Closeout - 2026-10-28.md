@@ -1,5 +1,17 @@
 # P1 MGE A1a: deployed closeout and evidence ledger
 
+> **Current MGE checkpoint — 29 October 2026:** A1b and its updater correction are
+> delivered; Report63 verifies the exercised actions and response-before-refresh
+> ordering. Exact running SHA remains operator-reported. See the [deployed closeout](P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).
+> The approved [MGE finalisation follow-up](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md) owns immutable historical boards,
+> durable unfinished final delivery and the shared Ark/voting/calendar caller design.
+> Its local source work is separate from publication, SQL qualification and deployment.
+> Earlier A1a-current, A1b-local-only and approval-pending passages below are retained
+> historical evidence, not current instructions. A1b's completed-event startup sweep
+> was implemented and is now superseded by the clarified finalisation policy.
+> Queue closure reconciliation, CFG-51421, exact audit/cleanup, atomic/cross-process
+> writers, natural acceptance, P0 and wider B/C remain separate. Do not replay live actions.
+
 > **Next step:** The [A1b design and delivery packet](P1%20MGE%20A1b%20-%20Design%20and%20Delivery%20Packet%20-%202026-10-28.md)
 > is prepared for implementation approval. This does not alter the deployed
 > evidence below or authorize another deployment. The handover is merged through

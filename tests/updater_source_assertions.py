@@ -20,9 +20,27 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_finalisation_hash(root, path):
+    """Exact local successor evidence only; does not change updater admission."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/p1_mge_finalisation_source_pairs.json"
+    if not fixture.exists():
+        return actual  # Historical standalone fixtures still authenticate themselves.
+    raw = fixture.read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "11aaae358c7c0544c00673a3d485ef4cb74f070a75b799e920811a75b1d9fdd8"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_a1b_hash(root, path):
     """Authenticate the exact A1b successor before walking historical source pins."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_finalisation_hash(root, path)
     fixture = root / "tests/fixtures/p1_a1b_source_pairs.json"
     if not fixture.exists():
         return actual

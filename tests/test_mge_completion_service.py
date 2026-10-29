@@ -57,7 +57,7 @@ def test_reopen_requires_completed_state() -> None:
     ):
         result = mge_completion_service.reopen_event(3, actor_discord_id=42)
         assert result["ok"] is False
-        assert result["reason"] == "not_completed"
+        assert result["reason"] == "history_frozen"
 
 
 def test_auto_complete_due_events() -> None:

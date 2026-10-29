@@ -434,6 +434,8 @@ async def _publish_primary(
         validate_event(current, event_id, publication=True)
     except MgeDatasetError:
         return PublishResult(False, "Publication data could not be verified."), None, [], []
+    if current["Status"] == "completed":
+        return PublishResult(False, "Completed MGE history is frozen."), None, [], []
     if not _same_publication_binding(expected, current):
         return (
             PublishResult(
@@ -833,7 +835,7 @@ async def refresh_award_reminders(
         )
 
     status = str(ctx.get("Status") or "").strip().lower()
-    if status == "completed" and not allow_completed:
+    if status == "completed":
         return RefreshAwardRemindersResult(
             False,
             "Completed MGE events require an explicit admin-selected event id.",
@@ -1105,14 +1107,15 @@ async def unpublish_event_awards(
             return UnpublishResult(False, "Unpublication data could not be verified.")
 
         old_status = str(ctx.get("Status") or "")
+        if old_status == "completed":
+            return UnpublishResult(False, "Completed MGE history is frozen.")
         old_publish_version = _to_int(ctx.get("PublishVersion"), 0)
         if old_publish_version <= 0 and old_status.strip().lower() not in {
             "published",
-            "completed",
         }:
             return UnpublishResult(False, "Event is not currently published.")
 
-        restore_status = "reopened" if old_status == "completed" else "signup_closed"
+        restore_status = "signup_closed"
 
         result = await drain_thread(
             mge_publish_dal.apply_unpublish_atomic,

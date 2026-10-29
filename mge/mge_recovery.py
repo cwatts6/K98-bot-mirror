@@ -133,6 +133,8 @@ class RecoverySweep:
                     raise ValueError("Receipt key mismatch")
                 row = await drain_thread(fetch_event_for_embed, event_id, strict=True)
                 validate_event(row, event_id)
+                if row["Status"] == "completed":
+                    continue  # Old send receipts cannot restore frozen history.
                 if (
                     row[BOARD_FIELDS[kind][1]] == receipt.get("message_id")
                     and row[BOARD_FIELDS[kind][0]] == channel_id

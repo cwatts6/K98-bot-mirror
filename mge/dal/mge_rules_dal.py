@@ -70,12 +70,16 @@ def update_event_rules_text_with_audit(
     )
 
     sql_update_with_output = """
+    SET NOCOUNT ON;
+    DECLARE @ChangedEvent TABLE (EventId bigint NOT NULL);
     UPDATE dbo.MGE_Events
     SET RulesText = ?,
         RuleMode = ?,
         UpdatedUtc = ?
-    OUTPUT INSERTED.EventId
-    WHERE EventId = ?
+    OUTPUT INSERTED.EventId INTO @ChangedEvent
+    WHERE EventId = ?;
+    SELECT EventId FROM @ChangedEvent;
+    SET NOCOUNT OFF;
     """
 
     sql_audit = """

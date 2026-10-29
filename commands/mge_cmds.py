@@ -355,7 +355,7 @@ def register_mge(bot: ext_commands.Bot) -> None:
 
     @group.command(
         name="admin_completion",
-        description="Open MGE completion/reopen controls (admin only).",
+        description="Open MGE finalisation and historical board controls (admin only).",
     )
     @versioned("v1.0")
     @safe_command

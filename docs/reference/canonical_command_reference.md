@@ -1,5 +1,15 @@
 # Canonical Command Reference
 
+## MGE finalisation source update — 29 October 2026
+
+The local follow-up retains `/mge admin_completion` and updates its admin controls
+to Complete Event, Check Final Delivery, Review Retirement and Post Internal
+Summary. Completed history cannot be reopened. Retirement confirms exact saved
+targets and retains messages, results and audit data; it is not deletion or proof
+of delivery. Unknown edits require readback reconciliation. This source change is
+not deployed by its documentation; see the [finalisation pack](../task_packs/P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md).
+
+
 ## Current delivery and next phase — 2026-09-25
 
 S11 Bot mirror #281, SQL #89 and production Bot #588 are merged. See the

@@ -7,7 +7,7 @@ import discord
 from core.interaction_safety import private_operation, send_ephemeral
 from core.mge_permissions import is_admin_interaction
 from core.owned_work import drain_thread
-from mge import mge_completion_service, mge_report_service
+from mge import mge_finalisation, mge_report_service
 
 logger = logging.getLogger(__name__)
 
@@ -40,29 +40,38 @@ class MgeAdminCompletionView(discord.ui.View):
             return
 
         try:
-            result = await drain_thread(
-                mge_completion_service.complete_event,
-                event_id=self.event_id,
-                actor_discord_id=int(interaction.user.id),
-                source="admin_view",
+            result = await mge_finalisation.finalise_event(
+                interaction.client,
+                self.event_id,
+                actor_id=int(interaction.user.id),
+                complete=True,
             )
         except Exception:
             logger.exception("mge_complete_event_failed event_id=%s", self.event_id)
-            await send_ephemeral(interaction, f"Failed to complete event {self.event_id}.")
+            await send_ephemeral(
+                interaction,
+                f"Completion of event {self.event_id} could not be confirmed. Check its current state before repeating.",
+            )
             return
 
-        if result.get("ok"):
-            await send_ephemeral(interaction, f"Event {self.event_id} marked completed.")
+        if result.get("domain_completed"):
+            await send_ephemeral(
+                interaction,
+                f"Event {self.event_id} is completed and frozen. Board delivery: {result['states'] or 'historical / no recorded targets'}. Results and summaries remain available.",
+            )
             return
-        await send_ephemeral(interaction, f"Failed to complete event {self.event_id}.")
+        await send_ephemeral(
+            interaction,
+            f"Completion of event {self.event_id} could not be confirmed. Check its current state before repeating.",
+        )
 
     @discord.ui.button(
-        label="Reopen Event",
+        label="Check Final Delivery",
         style=discord.ButtonStyle.primary,
-        custom_id="mge_admin_reopen_event",
+        custom_id="mge_admin_check_final_delivery",
     )
     @private_operation
-    async def reopen_event_button(  # type: ignore[override]
+    async def check_final_delivery_button(  # type: ignore[override]
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
@@ -72,20 +81,46 @@ class MgeAdminCompletionView(discord.ui.View):
             return
 
         try:
-            result = await drain_thread(
-                mge_completion_service.reopen_event,
-                event_id=self.event_id,
-                actor_discord_id=int(interaction.user.id),
-            )
+            result = await mge_finalisation.finalise_event(interaction.client, self.event_id)
         except Exception:
-            logger.exception("mge_reopen_event_failed event_id=%s", self.event_id)
-            await send_ephemeral(interaction, f"Failed to reopen event {self.event_id}.")
+            logger.exception("mge_final_delivery_check_failed event_id=%s", self.event_id)
+            await send_ephemeral(
+                interaction,
+                "Final delivery could not be checked. No business action should be repeated.",
+            )
             return
 
-        if result.get("ok"):
-            await send_ephemeral(interaction, f"Event {self.event_id} reopened.")
+        await send_ephemeral(
+            interaction,
+            f"Final delivery for event {self.event_id}: {result}. Confirmed and held boards are left unchanged.",
+        )
+
+    @discord.ui.button(
+        label="Review Retirement",
+        style=discord.ButtonStyle.secondary,
+        custom_id="mge_admin_retire_review",
+    )
+    @private_operation
+    async def retire_review_button(self, button, interaction):
+        if await self._deny_if_not_admin(interaction):
             return
-        await send_ephemeral(interaction, f"Event {self.event_id} is not in completed state.")
+        targets = await mge_finalisation.retirement_preview(self.event_id)
+        if not targets:
+            await send_ephemeral(
+                interaction,
+                "No pending, failed or held final boards to retire. Unknown edits require reconciliation first.",
+            )
+            return
+        description = "\n".join(
+            f"{t['BoardKind']}: channel {t['ChannelId']}, message {t['MessageId']} ({t['DeliveryState']})"
+            for t in targets
+        )
+        await send_ephemeral(
+            interaction,
+            "Retirement stops final-delivery work and retains these messages and all result/audit data. It does not confirm final delivery or delete messages.\n"
+            + description,
+            view=_RetireFinalBoards(self.event_id, targets, interaction.user.id),
+        )
 
     @discord.ui.button(
         label="Post Internal Summary",
@@ -163,3 +198,26 @@ class MgeAdminCompletionView(discord.ui.View):
         await send_ephemeral(
             interaction, f"Summary generated and posted for event {self.event_id}."
         )
+
+
+class _RetireFinalBoards(discord.ui.View):
+    def __init__(self, event_id, targets, actor_id):
+        super().__init__(timeout=120)
+        self.event_id, self.targets, self.actor_id = event_id, targets, actor_id
+
+    @discord.ui.button(label="Confirm Retirement", style=discord.ButtonStyle.danger)
+    @private_operation
+    async def confirm(self, button, interaction):
+        if interaction.user.id != self.actor_id or not is_admin_interaction(interaction):
+            await send_ephemeral(
+                interaction, "You do not have permission to confirm this retirement."
+            )
+            return
+        outcomes = await mge_finalisation.retire_targets(
+            interaction.client, self.event_id, self.targets, self.actor_id
+        )
+        await send_ephemeral(
+            interaction,
+            f"Retirement outcomes: {outcomes}. False means changed or unconfirmed; review current state before repeating.",
+        )
+        self.stop()

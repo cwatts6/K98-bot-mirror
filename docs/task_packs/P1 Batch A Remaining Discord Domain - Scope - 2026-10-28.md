@@ -1,4 +1,52 @@
-# Remaining Batch A: Discord/domain lifecycle completion
+# Remaining Batch A: A2 shared board and domain lifecycle
+
+Current 29 October 2026: A1a and A1b plus the updater correction are delivered.
+Read the [A1b deployed closeout](P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).
+The approved [MGE finalisation slice](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md)
+owns MGE implementation and shared-contract validation. A2 adopts the resulting
+contract in domain-sized changes; wholesale Ark/voting/calendar implementation is
+not included in the MGE slice. Earlier scope and status below are historical.
+
+## Current caller and ownership map
+
+| Domain / current evidence | Required next boundary | Owner / policy |
+|---|---|---|
+| Ark `list_open_matches` selects Scheduled/Locked; scheduler's completion fallback is fed only already-Completed rows | Inventory past Scheduled/Locked matches explicitly; stop roster work at end while retaining late-result admission | A2 Ark; expected two or three active boards is not a cap and static code does not prove current old rows |
+| Ark completed selector uses `CompletionEmbedPostedAtUtc < UpdatedAtUtc` and seven-day lookback | Version/identity-qualified final delivery for registration, confirmation and published team boards, without age-stranding | A2 Ark; preserve result/audit data and distinguish ended/awaiting-result from fully finalised |
+| Ark tracked restoration uses `bot.add_view`; registration handlers reject Cancelled/Completed at their current checks | Verify final action-boundary rechecks as well as local handler restoration; do not claim visible-board edits from add_view | A2 Ark; original accepted callback remains accepted; admin-add response timeout is a separate observation |
+| Voting/surveys close domain state then edit disabled board and send announcement; due selectors read Open only | Persist independent final edit and announcement outcomes; failed/unknown delivery survives close and restart | A2 votes/surveys; unknown sends are held, not blindly resent; include manual close/reopen/delete |
+| Calendar pinned overview keeps a rolling 30-day window; broad fetch/edit failure can replace its tracked identity | Preserve identity on transient/unknown failures; distinguish confirmed deletion and intentional replacement | A2 calendar; overview stays active; event messages/reminders/private responses have different lifecycles |
+
+Reuse the small `core/board_lifecycle.py` eligibility vocabulary, existing owned
+execution, refresh coordination and delivery receipts. Domain services decide
+completion; DAL stores generation, identities, final payload and outcome. A shared
+contract is not a universal scheduler or a second retry framework. Test real caller
+adapters and mismatched semantics before adoption, not helper tests alone.
+
+Ark policy options for its implementation: (1) recommended ended/awaiting-result,
+with roster refresh stopped and explicit result finalisation; (2) explicit no-result
+finalisation with a durable operator reason. Do not silently choose a timeout or
+erase the ability to record a late result. A correction after finalisation needs a
+separate revision/message policy to preserve the immutable historical board.
+
+## A2 acceptance and sequencing
+
+1. Revalidate domain caller/SQL definitions and select one bounded domain slice.
+2. Establish current active, awaiting-finalisation, held and retired inventory;
+   explain old eligible rows. No blanket age deletion or live inventory mutation.
+3. Cover stale controls, final edit interruption, partial targets, identity races,
+   missing versus inaccessible messages, cancellation, restart and retirement.
+4. Prove repeated restart causes zero network work for finalised history, while
+   calendar's rolling overview remains live and Ark can accept late results.
+5. Measure SQL reads and Discord fetch/edit counts, plus per-state inventory;
+   qualify the actual native SQL contract and separate Changes review per repo.
+
+Preserve CFG-51421/configuration choice, Report63 queue closure reconciliation,
+audit/cleanup gaps, R12 atomic writers/cross-process IO ownership, receipt scaling,
+A3 policy work, B/C, natural acceptance and P0. None is silently closed here.
+
+## Historical A1b planning record
+
 
 Date: 28 October 2026. **Current status: A1a deployed and exercised flows verified.**
 Private runtime: `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b`. Read the
@@ -10,7 +58,7 @@ is now prepared for approval before runtime changes. Do not repeat deployment,
 restart or accepted business actions. The handover documents are merged through
 mirror PR 455/private PR 703; the new A1b design and subsequent amendments remain local.
 
-## A1: focused MGE responsiveness and refresh proposal
+## Historical A1: responsiveness and refresh proposal, now delivered
 
 Use the retained production sample and deterministic fixtures. Instrument/measure
 separately: interaction age at handler entry, initial response await, worker/event
@@ -78,7 +126,7 @@ tests as justified, smoke/registration when applicable and protected log isolati
 Use per-repository Changes security review for sensitive diffs, Deep off, or a precise
 documented skip. Mirror-first PRs and patch-based private promotion remain separate.
 
-## Required handback before implementation
+## Historical handback requirements for the original A1b scope
 
 Return evidence versus hypotheses; caller/ownership map; reusable architecture; bounded
 PR order; measurable acceptance; test/security routing; SQL/deployment implications;

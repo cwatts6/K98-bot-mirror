@@ -18,7 +18,7 @@ class _InsertSignupCursor:
     def fetchone(self) -> tuple[object, ...] | None:
         if self._last_sql.startswith("SELECT EventMode FROM dbo.MGE_Events"):
             return (self.event_mode,)
-        if self._last_sql.startswith("INSERT INTO dbo.MGE_Signups"):
+        if "INSERT INTO dbo.MGE_Signups" in self._last_sql:
             return (42,)
         return None
 
@@ -59,6 +59,8 @@ def test_insert_signup_locks_event_and_inserts_only_when_controlled(monkeypatch)
     assert "WHERE EventId = ?" in lock_sql
     assert lock_params == (563,)
     assert "INSERT INTO dbo.MGE_Signups" in insert_sql
+    assert "OUTPUT INSERTED.SignupId INTO @CreatedSignup" in insert_sql
+    assert "SELECT SignupId FROM @CreatedSignup" in insert_sql
     assert insert_params[0] == 563
 
 

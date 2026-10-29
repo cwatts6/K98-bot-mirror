@@ -751,7 +751,7 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: medium
 - Risk: medium
 - Dependencies: Accepted MGE closeout and remaining Batch A scope; receipt-query scaling and cross-process roster contracts stay separately scoped.
-- Status: A1a deployed/exercised acceptance retained. Revised A1b is operator-approved and locally implemented; Windows local validation is complete; Linux execution was unavailable on this host. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). It covers B1 qualified data, B2/B3 exact results and owned refresh/recovery, and shared publication/refresh identity safeguards. Publication, merge, deployment and production percentile/performance acceptance remain separate; this item is not closed by local implementation.
+- Status: A1a/A1b exercised delivery is accepted; Report63 and updater correction are recorded in the 29 October A1b deployed closeout. The following local checkpoint is historical: revised A1b was operator-approved and locally implemented; Windows local validation is complete; Linux execution was unavailable on this host. See the [implementation and evidence record](../task_packs/P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). It covers B1 qualified data, B2/B3 exact results and owned refresh/recovery, and shared publication/refresh identity safeguards. Publication, merge, deployment and production percentile/performance acceptance remain separate; this item is not closed by local implementation.
 
 ### Deferred Optimisation
 - Area: CFG-51421; proc_config_import.py and services/legacy_export_snapshot_service.py::begin_writer / legacy_export_snapshot_dal.py::session
@@ -805,3 +805,33 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Risk: medium
 - Dependencies: Separate reliability scope; only proven directly related blocking work belongs in A1b. SQL 51400, singleton ownership and earlier configuration 51421 remain distinct.
 - Status: Confirmed delay observation; cause unassigned. No runtime fix authorized by the documentation handoff.
+
+
+## 29 October shared board lifecycle follow-ups
+
+### Deferred Optimisation
+- Area: A2-ARK-FINAL; ark/ark_scheduler.py, ark/dal/ark_dal.py, registration/confirmation/team delivery and rehydrate_views.py
+- Type: architecture
+- Description: Past Scheduled/Locked rows can remain refresh-eligible because the fallback completion call is fed only Completed rows. Final delivery uses timestamps and a seven-day lookback, with no per-target generation proof. Static source evidence does not establish live old-record counts.
+- Suggested Fix: In a bounded Ark slice, inventory eligibility, separate ended/awaiting-result from finalised, and persist all target identities/revisions/outcomes. Preserve late results, original handlers and result/audit data; do not use expected two or three active boards as a cap.
+- Impact: high
+- Risk: medium
+- Dependencies: A2 Ark result policy and SQL validation; shared MGE contract evidence; no live cleanup authorized.
+
+### Deferred Optimisation
+- Area: A2-VOTE-FINAL; voting/scheduler.py, voting/dal.py, voting/survey_dal.py and manual close/reopen/delete services
+- Type: architecture
+- Description: Domain closure precedes final board edit and announcement, while due selectors include only Open records. Failed final delivery can be stranded after closure.
+- Suggested Fix: Persist generation-qualified board edits and independent announcement outcomes across deadline/manual closure and restart. Hold unknown sends; retain response and audit history during retirement.
+- Impact: high
+- Risk: medium
+- Dependencies: A2 voting/survey slice; authoritative 20260701_002 and 20260702_003 SQL migrations; separate bot/SQL Changes review.
+
+### Deferred Optimisation
+- Area: A2-CALENDAR-IDENTITY; event_calendar/pinned_embed.py
+- Type: consistency
+- Description: Broad fetch/edit failures can create a replacement overview or clear its tracker. Transient/inaccessible/unknown outcomes are not confirmed deletion.
+- Suggested Fix: Preserve the original identity and durable uncertainty until an explicit disposition. Keep the rolling 30-day overview active and distinguish historical event messages, reminders and private responses.
+- Impact: high
+- Risk: medium
+- Dependencies: Bounded A2 calendar caller/receipt design and negative tests; no automatic historical cutoff or replacement.

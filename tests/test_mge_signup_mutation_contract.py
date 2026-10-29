@@ -97,7 +97,7 @@ class Cursor:
             )
         elif "FROM dbo.MGE_Signups" in sql:
             self.result(state["signup"])
-        elif sql.startswith("INSERT INTO dbo.MGE_Signups"):
+        elif "INSERT INTO dbo.MGE_Signups" in sql:
             state["signup"] = dict(
                 SignupId=99, EventId=params[0], GovernorId=params[1], IsActive=True
             )

@@ -232,6 +232,8 @@ def insert_signup(
 
         cur.execute(
             """
+            SET NOCOUNT ON;
+            DECLARE @CreatedSignup TABLE (SignupId bigint NOT NULL);
             INSERT INTO dbo.MGE_Signups
             (
                 EventId,
@@ -255,9 +257,11 @@ def insert_signup(
                 CreatedUtc,
                 UpdatedUtc
             )
-            OUTPUT INSERTED.SignupId
+            OUTPUT INSERTED.SignupId INTO @CreatedSignup
             VALUES
             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 1, ?, ?, ?);
+            SELECT SignupId FROM @CreatedSignup;
+            SET NOCOUNT OFF;
             """,
             (
                 event_id,

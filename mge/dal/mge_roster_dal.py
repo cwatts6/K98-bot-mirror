@@ -115,6 +115,8 @@ WHERE EventId = ?
 
 
 SQL_INSERT_AWARD = """
+SET NOCOUNT ON;
+DECLARE @CreatedAward TABLE (AwardId bigint NOT NULL);
 INSERT INTO dbo.MGE_Awards
 (
     EventId, SignupId, GovernorId, GovernorNameSnapshot,
@@ -122,9 +124,11 @@ INSERT INTO dbo.MGE_Awards
     TargetScore, AwardStatus, WaitlistOrder, ManualOrderOverride, InternalNotes,
     PublishVersion, AssignedByDiscordId, CreatedUtc, UpdatedUtc
 )
-OUTPUT INSERTED.AwardId
+OUTPUT INSERTED.AwardId INTO @CreatedAward
 VALUES
 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?);
+SELECT AwardId FROM @CreatedAward;
+SET NOCOUNT OFF;
 """
 
 SQL_UPDATE_AWARD = """

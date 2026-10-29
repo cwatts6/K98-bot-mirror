@@ -30,8 +30,8 @@ async def test_scheduler_runs_completion_sweep_once() -> None:
             new_callable=AsyncMock,
         ),
         patch(
-            "mge.mge_completion_service.auto_complete_due_events",
-            return_value={"ok": True, "due_count": 1, "completed_count": 1},
+            "mge.mge_finalisation.sweep",
+            new_callable=AsyncMock,
         ) as mock_complete,
         patch("mge.mge_scheduler._INTERVAL_SECONDS", 1),
     ):
