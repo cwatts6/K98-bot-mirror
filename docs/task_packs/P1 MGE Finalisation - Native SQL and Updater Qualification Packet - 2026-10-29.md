@@ -3,15 +3,23 @@
 Prepared 29 October 2026; updated after the bounded implementation approval.
 **Review candidate; not an executable production release.** A1 implementation,
 A2 read-only local discovery and A6 review-PR publication/comment management are
-now authorized. Database creation/writes, merge, updater installation and deployment
+now authorized. The subsequent operator instruction also authorizes reviewed source
+merges and private promotion (A7). Database creation/writes, updater installation and deployment
 remain behind their separate approvals.
 The approved MGE implementation direction remains accepted. This packet defines
 the additional work and evidence needed to release it; it does not reopen that
 direction or repeat accepted A1b operations.
 
-**Verdict: do not promote or deploy yet.** The bounded updater extension and native
-harness have been authored. Production bindings and native write qualification
+**Verdict: source merge/promotion authorized; deployment blocked.** The bounded updater extension and native
+harness have been authored and reviewed. Production bindings and native write qualification
 remain outstanding. Only SELECT-based SQL discovery has executed.
+
+The operator's subsequent instruction is to merge the reviewed work and prepare a
+deployment, verification and confirmation plan. This supersedes only the source
+merge/promotion hold in this dated packet. It does not authorize operational SQL
+writes, tool installation or deployment. Initial adoption remains fail-closed until
+the separately reviewed MGE profile and descriptor are committed. See the
+[deployment and confirmation plan](P1%20MGE%20Finalisation%20-%20Deployment%20and%20Confirmation%20Plan%20-%202026-10-29.md).
 
 ## Approved implementation follow-up
 
@@ -100,7 +108,7 @@ new updater's current fingerprints or a deployment manifest.
 
 Remaining decisions are A3 (exact disposable creation/writes/backup and named child
 faults), A4 (bounded production read-only inventory), A5 (isolated protected updater
-rehearsal), A7 (merge/private promotion), A8 (installed-tool upgrade), A9 (production
+rehearsal), A8 (installed-tool upgrade), A9 (production
 preparation/deployment), and A10 (bounded acceptance/cleanup). Backup-directory
 access/capacity is still unresolved; database creation and writes have not occurred.
 Review publication is complete and does not satisfy any of these remaining gates.
@@ -323,14 +331,15 @@ for a new capability. Record every command, interpreter, exact target and exit c
 | A4 | Bounded MINI_AMD read-only inventory: installed Bot SHA/tool manifest/policy/receipts/custody; SQL identity/schema/permissions/ledger/backup observations, no health/provider probe | Required for this release's live bindings; reuse any applicable retained authorization only if it covers these exact operations |
 | A5 | Native protected updater rehearsal in a separately named isolated fixture root, with actual elevation and approved synthetic SQL target | Required after exact root/files/tool versions and effects are bound |
 | A6 | Publish mirror Bot and SQL branches/PRs, including the explicit mirror publication route | Authorized by explicit create-PR instruction; draft review must retain native/binding blockers. This does not approve merge or deployment. |
-| A7 | Merge the reviewed mirror/SQL work and promote an exact patch on a clean private-main-based branch; then merge the private PR | Required after review/CI and relevant qualification. Re-pin SQL if merge strategy changes the reviewed commit's ancestry; rerun affected qualification on changed bytes. |
+| A7 | Merge the reviewed mirror/SQL work and promote an exact patch on a clean private-main-based branch; then merge the private PR | Authorized by the subsequent explicit merge instruction, subject to final source review/CI. Native qualification remains a deployment gate. Re-pin SQL if merge strategy changes the reviewed commit's ancestry; rerun affected qualification on changed bytes. |
 | A8 | Install the authenticated updater upgrade on MINI_AMD, if required by verified installed capability | Separate approval; tool installation is not Bot deployment. No active release may be bypassed. |
 | A9 | Production preparation and final deployment of the exact private-main target, selected SQL profile and manifest/hash, in the agreed drained window | Required. `-PrepareOnly` creates/stages files and is not a no-write diagnostic. Approval must bind the actual package, targets, backup evidence and recovery plan. |
 | A10 | Bounded post-deployment acceptance and later cleanup | Acceptance observes the new runtime without replaying accepted business actions. Live mutation tests, historical disposition and artifact/database deletion require their own explicit scope. |
 
-A1/A2 can be agreed independently; A3 waits for concrete bindings. Before merge-ready
-publication, resolve B1–B5, preserve CI/security evidence and complete the agreed native
-checks. Publication, merge, installed-tool upgrade and deployment approvals are
+A1/A2 can be agreed independently; A3 waits for concrete bindings. Before executable
+release readiness, resolve B1–B5, preserve CI/security evidence and complete the agreed native
+checks. The subsequent A7 instruction permits source merge ahead of those operational gates.
+Publication, merge, installed-tool upgrade and deployment approvals are
 distinct; do not ask again for the already accepted MGE design direction.
 
 For production promotion, preserve private repository history: use a clean branch
