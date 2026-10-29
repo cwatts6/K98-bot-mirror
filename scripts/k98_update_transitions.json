@@ -2150,6 +2150,11 @@
           "after_sha256": "edd7811631f17c9dc503b9594e411b2fadc24f341b45f00d0a99c112b356ffe3"
         },
         {
+          "path": "mge/dal/mge_results_dal.py",
+          "before_sha256": "1e347fc134304f02b57b0d0f87b50a0d2964feb7de30c5a817f61f8b706d303b",
+          "after_sha256": "d65edd74bd66e4182e5afc46d77947a9b59566653cc3664ce68ab817b3db35da"
+        },
+        {
           "path": "mge/dal/mge_roster_dal.py",
           "before_sha256": "c3a6b613a6e2852a8f5887aea80f045b8ef51f9383cd99a1f7c6bb5296e1fcd1",
           "after_sha256": "bd106e672d195fb89522a215ad7a1bd9fd79476a677aa0ad909bfaaed8a363fa"

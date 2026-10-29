@@ -583,6 +583,7 @@ MGE_FINALISATION_PATHS = frozenset(
         "mge/dal/qualified_read.py",
         "mge/dal/mge_completion_dal.py",
         "mge/dal/mge_finalisation_dal.py",
+        "mge/dal/mge_results_dal.py",
         "mge/dal/mge_roster_dal.py",
         "mge/dal/mge_rules_dal.py",
         "mge/dal/mge_signup_dal.py",
