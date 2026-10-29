@@ -12,6 +12,13 @@ for accepted delivery and residual evidence. This pack is the focused source of
 truth; the [A2 scope](P1%20Batch%20A%20Remaining%20Discord%20Domain%20-%20Scope%20-%202026-10-28.md)
 owns subsequent domain adoption.
 
+The [native SQL and updater qualification packet](P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md)
+now pins the source targets, native checks and remaining approvals. Source review
+confirmed that the current combined updater cannot represent this table/trigger
+bundle and has no finalisation source transition or release profile. A bounded
+updater extension and exact release metadata are required before release rehearsal;
+this is additional release-authoring work, not merely an unexecuted test checklist.
+
 ## Scope and architecture
 
 MGE signups begin roughly seven days before an event. Ranks and targets remain

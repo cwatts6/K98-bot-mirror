@@ -810,6 +810,16 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 ## 29 October shared board lifecycle follow-ups
 
 ### Deferred Optimisation
+- Area: MGE-RELEASE-CAPABILITY; scripts/prepare_k98_update.py, installed source-transition registry, deploy/k98-release.json and SQL deploy/SqlDeploy.*Release.ps1
+- Type: architecture
+- Description: The completed local MGE finalisation schema requires rowversion/defaults, an ordinary work index and three new triggers, which neither existing combined-updater profile represents. There is no MGE release profile or installed exact source transition. This is a release blocker, not a security finding or optional cleanup.
+- Suggested Fix: Implement the bounded release-authoring slice and native checks in the [qualification packet](../task_packs/P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md), reusing existing ownership, ledger, atomicity and resume contracts. Bind actual predecessor/tool/environment observations before packaging; preserve historical registry entries and uncertain outcomes.
+- Impact: high
+- Risk: high
+- Dependencies: Explicit release-authoring scope approval, disposable native target approval, separate Bot/SQL Changes reviews, actual installed-tool bindings and coordinated drained rollout.
+- Status: Captured and implementation-ready for approval; no updater capability or live SQL change made by packet preparation.
+
+### Deferred Optimisation
 - Area: A2-ARK-FINAL; ark/ark_scheduler.py, ark/dal/ark_dal.py, registration/confirmation/team delivery and rehydrate_views.py
 - Type: architecture
 - Description: Past Scheduled/Locked rows can remain refresh-eligible because the fallback completion call is fed only Completed rows. Final delivery uses timestamps and a seven-day lookback, with no per-target generation proof. Static source evidence does not establish live old-record counts.

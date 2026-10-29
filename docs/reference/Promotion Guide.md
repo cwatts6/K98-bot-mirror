@@ -1,5 +1,11 @@
 # K98 promotion and deployment — operator runbook
 
+For the local MGE finalisation release, use the [qualification packet](../task_packs/P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).
+The current combined updater cannot represent its rowversion/default/index/trigger
+bundle. A reviewed capability extension, exact profile/descriptor and installed
+source transition are required before preparation; do not apply the SQL manually
+or treat the existing KVK descriptor as MGE release authority.
+
 > **Current status — 29 October 2026:** A1b and its updater correction are
 > operator-reported deployed, with the bounded Report63 acceptance and residuals
 > in the [A1b closeout](../task_packs/P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).

@@ -1,5 +1,9 @@
 # Task Packs
 
+Current MGE release preparation: [native SQL and updater qualification packet](P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).
+This names the exact local targets, unsupported updater capabilities, native check
+matrix and separate publication/deployment approvals; no execution is authorized.
+
 > **Current MGE checkpoint — 29 October 2026:** A1b and its updater correction are
 > delivered; Report63 verifies the exercised actions and response-before-refresh
 > ordering. Exact running SHA remains operator-reported. See the [deployed closeout](P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).
