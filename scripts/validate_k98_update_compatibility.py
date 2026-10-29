@@ -14,6 +14,7 @@ import subprocess
 from scripts.prepare_k98_update import (
     TOOL_SOURCE_PATHS,
     check_case_aliases,
+    check_mge_release_binding,
     check_source_only,
     check_transition_inventory,
     coordinated_policy,
@@ -47,6 +48,7 @@ def classify(
             raise ValueError("Bounded unique changed paths required.")
         check_case_aliases(set(paths) | set(inventory_paths or ()))
         check_transition_inventory(paths, read_blob, before, target, admitted=admitted)
+        check_mge_release_binding(before, target, paths, read_blob)
     except ValueError as exc:
         blockers.append(str(exc))
     if installed_tool is not None:

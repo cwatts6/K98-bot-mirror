@@ -45,7 +45,11 @@ SQL_TOOLS = ("Deploy-SqlMigration.ps1", "SqlDeploy.ModuleRelease.ps1")
 
 DRAINED_ISSUER_TRANSITION_PATHS = frozenset({"scripts/run_export_startup_issuer.py"})
 STARTUP_CACHE_COMPLETION_PATHS = frozenset(
-    {"bot_instance.py", "core/startup_diagnostics.py", "services/player_stats_startup.py"}
+    {
+        "bot_instance.py",
+        "core/startup_diagnostics.py",
+        "services/player_stats_startup.py",
+    }
 )
 CONFIGURATION_READ_REQUEST_PATHS = frozenset(
     {
@@ -570,6 +574,32 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+MGE_FINALISATION_PATHS = frozenset(
+    {
+        "commands/mge_cmds.py",
+        "core/board_lifecycle.py",
+        "core/owned_work.py",
+        "core/operation_outcome.py",
+        "mge/dal/qualified_read.py",
+        "mge/dal/mge_completion_dal.py",
+        "mge/dal/mge_finalisation_dal.py",
+        "mge/dal/mge_roster_dal.py",
+        "mge/dal/mge_rules_dal.py",
+        "mge/dal/mge_signup_dal.py",
+        "mge/mge_completion_service.py",
+        "mge/mge_embed_manager.py",
+        "mge/mge_finalisation.py",
+        "mge/mge_publish_service.py",
+        "mge/mge_recovery.py",
+        "mge/mge_scheduler.py",
+        "mge/mge_board_ownership.py",
+        "mge/mge_board_preparation.py",
+        "mge/mge_refresh_work.py",
+        "ui/views/mge_admin_completion_view.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -577,12 +607,12 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 102400:
+    if len(raw) > 110592:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 51:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 52:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -590,12 +620,16 @@ def reviewed_transitions():
             raise ValueError("Exact installed transition required.")
         # These larger reviewed families are indivisible; other bounds remain 16.
         member_limit = (
-            len(COORDINATION_LIFECYCLE_PATHS)
-            if item["id"] == "coordination_lifecycle_v1"
+            len(MGE_FINALISATION_PATHS)
+            if item["id"] == "p1_mge_finalisation_v1"
             else (
-                len(MGE_A1B_PATHS)
-                if item["id"] == "p1_mge_a1b_v1"
-                else len(MGE_LIFECYCLE_PATHS) if item["id"] == "p1_mge_lifecycle_v1" else 16
+                len(COORDINATION_LIFECYCLE_PATHS)
+                if item["id"] == "coordination_lifecycle_v1"
+                else (
+                    len(MGE_A1B_PATHS)
+                    if item["id"] == "p1_mge_a1b_v1"
+                    else (len(MGE_LIFECYCLE_PATHS) if item["id"] == "p1_mge_lifecycle_v1" else 16)
+                )
             )
         )
         if item["id"] in identities or not 1 <= len(item["members"]) <= member_limit:
@@ -665,6 +699,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_mge_final = (
+                item["id"] == "p1_mge_finalisation_v1" and path in MGE_FINALISATION_PATHS
             )
             fixed_mge_a1b = item["id"] == "p1_mge_a1b_v1" and path in MGE_A1B_PATHS
             fixed_mge_a1a = item["id"] == "p1_mge_a1a_v1" and path in MGE_A1A_PATHS
@@ -757,6 +794,7 @@ def reviewed_transitions():
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
+                    or fixed_mge_final
                     or fixed_mge_a1b
                     or fixed_mge_a1a
                     or fixed_mge_lifecycle
@@ -886,6 +924,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p1_mge_finalisation_v1" and paths != MGE_FINALISATION_PATHS:
+            raise ValueError("Complete fixed MGE finalisation transition required.")
         if item["id"] == "p1_mge_a1b_v1" and paths != MGE_A1B_PATHS:
             raise ValueError("Complete fixed MGE A1b transition required.")
         if item["id"] == "p1_mge_a1a_v1" and paths != MGE_A1A_PATHS:
@@ -1026,6 +1066,7 @@ def validate_combined_description(raw):
     if value["version"] != 1 or value["profile"] not in {
         "module_grants_v1",
         "additive_tables_v1",
+        "mge_finalisation_v1",
     }:
         raise ValueError("Unsupported combined SQL profile; no drain requested.")
     predecessors = value["bot_predecessors"]
@@ -1059,11 +1100,84 @@ def validate_combined_description(raw):
     return value
 
 
+def validate_mge_profile(profile, migration_id):
+    """Fixed schema family; environment bindings only, never target-supplied DDL."""
+    if (
+        not isinstance(profile, dict)
+        or set(profile)
+        != {
+            "version",
+            "profile",
+            "migration_id",
+            "database_collation",
+            "tempdb_collation",
+            "compatibility_level",
+            "requires",
+        }
+        or type(profile["version"]) is not int
+        or profile["version"] != 1
+        or profile["profile"] != "mge_finalisation_v1"
+        or profile["migration_id"] != migration_id
+        or not isinstance(migration_id, str)
+        or not re.fullmatch(r"[0-9]{8}_[0-9]{3}_[a-z0-9_]+", migration_id)
+        or type(profile["compatibility_level"]) is not int
+        or profile["compatibility_level"] not in {130, 140, 150, 160}
+        or any(
+            not isinstance(profile[k], str) or not re.fullmatch(r"[A-Za-z0-9_]{1,128}", profile[k])
+            for k in ("database_collation", "tempdb_collation")
+        )
+        or not isinstance(profile["requires"], list)
+        or len(profile["requires"]) > 64
+    ):
+        raise ValueError("Exact bounded MGE profile required.")
+    seen = set()
+    for dependency in profile["requires"]:
+        if (
+            not isinstance(dependency, dict)
+            or set(dependency) != {"migration_id", "sha256", "status"}
+            or not isinstance(dependency["migration_id"], str)
+            or not re.fullmatch(r"[0-9]{8}_[0-9]{3}_[A-Za-z0-9_]+", dependency["migration_id"])
+            or dependency["migration_id"] in seen
+            or not isinstance(dependency["sha256"], str)
+            or not re.fullmatch(r"[a-f0-9]{64}", dependency["sha256"])
+            or dependency["status"] not in ("Applied", "Failed")
+        ):
+            raise ValueError("Exact unique MGE predecessor history required.")
+        seen.add(dependency["migration_id"])
+    return profile
+
+
+def check_mge_release_binding(before, target, changes, read_blob):
+    """Initial finalisation adoption must install its SQL through the combined runner."""
+    introduced = {
+        "core/board_lifecycle.py",
+        "mge/dal/mge_finalisation_dal.py",
+        "mge/mge_finalisation.py",
+    }
+    if not any(
+        path in changes and read_blob(before, path) is None and read_blob(target, path) is not None
+        for path in introduced
+    ):
+        return
+    raw = read_blob(target, RELEASE_DESCRIPTION)
+    if raw is None or raw == read_blob(before, RELEASE_DESCRIPTION):
+        raise ValueError("MGE finalisation requires a changed, bound combined SQL descriptor.")
+    description = combined_description(raw, before)
+    if description["profile"] != "mge_finalisation_v1" or len(description["migrations"]) != 1:
+        raise ValueError("MGE finalisation requires its single fixed SQL profile.")
+
+
 def combined_payload(description, read_sql_blob, *, protected_objects=(), protected_principals=()):
     """Flatten only the explicit pinned profile/modules; preserve all SQL bytes."""
     files = {}
     sql_tools = SQL_TOOLS + (
-        ("SqlDeploy.TableRelease.ps1",) if description["profile"] == "additive_tables_v1" else ()
+        ("SqlDeploy.TableRelease.ps1", "SqlDeploy.MgeFinalisation.ps1")
+        if description["profile"] == "mge_finalisation_v1"
+        else (
+            ("SqlDeploy.TableRelease.ps1",)
+            if description["profile"] == "additive_tables_v1"
+            else ()
+        )
     )
     for name in sql_tools:
         raw = read_sql_blob("deploy/" + name)
@@ -1079,6 +1193,25 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
         if not raw or len(raw) > 1024 * 1024 or sha256(raw) != migration["sha256"]:
             raise ValueError(f"SQL profile differs from reviewed description: {name}")
         p = json.loads(raw)
+        if description["profile"] == "mge_finalisation_v1":
+            validate_mge_profile(p, migration["id"])
+            objects = {
+                "dbo.mge_boardfinalisation",
+                "dbo.tr_mge_events_frozen",
+                "dbo.tr_mge_awards_frozen",
+                "dbo.tr_mge_signups_frozen",
+                "dbo.mge_events",
+                "dbo.mge_awards",
+                "dbo.mge_signups",
+            }
+            if objects & (modules | protected_objects):
+                raise ValueError("Repeated or protected MGE schema family.")
+            modules.update(objects)
+            if name in files:
+                raise ValueError("SQL profile filename collision.")
+            files[name] = raw
+            profiles.append(dict(id=migration["id"], file=name, sha256=sha256(raw)))
+            continue
         if description["profile"] == "additive_tables_v1":
             expected = {
                 "version",
@@ -1280,7 +1413,13 @@ def check_source_only(paths, *, tool_copies=(), read_blob=None, before=None, tar
             raise ValueError(f"Release includes a bootstrap-forbidden import artifact: {path}")
         if lower.startswith(
             ("requirements", "sql/", "migrations/", "config/", ".env")
-        ) or lower in {"pyproject.toml", "poetry.lock", "uv.lock", "pipfile", "pipfile.lock"}:
+        ) or lower in {
+            "pyproject.toml",
+            "poetry.lock",
+            "uv.lock",
+            "pipfile",
+            "pipfile.lock",
+        }:
             raise ValueError(f"Release includes a non-source contract change: {path}")
 
 
@@ -1363,6 +1502,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     coordinated = policy.selected(before, target, changes, read_blob) if policy else None
     admitted = {r["path"] for r in coordinated["sources"]} if coordinated else set()
     check_transition_inventory(changes, read_blob, before, target, admitted=admitted)
+    check_mge_release_binding(before, target, changes, read_blob)
     check_source_only(
         [p for p in changes if p not in admitted],
         tool_copies=tool_sources,
@@ -1481,7 +1621,10 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
             raw = raw.replace(b"\r\n", b"\n").replace(b"\n", conventions[path])
         if sha256(raw) != digest:
             raise ValueError(f"Target inventory omitted changed source: {path}")
-    return dict(before=before, target=target, source_members=members, new_pins=pins), payload
+    return (
+        dict(before=before, target=target, source_members=members, new_pins=pins),
+        payload,
+    )
 
 
 def release_seed(previous, pins, gate, *, policy_path=None, policy_sha256=None):
@@ -1646,7 +1789,10 @@ def prepare_update(
     if recovery:
         files["Verify-RecoverySeed.py"] = (tools / "recovery_release_seed.py").read_bytes()
         config["extra_members"].append(
-            dict(name="Verify-RecoverySeed.py", sha256=sha256(files["Verify-RecoverySeed.py"]))
+            dict(
+                name="Verify-RecoverySeed.py",
+                sha256=sha256(files["Verify-RecoverySeed.py"]),
+            )
         )
     # Flat payload names keep the runner's bounded inventory and avoid archive
     # extraction. Every target path is separately validated by the adapter.

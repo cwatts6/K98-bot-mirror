@@ -1,13 +1,63 @@
 # MGE finalisation: native SQL and updater qualification packet
 
-Prepared 29 October 2026. **Preparation only; not an executable release or approval
-to connect to SQL, create a database, install an updater, publish, merge or deploy.**
+Prepared 29 October 2026; updated after the bounded implementation approval.
+**Review candidate; not an executable production release.** A1 implementation,
+A2 read-only local discovery and A6 review-PR publication/comment management are
+now authorized. Database creation/writes, merge, updater installation and deployment
+remain behind their separate approvals.
 The approved MGE implementation direction remains accepted. This packet defines
 the additional work and evidence needed to release it; it does not reopen that
 direction or repeat accepted A1b operations.
 
-**Verdict: do not promote or deploy yet.** The remaining work includes an updater
-capability extension, not just running tests. Native SQL execution has not occurred.
+**Verdict: do not promote or deploy yet.** The bounded updater extension and native
+harness have been authored. Production bindings and native write qualification
+remain outstanding. Only SELECT-based SQL discovery has executed.
+
+## Approved implementation follow-up
+
+The SQL branch now supplies `mge_finalisation_v1` through the existing release
+lock/attempt/transaction/receipt protocol. Its fixed five batches create only the
+finalisation table/index and three freeze triggers, with absent preimages and
+independent structural/trigger postimages. Profiles cannot supply arbitrary SQL,
+objects or grants. Existing migration bytes remain unchanged; partial/manual
+installations are refused.
+
+The Bot updater adds one exact 20-member finalisation transition (14 changed runtime
+members and six unchanged dependencies), preserving all 51 historical entries.
+The registry permits 52 entries and 110592 bytes. Initial finalisation adoption
+requires a changed MGE combined descriptor: the unchanged old KVK descriptor cannot
+admit this code as a source-only update. Profile/descriptor authoring helpers require
+explicit observed bindings. No production descriptor or profile is invented before A4.
+
+The SQL native harness defaults to SELECT-only discovery. Its explicit write mode
+requires a separately approved, already-created empty SIMPLE database, exact login,
+creation timestamp/files/backup, collations/compatibility, clean source commits,
+approval-byte SHA256 and matching environment opt-in. It never creates/drops a
+database. Named child interruption targets only handles created by that run. Actual
+DAL/SqlClient/pyodbc cases retain results and refuse blind replay or cleanup.
+
+Read-only discovery verified `9SX2VF4\K98DEV` via `lpc:localhost\K98DEV`, version
+16.0.1210.3; server/tempdb collation is `SQL_Latin1_General_CP1_CI_AS`.
+`K98_MGE_Finalisation_Qualification_20261029_A` does not exist. Data/log directory:
+`C:\Program Files\Microsoft SQL Server\MSSQL16.K98DEV\MSSQL\DATA\`; approximately
+1.60 TB free was observed. Proposed files are the database name plus `.mdf`/`.ldf`.
+Backup directory: `C:\Program Files\Microsoft SQL Server\MSSQL16.K98DEV\MSSQL\Backup`;
+its access/capacity remains unverified. The harness proposes
+`K98_MGE_Finalisation_Qualification_20261029_A_qualification.bak` there. Private
+evidence retains the exact integrated login; it is not published to the mirror.
+Creation timestamp and actual database collation/compatibility cannot be observed
+until separately approved creation. No other database was modified.
+
+Offline SQL evidence: 14 guard/import tests and native PowerShell 5.1 parser/profile
+construction/dispatch/hash checks passed. A reserved discovery-query alias was
+corrected after a read-only syntax failure; the harness's SELECT-only discovery
+then passed. All N00–N16 write exercises and protected Windows U05–U13 remain NOT RUN.
+The existing combined-updater tools supply the protected stage rehearsal after A5;
+the new SQL harness does not claim Windows custody or end-to-end deployment evidence.
+
+The original fingerprint JSON below remains a dated preparation snapshot, not the
+new updater's current fingerprints or a deployment manifest. Final review commits,
+CI/security results and native bindings must be retained separately.
 
 Read with the [implementation and validation record](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md),
 [Promotion Guide](../reference/Promotion%20Guide.md),
@@ -113,8 +163,8 @@ Bind every connection explicitly to this database and validate server, database
 and approved login on that same connection before any mutation. Never load a
 production `.env`, launch the bot, invoke calendar sync, or contact Discord/Sheets.
 Exercise real DAL callbacks with an injected native connection; Discord adapters
-remain fakes. The native harness is **to be authored and reviewed**, not supplied
-or executed by this packet. Existing KVK table/module rehearsal scripts are
+remain fakes. The native harness is now authored in the SQL review branch; its write mode has
+not executed. The implementation follow-up above supersedes the original proposal. Existing KVK table/module rehearsal scripts are
 reference patterns; their target guards and fixture domains do not qualify MGE.
 
 ## 4. Native SQL check matrix
@@ -156,7 +206,8 @@ Recommended approach: extend the existing bounded combined updater and SQL
 ledger protocol for this exact table/index/trigger family. Reuse exclusive release
 ownership, immutable intents, authoritative verification and safe resume. Do not
 invent a second MGE scheduler, a generic arbitrary-SQL executor, or a one-off live
-patch launcher. This is a proposed implementation scope requiring approval.
+patch launcher. This bounded implementation scope is now approved; production bindings and native
+execution remain separately gated.
 
 Its reviewed contract must cover:
 
@@ -220,12 +271,12 @@ for a new capability. Record every command, interpreter, exact target and exit c
 | Gate | Concrete approval / prerequisite | Current status |
 |---|---|---|
 | A0 | Prepare this packet, source checks and local documentation | Authorized; completed locally |
-| A1 | Implement the bounded release capability, MGE profile/descriptor/source transition and native harness described in sections 4–6, with per-repo Changes reviews | Required; not implied by packet preparation. Existing MGE feature approval remains valid. |
-| A2 | Bounded read-only local SQL target discovery: server identity, proposed DB absence, defaults/storage, login, version/collations/isolation; no fixture creation or production access | Required for this qualification target |
+| A1 | Implement the bounded release capability, MGE profile/descriptor/source transition and native harness described in sections 4–6, with per-repo Changes reviews | Authorized in the current instruction; implemented for review. Existing MGE feature approval remains valid. |
+| A2 | Bounded read-only local SQL target discovery: server identity, proposed DB absence, defaults/storage, login, version/collations/isolation; no fixture creation or production access | Authorized and completed; SELECT only, target absent, backup storage verification outstanding |
 | A3 | Create/write the exact disposable database and exact observed file/backup paths; synthetic fixtures, two-session races, named fixture-child termination and retained artifacts | Required after A2 binds the missing values and the harness is reviewable |
 | A4 | Bounded MINI_AMD read-only inventory: installed Bot SHA/tool manifest/policy/receipts/custody; SQL identity/schema/permissions/ledger/backup observations, no health/provider probe | Required for this release's live bindings; reuse any applicable retained authorization only if it covers these exact operations |
 | A5 | Native protected updater rehearsal in a separately named isolated fixture root, with actual elevation and approved synthetic SQL target | Required after exact root/files/tool versions and effects are bound |
-| A6 | Publish mirror Bot and SQL branches/PRs, including the explicit mirror publication route | Required. Draft PRs may be published earlier if explicitly approved and clearly blocked; passing native tests is not a prerequisite to honestly labelled draft review. |
+| A6 | Publish mirror Bot and SQL branches/PRs, including the explicit mirror publication route | Authorized by explicit create-PR instruction; draft review must retain native/binding blockers. This does not approve merge or deployment. |
 | A7 | Merge the reviewed mirror/SQL work and promote an exact patch on a clean private-main-based branch; then merge the private PR | Required after review/CI and relevant qualification. Re-pin SQL if merge strategy changes the reviewed commit's ancestry; rerun affected qualification on changed bytes. |
 | A8 | Install the authenticated updater upgrade on MINI_AMD, if required by verified installed capability | Separate approval; tool installation is not Bot deployment. No active release may be bypassed. |
 | A9 | Production preparation and final deployment of the exact private-main target, selected SQL profile and manifest/hash, in the agreed drained window | Required. `-PrepareOnly` creates/stages files and is not a no-write diagnostic. Approval must bind the actual package, targets, backup evidence and recovery plan. |
@@ -279,7 +330,9 @@ and ownership verification; unknown/live/mismatched state remains stopped.
 
 ## 10. Packet validation and evidence boundary
 
-This change adds documentation and a source-fingerprint manifest only. No runtime,
+The original packet commit added documentation and a source-fingerprint manifest only.
+The implementation follow-up above has a separate runtime/test/security review; the
+following validation paragraph describes only the original preparation delta. No runtime,
 SQL definition, updater registry, descriptor or installed state changes. Apply the
 security-routing documentation-only skip to this exact packet delta; do not rerun
 the completed source scans or infer any whole-repository/deep audit requirement.
