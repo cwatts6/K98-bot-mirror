@@ -31,9 +31,10 @@ def description(p):
     )
 
 
-def test_exact_registry_pins_all_twenty_runtime_members():
+def test_exact_registry_pins_all_runtime_members_including_results_import():
     item = next(t for t in updater.reviewed_transitions() if t["id"] == "p1_mge_finalisation_v1")
     assert {m["path"] for m in item["members"]} == updater.MGE_FINALISATION_PATHS
+    assert "mge/dal/mge_results_dal.py" in updater.MGE_FINALISATION_PATHS
     for member in item["members"]:
         raw = (Path(__file__).resolve().parents[1] / member["path"]).read_bytes()
         assert updater.sha256(raw.replace(b"\r\n", b"\n")) == member["after_sha256"]

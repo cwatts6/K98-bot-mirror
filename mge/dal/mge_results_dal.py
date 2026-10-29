@@ -92,6 +92,7 @@ def create_import_batch(
                 EventId, EventMode, SourceType, Filename, FileHashSha256,
                 ImportStatus, ActorDiscordId, DetailsJson, CreatedUtc, UpdatedUtc
             )
+            OUTPUT INSERTED.ImportId
             VALUES (?, ?, ?, ?, ?, 'started', ?, ?, ?, ?)
             """,
             (
@@ -106,10 +107,9 @@ def create_import_batch(
                 now,
             ),
         )
-        cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS ImportId")
         row = cursor.fetchone()
-        if not row:
-            raise RuntimeError("create_import_batch failed: SCOPE_IDENTITY returned no row.")
+        if not row or row[0] is None:
+            raise RuntimeError("create_import_batch failed: INSERT returned no ImportId.")
         return int(row[0])
 
     val = exec_with_cursor(_tx)
