@@ -144,6 +144,27 @@ async def test_retirement_uses_preview_version_and_keeps_message(scene):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("actor_id,source", [(123, "admin_view"), (None, "scheduler")])
+async def test_completion_keeps_origin_in_audit_log(scene, monkeypatch, caplog, actor_id, source):
+    from mge import mge_embed_manager as manager
+    from mge.dal import mge_event_dal
+    from mge.mge_refresh_work import RefreshCoordinator
+
+    monkeypatch.setattr(manager, "_refreshes", RefreshCoordinator())
+    monkeypatch.setattr(mge_event_dal, "fetch_event_for_embed", lambda *a, **k: scene.event)
+    monkeypatch.setattr(
+        mge_completion_dal, "fetch_event_completion_context", lambda _: {"Status": "published"}
+    )
+    monkeypatch.setattr(mge_completion_dal, "mark_event_completed", lambda **kwargs: True)
+    with caplog.at_level("INFO", logger="mge.mge_completion_service"):
+        result = await final.finalise_event(scene.bot, 1, actor_id=actor_id, complete=True)
+    record = next(record for record in caplog.records if record.message == "mge_event_complete")
+    assert record.source == source
+    assert record.actor_discord_id == actor_id
+    assert result["domain_completed"]
+
+
+@pytest.mark.asyncio
 async def test_finalisation_waits_for_inflight_refresh_and_drains_cancellation(scene, monkeypatch):
     from mge import mge_embed_manager as manager
     from mge.dal import mge_event_dal

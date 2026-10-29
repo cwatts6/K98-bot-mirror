@@ -322,7 +322,6 @@ def register_mge(bot: ext_commands.Bot) -> None:
             adapter=MgePublishDiscordAdapter(ctx.bot),
             event_id=event_id,
             actor_discord_id=int(ctx.user.id),
-            allow_completed=event_id is not None,
         )
         text = ("OK: " if result.success else "Error: ") + result.message
         if result.event_id is not None:

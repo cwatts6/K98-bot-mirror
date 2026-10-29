@@ -2,7 +2,7 @@
   {
     "path": "commands/mge_cmds.py",
     "before": "3a5282f7899395511a0c3fe9c8bc380a4f6953ad700b5c4bc46ed02a01007109",
-    "after": "6413d20de593023f5d049f9d8449ed9bff9181a9f7fbca3bde25819131fdb6ce"
+    "after": "6c075e925609812736762c13fffa1b1aa67846c057927d2b05b4392fd9a8f1cb"
   },
   {
     "path": "mge/dal/mge_completion_dal.py",
@@ -37,7 +37,7 @@
   {
     "path": "mge/mge_publish_service.py",
     "before": "7d7bb853e450a787adefd358ac30c1b5f3105caa23c67881e861adfaf60fb6d9",
-    "after": "410c4c0c8c64b15a55834eacfeebf9769816579cccbf511fb97959307a9c6449"
+    "after": "cc005808efb2adbb7f636fae3f0b0be8f25509400b08262c0e982a6a1c55b24a"
   },
   {
     "path": "mge/mge_recovery.py",

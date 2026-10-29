@@ -182,7 +182,12 @@ async def finalise_event(bot, event_id, *, actor_id=None, complete=False):
     async def owned():
         async with presentation_owner(bot, event_id):
             if complete:
-                result = await drain_thread(complete_event, event_id, actor_discord_id=actor_id)
+                result = await drain_thread(
+                    complete_event,
+                    event_id,
+                    actor_discord_id=actor_id,
+                    source="admin_view" if actor_id is not None else "scheduler",
+                )
                 if not result.get("ok"):
                     return {"domain_completed": False, "states": {}}
             event = await drain_thread(fetch_event_for_embed, event_id, strict=True)

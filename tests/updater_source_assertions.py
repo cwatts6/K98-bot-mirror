@@ -29,7 +29,7 @@ def before_finalisation_hash(root, path):
     raw = fixture.read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "082cca78287c52c48e96b8369cd3a10ff14332c09b21efaec70c2e1b65032318"
+        == "26913524929d935e19dbb47922cbfbfa2a763065985383d0be045048efd76675"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:

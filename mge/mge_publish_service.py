@@ -807,7 +807,6 @@ async def refresh_award_reminders(
     adapter: MgePublishIoAdapter,
     event_id: int | None,
     actor_discord_id: int,
-    allow_completed: bool = False,
     now_utc: datetime | None = None,
 ) -> RefreshAwardRemindersResult:
     """Refresh the persisted award-reminders post without reallocating awards."""

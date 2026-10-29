@@ -2122,7 +2122,7 @@
         {
           "path": "commands/mge_cmds.py",
           "before_sha256": "3a5282f7899395511a0c3fe9c8bc380a4f6953ad700b5c4bc46ed02a01007109",
-          "after_sha256": "6413d20de593023f5d049f9d8449ed9bff9181a9f7fbca3bde25819131fdb6ce"
+          "after_sha256": "6c075e925609812736762c13fffa1b1aa67846c057927d2b05b4392fd9a8f1cb"
         },
         {
           "path": "core/board_lifecycle.py",
@@ -2192,12 +2192,12 @@
         {
           "path": "mge/mge_finalisation.py",
           "before_sha256": null,
-          "after_sha256": "ad98169e3b89cd61ff0b22b95fc6226218ea84944563ef39713a5b6c7e9dd501"
+          "after_sha256": "ebb29e5b2b5e67cb9cba4235edf3be3a66b22c25e387621a292ac876af4a1c7d"
         },
         {
           "path": "mge/mge_publish_service.py",
           "before_sha256": "7d7bb853e450a787adefd358ac30c1b5f3105caa23c67881e861adfaf60fb6d9",
-          "after_sha256": "410c4c0c8c64b15a55834eacfeebf9769816579cccbf511fb97959307a9c6449"
+          "after_sha256": "cc005808efb2adbb7f636fae3f0b0be8f25509400b08262c0e982a6a1c55b24a"
         },
         {
           "path": "mge/mge_recovery.py",
