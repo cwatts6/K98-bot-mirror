@@ -1,0 +1,22 @@
+[
+  {
+    "path": "bot_instance.py",
+    "before": "d9ccf92cd8435493e48a4ccb997335f569aa2e7db9e47eb845bd628eb0b03b95",
+    "after": "41eb1787fcfd4864fcd14b3d99e33243f94e9b2e97cbd9c80a4e813e17863fb0"
+  },
+  {
+    "path": "core/interaction_safety.py",
+    "before": "d8212d6e8f591b4d65ad7e03349c17c506d720e42ff428340e9b10f97ae1e331",
+    "after": "9142fd9cebcb475582d7ff8b5b74fb7dd9dffd1c02af81e08ad70206241e7c7c"
+  },
+  {
+    "path": "services/event_delivery_service.py",
+    "before": "74f1fb2309fa0150919a9d82338ee1d446262031a0c074b3279fd541dbc88779",
+    "after": "797ef4e3745f4c6357f96334012057d25afa7edde21db6a15961ab23caddb87b"
+  },
+  {
+    "path": "services/legacy_export_snapshot_service.py",
+    "before": "32e0183cf71a7c10ea1846f3ea1436732bb7ee014588a0ac10eec3359ab20400",
+    "after": "d1de03902ddbecbee8dd341c49c2af7fa73c75a351528986899cff9adfe52890"
+  }
+]
