@@ -1,0 +1,464 @@
+from types import SimpleNamespace
+
+import pytest
+
+from core.discord_embed_limits import require_valid_embed_payload
+from core.operator_diagnostic_payloads import (
+    DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES,
+    iter_redacted_diagnostic_line_pairs,
+    neutralize_discord_mentions,
+    omission_marker,
+    pack_complete_units,
+    redact_diagnostic_lines,
+    redact_diagnostic_text,
+    resolve_attachment_size_limit,
+    safe_attachment_filename,
+    safe_diagnostic_content,
+    utf8_size,
+)
+
+
+def test_complete_unit_packing_exact_boundary_and_one_over() -> None:
+    exact = pack_complete_units(["A" * 20], limit=20, label="rows")
+    over = pack_complete_units(["A" * 21], limit=20, label="rows")
+
+    assert exact.text == "A" * 20
+    assert exact.shown == 1
+    assert exact.omitted == 0
+    assert over.shown == 0
+    assert over.omitted == 1
+    assert "1 row not shown" in over.text
+    assert "A" not in over.text
+
+
+def test_complete_unit_packing_reserves_truthful_omission_marker() -> None:
+    packed = pack_complete_units(["first", "second", "X" * 200], limit=45, label="rows")
+
+    assert packed.shown == 2
+    assert packed.omitted == 1
+    assert packed.text.splitlines() == ["first", "second", "… 1 row not shown."]
+
+
+def test_redaction_is_consistent_for_preview_and_attachment_text() -> None:
+    source = (
+        "Authorization: Bearer abc.def\n"
+        "password=hunter2;server=db\n"
+        "https://example.test/file?X-Amz-Signature=abc123&part=1"
+    )
+
+    redacted = redact_diagnostic_text(source)
+
+    assert "abc.def" not in redacted
+    assert "hunter2" not in redacted
+    assert "abc123" not in redacted
+    assert redacted.count("[REDACTED]") == 3
+    assert redacted.splitlines()[1].endswith(";server=db")
+
+
+def test_redaction_consumes_quoted_keys_and_complete_quoted_values() -> None:
+    source = (
+        '{"token": "live-secret", "Authorization": "Bearer auth secret"}\n'
+        'token="secret with spaces"\n'
+        "'client_secret': 'another spaced secret'\n"
+        'password="escaped \\" secret"'
+    )
+
+    redacted = redact_diagnostic_text(source)
+
+    for secret in (
+        "live-secret",
+        "auth secret",
+        "secret with spaces",
+        "another spaced secret",
+        "escaped",
+    ):
+        assert secret not in redacted
+    assert redacted.count("[REDACTED]") == 5
+    assert '{"token": "[REDACTED]"' in redacted
+    assert '"Authorization": "[REDACTED]"' in redacted
+
+
+@pytest.mark.parametrize(
+    ("source", "secret"),
+    [
+        ("OPENAI_API_KEY=sk-test_dummy", "sk-test_dummy"),
+        ("SQL_PASSWORD: db-pass_dummy", "db-pass_dummy"),
+        ("ARTIFACT_UPLOAD_TOKEN = upload_dummy", "upload_dummy"),
+        ("SERVICE__ACCESS_TOKEN=access_dummy", "access_dummy"),
+        ('"OPENAI_API_KEY": "sk-test_dummy"', "sk-test_dummy"),
+        ("'SQL_PASSWORD'='db pass dummy'", "db pass dummy"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("Authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("HTTP_AUTHORIZATION=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("PROXY_AUTHORIZATION=Bearer proxy-token", "proxy-token"),
+        ("Authorization: Bot discord-production-token", "discord-production-token"),
+        (
+            'Authorization: Digest username="operator", response="digest-secret"',
+            "digest-secret",
+        ),
+        (
+            "Authorization: AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE,Signature=abc123",
+            "abc123",
+        ),
+        (
+            '"Authorization": AWS4-HMAC-SHA256 Credential=AKIAQUOTED,Signature=quoted-signature',
+            "quoted-signature",
+        ),
+        ("AWS_SECRET_ACCESS_KEY=aws-secret-value", "aws-secret-value"),
+        ("AWS_ACCESS_KEY_ID=AKIAEXAMPLE", "AKIAEXAMPLE"),
+        ("SIGNING_PRIVATE_KEY=private-key-value", "private-key-value"),
+        ("authorization : basic dXNlcjpwYXNz==; next=ok", "dXNlcjpwYXNz=="),
+        ('token="unterminated spaced secret', "unterminated spaced secret"),
+        ('{"client_secret": "unterminated json secret', "unterminated json secret"),
+        ('"Authorization": "unterminated auth secret', "unterminated auth secret"),
+        ('OPENAI_API_KEY="escaped \\" quote still secret', "quote still secret"),
+    ],
+)
+def test_redaction_covers_prefixed_keys_basic_auth_and_unterminated_quotes(
+    source: str, secret: str
+) -> None:
+    redacted = redact_diagnostic_text(source)
+
+    assert secret not in redacted
+    assert redacted.count("[REDACTED]") == 1
+    assert redact_diagnostic_text(redacted) == redacted
+
+
+def test_unterminated_quoted_redaction_is_line_bounded() -> None:
+    source = "SQL_PASSWORD='unterminated secret\r\nSQL_SERVER=db.internal"
+
+    redacted = redact_diagnostic_text(source)
+
+    assert redacted == "SQL_PASSWORD='[REDACTED]\r\nSQL_SERVER=db.internal"
+
+
+def test_basic_authorization_redaction_preserves_following_diagnostic_unit() -> None:
+    source = "authorization : basic dXNlcjpwYXNz==; next=ok"
+
+    assert redact_diagnostic_text(source) == "authorization : [REDACTED]; next=ok"
+
+
+def test_complete_multiline_quoted_redaction_preserves_physical_lines() -> None:
+    source = 'token="first\r\nsecond"\nstatus=healthy'
+
+    redacted = redact_diagnostic_text(source)
+
+    assert redacted == 'token="[REDACTED]\r\n[REDACTED]"\nstatus=healthy'
+    assert redacted.count("\n") == source.count("\n")
+    assert redact_diagnostic_text(redacted) == redacted
+
+
+def test_line_oriented_redaction_joins_before_multiline_secret_matching() -> None:
+    source = ['SIGNING_PRIVATE_KEY="first-secret', 'second-secret"', "status=healthy"]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        'SIGNING_PRIVATE_KEY="[REDACTED]',
+        '[REDACTED]"',
+        "status=healthy",
+    ]
+    assert "first-secret" not in "\n".join(redacted)
+    assert "second-secret" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_covers_folded_authorization_values() -> None:
+    source = [
+        "Authorization: AWS4-HMAC-SHA256",
+        " Credential=AKIAFOLDED,",
+        " Signature=folded-signature",
+        "status=healthy",
+    ]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        "Authorization: [REDACTED]",
+        " [REDACTED]",
+        " [REDACTED]",
+        "status=healthy",
+    ]
+    assert "AKIAFOLDED" not in "\n".join(redacted)
+    assert "folded-signature" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_covers_unterminated_private_key_blocks() -> None:
+    source = [
+        "SIGNING_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----",
+        "private-key-body",
+        "still-private-at-eof",
+    ]
+
+    redacted = redact_diagnostic_lines(source)
+
+    assert redacted == [
+        "SIGNING_PRIVATE_KEY=[REDACTED]",
+        "[REDACTED]",
+        "[REDACTED]",
+    ]
+    assert "private-key-body" not in "\n".join(redacted)
+    assert "still-private-at-eof" not in "\n".join(redacted)
+
+
+def test_line_oriented_redaction_preserves_trailing_empty_physical_lines() -> None:
+    assert redact_diagnostic_lines(["first", ""]) == ["first", ""]
+
+
+def test_streaming_redaction_retains_context_before_tail_or_reverse() -> None:
+    source = [
+        "Authorization: AWS4-HMAC-SHA256\n",
+        " Credential=AKIASTREAM,\n",
+        " Signature=stream-signature\n",
+        "status=healthy\n",
+    ]
+
+    pairs = list(iter_redacted_diagnostic_line_pairs(source))
+
+    assert [raw for raw, _ in pairs] == [line.rstrip("\n") for line in source]
+    assert [redacted for _, redacted in pairs] == [
+        "Authorization: [REDACTED]",
+        " [REDACTED]",
+        " [REDACTED]",
+        "status=healthy",
+    ]
+
+
+def test_streaming_redaction_fails_closed_when_private_key_opener_leaves_tail() -> None:
+    source = [
+        "SIGNING_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n",
+        "private-body\n",
+        "-----END PRIVATE KEY-----\n",
+        "status=healthy\n",
+    ]
+
+    redacted_tail = [redacted for _, redacted in iter_redacted_diagnostic_line_pairs(source)][-3:]
+
+    assert redacted_tail == ["[REDACTED]", "[REDACTED]", "status=healthy"]
+    assert "private-body" not in "\n".join(redacted_tail)
+
+
+def test_streaming_redaction_covers_quoted_key_pem_and_indented_values() -> None:
+    source = [
+        '"SIGNING_PRIVATE_KEY": -----BEGIN PRIVATE KEY-----\n',
+        "quoted-key-private-body\n",
+        "-----END PRIVATE KEY-----\n",
+        '"Authorization":\n',
+        '  "Bearer pretty-json-secret"\n',
+        "password: |\n",
+        "  yaml-block-secret\n",
+        "status=healthy\n",
+    ]
+
+    redacted = [redacted for _, redacted in iter_redacted_diagnostic_line_pairs(source)]
+
+    assert "quoted-key-private-body" not in "\n".join(redacted)
+    assert "pretty-json-secret" not in "\n".join(redacted)
+    assert "yaml-block-secret" not in "\n".join(redacted)
+    assert redacted[-1] == "status=healthy"
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "password: |2-",
+        "password: |-2",
+        "client_secret: >- # folded secret",
+        '"Authorization": |+2 # authorization block',
+    ],
+)
+def test_streaming_redaction_covers_yaml_block_scalar_modifiers(header: str) -> None:
+    redacted = redact_diagnostic_lines([header, "  yaml-modifier-secret", "status=healthy"])
+
+    assert "yaml-modifier-secret" not in "\n".join(redacted)
+    assert redacted[1] == "  [REDACTED]"
+    assert redacted[2] == "status=healthy"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "SQL_SERVER=db.internal",
+        "SQL_DATABASE=K98",
+        "SQL_USERNAME=bot",
+        "OPENAI_VISION_MODEL=gpt-4.1-mini",
+        "TOKENIZER=enabled",
+        "token_count=3",
+        "password_hint=required",
+        "api_key rotation required",
+        "Authorization status: Basic unavailable",
+        "mode=basic",
+        "ordinary user@example.com text",
+    ],
+)
+def test_redaction_preserves_non_secret_diagnostic_text(source: str) -> None:
+    assert redact_diagnostic_text(source) == source
+
+
+def test_diagnostic_mentions_are_neutralized_without_hiding_identity() -> None:
+    source = "@everyone @here <@123> <@!456> <@&789>"
+
+    neutralized = neutralize_discord_mentions(source)
+
+    assert "@everyone" not in neutralized
+    assert "@here" not in neutralized
+    assert "<@123>" not in neutralized
+    assert "<@!456>" not in neutralized
+    assert "<@&789>" not in neutralized
+    assert neutralized.replace("\u200b", "") == source
+    assert neutralize_discord_mentions("ordinary user@example.com text") == (
+        "ordinary user@example.com text"
+    )
+
+
+def test_safe_diagnostic_content_redacts_and_neutralizes_mentions() -> None:
+    content = safe_diagnostic_content(
+        "Failed:", "sheet @everyone from <@123> role <@&456> token=secret"
+    )
+
+    assert "@everyone" not in content
+    assert "<@123>" not in content
+    assert "<@&456>" not in content
+    assert "secret" not in content
+    assert "[REDACTED]" in content
+
+
+def test_command_modules_reuse_canonical_diagnostic_content_helper() -> None:
+    from commands import admin_cmds, stats_cmds, subscriptions_cmds
+
+    assert admin_cmds._safe_operator_content is safe_diagnostic_content
+    assert stats_cmds._safe_diagnostic_error is safe_diagnostic_content
+    assert subscriptions_cmds._safe_diagnostic_error is safe_diagnostic_content
+
+
+def test_utf8_size_measures_encoded_bytes() -> None:
+    assert utf8_size("a") == 1
+    assert utf8_size("🦊") == 4
+
+
+def test_attachment_filename_is_conservative_and_deterministic() -> None:
+    name = safe_attachment_filename("../Sensitive report 🦊.reallylongextension")
+
+    assert name == "Sensitive_report.reallylongex"
+    assert len(name) <= 113
+
+
+def test_attachment_limit_resolution_prefers_interaction_then_guild() -> None:
+    interaction = SimpleNamespace(
+        attachment_size_limit=1234, guild=SimpleNamespace(filesize_limit=99)
+    )
+    channel = SimpleNamespace(guild=SimpleNamespace(filesize_limit=5678))
+
+    assert resolve_attachment_size_limit(interaction) == 1234
+    assert resolve_attachment_size_limit(channel) == 5678
+    assert resolve_attachment_size_limit(object()) == DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
+
+
+def test_omission_marker_supports_explicit_singular_label() -> None:
+    assert (
+        omission_marker(1, "audit batches", singular_label="audit batch")
+        == "… 1 audit batch not shown."
+    )
+    assert omission_marker(2, "audit batches", singular_label="audit batch") == (
+        "… 2 audit batches not shown."
+    )
+
+
+def test_inventory_audit_embed_marks_records_beyond_field_limit(monkeypatch) -> None:
+    from commands import inventory_cmds
+
+    monkeypatch.setattr(
+        inventory_cmds.audit_service,
+        "summarize_json_comparison",
+        lambda _record: "unchanged",
+    )
+    records = [
+        SimpleNamespace(
+            import_batch_id=index,
+            status="completed",
+            confidence_score=1.0,
+            governor_id=1000 + index,
+            discord_user_id=2000 + index,
+            import_type="resources",
+            flow_type="command",
+            debug_reference="none",
+        )
+        for index in range(30)
+    ]
+
+    embed = inventory_cmds._build_inventory_audit_embed(records, days=7)
+
+    require_valid_embed_payload(embed)
+    assert len(embed.fields) == 25
+    assert embed.fields[-1].name == "Audit display compacted"
+    assert embed.fields[-1].value == "… 6 audit batches not shown."
+
+
+@pytest.mark.asyncio
+async def test_subscriber_list_reserves_field_for_omission_marker(monkeypatch) -> None:
+    from commands import subscriptions_cmds
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.application_commands = []
+
+        def slash_command(self, **_kwargs):
+            return lambda callback: callback
+
+        def add_application_command(self, command) -> None:
+            self.application_commands.append(command)
+
+    class FakeInteraction:
+        attachment_size_limit = DEFAULT_ATTACHMENT_SIZE_LIMIT_BYTES
+
+        def __init__(self) -> None:
+            self.edits: list[dict] = []
+
+        async def edit_original_response(self, **kwargs):
+            self.edits.append(kwargs)
+
+    async def fake_defer(_ctx, *, ephemeral: bool) -> None:
+        assert ephemeral is True
+
+    subscribers = {
+        str(1000 + index): {
+            "username": f"User {index:02d}",
+            "subscriptions": ["fights"],
+            "reminder_times": ["5m"],
+        }
+        for index in range(26)
+    }
+    monkeypatch.setattr(subscriptions_cmds, "safe_defer", fake_defer)
+    monkeypatch.setattr(subscriptions_cmds, "get_all_subscribers", lambda: subscribers)
+    monkeypatch.setattr(subscriptions_cmds, "dm_scheduled_tracker", {})
+    monkeypatch.setattr(subscriptions_cmds, "dm_sent_tracker", {})
+    monkeypatch.setattr(subscriptions_cmds, "active_task_count", lambda _uid: 0)
+
+    bot = FakeBot()
+    subscriptions_cmds.register_subscriptions(bot)
+    group = bot.application_commands[0]
+    handler = next(command.callback for command in group.subcommands if command.name == "list")
+    while hasattr(handler, "__wrapped__"):
+        handler = handler.__wrapped__
+    interaction = FakeInteraction()
+
+    await handler(SimpleNamespace(interaction=interaction))
+
+    response = interaction.edits[-1]
+    embed = response["embed"]
+    require_valid_embed_payload(embed)
+    assert len(embed.fields) == 25
+    assert embed.fields[-1].name == "Subscriber display compacted"
+    assert embed.fields[-1].value == "… 2 subscribers not shown."
+    assert len(response["attachments"]) == 1
+
+    subscribers.pop("1025")
+    exact_interaction = FakeInteraction()
+
+    await handler(SimpleNamespace(interaction=exact_interaction))
+
+    exact_response = exact_interaction.edits[-1]
+    exact_embed = exact_response["embed"]
+    require_valid_embed_payload(exact_embed)
+    assert len(exact_embed.fields) == 25
+    assert exact_embed.fields[-1].name == "User 24 • <@1024>"
+    assert exact_response["attachments"] == []
