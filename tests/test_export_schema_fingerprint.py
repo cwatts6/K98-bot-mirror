@@ -447,3 +447,26 @@ def test_new_reader_requires_explicit_supported_format_and_pinned_scope_before_s
     with pytest.raises(SourceConflict):
         application_installation_snapshot(cursor, scope=["dbo.Fixture"], metadata_format="unknown")
     cursor.execute.assert_not_called()
+
+
+def test_historical_source_bridge_authenticates_bytes_without_authorizing_updater(tmp_path):
+    from pathlib import Path
+
+    from scripts import prepare_k98_update as update
+    from tests.updater_source_assertions import before_portable_fingerprint_hash
+
+    root = Path(__file__).resolve().parents[1]
+    path = "services/export_execution_dal.py"
+    assert before_portable_fingerprint_hash(root, path) != update.sha256(
+        (root / path).read_bytes().replace(b"\r\n", b"\n")
+    )
+    # The new security-sensitive module remains refused without installed authority.
+    with pytest.raises(ValueError, match="non-routine release"):
+        update.check_source_only(["services/export_schema_fingerprint.py"])
+    fixture_path = "tests/fixtures/portable_fingerprint_source_pairs.json"
+    (tmp_path / fixture_path).parent.mkdir(parents=True)
+    (tmp_path / fixture_path).write_bytes((root / fixture_path).read_bytes())
+    (tmp_path / path).parent.mkdir(parents=True)
+    (tmp_path / path).write_bytes(b"unreviewed successor")
+    with pytest.raises(AssertionError):
+        before_portable_fingerprint_hash(tmp_path, path)
