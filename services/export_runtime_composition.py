@@ -1580,17 +1580,23 @@ def validate_application_installation_contract(approved):
         "permissions_hash",
         "review_id",
     }
-    if isinstance(approved, dict) and approved.get("version") == 2:
+    if isinstance(approved, dict) and approved.get("version") in (2, 3):
         from services.export_execution_dal import APPLICATION_ACTIVATION_SCOPE_HASH
 
         fields.add("scope_hash")
         if approved.get("scope_hash") != APPLICATION_ACTIVATION_SCOPE_HASH:
             raise SourceConflict("Exact reviewed S11 activation dependency scope required.")
+    if isinstance(approved, dict) and approved.get("version") == 3:
+        from services.export_schema_fingerprint import FORMAT
+
+        fields.add("fingerprint_format")
+        if approved.get("fingerprint_format") != FORMAT:
+            raise SourceConflict("Exact supported application fingerprint format required.")
     if (
         not isinstance(approved, dict)
         or set(approved) != fields
         or type(approved["version"]) is not int
-        or approved["version"] not in (1, 2)
+        or approved["version"] not in (1, 2, 3)
         or approved["database"] != "ROK_TRACKER"
         or any(
             not isinstance(approved[k], str) or not 1 <= len(approved[k]) <= 128
@@ -1605,7 +1611,7 @@ def validate_application_installation_contract(approved):
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")
     uuid_text(approved["review_id"])
-    if approved["version"] == 2:
+    if approved["version"] in (2, 3):
         from services.export_execution_dal import application_activation_scope
 
         if not set(application_activation_scope()) <= {s["name"] for s in approved["sources"]}:
@@ -1655,6 +1661,10 @@ def application_snapshot_for_contract(cursor, approved):
     scope = application_contract_scope(approved)
     if scope is None:
         return application_installation_snapshot(cursor)
+    if approved["version"] == 3:
+        return application_installation_snapshot(
+            cursor, scope=scope, metadata_format=approved["fingerprint_format"]
+        )
     return application_installation_snapshot(cursor, scope=scope)
 
 
@@ -1664,10 +1674,13 @@ def verify_application_installation_contract(observed, approved):
 
     validate_application_installation_contract(approved)
     scope = application_contract_scope(approved)
+    portable = approved["version"] == 3
+    identity_fields = {"schema_identity"} if portable else set()
     if (
         not isinstance(observed, dict)
         or set(observed)
-        != {
+        != identity_fields
+        | {
             "version",
             "target",
             "metadata",
@@ -1676,7 +1689,7 @@ def verify_application_installation_contract(observed, approved):
             "column_permissions",
         }
         or type(observed["version"]) is not int
-        or observed["version"] != 1
+        or observed["version"] != (2 if portable else 1)
         or observed["target"]
         != dict(
             ServerName=approved["server"],
@@ -1694,6 +1707,20 @@ def verify_application_installation_contract(observed, approved):
         or any(not isinstance(v, list) for v in metadata.values())
     ):
         raise SourceConflict("Whole application metadata categories are incomplete.")
+    if portable:
+        from services.export_schema_fingerprint import (
+            SchemaFingerprintError,
+            application_metadata_fingerprint,
+        )
+
+        try:
+            metadata_hash = application_metadata_fingerprint(metadata, observed["schema_identity"])
+        except SchemaFingerprintError as exc:
+            raise SourceConflict(
+                "Application schema identity is incomplete or unsupported."
+            ) from exc
+    else:
+        metadata_hash = digest(metadata).hex()
     expected = {
         s["name"]: s["type"]
         for s in approved["sources"] + approved["dynamic_objects"]
@@ -1719,7 +1746,7 @@ def verify_application_installation_contract(observed, approved):
             for s in approved["sources"]
             if s["type"] == "TT" and (scope is None or s["name"] in scope)
         }
-        or digest(metadata).hex() != approved["metadata_hash"]
+        or metadata_hash != approved["metadata_hash"]
     ):
         raise SourceConflict(
             "Installed application schema/dependencies differ from reviewed source shapes."
