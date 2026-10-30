@@ -913,14 +913,14 @@ def legacy_installation_snapshot(cursor, source):
 # Separate opt-in provenance reads; the legacy fixed-contract queries remain unchanged.
 _APPLICATION_IDENTITY_QUERIES = {
     "checks": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,name,is_system_named,COL_NAME(parent_object_id,parent_column_id) AS "
     "parent_column_name,definition,is_disabled,is_not_trusted,is_not_for_replication FROM "
     "sys.check_constraints WHERE parent_object_id IN (SELECT id FROM selected) ORDER BY "
     "object_name,name",
     "columns": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(c.object_id)+'.'+OBJECT_NAME(c.object_id) AS "
     "object_name,c.column_id,c.name AS column_name,ROW_NUMBER() OVER(PARTITION BY "
     "c.object_id ORDER BY c.column_id) AS "
@@ -928,7 +928,7 @@ _APPLICATION_IDENTITY_QUERIES = {
     "sys.tables t ON t.object_id=c.object_id WHERE c.object_id IN (SELECT id FROM "
     "selected) ORDER BY object_name,c.column_id",
     "default_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) "
+    "OPENJSON(@scope)) "
     "SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,COL_NAME(parent_object_id,parent_column_id) AS "
@@ -936,7 +936,7 @@ _APPLICATION_IDENTITY_QUERIES = {
     "WHERE parent_object_id IN (SELECT id FROM selected) ORDER BY "
     "object_name,parent_column_id",
     "dependencies": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(d.referencing_id)+'.'+OBJECT_NAME(d.referencing_id) AS "
     "object_name,d.referencing_minor_id,d.referencing_class,d.referencing_class_desc,COL_NAME(d.referencing_id,d.referencing_minor_id) "
     "AS candidate_column_name,i.name AS candidate_index_name,i.has_filter AS "
@@ -953,25 +953,25 @@ _APPLICATION_IDENTITY_QUERIES = {
     "selected) ORDER BY "
     "object_name,d.referencing_class,d.referencing_minor_id,d.referenced_entity_name,d.referenced_minor_id",
     "filtered_statistics": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) "
+    "OPENJSON(@scope)) "
     "SELECT OBJECT_SCHEMA_NAME(object_id)+'.'+OBJECT_NAME(object_id) AS "
     "object_name,stats_id,name,auto_created,user_created,has_filter,filter_definition "
     "FROM sys.stats WHERE has_filter=1 AND object_id IN (SELECT id FROM "
     "selected) ORDER BY object_name,stats_id",
     "foreign_keys": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,name,is_system_named,OBJECT_SCHEMA_NAME(referenced_object_id)+'.'+OBJECT_NAME(referenced_object_id) "
     "AS referenced_object FROM sys.foreign_keys WHERE parent_object_id IN (SELECT id "
     "FROM selected) ORDER BY object_name,name",
     "indexes": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(object_id)+'.'+OBJECT_NAME(object_id) AS "
     "object_name,index_id,name,type_desc,is_unique,is_primary_key,is_unique_constraint,is_disabled,has_filter,filter_definition "
     "FROM sys.indexes WHERE object_id IN (SELECT id FROM selected) ORDER BY "
     "object_name,index_id",
     "key_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,name,type_desc,is_system_named,unique_index_id FROM "
     "sys.key_constraints WHERE parent_object_id IN (SELECT id FROM selected) ORDER "

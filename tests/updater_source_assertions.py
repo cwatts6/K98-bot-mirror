@@ -33,7 +33,7 @@ def before_portable_fingerprint_hash(root, path):
     raw = fixture.read_bytes()
     assert (
         hashlib.sha256(raw).hexdigest()
-        == "71b1546427efb0d36dac736bbba61914a66b732819c94f1664a7426ba90eaa01"
+        == "0118393100c6408b5258099fbbcb300f55837d891e1195933f5fec566ec5ad86"
     )
     member = next((m for m in json.loads(raw) if m["path"] == path), None)
     if member:
