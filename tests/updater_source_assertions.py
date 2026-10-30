@@ -20,9 +20,31 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_portable_fingerprint_hash(root, path):
+    """Authenticate the reviewed runtime successor for historical tests only.
+
+    This does not amend installed updater authority or reinterpret a SQL receipt.
+    Unknown successor edits still fail rather than learning hashes from checkout.
+    """
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/portable_fingerprint_source_pairs.json"
+    if not fixture.exists():
+        return actual  # Standalone historical fixtures authenticate their own bytes.
+    raw = fixture.read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "71b1546427efb0d36dac736bbba61914a66b732819c94f1664a7426ba90eaa01"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_finalisation_hash(root, path):
     """Exact local successor evidence only; does not change updater admission."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_portable_fingerprint_hash(root, path)
     fixture = root / "tests/fixtures/p1_mge_finalisation_source_pairs.json"
     if not fixture.exists():
         return actual  # Historical standalone fixtures still authenticate themselves.

@@ -910,7 +910,76 @@ def legacy_installation_snapshot(cursor, source):
     return result
 
 
-def application_installation_snapshot(cursor, *, scope=None):
+# Separate opt-in provenance reads; the legacy fixed-contract queries remain unchanged.
+_APPLICATION_IDENTITY_QUERIES = {
+    "checks": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
+    "object_name,name,is_system_named,COL_NAME(parent_object_id,parent_column_id) AS "
+    "parent_column_name,definition,is_disabled,is_not_trusted,is_not_for_replication FROM "
+    "sys.check_constraints WHERE parent_object_id IN (SELECT id FROM selected) ORDER BY "
+    "object_name,name",
+    "columns": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(c.object_id)+'.'+OBJECT_NAME(c.object_id) AS "
+    "object_name,c.column_id,c.name AS column_name,ROW_NUMBER() OVER(PARTITION BY "
+    "c.object_id ORDER BY c.column_id) AS "
+    "visible_position,t.max_column_id_used,c.is_computed FROM sys.columns c LEFT JOIN "
+    "sys.tables t ON t.object_id=c.object_id WHERE c.object_id IN (SELECT id FROM "
+    "selected) ORDER BY object_name,c.column_id",
+    "default_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) "
+    "SELECT "
+    "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
+    "object_name,COL_NAME(parent_object_id,parent_column_id) AS "
+    "column_name,name,is_system_named,definition FROM sys.default_constraints "
+    "WHERE parent_object_id IN (SELECT id FROM selected) ORDER BY "
+    "object_name,parent_column_id",
+    "dependencies": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(d.referencing_id)+'.'+OBJECT_NAME(d.referencing_id) AS "
+    "object_name,d.referencing_minor_id,d.referencing_class,d.referencing_class_desc,COL_NAME(d.referencing_id,d.referencing_minor_id) "
+    "AS candidate_column_name,i.name AS candidate_index_name,i.has_filter AS "
+    "candidate_index_filtered,i.filter_definition AS candidate_index_filter,s.name AS "
+    "candidate_statistics_name,s.has_filter AS "
+    "candidate_statistics_filtered,s.filter_definition AS "
+    "candidate_statistics_filter,d.referenced_class,d.referenced_class_desc,d.referenced_server_name,d.referenced_database_name,d.referenced_schema_name,d.referenced_entity_name,d.referenced_minor_id,COL_NAME(d.referenced_id,d.referenced_minor_id) "
+    "AS "
+    "referenced_column_name,d.is_schema_bound_reference,d.is_caller_dependent,d.is_ambiguous "
+    "FROM sys.sql_expression_dependencies d LEFT JOIN sys.indexes i ON "
+    "i.object_id=d.referencing_id AND i.index_id=d.referencing_minor_id LEFT JOIN "
+    "sys.stats s ON s.object_id=d.referencing_id AND "
+    "s.stats_id=d.referencing_minor_id WHERE d.referencing_id IN (SELECT id FROM "
+    "selected) ORDER BY "
+    "object_name,d.referencing_class,d.referencing_minor_id,d.referenced_entity_name,d.referenced_minor_id",
+    "filtered_statistics": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) "
+    "SELECT OBJECT_SCHEMA_NAME(object_id)+'.'+OBJECT_NAME(object_id) AS "
+    "object_name,stats_id,name,auto_created,user_created,has_filter,filter_definition "
+    "FROM sys.stats WHERE has_filter=1 AND object_id IN (SELECT id FROM "
+    "selected) ORDER BY object_name,stats_id",
+    "foreign_keys": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
+    "object_name,name,is_system_named,OBJECT_SCHEMA_NAME(referenced_object_id)+'.'+OBJECT_NAME(referenced_object_id) "
+    "AS referenced_object FROM sys.foreign_keys WHERE parent_object_id IN (SELECT id "
+    "FROM selected) ORDER BY object_name,name",
+    "indexes": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(object_id)+'.'+OBJECT_NAME(object_id) AS "
+    "object_name,index_id,name,type_desc,is_unique,is_primary_key,is_unique_constraint,is_disabled,has_filter,filter_definition "
+    "FROM sys.indexes WHERE object_id IN (SELECT id FROM selected) ORDER BY "
+    "object_name,index_id",
+    "key_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
+    "OPENJSON(@scope)), required AS (SELECT id AS object_id FROM selected) SELECT "
+    "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
+    "object_name,name,type_desc,is_system_named,unique_index_id FROM "
+    "sys.key_constraints WHERE parent_object_id IN (SELECT id FROM selected) ORDER "
+    "BY object_name,name",
+}
+
+
+def application_installation_snapshot(cursor, *, scope=None, metadata_format=None):
     """Read complete application metadata/permissions on the caller's session.
 
     No business query/procedure, transaction transition, DDL or data import runs.
@@ -921,7 +990,12 @@ def application_installation_snapshot(cursor, *, scope=None):
     """
     from services.export_execution_protocol import encode
 
-    result = {"version": 1, "metadata": {}}
+    if metadata_format is not None:
+        from services.export_schema_fingerprint import FORMAT
+
+        if metadata_format != FORMAT or scope is None:
+            raise SourceConflict("Explicit supported fingerprint format and pinned scope required.")
+    result = {"version": 2 if metadata_format is not None else 1, "metadata": {}}
     required = (
         "SELECT object_id FROM sys.objects WHERE is_ms_shipped=0 "
         "AND type IN ('U','V','P','FN','IF','TF')"
@@ -1013,6 +1087,11 @@ def application_installation_snapshot(cursor, *, scope=None):
         *parameters,
     )
     result["column_permissions"] = rows(cursor)
+    if metadata_format is not None:
+        result["schema_identity"] = {}
+        for name, query in _APPLICATION_IDENTITY_QUERIES.items():
+            cursor.execute(query.replace("@scope", "?"), json.dumps(scope))
+            result["schema_identity"][name] = rows(cursor)
     encode(result)
     return result
 
