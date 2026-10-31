@@ -32,7 +32,7 @@ Before deployment, rebuild the verifier from the final reviewed source and quali
 all archived startup contracts at the unchanged 15-second limit. Continue the installed
 updater format bridge, authenticated bootstrap and combined updater/recovery rehearsals.
 The final release must pin private-main source, SQL/tool/policy identities and rollback
-artifacts. Production deployment remains separately approved against that final packet.
+artifacts. Production deployment remains separately unapproved pending approval of that final packet.
 
 No unrelated refactor or new deferred item is introduced by this narrow correction.
 Security routing: Changes review of this Bot patch, Deep off; SQL repository unchanged.
