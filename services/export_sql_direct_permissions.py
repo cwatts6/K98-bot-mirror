@@ -1,10 +1,10 @@
 """Explicit operator-approved legacy direct permissions; never a signing fallback."""
 
 import json
-from pathlib import Path
 import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.export_contract_resources import read_contract_resource
 
 DIRECT_SOURCE_HASH = "64f673aec3794b37443fa5500453ef427625b1d5fa80366ef5e5e40e13fc1880"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
@@ -32,9 +32,7 @@ FILE_VISIBILITY_MODULE_HASHES = {
 
 def application_grant_rows():
     """Expected direct user rights derive only from the reviewed source plan."""
-    plan = json.loads(
-        (Path(__file__).resolve().parents[1] / "deploy/s11_application_grants.json").read_bytes()
-    )
+    plan = json.loads(read_contract_resource("s11_application_grants.json"))
     if digest(plan).hex() != APPLICATION_GRANT_PLAN_HASH:
         raise SourceConflict("Reviewed application grant source differs.")
     entries = [

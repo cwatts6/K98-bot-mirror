@@ -20,13 +20,31 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_contract_resource_hash(root, path):
+    """Test-only exact resource-loader successor; grants no updater admission."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/updater_contract_resource_pairs.json"
+    if not fixture.exists():
+        return actual
+    raw = fixture.read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "e77cc8bfaad532bb5fd9e38e29584ab8c7ea94131d880c7f0b8cdd75ffd92984"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_portable_fingerprint_hash(root, path):
     """Authenticate the reviewed runtime successor for historical tests only.
 
     This does not amend installed updater authority or reinterpret a SQL receipt.
     Unknown successor edits still fail rather than learning hashes from checkout.
     """
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_contract_resource_hash(root, path)
     fixture = root / "tests/fixtures/portable_fingerprint_source_pairs.json"
     if not fixture.exists():
         return actual  # Standalone historical fixtures authenticate their own bytes.

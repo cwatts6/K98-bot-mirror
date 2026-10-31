@@ -8,11 +8,11 @@ from contextlib import nullcontext
 from datetime import datetime
 import hashlib
 import json
-from pathlib import Path
 import re
 from uuid import UUID
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows
+from services.export_contract_resources import read_contract_resource
 from services.export_coordination_dal import bounded_json
 
 
@@ -586,9 +586,7 @@ APPLICATION_ACTIVATION_SCOPE_HASH = (
 
 
 def application_activation_scope():
-    scope = json.loads(
-        (Path(__file__).resolve().parents[1] / "deploy/s11_activation_scope.json").read_bytes()
-    )
+    scope = json.loads(read_contract_resource("s11_activation_scope.json"))
     if digest(scope).hex() != APPLICATION_ACTIVATION_SCOPE_HASH:
         raise SourceConflict("Reviewed S11 activation dependency scope differs.")
     return scope["objects"]
