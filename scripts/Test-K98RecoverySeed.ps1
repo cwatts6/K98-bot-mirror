@@ -5,7 +5,7 @@ $ErrorActionPreference='Stop'
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw ($errors|Out-String)}
-foreach($name in @('Resolve-RecoverySeed','Verify-Native','Same','Hash')) {
+foreach($name in @('Resolve-RecoverySeed','Verify-Native','Assert-ContractVerifier','Same','Hash')) {
  $f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
  . ([scriptblock]::Create($f.Extent.Text.Replace('$PSScriptRoot',("'"+$PSScriptRoot.Replace("'","''")+"'"))))
 }
@@ -24,7 +24,8 @@ $script:sourceDrift=$false;$script:helperCode=0
 $ExpectedBindingsSHA256='a'*64
 $base=@{
  recovery_seed='live_sql_observation_v1';new_pins=@{source='pinned'};target=('b'*40)
- extra_members=@(@{name='Verify-RecoverySeed.py';sha256=('c'*64)},@{name='Verify-NewPair.py';sha256=('d'*64)})
+ contract_verifier_sha256=('6'*64)
+ extra_members=@(@{name='Verify-RecoverySeed.py';sha256=('c'*64)},@{name='Verify-NewPair.py';sha256=('d'*64)},@{name='contract_verifier.zip';sha256=('6'*64)})
  venv=@{path='Fake-VerifiedPython';sha256=('e'*64)}
  seed_members=@(@{name='old';sha256=('f'*64)});new_policy=@{seed_plan=@{path='fixed';sha256=('1'*64)}};new_policy_sha256=('2'*64)
  flags=@{recovery=$false};new_seed_directory='C:\fixture\seed';release_id='fixture'
@@ -46,6 +47,7 @@ foreach($code in @(10,11)) {
 Reset-Case
 Check ((Resolve-RecoverySeed -Create) -eq 0) 'Verified SQL did not select derived seed'
 Check ($script:events[0] -ceq 'source') 'Helper ran before complete target source authentication'
+Check ($script:events.IndexOf('read:contract_verifier.zip') -gt 0 -and $script:events.IndexOf('read:contract_verifier.zip') -lt $script:events.IndexOf('helper')) 'Archive check did not precede helper execution'
 Check ('--create' -in $script:arguments) 'Apply did not request protected evidence publication'
 Check ($script:c.new_policy_sha256 -ceq ('5'*64)) 'Derived policy binding not selected'
 Check ($script:activeBindingsHash -ceq (Hash ([Text.Encoding]::UTF8.GetBytes(($script:derived|ConvertTo-Json -Depth 30 -Compress))))) 'Effective binding hash differs'
