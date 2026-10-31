@@ -1,0 +1,10 @@
+[
+  {
+    "query": "SELECT * FROM [dbo].[v_TARGETS_FOR_UPLOAD]",
+    "sheet": "KVK 13 Tides Targets",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": []
+  }
+]

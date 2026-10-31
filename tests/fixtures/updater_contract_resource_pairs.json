@@ -1,0 +1,17 @@
+[
+  {
+    "path": "services/export_contract_resources.py",
+    "before": null,
+    "after": "566a00d01a2d853081ed98e4c4457198ad28958fbc1855973afad032fafa95f3"
+  },
+  {
+    "path": "services/export_execution_dal.py",
+    "before": "6ac2da527bb3cfda6e2aab4c5be1bcb6a0e34ab041706000cfa940d8e1ddbba9",
+    "after": "9b1ee3daf3e794181c2ea7f71dd087118c7ba1034509d68bd154a0667d7b454b"
+  },
+  {
+    "path": "services/export_sql_direct_permissions.py",
+    "before": "9141e3f9b4e98fe388229ac33ac5d429517a5f4af0198d1a89971c02a4a73899",
+    "after": "94fa4cbc36a6e8f5a5f7380ff061dcd90a41daf4148c30787f2a05303120a060"
+  }
+]
