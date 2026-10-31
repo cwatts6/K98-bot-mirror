@@ -20,9 +20,27 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_scoped_index_hash(root, path):
+    """Authenticate the exact query successor for tests, never updater admission."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    fixture = root / "tests/fixtures/scoped_index_metadata_source_pairs.json"
+    if not fixture.exists():
+        return actual
+    raw = fixture.read_bytes()
+    assert (
+        hashlib.sha256(raw).hexdigest()
+        == "73185ef7d122da6455619a05fdec316c831e59d741dc3404140c83ded91d56fa"
+    )
+    member = next((m for m in json.loads(raw) if m["path"] == path), None)
+    if member:
+        assert actual == member["after"], path
+        return member["before"]
+    return actual
+
+
 def before_contract_resource_hash(root, path):
     """Test-only exact resource-loader successor; grants no updater admission."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_scoped_index_hash(root, path)
     fixture = root / "tests/fixtures/updater_contract_resource_pairs.json"
     if not fixture.exists():
         return actual

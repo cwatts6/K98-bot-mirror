@@ -908,6 +908,33 @@ def legacy_installation_snapshot(cursor, source):
     return result
 
 
+# Materialize the pinned scope once per index read. Native qualification found
+# the former CTE query exceeded the 15-second statement budget on the lab schema.
+# DISTINCT and NULL exclusion preserve IN semantics for aliases/missing objects.
+# Only a statement-local table variable is written; metadata visibility is unchanged.
+_APPLICATION_INDEX_SCOPE = """SET NOCOUNT ON;
+DECLARE @required TABLE(object_id int NOT NULL PRIMARY KEY);
+INSERT @required SELECT DISTINCT OBJECT_ID(value) FROM OPENJSON(@scope) WHERE OBJECT_ID(value) IS NOT NULL;
+"""
+_APPLICATION_INDEX_METADATA = (
+    _APPLICATION_INDEX_SCOPE
+    + """SELECT s.name+'.'+o.name AS ObjectName,
+        i.name AS IndexName,i.type AS IndexType,i.is_unique AS IsUnique,i.is_primary_key AS IsPrimaryKey,
+        i.is_unique_constraint AS IsUniqueConstraint,i.is_disabled AS Disabled,
+        i.is_hypothetical AS Hypothetical,i.ignore_dup_key AS IgnoreDuplicateKey,
+        i.has_filter AS HasFilter,i.filter_definition AS FilterDefinition,
+        ic.index_column_id AS Ordinal,c.name AS ColumnName,ic.key_ordinal AS KeyOrdinal,
+        ic.partition_ordinal AS PartitionOrdinal,ic.is_descending_key AS DescendingKey,
+        ic.is_included_column AS IncludedColumn
+        FROM sys.indexes i JOIN sys.objects o ON o.object_id=i.object_id
+        JOIN sys.schemas s ON s.schema_id=o.schema_id LEFT JOIN sys.index_columns ic
+          ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+        LEFT JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+        WHERE i.object_id IN (SELECT object_id FROM @required)
+        ORDER BY s.name COLLATE Latin1_General_100_BIN2,o.name COLLATE Latin1_General_100_BIN2,i.name COLLATE Latin1_General_100_BIN2,ic.index_column_id"""
+)
+
+
 # Separate opt-in provenance reads; the legacy fixed-contract queries remain unchanged.
 _APPLICATION_IDENTITY_QUERIES = {
     "checks": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
@@ -962,12 +989,13 @@ _APPLICATION_IDENTITY_QUERIES = {
     "object_name,name,is_system_named,OBJECT_SCHEMA_NAME(referenced_object_id)+'.'+OBJECT_NAME(referenced_object_id) "
     "AS referenced_object FROM sys.foreign_keys WHERE parent_object_id IN (SELECT id "
     "FROM selected) ORDER BY object_name,name",
-    "indexes": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)) SELECT "
-    "OBJECT_SCHEMA_NAME(object_id)+'.'+OBJECT_NAME(object_id) AS "
-    "object_name,index_id,name,type_desc,is_unique,is_primary_key,is_unique_constraint,is_disabled,has_filter,filter_definition "
-    "FROM sys.indexes WHERE object_id IN (SELECT id FROM selected) ORDER BY "
-    "object_name,index_id",
+    "indexes": _APPLICATION_INDEX_SCOPE
+    + """SELECT s.name+'.'+o.name AS object_name,i.index_id,i.name,i.type_desc,
+        i.is_unique,i.is_primary_key,i.is_unique_constraint,i.is_disabled,i.has_filter,i.filter_definition
+        FROM sys.indexes i JOIN sys.objects o ON o.object_id=i.object_id
+        JOIN sys.schemas s ON s.schema_id=o.schema_id
+        WHERE i.object_id IN (SELECT object_id FROM @required) ORDER BY object_name,i.index_id
+    """,
     "key_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
     "OPENJSON(@scope)) SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
@@ -1013,7 +1041,10 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
     if result["target"] is None or result["target"]["ViewDefinition"] != 1:
         raise SourceConflict("Whole application metadata must be visible.")
     for name, query in _METADATA_QUERIES.items():
-        cursor.execute("WITH required AS (" + required + ") " + query, *parameters)
+        if name == "indexes" and scope is not None:
+            cursor.execute(_APPLICATION_INDEX_METADATA.replace("@scope", "?"), *parameters)
+        else:
+            cursor.execute("WITH required AS (" + required + ") " + query, *parameters)
         result["metadata"][name] = rows(cursor)
     cursor.execute(
         "SELECT SCHEMA_NAME(t.schema_id)+'.'+t.name AS TypeName,c.column_id AS Ordinal,"
