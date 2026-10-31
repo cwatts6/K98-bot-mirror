@@ -104,13 +104,25 @@ foreach($key in @('include.path','core.sshcommand','filter.x.smudge','credential
 function Fake-Venv {$script:venvCalls++;$script:verifyArgs=@($args);$global:LASTEXITCODE=0}
 function Fake-Base {throw 'BASE_PYTHON_SELECTED'}
 $script:venvCalls=0
-$c=[pscustomobject]@{venv=@{path='Fake-Venv';sha256='a'*64};old_plan=@{Python='Fake-Base'};extra_members=@([pscustomobject]@{name='Verify-NewPair.py';sha256='b'*64})}
+$c=[pscustomobject]@{venv=@{path='Fake-Venv';sha256='a'*64};old_plan=@{Python='Fake-Base'};contract_verifier_sha256='d'*64;extra_members=@([pscustomobject]@{name='Verify-NewPair.py';sha256='b'*64},[pscustomobject]@{name='contract_verifier.zip';sha256='d'*64})}
 $ExpectedBindingsSHA256='c'*64
 Verify-Native
 Check ($venvCalls -eq 1) 'Native verifier did not use installed venv'
 Check ('--preflight' -notin $verifyArgs) 'Successor verification selected predecessor'
 Verify-Native -Preflight
 Check ('--preflight' -in $verifyArgs) 'Preflight did not select complete predecessor source check'
+# Read-Bytes is the explicit content/custody seam here; keep the real sealing
+# guard active and prove invalid archive bindings never reach the fake Python.
+$sealedMembers=$c.extra_members
+$c.extra_members=@($sealedMembers[0])
+Reject {Verify-Native} '*Contract verifier not sealed*'
+$c.extra_members=$sealedMembers;$c.contract_verifier_sha256='e'*64
+Reject {Verify-Native} '*Contract verifier not sealed*'
+$c.contract_verifier_sha256='d'*64;$c.extra_members=@($sealedMembers)+@($sealedMembers[1])
+Reject {Verify-Native} '*Contract verifier not sealed*'
+$c.extra_members=$sealedMembers
+Check ($venvCalls -eq 2) 'Invalid archive binding reached Python'
+
 
 # Retained cohorts may gain new captures, but an existing held/captured row
 # cannot disappear or change during deployment.
