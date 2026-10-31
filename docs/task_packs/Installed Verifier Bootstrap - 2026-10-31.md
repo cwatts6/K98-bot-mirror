@@ -1,4 +1,4 @@
-# Installed verifier bootstrap â€” 31 October 2026
+# Installed verifier bootstrap - 31 October 2026
 
 ## Problem and resulting behaviour
 
