@@ -1937,9 +1937,9 @@ def prepare_update(
     if recovery:
         seed = recovery_policy.adapt_candidate(seed, recovery)
     elif mge_contracts is not None:
-        from scripts.p0a_release import adapt_candidate
-
-        seed = adapt_candidate(seed, mge_contracts)
+        if recovery_policy is None:
+            raise ValueError("Installed contract adapter required for combined release.")
+        seed = recovery_policy.adapt_candidate(seed, mge_contracts)
     config["release_id"] = str(uuid4())
     config["seed_members"] = [
         dict(name=name, sha256=sha256(raw)) for name, raw in sorted(seed.items())

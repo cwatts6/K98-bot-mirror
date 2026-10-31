@@ -1,5 +1,6 @@
 """A reviewed trigger delta must not authorize other startup contract drift."""
 
+import builtins
 from copy import deepcopy
 import json
 from pathlib import Path, PureWindowsPath
@@ -67,10 +68,11 @@ def test_other_release_cannot_borrow_contract_amendment(previous, field):
         updater.mge_application_contract_transition(previous, description)
 
 
+@pytest.mark.parametrize("adapter_missing", [False, True])
 @pytest.mark.parametrize("portable", [False, True])
 @pytest.mark.parametrize("independent_protection", [False, True])
 def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guards(
-    tmp_path, monkeypatch, independent_protection, portable
+    tmp_path, monkeypatch, independent_protection, portable, adapter_missing
 ):
     from core.export_release_seed import successor_seed
     import services.export_runtime_composition as composition
@@ -164,6 +166,20 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
     tools, archive_hash = installed_tool_fixture(tmp_path)
     observation["bindings"]["contract_verifier_sha256"] = archive_hash
 
+    # Exercise the installed flat companion path; the checkout package must not
+    # supply the adapter, even when this test runs inside a repository process.
+    monkeypatch.setattr(updater, "__file__", str(tools / "prepare_k98_update.py"))
+    original_import = builtins.__import__
+
+    def reject_repository_adapter(name, *args, **kwargs):
+        if name == "scripts.p0a_release":
+            raise AssertionError("Repository adapter import is forbidden")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_repository_adapter)
+    if adapter_missing:
+        (tools / "p0a_release.py").unlink()
+
     def run():
         return updater.prepare_update(
             observation,
@@ -176,6 +192,11 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
 
     if independent_protection:
         with pytest.raises(ValueError, match="protected MGE"):
+            run()
+        assert not (tmp_path / "packet").exists()
+        return
+    if adapter_missing:
+        with pytest.raises(ValueError, match="Installed contract adapter required"):
             run()
         assert not (tmp_path / "packet").exists()
         return
