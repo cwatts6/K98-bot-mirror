@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "profile": "mge_finalisation_v1",
   "bot_predecessors": [
     "2c31de42eb91cf6b7f9f61f3aaf3efc3597c4ea6"
@@ -10,5 +10,6 @@
       "id": "20261029_001_mge_board_finalisation",
       "sha256": "8fea59034c0ac0d14cfb6f72e03a3eda9c823648ec2c0fead6cd208bd4312bb0"
     }
-  ]
+  ],
+  "application_contract_transition": "mge_application_schema_v2"
 }
