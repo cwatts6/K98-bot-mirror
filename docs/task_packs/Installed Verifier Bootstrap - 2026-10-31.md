@@ -91,7 +91,7 @@ introduced. No unrelated refactor or deferred optimisation is required.
 
 1. Finish exact code review, validation and equivalent private promotion.
 2. Retain the completed isolated S selector/protected-configuration qualification:
-   all41 queries and three contracts passed at15 seconds; actual native custody,
+   all 41 queries and three contracts passed at 15 seconds; actual native custody,
    owned configuration-file removal, disabled login and zero VM adapters confirmed.
    S exercised the selector function with authenticated staged source; complete
    installed CLI and combined updater execution remain separate requirements.
