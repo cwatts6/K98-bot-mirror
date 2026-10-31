@@ -643,6 +643,17 @@ MGE_FINALISATION_PATHS = frozenset(
 )
 
 
+APPLICATION_SCHEMA_PORTABLE_PATHS = frozenset(
+    {
+        "services/export_contract_resources.py",
+        "services/export_execution_dal.py",
+        "services/export_runtime_composition.py",
+        "services/export_schema_fingerprint.py",
+        "services/export_sql_direct_permissions.py",
+    }
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -655,7 +666,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 52:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 53:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -872,6 +883,11 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if (
+            item["id"] == "application_schema_portable_v1"
+            and paths != APPLICATION_SCHEMA_PORTABLE_PATHS
+        ):
+            raise ValueError("Complete fixed portable schema transition required.")
         if item["id"] == "evidence_backup_collection_v1" and paths != EVIDENCE_BACKUP_PATHS:
             raise ValueError("Complete fixed evidence-backup transition required.")
         if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:

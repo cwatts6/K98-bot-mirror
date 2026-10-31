@@ -2225,6 +2225,36 @@
           "after_sha256": "67ebe250b566eda589a5d3ca7611c17daec5e86f5c329a4f609558bc72e169a2"
         }
       ]
+    },
+    {
+      "id": "application_schema_portable_v1",
+      "members": [
+        {
+          "path": "services/export_contract_resources.py",
+          "before_sha256": null,
+          "after_sha256": "566a00d01a2d853081ed98e4c4457198ad28958fbc1855973afad032fafa95f3"
+        },
+        {
+          "path": "services/export_execution_dal.py",
+          "before_sha256": "9268e2572a23f39df85e74feab4ca7daa0a86c73e2003a9b5077d7448bd5df4f",
+          "after_sha256": "a4b1f94107e3d47cb0af51442cb9a56deff4ccaeb26d63a1b30b09313e1aadf3"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "before_sha256": "a3a01d679955cb8f2a1ded719b0f833dcf06f7a538c58f87a502e3d734d446ac",
+          "after_sha256": "3c619fbe285b9ef6fbcc311ddbbb3c8b259cf59a5409b87bbfc626eb921517fd"
+        },
+        {
+          "path": "services/export_schema_fingerprint.py",
+          "before_sha256": null,
+          "after_sha256": "c86f207296adab35f87490a46beebf5a9f889b32fd81fcb7a6b1da8bbf163207"
+        },
+        {
+          "path": "services/export_sql_direct_permissions.py",
+          "before_sha256": "9141e3f9b4e98fe388229ac33ac5d429517a5f4af0198d1a89971c02a4a73899",
+          "after_sha256": "94fa4cbc36a6e8f5a5f7380ff061dcd90a41daf4148c30787f2a05303120a060"
+        }
+      ]
     }
   ]
 }
