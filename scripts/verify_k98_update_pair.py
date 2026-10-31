@@ -8,11 +8,13 @@ read-only SQL observations are checked by the complete existing startup comparat
 import argparse
 from datetime import UTC
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
 import runpy
 import sys
+import zipfile
 
 
 class PairPublicationPending(Exception):
@@ -40,6 +42,142 @@ def read(path, expected=None, limit=1048576):
     if expected is not None and hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError("Pinned bytes differ")
     return raw
+
+
+CONTRACT_ARCHIVE = "contract_verifier.zip"
+CONTRACT_ARCHIVE_LIMIT = 2 * 1024 * 1024
+# Fixed reviewed inventory: services/kvk and their metadata resources only.
+# core and root configuration retain the authenticated application's .env root.
+CONTRACT_ARCHIVE_MEMBERS = (
+    "deploy/s11_activation_scope.json",
+    "deploy/s11_application_grants.json",
+    "kvk/__init__.py",
+    "kvk/dal/__init__.py",
+    "kvk/dal/new_source_admin_dal.py",
+    "kvk/dal/new_source_config_dal.py",
+    "kvk/dal/new_source_import_dal.py",
+    "kvk/dal/source_sql_diagnostics.py",
+    "kvk/models/__init__.py",
+    "kvk/models/new_source_observation.py",
+    "kvk/models/new_source_reporting.py",
+    "kvk/models/source_integration.py",
+    "kvk/models/source_receipt_state.py",
+    "kvk/schemas/__init__.py",
+    "kvk/schemas/new_source_schema.py",
+    "kvk/services/__init__.py",
+    "kvk/services/new_source_artifact_store.py",
+    "kvk/services/new_source_digest.py",
+    "kvk/services/new_source_metadata.py",
+    "kvk/services/new_source_parser.py",
+    "services/__init__.py",
+    "services/event_cache_service.py",
+    "services/export_contention.py",
+    "services/export_contract_resources.py",
+    "services/export_coordination_dal.py",
+    "services/export_execution_authority.py",
+    "services/export_execution_dal.py",
+    "services/export_execution_protocol.py",
+    "services/export_publication_metrics.py",
+    "services/export_request_budget.py",
+    "services/export_runtime_composition.py",
+    "services/export_schema_fingerprint.py",
+    "services/export_snapshot_store.py",
+    "services/export_sql_direct_permissions.py",
+)
+
+
+def _archive_bytes(members):
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_STORED) as archive:
+        for name, raw in sorted(members.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, raw)
+    return stream.getvalue()
+
+
+def build_contract_archive(root):
+    """Package reviewed checkout bytes; never called by runtime admission."""
+    root = Path(root)
+    members = {}
+    for name in CONTRACT_ARCHIVE_MEMBERS:
+        with (root / name).open("rb") as stream:
+            content = stream.read(CONTRACT_ARCHIVE_LIMIT + 1)
+        if len(content) > CONTRACT_ARCHIVE_LIMIT:
+            raise ValueError("Contract archive source exceeds bound")
+        members[name] = content.replace(b"\r\n", b"\n")
+    raw = _archive_bytes(members)
+    validate_contract_archive(raw, hashlib.sha256(raw).hexdigest())
+    return raw
+
+
+def validate_contract_archive(raw, expected):
+    """Reject changed, ambiguous or unbounded archives before executable imports."""
+    if (
+        not isinstance(expected, str)
+        or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+        or not 0 < len(raw) <= CONTRACT_ARCHIVE_LIMIT
+        or hashlib.sha256(raw).hexdigest() != expected
+    ):
+        raise ValueError("Installed contract archive identity differs")
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        entries = archive.infolist()
+        if tuple(entry.filename for entry in entries) != CONTRACT_ARCHIVE_MEMBERS:
+            raise ValueError("Exact contract archive inventory required")
+        if (
+            any(
+                entry.compress_type != zipfile.ZIP_STORED
+                or entry.flag_bits != 0
+                or entry.file_size != entry.compress_size
+                or not 0 <= entry.file_size <= CONTRACT_ARCHIVE_LIMIT
+                for entry in entries
+            )
+            or sum(entry.file_size for entry in entries) > CONTRACT_ARCHIVE_LIMIT
+        ):
+            raise ValueError("Bounded stored contract archive required")
+        members = {entry.filename: archive.read(entry) for entry in entries}
+    if _archive_bytes(members) != raw:
+        raise ValueError("Canonical contract archive required")
+    return raw
+
+
+def activate_contract_archive(path, expected, application_root):
+    """Select the sealed verifier after the caller authenticates source/custody.
+
+    Installed manifest or immutable release bindings supply expected, never an
+    acquired target. Native callers retain administrative custody during imports.
+    No extraction, module eviction, or live-source fallback is permitted.
+    """
+    archive, root = Path(path), Path(application_root)
+    if not archive.is_absolute() or not root.is_absolute() or not root.is_dir():
+        raise ValueError("Absolute installed archive and application root required")
+    conflicts = {
+        "services",
+        "kvk",
+        "core",
+        "bot_config",
+        "constants",
+        "file_utils",
+        "utils",
+        "process_utils",
+        "event_cache",
+        "event_data_loader",
+    }
+    if any(name.split(".")[0] in conflicts for name in sys.modules):
+        raise ValueError("Application modules loaded before verifier selection")
+    raw = read(archive, limit=CONTRACT_ARCHIVE_LIMIT)
+    validate_contract_archive(raw, expected)
+    sys.dont_write_bytecode = True
+    sys.path[:0] = [str(archive), str(root)]
+
+
+def activate_release_archive(config, directory):
+    expected = config["contract_verifier_sha256"]
+    members = [m for m in config["extra_members"] if m["name"] == CONTRACT_ARCHIVE]
+    if members != [{"name": CONTRACT_ARCHIVE, "sha256": expected}]:
+        raise ValueError("Sealed contract archive binding differs")
+    activate_contract_archive(Path(directory) / CONTRACT_ARCHIVE, expected, config["root"])
 
 
 def verify_live_source(config, *, predecessor=False):
@@ -77,6 +215,7 @@ def main():
         raise ValueError("Isolated Python required")
     config = json.loads(read(args.bindings, args.sha256))
     policy = verify_live_source(config, predecessor=args.preflight)
+    activate_release_archive(config, Path(__file__).parent)
     if args.sql_contracts:
         verify_sql_contracts(config, policy)
     if args.preflight:

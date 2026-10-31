@@ -11,14 +11,56 @@ import hashlib
 import json
 from pathlib import Path, PureWindowsPath
 import re
+import runpy
 import sys
 from typing import Any
 from uuid import uuid4
 
 if __name__ == "__main__" and not __package__:
-    # The Windows launcher verifies installed source and administrator custody
-    # before invoking this file with the pinned venv and -I -B.
-    sys.path.insert(0, "C:/discord_file_downloader")
+    # The native launcher authenticates installed tools, application source and
+    # protected observation before this isolated process starts. Select the
+    # installed verifier before core's transitive services imports.
+    import argparse
+
+    early = argparse.ArgumentParser(add_help=False)
+    early.add_argument("--observation", required=True)
+    early.add_argument("--observation-sha256", required=True)
+    options, _ = early.parse_known_args()
+    if not sys.flags.isolated:
+        raise ValueError("Isolated installed preparer required")
+    with Path(options.observation).open("rb") as stream:
+        observation_raw = stream.read(4 * 1024 * 1024 + 1)
+    if (
+        not 0 < len(observation_raw) <= 4 * 1024 * 1024
+        or hashlib.sha256(observation_raw).hexdigest() != options.observation_sha256
+    ):
+        raise ValueError("Protected observation identity differs")
+    installed = Path(__file__).parent
+    with (installed / "update-tool.json").open("rb") as stream:
+        manifest_raw = stream.read(65537)
+    if len(manifest_raw) > 65536:
+        raise ValueError("Installed manifest exceeds bound")
+    tool_manifest = json.loads(manifest_raw)
+    with (installed / "verify_k98_update_pair.py").open("rb") as stream:
+        verifier_raw = stream.read(2 * 1024 * 1024 + 1)
+    if (
+        len(verifier_raw) > 2 * 1024 * 1024
+        or hashlib.sha256(verifier_raw).hexdigest()
+        != tool_manifest["files"]["verify_k98_update_pair.py"]
+    ):
+        raise ValueError("Installed verifier identity differs")
+    installed_verifier: dict[str, Any] = {
+        "__name__": "installed_verifier",
+        "__file__": str(installed / "verify_k98_update_pair.py"),
+    }
+    exec(compile(verifier_raw, installed_verifier["__file__"], "exec"), installed_verifier)
+    observed_bindings = json.loads(observation_raw)["bindings"]
+    expected_archive = tool_manifest["files"]["contract_verifier.zip"]
+    if observed_bindings["contract_verifier_sha256"] != expected_archive:
+        raise ValueError("Observation and installed verifier differ")
+    installed_verifier["activate_contract_archive"](
+        installed / "contract_verifier.zip", expected_archive, observed_bindings["root"]
+    )
 
 from core.export_release_seed import successor_seed
 from services.export_execution_protocol import encode
@@ -1744,6 +1786,11 @@ def prepare_update(
     previous = observation["seed"]
     config = deepcopy(observation["bindings"])
     tools = Path(tool_directory)
+    verifier = runpy.run_path(str(tools / "verify_k98_update_pair.py"))
+    archive = verifier["validate_contract_archive"](
+        verifier["read"](tools / "contract_verifier.zip", limit=2 * 1024 * 1024),
+        config["contract_verifier_sha256"],
+    )
     tool_sources = {
         path: (tools / Path(path).name).read_bytes()
         for path in changes
@@ -1839,8 +1886,10 @@ def prepare_update(
     files["Release-Step.ps1"] = (tools / "K98-SourceUpdate.ps1").read_bytes()
     files["Verify-NewPair.py"] = (tools / "verify_k98_update_pair.py").read_bytes()
     files["EmptyGitConfig.txt"] = b""
+    files["contract_verifier.zip"] = archive
     config["extra_members"] = [
-        dict(name="Verify-NewPair.py", sha256=sha256(files["Verify-NewPair.py"]))
+        dict(name="Verify-NewPair.py", sha256=sha256(files["Verify-NewPair.py"])),
+        dict(name="contract_verifier.zip", sha256=sha256(archive)),
     ]
     if recovery:
         files["Verify-RecoverySeed.py"] = (tools / "recovery_release_seed.py").read_bytes()
@@ -1996,9 +2045,13 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--observation", required=True)
+    parser.add_argument("--observation-sha256", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    raw = Path(args.observation).read_bytes()
+    with Path(args.observation).open("rb") as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    if hashlib.sha256(raw).hexdigest() != args.observation_sha256:
+        raise ValueError("Protected observation changed after bootstrap")
     if len(raw) > 4 * 1024 * 1024:
         raise ValueError("Installed observation exceeds bound.")
     observation = json.loads(raw)

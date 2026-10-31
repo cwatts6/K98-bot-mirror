@@ -20,6 +20,7 @@ from scripts.prepare_k98_update import (
     coordinated_policy,
     sha256,
 )
+from scripts.verify_k98_update_pair import CONTRACT_ARCHIVE, build_contract_archive
 
 COORDINATED_RELEASE_EXIT = 3
 
@@ -66,13 +67,17 @@ def classify(
             or type(installed_tool["version"]) is not int
             or installed_tool["version"] != 1
             or not isinstance(installed_tool["files"], dict)
-            or set(installed_tool["files"]) not in (expected, registry, prior, legacy)
+            or set(installed_tool["files"])
+            not in (expected | {CONTRACT_ARCHIVE}, expected, registry, prior, legacy)
             or any(
                 not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in installed_tool["files"].values()
             )
         ):
             raise ValueError("Exact version-1 supported installed-tool manifest required.")
+        archive_hash = sha256(build_contract_archive(Path(__file__).resolve().parents[1]))
+        if installed_tool["files"].get(CONTRACT_ARCHIVE) != archive_hash:
+            tool_changes.append(CONTRACT_ARCHIVE)
         for missing in expected - set(installed_tool["files"]):
             tool_changes.append("scripts/" + missing)
     if recovery:

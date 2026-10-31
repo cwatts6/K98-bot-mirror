@@ -38,6 +38,13 @@ def bundle_fixture(monkeypatch, *, crlf=False):
     }
     files = {Path(p).name: "c" * 64 for p in updater.TOOL_SOURCE_PATHS}
     files["EmptyGitConfig.txt"] = updater.sha256(b"")
+    import hashlib
+
+    from scripts.verify_k98_update_pair import build_contract_archive
+
+    files["contract_verifier.zip"] = hashlib.sha256(
+        build_contract_archive(Path(__file__).resolve().parents[1])
+    ).hexdigest()
     installed = {"version": 1, "files": files}
     return blobs, paths, changed, previous, installed
 

@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import runpy
 
 INSTALLER = r"""[CmdletBinding()]
 param()
@@ -99,6 +100,8 @@ def package(output, source=None, *, previous_manifest=None):
     # Ship Git's LF form even from a Windows CRLF checkout, so exact target
     # blob comparison during the first routine release is reproducible.
     files = {name: (source / name).read_bytes().replace(b"\r\n", b"\n") for name in names}
+    verifier = runpy.run_path(str(source / "verify_k98_update_pair.py"))
+    files[verifier["CONTRACT_ARCHIVE"]] = verifier["build_contract_archive"](source.parent)
     files["EmptyGitConfig.txt"] = b""
     manifest = dict(
         version=1, files={name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
@@ -128,7 +131,13 @@ def package(output, source=None, *, previous_manifest=None):
         prior = registry - {"k98_update_transitions.json"}
         required = prior - {"prepare_k98_release.py"}
         inventory = set(previous.get("files", {})) - {"EmptyGitConfig.txt"}
-        if previous.get("version") != 1 or inventory not in (required, prior, registry, set(names)):
+        if previous.get("version") != 1 or inventory not in (
+            required,
+            prior,
+            registry,
+            set(names),
+            set(names) | {"contract_verifier.zip"},
+        ):
             raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
         old_hash = hashlib.sha256(previous_raw).hexdigest()
         new_hash = hashlib.sha256(files["update-tool.json"]).hexdigest()

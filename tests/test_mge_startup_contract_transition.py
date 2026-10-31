@@ -153,13 +153,18 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
     }
     files["migrations/" + p["migration_id"] + ".release.json"] = raw_profile
 
+    from tests.updater_source_assertions import installed_tool_fixture
+
+    tools, archive_hash = installed_tool_fixture(tmp_path)
+    observation["bindings"]["contract_verifier_sha256"] = archive_hash
+
     def run():
         return updater.prepare_update(
             observation,
             ["DL_bot.py", updater.RELEASE_DESCRIPTION],
             lambda *key: blobs.get(key),
             tmp_path / "packet",
-            Path(__file__).resolve().parents[1] / "scripts",
+            tools,
             read_sql_blob=files.get,
         )
 

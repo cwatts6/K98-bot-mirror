@@ -343,3 +343,23 @@ def historical_runtime_hash(root, path):
         assert historic["before"] is not None, path
         return historic["before"]
     return actual
+
+
+def installed_tool_fixture(directory):
+    """Stage the real installer payload for package-generation tests."""
+    import base64
+    from pathlib import Path
+    import re
+
+    from scripts.package_k98_update_tool import package
+
+    result = package(directory / "installer")
+    script = Path(result["installer"]).read_text()
+    encoded = re.search(r"\$encoded='([^']+)'", script)[1]
+    payload = json.loads(base64.b64decode(encoded))
+    tools = directory / "installed"
+    tools.mkdir()
+    for name, content in payload.items():
+        (tools / name).write_bytes(base64.b64decode(content))
+    manifest = json.loads((tools / "update-tool.json").read_bytes())
+    return tools, manifest["files"]["contract_verifier.zip"]

@@ -35,6 +35,14 @@ NEW = OLD.replace(b"return spec", b"self.check_intent_weights(spec)\n        ret
 def installed_manifest(policy="a" * 64):
     files = {path.rsplit("/", 1)[1]: "a" * 64 for path in TOOL_SOURCE_PATHS}
     files.update({"EmptyGitConfig.txt": sha256(b""), "prepare_k98_update.py": policy})
+    import hashlib
+    from pathlib import Path
+
+    from scripts.verify_k98_update_pair import build_contract_archive
+
+    files["contract_verifier.zip"] = hashlib.sha256(
+        build_contract_archive(Path(__file__).resolve().parents[1])
+    ).hexdigest()
     return {"version": 1, "files": files}
 
 
@@ -244,6 +252,7 @@ def test_supported_legacy_installed_manifest_reports_upgrade():
 def test_legacy_inventory_requires_upgrade_even_with_matching_policy():
     installed = installed_manifest()
     del installed["files"]["prepare_k98_release.py"]
+    del installed["files"]["contract_verifier.zip"]
     del installed["files"]["k98_update_transitions.json"]
     for name in ("p0a_release.py", "p0a_release_spec.json", "recovery_release_seed.py"):
         del installed["files"][name]
