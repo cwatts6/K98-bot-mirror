@@ -1,4 +1,4 @@
-# Installed verifier bootstrap — 31 October 2026
+# Installed verifier bootstrap â€” 31 October 2026
 
 ## Problem and resulting behaviour
 
@@ -75,7 +75,10 @@ recovery/resumption behaviour. Native ACLs are mocked in the new gate unit test;
 the lab rehearsal must prove actual custody separately.
 
 The three package tests now stage the actual installer payload instead of treating
-a source directory as an installed tool. No test-only runtime fallback was added.
+a source directory as an installed tool. Eleven historical transition fixtures
+also bind the real archive when representing the candidate installed inventory;
+old-policy and old-registry rejection assertions remain unchanged. No test-only
+runtime fallback was added.
 Run focused/full pytest with operational-log isolation, architecture/deferred/
 security-routing validation, test selection, smoke imports, registration, pre-commit
 and exact source review before promotion. Record exact results in the review/PR.
@@ -87,8 +90,11 @@ introduced. No unrelated refactor or deferred optimisation is required.
 ## Remaining release gates
 
 1. Finish exact code review, validation and equivalent private promotion.
-2. Qualify installed bootstrap and protected configuration loading in the isolated
-   guest, using fresh retained evidence and existing qualification approval.
+2. Retain the completed isolated S selector/protected-configuration qualification:
+   all41 queries and three contracts passed at15 seconds; actual native custody,
+   owned configuration-file removal, disabled login and zero VM adapters confirmed.
+   S exercised the selector function with authenticated staged source; complete
+   installed CLI and combined updater execution remain separate requirements.
 3. Complete the separately declared portable contract transition. Keep production
    predecessor evidence distinct from the rebuilt lab schema.
 4. Qualify the combined updater, recovery and rollback paths; bind exact release

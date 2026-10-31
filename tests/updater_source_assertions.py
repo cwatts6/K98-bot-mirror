@@ -5,6 +5,14 @@ import json
 
 from scripts import p0a_release, prepare_k98_update
 
+
+def installed_contract_archive_hash(root):
+    """Pin the real packaged verifier in candidate installed-tool fixtures."""
+    from scripts.verify_k98_update_pair import build_contract_archive
+
+    return hashlib.sha256(build_contract_archive(root)).hexdigest()
+
+
 # Test-only bridge through this local WS3 source change to the unchanged
 # historical release assertions. These pairs do not authorize installation or
 # amend the production updater registry. Require exact successor bytes first.
