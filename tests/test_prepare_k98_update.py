@@ -366,7 +366,15 @@ def test_cli_checks_unchanged_unpinned_git_paths_before_blob_acquisition(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["prepare", "--observation", str(observation), "--output", str(tmp_path / "output")],
+        [
+            "prepare",
+            "--observation",
+            str(observation),
+            "--observation-sha256",
+            sha256(observation.read_bytes()),
+            "--output",
+            str(tmp_path / "output"),
+        ],
     )
     trees_read = []
 
@@ -419,7 +427,15 @@ def test_cli_batch_objects_are_verified_before_preparation(tmp_path, monkeypatch
     monkeypatch.setattr(
         sys,
         "argv",
-        ["prepare", "--observation", str(observation), "--output", str(tmp_path / "output")],
+        [
+            "prepare",
+            "--observation",
+            str(observation),
+            "--observation-sha256",
+            sha256(observation.read_bytes()),
+            "--output",
+            str(tmp_path / "output"),
+        ],
     )
     contents = {BEFORE: b"old\n\x00", AFTER: b"new\n\x00"}
     oids = {BEFORE: b"a" * 40, AFTER: b"b" * 40}
@@ -547,7 +563,9 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
             pipe_id=str(uuid4()),
         ).items()
     }
-    tools = Path(__file__).resolve().parents[1] / "scripts"
+    from tests.updater_source_assertions import installed_tool_fixture
+
+    tools, archive_hash = installed_tool_fixture(tmp_path)
     identities = set()
     for index, content in enumerate((b"print('first')\n", b"print('second')\n")):
         policy = previous["AutomaticStartupPolicy.json"]
@@ -567,6 +585,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
             seed=previous,
             gate=gate,
             bindings=dict(
+                contract_verifier_sha256=archive_hash,
                 before=str(index + 1) * 40,
                 target=str(index + 2) * 40,
                 root="C:\\fixture",

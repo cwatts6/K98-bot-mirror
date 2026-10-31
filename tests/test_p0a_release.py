@@ -295,6 +295,13 @@ def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch)
         },
     )
     installed["files"]["EmptyGitConfig.txt"] = recovery.sha(b"")
+    import hashlib
+
+    from scripts.verify_k98_update_pair import build_contract_archive
+
+    installed["files"]["contract_verifier.zip"] = hashlib.sha256(
+        build_contract_archive(Path(__file__).resolve().parents[1])
+    ).hexdigest()
 
     def classify():
         return compatibility.classify(
@@ -306,6 +313,7 @@ def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch)
     assert classify()["classification"] == "UPDATER_UPGRADE_REQUIRED"
     for name in ("p0a_release.py", "p0a_release_spec.json", "recovery_release_seed.py"):
         installed["files"].pop(name)
+    installed["files"].pop("contract_verifier.zip")
     assert classify()["classification"] == "UPDATER_UPGRADE_REQUIRED"
 
 

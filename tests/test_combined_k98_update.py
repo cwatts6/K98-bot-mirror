@@ -262,12 +262,16 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
         ("c" * 40, "DL_bot.py"): b"new\n",
         ("c" * 40, RELEASE_DESCRIPTION): json.dumps(d).encode(),
     }
+    from tests.updater_source_assertions import installed_tool_fixture
+
+    tools, archive_hash = installed_tool_fixture(tmp_path)
+    observation["bindings"]["contract_verifier_sha256"] = archive_hash
     result = prepare_update(
         observation,
         ["DL_bot.py", RELEASE_DESCRIPTION],
         lambda *key: blobs.get(key),
         tmp_path / "packet",
-        Path(__file__).resolve().parents[1] / "scripts",
+        tools,
         read_sql_blob=files.get,
     )
     package = Path(result["manifest"]).parent

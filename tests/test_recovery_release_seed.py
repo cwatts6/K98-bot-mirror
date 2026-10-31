@@ -271,6 +271,11 @@ def cli_fixture(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(windows, "administrative_path", lambda p, **_: p)
     monkeypatch.setattr(verifier, "verify_bot_sql_contracts", lambda _: deepcopy(collected))
+    monkeypatch.setattr(
+        helper,
+        "load_release_verifier",
+        lambda _: {"verify_bot_sql_contracts": verifier.verify_bot_sql_contracts},
+    )
     original_writers = preparer.output_writers
     monkeypatch.setattr(
         preparer, "output_writers", lambda sid, **_: original_writers(sid, secure_output=False)

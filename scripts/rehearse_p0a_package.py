@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.p0a_release import specification
 from scripts.prepare_k98_release import validate_updater_manifest
 from scripts.prepare_k98_update import TOOL_SOURCE_PATHS, prepare_update, sha256
+from scripts.verify_k98_update_pair import CONTRACT_ARCHIVE_MEMBERS, build_contract_archive
 
 
 def git(root, *args):
@@ -115,11 +116,24 @@ def main():
     tools.mkdir()
     for path in TOOL_SOURCE_PATHS:
         (tools / Path(path).name).write_bytes(blob(target, path))
+    # Build from the same projected private target used by source_plan. Reading
+    # ROOT directly could silently substitute scrubbed mirror predecessor bytes.
+    archive_source = output / "archive-source"
+    for name in CONTRACT_ARCHIVE_MEMBERS:
+        raw = blob(target, name)
+        if raw is None:
+            raise ValueError("Rehearsal contract source missing: " + name)
+        member = archive_source / name
+        member.parent.mkdir(parents=True, exist_ok=True)
+        member.write_bytes(raw)
+    contract_archive = build_contract_archive(archive_source)
+    (tools / "contract_verifier.zip").write_bytes(contract_archive)
     sql_contract = spec["contracts"]["sql_contract"]["before"]
     bindings = dict(old)
     bindings.update(
         before=before,
         target=target,
+        contract_verifier_sha256=sha256(contract_archive),
         old_policy=dict(
             Path=str(
                 PureWindowsPath(policy["seed_plan"]["path"]).with_name(

@@ -98,10 +98,19 @@ function Invoke-UpdateSql([string]$Operation,[string]$Id) {
  }
  return 0
 }
+function Assert-ContractVerifier {
+ $archive=@($c.extra_members | Where-Object {$_.name -ceq 'contract_verifier.zip'})
+ if($archive.Count -ne 1 -or $archive[0].sha256 -cne $c.contract_verifier_sha256){throw 'Contract verifier not sealed'}
+ $null=Read-Bytes (Join-Path $PSScriptRoot 'contract_verifier.zip') $c.contract_verifier_sha256 2MB
+}
 function Resolve-RecoverySeed([switch]$Create) {
  if($null -eq $c.PSObject.Properties['recovery_seed']){return 0}
  if($c.recovery_seed -cne 'live_sql_observation_v1'){throw 'Unknown recovery seed protocol'}
  Assert-Source $c.new_pins $c.target
+ Assert-ContractVerifier
+ $pair=@($c.extra_members | Where-Object {$_.name -ceq 'Verify-NewPair.py'})
+ if($pair.Count -ne 1){throw 'Native verifier not sealed'}
+ $null=Read-Bytes (Join-Path $PSScriptRoot 'Verify-NewPair.py') $pair[0].sha256
  $member=@($c.extra_members|Where-Object {$_.name -ceq 'Verify-RecoverySeed.py'})
  if($member.Count -ne 1){throw 'Pinned recovery seed verifier required'}
  $helper=Join-Path $PSScriptRoot $member[0].name
@@ -716,6 +725,7 @@ function Seed-Complete {
  return $true
 }
 function Verify-Native([switch]$Preflight) {
+ Assert-ContractVerifier
  $member=@($c.extra_members | Where-Object {$_.name -ceq 'Verify-NewPair.py'})
  if($member.Count -ne 1){throw 'Native verifier not sealed'}
  $script=Join-Path $PSScriptRoot $member[0].name

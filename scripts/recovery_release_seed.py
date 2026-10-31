@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import re
 import sys
+from typing import Any
 from uuid import uuid4
 
 
@@ -155,6 +156,24 @@ def prepare_verified_files(config, binding_hash, candidate, proof):
     return {**files, "bindings.json": encode(effective_bindings(config, files))}
 
 
+def load_release_verifier(config):
+    """Load only the sealed release verifier; caller authenticates custody/source."""
+    verifier_path = Path(__file__).with_name("Verify-NewPair.py")
+    members = [m for m in config["extra_members"] if m["name"] == verifier_path.name]
+    with verifier_path.open("rb") as stream:
+        verifier_raw = stream.read(1024 * 1024 + 1)
+    if (
+        len(members) != 1
+        or len(verifier_raw) > 1024 * 1024
+        or hashlib.sha256(verifier_raw).hexdigest() != members[0]["sha256"]
+    ):
+        raise ValueError("Sealed recovery verifier identity differs")
+    verifier: dict[str, Any] = {"__name__": "sealed_verifier", "__file__": str(verifier_path)}
+    exec(compile(verifier_raw, str(verifier_path), "exec"), verifier)
+    verifier["activate_release_archive"](config, verifier_path.parent)
+    return verifier
+
+
 def main():
     import argparse
 
@@ -175,10 +194,11 @@ def main():
         raise ValueError("Exact coordinated recovery seed mode required.")
     # The native adapter authenticates complete target source and this helper
     # before invocation. Imports use that verified checkout, never target payload.
-    sys.path.insert(0, config["root"])
+    verifier = load_release_verifier(config)
     from core.export_startup_windows import administrative_path
     from scripts.prepare_k98_update import output_writers
-    from scripts.verify_k98_update_pair import verify_bot_sql_contracts
+
+    verify_bot_sql_contracts = verifier["verify_bot_sql_contracts"]
 
     def read(member):
         protected = administrative_path(member, private=True)

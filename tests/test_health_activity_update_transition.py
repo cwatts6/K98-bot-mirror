@@ -8,7 +8,10 @@ import pytest
 
 from scripts import prepare_k98_update as updater
 from scripts.validate_k98_update_compatibility import classify
-from tests.updater_source_assertions import before_mge_lifecycle_hash
+from tests.updater_source_assertions import (
+    before_mge_lifecycle_hash,
+    installed_contract_archive_hash,
+)
 
 
 def transition():
@@ -107,6 +110,9 @@ def test_compatibility_requires_both_installed_policy_and_registry(monkeypatch, 
     blobs = synthetic_bundle(monkeypatch)
     files = {Path(p).name: "a" * 64 for p in updater.TOOL_SOURCE_PATHS}
     files["EmptyGitConfig.txt"] = updater.sha256(b"")
+    files["contract_verifier.zip"] = installed_contract_archive_hash(
+        Path(__file__).resolve().parents[1]
+    )
     if installed == "old_policy":
         files["prepare_k98_update.py"] = "b" * 64
     elif installed == "old_registry":
