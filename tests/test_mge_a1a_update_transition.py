@@ -38,7 +38,7 @@ def test_complete_bundle_pins_current_source():
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 52
+    assert len(items) == 53
     # Independent review pins: original 49 entries and exact 12-file addition.
     # These include predecessor hashes, including required absence for new files.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -59,10 +59,10 @@ def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
         with pytest.raises(ValueError, match="registry exceeds bound"):
             updater.reviewed_transitions()
     else:
-        assert len(updater.reviewed_transitions()) == 52
+        assert len(updater.reviewed_transitions()) == 53
 
 
-def test_fifty_third_registry_entry_is_rejected(monkeypatch):
+def test_fifty_fourth_registry_entry_is_rejected(monkeypatch):
     items = updater.reviewed_transitions()
     items.append(deepcopy(items[0]))
     raw = json.dumps(dict(version=1, transitions=items)).encode()
