@@ -1098,15 +1098,18 @@ def validate_combined_description(raw):
     if len(raw) > 65536:
         raise ValueError("Combined release description exceeds bound.")
     value = json.loads(raw)
-    if not isinstance(value, dict) or set(value) != {
-        "version",
-        "profile",
-        "bot_predecessors",
-        "sql_commit",
-        "migrations",
-    }:
+    fields = {"version", "profile", "bot_predecessors", "sql_commit", "migrations"}
+    if not isinstance(value, dict) or type(value.get("version")) is not int:
+        raise ValueError("Exact combined release fields and integer version required.")
+    if value["version"] == 2:
+        if value != MGE_PORTABLE_APPLICATION_RELEASE:
+            raise ValueError("Portable MGE contract requires the exact reviewed release.")
+        fields.add("application_contract_transition")
+    elif value["version"] != 1:
+        raise ValueError("Unsupported combined descriptor version; no drain requested.")
+    if set(value) != fields:
         raise ValueError("Exact combined release fields required.")
-    if value["version"] != 1 or value["profile"] not in {
+    if value["profile"] not in {
         "module_grants_v1",
         "additive_tables_v1",
         "mge_finalisation_v1",
@@ -1768,6 +1771,53 @@ def mge_application_contract_transition(previous, description):
     }
 
 
+# A distinct installed authority upgrades the raw v2 contract to portable v3.
+# The before contract and SQL migration remain the original exact production
+# bindings. This does not admit a rebuilt lab as that production predecessor.
+MGE_PORTABLE_APPLICATION_RELEASE = deepcopy(MGE_APPLICATION_RELEASE) | {
+    "version": 2,
+    "application_contract_transition": "mge_application_schema_v2",
+}
+MGE_PORTABLE_APPLICATION_AFTER_METADATA = (
+    "2825f1e9fb60d022a974951959f8443dfadabcb8e163d2fdb79e13ca6174648f"
+)
+MGE_PORTABLE_APPLICATION_REVIEW = "9d113843-0cf0-5f31-a1c6-296e5b335156"
+
+
+def mge_portable_application_contract_transition(previous, description):
+    """Admit one independently derived format and three-trigger transition.
+
+    Complete old raw and new portable observations remain mandatory at their
+    respective release gates. Neither target source nor observed SQL supplies
+    the expected contract, and permission/scope expectations never change.
+    """
+    if description != MGE_PORTABLE_APPLICATION_RELEASE:
+        raise ValueError("Portable MGE contract requires the exact reviewed release.")
+    bot = previous["bot-template.json"]
+    before = bot["application_sql_contract"]
+    if (
+        sha256(encode(before)) != MGE_APPLICATION_BEFORE
+        or type(before.get("version")) is not int
+        or before["version"] != 2
+        or "fingerprint_format" in before
+    ):
+        raise ValueError("Portable MGE predecessor application contract differs from review.")
+    after = deepcopy(before)
+    after.update(
+        version=3,
+        fingerprint_format="application_schema_v2",
+        metadata_hash=MGE_PORTABLE_APPLICATION_AFTER_METADATA,
+        review_id=MGE_PORTABLE_APPLICATION_REVIEW,
+    )
+    return {
+        "contracts": {
+            key: {"before": deepcopy(bot[key]), "after": deepcopy(bot[key])}
+            for key in ("sql_contract", "legacy_sql_contract")
+        }
+        | {"application_sql_contract": {"before": deepcopy(before), "after": after}}
+    }
+
+
 def prepare_update(
     observation,
     changes,
@@ -1840,7 +1890,12 @@ def prepare_update(
                 "Whole-database startup SQL contract needs a separately reviewed upgrade."
             )
         if description["profile"] == "mge_finalisation_v1":
-            mge_contracts = mge_application_contract_transition(previous, description)
+            transition = (
+                mge_portable_application_contract_transition
+                if description["version"] == 2
+                else mge_application_contract_transition
+            )
+            mge_contracts = transition(previous, description)
             # Only application-scope parents receive this reviewed amendment.
             # Installation/legacy protection remains independent and unchanged.
             scope = set(scope) - MGE_APPLICATION_PARENTS

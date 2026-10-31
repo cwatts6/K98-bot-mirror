@@ -67,9 +67,10 @@ def test_other_release_cannot_borrow_contract_amendment(previous, field):
         updater.mge_application_contract_transition(previous, description)
 
 
+@pytest.mark.parametrize("portable", [False, True])
 @pytest.mark.parametrize("independent_protection", [False, True])
 def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guards(
-    tmp_path, monkeypatch, independent_protection
+    tmp_path, monkeypatch, independent_protection, portable
 ):
     from core.export_release_seed import successor_seed
     import services.export_runtime_composition as composition
@@ -83,7 +84,11 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
     initial["ManualProcessPairPlan-CANDIDATE.json"]["templates"]["authority"]["sha256"] = (
         updater.sha256(updater.encode(initial["authority-template.json"]))
     )
-    bot["application_sql_contract"] = {"principal": "restricted", "metadata_hash": "old"}
+    bot["application_sql_contract"] = {
+        "version": 2,
+        "principal": "restricted",
+        "metadata_hash": "old",
+    }
     bot["legacy_sql_contract"] = {
         "principal": "restricted",
         "source": {"modules": [{"name": "dbo.MGE_Events"}] if independent_protection else []},
@@ -114,10 +119,11 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
         updater.sha256(updater.encode(previous["bot-template.json"]["application_sql_contract"])),
     )
     p = profile()
-    d = deepcopy(updater.MGE_APPLICATION_RELEASE)
+    release_name = "MGE_PORTABLE_APPLICATION_RELEASE" if portable else "MGE_APPLICATION_RELEASE"
+    d = deepcopy(getattr(updater, release_name))
     raw_profile = json.dumps(p).encode()
     d["migrations"][0]["sha256"] = updater.sha256(raw_profile)
-    monkeypatch.setattr(updater, "MGE_APPLICATION_RELEASE", d)
+    monkeypatch.setattr(updater, release_name, d)
     before = d["bot_predecessors"][0]
     target = "c" * 40
     policy = previous["AutomaticStartupPolicy.json"]
@@ -176,9 +182,14 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
     result = run()
     package = Path(result["manifest"]).parent
     new_bot = json.loads((package / "bot-template.json").read_bytes())
-    assert (
-        new_bot["application_sql_contract"]["metadata_hash"]
-        == updater.MGE_APPLICATION_AFTER_METADATA
+    assert new_bot["application_sql_contract"]["metadata_hash"] == (
+        updater.MGE_PORTABLE_APPLICATION_AFTER_METADATA
+        if portable
+        else updater.MGE_APPLICATION_AFTER_METADATA
+    )
+    assert new_bot["application_sql_contract"]["version"] == (3 if portable else 2)
+    assert new_bot["application_sql_contract"].get("fingerprint_format") == (
+        "application_schema_v2" if portable else None
     )
     assert new_bot["sql_contract"] == previous["bot-template.json"]["sql_contract"]
     assert new_bot["legacy_sql_contract"] == previous["bot-template.json"]["legacy_sql_contract"]
