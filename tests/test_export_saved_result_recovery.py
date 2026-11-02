@@ -360,6 +360,34 @@ def test_permanent_sql_error_is_not_retryable(state, number):
     assert caught.value.args[0] == state
 
 
+@pytest.mark.parametrize("already_loaded", [False, True])
+def test_adapter_collision_is_checked_before_module_side_effects(
+    tmp_path, monkeypatch, already_loaded
+):
+    import sys
+
+    from scripts.recover_stranded_export import load_tool
+
+    name = "_p03a_adapter_collision_test"
+    source = tmp_path / "adapter.py"
+    source.write_text(
+        'from pathlib import Path\nPath(__file__).with_suffix(".executed").write_text("ran")\n'
+    )
+    sentinel = SimpleNamespace()
+    monkeypatch.delitem(sys.modules, name, raising=False)
+    if already_loaded:
+        monkeypatch.setitem(sys.modules, name, sentinel)
+        with pytest.raises(ValueError, match="already loaded"):
+            load_tool(source, name, require_unloaded=True)
+        assert sys.modules[name] is sentinel
+        assert not source.with_suffix(".executed").exists()
+    else:
+        module = load_tool(source, name, require_unloaded=True)
+        assert module.__name__ == name
+        assert source.with_suffix(".executed").read_text() == "ran"
+        assert name not in sys.modules  # Registration still belongs to the caller.
+
+
 @pytest.mark.parametrize("failure", ["write", "flush"])
 def test_verified_success_survives_final_console_failure(saved, monkeypatch, failure):
     import sys

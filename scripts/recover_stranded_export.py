@@ -56,7 +56,9 @@ class RecoveryJournal:
             raise ValueError("Recovery journal readback differs.")
 
 
-def load_tool(path, name):
+def load_tool(path, name, *, require_unloaded=False):
+    if require_unloaded and name in sys.modules:
+        raise ValueError("Recovery adapter already loaded; incompatible package.")
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -206,9 +208,8 @@ def main(argv=None, *, recovery="stranded"):
             adapter = load_tool(
                 tool_root / "export_saved_result_recovery_dal.py",
                 "services.export_saved_result_recovery_dal",
+                require_unloaded=True,
             )
-            if "services.export_saved_result_recovery_dal" in sys.modules:
-                raise ValueError("Recovery adapter already loaded; incompatible package.")
             sys.modules["services.export_saved_result_recovery_dal"] = adapter
             connections = adapter.RecoveryConnections(connect)
             closeout.dal.connect = connections.connect
