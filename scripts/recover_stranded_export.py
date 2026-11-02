@@ -87,7 +87,21 @@ def previous_journal_paths(target):
     return [Path("C:/ProgramData/K98/S11/recovery") / value / "journal" for value in values]
 
 
-def main(argv=None):
+def emit_result(result, *, recovery):
+    """A broken console cannot change a durably verified saved-result outcome."""
+    try:
+        print(json.dumps(result, sort_keys=True), flush=recovery == "saved_result")
+    except Exception:
+        if recovery != "saved_result" or result.get("stage") != "PARTIAL_EXPORT_CLOSED":
+            raise
+        # The verified journal is authoritative. Prevent Python's final stdout
+        # flush from changing exit status after an already handled broken pipe.
+        sys.stdout = None
+
+
+def main(argv=None, *, recovery="stranded"):
+    if recovery not in {"stranded", "saved_result"}:
+        raise ValueError("Fixed recovery workflow required.")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--action", choices=("Inspect", "Apply"), required=True)
     parser.add_argument("--manifest", required=True)
@@ -125,12 +139,22 @@ def main(argv=None):
 
     boundary = DeploymentBoundary(manifest)
     tool_root = Path(__file__).resolve().parent
+    tool_names = (
+        (
+            "export_saved_result_recovery.py",
+            "export_saved_result_recovery_dal.py",
+        )
+        if recovery == "saved_result"
+        else (
+            "stranded_export_host.py",
+            "stranded_export_custody.py",
+            "stranded_export_recovery.py",
+            "stranded_export_recovery_dal.py",
+        )
+    )
     for path in (
         tool_root,
-        tool_root / "stranded_export_host.py",
-        tool_root / "stranded_export_custody.py",
-        tool_root / "stranded_export_recovery.py",
-        tool_root / "stranded_export_recovery_dal.py",
+        *(tool_root / name for name in tool_names),
         Path(args.target),
     ):
         assert_protected_path(path, private=True, allow_current_identity=False)
@@ -178,29 +202,59 @@ def main(argv=None):
             ):
                 raise ValueError("Original process pair exited; preserve recovery evidence.")
 
-        host_module = load_tool(tool_root / "stranded_export_host.py", "_stranded_host")
-        custody_module = load_tool(tool_root / "stranded_export_custody.py", "_stranded_custody")
-        service_module = load_tool(
-            tool_root / "stranded_export_recovery.py",
-            "_stranded_recovery",
-        )
-        dal_module = load_tool(tool_root / "stranded_export_recovery_dal.py", "_stranded_dal")
-        journal = RecoveryJournal(args.journal, assert_protected_path)
-        service = service_module.StrandedExportRecovery(
-            closeout=closeout,
-            execution=execution,
-            coordinator=dal_module.StrandedExportRecoveryDAL(closeout.dal),
-            store=store,
-            host=host_module.RecoveryHost(
-                manifest["process_bindings"]["authority"],
-                custody=custody_module,
-                child_script=manifest["child_script"],
-                manifest_path=args.manifest,
-            ),
-            journal=journal,
-            check_boundary=check_boundary,
-            expected=target,
-        )
+        if recovery == "saved_result":
+            adapter = load_tool(
+                tool_root / "export_saved_result_recovery_dal.py",
+                "services.export_saved_result_recovery_dal",
+            )
+            if "services.export_saved_result_recovery_dal" in sys.modules:
+                raise ValueError("Recovery adapter already loaded; incompatible package.")
+            sys.modules["services.export_saved_result_recovery_dal"] = adapter
+            connections = adapter.RecoveryConnections(connect)
+            closeout.dal.connect = connections.connect
+            recovery_module = load_tool(
+                tool_root / "export_saved_result_recovery.py", "_saved_result_recovery"
+            )
+            journal = RecoveryJournal(args.journal, assert_protected_path)
+            journal.names = frozenset(
+                {"review", "intent", "closure", "closeout-intent", "verified"}
+            )
+            execution = adapter.SavedResultRecoveryDAL(closeout.dal)
+            closeout.execution = execution
+            service = recovery_module.SavedResultRecovery(
+                closeout=closeout,
+                execution=execution,
+                store=store,
+                journal=journal,
+                check_boundary=check_boundary,
+                target=target,
+            )
+        else:
+            host_module = load_tool(tool_root / "stranded_export_host.py", "_stranded_host")
+            custody_module = load_tool(
+                tool_root / "stranded_export_custody.py", "_stranded_custody"
+            )
+            service_module = load_tool(
+                tool_root / "stranded_export_recovery.py",
+                "_stranded_recovery",
+            )
+            dal_module = load_tool(tool_root / "stranded_export_recovery_dal.py", "_stranded_dal")
+            journal = RecoveryJournal(args.journal, assert_protected_path)
+            service = service_module.StrandedExportRecovery(
+                closeout=closeout,
+                execution=execution,
+                coordinator=dal_module.StrandedExportRecoveryDAL(closeout.dal),
+                store=store,
+                host=host_module.RecoveryHost(
+                    manifest["process_bindings"]["authority"],
+                    custody=custody_module,
+                    child_script=manifest["child_script"],
+                    manifest_path=args.manifest,
+                ),
+                journal=journal,
+                check_boundary=check_boundary,
+                expected=target,
+            )
         if args.action == "Inspect":
             review = service.inspect()
             journal.write("review", review)
@@ -208,7 +262,7 @@ def main(argv=None):
                 stage="RECOVERY_REVIEW_READY",
                 review_token=service.token(review),
                 job_id=target["job_id"],
-                destination_count=target["destination_count"],
+                destination_count=len(review["original"]["membership"]) - 1,
                 production_changed=False,
                 provider_requests=0,
             )
@@ -216,8 +270,21 @@ def main(argv=None):
             review = journal.read("review")
             if review is None or args.review_token is None:
                 raise ValueError("Inspect first and supply its exact review token.")
-            result = service.apply(review, args.review_token)
-    print(json.dumps(result, sort_keys=True))
+            if recovery == "saved_result":
+                from time import monotonic, sleep
+
+                result = recovery_module.run_saved_recovery(
+                    service,
+                    review,
+                    args.review_token,
+                    connections,
+                    clock=monotonic,
+                    sleep=sleep,
+                    notify=lambda value: print(json.dumps(value, sort_keys=True)),
+                )
+            else:
+                result = service.apply(review, args.review_token)
+    emit_result(result, recovery=recovery)
     return 0
 
 
