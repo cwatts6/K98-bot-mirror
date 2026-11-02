@@ -300,6 +300,52 @@ def test_closure_lost_reply_reconciles_exact_receipt_once(live, stage):
     assert f.child.execute.call_count == f.child.terminate_and_observe.call_count == 1
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("stream", None),
+        ("stream", []),
+        ("stream", "invalid"),
+        ("stream_id", None),
+        ("stream_id", []),
+        ("stream_id", "not-a-uuid"),
+        ("payload_sha256", None),
+        ("payload_sha256", []),
+        ("payload_sha256", "z" * 64),
+        ("payload_sha256", "AB" * 32),
+        ("payload_reference", None),
+        ("payload_reference", "not-a-uuid"),
+        (None, b"{"),
+        (None, b"[]"),
+    ],
+)
+def test_corrupt_locator_has_deterministic_conflict_and_preserves_ownership(live, field, value):
+    from services.export_evidence_storage import EvidenceCopies
+
+    f = live
+    f.authority.execute(f.request)
+    before = deepcopy(f.ledger.transitions)
+    locator = f.settlement.locator(f.request["request_id"])
+    if field is not None:
+        if field == "stream_id":
+            locator["stream"]["StreamID"] = value
+        else:
+            locator[field] = value
+        raw = encode(locator)
+    else:
+        raw = value
+    for key in EvidenceCopies.keys(fixed_reference("locator", f.request["request_id"])):
+        f.store._store._path(key).write_bytes(b"cipher:" + raw)
+    with pytest.raises(SourceConflict):
+        f.settlement.locator(f.request["request_id"])
+    with pytest.raises(ExecutionUncertain) as raised:
+        f.authority.execute(f.request)
+    assert isinstance(raised.value.__cause__, SourceConflict)
+    assert f.authority._streams[f.request["stream_id"]].uncertain
+    assert f.ledger.transitions == before
+    assert f.child.execute.call_count == 1
+
+
 @pytest.mark.parametrize("failure", [FileNotFoundError, HostBoundaryError, SourceConflict])
 @pytest.mark.parametrize("stage", ["locator", "run"])
 def test_existing_request_failure_retains_uncertainty_without_dispatch(live, failure, stage):

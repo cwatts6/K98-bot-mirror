@@ -127,7 +127,10 @@ class RequestSettlement:
             ) from exc
         if len(raw) > 65536:
             raise SourceConflict("Request locator exceeds its fixed bound.")
-        value = decode(raw)
+        try:
+            value = decode(raw)
+        except ValueError as exc:
+            raise SourceConflict("Saved request locator is invalid.") from exc
         if (
             set(value)
             != {
@@ -145,6 +148,7 @@ class RequestSettlement:
             or value["request_id"] != request_id
             or value["response_reference"] != fixed_reference("response", request_id)
             or value["event_id"] != fixed_reference("terminal", request_id)
+            or not isinstance(value["stream"], dict)
             or set(value["stream"]) != set(_BINDING)
             or type(value["dispatch_version"]) is not int
             or value["dispatch_version"] < 3
@@ -152,10 +156,15 @@ class RequestSettlement:
             or value["sequence"] < 1
         ):
             raise SourceConflict("Exact original request locator required.")
-        uuid_text(value["payload_reference"])
+        try:
+            uuid_text(value["payload_reference"])
+            uuid_text(value["stream"]["StreamID"])
+        except ValueError as exc:
+            raise SourceConflict("Canonical locator reference required.") from exc
         if (
-            len(value["payload_sha256"]) != 64
-            or bytes.fromhex(value["payload_sha256"]).hex() != value["payload_sha256"]
+            not isinstance(value["payload_sha256"], str)
+            or len(value["payload_sha256"]) != 64
+            or any(char not in "0123456789abcdef" for char in value["payload_sha256"])
         ):
             raise SourceConflict("Canonical payload commitment required.")
         return value
