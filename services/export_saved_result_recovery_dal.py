@@ -1,6 +1,7 @@
 """Exact recovery CAS on existing SQL contracts; no provider operations."""
 
 import hashlib
+import threading
 
 from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit, one
 from services.export_contention import CoordinationLockRefused, sql_error_facts
@@ -18,9 +19,22 @@ class RecoveryConnections:
 
     def __init__(self, connect):
         self.factory = connect
-        self.opened = []
+        self._local = threading.local()
+
+    @property
+    def opened(self):
+        if not hasattr(self._local, "opened"):
+            self._local.opened = []
+        return self._local.opened
+
+    @opened.setter
+    def opened(self, value):
+        self._local.opened = value
 
     def connect(self):
+        # Reconciliation after a lost reply may request a fresh receipt inside
+        # the same checkpoint. Never open it until prior cleanup acknowledged.
+        self.require_closed()
         owner = self
 
         class Connection:
@@ -46,6 +60,10 @@ class RecoveryConnections:
         connection = Connection()
         self.opened.append(connection)
         return connection
+
+    def require_closed(self):
+        if any(not connection.closed for connection in self.opened):
+            raise SourceConflict("Previous recovery connection cleanup is unconfirmed.")
 
     def checkpoint(self, work):
         if any(not c.closed for c in self.opened):

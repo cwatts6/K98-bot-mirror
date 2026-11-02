@@ -276,7 +276,35 @@ def main(argv=None):
             ),
             authority["sql_contract"],
         )
-        reconciler = StartupReconciler(connect, authority["runtime_registration"], host)
+        from core.export_execution_host import (
+            PrivateEvidenceStore,
+            current_sid,
+            observe_retired_child,
+        )
+        from services.export_request_settlement import RequestSettlement
+        from services.export_saved_result_restart import SavedResultRestart
+
+        if current_sid() != sid:
+            raise ValueError(
+                "Saved-result restart requires the original application DPAPI identity."
+            )
+        evidence_root = inspect(authority["evidence_root"], private=True)
+        restart_settlement = RequestSettlement(
+            ExportExecutionDAL(connect),
+            PrivateEvidenceStore(evidence_root, authority["storage_owner"]),
+            check_boundary=lambda: inspect(authority["evidence_root"], private=True),
+        )
+        reconciler = StartupReconciler(
+            connect,
+            authority["runtime_registration"],
+            host,
+            saved_result_recovery=SavedResultRestart(
+                restart_settlement,
+                account=authority["runtime_registration"]["account"],
+                hostname=host["hostname"],
+                observe_retired=lambda birth: observe_retired_child(birth, authority_sid=sid),
+            ),
+        )
         from core.export_deployment_handoff import previous_termination, record_termination
 
         termination = previous_termination(history_directory, previous, inspect)

@@ -123,6 +123,7 @@ class ReplacementVerificationService:
                 session_id=self.authority.session_id,
                 enrollment_plan=plan,
                 dispatch_guard=guard,
+                settlement=self.authority.settlement,
             )
             # Retain the owned child even if opening or closing loses its reply.
             self.authority._replacement_readers[value["plan_id"]] = worker

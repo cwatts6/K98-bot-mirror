@@ -584,10 +584,16 @@ def test_broker_accepts_only_typed_open_execute_and_close():
         arguments={"fields": "id"},
     )
     assert (
-        broker.dispatch(dict(version=1, action="execute", request=request))["request_id"]
+        broker._dispatch(dict(version=1, action="execute", request=request))["request_id"]
         == request["request_id"]
     )
-    assert broker.dispatch(dict(version=1, action="close", stream_id=stream_id)) == {"version": 4}
+    assert broker._dispatch(dict(version=1, action="close", stream_id=stream_id)) == {"version": 4}
+    for message in (
+        dict(version=1, action="execute", request=request),
+        dict(version=1, action="close", stream_id=stream_id),
+    ):
+        with pytest.raises(ValueError, match="start/status"):
+            broker.dispatch(message)
 
 
 def test_broker_preserves_absent_owner_and_zero_fence_for_closing_probe():
@@ -866,3 +872,63 @@ def test_explicit_authority_startup_checks_installation_before_session_store_or_
     dal.transition.assert_not_called()
     process_factory.assert_not_called()
     store_factory.assert_not_called()
+
+
+def test_enrollment_interrupt_stops_settlement_before_physical_drain(monkeypatch, tmp_path):
+    import core.export_execution_host as host
+    import scripts.enroll_export_output_pool as entry
+    import scripts.run_export_authority as launcher
+    import services.export_execution_authority as authority_module
+    import services.export_execution_dal as persistence
+    import services.export_manual_enrollment as enrollment
+    import services.export_runtime_composition as composition
+
+    path = tmp_path / "manifest.json"
+    path.write_text("{}")
+    manifest = dict(
+        sql_contract={},
+        python=str(path),
+        child_script=str(path),
+        authority_sid="sid",
+        evidence_root=str(tmp_path),
+        storage_owner="disk",
+    )
+    monkeypatch.setattr(entry, "bootstrap", Mock())
+    monkeypatch.setattr(entry, "approved_plan", Mock(return_value=object()))
+    monkeypatch.setattr(host, "assert_protected_path", lambda value, **_: Path(value))
+    monkeypatch.setattr(host, "current_sid", lambda: "sid")
+    monkeypatch.setattr(host, "DeploymentBoundary", Mock())
+    monkeypatch.setattr(host, "PrivateEvidenceStore", Mock())
+    monkeypatch.setattr(host, "WindowsExecutionHost", Mock())
+    monkeypatch.setattr(launcher, "manifest_contract", Mock(return_value=manifest))
+    monkeypatch.setattr(launcher, "connection_factory", Mock(return_value=Mock()))
+    monkeypatch.setattr(composition, "verify_installation_contract", Mock())
+    monkeypatch.setattr(persistence, "installation_migrations", Mock(return_value=()))
+    dal = Mock()
+    dal.transition.return_value = {"Version": 1}
+    monkeypatch.setattr(persistence, "ExportExecutionDAL", Mock(return_value=dal))
+    authority = Mock()
+    authority.drain.side_effect = (
+        lambda: authority.settlement.stop.set.assert_called_once() or False
+    )
+    monkeypatch.setattr(authority_module, "ExportExecutionAuthority", Mock(return_value=authority))
+    runner = Mock()
+    runner.run.side_effect = KeyboardInterrupt
+    monkeypatch.setattr(enrollment, "ManualOutputEnrollment", Mock(return_value=runner))
+    with pytest.raises(KeyboardInterrupt):
+        entry.main(
+            [
+                "--manifest",
+                str(path),
+                "--plan",
+                str(path),
+                "--actor",
+                "fixture",
+                "--reason",
+                "fixture",
+                "--authorize-operation",
+                "S11_REGISTER_MANUAL_OUTPUT_POOL",
+            ]
+        )
+    authority.drain.assert_called_once()
+    assert dal.transition.call_count == 1  # Unproven drain cannot close the session.

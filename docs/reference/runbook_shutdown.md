@@ -1,5 +1,34 @@
 # Shutdown Runbook
 
+## P03a.2 saved-response settlement — implementation contract
+
+For requests created by this version, the authority saves a private request locator
+before dispatch and writes a validated response at its fixed encrypted reference.
+SQL remains the outcome authority. A refused or lost terminal acknowledgement is
+reconciled against that exact request before another bookkeeping attempt; it never
+causes a provider resend. Completion of the shared pacing checkpoint is separate
+and may conservatively extend the interval after a lost reply.
+
+Execution and closure use owned start/status operations. Status reads retained
+memory only; it cannot start work, query SQL or read private proof files. The live
+caller keeps waiting through ordinary contention. Settlement retries use a short
+burst, then a 30-second wait, with attention indicated after five minutes. A client
+timeout or disconnect does not release the worker, stream, or resource ownership.
+Shutdown stops admission and joins the actual worker before normal authority drain.
+Unknown responses, changed bindings, damaged evidence and unconfirmed connection
+cleanup retain ownership and require investigation.
+
+After verified predecessor termination, startup can settle a saved response and
+close its original stream using its bound child-job retirement evidence. Existing
+readiness checks still apply: a partial job is not delivered or abandoned by this
+step, and its claims are not automatically released. Old requests without the
+pre-dispatch locator retain their existing explicit recovery path. No directory
+scan, evidence overwrite, force-clear, or automatic provider replay is authorized.
+
+Install the complete reviewed source/updater transition together, following the
+[Promotion Guide](Promotion%20Guide.md). This contract does not establish production
+installation or acceptance. P03a.1 incident closeout is a separate completed recovery.
+
 ## Local MGE finalisation contract — 29 October 2026
 
 The [approved local follow-up](../task_packs/P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md)

@@ -654,6 +654,37 @@ APPLICATION_SCHEMA_PORTABLE_PATHS = frozenset(
 )
 
 
+REQUEST_SETTLEMENT_PATHS = frozenset(
+    {
+        "core/export_child_lifecycle.py",
+        "core/export_execution_host.py",
+        "scripts/enroll_export_output_pool.py",
+        "scripts/run_export_authority.py",
+        "scripts/run_export_startup_issuer.py",
+        "scripts/recover_stranded_export.py",
+        "services/export_execution_authority.py",
+        "services/export_execution_dal.py",
+        "services/export_execution_protocol.py",
+        "services/export_execution_progress.py",
+        "services/export_request_settlement.py",
+        "services/export_saved_result_restart.py",
+        "services/export_saved_result_recovery.py",
+        "services/export_saved_result_recovery_dal.py",
+        "services/export_reconciliation_service.py",
+        "services/export_replacement_verification_service.py",
+        "services/export_runtime_composition.py",
+        "services/export_snapshot_store.py",
+        "services/export_startup_reconciliation.py",
+        "services/export_evidence_storage.py",
+        "services/export_coordination_dal.py",
+        "services/export_request_budget.py",
+    }
+)
+REQUEST_SETTLEMENT_TRANSITIONS = frozenset(
+    {"request_settlement_v1", "request_settlement_from_p03a1_v1"}
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -661,12 +692,12 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 110592:
+    if len(raw) > 122880:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 53:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 55:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -686,6 +717,8 @@ def reviewed_transitions():
                 )
             )
         )
+        if item["id"] in REQUEST_SETTLEMENT_TRANSITIONS:
+            member_limit = len(REQUEST_SETTLEMENT_PATHS)
         if item["id"] in identities or not 1 <= len(item["members"]) <= member_limit:
             raise ValueError("Unique bounded transition required.")
         identities.add(item["id"])
@@ -696,6 +729,9 @@ def reviewed_transitions():
             path = ordinary_path(member["path"])
             fixed_closeout = (
                 item["id"] == "failed_export_closeout_v1" and path in FAILED_EXPORT_TRANSITION_PATHS
+            )
+            fixed_settlement = (
+                item["id"] in REQUEST_SETTLEMENT_TRANSITIONS and path in REQUEST_SETTLEMENT_PATHS
             )
             fixed_cache = (
                 item["id"] == "cache_only_completion_v1" and path in CACHE_ONLY_TRANSITION_PATHS
@@ -831,6 +867,7 @@ def reviewed_transitions():
             if (
                 not (
                     path.startswith("services/export_")
+                    or fixed_settlement
                     or fixed_closeout
                     or fixed_cache
                     or fixed_configuration
@@ -1017,6 +1054,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed publication progress transition required.")
         if item["id"] == "probe_busy_recovery_v1" and paths != PROBE_BUSY_TRANSITION_PATHS:
             raise ValueError("Complete fixed probe busy recovery transition required.")
+        if item["id"] in REQUEST_SETTLEMENT_TRANSITIONS and paths != REQUEST_SETTLEMENT_PATHS:
+            raise ValueError("Complete fixed request-settlement transition required.")
     return value["transitions"]
 
 

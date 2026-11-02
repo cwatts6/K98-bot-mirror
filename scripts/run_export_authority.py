@@ -374,6 +374,20 @@ class AuthorityBroker:
         from services.export_proof_progress import ProofProgress
 
         self.proof_progress = ProofProgress(self._dispatch, report_failure=report_dispatch_failure)
+        from services.export_execution_progress import ExecutionProgress
+
+        self.execution_progress = ExecutionProgress(
+            self._execute_owned, report_failure=report_dispatch_failure
+        )
+
+    def _execute_owned(self, selector, progress):
+        if self.boundary is not None:
+            self.boundary.recheck()
+        self.authority._progress.callback = progress
+        try:
+            return self._dispatch(selector)
+        finally:
+            self.authority._progress.callback = None
 
     def dispatch(self, message):
         from services.export_execution_protocol import uuid_text
@@ -385,7 +399,42 @@ class AuthorityBroker:
         ):
             raise ValueError("Action belongs to another deployment boundary.")
         action = message.get("action")
+        if action in {"execute", "close"}:
+            raise ValueError(
+                "Use owned execution start/status; synchronous IPC work is unsupported."
+            )
+        if action in {"execute_start", "execute_status", "close_start", "close_status"}:
+            from services.export_execution_protocol import ProviderRequest
+
+            execute = action.startswith("execute_")
+            fields = {"version", "action", "request" if execute else "stream_id"}
+            if self.boundary is not None:
+                fields.add("deployment_hash")
+            if (
+                set(message) != fields
+                or type(message.get("version")) is not int
+                or message["version"] != 1
+            ):
+                raise ValueError("Exact owned execution progress selector required.")
+            request = ProviderRequest.parse(message["request"]) if execute else None
+            stream_id = request.stream_id if execute else uuid_text(message["stream_id"])
+            identifier = request.request_id if execute else stream_id
+            selector = dict(message, action="execute" if execute else "close")
+            if action.endswith("_status"):
+                # Authenticated connection and immutable selector only: no boundary
+                # recheck, SQL, private files, worker start or account admission.
+                return self.execution_progress.poll(identifier, selector)
+            if self.proof_progress.busy() and not self.proof_progress.owns_current_thread():
+                raise AuthorityProofBusy("Publication verification is in progress.")
+            with self.authority._lock:
+                owned = self.authority._streams.get(stream_id)
+                if owned is None:
+                    raise ValueError("Progress start requires an admitted owned stream.")
+                account = owned.account
+            return self.execution_progress.start(identifier, account, selector)
         if action in {"proof_start", "proof_status"}:
+            if action == "proof_start" and self.execution_progress.busy():
+                raise AuthorityProofBusy("Owned provider execution or settlement is in progress.")
             fields = {
                 "version",
                 "action",
@@ -427,6 +476,8 @@ class AuthorityBroker:
             and action != "ready"
         ):
             raise AuthorityProofBusy("Publication verification is in progress.")
+        if self.execution_progress.busy() and action != "ready":
+            raise AuthorityProofBusy("Owned provider execution or settlement is in progress.")
         from services.authority_observation import dispatch_observation
 
         return dispatch_observation(self._dispatch, message)
@@ -859,6 +910,8 @@ def _main(argv=None):
         budget_dal = ExportCoordinationDAL(
             connect, preparations=True, output_operations=True, execution_evidence=True
         )
+        from services.export_request_settlement import RequestSettlement
+
         authority = ExportExecutionAuthority(
             dal=dal,
             store=store,
@@ -866,6 +919,7 @@ def _main(argv=None):
             session_id=session_id,
             budget_factory=lambda account: RequestBudget(budget_dal, account),
             dispatch_guard=boundary.recheck,
+            settlement=RequestSettlement(dal, store, check_boundary=boundary.recheck),
         )
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL
         from scripts.run_export_authority import AuthorityBroker as RegisteredAuthorityBroker
@@ -904,7 +958,11 @@ def _main(argv=None):
     finally:
         # Construction opens no streams; once constructed, require a proven drain.
         if authority is not None and "broker" in locals():
+            broker.execution_progress.stop_admission()
+            if authority.settlement is not None:
+                authority.settlement.stop.set()
             broker.proof_progress.drain()
+            broker.execution_progress.drain()
         drained = authority is None or authority.drain()
         if drained:
             dal.transition(

@@ -223,6 +223,9 @@ def guided(workflow, monkeypatch):
     service, state, _, _ = workflow
     service.execution.connect = object()
     broker = object.__new__(AuthorityBroker)
+    from services.export_execution_progress import ExecutionProgress
+
+    broker.execution_progress = ExecutionProgress(broker._execute_owned)
     broker.proof_progress = ProofProgress(broker._dispatch)
     broker.boundary = SimpleNamespace(fingerprint="b" * 64, recheck=Mock())
     broker.authority = SimpleNamespace(

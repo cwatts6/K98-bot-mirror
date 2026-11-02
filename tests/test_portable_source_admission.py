@@ -40,7 +40,7 @@ def synthetic(monkeypatch):
 def test_exact_reviewed_family_and_prior_history():
     items = updater.reviewed_transitions()
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    assert len(items) == 53
+    assert len(items) == 55
     assert (
         updater.sha256(canonical(items[:52]))
         == "cf3ae28f7d563acaad9106bbfd6cc60402d9d267522e9654963a8ab1adb1164b"
@@ -58,11 +58,10 @@ def test_exact_reviewed_family_and_prior_history():
         "services/export_contract_resources.py",
     }
     root = Path(__file__).resolve().parents[1]
+    from tests.updater_source_assertions import before_settlement_hash
+
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_settlement_hash(root, member["path"]) == member["after_sha256"]
 
 
 @pytest.mark.parametrize("defect", ["missing", "extra", "duplicate", "foreign"])

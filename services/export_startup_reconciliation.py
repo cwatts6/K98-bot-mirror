@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class StartupReconciler:
-    def __init__(self, connect, registration, host):
+    def __init__(self, connect, registration, host, *, saved_result_recovery=None):
         self.connect, self.registration, self.host = connect, registration, host
+        self.saved_result_recovery = saved_result_recovery
 
     def _readiness(self, cursor, *, retained_pair=False):
         account = self.registration["account"]
@@ -91,6 +92,8 @@ class StartupReconciler:
             # Verify even when no session remains open: terminal containment
             # must never become a way to start alongside the previous pair.
             termination.verify()
+            if self.saved_result_recovery is not None:
+                self.saved_result_recovery(previous_hash, termination)
         connection = self.connect()
         try:
             connection.autocommit = True

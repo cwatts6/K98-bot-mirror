@@ -236,7 +236,9 @@ def test_predecessor_preparer_rejects_target_generator_and_consumer_changes(monk
     from scripts import prepare_k98_update as updater
 
     installed = [
-        item for item in updater.reviewed_transitions() if item["id"] != "drained_issuer_exit_v1"
+        item
+        for item in updater.reviewed_transitions()
+        if item["id"] not in ({"drained_issuer_exit_v1"} | updater.REQUEST_SETTLEMENT_TRANSITIONS)
     ]
     monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
 

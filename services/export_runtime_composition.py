@@ -2650,7 +2650,9 @@ class AuthorityClient:
 
     def execute(self, message):
         request = ProviderRequest.parse(message)
-        result = self._invoke(dict(version=1, action="execute", request=request.message()))
+        result = self._wait_execution(
+            dict(version=1, action="execute_start", request=request.message()), request.request_id
+        )
         if (
             not isinstance(result, dict)
             or set(result) != {"request_id", "result"}
@@ -2661,7 +2663,9 @@ class AuthorityClient:
 
     def close_stream(self, stream_id):
         uuid_text(stream_id)
-        result = self._invoke(dict(version=1, action="close", stream_id=stream_id))
+        result = self._wait_execution(
+            dict(version=1, action="close_start", stream_id=stream_id), stream_id
+        )
         if (
             not isinstance(result, dict)
             or set(result) != {"stream_id", "version"}
@@ -2671,6 +2675,57 @@ class AuthorityClient:
         ):
             raise ExecutionUncertain("Stream closure acknowledgment differs.")
         return result
+
+    def _wait_execution(self, message, identifier):
+        """Wait for owned work; lost IPC replies poll the same identity, never resend."""
+        from time import sleep
+
+        from services.export_proof_progress import AuthorityProofBusy
+
+        start = dict(message)
+        failures = 0
+        reconstructions = 0
+        while True:
+            try:
+                progress = self._invoke(message)
+            except AuthorityProofBusy:
+                # Authenticated refusal precedes admission. The outer owned
+                # stream handles this case; it is not an unknown dispatch.
+                raise
+            except ExecutionUncertain:
+                failures += 1
+                if failures >= 3:
+                    raise
+                message = dict(start, action=start["action"].replace("_start", "_status"))
+                sleep(0.1)
+                continue
+            failures = 0
+            if (
+                not isinstance(progress, dict)
+                or set(progress)
+                != {"request_id", "state", "result", "elapsed_seconds", "needs_attention"}
+                or progress["request_id"] != identifier
+                or progress["state"] not in {"running", "waiting", "complete", "unavailable"}
+                or type(progress["elapsed_seconds"]) is not int
+                or progress["elapsed_seconds"] < 0
+                or type(progress["needs_attention"]) is not bool
+                or (progress["state"] != "complete" and progress["result"] is not None)
+            ):
+                raise ExecutionUncertain("Execution progress acknowledgement differs.")
+            if progress["state"] == "complete":
+                return progress["result"]
+            if progress["state"] == "unavailable":
+                if progress["needs_attention"]:
+                    raise ExecutionUncertain("Owned execution requires evidence reconciliation.")
+                reconstructions += 1
+                if reconstructions > 1:
+                    raise ExecutionUncertain("Execution admission has no retained acknowledgement.")
+                # A missing projection starts exact receipt reconstruction. The
+                # authority checks the existing SQL RequestID before dispatch.
+                message = dict(start)
+            else:
+                message = dict(start, action=start["action"].replace("_start", "_status"))
+            sleep(0.1)
 
     def stream(self, scope):
         return AuthorityStream(self, scope)
@@ -3010,7 +3065,7 @@ class LocalAuthorityClient(AuthorityClient):
             ):
                 raise SourceConflict("Local proof producers may open only observational streams.")
             if (
-                message.get("action") == "execute"
+                message.get("action") in {"execute", "execute_start"}
                 and ProviderRequest.parse(message["request"]).mutation
             ):
                 raise SourceConflict("Local proof producers cannot dispatch a mutation.")

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_settlement_hash
 
 
 def issuer_bundle():
@@ -17,8 +18,10 @@ def test_drained_issuer_transition_pins_exact_current_source():
     bundle = issuer_bundle()
     assert {m["path"] for m in bundle["members"]} == updater.DRAINED_ISSUER_TRANSITION_PATHS
     member = bundle["members"][0]
-    raw = (Path(__file__).resolve().parents[1] / member["path"]).read_bytes()
-    assert updater.sha256(raw.replace(b"\r\n", b"\n")) == member["after_sha256"]
+    assert (
+        before_settlement_hash(Path(__file__).resolve().parents[1], member["path"])
+        == member["after_sha256"]
+    )
     assert member["before_sha256"] and member["before_sha256"] != member["after_sha256"]
 
 

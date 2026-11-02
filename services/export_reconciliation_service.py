@@ -220,8 +220,8 @@ class ClosedStreamVerifier:
         if observed.get("termination_method") is not None:
             from core.export_child_lifecycle import read_birth, validate_retirement
 
-            if stream["Purpose"] != "probe":
-                raise SourceConflict("Restarted-child closure is only admitted for read probes.")
+            if stream["Purpose"] not in {"probe", "mutation"}:
+                raise SourceConflict("Restarted-child closure requires a normal runtime stream.")
             try:
                 birth, birth_hash = read_birth(self.store, stream)
                 validate_retirement(observed, birth, birth_hash)
@@ -949,10 +949,11 @@ class TrustedProofIssuer:
             uuid_text(old_attempt_id)
         elif current_attempt_id is not None or old_attempt_id is not None:
             raise SourceConflict("Attempt selectors belong only to ordinary retirement.")
-        # Reentrant: the fixed probes use the same in-process broker and lock.
-        # No Bot request can interleave with the local producer. SQL independently
-        # protects against another connection/process at all durable boundaries.
-        with self.authority._lock:
+        # Serialize proof producers independently of the short authority map lock.
+        # Owned probes run on the execution worker; holding the map lock here
+        # would deadlock that worker and make passive progress wait on proof I/O.
+        # Broker admission and SQL retain their independent exclusion checks.
+        with self.authority._proof_lock:
             if self.authority._closed:
                 raise SourceConflict("Authority admission is closed.")
             boundary_hash = self.boundary.recheck()

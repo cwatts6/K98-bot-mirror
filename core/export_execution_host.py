@@ -573,6 +573,68 @@ class PrivateEvidenceStore:
         EvidenceCopies(self).retain_replica(result)
         return result
 
+    def put_fixed(self, reference, data):
+        """Idempotent immutable plaintext at a pre-dispatch UUID; keep damaged copies."""
+        from uuid import UUID
+
+        from services.export_evidence_storage import EvidenceCopies
+
+        if not isinstance(data, bytes) or not 0 < len(data) <= MAX_MESSAGE_BYTES:
+            raise HostBoundaryError("Fixed evidence exceeds its plaintext bound.")
+        key = UUID(str(reference)).hex
+        copies = EvidenceCopies(self)
+        for name in copies.keys(reference):
+            try:
+                raw = self._read_fixed_copy(name)
+            except FileNotFoundError:
+                encrypted = self._protect(data)
+                try:
+                    self._store.put_fixed(name, encrypted)
+                except FileExistsError:
+                    pass  # Concurrent exact creation still requires plaintext readback.
+                raw = self._read_fixed_copy(name)
+            if raw != data:
+                raise HostBoundaryError("Conflicting fixed evidence; original bytes retained.")
+        return SnapshotReceipt(
+            key, len(data), hashlib.sha256(data).hexdigest(), self._store.storage_owner
+        )
+
+    def _read_fixed_copy(self, key):
+        with self._store._path(key).open("rb") as source:
+            encrypted = source.read(self._store.max_bytes + 1)
+        if not 0 < len(encrypted) <= self._store.max_bytes:
+            raise HostBoundaryError("Fixed encrypted evidence exceeds its bound.")
+        try:
+            data = self._unprotect(encrypted)
+        except Exception as exc:
+            raise HostBoundaryError("Fixed evidence could not be decrypted.") from exc
+        if not isinstance(data, bytes) or not 0 < len(data) <= MAX_MESSAGE_BYTES:
+            raise HostBoundaryError("Fixed plaintext evidence exceeds its bound.")
+        return data
+
+    def read_fixed(self, reference):
+        """Read an exact known UUID, never enumerate storage or silently repair it.
+
+        A surviving authenticated copy can recover an interrupted replica write.
+        Two readable but different documents are a conflict, not a voting scheme.
+        The caller must validate the document's full request/stream binding.
+        """
+        from services.export_evidence_storage import EvidenceCopies
+
+        found, failures = [], []
+        for key in EvidenceCopies.keys(reference):
+            try:
+                found.append(self._read_fixed_copy(key))
+            except (FileNotFoundError, HostBoundaryError) as exc:
+                failures.append(exc)
+        if not found:
+            if all(isinstance(error, FileNotFoundError) for error in failures):
+                raise FileNotFoundError("Fixed evidence has not been created.") from failures[0]
+            raise HostBoundaryError("Fixed evidence has no readable copy.") from failures[0]
+        if any(raw != found[0] for raw in found):
+            raise HostBoundaryError("Fixed evidence copies conflict; originals retained.")
+        return found[0]
+
     def read(self, receipt):
         path = self._store._path(receipt.key)
         with path.open("rb") as source:
@@ -1210,38 +1272,43 @@ class WindowsExecutionHost:
 
     def observe_retired_child(self, birth):
         """Observe one previously bound job; never terminate or enumerate other processes."""
-        import pywintypes
-        import win32job
+        return observe_retired_child(birth, authority_sid=self.sid)
 
-        from core.export_child_lifecycle import validate_host_birth
 
-        validate_host_birth(birth)
-        if birth["authority_sid"] != self.sid or birth["machine"] != machine_identity():
-            raise HostBoundaryError("Child birth belongs to another Windows host or identity.")
+def observe_retired_child(birth, *, authority_sid):
+    """Shared native observation for authority recovery and the protected issuer."""
+    import pywintypes
+    import win32job
+
+    from core.export_child_lifecycle import validate_host_birth
+
+    validate_host_birth(birth)
+    if birth["authority_sid"] != authority_sid or birth["machine"] != machine_identity():
+        raise HostBoundaryError("Child birth belongs to another Windows host or identity.")
+    try:
+        job = win32job.OpenJobObject(0x0004, False, birth["job_name"])
+    except pywintypes.error as exc:
+        if exc.winerror != 2:
+            raise HostBoundaryError("Exact named child job cannot be observed.") from exc
+        method = "named_job_destroyed"
+    else:
         try:
-            job = win32job.OpenJobObject(0x0004, False, birth["job_name"])  # JOB_OBJECT_QUERY
-        except pywintypes.error as exc:
-            if exc.winerror != 2:  # Only ERROR_FILE_NOT_FOUND establishes object destruction.
-                raise HostBoundaryError("Exact named child job cannot be observed.") from exc
-            method = "named_job_destroyed"
-        else:
-            try:
-                limits = win32job.QueryInformationJobObject(job, 9)
-                accounting = win32job.QueryInformationJobObject(job, 1)
-                if limits["BasicLimitInformation"]["LimitFlags"] != 0x2000:
-                    raise HostBoundaryError("Retained child job containment changed.")
-                if accounting["ActiveProcesses"] != 0:
-                    raise HostBoundaryError("The exact child job still contains live processes.")
-                method = "named_job_empty"
-            finally:
-                job.Close()
-        # Windows destroys a job only after every associated process has exited.
-        # Do not claim a process-handle wait occurred after those handles were lost.
-        return dict(
-            child_id=birth["child_id"],
-            pid=birth["pid"],
-            job_empty=True,
-            process_terminated=True,
-            termination_method=method,
-            job_name_sha256=hashlib.sha256(birth["job_name"].encode()).hexdigest(),
-        )
+            limits = win32job.QueryInformationJobObject(job, 9)
+            accounting = win32job.QueryInformationJobObject(job, 1)
+            if limits["BasicLimitInformation"]["LimitFlags"] != 0x2000:
+                raise HostBoundaryError("Retained child job containment changed.")
+            if accounting["ActiveProcesses"] != 0:
+                raise HostBoundaryError("The exact child job still contains live processes.")
+            method = "named_job_empty"
+        finally:
+            job.Close()
+    # Job destruction proves all associated processes exited, not a retained
+    # process-handle wait. The verifier separately binds this named job's birth.
+    return dict(
+        child_id=birth["child_id"],
+        pid=birth["pid"],
+        job_empty=True,
+        process_terminated=True,
+        termination_method=method,
+        job_name_sha256=hashlib.sha256(birth["job_name"].encode()).hexdigest(),
+    )

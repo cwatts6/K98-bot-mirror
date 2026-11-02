@@ -1313,6 +1313,61 @@ class ExportExecutionDAL:
         finally:
             connection.close()
 
+    def last_request(self, stream_id):
+        """Index-backed last request; never scan private evidence for pending work."""
+        connection = self.connect()
+        try:
+            connection.autocommit = True
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT TOP (1) RequestID FROM dbo.ExportProviderRequest WHERE StreamID=? ORDER BY Sequence DESC",
+                    stream_id,
+                )
+                row = one(cursor)
+                return str(row["RequestID"]).lower() if row else None
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+    def session_streams(self, session_id, account):
+        """Bounded exact predecessor inventory; retained SQL identities locate files."""
+        connection = self.connect()
+        try:
+            connection.autocommit = True
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT TOP (33) * FROM dbo.ExportExecutionStream WHERE SessionID=? AND AccountKey=? AND State IN ('open','frozen') ORDER BY StreamID",
+                    session_id,
+                    account,
+                )
+                result = rows(cursor)
+                if len(result) > 32:
+                    raise SourceConflict("Retained stream recovery exceeds its fixed bound.")
+                return result
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+    def open_host_sessions(self, hostname):
+        connection = self.connect()
+        try:
+            connection.autocommit = True
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT TOP (33) * FROM dbo.ExportExecutionSession WHERE AuthorityPrincipal=USER_NAME() AND LOWER(HostIdentity) COLLATE Latin1_General_100_BIN2=? AND State='open' ORDER BY CreatedUTC,SessionID",
+                    hostname,
+                )
+                return rows(cursor)
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
     def read_proof(self, proof_id):
         """Read immutable historical evidence; this does not grant settlement authority."""
         from services.export_execution_protocol import uuid_text

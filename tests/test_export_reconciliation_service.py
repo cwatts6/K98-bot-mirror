@@ -230,6 +230,7 @@ def test_fixed_issuer_uses_private_observation_and_exact_sql_identity_only(
             ),
         ),
         _lock=threading.RLock(),
+        _proof_lock=threading.RLock(),
         _closed=False,
         session_id=str(uuid4()),
         enrollment_plan=None,

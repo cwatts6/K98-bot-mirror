@@ -41,9 +41,12 @@ class ExportSnapshotStore:
         return path
 
     def put(self, data):
+        return self.put_fixed(uuid4().hex, data)
+
+    def put_fixed(self, key, data):
+        """Create one predetermined opaque name; never replace even partial bytes."""
         if not isinstance(data, bytes) or not 0 < len(data) <= self.max_bytes:
             raise ValueError("Spool exceeds its configured bound.")
-        key = uuid4().hex
         # Exclusive creation never replaces an existing generation. Register in SQL
         # only after close/fsync and readback; incomplete/orphan bytes are retained.
         with self._path(key).open("xb") as stream:

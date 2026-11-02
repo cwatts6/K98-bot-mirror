@@ -126,6 +126,8 @@ def main(argv=None):
         budget_dal = ExportCoordinationDAL(
             connect, preparations=True, output_operations=True, execution_evidence=True
         )
+        from services.export_request_settlement import RequestSettlement
+
         authority = ExportExecutionAuthority(
             dal=dal,
             store=store,
@@ -134,12 +136,15 @@ def main(argv=None):
             budget_factory=lambda account: RequestBudget(budget_dal, account),
             enrollment_plan=plan,
             dispatch_guard=boundary.recheck,
+            settlement=RequestSettlement(dal, store, check_boundary=boundary.recheck),
         )
         ManualOutputEnrollment(plan=plan, authority=authority, dal=dal, store=store).run(
             actor=args.actor, reason=args.reason
         )
     finally:
         # Construction opens no streams; once constructed, require a proven drain.
+        if authority is not None:
+            authority.settlement.stop.set()
         drained = authority is None or authority.drain()
         if drained:
             dal.transition(

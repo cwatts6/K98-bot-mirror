@@ -527,7 +527,8 @@ def test_shutdown_keeps_unacknowledged_closure_retained(runtime):
     dal.fail = "freeze"
     assert authority.drain() is False
     assert authority._streams[request["stream_id"]].uncertain
-    assert not child.terminated
+    assert child.terminated  # Physical shutdown is independent of SQL admission.
+    assert not authority._streams[request["stream_id"]].closed
 
 
 def test_dal_does_not_acknowledge_row_before_commit_completion():

@@ -28,9 +28,30 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_settlement_hash(root, path):
+    """Authenticate this exact successor before retaining older release assertions."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    # Historical assertions still require their original bytes after the exact
+    # complete request-settlement successor is authenticated.
+    successor = next(
+        (
+            t
+            for t in prepare_k98_update.reviewed_transitions()
+            if t["id"] == "request_settlement_from_p03a1_v1"
+        ),
+        None,
+    )
+    if successor is not None:
+        member = next((m for m in successor["members"] if m["path"] == path), None)
+        if member is not None:
+            assert actual == member["after_sha256"], path
+            actual = member["before_sha256"]
+    return actual
+
+
 def before_scoped_index_hash(root, path):
     """Authenticate the exact query successor for tests, never updater admission."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_settlement_hash(root, path)
     fixture = root / "tests/fixtures/scoped_index_metadata_source_pairs.json"
     if not fixture.exists():
         return actual

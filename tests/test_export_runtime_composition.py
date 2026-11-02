@@ -260,9 +260,20 @@ def test_local_authority_probe_uses_registered_broker_without_connecting_to_its_
             return {"id": "index-0"}
 
     timing = Mock()
+    from threading import RLock, local
+
+    streams = {}
+
+    def admit(**kw):
+        streams[kw["stream_id"]] = SimpleNamespace(account=kw["scope"]["AccountKey"])
+        return kw["stream_id"]
+
     authority = SimpleNamespace(
         enrollment_plan=None,
-        open_stream=Mock(side_effect=lambda **kw: kw["stream_id"]),
+        _lock=RLock(),
+        _progress=local(),
+        _streams=streams,
+        open_stream=Mock(side_effect=admit),
         execute=Mock(side_effect=execute),
         close_stream=Mock(side_effect=lambda identifier: dict(stream_id=identifier, version=5)),
     )
@@ -1410,6 +1421,8 @@ def test_configuration_binds_real_authority_stream_and_closes_before_release():
 
 
 def test_bot_pipe_client_opens_executes_and_closes_exact_one_stream(monkeypatch):
+    from threading import RLock, local
+
     from scripts.run_export_authority import AuthorityBroker
     from services.export_execution_authority import ExecutionUncertain
     from services.export_runtime_composition import AuthorityClient, RuntimeRegistration
@@ -1419,7 +1432,17 @@ def test_bot_pipe_client_opens_executes_and_closes_exact_one_stream(monkeypatch)
         open_stream=Mock(side_effect=lambda **kw: opened.append(kw) or kw["stream_id"]),
         execute=Mock(return_value={"id": "file-aaa"}),
         close_stream=Mock(side_effect=lambda stream_id: {"stream_id": stream_id, "version": 4}),
+        _lock=RLock(),
+        _progress=local(),
+        _streams={},
     )
+
+    def admit(**kw):
+        opened.append(kw)
+        authority._streams[kw["stream_id"]] = SimpleNamespace(account=kw["scope"]["AccountKey"])
+        return kw["stream_id"]
+
+    authority.open_stream.side_effect = admit
     registered = registration_fixture()
     registered["pools"][0]["index_file_id"] = "file-aaa"
     broker = AuthorityBroker(authority, RuntimeRegistration(registered))
@@ -1491,7 +1514,7 @@ def test_bot_pipe_client_opens_executes_and_closes_exact_one_stream(monkeypatch)
             stream.execute(request | {"stream_id": str(uuid4())})
     assert len(opened) == 1 and authority.execute.call_count == 1
     authority.close_stream.assert_called_once_with(stream.stream_id)
-    assert len(handles) == 3 and all(handle.closed for handle in handles)
+    assert len(handles) >= 3 and all(handle.closed for handle in handles)
     with pytest.raises(ExecutionUncertain):
         with stream:
             pass

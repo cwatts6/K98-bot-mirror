@@ -48,9 +48,11 @@ def run_issuer(tmp_path, monkeypatch):
         "manifests": {"authority": "b" * 64, "bot": "c" * 64},
     }
     authority = {
-        "deployment_boundary": {"host": {"machine_guid": "machine"}},
+        "deployment_boundary": {"host": {"machine_guid": "machine", "hostname": "fixture-host"}},
         "sql_contract": {},
-        "runtime_registration": {},
+        "runtime_registration": {"account": "fixture-account"},
+        "evidence_root": str(tmp_path / "evidence"),
+        "storage_owner": "disk",
         "python": "python",
     }
     plan = {
@@ -70,7 +72,14 @@ def run_issuer(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(issuer, "release_history", Mock(return_value=(None, str(tmp_path))))
     monkeypatch.setattr(handoff, "previous_termination", Mock(return_value=None))
-    monkeypatch.setattr(host, "machine_identity", Mock(return_value={"machine_guid": "machine"}))
+    monkeypatch.setattr(
+        host,
+        "machine_identity",
+        Mock(return_value={"machine_guid": "machine", "hostname": "fixture-host"}),
+    )
+    monkeypatch.setattr(host, "current_sid", Mock(return_value="sid"))
+    monkeypatch.setattr(host, "PrivateEvidenceStore", Mock())
+    (tmp_path / "evidence").mkdir()
     token, mutex = Mock(), Mock()
     monkeypatch.setattr(native, "linked_application_token", Mock(return_value=(token, {})))
     monkeypatch.setattr(native, "startup_mutex", Mock(return_value=mutex))

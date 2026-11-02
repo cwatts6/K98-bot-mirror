@@ -5,7 +5,7 @@ to one exact supervised child. Only its trusted parent can author response event
 """
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import threading
 from uuid import UUID, uuid4
@@ -41,6 +41,7 @@ class OwnedStream:
     termination_evidence: dict | None = None
     closure_receipt: object | None = None
     closure_document: dict | None = None
+    lock: object = field(default_factory=threading.RLock)
 
 
 class ExportExecutionAuthority:
@@ -54,10 +55,13 @@ class ExportExecutionAuthority:
         session_id,
         enrollment_plan=None,
         dispatch_guard=None,
+        settlement=None,
     ):
         self.dal, self.store, self.host = dal, store, host
         self.budget_factory, self.session_id = budget_factory, session_id
         self.dispatch_guard = dispatch_guard
+        self.settlement = settlement
+        self._progress = threading.local()
         if enrollment_plan is not None:
             from services.export_enrollment_service import EnrollmentPlan
             from services.export_replacement_verification import ReplacementVerificationPlan
@@ -65,9 +69,10 @@ class ExportExecutionAuthority:
             if not isinstance(enrollment_plan, (EnrollmentPlan, ReplacementVerificationPlan)):
                 raise ValueError("Protected typed enrollment plan required.")
         self.enrollment_plan = enrollment_plan
-        # SQL owns cross-process exclusion. This lock also serializes local
-        # freeze vs dispatch, including the final commit-before-send boundary.
+        # SQL owns cross-process exclusion. The map lock is short; each owned
+        # stream serializes freeze/dispatch without blocking passive progress.
         self._lock = threading.RLock()
+        self._proof_lock = threading.RLock()
         self._streams = {}
         self._closed = False
         self._replacement_readers = {}
@@ -132,12 +137,7 @@ class ExportExecutionAuthority:
             self._streams[stream_id] = stream
             try:
                 birth = getattr(child, "birth_evidence", None)
-                if (
-                    birth is not None
-                    and enrollment is None
-                    and scope["OwnerKind"] == "preparation"
-                    and scope["Purpose"] == "probe"
-                ):
+                if birth is not None and enrollment is None:
                     from core.export_child_lifecycle import validate_host_birth
 
                     validate_host_birth(birth)
@@ -214,6 +214,11 @@ class ExportExecutionAuthority:
         request = ProviderRequest.parse(message, enrollment=self.enrollment_plan is not None)
         with self._lock:
             stream = self._streams.get(request.stream_id)
+        if stream is None:
+            raise ExecutionUncertain("Unknown stream.")
+        # The owned account worker serializes dispatch. Never hold the global
+        # authority lock across provider I/O, private proof work or retry waits.
+        with stream.lock:
             if stream is None or stream.frozen or stream.uncertain:
                 raise ExecutionUncertain("Unknown, frozen or uncertain stream.")
             if request.target not in stream.destinations or (
@@ -229,6 +234,20 @@ class ExportExecutionAuthority:
             with authority_request_step("request_lookup", request):
                 existing, _ = self.dal.read_request(request.request_id)
             if existing is not None:
+                if self.settlement is not None:
+                    import hashlib
+
+                    locator = self.settlement.locator(request.request_id)
+                    if (
+                        hashlib.sha256(encode(request.message())).hexdigest()
+                        != locator["payload_sha256"]
+                    ):
+                        raise ExecutionUncertain("Repeated RequestID has a different payload.")
+                    saved = self.settlement.run(
+                        request.request_id, progress=getattr(self._progress, "callback", None)
+                    )
+                    stream.version = saved["stream_version"]
+                    return saved["response"]
                 raise ExecutionUncertain(
                     "RequestID already exists; reconcile its retained outcome."
                 )
@@ -242,6 +261,15 @@ class ExportExecutionAuthority:
             try:
                 with authority_request_step("request_payload", request):
                     payload = self.store.put(encode(request.message()))
+                locator = None
+                if self.settlement is not None:
+                    locator = self.settlement.checkpoint(
+                        lambda: self.settlement.prepare(
+                            request,
+                            payload,
+                            self.settlement.execution.read_stream(request.stream_id),
+                        )
+                    )
                 with authority_request_step("request_prepared", request):
                     self._event(
                         stream,
@@ -287,15 +315,23 @@ class ExportExecutionAuthority:
                     validate_response(request, response)
                 outcome_attempted = True
                 with authority_request_step("request_result", request):
-                    self._event(
-                        stream,
-                        request,
-                        "succeeded",
-                        {"request_id": request.request_id, "response": response},
-                    )
+                    if self.settlement is None:
+                        self._event(
+                            stream,
+                            request,
+                            "succeeded",
+                            {"request_id": request.request_id, "response": response},
+                        )
+                    else:
+                        self.settlement.save(locator, response)
+                        saved = self.settlement.run(
+                            request.request_id, progress=getattr(self._progress, "callback", None)
+                        )
+                        stream.version = saved["stream_version"]
                 durable_success = True
-                with authority_request_step("budget_complete", request):
-                    budget.completed()
+                if self.settlement is None:
+                    with authority_request_step("budget_complete", request):
+                        budget.completed()
                 report_authority_event(
                     "AUTHORITY_REQUEST_COMPLETED",
                     message={
@@ -344,9 +380,108 @@ class ExportExecutionAuthority:
                 ) from exc
 
     def close_stream(self, stream_id):
-        """Freeze, observe exact child termination, then commit closure; no release."""
+        if self.settlement is None:
+            return self._close_stream_once(stream_id)
         with self._lock:
             stream = self._streams.get(stream_id)
+        if stream is None:
+            raise ExecutionUncertain("Stream is not owned by this authority.")
+        with stream.lock:
+            try:
+                # Physical child retirement must not depend on readable evidence
+                # or SQL admission. Keep the claim if bookkeeping cannot settle.
+                if not stream.closed and stream.termination_evidence is None:
+                    self._terminate_child(stream)
+                return self._close_settled_stream(stream_id, stream)
+            except BaseException as error:
+                stream.uncertain = True
+                raise ExecutionUncertain(
+                    "Stream closure requires reconciliation; retain claims."
+                ) from error
+
+    def _close_settled_stream(self, stream_id, stream):
+        from services.export_request_settlement import transient
+
+        with stream.lock:
+            delay, started = 0.25, self.settlement.clock()
+            while True:
+                before = None
+                try:
+                    before = self.settlement.checkpoint(
+                        lambda: self.settlement.execution.read_stream(stream_id)
+                    )
+                    self._settle_before_closure(stream, before)
+                    return self.settlement.checkpoint(lambda: self._close_stream_once(stream_id))
+                except Exception as error:
+                    # Cleanup is checked before this fresh receipt read. A failed
+                    # close never authorizes another connection or blind replay.
+                    try:
+                        after = self.settlement.checkpoint(
+                            lambda: self.settlement.execution.read_stream(stream_id)
+                        )
+                    except Exception as read_error:
+                        if not transient(read_error):
+                            raise
+                        after = None
+                    if (
+                        before is not None
+                        and after is not None
+                        and after["Version"] != before["Version"]
+                    ):
+                        continue  # The exact closure checks reconcile the changed receipt.
+                    if not transient(error):
+                        raise
+                    callback = getattr(self._progress, "callback", None)
+                    elapsed = self.settlement.clock() - started
+                    if callback is not None:
+                        callback("waiting", elapsed >= 300)
+                    if self.settlement.stop.wait(30 if elapsed > 15 else delay):
+                        raise ExecutionUncertain(
+                            "Closure interrupted; retain its durable evidence."
+                        ) from error
+                    delay = min(delay * 2, 5)
+
+    def _settle_before_closure(self, stream, before):
+        if before is None or before["State"] == "closed":
+            return
+        execution = self.settlement.execution
+        identifier = self.settlement.checkpoint(lambda: execution.last_request(stream.stream_id))
+        if identifier is None:
+            return
+        _, events = self.settlement.checkpoint(lambda: execution.read_request(identifier))
+        if [e["State"] for e in events] not in (
+            ["prepared", "dispatch_intent"],
+            ["prepared", "dispatch_intent", "succeeded"],
+        ):
+            return
+        old = stream.closure_document
+        if old is not None:
+            count, digest = self.settlement.checkpoint(
+                lambda: execution.stream_digest(stream.stream_id)
+            )
+            if (
+                old["version"] != before["Version"]
+                or old["last_sequence"] != count
+                or old["event_digest"] != digest.hex()
+            ):
+                raise ExecutionUncertain(
+                    "Old closure no longer matches the original frozen history."
+                )
+        saved = self.settlement.run(identifier, progress=getattr(self._progress, "callback", None))
+        stream.version = saved["stream_version"]
+        if old is not None and saved["stream_version"] != before["Version"]:
+            # Only the exact saved terminal event changed the digest. Keep the
+            # old private seal immutable and issue a fresh seal for this version.
+            stream.closure_document = stream.closure_receipt = None
+
+    def _close_stream_once(self, stream_id):
+        """Freeze, observe exact child termination, then commit closure; no release."""
+        execution = self.settlement.execution if self.settlement is not None else self.dal
+        with self._lock:
+            stream = self._streams.get(stream_id)
+        if stream is None:
+            raise ExecutionUncertain("Stream is not owned by this authority.")
+        with stream.lock:
             if stream is None:
                 raise ExecutionUncertain("Stream is not owned by this authority.")
             if stream.closed:
@@ -356,7 +491,7 @@ class ExportExecutionAuthority:
             try:
                 state = "open"
                 if recover:
-                    retained = self.dal.read_stream(stream_id)
+                    retained = execution.read_stream(stream_id)
                     if not retained or (
                         str(retained["StreamID"]).lower(),
                         str(retained["SessionID"]).lower(),
@@ -367,7 +502,7 @@ class ExportExecutionAuthority:
                     state = retained["State"]
                     if state == "closed":
                         receipt, document = stream.closure_receipt, stream.closure_document
-                        sequence, event_digest = self.dal.stream_digest(stream_id)
+                        sequence, event_digest = execution.stream_digest(stream_id)
                         if (
                             receipt is None
                             or document is None
@@ -388,7 +523,7 @@ class ExportExecutionAuthority:
                         raise ExecutionUncertain("Stream has no recoverable closure transition.")
                     stream.version = retained["Version"]
                 if state == "open":
-                    row = self.dal.transition(
+                    row = execution.transition(
                         "stream",
                         SessionID=self.session_id,
                         StreamID=stream_id,
@@ -401,7 +536,7 @@ class ExportExecutionAuthority:
                     self._terminate_child(stream)
                 elif callable(getattr(stream.child, "retry_handle_cleanup", None)):
                     stream.child.retry_handle_cleanup()
-                last_sequence, event_digest = self.dal.stream_digest(stream_id)
+                last_sequence, event_digest = execution.stream_digest(stream_id)
                 document = {
                     "stream_id": stream_id,
                     "version": stream.version,
@@ -413,9 +548,17 @@ class ExportExecutionAuthority:
                     raise ExecutionUncertain("Frozen journal changed after closure evidence.")
                 stream.closure_document = deepcopy(document)
                 if stream.closure_receipt is None:
-                    stream.closure_receipt = self.store.put(encode(document))
+                    if self.settlement is None:
+                        stream.closure_receipt = self.store.put(encode(document))
+                    else:
+                        from services.export_request_settlement import fixed_reference
+
+                        stream.closure_receipt = self.settlement.retain(
+                            fixed_reference("closure-" + str(stream.version), stream_id),
+                            encode(document),
+                        )
                 receipt = stream.closure_receipt
-                row = self.dal.transition(
+                row = execution.transition(
                     "stream",
                     SessionID=self.session_id,
                     StreamID=stream_id,
@@ -458,7 +601,7 @@ class ExportExecutionAuthority:
             stream = self._streams.get(stream_id)
             if stream is None or not (stream.uncertain or stream.frozen):
                 raise ExecutionUncertain("No interrupted locally owned stream closure.")
-            return self.close_stream(stream_id)
+        return self.close_stream(stream_id)
 
     def recover_abandoned_read_closure(self, stream_id):
         """Close an old-session read only from its private birth and retired exact job."""
@@ -525,19 +668,16 @@ class ExportExecutionAuthority:
     def recover_object_closures(self, account, object_id):
         """A registered proof request can finish only its interrupted local children."""
         with self._lock:
-            for stream_id, owned in tuple(self._streams.items()):
-                if (
-                    owned.account != account
-                    or owned.closed
-                    or not (owned.frozen or owned.uncertain)
-                ):
-                    continue
-                row = self.dal.read_stream(stream_id)
-                if row and object_id in {
-                    str(row.get("JobID")).lower(),
-                    str(row.get("OutputOperationID")).lower(),
-                }:
-                    self.recover_owned_closure(stream_id)
+            streams = tuple(self._streams.items())
+        for stream_id, owned in streams:
+            if owned.account != account or owned.closed or not (owned.frozen or owned.uncertain):
+                continue
+            row = self.dal.read_stream(stream_id)
+            if row and object_id in {
+                str(row.get("JobID")).lower(),
+                str(row.get("OutputOperationID")).lower(),
+            }:
+                self.recover_owned_closure(stream_id)
 
     def stop(self):
         """Close admission. Caller drains owned streams; no automatic adoption/retry."""
@@ -551,12 +691,18 @@ class ExportExecutionAuthority:
         old stream is adopted from SQL when the authority restarts.
         """
         self.stop()
+        if self.settlement is not None:
+            self.settlement.stop.set()
         failures = []
         # Replacement checks own real supervised children, although their slow
         # read-only requests intentionally do not hold this authority's lock.
         # Close them before the parent session can be recorded as drained.
         for key, worker in tuple(self._replacement_readers.items()):
-            if not worker.drain():
+            try:
+                drained = worker.drain()
+            except Exception:
+                drained = False
+            if not drained:
                 failures.append(key)
         for thread in tuple(self._replacement_threads.values()):
             if thread is not threading.current_thread():
@@ -565,10 +711,17 @@ class ExportExecutionAuthority:
             if stream.closed:
                 continue
             try:
-                if self._drain_discarded_replacement(stream_id, stream):
-                    continue
-                self.close_stream(stream_id)
-            except ExecutionUncertain:
+                with stream.lock:
+                    # Even discarded replacement reads need physical retirement
+                    # when SQL/private evidence cannot be inspected.
+                    if stream.termination_evidence is None:
+                        self._terminate_child(stream)
+                    elif callable(getattr(stream.child, "retry_handle_cleanup", None)):
+                        stream.child.retry_handle_cleanup()
+                    if self._drain_discarded_replacement(stream_id, stream):
+                        continue
+                    self.close_stream(stream_id)
+            except Exception:
                 failures.append(stream_id)
         return not failures and all(stream.closed for stream in self._streams.values())
 
@@ -595,7 +748,8 @@ class ExportExecutionAuthority:
                     account=owned.account,
                     registration_hash=self.enrollment_plan.digest,
                 )
-                self._terminate_child(owned)
+                if owned.termination_evidence is None:
+                    self._terminate_child(owned)
                 observed = owned.termination_evidence
                 if (
                     observed.get("child_id") != owned.child.identity
