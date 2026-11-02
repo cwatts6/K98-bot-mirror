@@ -68,7 +68,7 @@ class ExecutionProgress:
                 worker.start()
             except BaseException:
                 del self._active[account]
-                entry["state"] = "unavailable"
+                entry.update(state="unavailable", needs_attention=True)
                 raise
             return self._view(identifier, entry)
 

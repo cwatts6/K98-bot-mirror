@@ -284,6 +284,43 @@ def test_closure_lost_reply_reconciles_exact_receipt_once(live, stage):
     assert f.child.execute.call_count == f.child.terminate_and_observe.call_count == 1
 
 
+@pytest.mark.parametrize("failure", [FileNotFoundError, HostBoundaryError, SourceConflict])
+@pytest.mark.parametrize("stage", ["locator", "run"])
+def test_existing_request_failure_retains_uncertainty_without_dispatch(live, failure, stage):
+    f = live
+    f.authority.execute(f.request)
+    before = deepcopy(f.ledger.transitions)
+    error = failure("retained evidence unavailable")
+    setattr(f.settlement, stage, Mock(side_effect=error))
+    with pytest.raises(ExecutionUncertain, match="requires reconciliation") as raised:
+        f.authority.execute(f.request)
+    assert raised.value.__cause__ is error
+    assert f.authority._streams[f.request["stream_id"]].uncertain
+    with pytest.raises(ExecutionUncertain):
+        f.authority.execute(dict(f.request, request_id=str(uuid4())))
+    assert f.ledger.transitions == before
+    assert f.child.execute.call_count == 1
+
+
+def test_worker_start_failure_is_retained_attention_without_reconstruction(monkeypatch):
+    issue = Mock()
+    worker = ExecutionProgress(issue)
+    selector = dict(action="execute", request=dict(request_id="request"))
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "services.export_execution_progress.Thread.start",
+            Mock(side_effect=RuntimeError("cannot start")),
+        )
+        with pytest.raises(RuntimeError, match="cannot start"):
+            worker.start("request", "account", selector)
+    status = worker.poll("request", selector)
+    assert status["state"] == "unavailable" and status["needs_attention"] is True
+    assert worker.start("request", "account", selector)["needs_attention"] is True
+    assert not worker.busy()
+    worker.drain()
+    issue.assert_not_called()
+
+
 def test_new_service_recovers_only_fixed_saved_result_without_provider(live):
     f = live
     original = f.settlement.run
@@ -403,7 +440,10 @@ def test_saved_response_surviving_replica_is_used_without_overwrite(live, partia
 
 
 @pytest.mark.parametrize("saved_seal", [False, True])
-def test_restart_settles_original_request_and_verifies_full_closure(live, saved_seal):
+@pytest.mark.parametrize("missing_locator", [False, True])
+def test_restart_settles_original_request_and_verifies_full_closure(
+    live, saved_seal, missing_locator
+):
     from services.export_saved_result_restart import SavedResultRestart
 
     f = live
@@ -447,6 +487,18 @@ def test_restart_settles_original_request_and_verifies_full_closure(live, saved_
     recovery = SavedResultRestart(
         f.settlement, account="account", hostname="fixture-host", observe_retired=retired
     )
+    if missing_locator:
+        from services.export_evidence_storage import EvidenceCopies
+
+        for key in EvidenceCopies.keys(fixed_reference("locator", f.request["request_id"])):
+            f.store._store._path(key).unlink()
+        before = deepcopy(f.ledger.transitions)
+        with pytest.raises(SourceConflict, match="Original request locator unavailable"):
+            recovery((b"m" * 32).hex(), termination)
+        assert f.ledger.transitions == before
+        assert f.ledger.read_stream(f.request["stream_id"])["State"] != "closed"
+        assert f.child.execute.call_count == 1
+        return
     assert recovery((b"m" * 32).hex(), termination) == [f.request["stream_id"]]
     assert f.ledger.read_stream(f.request["stream_id"])["State"] == "closed"
     assert f.ledger.transitions.count("succeeded") == f.ledger.transitions.count("close") == 1

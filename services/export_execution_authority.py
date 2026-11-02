@@ -237,17 +237,25 @@ class ExportExecutionAuthority:
                 if self.settlement is not None:
                     import hashlib
 
-                    locator = self.settlement.locator(request.request_id)
-                    if (
-                        hashlib.sha256(encode(request.message())).hexdigest()
-                        != locator["payload_sha256"]
-                    ):
-                        raise ExecutionUncertain("Repeated RequestID has a different payload.")
-                    saved = self.settlement.run(
-                        request.request_id, progress=getattr(self._progress, "callback", None)
-                    )
-                    stream.version = saved["stream_version"]
-                    return saved["response"]
+                    try:
+                        locator = self.settlement.locator(request.request_id)
+                        if (
+                            hashlib.sha256(encode(request.message())).hexdigest()
+                            != locator["payload_sha256"]
+                        ):
+                            raise ExecutionUncertain("Repeated RequestID has a different payload.")
+                        saved = self.settlement.run(
+                            request.request_id, progress=getattr(self._progress, "callback", None)
+                        )
+                        stream.version = saved["stream_version"]
+                        return saved["response"]
+                    except BaseException as exc:
+                        stream.uncertain = True
+                        if isinstance(exc, ExecutionUncertain):
+                            raise
+                        raise ExecutionUncertain(
+                            "Retained request requires reconciliation; retain claims."
+                        ) from exc
                 raise ExecutionUncertain(
                     "RequestID already exists; reconcile its retained outcome."
                 )

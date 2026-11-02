@@ -118,7 +118,13 @@ class RequestSettlement:
 
     def locator(self, request_id):
         uuid_text(request_id)
-        raw = self.store.read_fixed(fixed_reference("locator", request_id))
+        try:
+            raw = self.store.read_fixed(fixed_reference("locator", request_id))
+        except FileNotFoundError as exc:
+            raise SourceConflict(
+                "Original request locator unavailable; automatic settlement requires "
+                "its pre-dispatch binding. Retain evidence and ownership."
+            ) from exc
         if len(raw) > 65536:
             raise SourceConflict("Request locator exceeds its fixed bound.")
         value = decode(raw)
