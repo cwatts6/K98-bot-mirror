@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 
+from core.export_child_lifecycle import read_birth
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from kvk.services.new_source_export_service import (
     GoogleSheetsTransport,
@@ -374,6 +375,19 @@ class RolloverJournalVerifier:
                     or stream["Purpose"] != "mutation"
                 ):
                     continue
+                persisted_scope = json.loads(stream["ScopeJson"])
+                if set(persisted_scope) not in ({"resources"}, {"resources", "host_birth"}):
+                    raise SourceConflict("Original operation phase scope fields differ.")
+                if "host_birth" in persisted_scope:
+                    # Host metadata is independent of the registered resource set.
+                    # Authenticate its original child/session/account binding before
+                    # comparing resources; never silently discard unverified fields.
+                    try:
+                        read_birth(self.store, stream)
+                    except (ValueError, TypeError, KeyError) as exc:
+                        raise SourceConflict(
+                            "Original operation phase child birth differs."
+                        ) from exc
                 version = stream["ClaimVersion"]
                 if (
                     version not in phases
@@ -385,7 +399,7 @@ class RolloverJournalVerifier:
                     or (stream["Fence"], stream["Epoch"]) != (scope["Fence"], scope["Epoch"])
                     or bytes(stream["RegistrationHash"]).hex() != scope["RegistrationHash"]
                     or len(bytes(stream["SnapshotHash"])) != 32
-                    or bounded_json(json.loads(stream["ScopeJson"]))
+                    or bounded_json(dict(resources=persisted_scope["resources"]))
                     != bounded_json(scope["ScopeJson"])
                 ):
                     raise SourceConflict(

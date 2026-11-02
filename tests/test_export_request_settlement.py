@@ -28,6 +28,22 @@ def busy():
     )
 
 
+@pytest.mark.parametrize("hostname", ["fixture-host", "FiXtUrE-HoSt"])
+def test_predecessor_host_lookup_normalizes_parameter_and_closes_connection(hostname):
+    from services.export_execution_dal import ExportExecutionDAL
+
+    cursor, connection = Mock(), Mock()
+    cursor.description = [("SessionID",)]
+    cursor.fetchall.return_value = [("original-session",)]
+    connection.cursor.return_value = cursor
+    assert ExportExecutionDAL(lambda: connection).open_host_sessions(hostname) == [
+        dict(SessionID="original-session")
+    ]
+    assert cursor.execute.call_args.args[1] == "fixture-host"
+    cursor.close.assert_called_once()
+    connection.close.assert_called_once()
+
+
 class Ledger:
     """Inert SQL-contract state for end-to-end service/caller fault injection."""
 

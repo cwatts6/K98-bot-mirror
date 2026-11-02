@@ -179,7 +179,7 @@ def test_native_result_settlement_and_passive_poll(installed, tmp_path, fault): 
                 )
 
             recovery = SavedResultRestart(
-                service, account="test-account", hostname="fixture-host", observe_retired=retired
+                service, account="test-account", hostname="FiXtUrE-HoSt", observe_retired=retired
             )
             assert recovery((b"m" * 32).hex(), SimpleNamespace(verify=lambda: None)) == [f.f.stream]
             assert execution.read_stream(f.f.stream)["State"] == "closed"

@@ -1360,7 +1360,7 @@ class ExportExecutionDAL:
             try:
                 cursor.execute(
                     "SELECT TOP (33) * FROM dbo.ExportExecutionSession WHERE AuthorityPrincipal=USER_NAME() AND LOWER(HostIdentity) COLLATE Latin1_General_100_BIN2=? AND State='open' ORDER BY CreatedUTC,SessionID",
-                    hostname,
+                    hostname.lower(),
                 )
                 return rows(cursor)
             finally:

@@ -667,6 +667,7 @@ REQUEST_SETTLEMENT_PATHS = frozenset(
         "services/export_execution_protocol.py",
         "services/export_execution_progress.py",
         "services/export_request_settlement.py",
+        "services/export_rollover_evidence.py",
         "services/export_saved_result_restart.py",
         "services/export_saved_result_recovery.py",
         "services/export_saved_result_recovery_dal.py",

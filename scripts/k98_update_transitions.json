@@ -2307,7 +2307,7 @@
         {
           "path": "services/export_execution_dal.py",
           "before_sha256": "a4b1f94107e3d47cb0af51442cb9a56deff4ccaeb26d63a1b30b09313e1aadf3",
-          "after_sha256": "5acc51701ad0edbd3fb5226a737e8c440fd3485e23b73fce5e1bf7bd10253465"
+          "after_sha256": "052dedc08551ae987890062125060ad752e851e4efcf12a7a5e1642d8aaa5700"
         },
         {
           "path": "services/export_execution_progress.py",
@@ -2338,6 +2338,11 @@
           "path": "services/export_request_settlement.py",
           "before_sha256": null,
           "after_sha256": "1524b159d52717d45a47611ca70f641ca834536c5859b33576907a86c15f4b24"
+        },
+        {
+          "path": "services/export_rollover_evidence.py",
+          "before_sha256": "8e3306e9fda7ba893a003fdf2dfe151bcd7f928222d4829283d47041e5cd7765",
+          "after_sha256": "e72f3332615b24761308b250d1285a6c65bf8791de0c185f70e92275ff650165"
         },
         {
           "path": "services/export_runtime_composition.py",
@@ -2422,7 +2427,7 @@
         {
           "path": "services/export_execution_dal.py",
           "before_sha256": "a4b1f94107e3d47cb0af51442cb9a56deff4ccaeb26d63a1b30b09313e1aadf3",
-          "after_sha256": "5acc51701ad0edbd3fb5226a737e8c440fd3485e23b73fce5e1bf7bd10253465"
+          "after_sha256": "052dedc08551ae987890062125060ad752e851e4efcf12a7a5e1642d8aaa5700"
         },
         {
           "path": "services/export_execution_progress.py",
@@ -2453,6 +2458,11 @@
           "path": "services/export_request_settlement.py",
           "before_sha256": null,
           "after_sha256": "1524b159d52717d45a47611ca70f641ca834536c5859b33576907a86c15f4b24"
+        },
+        {
+          "path": "services/export_rollover_evidence.py",
+          "before_sha256": "8e3306e9fda7ba893a003fdf2dfe151bcd7f928222d4829283d47041e5cd7765",
+          "after_sha256": "e72f3332615b24761308b250d1285a6c65bf8791de0c185f70e92275ff650165"
         },
         {
           "path": "services/export_runtime_composition.py",

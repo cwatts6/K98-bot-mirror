@@ -238,6 +238,68 @@ def verifier(fixture):
     )
 
 
+@pytest.mark.parametrize(
+    "damage", [None, "child", "session", "resources", "unknown_field", "missing", "hash"]
+)
+def test_original_rollover_phases_validate_host_birth_separately_from_resources(damage):
+    f = rollover_fixture()
+    expected = verifier(f).verify(f.snapshot)
+    messages = deepcopy(f.messages)
+    births = {}
+    for record in f.records.values():
+        stream = record["stream"]
+        stream["SessionID"] = str(uuid4())
+        reference = str(uuid4())
+        body = dict(
+            kind="provider_child_birth/1",
+            stream_id=str(stream["StreamID"]).lower(),
+            session_id=str(stream["SessionID"]).lower(),
+            account=stream["AccountKey"],
+            host=dict(
+                child_id=str(stream["ChildIdentity"]).lower(),
+                pid=123,
+                job_name="Global\\K98ExportChild-" + "a" * 64,
+                machine=dict(machine_guid=str(uuid4()), hostname="fixture-host"),
+                authority_sid="S-1-5-21-1",
+                limit_flags=0x2000,
+                assigned=True,
+            ),
+        )
+        if damage == "child":
+            body["host"]["child_id"] = str(uuid4())
+        if damage == "session":
+            body["session_id"] = str(uuid4())
+        raw = encode(body)
+        scope = json.loads(stream["ScopeJson"])
+        scope["host_birth"] = dict(reference=reference, sha256=hashlib.sha256(raw).hexdigest())
+        if damage == "resources":
+            scope["resources"].pop()
+        if damage == "unknown_field":
+            scope["unverified"] = True
+        if damage == "hash":
+            scope["host_birth"]["sha256"] = "0" * 64
+        stream["ScopeJson"] = bounded_json(scope)
+        if damage != "missing":
+            births[reference] = raw
+    original_read = f.store.read_reference
+
+    def read(reference, checksum):
+        if reference not in births:
+            return original_read(reference, checksum)
+        raw = births[reference]
+        if hashlib.sha256(raw).digest() != bytes(checksum):
+            raise ValueError("Private evidence checksum differs")
+        return raw
+
+    f.store.read_reference = read
+    if damage is None:
+        assert verifier(f).verify(f.snapshot) == expected
+    else:
+        with pytest.raises(SourceConflict):
+            verifier(f).verify(f.snapshot)
+    assert f.messages == messages
+
+
 def probe_arguments(fixture):
     observations = []
 
