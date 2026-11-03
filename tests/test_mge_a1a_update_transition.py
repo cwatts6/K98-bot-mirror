@@ -62,7 +62,7 @@ def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
         assert len(updater.reviewed_transitions()) == 56
 
 
-def test_fifty_sixth_registry_entry_is_rejected(monkeypatch):
+def test_registry_entry_beyond_installed_bound_is_rejected(monkeypatch):
     items = updater.reviewed_transitions()
     items.append(deepcopy(items[0]))
     raw = json.dumps(dict(version=1, transitions=items)).encode()
