@@ -234,6 +234,7 @@ class DiagnosticSink:
         }
         if (
             type(event) is not dict
+            or not {"reference", "stage", "state", "observed_utc"} <= event.keys()
             or not set(event) <= allowed
             or len(json.dumps(event)) > MAX_EVENT
         ):

@@ -2517,7 +2517,7 @@
         {
           "path": "core/interaction_safety.py",
           "before_sha256": "c9289a9eaf7efed47abd7b4c4390a5634283dca8ac77c8ca7fb412e018a1e09b",
-          "after_sha256": "4ffae8fef89621c38335592bd5075ad9b4f2fd540a2a6bba213f64cf051fd730"
+          "after_sha256": "d67ec3feba8e3c5175b279722f6d075a757353e750b03569c9aa7adfe7a64d1b"
         },
         {
           "path": "core/operation_evidence.py",
@@ -2567,7 +2567,7 @@
         {
           "path": "services/operation_diagnostics.py",
           "before_sha256": null,
-          "after_sha256": "dc88e800ee5cb0d0474d4870ba7962ed99e09ff2a38f9f5754ff914e9ae74f2a"
+          "after_sha256": "61678d5433af061b469b6e2cf8351deb8ac78b92edb516ba74210f86b8d20f33"
         },
         {
           "path": "services/recovery_report.py",

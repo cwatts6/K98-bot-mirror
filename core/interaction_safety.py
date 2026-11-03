@@ -269,12 +269,16 @@ def private_operation(function):
         pending.add(key)
         child = asyncio.create_task(function(self, *args, **kwargs))
         _private_children.add(child)
+        disposition = "completed"
         try:
             return await drain_awaitable(child)
+        except BaseException:
+            disposition = "interrupted"
+            raise
         finally:
             _private_children.discard(child)
             pending.discard(key)
-            elapsed("private_operation", started)
+            elapsed("private_operation", started, disposition)
 
     @functools.wraps(function)
     async def measured(self, *args, **kwargs):

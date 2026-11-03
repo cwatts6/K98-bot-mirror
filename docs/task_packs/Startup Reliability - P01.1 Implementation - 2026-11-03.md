@@ -181,3 +181,20 @@ F08/F32 closure is limited to these implemented boundaries. P01.2 issuer launch
 diagnostics, P01.3 health presentation, P01.4 upload/audit, P01.5 calendar and P01.6
 personal-read capacity remain separate approved-design slices. SQL holder/native
 contention qualification and F09 remain P02; continuation convergence stays P03.
+
+## PR review follow-up before deployment
+
+The late review of mirror #480/private #721 identified two small diagnostic
+improvements within P01.1. Restored events must contain reference, stage, state and
+timestamp before any retained record is mutated; malformed optional history can no
+longer poison subsequent publication. Private callback timing now records interrupted
+for errors and cancellation while preserving the exception and child-drain contract.
+The exact P01.1 updater successor hashes are refreshed for these two runtime files.
+This updates the uninstalled candidate; earlier updater packages are superseded.
+
+Focused qualification: 79 tests passed, including four incomplete-history restore
+cases and callback error/cancellation disposition; operational logs remained unchanged.
+The traceback review suggestion was rejected with executable evidence: tb_next moves
+toward the original raise site. The proposed concurrent initialization race is excluded
+by the sole synchronous caller after the locked, one-time startup claim. Neither
+requires a runtime change. Final private CI and deployment receipts remain separate.

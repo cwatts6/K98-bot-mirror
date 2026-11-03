@@ -122,3 +122,27 @@ async def test_cancelled_stage_records_interruption_and_propagates(observations)
     with pytest.raises(asyncio.CancelledError), timing_scope(), timed_stage("private_callback"):
         raise asyncio.CancelledError()
     assert stages(observations)[0]["disposition"] == "interrupted"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancelled", [False, True])
+async def test_private_operation_preserves_error_and_records_interruption(observations, cancelled):
+    original = asyncio.CancelledError() if cancelled else ValueError("private failure")
+
+    class View:
+        @private_operation
+        async def callback(self, interaction):
+            raise original
+
+    view = View()
+    with pytest.raises(type(original)) as caught:
+        await view.callback(Interaction())
+    if not cancelled:
+        assert caught.value is original
+    assert view._private_operations == set()
+    assert [
+        (row["stage"], row["disposition"])
+        for row in stages(observations)
+        if row["stage"] in {"private_operation", "private_callback"}
+    ] == [("private_operation", "interrupted"), ("private_callback", "interrupted")]
+    assert "private failure" not in str(observations)

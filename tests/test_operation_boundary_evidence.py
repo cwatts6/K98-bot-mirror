@@ -40,6 +40,32 @@ def event(reference=None, state="observed", **extra):
     )
 
 
+@pytest.mark.parametrize("missing", ["reference", "stage", "state", "observed_utc"])
+def test_incomplete_restored_event_cannot_poison_later_publication(tmp_path, missing):
+    malformed = event(state="settled")
+    malformed["stage"] = "operation"
+    del malformed[missing]
+    path = tmp_path / "observations.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "operation-observations/1",
+                "operations": [{"transitions": [malformed]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    sink = diagnostics.DiagnosticSink(tmp_path).start()
+    fresh = event(state="failed")
+    assert sink.offer(fresh)
+    sink.close()
+    document = json.loads(path.read_text(encoding="utf-8"))
+    assert document["sink_failures"] == 1
+    assert [row["reference"] for row in document["operations"]] == [fresh["reference"]]
+    assert document["operations"][0]["first_failure"] == fresh
+    assert document["status"] == "closed"
+
+
 @pytest.fixture
 def capture(monkeypatch):
     events = []
