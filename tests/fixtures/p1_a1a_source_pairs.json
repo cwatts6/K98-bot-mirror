@@ -1,0 +1,52 @@
+[
+  {
+    "path": "core/interaction_safety.py",
+    "before": "9142fd9cebcb475582d7ff8b5b74fb7dd9dffd1c02af81e08ad70206241e7c7c",
+    "after": "054b144802145e7dae450b1fbcc2a0ac0276ff9147034f98b49b6538bd6e4c88"
+  },
+  {
+    "path": "core/owned_work.py",
+    "before": "1c0a51b42003b8bcf407c78340bbe4e640b9dc8e9818bf28ccf8b75a29d900f9",
+    "after": "0ff3ade205877a013ebd3a43f0ea1aafd99e51113e9c23ee73a4148eb2918777"
+  },
+  {
+    "path": "mge/dal/mge_review_dal.py",
+    "before": "e9019912034ea7ec66322580e8aed707ecea0237acb23ccb80935a3eea3b5025",
+    "after": "b598da196f413d3778657339b0ede0cd62ad16c63f76a78e4f46b79ea0437f7a"
+  },
+  {
+    "path": "mge/dal/mge_roster_dal.py",
+    "before": "6958235a5cb357cef96032fc770f57578e7cc4ab19bcad7704d8988ac3ae161d",
+    "after": "ced30fae60b800b67a64dd628cba0ad6ca9d19f2d0aff2f923dd96561cf48ec5"
+  },
+  {
+    "path": "mge/mge_embed_manager.py",
+    "before": "822ba743d38906972799be5c434b98453ba907e8bc5b3d2a205483da24ef0223",
+    "after": "561adbc8d8edb7a497312ab924ff16b3432741a9fc67a472f45b2f4d49008fb8"
+  },
+  {
+    "path": "mge/mge_publish_service.py",
+    "before": "39e9eb2d194c64dbde4ec74dee2feecf3e60a3ec0f8e3ffee5b2b7893ad7d716",
+    "after": "d1f35ad10fbdfe04d4d760e1f79669a4ef29350bc157003805c4f78c5a13eab0"
+  },
+  {
+    "path": "mge/mge_roster_execution.py",
+    "before": "4edc226c66f7ac724b3b0e43ffe804cf1cad13f4d26314097cc9b26d30e01ead",
+    "after": "c73f7f5c93624f3e4fcda1b560e584c0651f59545db2c1cea484d58c5f0e224e"
+  },
+  {
+    "path": "mge/mge_simplified_flow_service.py",
+    "before": "ad02bc14def0cb98821a7b7b109f86d046b413302657bce55d49c94377d8afcb",
+    "after": "9029e39f1d025c2f3bd4e72192376e50fe20b06fb6c0181347191340a7f46a8d"
+  },
+  {
+    "path": "mge/mge_simplified_leadership_service.py",
+    "before": "8e0f0563a494f2052b9722ae426c937a66f9a7cb235062d394ac1f90ad8c2a38",
+    "after": "3c5728b25ea47d5bb709299c50684fab6c3602aed3ecbf056cc9505e6b2219c5"
+  },
+  {
+    "path": "ui/views/mge_simplified_leadership_view.py",
+    "before": "80e4383f16c47e5192bac312401b5f6efa9aa5c48c41298fdd5ab6fa6da78cc5",
+    "after": "fbac7d0684ca85129815949e8359c83e8927fae15e1c134ea63a9c3ea264f843"
+  }
+]
