@@ -37,7 +37,7 @@ async def test_deadline_drains_worker_without_retry_or_false_failure(caplog):
     assert finished.is_set()
     assert startup.report()[0]["state"] == "deadline_elapsed_outcome_unconfirmed"
     assert "deferring" not in caplog.text
-    assert "does not establish failure" in caplog.text
+    assert startup.report()[0]["physical"] == "settled"
     assert "drain finished" not in caplog.text
 
 

@@ -2505,6 +2505,76 @@
           "after_sha256": "e9735585cf74c4af60df50a47691eccbba8af5dbe9852695221388c5baaae3ff"
         }
       ]
+    },
+    {
+      "id": "p011_startup_outcomes_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "6c1e338c5db4a97d3ba34dd2a2626006b916dbf8226faa9ec56e85a7d78dc691",
+          "after_sha256": "82814f9a8f2b8461557b6c13fad3690baa72cdb194d0705b27a8e2806d229463"
+        },
+        {
+          "path": "core/interaction_safety.py",
+          "before_sha256": "c9289a9eaf7efed47abd7b4c4390a5634283dca8ac77c8ca7fb412e018a1e09b",
+          "after_sha256": "4ffae8fef89621c38335592bd5075ad9b4f2fd540a2a6bba213f64cf051fd730"
+        },
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": null,
+          "after_sha256": "ebd268a9fe2c5c0a1126fe9d4d4965a9b914dd77ba90a063fc9698712e44890f"
+        },
+        {
+          "path": "core/operation_timing.py",
+          "before_sha256": "04c71084a204b366ad16aa65e60bef4d1668ce9ac694bafc82e303c4a75fe6cd",
+          "after_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "0ff3ade205877a013ebd3a43f0ea1aafd99e51113e9c23ee73a4148eb2918777",
+          "after_sha256": "450b7fae263b75f4b99ceb833040d46034397067305244e3b803880e9863fdb8"
+        },
+        {
+          "path": "core/startup_diagnostics.py",
+          "before_sha256": "62c47453916b67dc4f6465051a5efb41002569c4eaf6a405602935337efe4e65",
+          "after_sha256": "23f4c3f9d8f5eec45a965329ccf3411dc9766c6e09ab035345cb2b7acea83cef"
+        },
+        {
+          "path": "logging_setup.py",
+          "before_sha256": "815b62476b7236185fa14ba80c3a8c3c6190f537167936187b416994958f7fa3",
+          "after_sha256": "ed59450eb6358d45853df9e611d33582902ea38e271f65f5b66fc4e6b4e2b441"
+        },
+        {
+          "path": "mge/mge_board_ownership.py",
+          "before_sha256": "f23f8597496e72a319ea0296fc346dea48432c9ced701c0aaebf3e2ce36f0b29",
+          "after_sha256": "4e465728ea93885cba33f205683223fd006f7c3cf4f0dd8199cee546e03bbb3a"
+        },
+        {
+          "path": "mge/mge_roster_execution.py",
+          "before_sha256": "b9167300775d218429d13f37974f3657325380eb53d9a536006a5cbf7f964f44",
+          "after_sha256": "375f34931dbc9eecb4e6e3ca4082883dfea99ff357ee87279ca077bb25872c38"
+        },
+        {
+          "path": "services/cache_admission_diagnostics.py",
+          "before_sha256": "d81b389379481fd29f61d644ec3c5b757646026e5a58c733f552720db6420239",
+          "after_sha256": "bcfc1bee7c8bf935b8126834f581ead8f2c84fa906a64151efd2d536ec513fab"
+        },
+        {
+          "path": "services/configuration_attempt_recovery.py",
+          "before_sha256": "e4a3531d328641e51912c775b9f62584c83c189fd0a57b135f8232fdbedf48df",
+          "after_sha256": "0a5b9f92e948dbebb85378023d6196a3f109abf03f377aad61d41505128b2829"
+        },
+        {
+          "path": "services/operation_diagnostics.py",
+          "before_sha256": null,
+          "after_sha256": "dc88e800ee5cb0d0474d4870ba7962ed99e09ff2a38f9f5754ff914e9ae74f2a"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "0288f7bd02b3d9c907d61c10ad6fb4b79d3a0e817050791e3de792a0c792ebff",
+          "after_sha256": "6edae4d374ad51d78cae3e629951b088d5dc748fd257c5afe5148ae06dd70a68"
+        }
+      ]
     }
   ]
 }

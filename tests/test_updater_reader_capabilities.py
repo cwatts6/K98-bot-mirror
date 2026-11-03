@@ -14,6 +14,7 @@ from tests.updater_source_assertions import (
     before_event_delivery_hash,
     before_finalisation_hash,
     before_monitoring_hash,
+    before_p011_hash,
     before_portable_fingerprint_hash,
     before_procconfig_admission_hash,
     before_settlement_hash,
@@ -88,7 +89,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     for transition in update.reviewed_transitions():
-        if transition["id"] == "startup_evidence_custody_v1":
+        if transition["id"] in {"startup_evidence_custody_v1", "p011_startup_outcomes_v1"}:
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
@@ -111,8 +112,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p1_mge_finalisation_v1":
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"], member["path"]
+                assert before_p011_hash(root, member["path"]) == member["after_sha256"], member[
+                    "path"
+                ]
             continue
         if transition["id"] == "checkpoint_observation_lifecycle_v1":
             for member in transition["members"]:

@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-import logging
 from types import SimpleNamespace
 
 import pytest
@@ -13,18 +12,26 @@ from core.owned_work import drain_thread
 from tests.test_p1_owned_operations import Interaction, form
 
 
-def stages(caplog):
-    return [r.operation_stage for r in caplog.records if hasattr(r, "operation_stage")]
+@pytest.fixture
+def observations(monkeypatch):
+    from services import operation_diagnostics
+
+    events = []
+    monkeypatch.setattr(operation_diagnostics, "offer", events.append)
+    return events
+
+
+def stages(observations):
+    return [dict(r, disposition=r["state"]) for r in observations if "elapsed_ms" in r]
 
 
 @pytest.mark.asyncio
-async def test_context_crosses_owned_thread_and_nested_callbacks_without_second_ack(caplog):
-    caplog.set_level(logging.INFO)
+async def test_context_crosses_owned_thread_and_nested_callbacks_without_second_ack(observations):
 
     class View:
         @private_operation
         async def child(self, interaction):
-            return await drain_thread(lambda: record_timing("fixture_dal", 0.002))
+            return await drain_thread(lambda: record_timing("mge_review_read", 0.002))
 
         @private_operation
         async def parent(self, interaction):
@@ -33,7 +40,7 @@ async def test_context_crosses_owned_thread_and_nested_callbacks_without_second_
     interaction = Interaction()
     interaction.created_at = datetime.now(UTC) - timedelta(seconds=1)
     await View().parent(interaction)
-    rows = stages(caplog)
+    rows = stages(observations)
     assert len({r["reference"] for r in rows}) == 1
     assert [r["disposition"] for r in rows if r["stage"] == "acknowledgement"] == [
         "confirmed",
@@ -41,7 +48,7 @@ async def test_context_crosses_owned_thread_and_nested_callbacks_without_second_
     ]
     assert sum(e[0] == "ack" for e in interaction.events) == 1
     assert {r["stage"] for r in rows} >= {
-        "fixture_dal",
+        "mge_review_read",
         "worker_queue_wait",
         "worker_execution",
         "interaction_age_at_entry",
@@ -49,8 +56,7 @@ async def test_context_crosses_owned_thread_and_nested_callbacks_without_second_
 
 
 @pytest.mark.asyncio
-async def test_failed_ack_records_non_entry_without_token_or_exception_text(caplog):
-    caplog.set_level(logging.INFO)
+async def test_failed_ack_records_non_entry_without_token_or_exception_text(observations):
 
     class View:
         @private_operation
@@ -58,17 +64,16 @@ async def test_failed_ack_records_non_entry_without_token_or_exception_text(capl
             pytest.fail("must not enter")
 
     await View().callback(Interaction(ack_error=True))
-    assert any(r["disposition"] == "unconfirmed" for r in stages(caplog))
-    assert "simulated unknown acknowledgement" not in caplog.text
+    assert any(r["disposition"] == "unconfirmed" for r in stages(observations))
+    assert "simulated unknown acknowledgement" not in str(observations)
 
 
 @pytest.mark.asyncio
-async def test_real_signup_and_rank_callbacks_qualify_shared_timing(monkeypatch, caplog):
+async def test_real_signup_and_rank_callbacks_qualify_shared_timing(monkeypatch, observations):
     from mge import mge_signup_service
     from mge.mge_roster_service import RosterResult
     from ui.views import mge_simplified_leadership_view as views
 
-    caplog.set_level(logging.INFO)
     monkeypatch.setattr(
         mge_signup_service,
         "create_signup",
@@ -76,8 +81,8 @@ async def test_real_signup_and_rank_callbacks_qualify_shared_timing(monkeypatch,
     )
     signup = form()
     await signup.submit_btn.callback(Interaction())
-    first = {r["reference"] for r in stages(caplog)}
-    caplog.clear()
+    first = {r["reference"] for r in stages(observations)}
+    observations.clear()
     monkeypatch.setattr(views, "is_admin_or_leadership_interaction", lambda _: True)
     monkeypatch.setattr(
         views.mge_roster_service, "set_rank", lambda **_: RosterResult(True, "Saved")
@@ -92,9 +97,9 @@ async def test_real_signup_and_rank_callbacks_qualify_shared_timing(monkeypatch,
     interaction = Interaction()
     interaction.client = object()
     await modal.callback(interaction)
-    second = {r["reference"] for r in stages(caplog)}
+    second = {r["reference"] for r in stages(observations)}
     assert len(first) == len(second) == 1 and first.isdisjoint(second)
-    assert {r["stage"] for r in stages(caplog)} >= {
+    assert {r["stage"] for r in stages(observations)} >= {
         "acknowledgement",
         "private_response",
         "worker_execution",
@@ -102,20 +107,18 @@ async def test_real_signup_and_rank_callbacks_qualify_shared_timing(monkeypatch,
     signup.stop()
 
 
-def test_interrupted_stage_is_redacted_and_scope_is_reset(caplog):
-    caplog.set_level(logging.INFO)
-    with pytest.raises(RuntimeError), timing_scope(), timed_stage("fixture"):
+def test_interrupted_stage_is_redacted_and_scope_is_reset(observations):
+    with pytest.raises(RuntimeError), timing_scope(), timed_stage("private_callback"):
         raise RuntimeError("private-payload-do-not-log")
-    assert stages(caplog)[0]["disposition"] == "interrupted"
-    assert "private-payload" not in caplog.text
-    caplog.clear()
+    assert stages(observations)[0]["disposition"] == "interrupted"
+    assert "private-payload" not in str(observations)
+    observations.clear()
     record_timing("outside_scope", 1)
-    assert stages(caplog) == []
+    assert stages(observations) == []
 
 
 @pytest.mark.asyncio
-async def test_cancelled_stage_records_interruption_and_propagates(caplog):
-    caplog.set_level(logging.INFO)
-    with pytest.raises(asyncio.CancelledError), timing_scope(), timed_stage("fixture"):
+async def test_cancelled_stage_records_interruption_and_propagates(observations):
+    with pytest.raises(asyncio.CancelledError), timing_scope(), timed_stage("private_callback"):
         raise asyncio.CancelledError()
-    assert stages(caplog)[0]["disposition"] == "interrupted"
+    assert stages(observations)[0]["disposition"] == "interrupted"

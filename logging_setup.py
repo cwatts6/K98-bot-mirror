@@ -480,8 +480,20 @@ def setup_logging(
         )
 
 
+def configure_operation_diagnostics():
+    """Bot-only owner; watchdog and maintenance processes do not share this writer."""
+    if not is_pytest_logging_mode():
+        from core.operation_evidence import optional
+        from services.operation_diagnostics import configure
+
+        optional(configure, Path(LOG_DIR) / "operation_observations")
+
+
 def shutdown_logging():
     """Idempotent stop/flush/close to release file locks (safe to call multiple times)."""
+    from services.operation_diagnostics import shutdown as shutdown_operation_diagnostics
+
+    shutdown_operation_diagnostics()
     global _IS_SHUT_DOWN, _LISTENER
     with _LISTENER_LOCK:
         if _IS_SHUT_DOWN:

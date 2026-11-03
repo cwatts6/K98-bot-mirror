@@ -12,6 +12,12 @@ _records = deque(maxlen=32)
 _lock = Lock()
 
 
+def _local_id():
+    from core.operation_evidence import optional
+
+    return optional(lambda: uuid4().hex)
+
+
 @contextmanager
 def startup_context(label):
     # Only known operation names enter shareable diagnostics.
@@ -40,7 +46,7 @@ def observation_context(operation, origin):
         raise ValueError("Known admission observation required.")
     if origin not in {"startup", "monitor", "health"}:
         raise ValueError("Known admission origin required.")
-    token = _context.set({"operation": operation, "origin": origin, "invocation_id": uuid4().hex})
+    token = _context.set({"operation": operation, "origin": origin, "invocation_id": _local_id()})
     try:
         yield
     finally:
@@ -48,8 +54,11 @@ def observation_context(operation, origin):
 
 
 def identity():
+    from core.operation_evidence import reference
+
     return {
-        "correlation_id": uuid4().hex,
+        "operation_reference": reference(),
+        "correlation_id": _local_id(),
         "correlation_kind": "process_local",
         **(_context.get() or {"operation": "coordination", "origin": "unspecified"}),
         "sql_session_role": "requesting_session_not_blocker",

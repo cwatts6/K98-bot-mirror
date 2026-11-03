@@ -1426,6 +1426,12 @@ async def _graceful_teardown():
     except Exception:
         logger.exception("[SHUTDOWN] Failed stopping usage tracker.")
 
+    # Business owners have settled; keep entered diagnostic I/O owned through shutdown.
+    from core.owned_work import drain_thread
+    from services.operation_diagnostics import shutdown as shutdown_operation_diagnostics
+
+    await drain_thread(shutdown_operation_diagnostics)
+
     # **NEW**: drop webhook/HTTP/stream handlers but keep file handlers alive
     try:
         quiesce_logging()
@@ -1454,6 +1460,10 @@ async def on_ready():
     if not await claim_startup_once():
         logger.info("[STARTUP] on_ready called again — startup already completed; skipping.")
         return
+
+    from logging_setup import configure_operation_diagnostics
+
+    configure_operation_diagnostics()
 
     await run_startup_phases(
         [
@@ -1921,55 +1931,18 @@ async def full_startup_sequence():
             try:
                 logger.warning("Scheduling ProcConfig import in background.")
 
-                # Wrap the import to get robust start/end logging inside the background task
                 async def _proc_import_wrapper():
-                    logger.warning("[PROC_IMPORT] Background import START")
-                    try:
-                        # Prefer the async offload wrapper if available (runs in isolated worker when possible)
-                        if callable(globals().get("run_proc_config_import_offload")):
-                            try:
-                                ok, report = await run_proc_config_import_offload(
-                                    dry_run=False,
-                                    prefer_process=True,
-                                    meta={"trigger": "startup"},
-                                    source_provenance={"trigger": "startup"},
-                                )
-                                logger.warning(
-                                    "[PROC_IMPORT] Background import END (success=%s) report_keys=%s",
-                                    ok,
-                                    list(report.keys())[:10] if isinstance(report, dict) else None,
-                                )
-                                return ok
-                            except Exception:
-                                logger.exception(
-                                    "[PROC_IMPORT] run_proc_config_import_offload crashed"
-                                )
-                                raise
-
-                        # Fallback: run the legacy blocking import in a thread/executor
-                        try:
-                            res = await run_blocking(
-                                run_proc_config_import, source_provenance={"trigger": "startup"}
-                            )
-                            # res may be (bool, report) or similar
-                            if isinstance(res, tuple):
-                                ok = res[0]
-                                report = res[1] if len(res) > 1 else None
-                            else:
-                                ok = bool(res)
-                                report = None
-                            logger.warning(
-                                "[PROC_IMPORT] Background import END (success=%s) (fallback path)",
-                                ok,
-                            )
-                            return ok
-                        except Exception:
-                            logger.exception("[PROC_IMPORT] Blocking fallback import crashed")
-                            raise
-
-                    except Exception as e:
-                        logger.exception("[PROC_IMPORT] Background import crashed: %s", e)
-                        raise
+                    # Choose once before entry. Never retry an offload exception via fallback.
+                    if callable(globals().get("run_proc_config_import_offload")):
+                        return await run_proc_config_import_offload(
+                            dry_run=False,
+                            prefer_process=True,
+                            meta={"trigger": "startup"},
+                            source_provenance={"trigger": "startup"},
+                        )
+                    return await run_blocking(
+                        run_proc_config_import, source_provenance={"trigger": "startup"}
+                    )
 
                 # Give it a generous envelope (e.g., 180s) to cover Sheets/SQL work
                 from services.configuration_attempt_recovery import verify_startup_import
@@ -1978,6 +1951,7 @@ async def full_startup_sequence():
                     "proc_config_import",
                     180.0,
                     _proc_import_wrapper,
+                    cancel_on_deadline=False,
                     completion_check=verify_startup_import,
                 )
             except Exception as e:

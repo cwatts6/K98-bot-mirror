@@ -9,10 +9,10 @@ import asyncio
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock, RLock
-from time import perf_counter
 from weakref import WeakValueDictionary
 
-from core.operation_timing import record_timing
+from core.operation_evidence import local_owner, owner_wait
+from core.operation_timing import clock, elapsed
 from core.owned_work import drain_awaitable, drain_thread
 
 _locks = WeakValueDictionary()
@@ -34,9 +34,10 @@ def roster_thread_owner(event_key):
     """
     with _registry_lock:
         lock = _thread_locks.setdefault(int(event_key), RLock())
-    started = perf_counter()
-    with lock:
-        record_timing("mge_roster_thread_wait", perf_counter() - started)
+    started = clock()
+    owner_wait(lock, "mge_roster_thread_wait")
+    with lock, local_owner(lock, "mge_roster_thread_wait"):
+        elapsed("mge_roster_thread_wait", started)
         token = _event.set(int(event_key))
         try:
             yield
@@ -68,9 +69,11 @@ async def run_roster_mutation(event_key, function, *args, **kwargs):
     lock = _locks.setdefault(int(event_key), asyncio.Lock())
 
     async def owned():
-        started = perf_counter()
+        started = clock()
+        owner_wait(lock, "mge_roster_owner_wait")
         async with lock:
-            record_timing("mge_roster_owner_wait", perf_counter() - started)
-            return await drain_thread(_run_owned, event_key, function, args, kwargs)
+            with local_owner(lock, "mge_roster_owner_wait"):
+                elapsed("mge_roster_owner_wait", started)
+                return await drain_thread(_run_owned, event_key, function, args, kwargs)
 
     return await drain_awaitable(owned())
