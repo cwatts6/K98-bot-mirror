@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_p011_hash
 
 
 def profile():
@@ -36,8 +37,10 @@ def test_exact_registry_pins_all_runtime_members_including_results_import():
     assert {m["path"] for m in item["members"]} == updater.MGE_FINALISATION_PATHS
     assert "mge/dal/mge_results_dal.py" in updater.MGE_FINALISATION_PATHS
     for member in item["members"]:
-        raw = (Path(__file__).resolve().parents[1] / member["path"]).read_bytes()
-        assert updater.sha256(raw.replace(b"\r\n", b"\n")) == member["after_sha256"]
+        assert (
+            before_p011_hash(Path(__file__).resolve().parents[1], member["path"])
+            == member["after_sha256"]
+        )
 
 
 @pytest.mark.parametrize("path", sorted(updater.MGE_FINALISATION_PATHS))

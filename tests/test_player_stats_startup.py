@@ -115,10 +115,11 @@ async def test_invalid_completion_is_failed_and_does_not_modify_saved_cache(snap
         await startup.run(
             work(), 1, "cache", cancel_on_deadline=False, completion_check=subject.verify_completion
         )
-        is None
+        is output
     )
-    assert startup.report()[0]["state"] == "failed"
-    assert "completion" not in startup.report()[0]
+    assert startup.report()[0]["state"] == "verification_unavailable"
+    assert startup.report()[0]["completion"] is None
+    assert startup.report()[0]["returned"]
     assert (path.read_bytes() if path.exists() else None) == before
 
 

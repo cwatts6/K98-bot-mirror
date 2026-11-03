@@ -2,10 +2,10 @@
 
 import asyncio
 from contextlib import asynccontextmanager
-from time import perf_counter
 from weakref import WeakValueDictionary
 
-from core.operation_timing import record_timing
+from core.operation_evidence import local_owner, owner_wait
+from core.operation_timing import clock, elapsed
 
 _locks = WeakValueDictionary()
 
@@ -13,7 +13,9 @@ _locks = WeakValueDictionary()
 @asynccontextmanager
 async def presentation_owner(bot, event_id):
     lock = _locks.setdefault((id(bot), int(event_id)), asyncio.Lock())
-    started = perf_counter()
+    started = clock()
+    owner_wait(lock, "mge_board_owner_wait")
     async with lock:
-        record_timing("mge_board_owner_wait", perf_counter() - started)
-        yield
+        with local_owner(lock, "mge_board_owner_wait"):
+            elapsed("mge_board_owner_wait", started)
+            yield

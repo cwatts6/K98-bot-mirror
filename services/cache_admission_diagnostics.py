@@ -48,7 +48,10 @@ def observation_context(operation, origin):
 
 
 def identity():
+    from core.operation_evidence import reference
+
     return {
+        "operation_reference": reference(),
         "correlation_id": uuid4().hex,
         "correlation_kind": "process_local",
         **(_context.get() or {"operation": "coordination", "origin": "unspecified"}),

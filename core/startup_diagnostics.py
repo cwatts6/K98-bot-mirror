@@ -3,9 +3,9 @@
 import asyncio
 from copy import deepcopy
 from datetime import UTC, datetime
-import logging
 
-logger = logging.getLogger(__name__)
+from core.operation_evidence import emit, optional, result_facts, scope
+
 _steps = {}
 
 
@@ -13,10 +13,11 @@ def report():
     return deepcopy(list(_steps.values()))
 
 
-def _record(label, state, seconds, *, error=None):
+def _record(label, state, seconds, *, error=None, **facts):
     if label not in _steps and len(_steps) >= 64:
         return
     _steps[label] = dict(
+        **facts,
         step=label,
         state=state,
         observed_utc=datetime.now(UTC).isoformat(),
@@ -26,7 +27,7 @@ def _record(label, state, seconds, *, error=None):
     if error is not None:
         from services.recovery_health import failure_detail
 
-        _steps[label]["diagnostic"] = failure_detail(error)
+        _steps[label]["diagnostic"] = optional(failure_detail, error) or {"status": "unavailable"}
 
 
 async def _drain_cancel(task):
@@ -43,67 +44,104 @@ async def _drain_cancel(task):
 
 
 async def run(coro, seconds, label, *, cancel_on_deadline=True, completion_check=None):
-    """Keep cancellation/drain semantics; distinguish a deadline from a failure.
+    """Observe once and retain results; deadline, settlement and verification differ."""
+    from services.cache_admission_diagnostics import startup_context
 
-    The default cancels at the deadline. An explicitly observed long-running task
-    instead remains pending until it returns; shutdown still cancels and drains it.
-    A supplied completion check runs in that same tracked task before success.
-    The coroutine is awaited after cancellation and is never replayed. Executor
-    callers must track their actual workers: cancelling a proxy future alone
-    does not stop its thread. Cancelled business outcomes remain unproven.
-    """
+    with scope() as observation:
+        return await _run(
+            coro, seconds, label, cancel_on_deadline, completion_check, observation, startup_context
+        )
+
+
+async def _run(
+    coro, seconds, label, cancel_on_deadline, completion_check, observation, startup_context
+):
+    result = None
+    returned = False
+    verified = None
+    check_error = None
+
+    def record(state, **facts):
+        optional(
+            _record,
+            label,
+            state,
+            seconds,
+            reference=observation.reference,
+            worker_result=dict(observation.worker_result),
+            **facts,
+        )
+        emit(label, state, error=facts.get("error"))
 
     async def observed():
-        from services.cache_admission_diagnostics import startup_context
-
+        nonlocal result, returned, verified, check_error
         with startup_context(label):
             result = await coro
-        summary = await completion_check(result) if completion_check is not None else None
-        return result, summary
+            returned = True
+            emit(label, "result_returned", facts=optional(result_facts, result))
+            if completion_check is not None:
+                try:
+                    verified = await completion_check(result)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    check_error = exc
 
     task = asyncio.ensure_future(observed())
-    _record(label, "running", seconds)
+    record("running", observer="pending", physical="pending", verification_state="pending")
     try:
         done, _ = await asyncio.wait({task}, timeout=seconds)
         if not done:
-            _record(
-                label,
+            record(
                 "deadline_elapsed_draining" if cancel_on_deadline else "deadline_elapsed_pending",
-                seconds,
-            )
-            logger.warning(
-                "[BOOT] %s exceeded %.1fs; waiting for the original task. No retry requested.",
-                label,
-                seconds,
+                observer="deadline_elapsed",
+                physical="pending",
             )
             if cancel_on_deadline:
                 task.cancel()
-            # Shield from outer shutdown cancellation so the explicit drain below
-            # remains the only cancellation owner, including repeated cancellation.
             await asyncio.shield(asyncio.gather(task, return_exceptions=True))
             if task.cancelled():
-                _record(label, "deadline_elapsed_outcome_unconfirmed", seconds)
-                logger.warning(
-                    "[BOOT] %s startup coroutine cancelled; underlying worker outcome remains unconfirmed. Verify the feature receipt. The deadline does not establish failure or schedule a retry.",
-                    label,
+                record(
+                    "deadline_elapsed_outcome_unconfirmed",
+                    observer="deadline_elapsed",
+                    physical="settled",
+                    returned=returned,
+                    result=optional(result_facts, result),
                 )
                 return None
-        result, summary = task.result()
+        task.result()  # Worker exceptions are separate from verification exceptions.
         state = "completed" if done else "completed_after_deadline"
-        _record(label, state, seconds)
-        if summary is not None and label in _steps:
-            _steps[label]["completion"] = summary
-        logger.info("[BOOT] %s state=%s", label, state)
+        if check_error is not None:
+            from services.configuration_attempt_recovery import ProcConfigImportFailed
+
+            state = (
+                "failed"
+                if isinstance(check_error, ProcConfigImportFailed)
+                else "verification_unavailable"
+            )
+        record(
+            state,
+            observer="observed",
+            physical="settled",
+            returned=True,
+            result=optional(result_facts, result),
+            completion=verified,
+            verification_state=(
+                "unavailable" if check_error else "checked" if completion_check else "not_requested"
+            ),
+            error=check_error,
+        )
         return result
     except asyncio.CancelledError:
         await _drain_cancel(task)
-        _record(label, "cancelled_outcome_unconfirmed", seconds)
+        record(
+            "cancelled_outcome_unconfirmed",
+            observer="cancelled",
+            physical="settled",
+            returned=returned,
+            result=optional(result_facts, result),
+        )
         raise
     except Exception as exc:
-        _record(label, "failed", seconds, error=exc)
-        logger.warning(
-            "[BOOT] %s failed error_type=%s; inspect the private recovery report.",
-            label,
-            type(exc).__name__,
-        )
+        record("failed", observer="observed", physical="settled", returned=returned, error=exc)
         return None

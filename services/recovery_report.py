@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import json
 
 from core.operator_diagnostic_payloads import redact_diagnostic_text
-from services import recovery_health
+from services import operation_diagnostics, recovery_health
 from services.recovery_execution_guard import execution_progress
 from services.recovery_service import SourceConflict
 
@@ -178,6 +178,7 @@ def unavailable_report(error):
                 complete=False,
                 incidents_available=False,
                 monitor=recovery_health.report(),
+                operation_observations=operation_diagnostics.report(),
                 collection_failure=recovery_health.failure_detail(error),
                 next_step="Incident collection failed. Share this diagnostic report, then download again after connectivity or registration recovers. This is not an empty incident list.",
             )
@@ -208,6 +209,7 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
             "Downloading reads saved observations only; it never applies or reconciles a repair."
         ),
         monitor=recovery_health.report(),
+        operation_observations=operation_diagnostics.report(),
         incidents=[],
     )
     next_after = after

@@ -5,9 +5,9 @@ The caller retains its admission/lock until the child actually settles.
 """
 
 import asyncio
-from time import perf_counter
 
-from core.operation_timing import record_timing, timed_stage
+from core.operation_evidence import emit, optional, worker_result
+from core.operation_timing import clock, elapsed
 
 
 async def drain_awaitable(awaitable):
@@ -15,6 +15,7 @@ async def drain_awaitable(awaitable):
     try:
         return await asyncio.shield(pending)
     except asyncio.CancelledError:
+        emit("worker_observer", "cancelled_draining")
         while not pending.done():
             try:
                 await asyncio.shield(pending)
@@ -29,11 +30,22 @@ async def drain_awaitable(awaitable):
 
 async def drain_thread(function, *args, **kwargs):
     """Run exactly once; cancellation waits for the thread, then propagates."""
-    queued = perf_counter()
+    queued = clock()
 
     def run():
-        record_timing("worker_queue_wait", perf_counter() - queued)
-        with timed_stage("worker_execution"):
-            return function(*args, **kwargs)
+        optional(elapsed, "worker_queue_wait", queued)
+        emit("worker_execution", "entered")
+        started = clock()
+        disposition = "completed"
+        try:
+            result = function(*args, **kwargs)
+            optional(worker_result, result)
+            return result
+        except BaseException as exc:
+            disposition = "interrupted"
+            emit("worker_execution", "failed", error=exc)
+            raise
+        finally:
+            optional(elapsed, "worker_execution", started, disposition)
 
     return await drain_awaitable(asyncio.to_thread(run))

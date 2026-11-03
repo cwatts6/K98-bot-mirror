@@ -5,50 +5,35 @@ tasks and asyncio.to_thread. No interaction IDs, payloads or exception text are 
 """
 
 from contextlib import contextmanager
-from contextvars import ContextVar
-import logging
 from time import perf_counter
-from uuid import uuid4
 
-logger = logging.getLogger(__name__)
-_reference = ContextVar("operation_timing_reference", default=None)
+from core.operation_evidence import emit, optional, scope
 
 
 @contextmanager
 def timing_scope():
-    if _reference.get() is not None:
+    with scope():
         yield
-        return
-    token = _reference.set(uuid4().hex)
-    try:
-        yield
-    finally:
-        _reference.reset(token)
 
 
 def record_timing(stage, elapsed_seconds, disposition="completed"):
-    reference = _reference.get()
-    if reference is not None:
-        logger.info(
-            "operation_stage reference=%s stage=%s elapsed_ms=%.3f disposition=%s",
-            reference,
-            stage,
-            elapsed_seconds * 1000,
-            disposition,
-            extra={
-                "operation_stage": {
-                    "reference": reference,
-                    "stage": stage,
-                    "elapsed_ms": elapsed_seconds * 1000,
-                    "disposition": disposition,
-                }
-            },
-        )
+    if type(elapsed_seconds) in (int, float):
+        emit(stage, disposition, elapsed_ms=elapsed_seconds * 1000)
+
+
+def clock():
+    return optional(perf_counter)
+
+
+def elapsed(stage, started, disposition="completed"):
+    ended = clock()
+    if type(started) in (int, float) and type(ended) in (int, float):
+        optional(record_timing, stage, ended - started, disposition)
 
 
 @contextmanager
 def timed_stage(stage):
-    started = perf_counter()
+    started = clock()
     disposition = "completed"
     try:
         yield
@@ -56,4 +41,4 @@ def timed_stage(stage):
         disposition = "interrupted"
         raise
     finally:
-        record_timing(stage, perf_counter() - started, disposition)
+        elapsed(stage, started, disposition)

@@ -19,7 +19,7 @@ from typing import Any
 import discord
 from discord import HTTPException, NotFound
 
-from core.operation_timing import record_timing, timed_stage, timing_scope
+from core.operation_timing import clock, elapsed, record_timing, timed_stage, timing_scope
 
 logger = logging.getLogger(__name__)
 _private_children = set()
@@ -223,7 +223,6 @@ def private_operation(function):
     Durable deduplication and authorization remain the service/DAL's responsibility.
     Apply only to callbacks that never open a modal as their initial response.
     """
-    from time import perf_counter
 
     from core.owned_work import drain_awaitable
 
@@ -237,7 +236,7 @@ def private_operation(function):
     @functools.wraps(function)
     async def run(self, *args, **kwargs):
         interaction = signature.bind(self, *args, **kwargs).arguments[interaction_parameter]
-        started = perf_counter()
+        started = clock()
         already_done = response_is_done(interaction)
         created = getattr(interaction, "created_at", None)
         if isinstance(created, datetime) and created.tzinfo is not None:
@@ -246,11 +245,11 @@ def private_operation(function):
                 (datetime.now(UTC) - created).total_seconds(),
                 "observed",
             )
-        ack_started = perf_counter()
+        ack_started = clock()
         admitted = await acknowledge_private(interaction)
-        record_timing(
+        elapsed(
             "acknowledgement",
-            perf_counter() - ack_started,
+            ack_started,
             "already_acknowledged" if already_done else "confirmed" if admitted else "unconfirmed",
         )
         if not admitted:
@@ -268,7 +267,6 @@ def private_operation(function):
             await send_ephemeral(interaction, "This action is still processing. Please wait.")
             return None
         pending.add(key)
-        acknowledged = perf_counter()
         child = asyncio.create_task(function(self, *args, **kwargs))
         _private_children.add(child)
         try:
@@ -276,12 +274,7 @@ def private_operation(function):
         finally:
             _private_children.discard(child)
             pending.discard(key)
-            logger.info(
-                "interaction_operation callback=%s ack_ms=%.3f total_ms=%.3f",
-                function.__qualname__,
-                (acknowledged - started) * 1000,
-                (perf_counter() - started) * 1000,
-            )
+            elapsed("private_operation", started)
 
     @functools.wraps(function)
     async def measured(self, *args, **kwargs):

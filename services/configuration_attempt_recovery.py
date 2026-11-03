@@ -152,6 +152,9 @@ def record_configuration_attempt(*, data_dir, report_sink):
                 phase="before_inputs",
                 outcome="unconfirmed",
             )
+            from core.operation_evidence import bind_attempt, optional
+
+            optional(bind_attempt, value["attempt_id"], value["operation_id"])
             report = dict(success=False, errors=[])
             try:
                 journal.save(value)
@@ -302,8 +305,21 @@ class ProcConfigImportFailed(RuntimeError):
 
 
 async def verify_startup_import(result):
-    if result is not True:
+    from core.operation_evidence import result_facts
+
+    facts = result_facts(result)
+    # Legacy boolean callers remain compatible. Structured results must retain
+    # their mandatory terminal receipt; diagnostic persistence cannot replace it.
+    ok = result is True
+    if type(result) is tuple and len(result) == 2:
+        ok = (
+            result[0] is True
+            and facts.get("attempt_recording") == "recorded"
+            and facts.get("attempt_outcome") == "reported_success"
+            and "attempt_id" in facts
+        )
+    if not ok:
         raise ProcConfigImportFailed(
             "ProcConfig startup import did not report success; inspect its attempt receipt."
         )
-    return {"import_reported_success": True}
+    return {"import_reported_success": True, **facts}

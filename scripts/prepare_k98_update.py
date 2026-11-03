@@ -616,6 +616,25 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P011_STARTUP_OUTCOME_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "core/interaction_safety.py",
+        "core/operation_evidence.py",
+        "core/operation_timing.py",
+        "core/owned_work.py",
+        "core/startup_diagnostics.py",
+        "logging_setup.py",
+        "mge/mge_board_ownership.py",
+        "mge/mge_roster_execution.py",
+        "services/cache_admission_diagnostics.py",
+        "services/configuration_attempt_recovery.py",
+        "services/operation_diagnostics.py",
+        "services/recovery_report.py",
+    }
+)
+
+
 MGE_FINALISATION_PATHS = frozenset(
     {
         "commands/mge_cmds.py",
@@ -693,12 +712,12 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 122880:
+    if len(raw) > 131072:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 56:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 57:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -790,6 +809,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_p011 = (
+                item["id"] == "p011_startup_outcomes_v1" and path in P011_STARTUP_OUTCOME_PATHS
             )
             fixed_mge_final = (
                 item["id"] == "p1_mge_finalisation_v1" and path in MGE_FINALISATION_PATHS
@@ -887,6 +909,7 @@ def reviewed_transitions():
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
+                    or fixed_p011
                     or fixed_mge_final
                     or fixed_mge_a1b
                     or fixed_mge_a1a
@@ -1025,6 +1048,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p011_startup_outcomes_v1" and paths != P011_STARTUP_OUTCOME_PATHS:
+            raise ValueError("Complete fixed P01.1 startup-outcome transition required.")
         if item["id"] == "p1_mge_finalisation_v1" and paths != MGE_FINALISATION_PATHS:
             raise ValueError("Complete fixed MGE finalisation transition required.")
         if item["id"] == "p1_mge_a1b_v1" and paths != MGE_A1B_PATHS:
