@@ -98,10 +98,15 @@ function Read-CorrectionPlan {
  $plan=Read-Json (Join-Path $chosen.directory 'correction-plan.json') $chosen.sha256
  if($plan.version -ne 1 -or $plan.kind -cne 'startup_evidence_correction_v1' -or $plan.recovery_id -cne $profile.recovery_id -or $plan.original_release_id -cne $profile.release_id -or $plan.original_bindings_sha256 -cne $profile.bindings_sha256 -or $plan.profile_sha256 -cne (Hash $profileBytes) -or $plan.target -cne $profile.target){throw 'Correction plan identity differs'}
  if($plan.members.Count -gt 256){throw 'Correction member inventory exceeds bound'}
+ $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
  foreach($member in $plan.members){
   if($member.name -cnotmatch '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'){throw 'Flat correction member required'}
+  if(-not $names.Add($member.name)){throw 'Duplicate correction member refused'}
   $null=Read-Bytes (Join-Path $chosen.directory $member.name) $member.sha256 16MB
  }
+ $adapterMembers=@($plan.members|Where-Object {$_.name -ceq 'Release-Step.ps1'})
+ $bindingMembers=@($plan.members|Where-Object {$_.name -ceq 'ReleaseBindings.json'})
+ if($adapterMembers.Count -ne 1 -or $bindingMembers.Count -ne 1 -or $bindingMembers[0].sha256 -cne $plan.bindings_sha256){throw 'Exact adapter and bindings inventory required'}
  $script:correctionDirectory=$chosen.directory;$script:correctionPlan=$plan
  $script:corrected=Read-Json (Join-Path $chosen.directory 'ReleaseBindings.json') $plan.bindings_sha256
 }

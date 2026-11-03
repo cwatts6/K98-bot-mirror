@@ -100,12 +100,18 @@ def correction_files(original, files, *, recovery_id, target):
         or str(PureWindowsPath(policy["seed_plan"]["path"]).parent) != binding["new_seed_directory"]
     ):
         raise ValueError("Fresh correction seed and history required.")
-    member = next(m for m in binding["source_members"] if m["path"] == ISSUER)
-    issuer = result[member["payload"]]
+    members = [m for m in binding["source_members"] if m.get("path") == ISSUER]
+    if len(members) != 1:
+        raise ValueError("Exactly one reviewed issuer source member required.")
+    member = members[0]
+    payload_name = member.get("payload")
+    issuer = result.get(payload_name) if isinstance(payload_name, str) else None
+    if not isinstance(issuer, bytes):
+        raise ValueError("Reviewed issuer payload is missing or invalid.")
     if (
         digest(issuer.replace(b"\r\n", b"\n")) != FIXED_ISSUER
-        or digest(issuer) != binding["new_pins"][ISSUER]
-        or member["target_sha256"] != digest(issuer)
+        or digest(issuer) != binding["new_pins"].get(ISSUER)
+        or member.get("target_sha256") != digest(issuer)
     ):
         raise ValueError("Exact reviewed issuer correction required.")
     # There was no failed incarnation: preserve the last actual predecessor,

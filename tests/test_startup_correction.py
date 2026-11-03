@@ -370,6 +370,10 @@ def test_correction_preserves_original_and_rebinds_only_unused_candidate():
         "issuer",
         "gate",
         "adapter",
+        "missing_issuer_member",
+        "duplicate_issuer_member",
+        "missing_issuer_payload",
+        "missing_issuer_pin",
     ],
 )
 def test_correction_refuses_changed_preconditions(damage):
@@ -395,6 +399,14 @@ def test_correction_refuses_changed_preconditions(damage):
         files["source-0000.bin"] += b"# unreviewed\n"
     elif damage == "gate":
         files["Start-ReviewedAutomaticStartup.ps1"] *= 2
+    elif damage == "missing_issuer_member":
+        binding["source_members"] = []
+    elif damage == "duplicate_issuer_member":
+        binding["source_members"] *= 2
+    elif damage == "missing_issuer_payload":
+        del files["source-0000.bin"]
+    elif damage == "missing_issuer_pin":
+        del binding["new_pins"][correction.ISSUER]
     else:
         files["Release-Step.ps1"] = b"# unreviewed adapter\n"
     files["ReleaseBindings.json"] = correction.encode(binding)
@@ -541,6 +553,8 @@ def test_complete_apply_and_resume_preserve_failed_release(tmp_path, outcome):
     binding = dict(original, before=correction.FAILED_TARGET, target=value["target"], old_pins={})
     raw = correction.encode(binding)
     (directory / "ReleaseBindings.json").write_bytes(raw)
+    adapter_raw = b"# Adapter invocation is substituted in this fixture.\n"
+    (directory / "Release-Step.ps1").write_bytes(adapter_raw)
     plan = dict(
         version=1,
         kind="startup_evidence_correction_v1",
@@ -550,7 +564,10 @@ def test_complete_apply_and_resume_preserve_failed_release(tmp_path, outcome):
         profile_sha256=correction.digest(correction.encode(value)),
         target=value["target"],
         bindings_sha256=correction.digest(raw),
-        members=[dict(name="ReleaseBindings.json", sha256=correction.digest(raw))],
+        members=[
+            dict(name="ReleaseBindings.json", sha256=correction.digest(raw)),
+            dict(name="Release-Step.ps1", sha256=correction.digest(adapter_raw)),
+        ],
     )
     plan_raw = correction.encode(plan)
     (directory / "correction-plan.json").write_bytes(plan_raw)
@@ -729,6 +746,106 @@ try {Invoke-CorrectionStage 'start' 'verify' 'apply';$success=$true}catch{$succe
     assert observed["success"] is success
     assert observed["applies"] == applies
     assert observed["quiet"] == observed["released"] == applies
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        None,
+        "missing_adapter",
+        "duplicate_adapter",
+        "changed_adapter",
+        "missing_binding",
+        "binding_pin",
+    ],
+)
+def test_plan_must_authenticate_adapter_before_actual_invocation(tmp_path, damage):
+    powershell = shutil.which("powershell.exe")
+    if not powershell:
+        pytest.skip("Windows PowerShell required")
+    directory = tmp_path / ("plan-" + str(uuid4()))
+    directory.mkdir()
+    value = profile()
+    profile_raw = correction.encode(value)
+    (tmp_path / "profile.json").write_bytes(profile_raw)
+    binding_raw = b"{}"
+    adapter_raw = b"param($Action,$ExpectedBindingsSHA256)\n[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'executed.txt'),'ran')\nexit 0\n"
+    (directory / "ReleaseBindings.json").write_bytes(binding_raw)
+    (directory / "Release-Step.ps1").write_bytes(adapter_raw)
+    members = [
+        dict(name="ReleaseBindings.json", sha256=correction.digest(binding_raw)),
+        dict(name="Release-Step.ps1", sha256=correction.digest(adapter_raw)),
+    ]
+    if damage == "missing_adapter":
+        members.pop()
+    elif damage == "duplicate_adapter":
+        members.append(dict(name="release-step.ps1", sha256=correction.digest(adapter_raw)))
+    elif damage == "changed_adapter":
+        (directory / "Release-Step.ps1").write_bytes(adapter_raw + b"# changed\n")
+    elif damage == "missing_binding":
+        members.pop(0)
+    plan = dict(
+        version=1,
+        kind="startup_evidence_correction_v1",
+        recovery_id=value["recovery_id"],
+        original_release_id=value["release_id"],
+        original_bindings_sha256=value["bindings_sha256"],
+        profile_sha256=correction.digest(profile_raw),
+        target=value["target"],
+        bindings_sha256="0" * 64 if damage == "binding_pin" else correction.digest(binding_raw),
+        members=members,
+    )
+    plan_raw = correction.encode(plan)
+    (directory / "correction-plan.json").write_bytes(plan_raw)
+    (tmp_path / "selected-plan.json").write_bytes(
+        correction.encode(
+            dict(
+                profile_sha256=correction.digest(profile_raw),
+                directory=str(directory),
+                sha256=correction.digest(plan_raw),
+            )
+        )
+    )
+    harness = tmp_path / "invoke.ps1"
+    harness.write_text(
+        r"""
+param([string]$Template,[string]$Fixture)
+Set-StrictMode -Version Latest;$ErrorActionPreference='Stop'
+$t=$null;$e=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Template,[ref]$t,[ref]$e)
+if($e.Count){throw ($e|Out-String)}
+foreach($name in @('Read-CorrectionPlan','Invoke-CorrectionAdapter')){
+ $fn=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
+ . ([scriptblock]::Create($fn.Extent.Text))
+}
+function Hash([byte[]]$Bytes){$h=[Security.Cryptography.SHA256]::Create();try{return ([BitConverter]::ToString($h.ComputeHash($Bytes))).Replace('-','').ToLowerInvariant()}finally{$h.Dispose()}}
+function Read-Bytes($Path,$Expected='', $Limit=1MB){$raw=[IO.File]::ReadAllBytes($Path);if($Expected -and (Hash $raw) -cne $Expected){throw 'hash differs'};return ,$raw}
+function Read-Json($Path,$Expected=''){[Text.Encoding]::UTF8.GetString((Read-Bytes $Path $Expected))|ConvertFrom-Json}
+$destination=$Fixture;$selection=Join-Path $Fixture 'selected-plan.json'
+$profileBytes=Read-Bytes (Join-Path $Fixture 'profile.json')
+$profile=[Text.Encoding]::UTF8.GetString($profileBytes)|ConvertFrom-Json
+$powershell=Join-Path $PSHOME 'powershell.exe'
+try{$code=Invoke-CorrectionAdapter 'VerifySource';if($code){throw 'Adapter failed'};exit 0}catch{Write-Output $_.Exception.Message;exit 1}
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(harness),
+            "-Template",
+            str(ROOT / "scripts/Recover-K98StartupEvidence.ps1"),
+            "-Fixture",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert (result.returncode == 0) is (damage is None), result.stdout + result.stderr
+    assert (directory / "executed.txt").exists() is (damage is None)
 
 
 def test_native_mutex_excludes_other_process_and_detects_abandonment(tmp_path):
