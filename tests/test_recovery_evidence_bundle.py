@@ -93,6 +93,60 @@ def test_published_row_cache_evicts_with_retention(monkeypatch):
     assert not sink._dirty_rows
 
 
+@pytest.mark.parametrize("unavailable", [False, True])
+def test_ordinary_and_unavailable_reports_preserve_valid_v2_observations(monkeypatch, unavailable):
+    from services.recovery_report import unavailable_report
+
+    sink = diagnostics.DiagnosticSink()
+    ref, child = uuid4().hex, uuid4().hex
+    sink._accept(event(ref, "entered", "operation"))
+    sink._accept(
+        event(
+            ref,
+            "entered",
+            "worker_execution",
+            role="child",
+            child_reference=child,
+            parent_reference=ref,
+        )
+    )
+    sink._accept(event(ref, "completed", feature_outcome="succeeded"))
+    sink._publish()
+    monkeypatch.setattr(diagnostics, "_sink", sink)
+    service, _, _ = report_service()
+    result = unavailable_report(OSError()) if unavailable else service.download_report(ACTOR)
+    data = json.loads(result["content"])["operation_observations"]
+    assert data.get("status") != "unavailable"
+    row = data["operations"][0]
+    assert row["reference"] == ref
+    assert row["milestones"]["scope_entry"]["state"] == "entered"
+    assert row["milestones"]["verification"]["feature_outcome"] == "succeeded"
+    assert row["children"][child]["child_reference"] == child
+    assert row["latest"]["feature_outcome"] == "succeeded"
+
+
+@pytest.mark.parametrize("damage", ["stage", "secret", "inventory", "bytes"])
+def test_ordinary_operation_projection_rejects_invalid_or_oversize_sources(monkeypatch, damage):
+    from services.recovery_report import unavailable_report
+
+    sink = diagnostics.DiagnosticSink()
+    sink._accept(event(uuid4().hex, "entered", "operation"))
+    sink._publish()
+    source = sink.report()
+    if damage == "stage":
+        source["operations"][0]["milestones"]["scope_entry"]["stage"] = "unknown_stage"
+    elif damage == "secret":
+        source["operations"][0]["latest"]["password"] = "DO_NOT_EXPORT"
+    elif damage == "inventory":
+        source["operations"] *= 513
+    else:
+        source["padding"] = ["x" * 100] * 200
+    monkeypatch.setattr(diagnostics, "report", lambda: source)
+    result = unavailable_report(OSError())
+    assert json.loads(result["content"])["operation_observations"] == {"status": "unavailable"}
+    assert b"DO_NOT_EXPORT" not in result["content"]
+
+
 def test_chunked_publication_keeps_exact_json_bytes_and_prewrite_bound(tmp_path, monkeypatch):
     document = {
         "schema": "test",

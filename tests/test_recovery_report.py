@@ -105,16 +105,22 @@ def test_empty_and_small_reports_are_complete():
 
 
 def test_optional_observations_cannot_crowd_out_a_fitting_incident(monkeypatch):
+    from uuid import uuid4
+
     from services import recovery_report
+    from tests.test_recovery_evidence_bundle import event
 
     service, _, _ = report_service(1)
     monkeypatch.setattr(recovery_report.recovery_health, "report", lambda: {})
     monkeypatch.setattr(recovery_report, "incident_report", lambda *_: {"detail": "x" * 62000})
-    monkeypatch.setattr(
-        recovery_report.operation_diagnostics,
-        "report",
-        lambda: {"operations": [{"detail": "y" * 6000}, {"detail": "z" * 6000}]},
-    )
+    sink = recovery_report.operation_diagnostics.DiagnosticSink()
+    for _ in range(8):
+        ref = uuid4().hex
+        sink._accept(event(ref, "entered", "operation"))
+        sink._accept(event(ref, "deadline_elapsed_pending"))
+        sink._accept(event(ref, "completed", feature_outcome="succeeded"))
+    sink._publish()
+    monkeypatch.setattr(recovery_report.operation_diagnostics, "_sink", sink)
     result = service.download_report(ACTOR, max_bytes=65536)
     data = json.loads(result["content"])
     assert len(result["content"]) <= 65536

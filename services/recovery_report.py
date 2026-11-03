@@ -179,7 +179,7 @@ def unavailable_report(error):
                 complete=False,
                 incidents_available=False,
                 monitor=_optional_report(recovery_health.report),
-                operation_observations=_optional_report(operation_diagnostics.report),
+                operation_observations=_operation_report(),
                 collection_failure={"error_type": type(error).__name__},
                 next_step="Incident collection failed. Share this diagnostic report, then download again after connectivity or registration recovers. This is not an empty incident list.",
             )
@@ -204,6 +204,38 @@ def _optional_report(function):
     return guarded(function, limit=16384)[0]
 
 
+def _operation_report():
+    """Keep validated nested operation summaries within the ordinary-report budget."""
+    from services.recovery_evidence_bundle import safe
+
+    try:
+        source = operation_diagnostics.report()
+        if type(source) is not dict or type(source.get("operations")) is not list:
+            raise ValueError("Invalid operation report")
+        if len(source["operations"]) > 512:
+            raise ValueError("Operation report inventory bound")
+        result = safe({key: value for key, value in source.items() if key != "operations"})
+        result["operations"] = []
+        if len(encode(result)) > 16384:
+            raise ValueError("Operation report byte bound")
+        validator = operation_diagnostics.DiagnosticSink()
+        for row in source["operations"]:
+            if type(row) is not dict:
+                raise ValueError("Invalid operation summary")
+            latest = row.get("latest")
+            projected = validator._restore_row(
+                dict(row, transitions=[] if latest is None else [latest])
+            )
+            projected.pop("transitions")
+            projected["latest"] = latest
+            result["operations"].append(projected)
+            if len(encode(result)) > 16384:
+                raise ValueError("Operation report byte bound")
+        return result
+    except Exception:
+        return {"status": "unavailable"}
+
+
 def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 * 1024 * 1024):
     service.authorize(actor)
     if type(part) is not int or part < 1 or type(max_bytes) is not int or max_bytes < 65536:
@@ -224,7 +256,7 @@ def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 
             "Downloading reads saved observations only; it never applies or reconciles a repair."
         ),
         monitor=_optional_report(recovery_health.report),
-        operation_observations=_optional_report(operation_diagnostics.report),
+        operation_observations=_operation_report(),
         incidents=[],
     )
     next_after = after
