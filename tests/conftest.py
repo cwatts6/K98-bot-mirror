@@ -10,6 +10,7 @@ import pytest
 
 os.environ.setdefault("K98_TEST_MODE", "1")
 os.environ.setdefault("PYTEST_RUNNING", "1")
+os.environ.setdefault("PYTHON_DOTENV_DISABLED", "1")
 os.environ.setdefault("OUR_KINGDOM", "98")
 os.environ.setdefault("DISCORD_BOT_TOKEN", "test-token")
 os.environ.setdefault("TIMELINE_SHEET_ID", "test-timeline-sheet")
@@ -209,3 +210,11 @@ def isolate_private_operation_lifecycle(monkeypatch):
         from mge.mge_refresh_work import RefreshCoordinator
 
         monkeypatch.setattr(module, "_refreshes", RefreshCoordinator())
+
+
+@pytest.fixture(autouse=True)
+def _isolate_report_admission(monkeypatch):
+    from services import recovery_evidence_bundle as bundle
+
+    monkeypatch.setattr(bundle, "_stopped", False)
+    monkeypatch.setattr(bundle, "_sessions", {})

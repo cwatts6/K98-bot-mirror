@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_p012a_hash
 
 
 def transition():
@@ -26,8 +27,11 @@ def source_pair(monkeypatch):
     after = {row["path"]: (root / row["path"]).read_bytes() for row in members}
     original_hash = updater.sha256
     hashes = {
-        old[row["path"]]: row["before_sha256"] for row in members if old[row["path"]] is not None
+        raw.replace(b"\r\n", b"\n"): before_p012a_hash(root, path) for path, raw in after.items()
     }
+    hashes.update(
+        {old[row["path"]]: row["before_sha256"] for row in members if old[row["path"]] is not None}
+    )
     # Fixtures stand in only for historical bytes. Successor bytes use real SHA256.
     monkeypatch.setattr(updater, "sha256", lambda raw: hashes.get(raw, original_hash(raw)))
     return old, after

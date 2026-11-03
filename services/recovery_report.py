@@ -3,7 +3,6 @@
 from datetime import UTC, datetime
 import json
 
-from core.operator_diagnostic_payloads import redact_diagnostic_text
 from services import operation_diagnostics, recovery_health
 from services.recovery_execution_guard import execution_progress
 from services.recovery_service import SourceConflict
@@ -16,7 +15,9 @@ def _safe(value):
         return [_safe(v) for v in value]
     if value is None or isinstance(value, (bool, int, float)):
         return value
-    return redact_diagnostic_text(value)
+    from services.recovery_evidence_bundle import redact_report_text
+
+    return redact_report_text(value)
 
 
 def _next_step(row, evidence, actions, blocked):
@@ -177,9 +178,9 @@ def unavailable_report(error):
                 generated_utc=datetime.now(UTC).isoformat(),
                 complete=False,
                 incidents_available=False,
-                monitor=recovery_health.report(),
-                operation_observations=operation_diagnostics.report(),
-                collection_failure=recovery_health.failure_detail(error),
+                monitor=_optional_report(recovery_health.report),
+                operation_observations=_optional_report(operation_diagnostics.report),
+                collection_failure={"error_type": type(error).__name__},
                 next_step="Incident collection failed. Share this diagnostic report, then download again after connectivity or registration recovers. This is not an empty incident list.",
             )
         ),
@@ -190,6 +191,20 @@ def unavailable_report(error):
 
 
 def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 * 1024 * 1024):
+    from services.recovery_evidence_bundle import report_request
+
+    service.report_authorize(actor)
+    with report_request():
+        return _build_report(service, actor, after, through, part, max_bytes)
+
+
+def _optional_report(function):
+    from services.recovery_evidence_bundle import guarded
+
+    return guarded(function, limit=16384)[0]
+
+
+def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 * 1024 * 1024):
     service.authorize(actor)
     if type(part) is not int or part < 1 or type(max_bytes) is not int or max_bytes < 65536:
         raise SourceConflict("A valid report continuation and attachment budget are required.")
@@ -208,8 +223,8 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
             "A healthy monitor does not prove there are no incidents. Undiscovered failures are not included. "
             "Downloading reads saved observations only; it never applies or reconciles a repair."
         ),
-        monitor=recovery_health.report(),
-        operation_observations=operation_diagnostics.report(),
+        monitor=_optional_report(recovery_health.report),
+        operation_observations=_optional_report(operation_diagnostics.report),
         incidents=[],
     )
     next_after = after
@@ -231,7 +246,10 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
             encoded_size = len(encode(document))
         if encoded_size + addition > max_bytes - 1024:
             if not document["incidents"]:
-                raise SourceConflict("One incident exceeds this destination's attachment budget.")
+                raise SourceConflict(
+                    f"One incident requires at least {encoded_size + addition + 1024} bytes. "
+                    "Use a destination with a larger attachment budget; the incident cursor has not advanced."
+                )
             break
         document["incidents"].append(incident)
         encoded_size += addition

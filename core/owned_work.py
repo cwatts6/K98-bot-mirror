@@ -6,7 +6,7 @@ The caller retains its admission/lock until the child actually settles.
 
 import asyncio
 
-from core.operation_evidence import emit, optional, worker_result
+from core.operation_evidence import child_scope, emit, optional, worker_result
 from core.operation_timing import clock, elapsed
 
 
@@ -48,4 +48,5 @@ async def drain_thread(function, *args, **kwargs):
         finally:
             optional(elapsed, "worker_execution", started, disposition)
 
-    return await drain_awaitable(asyncio.to_thread(run))
+    with child_scope():
+        return await drain_awaitable(asyncio.to_thread(run))

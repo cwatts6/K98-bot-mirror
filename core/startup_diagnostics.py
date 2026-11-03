@@ -4,7 +4,8 @@ import asyncio
 from copy import deepcopy
 from datetime import UTC, datetime
 
-from core.operation_evidence import emit, optional, result_facts, scope
+from core.operation_evidence import emit, optional, result_facts, scope, typed_result
+from services.startup_outcome_projection import project
 
 _steps = {}
 
@@ -16,7 +17,7 @@ def report():
 def _record(label, state, seconds, *, error=None, **facts):
     if label not in _steps and len(_steps) >= 64:
         return
-    _steps[label] = dict(
+    row = dict(
         **facts,
         step=label,
         state=state,
@@ -27,7 +28,8 @@ def _record(label, state, seconds, *, error=None, **facts):
     if error is not None:
         from services.recovery_health import failure_detail
 
-        _steps[label]["diagnostic"] = optional(failure_detail, error) or {"status": "unavailable"}
+        row["diagnostic"] = optional(failure_detail, error) or {"status": "unavailable"}
+    _steps[label] = row
 
 
 async def _drain_cancel(task):
@@ -62,6 +64,13 @@ async def _run(
     check_error = None
 
     def record(state, **facts):
+        outcome = optional(
+            project,
+            label,
+            verified,
+            checked=completion_check is not None,
+            error=type(check_error).__name__ if check_error is not None else False,
+        ) or {"feature_outcome": "unknown"}
         optional(
             _record,
             label,
@@ -69,16 +78,25 @@ async def _run(
             seconds,
             reference=observation.reference,
             worker_result=dict(observation.worker_result),
+            parent_return=optional(typed_result, result) if returned else None,
+            feature=outcome,
             **facts,
         )
-        emit(label, state, error=facts.get("error"))
+        emit(label, state, error=facts.get("error"), facts=outcome if returned else None)
 
     async def observed():
         nonlocal result, returned, verified, check_error
         with startup_context(label):
             result = await coro
             returned = True
-            emit(label, "result_returned", facts=optional(result_facts, result))
+            emit(
+                label,
+                "result_returned",
+                facts={
+                    **(optional(result_facts, result) or {}),
+                    **(optional(typed_result, result) or {}),
+                },
+            )
             if completion_check is not None:
                 try:
                     verified = await completion_check(result)

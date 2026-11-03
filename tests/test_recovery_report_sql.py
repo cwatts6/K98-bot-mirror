@@ -149,3 +149,29 @@ def test_action_failure_is_batched_and_scope_bound(contained_job):
     with pytest.raises(SourceConflict):
         foreign.latest_action(row["IncidentID"])
     assert foreign.report_page()["rows"] == []
+
+
+def test_bundle_ten_row_pages_preserve_real_guid_order_and_cutoff(contained_job):
+    f = contained_job
+    store = RecoveryDAL(f.connect, account="test-account", storage_owner="disk", guild_id=2)
+    evidence = dict(title="Test", explanation="Fixture", outcome="held", actions={})
+    for index in range(25):
+        store.observe("stats_import", str(uuid4()), evidence, "a" * 64, resolved=bool(index % 2))
+    expected = [
+        str(row[0]).lower()
+        for row in f.sql.execute(
+            "SELECT IncidentID FROM #RecoveryIncident ORDER BY IncidentID"
+        ).fetchall()
+    ]
+    after = through = None
+    actual = []
+    sizes = []
+    while True:
+        page = store.report_page(after=after, through=through, page_size=10)
+        through = page["through"]
+        sizes.append(len(page["rows"]))
+        actual.extend(row["IncidentID"] for row in page["rows"])
+        if not page["more"]:
+            break
+        after = page["rows"][-1]["IncidentID"]
+    assert actual == expected and sizes == [10, 10, 5]

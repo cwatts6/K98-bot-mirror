@@ -616,6 +616,26 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P012A_EVIDENCE_BUNDLE_PATHS = frozenset(
+    {
+        "core/operation_evidence.py",
+        "core/owned_work.py",
+        "core/startup_diagnostics.py",
+        "services/export_runtime_composition.py",
+        "services/operation_diagnostics.py",
+        "services/recovery_complete_report.py",
+        "services/recovery_dal.py",
+        "services/recovery_evidence_bundle.py",
+        "services/recovery_report.py",
+        "services/recovery_runtime.py",
+        "services/recovery_service.py",
+        "services/startup_outcome_projection.py",
+        "ui/views/recovery_backlog_view.py",
+        "ui/views/recovery_view.py",
+    }
+)
+
+
 P011_STARTUP_OUTCOME_PATHS = frozenset(
     {
         "bot_instance.py",
@@ -717,7 +737,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 57:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 58:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -809,6 +829,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_p012a = (
+                item["id"] == "p012a_evidence_bundle_v1" and path in P012A_EVIDENCE_BUNDLE_PATHS
             )
             fixed_p011 = (
                 item["id"] == "p011_startup_outcomes_v1" and path in P011_STARTUP_OUTCOME_PATHS
@@ -909,6 +932,7 @@ def reviewed_transitions():
                     or fixed_coordination_lifecycle
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
+                    or fixed_p012a
                     or fixed_p011
                     or fixed_mge_final
                     or fixed_mge_a1b
@@ -1048,6 +1072,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p012a_evidence_bundle_v1" and paths != P012A_EVIDENCE_BUNDLE_PATHS:
+            raise ValueError("Complete fixed P01.2a evidence-bundle transition required.")
         if item["id"] == "p011_startup_outcomes_v1" and paths != P011_STARTUP_OUTCOME_PATHS:
             raise ValueError("Complete fixed P01.1 startup-outcome transition required.")
         if item["id"] == "p1_mge_finalisation_v1" and paths != MGE_FINALISATION_PATHS:

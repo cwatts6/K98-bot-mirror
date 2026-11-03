@@ -1,7 +1,5 @@
 """Admin review of a whole evidence group; verification runs through services."""
 
-import io
-
 import discord
 
 from core.interaction_safety import safe_defer
@@ -68,23 +66,53 @@ async def show_group(interaction):
         await report_error(interaction, exc)
 
 
-async def show_complete_report(interaction):
+class EvidenceReportPartsView(discord.ui.View):
+    def __init__(self, report):
+        super().__init__(timeout=600)
+        self.token = report.get("diagnostic_token")
+        self.through = report.get("through")
+        self.diagnostics.disabled = self.token is None
+        self.incidents.disabled = not report.get("incident_continuation")
+
+    @discord.ui.button(label="Download remaining diagnostics", style=discord.ButtonStyle.primary)
+    async def diagnostics(self, button, interaction):
+        await show_complete_report(interaction, token=self.token)
+
+    @discord.ui.button(label="Download incident parts", style=discord.ButtonStyle.secondary)
+    async def incidents(self, button, interaction):
+        from ui.views.recovery_view import show_report
+
+        await show_report(interaction, through=self.through)
+
+
+async def show_complete_report(interaction, *, token=None):
     from core.operator_diagnostic_payloads import resolve_attachment_size_limit
+    from services.recovery_evidence_bundle import report_request
+    from ui.views.recovery_view import report_call, send_report_attachment
 
     try:
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
             return
-        report = await call(
-            "download_complete_report",
-            actor,
-            min(resolve_attachment_size_limit(interaction), 8388608),
-        )
-        await interaction.followup.send(
-            f"Complete report: {report['count']} recorded incidents. The ZIP contains summary.json and all incident details in incidents.jsonl. Resolved incidents are included. No repairs were applied.",
-            file=discord.File(io.BytesIO(report["content"]), filename=report["filename"]),
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+        with report_request():
+            limit = min(resolve_attachment_size_limit(interaction), 8388608)
+            report = (
+                await report_call("download_complete_report", actor, limit)
+                if token is None
+                else await report_call("download_diagnostic_part", actor, token, limit)
+            )
+            text = (
+                f"Report: {report['count']} recorded incidents. "
+                if token is None
+                else "Diagnostic continuation. "
+            )
+            if report.get("complete"):
+                text += "All recorded incidents through the cutoff are included. "
+            elif report.get("incident_continuation"):
+                text += "Incident collection is incomplete; use incident parts below. "
+            text += "The manifest records coverage and unavailable evidence."
+            await send_report_attachment(
+                interaction, actor, report, text, EvidenceReportPartsView(report)
+            )
     except Exception as exc:
         await report_error(interaction, exc)

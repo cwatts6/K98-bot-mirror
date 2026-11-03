@@ -28,19 +28,20 @@ def report_service(count=1):
         item["evidence"]["explanation"] = "Needs verification; password=DO_NOT_EXPORT"
         records.append(item)
 
-    def page(*, after=None, through=None):
+    def page(*, after=None, through=None, page_size=100):
         start = (
             0
             if after is None
             else next(i + 1 for i, r in enumerate(records) if r["IncidentID"] == after)
         )
         return dict(
-            rows=deepcopy(records[start : start + 100]),
+            rows=deepcopy(records[start : start + page_size]),
             total=count,
             through=through or "2026-10-17 10:00:00",
-            more=start + 100 < count,
+            more=start + page_size < count,
         )
 
+    store.scope = "test-report-scope"
     store.report_page = Mock(side_effect=page)
     store.pending_actions = Mock(side_effect=AssertionError("Report must use paged action state"))
     service.refresh = Mock(side_effect=AssertionError("Report must not refresh or reconcile"))
@@ -112,7 +113,7 @@ def test_optional_observations_cannot_crowd_out_a_fitting_incident(monkeypatch):
     monkeypatch.setattr(
         recovery_report.operation_diagnostics,
         "report",
-        lambda: {"operations": [{"detail": "y" * 12000}]},
+        lambda: {"operations": [{"detail": "y" * 6000}, {"detail": "z" * 6000}]},
     )
     result = service.download_report(ACTOR, max_bytes=65536)
     data = json.loads(result["content"])
@@ -247,8 +248,9 @@ def test_report_refuses_budget_consumed_by_monitor_history(monkeypatch):
     service, _, records = report_service()
     records[0]["evidence"]["explanation"] = "é\n" * 12000
     monkeypatch.setattr(module.recovery_health, "report", lambda: {"history": "x" * 65536})
-    with pytest.raises(SourceConflict, match="attachment budget"):
-        service.download_report(ACTOR, max_bytes=65536)
+    report = service.download_report(ACTOR, max_bytes=65536)
+    assert len(report["content"]) <= 65536
+    assert json.loads(report["content"])["included_incidents"] == 1
 
 
 def test_report_serialization_is_linear_and_uses_paged_pending_action(monkeypatch):
@@ -287,10 +289,13 @@ async def test_report_button_uses_ephemeral_file_and_auth_before_query(monkeypat
     monkeypatch.setattr(module, "actor_for", Mock(return_value=ACTOR))
     monkeypatch.setattr(module, "safe_defer", AsyncMock(return_value=True))
     interaction = SimpleNamespace(followup=SimpleNamespace(send=AsyncMock()))
+    captured = []
+    interaction.followup.send.side_effect = lambda **kw: captured.append(kw["file"].fp.getvalue())
     await module.show_report(interaction)
     sent = interaction.followup.send.call_args.kwargs
     assert sent["ephemeral"] is True
-    assert json.loads(sent["file"].fp.getvalue())["complete"]
+    assert json.loads(captured[0])["complete"]
+    assert sent["file"].fp.closed
     assert module.RecoveryEntryView().is_persistent()
     call.reset_mock()
     monkeypatch.setattr(module, "actor_for", Mock(side_effect=SourceConflict("denied")))

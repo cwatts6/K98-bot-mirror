@@ -46,9 +46,15 @@ class RuntimeLifetime:
         self._reconfiguration_calls = set()
 
     @contextmanager
-    def owned(self):
+    def owned(self, *, wait=True):
         inherited = _caller.get()
-        with self._condition:
+        if not self._condition.acquire(blocking=wait):
+            raise SourceConflict(
+                "Report runtime is busy; collect again after current work settles."
+            )
+        try:
+            if not wait and (self._reconfiguring or not self._accepting):
+                raise SourceConflict("Report runtime admission is unavailable.")
             if inherited is not None:
                 if (
                     inherited.bundle is not self
@@ -62,11 +68,14 @@ class RuntimeLifetime:
                 call = inherited
                 call.references += 1
             else:
-                self._condition.wait_for(lambda: not self._reconfiguring or not self._accepting)
+                if wait:
+                    self._condition.wait_for(lambda: not self._reconfiguring or not self._accepting)
                 if not self._accepting:
                     raise SourceConflict("Export runtime admission is closed.")
                 call, root = RuntimeCall(self), True
                 self._calls.add(call)
+        finally:
+            self._condition.release()
         token = _caller.set(call)
         try:
             yield self
@@ -165,6 +174,26 @@ def recovery_caller_scope():
             yield bundle.legacy
 
 
+@contextmanager
+def report_caller_scope():
+    """Register read-only collection without waiting for installation/reconfiguration."""
+    if not _installation_lock.acquire(blocking=False):
+        raise SourceConflict("Report runtime installation is busy.")
+    owner = None
+    try:
+        bundle = _installed or _recovery_bundle
+        if bundle is None or _runtime_stopped:
+            raise SourceConflict("Report runtime is unavailable.")
+        owner = bundle.owned(wait=False)
+        owner.__enter__()
+    finally:
+        _installation_lock.release()
+    try:
+        yield bundle.legacy
+    finally:
+        owner.__exit__(None, None, None)
+
+
 def retry_recovery_admission():
     with _installation_lock:
         retry = _installed is None and _recovery_bundle is not None and not _runtime_stopped
@@ -220,6 +249,9 @@ def caller_scope(injected=None):
 
 
 def stop_runtime_admission():
+    from services.recovery_evidence_bundle import stop_admission
+
+    stop_admission()
     global _runtime_stopped
     with _installation_lock:
         _runtime_stopped = True
@@ -231,6 +263,9 @@ def stop_runtime_admission():
 
 async def drain_runtime():
     from services.legacy_export_snapshot_service import drain_thread
+    from services.recovery_evidence_bundle import drain_reports
+
+    await drain_thread(drain_reports)
 
     with _installation_lock:
         bundle = _installed or _recovery_bundle

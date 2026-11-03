@@ -1,5 +1,6 @@
 """Optional process-local observations. These values confer no recovery authority."""
 
+import asyncio
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -28,6 +29,10 @@ STAGES = frozenset(
         "build_player_stats_cache",
         "warm_profile_cache",
         "warm_name_cache",
+        "rehydrate_tracked_views",
+        "rehydrate_vote_post_views",
+        "rehydrate_survey_post_views",
+        "rehydrate_pinned_calendar_view",
         "acknowledgement",
         "interaction_age_at_entry",
         "private_callback",
@@ -120,8 +125,13 @@ def result_facts(result):
 
 
 class Observation:
-    def __init__(self, enabled=True):
-        self.reference = uuid4().hex if enabled else None
+    def __init__(self, enabled=True, parent=None):
+        identifier = uuid4().hex if enabled else None
+        self.reference = parent.reference if parent is not None else identifier
+        self.child_reference = identifier if parent is not None else None
+        self.parent_reference = (parent.child_reference or parent.reference) if parent else None
+        self.root = parent.root if parent else self
+        self.sequence = 0
         self.worker_result = {}
         self.references = {}
 
@@ -155,7 +165,11 @@ def scope():
     if not admitted:
         optional(_lost_scope)
     try:
+        emit("operation", "entered")
         yield observation
+    except asyncio.CancelledError:
+        emit("operation", "cancelled_outcome_unconfirmed")
+        raise
     except BaseException:
         emit("operation", "interrupted")
         raise
@@ -167,6 +181,45 @@ def scope():
         optional(_current.reset, token)
         if admitted:
             optional(_slots.release)
+
+
+@contextmanager
+def child_scope():
+    """A physical invocation has its own identity and durable-reference namespace."""
+    parent = _current.get()
+    admitted = False
+    token = None
+    try:
+        if parent is not None and parent.reference is not None:
+            admitted = _slots.acquire(blocking=False)
+            if admitted:
+                token = _current.set(Observation(parent=parent))
+            else:
+                token = _current.set(_disabled)
+                optional(_lost_scope)
+    except Exception:
+        # Do not attribute an unobserved physical child to its parent's namespace.
+        token = optional(_current.set, _disabled)
+        optional(_lost_scope)
+    try:
+        yield
+    finally:
+        if token is not None:
+            optional(_current.reset, token)
+        if admitted:
+            optional(_slots.release)
+
+
+def typed_result(result):
+    """Values describe returns, never inferred business success."""
+    facts = {"value_kind": "unavailable", "value_meaning": "unclassified_return"}
+    if type(result) is bool:
+        facts.update(value_kind="boolean", value_boolean=result)
+    elif result is None:
+        facts["value_kind"] = "none"
+    elif type(result) in (dict, tuple, list):
+        facts["value_kind"] = type(result).__name__
+    return facts
 
 
 def reference():
@@ -233,7 +286,10 @@ def worker_result(result):
         facts = result_facts(result)
         if facts:
             current.worker_result = facts
-        emit("worker_execution", "settled", facts=current.worker_result)
+            # Compatibility-only field for existing startup callers. V2 consumers
+            # use identified children and the independently retained parent return.
+            current.root.worker_result = facts
+        emit("worker_execution", "settled", facts={**facts, **typed_result(result)})
 
 
 def emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None):
@@ -249,6 +305,12 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
         return
     # All facts are produced by result_facts, never caller dictionaries.
     event = dict(
+        schema="operation-boundary/2",
+        event_id=uuid4().hex,
+        sequence=current.sequence,
+        role="child" if current.child_reference else "parent",
+        origin="code_owned",
+        actor="unavailable_not_collected",
         reference=current.reference,
         stage=stage if type(stage) is str and stage in STAGES else "unavailable",
         state=state if type(state) is str and state in STATES else "unavailable",
@@ -260,6 +322,11 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
         sql_holder="unavailable_P02",
         **current.references,
     )
+    current.sequence += 1
+    if current.child_reference:
+        event.update(
+            child_reference=current.child_reference, parent_reference=current.parent_reference
+        )
     if _incarnation is None:
         event.pop("process_incarnation")
     if type(elapsed_ms) in (int, float) and 0 <= elapsed_ms <= 1e12:
@@ -280,6 +347,22 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
                     "attempt_recording",
                     "attempt_outcome",
                     "import_reported_success",
+                    "value_kind",
+                    "value_meaning",
+                    "value_boolean",
+                    "feature_outcome",
+                    "main_cache",
+                    "last_kvk_cache",
+                    "data_outcome",
+                    "execution_outcome",
+                    "persistence_outcome",
+                    "restoration_outcome",
+                    "attached",
+                    "pruned",
+                    "superseded",
+                    "failed_count",
+                    "unattempted",
+                    "outcome_unconfirmed",
                 }
             }
         )

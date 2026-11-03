@@ -39,6 +39,45 @@ async def call(method, *args):
     return await drain_thread(call_recovery, method, *args)
 
 
+async def report_call(method, *args):
+    import asyncio
+
+    from core.owned_work import drain_awaitable
+    from services.recovery_evidence_bundle import report_request
+
+    with report_request() as lease:
+        pending = asyncio.create_task(call(method, *args))
+        try:
+            return await asyncio.shield(pending)
+        except asyncio.CancelledError:
+            lease.cancelled.set()
+            try:
+                await drain_awaitable(pending)
+            finally:
+                raise
+
+
+async def send_report_attachment(interaction, actor, report, content, view):
+    # Identity and current configuration are checked immediately before emission.
+    if actor_for(interaction) != actor:
+        raise SourceConflict("The report authorization changed. Collect a new report.")
+    buffer = io.BytesIO(report["content"])
+    attachment = None
+    try:
+        attachment = discord.File(buffer, filename=report["filename"])
+        await interaction.followup.send(
+            content=content,
+            file=attachment,
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+    finally:
+        if attachment is not None:
+            attachment.close()
+        buffer.close()
+
+
 def incident_embed(row):
     evidence = row["evidence"]
     publication = row.get("publication_check")
@@ -506,44 +545,38 @@ class RecoveryReportView(discord.ui.View):
 
 async def show_report(interaction, after=None, through=None, part=1):
     from core.operator_diagnostic_payloads import resolve_attachment_size_limit
+    from services.recovery_evidence_bundle import report_request
 
     try:
         actor = actor_for(interaction)
         if not await safe_defer(interaction, ephemeral=True):
             return
-        limit = min(resolve_attachment_size_limit(interaction), 8 * 1024 * 1024)
-        try:
-            report = await call("download_report", actor, after, through, part, limit)
-        except Exception as exc:
-            from services.recovery_report import unavailable_report
+        with report_request():
+            limit = min(resolve_attachment_size_limit(interaction), 8 * 1024 * 1024)
+            try:
+                report = await report_call("download_report", actor, after, through, part, limit)
+            except SourceConflict:
+                raise
+            except Exception as exc:
+                from services.legacy_export_snapshot_service import drain_thread
+                from services.recovery_report import unavailable_report
 
-            report = unavailable_report(exc)
-        if report.get("unavailable"):
-            await interaction.followup.send(
-                content="The incident store could not be read. This diagnostic report includes monitor and collection failures; it is incomplete and does not mean there are no incidents.",
-                file=discord.File(io.BytesIO(report["content"]), filename=report["filename"]),
-                view=RecoveryEntryView(),
-                ephemeral=True,
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
-            return
-        more = report["next_after"] is not None
-        await interaction.followup.send(
-            content=(
-                f"Recovery report part {part}: {report['count']} incidents; "
-                f"{report['total']} recorded in this scope. "
-                + (
-                    "More incidents remain: download the next part below."
-                    if more
-                    else "This is the final part. Keep every part for the complete report."
+                report = await drain_thread(unavailable_report, exc)
+            if report.get("unavailable"):
+                text = "The incident store could not be read. This diagnostic report is incomplete and does not mean there are no incidents."
+                view = RecoveryEntryView()
+            else:
+                more = report["next_after"] is not None
+                text = (
+                    f"Recovery report part {part}: {report['count']} incidents; {report['total']} recorded in this scope. "
+                    + (
+                        "More incidents remain: download the next part below."
+                        if more
+                        else "This is the final part. Keep every part for the complete report."
+                    )
                 )
-                + " Includes resolved incidents and saved repair requirements. No repairs were applied."
-            ),
-            file=discord.File(io.BytesIO(report["content"]), filename=report["filename"]),
-            view=RecoveryReportView(report) if more else RecoveryEntryView(),
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+                view = RecoveryReportView(report) if more else RecoveryEntryView()
+            await send_report_attachment(interaction, actor, report, text, view)
     except Exception as exc:
         await report_error(interaction, exc)
 

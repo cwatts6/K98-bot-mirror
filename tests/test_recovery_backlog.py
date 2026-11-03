@@ -50,8 +50,11 @@ def test_incomplete_collection_never_labels_archive_complete():
     service, store, _ = report_service(3)
     original = store.report_page.side_effect
     store.report_page.side_effect = lambda **kw: dict(original(**kw), total=4)
-    with pytest.raises(SourceConflict, match="coverage changed"):
-        service.download_complete_report(ACTOR)
+    report = service.download_complete_report(ACTOR)
+    assert not report["complete"] and report["incident_continuation"]
+    with zipfile.ZipFile(io.BytesIO(report["content"])) as archive:
+        assert "incidents.jsonl" not in archive.namelist()
+        assert not json.loads(archive.read("summary.json"))["complete"]
 
 
 @pytest.mark.asyncio

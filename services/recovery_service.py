@@ -35,6 +35,17 @@ class RecoveryService:
                 "Recovery is available only to the configured admin in the admin notification channel."
             )
 
+    def report_authorize(self, actor):
+        self.authorize(actor)
+        checker = getattr(self, "current_report_authorizer", None)
+        if checker is not None:
+            checker(actor)
+
+    def download_diagnostic_part(self, actor, token, max_bytes=8388608):
+        from services.recovery_evidence_bundle import continuation
+
+        return continuation(self, actor, token, max_bytes)
+
     def refresh(self, incident_id):
         row = self.store.get(incident_id)
         if row["SourceKind"] not in self.adapters:

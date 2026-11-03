@@ -34,13 +34,13 @@ def _inspect_discovered(service, adapter, source_id):
 
 
 @contextmanager
-def recovery_service():
+def recovery_service(*, report=False):
     import bot_config
-    from services.export_runtime_composition import recovery_caller_scope
+    from services.export_runtime_composition import recovery_caller_scope, report_caller_scope
     from services.import_capture_recovery_service import ImportCaptureRecovery
     from services.stats_import_outcome_service import outcome_dal
 
-    with recovery_caller_scope() as runtime:
+    with report_caller_scope() if report else recovery_caller_scope() as runtime:
         if runtime is None:
             raise SourceConflict(
                 "Recovery checks are unavailable. Your incident remains open; use Recheck after service connectivity returns."
@@ -224,6 +224,8 @@ def recovery_service():
 
 
 def call_recovery(method, *args):
+    if method in {"download_report", "download_complete_report", "download_diagnostic_part"}:
+        return _call_report(method, *args)
     with recovery_service() as service:
         result = getattr(service, method)(*args)
     if method in {"execute", "execute_input"}:
@@ -527,3 +529,55 @@ def record_alert(incident_id, revision, channel_id, message_id):
 def claim_alert(incident_id):
     with recovery_service() as service:
         return service.store.claim_alert(incident_id)
+
+
+def _authorize_report_actor(actor):
+    import bot_config
+
+    if (actor.user_id, actor.guild_id, actor.channel_id) != (
+        int(bot_config.ADMIN_USER_ID),
+        int(bot_config.GUILD_ID),
+        int(bot_config.NOTIFY_CHANNEL_ID),
+    ):
+        raise SourceConflict(
+            "Recovery is restricted to the configured admin in the notification channel."
+        )
+
+
+def _call_report(method, *args):
+    from contextlib import ExitStack
+
+    from services.recovery_evidence_bundle import report_request
+
+    actor = args[0]
+    _authorize_report_actor(actor)
+    with report_request(), ExitStack() as stack:
+        try:
+            service = stack.enter_context(recovery_service(report=True))
+        except Exception:
+            service = RecoveryService(
+                _UnavailableReportStore(),
+                {},
+                admin_id=actor.user_id,
+                guild_id=actor.guild_id,
+                channel_id=actor.channel_id,
+            )
+        from services.export_runtime_composition import _caller
+
+        call = _caller.get()
+        if call is not None:
+            import re
+
+            client = getattr(call.bundle.legacy, "client", None)
+            deployment = getattr(client, "deployment_hash", None)
+            if type(deployment) is str and re.fullmatch(r"[0-9a-fA-F]{64}", deployment):
+                service.report_identity = {"authority_deployment_hash": deployment}
+        service.current_report_authorizer = _authorize_report_actor
+        return getattr(service, method)(*args)
+
+
+class _UnavailableReportStore:
+    scope = "runtime_unavailable"
+
+    def report_page(self, **kwargs):
+        raise SourceConflict("Incident storage is unavailable; diagnostics remain separate.")

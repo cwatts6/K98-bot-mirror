@@ -184,8 +184,10 @@ class RecoveryDAL:
                 self.scope,
             )
 
-    def report_page(self, *, after=None, through=None):
+    def report_page(self, *, after=None, through=None, page_size=100):
         """Read all states in bounded pages; never inspect, reconcile or dispatch."""
+        if type(page_size) is not int or not 1 <= page_size <= 100:
+            raise ValueError("Invalid report page size")
         after = identity(after) if after is not None else None
         with transaction(self.connect) as cursor:
             if through is None:
@@ -200,7 +202,7 @@ class RecoveryDAL:
             )
             total = one(cursor)["Total"]
             cursor.execute(
-                "SELECT TOP (101) i.*, a.State AS PendingActionState, "
+                "SELECT TOP (?) i.*, a.State AS PendingActionState, "
                 "a.ActionKind AS PendingActionKind, p.ActionID AS PublicationActionID, "
                 "p.State AS PublicationState, p.CreatedUTC AS PublicationCreatedUTC, "
                 "p.UpdatedUTC AS PublicationUpdatedUTC, r.ActionID AS LastActionID, "
@@ -217,14 +219,15 @@ class RecoveryDAL:
                 "WHERE i.ScopeKey=? "
                 "AND i.FirstSeenUTC<=? AND (? IS NULL OR i.IncidentID>CAST(? AS uniqueidentifier)) "
                 "ORDER BY i.IncidentID",
+                page_size + 1,
                 self.scope,
                 through,
                 after,
                 after,
             )
             result = rows(cursor)
-            more = len(result) > 100
-            result = result[:100]
+            more = len(result) > page_size
+            result = result[:page_size]
             for row in result:
                 row["IncidentID"] = identity(row["IncidentID"])
                 row["evidence"] = json.loads(row["EvidenceJson"])
