@@ -288,11 +288,19 @@ def main(argv=None):
             raise ValueError(
                 "Saved-result restart requires the original application DPAPI identity."
             )
-        evidence_root = inspect(authority["evidence_root"], private=True)
+
+        def inspect_evidence():
+            # Runtime evidence is writable by the verified application identity.
+            # Source, policy and history still use administrative_inspector.
+            return launcher["protected_path"](
+                authority["evidence_root"], private=True, identity=sid
+            )
+
+        evidence_root = inspect_evidence()
         restart_settlement = RequestSettlement(
             ExportExecutionDAL(connect),
             PrivateEvidenceStore(evidence_root, authority["storage_owner"]),
-            check_boundary=lambda: inspect(authority["evidence_root"], private=True),
+            check_boundary=inspect_evidence,
         )
         reconciler = StartupReconciler(
             connect,

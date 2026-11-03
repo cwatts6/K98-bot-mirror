@@ -698,7 +698,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 55:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 56:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -823,7 +823,8 @@ def reviewed_transitions():
                 and path in REPORT_CACHE_TRANSITION_PATHS
             )
             fixed_issuer = (
-                item["id"] == "drained_issuer_exit_v1" and path in DRAINED_ISSUER_TRANSITION_PATHS
+                item["id"] in {"drained_issuer_exit_v1", "startup_evidence_custody_v1"}
+                and path in DRAINED_ISSUER_TRANSITION_PATHS
             )
             fixed_report_handoff = (
                 item["id"] == "report_cache_handoff_v1" and path in REPORT_CACHE_HANDOFF_PATHS
@@ -928,7 +929,10 @@ def reviewed_transitions():
             raise ValueError("Complete fixed portable schema transition required.")
         if item["id"] == "evidence_backup_collection_v1" and paths != EVIDENCE_BACKUP_PATHS:
             raise ValueError("Complete fixed evidence-backup transition required.")
-        if item["id"] == "drained_issuer_exit_v1" and paths != DRAINED_ISSUER_TRANSITION_PATHS:
+        if (
+            item["id"] in {"drained_issuer_exit_v1", "startup_evidence_custody_v1"}
+            and paths != DRAINED_ISSUER_TRANSITION_PATHS
+        ):
             raise ValueError("Complete fixed drained-issuer transition required.")
         if item["id"] == "guided_rollover_v1" and paths != ROLLOVER_GUIDED_PATHS:
             raise ValueError("Complete fixed guided-rollover transition required.")

@@ -17,6 +17,29 @@ from tests.test_export_authority_boundaries import source_tree
 SID = "S-1-5-21-1-2-3-1001"
 
 
+def test_native_windows_application_evidence_acl(tmp_path, monkeypatch):
+    """Parse the deployed ACL shape with Win32; only filesystem lookup is substituted."""
+    security = pytest.importorskip("win32security")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    descriptor = security.ConvertStringSecurityDescriptorToSecurityDescriptor(
+        "O:BAG:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + SID + ")", 1
+    )
+    # All fixture ancestors use the same bounded descriptor, avoiding assumptions
+    # about the CI runner's own home-directory ACL. ACEs are native Win32 objects.
+    monkeypatch.setattr(security, "GetNamedSecurityInfo", lambda *_: descriptor)
+    assert launcher.protected_path(evidence, private=True, identity=SID) == evidence
+    with pytest.raises(launcher.AuthorityStartupError, match="Untrusted authority path access"):
+        issuer.administrative_inspector({"protected_path": launcher.protected_path})(
+            evidence, private=True
+        )
+    descriptor = security.ConvertStringSecurityDescriptorToSecurityDescriptor(
+        "O:BAG:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + SID + ")(A;;FR;;;BU)", 1
+    )
+    with pytest.raises(launcher.AuthorityStartupError, match="Untrusted authority path access"):
+        launcher.protected_path(evidence, private=True, identity=SID)
+
+
 def native_acl(
     monkeypatch,
     affected,

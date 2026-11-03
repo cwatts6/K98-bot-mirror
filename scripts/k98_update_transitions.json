@@ -2495,6 +2495,16 @@
           "after_sha256": "2b4e83cdb9002bb0f231b3a0dd080650ae421fbdd123ebb2916ef85c4f33e4ec"
         }
       ]
+    },
+    {
+      "id": "startup_evidence_custody_v1",
+      "members": [
+        {
+          "path": "scripts/run_export_startup_issuer.py",
+          "before_sha256": "e701d805aa8103cdf62827b23fd50852bc0bfb9488e97352ae9ef689164495ea",
+          "after_sha256": "e9735585cf74c4af60df50a47691eccbba8af5dbe9852695221388c5baaae3ff"
+        }
+      ]
     }
   ]
 }

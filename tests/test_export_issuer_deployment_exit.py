@@ -195,6 +195,8 @@ def run_issuer(tmp_path, monkeypatch):
         token=token,
         mutex=mutex,
         writes=writes,
+        launcher=launcher,
+        reconciler_factory=reconciliation.StartupReconciler,
     )
 
 
@@ -216,6 +218,38 @@ def test_drained_deployment_exits_without_console_dependency(run_issuer):
         handle.Close.assert_called_once()
     run_issuer.token.Close.assert_called_once()
     run_issuer.mutex.Close.assert_called_once()
+
+
+@pytest.mark.parametrize("damage", [None, "private_reader", "owner", "reparse"])
+def test_startup_evidence_uses_application_custody(run_issuer, monkeypatch, damage):
+    import scripts.run_export_authority as authority_launcher
+    import tests.test_export_startup_custody as custody
+
+    evidence = run_issuer.directory / "evidence"
+    monkeypatch.setattr(custody, "SID", "sid")
+    custody.native_acl(
+        monkeypatch,
+        evidence,
+        rights=0x1F01FF,
+        owner="untrusted" if damage == "owner" else "S-1-5-32-544",
+        other_reader=damage == "private_reader",
+        reparse=damage == "reparse",
+    )
+    run_issuer.launcher["protected_path"] = authority_launcher.protected_path
+    if damage:
+        with pytest.raises((authority_launcher.AuthorityStartupError, host.HostBoundaryError)):
+            run_issuer.run()
+        run_issuer.creates.assert_not_called()
+        run_issuer.reconciler_factory.assert_not_called()
+    else:
+        assert run_issuer.run() == 0
+        assert run_issuer.creates.call_count == 2
+        recovery = run_issuer.reconciler_factory.call_args.kwargs["saved_result_recovery"]
+        recovery.settlement.check_boundary()
+        # The retry boundary must keep checking private application evidence.
+        custody.native_acl(monkeypatch, evidence, rights=0x1F01FF, other_reader=True)
+        with pytest.raises((authority_launcher.AuthorityStartupError, host.HostBoundaryError)):
+            recovery.settlement.check_boundary()
 
 
 @pytest.mark.parametrize("phase", ["receipt", "readback", "diagnostic"])

@@ -7,6 +7,7 @@ import pytest
 
 from scripts import prepare_k98_update as updater
 from tests.test_updater_transition_inventory import AFTER, BEFORE
+from tests.updater_source_assertions import before_startup_evidence_hash
 
 
 @pytest.mark.parametrize("identity", sorted(updater.REQUEST_SETTLEMENT_TRANSITIONS))
@@ -15,10 +16,7 @@ def test_settlement_bundle_pins_every_actual_runtime_dependency(identity):
     item = next(t for t in updater.reviewed_transitions() if t["id"] == identity)
     assert {m["path"] for m in item["members"]} == updater.REQUEST_SETTLEMENT_PATHS
     for member in item["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_startup_evidence_hash(root, member["path"]) == member["after_sha256"]
 
 
 @pytest.mark.parametrize(

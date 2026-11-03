@@ -28,9 +28,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_startup_evidence_hash(root, path):
+    """Authenticate the custody fix before checking its historical predecessor."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "startup_evidence_custody_v1"
+    )
+    member = next((m for m in successor["members"] if m["path"] == path), None)
+    if member is not None:
+        assert actual == member["after_sha256"], path
+        return member["before_sha256"]
+    return actual
+
+
 def before_settlement_hash(root, path):
     """Authenticate this exact successor before retaining older release assertions."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_startup_evidence_hash(root, path)
     # Historical assertions still require their original bytes after the exact
     # complete request-settlement successor is authenticated.
     successor = next(
