@@ -445,6 +445,10 @@ def inspect_fixture(tmp_path, damage=None):
     (updates / "operator.lock").write_bytes(b"0")
     (tmp_path / ("deployment-" + release + ".lock")).write_bytes(b"0")
     library = tmp_path / "library.ps1"
+    adapter = (ROOT / "scripts/K98-SourceUpdate.ps1").read_text()
+    same = adapter[
+        adapter.index("function Same(") : adapter.index("function Get-GitCredentialManager")
+    ]
     library.write_text(
         r"""
 param([string]$Action)
@@ -455,7 +459,6 @@ function Read-Bytes($Path,$Expected='', $Limit=1MB) {
  return ,$raw
 }
 function Read-Json($Path,$Expected='') {[Text.Encoding]::UTF8.GetString((Read-Bytes $Path $Expected))|ConvertFrom-Json}
-function Same($a,$b){return ($a|ConvertTo-Json -Depth 20 -Compress) -ceq ($b|ConvertTo-Json -Depth 20 -Compress)}
 function Assert-Drained {}
 function Sessions {if($env:K98_CORRECTION_FIXTURE -ceq 'session'){return ,@(@{State='open'})};return ,@()}
 function Get-CimInstance {return @()}
@@ -463,7 +466,7 @@ function Assert-Source {}
 function Assert-Task {return [pscustomobject]@{Enabled=$true}}
 function New-Directory {throw 'WRITE IS FORBIDDEN DURING INSPECT'}
 function Write-New {throw 'WRITE IS FORBIDDEN DURING INSPECT'}
-""",
+""" + same,
         encoding="utf-8",
     )
     profile = dict(

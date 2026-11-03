@@ -214,7 +214,7 @@ try {
  Invoke-CorrectionStage 'start' 'VerifyStart' 'ApplyStart'
  Invoke-CorrectionStage 'readiness' 'VerifyReadiness' 'AwaitReadiness'
  Assert-OriginalRecords
- $completion=@{version=1;stage='STARTUP_CORRECTION_VERIFIED';recovery_id=$profile.recovery_id;original_release_id=$profile.release_id;original_target=$profile.failed_target;target=$profile.target;bindings_sha256=$correctionPlan.bindings_sha256;original_start_intent='preserved';provider_delivery_verified=$false}
+ $completion=[pscustomobject]@{version=1;stage='STARTUP_CORRECTION_VERIFIED';recovery_id=$profile.recovery_id;original_release_id=$profile.release_id;original_target=$profile.failed_target;target=$profile.target;bindings_sha256=$correctionPlan.bindings_sha256;original_start_intent='preserved';provider_delivery_verified=$false}
  $completePath=Join-Path $destination 'complete.json'
  if(Test-Path -LiteralPath $completePath){if(-not(Same (Read-Json $completePath) $completion)){throw 'Correction closeout differs'}}else{Write-AtomicRecord $completePath $completion}
  if(Test-Path -LiteralPath $activePath){Remove-Item -LiteralPath $activePath}
