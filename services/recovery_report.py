@@ -214,6 +214,7 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
     )
     next_after = after
     encoded_size = len(encode(document))
+    observations_omitted = False
     for row in page["rows"]:
         incident = incident_report(service, row)
         encoded_incident = encode(incident)
@@ -221,6 +222,13 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
         # first item adds its array newlines/closing indent; later items add ,\n.
         item_size = len(encoded_incident) + 4 * (encoded_incident.count(b"\n") + 1)
         addition = item_size + (2 if document["incidents"] else 4)
+        if not document["incidents"] and encoded_size + addition > max_bytes - 1024:
+            # Optional evidence must not prevent an otherwise fitting incident
+            # from being delivered. The final omission marker uses the existing
+            # reserved metadata allowance rather than the incident budget.
+            document.pop("operation_observations", None)
+            observations_omitted = True
+            encoded_size = len(encode(document))
         if encoded_size + addition > max_bytes - 1024:
             if not document["incidents"]:
                 raise SourceConflict("One incident exceeds this destination's attachment budget.")
@@ -233,6 +241,8 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
     document["complete"] = not more and after is None
     document["parts_complete_through_this_part"] = not more
     document["included_incidents"] = len(document["incidents"])
+    if observations_omitted:
+        document["operation_observations"] = {"status": "omitted_attachment_budget"}
     return dict(
         content=encode(document),
         filename=f"K98-recovery-report-part-{part}.json",

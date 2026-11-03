@@ -9,7 +9,10 @@ import threading
 from uuid import UUID, uuid4
 
 _current = ContextVar("operation_observation", default=None)
-_incarnation = uuid4().hex  # Diagnostic incarnation, NOT native process creation evidence.
+try:
+    _incarnation = uuid4().hex  # Diagnostic incarnation, NOT native process creation evidence.
+except Exception:
+    _incarnation = None
 _labels = re.compile(r"[a-zA-Z_][a-zA-Z_0-9]{0,79}\Z")
 _slots = threading.BoundedSemaphore(256)
 _owners = {}
@@ -123,15 +126,34 @@ class Observation:
         self.references = {}
 
 
+_disabled = Observation(enabled=False)
+
+
+def _lost_scope():
+    from services.operation_diagnostics import note_context_loss
+
+    note_context_loss()
+
+
 @contextmanager
 def scope():
     existing = _current.get()
     if existing is not None:
         yield existing
         return
-    admitted = _slots.acquire(blocking=False)
-    observation = Observation(enabled=admitted)
-    token = _current.set(observation)
+    admitted = False
+    try:
+        admitted = _slots.acquire(blocking=False)
+        observation = Observation(enabled=admitted)
+        token = _current.set(observation)
+    except Exception:
+        if admitted:
+            optional(_slots.release)
+        optional(_lost_scope)
+        yield _disabled
+        return
+    if not admitted:
+        optional(_lost_scope)
     try:
         yield observation
     except BaseException:
@@ -142,9 +164,9 @@ def scope():
         # protection for scopes with no recorded failure.
         emit("operation", "settled")
     finally:
-        _current.reset(token)
+        optional(_current.reset, token)
         if admitted:
-            _slots.release()
+            optional(_slots.release)
 
 
 def reference():
@@ -238,6 +260,8 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
         sql_holder="unavailable_P02",
         **current.references,
     )
+    if _incarnation is None:
+        event.pop("process_incarnation")
     if type(elapsed_ms) in (int, float) and 0 <= elapsed_ms <= 1e12:
         event["elapsed_ms"] = elapsed_ms
         event["timing_scope"] = "inclusive"

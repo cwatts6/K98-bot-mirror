@@ -53,6 +53,7 @@ class DiagnosticSink:
         self.dropped = 0
         self.failures = 0
         self.evicted = 0
+        self.context_losses = 0
         self.records = {}
         self.snapshot = {"operations": [], "status": "starting"}
         # logging_setup owns explicit close plus an atexit close/join. A daemon
@@ -128,6 +129,7 @@ class DiagnosticSink:
             dropped=self.dropped,
             sink_failures=self.failures,
             evicted=self.evicted,
+            context_losses=self.context_losses,
             worker_alive=self.thread.is_alive(),
             authority="diagnostic_only",
             sql_holder="unavailable_P02",
@@ -160,7 +162,7 @@ class DiagnosticSink:
         rows = document["operations"]
         if type(rows) is not list or len(rows) > MAX_OPERATIONS:
             raise ValueError("Diagnostic inventory too large")
-        for name in ("dropped", "sink_failures", "evicted"):
+        for name in ("dropped", "sink_failures", "evicted", "context_losses"):
             value = document.get(name, 0)
             if type(value) is not int or not 0 <= value < 2**63:
                 raise ValueError("Invalid diagnostic counter")
@@ -327,6 +329,7 @@ class DiagnosticSink:
             dropped=self.dropped,
             sink_failures=self.failures,
             evicted=self.evicted,
+            context_losses=self.context_losses,
             observed_utc=datetime.now(UTC).isoformat(),
             status="closed" if self.closed else "observing",
         )
@@ -386,6 +389,11 @@ def configure(directory):
 def offer(event):
     if _sink is not None:
         optional(_sink.offer, event)
+
+
+def note_context_loss():
+    if _sink is not None:
+        _sink.context_losses += 1
 
 
 def shutdown():

@@ -103,6 +103,24 @@ def test_empty_and_small_reports_are_complete():
         assert data["total_recorded_incidents"] == count
 
 
+def test_optional_observations_cannot_crowd_out_a_fitting_incident(monkeypatch):
+    from services import recovery_report
+
+    service, _, _ = report_service(1)
+    monkeypatch.setattr(recovery_report.recovery_health, "report", lambda: {})
+    monkeypatch.setattr(recovery_report, "incident_report", lambda *_: {"detail": "x" * 62000})
+    monkeypatch.setattr(
+        recovery_report.operation_diagnostics,
+        "report",
+        lambda: {"operations": [{"detail": "y" * 12000}]},
+    )
+    result = service.download_report(ACTOR, max_bytes=65536)
+    data = json.loads(result["content"])
+    assert len(result["content"]) <= 65536
+    assert data["included_incidents"] == 1 and data["complete"]
+    assert data["operation_observations"] == {"status": "omitted_attachment_budget"}
+
+
 def test_collection_failure_is_exportable_without_false_empty_or_secrets():
     from services.recovery_report import unavailable_report
 

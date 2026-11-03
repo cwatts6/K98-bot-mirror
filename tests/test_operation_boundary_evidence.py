@@ -415,3 +415,52 @@ async def test_unrecorded_terminal_receipt_still_fails_verification(capture):
     assert row["state"] == "failed"
     assert row["result"]["import_reported_success"] is True
     assert row["result"]["attempt_recording"] == "unrecorded"
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_uuid_failure_keeps_business_entry_and_releases_slot(monkeypatch):
+    from services import cache_admission_diagnostics as admission
+
+    sink = diagnostics.DiagnosticSink()
+    monkeypatch.setattr(diagnostics, "_sink", sink)
+    slots = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(evidence, "_slots", slots)
+    broken = Mock(side_effect=OSError("entropy unavailable"))
+    monkeypatch.setattr(evidence, "uuid4", broken)
+    monkeypatch.setattr(admission, "uuid4", broken)
+    calls = []
+
+    async def work():
+        calls.append(1)
+        assert admission.identity()["correlation_id"] is None
+        return "original result"
+
+    assert await startup.run(work(), 10, "proc_config_import") == "original result"
+    assert calls == [1]
+    assert slots.acquire(blocking=False)  # Initialization failure returned its slot.
+    slots.release()
+    assert sink.report()["context_losses"] == 1
+
+
+@pytest.mark.asyncio
+async def test_context_capacity_loss_is_visible_and_does_not_limit_business(monkeypatch):
+    sink = diagnostics.DiagnosticSink()
+    monkeypatch.setattr(diagnostics, "_sink", sink)
+    monkeypatch.setattr(evidence, "_slots", threading.BoundedSemaphore(1))
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def holder():
+        with evidence.scope():
+            entered.set()
+            await release.wait()
+
+    pending = asyncio.create_task(holder())
+    await entered.wait()
+    try:
+        with evidence.scope() as observation:
+            assert observation.reference is None
+            assert await drain_thread(lambda: "still executes") == "still executes"
+        assert sink.report()["context_losses"] == 1
+    finally:
+        release.set()
+        await pending
