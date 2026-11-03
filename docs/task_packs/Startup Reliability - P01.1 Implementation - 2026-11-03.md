@@ -6,7 +6,9 @@ Implements the approved first P01 slice, F08/F32: preserve startup results and
 make shared timing/diagnostic failures independent of business execution.
 Mirror base: `031af6e1c66d209f33c1db867ced44662189fef9`; its tree matches the
 previously deployed private `b6ec4a0eeabd3d32d8fd98726ab8a6af5e6b829b`.
-The implementation branch is `codex/p01-startup-outcomes`.
+The implementation branch is `codex/p01-startup-outcomes`; final runtime source is
+`80b05dfc257f70ca6bf4957b8cd62cdaaa975dac`. Implementation and local qualification
+are complete. Promotion, installed-host qualification and deployment remain separate.
 
 Recovery/deployment dependency assessment is pre-work **within P01.1**, before
 any bot stop. The exact updater transition is part of this implementation.
@@ -52,14 +54,25 @@ diagnostic scopes, 1,024 queued envelopes with 128 reserved for material outcome
 16 MiB per file. First failure and latest result have separate retention slots.
 Completed, failure-free scopes expire after 30 days or capacity eviction;
 unresolved first failures are retained until capacity refuses new observations.
-Overflow, coalescing, eviction and sink failures remain visible. There is no
+Overflow, coalescing, eviction, lost diagnostic contexts and sink failures remain
+visible. Failed UUID allocation or full context capacity cannot prevent business
+entry. Prior counters are separate from live counters, so loading a projection cannot
+overwrite new losses; totals saturate within the restart reader contract. There is no
 additional rotated stream in this slice; the bounded projection provides the
 restart copy without duplicating records in the unbounded general log queue.
 
 The recovery report reads a bounded in-memory summary (under 16 KiB), including
 first failure, latest result/state and omitted-operation counts. It does not read
-disk or run reconciliation while rendering. Prior process references and original
+disk or run reconciliation while rendering. Optional observations are omitted with
+an explicit marker if they would prevent the first otherwise-fitting incident from
+fitting the attachment budget. Prior process references and original
 observation times remain visible after restart; they are not current liveness proof.
+
+The sink batches queued observations for up to one second before publishing. This
+wait occurs only on the writer thread, without holding the queue or business locks.
+Memory summaries and disk observations can lag by that interval plus entered I/O.
+Closing interrupts the batching delay. This avoids rewriting the growing projection
+on each producer wake and reduces Python-runtime and disk contention.
 
 Business owners drain before sink closure. Accepted observations are drained and
 entered I/O is joined. The logging atexit hook also closes/joins the sink; the
@@ -109,24 +122,60 @@ provider request, SQL mutation or recovery action was performed for this package
 
 ## Qualification record
 
-Initial focused qualification: 119 passed. Updater/negative-boundary subset:
-141 passed. Architecture boundaries, command registration and import smoke pass;
-smoke uses the repository's test environment with dotenv disabled, never production
-credentials. Final review and full-suite results are recorded below when complete.
+Final qualification is bound to the source revisions below; overlapping batches
+are not added together as a unique test total.
 
-Local Windows/Python 3.11.9 measurement used 30 matched, alternating pairs after six
-warmups, with real owned 20 ms threads and a disk diagnostic sink. Median overhead
-was 1.57%; p95 overhead 4.35%; enqueue p95 0.0104 ms and p99 0.0194 ms. The deliberate
-2,000-offer burst dropped 1,104 observations, with zero sink failures. Added p95
-heartbeat delay was 0.12 ms. Absolute heartbeat delay was about 14 ms in both arms
-(Windows scheduling); these are synthetic local measurements, not production SLOs.
+| Gate | Result and limit |
+|---|---|
+| Frozen full suite at `f364440` | **11,047 passed, 1,113 skipped, 8 subtests passed**, one Google Python-version advisory; 1,257.78 seconds. Operational-log isolation passed. |
+| Final runtime `80b05df` | **217 focused tests passed**, including the subsequent counter and batching changes; operational-log isolation passed. The full suite predates these narrow sink follow-ups. |
+| Shared callers | 33 direct imports across 28 source files: startup, coalesced/owned work, private interactions, MGE review/roster/board/publication/recovery/scheduling and views, event delivery, export snapshot and recovery health. Existing caller suites plus dedicated injected-failure tests were used. |
+| Deterministic gates | Architecture boundaries, deferred-item validation, explicit-path test selection, security-routing validation, command registration, import smoke, Ruff, Black/whitespace/merge-marker/size checks and committed-range secret scan pass. |
+| Configured type check | Zero errors and 28 dependency-resolution warnings. This is the repository's configured limited scope, not whole-repository type coverage. |
+| Updater | Exact Git predecessor/successor classification has no blockers and requires the updater upgrade. All 13 successor hashes match actual Git blobs; predecessor hashes and historical transitions are retained. Generated installer/upgrade parse under Windows PowerShell 5.1. Built, not installed. |
+| SQL/live operations | No new SQL query, schema, procedure, grant or config contract. Source contracts were checked against the SQL repository during design. Native SQL contention and installed-process/custody acceptance are not claimed by this slice. |
+
+Three complete **Changes** reviews cover the implementation and its final follow-ups;
+Deep scan was off, no candidates/findings remain:
+
+| Scan | Immutable range | Source items |
+|---|---|---|
+| `5f89dbd3-6a6d-4df1-b700-f7349204fb23` | `031af6e..7fb6317` | 15/15 |
+| `33412e62-2619-47ff-ba3a-8cbd9d30b1f1` | `7fb6317..f364440` | 5/5 |
+| `3c4c96b1-9151-4cee-8ca3-a67cce135721` | `f364440..80b05df` | 2/2 |
+
+The supplied source-backed threat model was preserved across follow-ups. These reviews
+do not attest live ACLs, installed updater identity, actual SQL holder or deployment
+readiness. The final documentation-only receipt adds no executable behavior and has
+a documented Changes-scan skip; no Codebase or Deep scan is a routine gate.
 
 Tests cover late completion; result identity; mandatory receipt refusal; repeated
 cancellation and physical drain; cancellation during verification; original exception
-identity; clock/emitter/projection failures; saturation/reserved capacity; stalled
+identity; clock/emitter/UUID/projection failures; saturation/reserved capacity; stalled
 sink ownership; corrupt/oversized/unwritable persistence; restart first-failure and
-result retention; bounded passive reporting; known local holder attribution; actual
-startup wrapper selection; shared MGE/interaction callers; and exact updater peers.
+result retention; early counter losses during restore; bounded passive reporting and
+attachment budgets; known local holder attribution; actual startup wrapper selection;
+shared MGE/interaction/delivery callers; and exact updater peers. A deterministic
+60-second batching-delay test proves close interrupts the delay and flushes accepted
+observations once; it does not wait out that delay.
+
+Final local Windows/Python 3.11.9 cost qualification uses **200 matched alternating
+sink-off/sink-on pairs after six warmups**, with identical owned 20 ms threads and
+context in both arms. Median elapsed was 21.2259/21.2659 ms (**0.19% overhead**);
+p95 was 22.6959/22.4164 ms (-1.23%, ordinary sampling variation). Added p95 heartbeat
+delay was **0.21 ms**. Enqueue p95/p99 were **0.0022/0.0079 ms**. Both arms invoked
+business work exactly 206 times including warmups and retained the original result.
+The normal workload had zero dropped observations and zero sink failures; a separate
+2,000-offer overload deliberately dropped 1,104 observations. Projection size was
+583,104 bytes; final close/drain took 18.34 ms.
+
+The sustained pre-batching check exceeded the provisional cost targets as the
+projection grew (12.92% median/30.15% p95 at 200 pairs). That evidence is retained;
+it motivated the bounded writer batching above. Two post-batching 200-pair checks
+met the provisional local targets. These measurements isolate sink cost; they do
+not measure all instrumentation against old code, every caller workload or production
+SLOs. Absolute Windows heartbeat delay was about 14 ms in both arms. Broader native
+observer/producer cost and contention qualification remains with P02/P05.
 
 F08/F32 closure is limited to these implemented boundaries. P01.2 issuer launch
 diagnostics, P01.3 health presentation, P01.4 upload/audit, P01.5 calendar and P01.6
