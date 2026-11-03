@@ -734,7 +734,9 @@ class DiagnosticSink:
         elif stage == "operation" and state == "settled":
             kind = "terminal"
         if "feature_outcome" in event:
-            slots.setdefault("verification", event)
+            # A deadline can precede verification. Retain its eventual outcome,
+            # including unavailable verification, after rolling detail is trimmed.
+            slots["verification"] = event
         if kind:
             slots.setdefault(kind, event)
             if kind in {"deadline", "cancellation"}:

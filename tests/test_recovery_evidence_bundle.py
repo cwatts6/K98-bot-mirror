@@ -283,7 +283,11 @@ def test_report_admission_zero_queue_and_stale_context():
 
 
 @pytest.mark.asyncio
-async def test_cancelled_report_retains_slot_until_physical_settlement(monkeypatch):
+@pytest.mark.parametrize("cancellations", [1, 3])
+@pytest.mark.parametrize("worker_outcome", ["success", "lease_check", "error"])
+async def test_cancelled_report_retains_slot_until_physical_settlement(
+    monkeypatch, cancellations, worker_outcome
+):
     from ui.views import recovery_view as view
 
     entered, release = threading.Event(), threading.Event()
@@ -291,6 +295,10 @@ async def test_cancelled_report_retains_slot_until_physical_settlement(monkeypat
     def work():
         entered.set()
         release.wait(5)
+        if worker_outcome == "lease_check":
+            bundle._active.check()
+        elif worker_outcome == "error":
+            raise ValueError("Worker failed while cancellation was draining")
         return {}
 
     async def call(*_):
@@ -301,7 +309,7 @@ async def test_cancelled_report_retains_slot_until_physical_settlement(monkeypat
     while not entered.is_set():
         await asyncio.sleep(0.001)
     try:
-        for _ in range(3):
+        for _ in range(cancellations):
             pending.cancel()
             await asyncio.sleep(0.001)
             assert not pending.done()
@@ -315,6 +323,66 @@ async def test_cancelled_report_retains_slot_until_physical_settlement(monkeypat
         await pending
     with bundle.report_request():
         pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["succeeded", "partial", "unknown"])
+async def test_late_verification_replaces_provisional_milestone_after_trim_and_restore(
+    monkeypatch, tmp_path, outcome
+):
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    monkeypatch.setattr(diagnostics, "_sink", sink)
+    monkeypatch.setattr(startup, "_steps", {})
+    checking, release = asyncio.Event(), asyncio.Event()
+
+    async def work():
+        return True
+
+    async def verify(_):
+        checking.set()
+        await release.wait()
+        if outcome == "unknown":
+            raise OSError("Verifier unavailable")
+        return {
+            "kind": "player_cache_readback",
+            "last_kvk_state": "succeeded" if outcome == "succeeded" else "failed",
+            "last_kvk_verification": "original_snapshot",
+        }
+
+    pending = asyncio.create_task(
+        startup.run(
+            work(),
+            0.01,
+            "build_player_stats_cache",
+            cancel_on_deadline=False,
+            completion_check=verify,
+        )
+    )
+
+    async def observe_deadline():
+        await checking.wait()
+        while startup.report()[0]["state"] != "deadline_elapsed_pending":
+            await asyncio.sleep(0)
+
+    try:
+        await asyncio.wait_for(observe_deadline(), 1)
+        assert startup.report()[0]["feature"]["feature_outcome"] == "not_checked"
+    finally:
+        release.set()
+        await pending
+    assert startup.report()[0]["feature"]["feature_outcome"] == outcome
+    sink.start().close()
+    ref = startup.report()[0]["reference"]
+    for index in range(80):
+        sink._accept(event(ref, "observed" if index % 2 else "running"))
+    sink._publish()
+    row = sink.records[ref]
+    assert row["trimmed"] > 0
+    assert row["milestones"]["deadline"]["feature_outcome"] == "not_checked"
+    assert row["milestones"]["verification"]["feature_outcome"] == outcome
+    restored = diagnostics.DiagnosticSink(tmp_path)
+    restored._load()
+    assert restored.records[ref]["milestones"]["verification"]["feature_outcome"] == outcome
 
 
 @pytest.mark.asyncio

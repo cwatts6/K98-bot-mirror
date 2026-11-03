@@ -2602,7 +2602,7 @@
         {
           "path": "services/operation_diagnostics.py",
           "before_sha256": "61678d5433af061b469b6e2cf8351deb8ac78b92edb516ba74210f86b8d20f33",
-          "after_sha256": "f8acfc224a748d2ccb1f67ba862a0141d8d51bc6fa064cbb8ae7f07efb736845"
+          "after_sha256": "d01a375064892f683bcda240e691fa0c0ab0135e35afa4354f7eb0a09f96b73a"
         },
         {
           "path": "services/recovery_complete_report.py",
@@ -2647,7 +2647,7 @@
         {
           "path": "ui/views/recovery_view.py",
           "before_sha256": "c1226f1beed926281999fa3775911b1c5b3f54bd9bdc9e49e5568b39ce52c87e",
-          "after_sha256": "ec50fef26feb712aa2a89d423c523afcbd218bc704eff2cd837440497eb4e2be"
+          "after_sha256": "87ec3d1cf1f531c08ac8d2e6ab4685122be424e04f357f71b77ae2cf677ce557"
         }
       ]
     }

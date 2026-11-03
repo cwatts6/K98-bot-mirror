@@ -49,12 +49,12 @@ async def report_call(method, *args):
         pending = asyncio.create_task(call(method, *args))
         try:
             return await asyncio.shield(pending)
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as cancelled:
             lease.cancelled.set()
             try:
                 await drain_awaitable(pending)
             finally:
-                raise
+                raise cancelled
 
 
 async def send_report_attachment(interaction, actor, report, content, view):
