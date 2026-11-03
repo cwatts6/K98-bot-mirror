@@ -845,3 +845,14 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: high
 - Risk: medium
 - Dependencies: Bounded A2 calendar caller/receipt design and negative tests; no automatic historical cutoff or replacement.
+
+## P03a startup diagnostic follow-up - 3 November 2026
+
+### Deferred Optimisation
+- Area: `scripts/run_export_startup_issuer.py` and the reviewed Windows startup wrapper
+- Type: architecture
+- Description: A pre-incarnation issuer failure can exit before an automatic-startup log or journal exists. The wrapper currently reports the launched PID and exits successfully without retaining the Python failure; the 3 November P03a.2 custody incident needed additional manual evidence collection.
+- Suggested Fix: In P01 startup supervision, retain bounded early issuer stderr/exit evidence in the correct protected or application-writable ownership domain, with attempt identity and explicit launched-versus-ready status. Cover failure before journal creation, process exit, redaction, retention and interruption without enabling a second start or provider replay.
+- Impact: high
+- Risk: medium
+- Dependencies: P03a startup custody correction and separately receipted recovery; review the launcher/source-pin transition and actual Windows task execution before deployment. This diagnostic improvement does not authorize changing the existing evidence ACL.
