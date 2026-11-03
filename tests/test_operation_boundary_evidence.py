@@ -498,3 +498,35 @@ def test_saturated_diagnostic_counter_stays_readable_after_restart(tmp_path):
     again.close()
     assert again.report()["dropped"] == 2**63 - 1
     assert again.report()["sink_failures"] == 0
+
+
+def test_projection_batches_offers_and_close_interrupts_publish_delay(tmp_path, monkeypatch):
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    waiting = threading.Event()
+    wait = sink.closing.wait
+    published = []
+    publish = sink._publish
+
+    def batch_wait(timeout):
+        waiting.set()
+        return wait(timeout)
+
+    def record_publish():
+        published.append(len(sink.records))
+        publish()
+
+    monkeypatch.setattr(diagnostics, "PUBLISH_INTERVAL", 60)
+    monkeypatch.setattr(sink.closing, "wait", batch_wait)
+    monkeypatch.setattr(sink, "_publish", record_publish)
+    sink.start()
+    try:
+        assert waiting.wait(5)
+        for _ in range(20):
+            assert sink.offer(event(state="failed"))
+        assert published == []
+    finally:
+        # A 60-second configured test delay is interrupted, never waited out.
+        sink.close()
+    assert published == [20]
+    assert not sink.thread.is_alive()
+    assert len(sink.report()["operations"]) > 0

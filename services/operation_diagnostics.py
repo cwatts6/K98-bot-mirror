@@ -19,6 +19,7 @@ MAX_EVENT = 8192
 MAX_PROJECTION = 32768
 MAX_OPERATIONS = 512
 MAX_FILE = MAX_PROJECTION * MAX_OPERATIONS
+PUBLISH_INTERVAL = 1.0
 _critical = {
     "failed",
     "interrupted",
@@ -49,6 +50,7 @@ class DiagnosticSink:
         self.queue = deque()
         self.lock = threading.Lock()
         self.wake = threading.Event()
+        self.closing = threading.Event()
         self.closed = False
         self.dropped = 0
         self.failures = 0
@@ -104,6 +106,7 @@ class DiagnosticSink:
         # Called only after business owners drain. Retain all accepted observations.
         with self.lock:
             self.closed = True
+            self.closing.set()
             self.wake.set()
         if self.thread.ident is not None:
             self.thread.join()  # No timeout that could falsely certify physical settlement.
@@ -371,6 +374,10 @@ class DiagnosticSink:
             self.failures += 1
         while True:
             self.wake.wait()
+            # Rewriting the bounded projection on every producer wake causes
+            # avoidable GIL/disk contention as history grows. Batch on the sink
+            # thread only; close interrupts this delay and flushes accepted work.
+            self.closing.wait(PUBLISH_INTERVAL)
             with self.lock:
                 events = list(self.queue)
                 self.queue.clear()
