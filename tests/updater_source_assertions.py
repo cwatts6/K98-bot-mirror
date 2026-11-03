@@ -32,10 +32,14 @@ def before_startup_evidence_hash(root, path):
     """Authenticate the custody fix before checking its historical predecessor."""
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
     successor = next(
-        t
-        for t in prepare_k98_update.reviewed_transitions()
-        if t["id"] == "startup_evidence_custody_v1"
+        (
+            t
+            for t in prepare_k98_update.reviewed_transitions()
+            if t["id"] == "startup_evidence_custody_v1"
+        ),
+        None,
     )
+    assert successor is not None, "Required startup_evidence_custody_v1 transition is missing"
     member = next((m for m in successor["members"] if m["path"] == path), None)
     if member is not None:
         assert actual == member["after_sha256"], path

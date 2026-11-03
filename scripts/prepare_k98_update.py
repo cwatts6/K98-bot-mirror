@@ -933,7 +933,7 @@ def reviewed_transitions():
             item["id"] in {"drained_issuer_exit_v1", "startup_evidence_custody_v1"}
             and paths != DRAINED_ISSUER_TRANSITION_PATHS
         ):
-            raise ValueError("Complete fixed drained-issuer transition required.")
+            raise ValueError(f"Complete fixed {item['id']} issuer transition required.")
         if item["id"] == "guided_rollover_v1" and paths != ROLLOVER_GUIDED_PATHS:
             raise ValueError("Complete fixed guided-rollover transition required.")
         if item["id"] == "publication_timing_v1" and paths != PUBLICATION_TIMING_PATHS:

@@ -8,12 +8,21 @@ import pytest
 
 from scripts import prepare_k98_update as updater
 from tests.test_updater_transition_inventory import AFTER, BEFORE
+from tests.updater_source_assertions import before_startup_evidence_hash
 
 
 def bundle():
     return next(
         t for t in updater.reviewed_transitions() if t["id"] == "startup_evidence_custody_v1"
     )
+
+
+def test_missing_custody_transition_has_explicit_diagnostic(monkeypatch):
+    monkeypatch.setattr(updater, "reviewed_transitions", lambda: [])
+    with pytest.raises(AssertionError, match="Required startup_evidence_custody_v1"):
+        before_startup_evidence_hash(
+            Path(__file__).resolve().parents[1], "scripts/run_export_startup_issuer.py"
+        )
 
 
 def test_custody_transition_pins_exact_corrected_issuer():
