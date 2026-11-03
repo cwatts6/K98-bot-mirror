@@ -464,3 +464,37 @@ async def test_context_capacity_loss_is_visible_and_does_not_limit_business(monk
     finally:
         release.set()
         await pending
+
+
+def test_restart_load_preserves_losses_already_recorded_by_new_producers(tmp_path, monkeypatch):
+    previous = diagnostics.DiagnosticSink(tmp_path)
+    previous.dropped, previous.failures = 11, 13
+    previous.evicted, previous.context_losses = 17, 19
+    previous.start().close()
+
+    restored = diagnostics.DiagnosticSink(tmp_path)
+    monkeypatch.setattr(diagnostics, "_sink", restored)
+    # Offers can arrive before the writer finishes loading its old projection.
+    assert not restored.offer({"unsafe": object()})
+    diagnostics.note_context_loss()
+    diagnostics.note_context_loss()
+    restored.failures, restored.evicted = 1, 3
+    restored.start().close()
+    expected = dict(dropped=12, sink_failures=14, evicted=20, context_losses=21)
+    assert {name: restored.report()[name] for name in expected} == expected
+    again = diagnostics.DiagnosticSink(tmp_path).start()
+    again.close()
+    assert {name: again.report()[name] for name in expected} == expected
+
+
+def test_saturated_diagnostic_counter_stays_readable_after_restart(tmp_path):
+    previous = diagnostics.DiagnosticSink(tmp_path)
+    previous.dropped = 2**63 - 1
+    previous.start().close()
+    restored = diagnostics.DiagnosticSink(tmp_path)
+    assert not restored.offer({"unsafe": object()})
+    restored.start().close()
+    again = diagnostics.DiagnosticSink(tmp_path).start()
+    again.close()
+    assert again.report()["dropped"] == 2**63 - 1
+    assert again.report()["sink_failures"] == 0

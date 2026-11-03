@@ -54,6 +54,7 @@ class DiagnosticSink:
         self.failures = 0
         self.evicted = 0
         self.context_losses = 0
+        self.prior_counters = {}
         self.records = {}
         self.snapshot = {"operations": [], "status": "starting"}
         # logging_setup owns explicit close plus an atexit close/join. A daemon
@@ -107,6 +108,18 @@ class DiagnosticSink:
         if self.thread.ident is not None:
             self.thread.join()  # No timeout that could falsely certify physical settlement.
 
+    def _counter_totals(self):
+        # Loading old evidence never writes the live producer counters. Saturate
+        # totals within the restore contract rather than persisting unreadable counts.
+        live = dict(
+            dropped=self.dropped,
+            sink_failures=self.failures,
+            evicted=self.evicted,
+            context_losses=self.context_losses,
+        )
+        prior = self.prior_counters
+        return {name: min(2**63 - 1, value + prior.get(name, 0)) for name, value in live.items()}
+
     def report(self):
         snapshot = self.snapshot  # Writer publishes by replacement, never mutation.
         result = {key: value for key, value in snapshot.items() if key != "operations"}
@@ -126,10 +139,7 @@ class DiagnosticSink:
             used += size
         result["omitted_operations"] = len(rows) - len(result["operations"])
         result.update(
-            dropped=self.dropped,
-            sink_failures=self.failures,
-            evicted=self.evicted,
-            context_losses=self.context_losses,
+            **self._counter_totals(),
             worker_alive=self.thread.is_alive(),
             authority="diagnostic_only",
             sql_holder="unavailable_P02",
@@ -162,11 +172,13 @@ class DiagnosticSink:
         rows = document["operations"]
         if type(rows) is not list or len(rows) > MAX_OPERATIONS:
             raise ValueError("Diagnostic inventory too large")
+        prior_counters = {}
         for name in ("dropped", "sink_failures", "evicted", "context_losses"):
             value = document.get(name, 0)
             if type(value) is not int or not 0 <= value < 2**63:
                 raise ValueError("Invalid diagnostic counter")
-            setattr(self, "failures" if name == "sink_failures" else name, value)
+            prior_counters[name] = value
+        self.prior_counters = prior_counters
         for row in rows:
             # Revalidate every value from disk using the same primitive allowlist.
             events = row["transitions"]
@@ -326,10 +338,7 @@ class DiagnosticSink:
             schema="operation-observations/1",
             operations=list(self.records.values()),
             retention_days=30,
-            dropped=self.dropped,
-            sink_failures=self.failures,
-            evicted=self.evicted,
-            context_losses=self.context_losses,
+            **self._counter_totals(),
             observed_utc=datetime.now(UTC).isoformat(),
             status="closed" if self.closed else "observing",
         )
