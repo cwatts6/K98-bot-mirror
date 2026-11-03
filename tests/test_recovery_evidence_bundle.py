@@ -7,7 +7,7 @@ import io
 import json
 import threading
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 import zipfile
 
@@ -408,6 +408,37 @@ async def test_final_authorization_and_attachment_cleanup(monkeypatch):
             interaction, ACTOR, {"content": b"{}", "filename": "report.json"}, "Report", None
         )
     assert len(seen) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("authorized", [True, False])
+async def test_unavailable_runtime_ordinary_report_preserves_authorization(monkeypatch, authorized):
+    from services import recovery_runtime
+    from ui.views import recovery_view as view
+
+    monkeypatch.setattr(view, "actor_for", lambda _: ACTOR)
+    monkeypatch.setattr(view, "safe_defer", AsyncMock(return_value=True))
+    send, error = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(view, "send_report_attachment", send)
+    monkeypatch.setattr(view, "report_error", error)
+    authorize = Mock(side_effect=None if authorized else SourceConflict("Authorization changed"))
+    monkeypatch.setattr(recovery_runtime, "_authorize_report_actor", authorize)
+    unavailable = Mock(side_effect=RuntimeError("Runtime unavailable"))
+    monkeypatch.setattr(recovery_runtime, "recovery_service", unavailable)
+    await view.show_report(SimpleNamespace())
+    if authorized:
+        error.assert_not_awaited()
+        send.assert_awaited_once()
+        report = send.await_args.args[2]
+        assert report["unavailable"] is True
+        assert report["filename"] == "K98-recovery-report-unavailable.json"
+        assert json.loads(report["content"])["complete"] is False
+        assert authorize.call_count >= 2
+    else:
+        send.assert_not_awaited()
+        error.assert_awaited_once()
+        unavailable.assert_not_called()
+    assert bundle._active is None
 
 
 def test_nonwaiting_runtime_registration_and_default_ownership(monkeypatch):

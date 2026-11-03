@@ -580,4 +580,6 @@ class _UnavailableReportStore:
     scope = "runtime_unavailable"
 
     def report_page(self, **kwargs):
-        raise SourceConflict("Incident storage is unavailable; diagnostics remain separate.")
+        # Storage failure permits an incomplete diagnostic attachment. Permission
+        # and ownership refusals remain SourceConflict and must not enter fallback.
+        raise RuntimeError("Incident storage is unavailable; diagnostics remain separate.")
