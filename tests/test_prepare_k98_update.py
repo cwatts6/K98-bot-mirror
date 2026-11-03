@@ -238,7 +238,11 @@ def test_predecessor_preparer_rejects_target_generator_and_consumer_changes(monk
     installed = [
         item
         for item in updater.reviewed_transitions()
-        if item["id"] not in ({"drained_issuer_exit_v1"} | updater.REQUEST_SETTLEMENT_TRANSITIONS)
+        # Model a predecessor with no installed issuer transition, including
+        # future reviewed families; enumerating old IDs made this fixture stale.
+        if not any(
+            member["path"] == "scripts/run_export_startup_issuer.py" for member in item["members"]
+        )
     ]
     monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
 
