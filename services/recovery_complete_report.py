@@ -96,6 +96,7 @@ def _build(service, actor, max_bytes, lease):
         output.close()
         output = BoundedArchive(max_bytes)
         count = detail_bytes = 0
+        groups, repairs, blockers = Groups(), Groups(), Groups()
         # No partial ZIP is delivered, so the incident cursor is still None.
         with zipfile.ZipFile(output, "w"):
             pass

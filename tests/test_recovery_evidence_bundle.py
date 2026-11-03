@@ -513,6 +513,43 @@ def test_nonwaiting_runtime_registration_and_default_ownership(monkeypatch):
         assert len(owner._calls) == 1
 
 
+def test_discarded_incident_prefix_does_not_leave_aggregate_counts(monkeypatch):
+    from services import recovery_complete_report
+
+    service, store, records = report_service(271)
+    original_page = store.report_page.side_effect
+
+    def page(**kwargs):
+        if kwargs.get("after") == records[269]["IncidentID"]:
+            raise OSError("Later page unavailable")
+        return original_page(**kwargs)
+
+    store.report_page.side_effect = page
+    monkeypatch.setattr(
+        recovery_complete_report,
+        "incident_report",
+        lambda _, row: dict(
+            source_kind=row["IncidentID"],
+            state="open",
+            diagnosis={
+                "outcome": "unknown",
+                "recovery_links": [{"kind": "test", "source_id": row["IncidentID"]}],
+            },
+            required_repairs=[{"action": row["IncidentID"], "availability": "unavailable"}],
+        ),
+    )
+    report = service.download_complete_report(ACTOR)
+    assert store.report_page.call_count == 28
+    with zipfile.ZipFile(io.BytesIO(report["content"])) as archive:
+        assert "incidents.jsonl" not in archive.namelist()
+        summary = json.loads(archive.read("summary.json"))
+        assert summary["complete"] is False
+        assert summary["included_incidents"] == 0
+        assert summary["groups"] == summary["required_repairs"] == summary["linked_recovery"] == []
+        assert summary["omitted_groups"] == 0
+        assert summary["other_contributions"] == {"groups": 0, "repairs": 0, "blockers": 0}
+
+
 def test_incident_overflow_discards_prefix_and_does_not_rescan(monkeypatch):
     import random
 

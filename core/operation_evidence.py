@@ -303,7 +303,7 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
     current = _current.get()
     if current is None or current.reference is None:
         return
-    # All facts are produced by result_facts, never caller dictionaries.
+    # Code-owned facts pass through the explicit primitive allowlists below.
     event = dict(
         schema="operation-boundary/2",
         event_id=uuid4().hex,

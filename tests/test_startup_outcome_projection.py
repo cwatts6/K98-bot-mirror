@@ -57,6 +57,27 @@ def test_only_explicit_verification_contracts_establish_outcome(label, value, ex
     assert project(label, value, checked=True, error=True)["feature_outcome"] == "unknown"
 
 
+@pytest.mark.parametrize("label", ["warm_profile_cache", "warm_name_cache"])
+@pytest.mark.parametrize("persistence", [None, "future_value", "unconfirmed"])
+def test_unknown_persistence_cannot_establish_feature_success(label, persistence):
+    result = project(
+        label,
+        {"execution": "succeeded", "availability": "loaded_populated", "persistence": persistence},
+        checked=True,
+    )
+    assert result["feature_outcome"] == "unknown"
+
+
+@pytest.mark.parametrize("availability", [None, "future_value", "unavailable"])
+def test_unknown_data_availability_cannot_establish_feature_success(availability):
+    result = project(
+        "warm_profile_cache",
+        {"execution": "succeeded", "availability": availability, "persistence": "saved"},
+        checked=True,
+    )
+    assert result["feature_outcome"] == "unknown"
+
+
 def test_untrusted_objects_are_not_inspected():
     class Hostile:
         def __getattribute__(self, name):

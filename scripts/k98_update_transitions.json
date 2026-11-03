@@ -2582,7 +2582,7 @@
         {
           "path": "core/operation_evidence.py",
           "before_sha256": "ebd268a9fe2c5c0a1126fe9d4d4965a9b914dd77ba90a063fc9698712e44890f",
-          "after_sha256": "6eaac78560ad685af06e1070462bb1700358ab4449a0787da45c16cb34092847"
+          "after_sha256": "1e8a35968f106171c55132ccc3d31ddfcf9e2e80a1227cade62112432096a093"
         },
         {
           "path": "core/owned_work.py",
@@ -2607,7 +2607,7 @@
         {
           "path": "services/recovery_complete_report.py",
           "before_sha256": "1f695bb320a1c82ca019d3c295717473efdefa16a7a128260afdd4c9e059e5bb",
-          "after_sha256": "f868e86baec751d939877174671c5603fb46ce190494aeb4fbaf47e60e99b2f2"
+          "after_sha256": "c818b8da81bb315ecb32ac770416bb56fab3cd73dc13179627297a72e58769a4"
         },
         {
           "path": "services/recovery_dal.py",
@@ -2637,7 +2637,7 @@
         {
           "path": "services/startup_outcome_projection.py",
           "before_sha256": null,
-          "after_sha256": "c76df9e0302e809aadec94719113cbb52eb40c574c88cf6b9feef4bc41723313"
+          "after_sha256": "b0b747231908aee8735eca97122cab441bea3ffc32a10085678269c2802ac35c"
         },
         {
           "path": "ui/views/recovery_backlog_view.py",

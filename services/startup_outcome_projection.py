@@ -47,10 +47,19 @@ def project(label, completion, *, checked=False, error=False):
                 else "unknown"
             ),
         )
-        if execution == "succeeded":
-            result["feature_outcome"] = (
-                "partial" if persistence == "failed_preserved" else "succeeded"
-            )
+        if result["execution_outcome"] == "succeeded" and result["data_outcome"] in {
+            "loaded_populated",
+            "loaded_empty",
+        }:
+            if result["persistence_outcome"] == "failed_preserved":
+                result["feature_outcome"] = "partial"
+            elif result["persistence_outcome"] in {
+                "saved",
+                "not_applicable",
+                "unchanged",
+                "verified_on_disk",
+            }:
+                result["feature_outcome"] = "succeeded"
     elif label == "rehydrate_tracked_views":
         status = completion.get("restoration_status")
         result["restoration_outcome"] = (
