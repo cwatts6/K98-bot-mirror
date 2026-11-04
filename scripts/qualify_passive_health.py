@@ -92,7 +92,7 @@ async def main(args):
     profile_source = subprocess.check_output(
         ["git", "show", f"{args.base}:services/profile_cache_service.py"], cwd=ROOT
     ).decode("utf-8")
-    profile_ns = {"__name__": "inert_profile_baseline"}
+    profile_ns: dict = {"__name__": "inert_profile_baseline"}
     exec(compile(profile_source, "baseline-profile-service", "exec"), profile_ns)
     from services.profile_cache_service import ProfileCacheService
 

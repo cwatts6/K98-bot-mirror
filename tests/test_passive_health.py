@@ -622,6 +622,51 @@ def test_recovery_navigation_uses_existing_notify_channel():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error_type,status_code", [(discord.Forbidden, 403), (discord.NotFound, 404)]
+)
+@pytest.mark.parametrize("saved_id", [None, 3])
+async def test_confirmed_card_send_rejection_recovers_on_next_update(
+    tmp_path, error_type, status_code, saved_id
+):
+    client = discord.Client(intents=discord.Intents.none())
+    message = SimpleNamespace(id=4, pin=AsyncMock())
+    missing = discord.NotFound(SimpleNamespace(status=404, reason="gone"), "gone")
+    rejected = error_type(SimpleNamespace(status=status_code, reason="rejected"), "rejected")
+    channel = SimpleNamespace(
+        fetch_message=AsyncMock(side_effect=missing), send=AsyncMock(side_effect=rejected)
+    )
+    ns = bot_functions(
+        "_get_health_view",
+        "_bind_health_view",
+        "_ensure_pinned_health_message",
+        bot=client,
+        GUILD_ID=1,
+        STATUS_CHANNEL_ID=2,
+        _health_view=None,
+        _health_registered_id=None,
+        _restore_health_view=lambda: saved_id,
+        _shutdown_once=asyncio.Event(),
+        _health_creation_unconfirmed=False,
+        _health_card=lambda: None,
+        discord=discord,
+        logger=Mock(),
+        json=json,
+        HEALTH_MSG_ID_PATH=tmp_path / "health.json",
+    )
+    with pytest.raises(error_type):
+        await ns["_ensure_pinned_health_message"](channel)
+    assert not ns["_health_creation_unconfirmed"]
+    channel.send.side_effect = None
+    channel.send.return_value = message
+    assert await ns["_ensure_pinned_health_message"](channel) == 4
+    assert channel.send.await_count == 2
+    assert json.loads((tmp_path / "health.json").read_text()) == {"id": 4}
+    assert not ns["_health_view"]._closed
+    assert len(client.persistent_views) == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["replace", "shutdown", "cancel"])
 async def test_deleted_card_replacement_drains_admitted_refresh(tmp_path, mode):
     click = interaction()

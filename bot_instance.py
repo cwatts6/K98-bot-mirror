@@ -744,7 +744,12 @@ async def _ensure_pinned_health_message(channel):
         return None
     # An uncertain send must not post another card on every scheduled render.
     _health_creation_unconfirmed = True
-    message = await channel.send(embed=_health_card(), view=_get_health_view())
+    try:
+        message = await channel.send(embed=_health_card(), view=_get_health_view())
+    except (discord.Forbidden, discord.NotFound):
+        # Confirmed non-delivery can recover on the existing five-minute update.
+        _health_creation_unconfirmed = False
+        raise
     _bind_health_view(message.id)
     _health_creation_unconfirmed = False
     try:
