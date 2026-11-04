@@ -695,6 +695,7 @@ def _get_health_view():
 def _bind_health_view(message_id):
     global _health_registered_id, _health_view
     if _health_registered_id is not None and _health_registered_id != message_id:
+        _health_view.close_admission()
         _health_view.stop()
         _health_view = None
     view = _get_health_view()
@@ -731,7 +732,8 @@ async def _ensure_pinned_health_message(channel):
             await channel.fetch_message(message_id)
             return message_id
         except discord.NotFound:
-            pass  # Confirmed deletion alone permits the existing replacement path.
+            # Retain and drain the old view before replacing its ownership.
+            await _get_health_view().shutdown()
         except Exception as exc:
             logger.warning("health_message_unavailable error_type=%s", type(exc).__name__)
             return None

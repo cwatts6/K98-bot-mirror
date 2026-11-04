@@ -619,3 +619,68 @@ def test_recovery_navigation_uses_existing_notify_channel():
     recovery = next(field for field in embed.fields if field.name == "Recovery monitor")
     assert "`/ops dl_bot_status` in <#456>" in recovery.value
     assert "456" not in embed.footer.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["replace", "shutdown", "cancel"])
+async def test_deleted_card_replacement_drains_admitted_refresh(tmp_path, mode):
+    click = interaction()
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def edit(**kwargs):
+        entered.set()
+        await release.wait()
+
+    click.message.edit.side_effect = edit
+    view = HealthView(guild_id=1, channel_id=2, render=lambda: None)
+    view.message_id = 3
+    callback = asyncio.create_task(view.children[0].callback(click))
+    await entered.wait()
+    stopped = asyncio.Event()
+    replacement = SimpleNamespace(id=4, pin=AsyncMock())
+    channel = SimpleNamespace(
+        fetch_message=AsyncMock(
+            side_effect=discord.NotFound(
+                SimpleNamespace(status=404, reason="gone"), {"message": "gone", "code": 10008}
+            )
+        ),
+        send=AsyncMock(return_value=replacement),
+    )
+    ns = bot_functions(
+        "_ensure_pinned_health_message",
+        _health_registered_id=3,
+        _restore_health_view=lambda: 3,
+        _shutdown_once=stopped,
+        _health_creation_unconfirmed=False,
+        _get_health_view=lambda: view,
+        _bind_health_view=Mock(),
+        _health_card=lambda: None,
+        discord=discord,
+        logger=Mock(),
+        json=json,
+        HEALTH_MSG_ID_PATH=tmp_path / "health.json",
+    )
+    replacing = asyncio.create_task(ns["_ensure_pinned_health_message"](channel))
+    try:
+        await asyncio.sleep(0)
+        channel.send.assert_not_awaited()
+        assert view._closed
+        assert not replacing.done()
+        if mode == "shutdown":
+            stopped.set()
+        if mode == "cancel":
+            replacing.cancel()
+            await asyncio.sleep(0)
+            assert not replacing.done()
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await replacing
+            channel.send.assert_not_awaited()
+        else:
+            release.set()
+            result = await replacing
+            assert result == (None if mode == "shutdown" else 4)
+            assert channel.send.await_count == (0 if mode == "shutdown" else 1)
+    finally:
+        release.set()
+        await asyncio.gather(callback, replacing, return_exceptions=True)
