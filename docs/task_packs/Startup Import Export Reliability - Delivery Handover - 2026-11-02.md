@@ -1,6 +1,6 @@
 # Startup, import and export reliability: delivery handover
 
-> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Final validation/private PR preparation are in progress; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
+> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Local validation and both independent PR packages are complete; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
 
 > **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
 

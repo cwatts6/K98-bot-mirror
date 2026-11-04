@@ -1,6 +1,6 @@
 # P01.3 handover: passive health presentation
 
-> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Final validation/private PR preparation are in progress; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
+> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Local validation and both independent PR packages are complete; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
 
 Current E80: full P01.3 implementation, local validation and PR preparation are authorized, including persistent Refresh. Recheck equivalent callers, full H01-H09 coverage and value/non-interference throughout. Earlier design-only holds below are superseded for this implementation; operational actions remain separate.
 
