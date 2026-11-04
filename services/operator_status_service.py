@@ -107,6 +107,8 @@ def snapshot(now_utc=None, now_monotonic=None):
 
 
 def sql_snapshot():
+    if sys.modules.get("constants") is None:
+        return (Observation("SQL", "configured check", reason="source_unavailable"), None, None)
     return _probe.snapshot(scope=_sql_scope())
 
 

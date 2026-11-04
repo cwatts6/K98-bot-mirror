@@ -70,6 +70,21 @@ async def test_unscoped_completed_probe_does_not_certify_configured_target():
     assert latest is None and failure is None
 
 
+@pytest.mark.asyncio
+async def test_missing_sql_configuration_is_unavailable_without_bootstrap(monkeypatch):
+    probe = HealthProbe(label="SQL")
+    await probe.observe(
+        AsyncMock(return_value=(True, "OK")), timeout=1, scope=("SQL connectivity", None, None)
+    )
+    monkeypatch.setattr(status, "_probe", probe)
+    monkeypatch.delitem(sys.modules, "constants", raising=False)
+    row, latest, failure = status.sql_snapshot()
+    assert row.reason == "source_unavailable"
+    assert row.outcome == "unknown"
+    assert latest is None and failure is None
+    assert "constants" not in sys.modules
+
+
 @pytest.mark.parametrize(
     "minutes,freshness", [(0, "fresh"), (60, "fresh"), (61, "stale"), (-1, "unknown")]
 )
