@@ -1,0 +1,19 @@
+# H08 receipt reconciliation — 2026-09-27
+
+Operator-supplied output reports MINI_AMD, StartedUtc 07:33:32.2862308Z, FinishedUtc 07:33:34.4946515Z, ElapsedMilliseconds 2205, Status Completed. The reported timestamps fall within the approved 07:23:07–07:43:07 UTC window. Both the reported stopwatch duration (2.205 seconds) and UTC endpoint difference (approximately 2.208 seconds) are below 20 seconds; retain these distinct clock fields without forcing equality. Exactly the three approved tasks are present; no error was supplied. This is operator-supplied metadata, not independent execution attestation or an OS exit code.
+
+Raw output is retained in `.codex_artifacts/s11-g4-capture-preparation-20260926/received-H08-20260927T073355Z.txt`. Receipt time is distinct from execution time. This additive record updates H08 awaiting-output status without rewriting the approval or sealed proposal.
+
+| Task | Reported binding | Meaning and remaining gap |
+|---|---|---|
+| Graceful DL_Bot Shutdown | Executable `C:\discord_file_downloader\venv\Scripts\python.exe`; working directory `C:\discord_file_downloader`; arguments `graceful_shutdown.py` | Resolves the relative script target to `C:\discord_file_downloader\graceful_shutdown.py`. Candidate source was already reviewed at the isolated hotfix; deployed file bytes, ACL and dependency/configuration effects remain unproved. |
+| Restart daily | Executable `Shutdown`; empty working directory; ArgumentsAllowlistMatched=false; argument field null | Arguments were successfully withheld. No inference about /r, /s, /t, /f, delay, comment, local/remote scope or actual effects. Nonmatch is not evidence of malicious input or a task fault. Bare executable resolution remains unproved. Do not rerun with a wider allowlist or request raw secret-bearing arguments. |
+| DLBotLogRotate | Executable `powershell.exe`; empty working directory; arguments `-NoProfile -ExecutionPolicy Bypass -File "C:\discord_file_downloader\rotate-logs.ps1"` | Binds the script path with no explicit script parameter overrides. Reviewed candidate source defaults to wrapper-log rotation and 1000 retained lines, conditional on deployed bytes matching. Deployed file bytes, ACL, executable resolution and runtime TEMP context remain unproved. |
+
+These bindings narrow the next possible file observation to two exact known script paths, but authorize no file read, invocation or hash capture. A future proposal can specify their metadata/hash/ACL scope without printing script contents. The restart action needs a separately scoped nonsecret clarification or allowlisted capture; H08 does not authorize either automatically. Existing single-account and manual-startup choices remain settled.
+
+H07's Sunday/Wednesday schedule and one-minute boundary-time separation remain planning constraints, not proof of successful graceful drain before restart. No task ran as a consequence of this metadata capture. Candidate shutdown source can perform Discord and process-control operations if invoked; no invocation is authorized.
+
+All seven typed G4 proofs and actual restore remain incomplete. Preserve protected-path/key-custody, native identity, provider, SQL, storage and remaining writer gaps. Production remains the isolated hotfix by retained evidence. Memory-cause investigation stays deferred, the withdrawn collector remains untouched, and empty KVK/view-rehydration remain separate issues. No rollout or G5 decision follows.
+
+Validation: local JSON parsing, approved target/window/time/output comparisons, command hash and original evidence/seal integrity checks. Runtime tests and a new security scan are skipped for this additive evidence-only record; no application/configuration/permission change or PR is made. No live SQL/provider/Discord, task control, backup/restore, deployment/restart, provisioning or Git publication was performed by the assistant.
