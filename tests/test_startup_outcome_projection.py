@@ -86,9 +86,7 @@ def test_untrusted_objects_are_not_inspected():
         def __repr__(self):
             raise AssertionError("No repr")
 
-    assert (
-        project("warm_profile_cache", Hostile(), checked=True)["feature_outcome"] == "not_checked"
-    )
+    assert project("warm_profile_cache", Hostile(), checked=True)["feature_outcome"] == "unknown"
 
 
 @pytest.mark.parametrize(

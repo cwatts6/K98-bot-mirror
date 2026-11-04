@@ -125,7 +125,9 @@ def result_facts(result):
 
 
 class Observation:
-    def __init__(self, enabled=True, parent=None):
+    def __init__(
+        self, enabled=True, parent=None, *, origin="code_owned", actor="unavailable_not_collected"
+    ):
         identifier = uuid4().hex if enabled else None
         self.reference = parent.reference if parent is not None else identifier
         self.child_reference = identifier if parent is not None else None
@@ -134,6 +136,8 @@ class Observation:
         self.sequence = 0
         self.worker_result = {}
         self.references = {}
+        self.origin = parent.origin if parent else origin
+        self.actor = parent.actor if parent else actor
 
 
 _disabled = Observation(enabled=False)
@@ -146,7 +150,7 @@ def _lost_scope():
 
 
 @contextmanager
-def scope():
+def scope(*, origin="code_owned", actor="unavailable_not_collected"):
     existing = _current.get()
     if existing is not None:
         yield existing
@@ -154,7 +158,12 @@ def scope():
     admitted = False
     try:
         admitted = _slots.acquire(blocking=False)
-        observation = Observation(enabled=admitted)
+        if (origin, actor) not in {
+            ("code_owned", "unavailable_not_collected"),
+            ("startup", "system"),
+        }:
+            origin, actor = "code_owned", "unavailable_not_collected"
+        observation = Observation(enabled=admitted, origin=origin, actor=actor)
         token = _current.set(observation)
     except Exception:
         if admitted:
@@ -294,7 +303,18 @@ def worker_result(result):
 
 def emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None):
     """Bounded, non-waiting offer; no I/O, formatting or arbitrary callbacks here."""
-    optional(_emit, stage, state, elapsed_ms=elapsed_ms, facts=facts, error=error, holder=holder)
+    try:
+        _emit(stage, state, elapsed_ms=elapsed_ms, facts=facts, error=error, holder=holder)
+    except Exception:
+        # This path cannot emit another event: identity, clock or sink itself may
+        # be broken. Counters are ancillary and must not replace business results.
+        optional(_emission_lost, state)
+
+
+def _emission_lost(state):
+    from services.operation_diagnostics import note_emission_failure
+
+    note_emission_failure(state)
 
 
 def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None):
@@ -303,16 +323,21 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
     current = _current.get()
     if current is None or current.reference is None:
         return
+    known_stage = type(stage) is str and stage in STAGES
+    if not known_stage:
+        from services.operation_diagnostics import note_unknown_stage
+
+        optional(note_unknown_stage)
     # Code-owned facts pass through the explicit primitive allowlists below.
     event = dict(
         schema="operation-boundary/2",
         event_id=uuid4().hex,
         sequence=current.sequence,
         role="child" if current.child_reference else "parent",
-        origin="code_owned",
-        actor="unavailable_not_collected",
+        origin=current.origin,
+        actor=current.actor,
         reference=current.reference,
-        stage=stage if type(stage) is str and stage in STAGES else "unavailable",
+        stage=stage if known_stage else "unavailable",
         state=state if type(state) is str and state in STATES else "unavailable",
         observed_utc=datetime.now(UTC).isoformat(),
         process_incarnation=_incarnation,
@@ -351,6 +376,8 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
                     "value_meaning",
                     "value_boolean",
                     "feature_outcome",
+                    "verification_reason",
+                    "verification_source",
                     "main_cache",
                     "last_kvk_cache",
                     "data_outcome",

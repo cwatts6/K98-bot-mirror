@@ -616,6 +616,16 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P012A_EVIDENCE_CONTRACT_PATHS = frozenset(
+    {
+        "core/operation_evidence.py",
+        "core/startup_diagnostics.py",
+        "services/operation_diagnostics.py",
+        "services/startup_outcome_projection.py",
+    }
+)
+
+
 P012A_REPORT_CORRECTION_PATHS = frozenset(
     {
         "services/operation_diagnostics.py",
@@ -748,7 +758,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 59:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 60:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -842,9 +852,15 @@ def reviewed_transitions():
                 and path in MONITORING_RELIABILITY_PATHS
             )
             fixed_p012a = (
-                item["id"] == "p012a_evidence_bundle_v1" and path in P012A_EVIDENCE_BUNDLE_PATHS
-            ) or (
-                item["id"] == "p012a_report_correction_v1" and path in P012A_REPORT_CORRECTION_PATHS
+                (item["id"] == "p012a_evidence_bundle_v1" and path in P012A_EVIDENCE_BUNDLE_PATHS)
+                or (
+                    item["id"] == "p012a_report_correction_v1"
+                    and path in P012A_REPORT_CORRECTION_PATHS
+                )
+                or (
+                    item["id"] == "p012a_evidence_contract_v1"
+                    and path in P012A_EVIDENCE_CONTRACT_PATHS
+                )
             )
             fixed_p011 = (
                 item["id"] == "p011_startup_outcomes_v1" and path in P011_STARTUP_OUTCOME_PATHS
@@ -1089,6 +1105,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed P01.2a evidence-bundle transition required.")
         if item["id"] == "p012a_report_correction_v1" and paths != P012A_REPORT_CORRECTION_PATHS:
             raise ValueError("Complete fixed P01.2a report-correction transition required.")
+        if item["id"] == "p012a_evidence_contract_v1" and paths != P012A_EVIDENCE_CONTRACT_PATHS:
+            raise ValueError("Complete fixed P01.2a evidence-contract transition required.")
         if item["id"] == "p011_startup_outcomes_v1" and paths != P011_STARTUP_OUTCOME_PATHS:
             raise ValueError("Complete fixed P01.1 startup-outcome transition required.")
         if item["id"] == "p1_mge_finalisation_v1" and paths != MGE_FINALISATION_PATHS:

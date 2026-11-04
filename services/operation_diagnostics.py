@@ -43,6 +43,8 @@ V2_FIELDS = {
     "value_meaning",
     "value_boolean",
     "feature_outcome",
+    "verification_reason",
+    "verification_source",
     "main_cache",
     "last_kvk_cache",
     "data_outcome",
@@ -140,6 +142,11 @@ class DiagnosticSink:
         self.restore_failures = 0
         self.children_omitted = 0
         self.refused_operations = 0
+        self.emission_failures = 0
+        self.unknown_stages = 0
+        self.unknown_historical_counters = set()
+        self.eviction_provenance = {}
+        self.eviction_history_available = True
         self.publication = {"v1": {}, "v2": {}}
         self.restore_status = "not_loaded"
         self.blocked_files = set()
@@ -210,10 +217,10 @@ class DiagnosticSink:
         if self.thread.ident is not None:
             self.thread.join()  # No timeout that could falsely certify physical settlement.
 
-    def _counter_totals(self):
+    def _live_counters(self):
         # Loading old evidence never writes the live producer counters. Saturate
         # totals within the restore contract rather than persisting unreadable counts.
-        live = dict(
+        counters = dict(
             dropped=self.dropped,
             sink_failures=self.failures,
             evicted=self.evicted,
@@ -223,9 +230,92 @@ class DiagnosticSink:
             restore_failures=self.restore_failures,
             children_omitted=self.children_omitted,
             refused_operations=self.refused_operations,
+            emission_failures=self.emission_failures,
+            unknown_stages=self.unknown_stages,
         )
+        return {name: min(MAX_COUNTER, value) for name, value in counters.items()}
+
+    def _counter_totals(self):
+        live = self._live_counters()
         prior = self.prior_counters
         return {name: min(2**63 - 1, value + prior.get(name, 0)) for name, value in live.items()}
+
+    def _counter_provenance(self):
+        from core.operation_evidence import _incarnation
+
+        return dict(
+            process_incarnation=_incarnation or "unavailable",
+            current=self._live_counters(),
+            historical={
+                name: (
+                    "unknown"
+                    if name in self.unknown_historical_counters
+                    else self.prior_counters.get(name, 0)
+                )
+                for name in self._live_counters()
+            },
+            totals_coverage="partial" if self.unknown_historical_counters else "available",
+        )
+
+    def _evict(self, reference, reason, cutoff=None):
+        from core.operation_evidence import _incarnation
+
+        del self.records[reference]
+        self.evicted = min(MAX_COUNTER, self.evicted + 1)
+        prior = self.eviction_provenance.get(reason, {})
+        self.eviction_provenance[reason] = dict(
+            count=min(MAX_COUNTER, prior.get("count", 0) + 1),
+            observed_utc=utc(),
+            process_incarnation=_incarnation or "unavailable",
+            cutoff_utc=cutoff or "not_applicable",
+        )
+
+    def _restore_provenance(self, document):
+        # Only the four bounded code-owned eviction reasons may cross restart.
+        prior = document.get("counter_provenance", {})
+        historical = prior.get("historical", {}) if type(prior) is dict else {}
+        if type(historical) is dict:
+            self.unknown_historical_counters.update(
+                key for key in self._live_counters() if historical.get(key) == "unknown"
+            )
+        value = document.get("eviction_provenance")
+        self.eviction_history_available = (
+            type(value) is dict and document.get("eviction_history_available") is True
+        )
+        if type(value) is not dict or len(value) > 4:
+            self.eviction_history_available = False
+            if value is not None:
+                self.invalid = min(MAX_COUNTER, self.invalid + 1)
+            return
+        for reason, row in value.items():
+            try:
+                if (
+                    reason not in {"capacity", "retention", "file_bound", "restore_capacity"}
+                    or type(row) is not dict
+                ):
+                    raise ValueError("Invalid eviction reason")
+                if set(row) != {"count", "observed_utc", "process_incarnation", "cutoff_utc"}:
+                    raise ValueError("Invalid eviction fields")
+                if type(row["count"]) is not int or not 0 <= row["count"] <= MAX_COUNTER:
+                    raise ValueError("Invalid eviction count")
+                from uuid import UUID
+
+                if row["process_incarnation"] != "unavailable":
+                    UUID(row["process_incarnation"])
+                for key in ("observed_utc", "cutoff_utc"):
+                    stamp = row[key]
+                    if key == "cutoff_utc" and stamp == "not_applicable":
+                        continue
+                    if (
+                        type(stamp) is not str
+                        or len(stamp) > 40
+                        or datetime.fromisoformat(stamp).tzinfo is None
+                    ):
+                        raise ValueError("Invalid eviction time")
+                self.eviction_provenance[reason] = dict(row)
+            except (ValueError, TypeError, AttributeError):
+                self.invalid = min(MAX_COUNTER, self.invalid + 1)
+                self.eviction_history_available = False
 
     def report(self):
         snapshot = self.snapshot  # Writer publishes by replacement, never mutation.
@@ -255,6 +345,9 @@ class DiagnosticSink:
         result["omitted_operations"] = len(rows) - len(result["operations"])
         result.update(
             **self._counter_totals(),
+            counter_provenance=self._counter_provenance(),
+            eviction_provenance=deepcopy(self.eviction_provenance),
+            eviction_history_available=self.eviction_history_available,
             worker_alive=self.thread.is_alive(),
             publication=deepcopy(self.publication),
             restore_status=self.restore_status,
@@ -434,11 +527,15 @@ class DiagnosticSink:
             "_older_fallback" if self.restore_failures else "_restored"
         )
         for name in self._counter_totals():
+            if name not in selected:
+                self.unknown_historical_counters.add(name)
             value = selected.get(name, 0)
             if type(value) is int and 0 <= value <= MAX_COUNTER:
                 self.prior_counters[name] = value
             else:
                 self.invalid += 1
+                self.unknown_historical_counters.add(name)
+        self._restore_provenance(selected)
         for version, document in documents.items():
             for row in document["operations"]:
                 try:
@@ -457,8 +554,7 @@ class DiagnosticSink:
                                 )
                                 self.dropped = min(MAX_COUNTER, self.dropped + 1)
                                 continue
-                            del self.records[disposable]
-                            self.evicted = min(MAX_COUNTER, self.evicted + 1)
+                            self._evict(disposable, "restore_capacity")
                         self.records[restored["reference"]] = restored
                     elif version == "v1" and restored["transitions"]:
                         existing = self.records.get(restored["reference"])
@@ -619,8 +715,28 @@ class DiagnosticSink:
                 "unknown",
             },
             "restoration_outcome": {"complete", "partial", "cancelled", "unavailable", "unknown"},
-            "origin": {"code_owned"},
-            "actor": {"unavailable_not_collected"},
+            "origin": {"code_owned", "startup"},
+            "actor": {"unavailable_not_collected", "system"},
+            "verification_source": {
+                "unavailable",
+                "proc_config_import",
+                "build_player_stats_cache",
+                "warm_profile_cache",
+                "warm_name_cache",
+                "rehydrate_tracked_views",
+            },
+            "verification_reason": {
+                "no_checker",
+                "pending",
+                "malformed_result",
+                "checker_failed",
+                "checker_cancelled",
+                "not_reached",
+                "projection_unavailable",
+                "incomplete_evidence",
+                "unsupported_stage",
+                "verified",
+            },
             "native_process_creation": {"unavailable_not_collected"},
             "sql_holder": {"unavailable_P02"},
             "timing_scope": {"inclusive"},
@@ -658,8 +774,7 @@ class DiagnosticSink:
                     self.dropped += 1
                     self.refused_operations += 1
                     return
-                del self.records[completed]
-                self.evicted += 1
+                self._evict(completed, "capacity")
             row = self.records[reference] = dict(
                 reference=reference,
                 transitions=[],
@@ -865,14 +980,16 @@ class DiagnosticSink:
                 and row["transitions"]
                 and datetime.fromisoformat(row["transitions"][-1]["observed_utc"]) < cutoff
             ):
-                del self.records[key]
-                self.evicted += 1
+                self._evict(key, "retention", cutoff.isoformat())
         self.generation += 1
         document = dict(
             schema="operation-observations/2",
             operations=list(self.records.values()),
             retention_days=30,
             **self._counter_totals(),
+            counter_provenance=self._counter_provenance(),
+            eviction_provenance=deepcopy(self.eviction_provenance),
+            eviction_history_available=self.eviction_history_available,
             observed_utc=utc(),
             generation=self.generation,
             publication=deepcopy(self.publication),
@@ -915,10 +1032,19 @@ class DiagnosticSink:
                 frozen = self._snapshot_row(trimmable)
                 self._published_rows[trimmable["reference"]] = (frozen, len(encoded(frozen)))
                 continue
-            del self.records[completed]
+            self._evict(completed, "file_bound")
             del self._published_rows[completed]
-            self.evicted += 1
             document["operations"] = list(self.records.values())
+            document.update(
+                **self._counter_totals(),
+                counter_provenance=self._counter_provenance(),
+                eviction_provenance=deepcopy(self.eviction_provenance),
+            )
+        document.update(
+            **self._counter_totals(),
+            counter_provenance=self._counter_provenance(),
+            eviction_provenance=deepcopy(self.eviction_provenance),
+        )
         document["latest_event_utc"] = max(
             (
                 event["observed_utc"]
@@ -990,12 +1116,28 @@ def configure(directory):
 
 def offer(event):
     if _sink is not None:
-        optional(_sink.offer, event)
+        try:
+            _sink.offer(event)
+        except Exception:
+            optional(note_emission_failure, event.get("state") if type(event) is dict else None)
+
+
+def note_emission_failure(state):
+    if _sink is not None:
+        _sink.emission_failures = min(MAX_COUNTER, _sink.emission_failures + 1)
+        _sink.dropped = min(MAX_COUNTER, _sink.dropped + 1)
+        if type(state) is str and state in _critical:
+            _sink.critical_dropped = min(MAX_COUNTER, _sink.critical_dropped + 1)
+
+
+def note_unknown_stage():
+    if _sink is not None:
+        _sink.unknown_stages = min(MAX_COUNTER, _sink.unknown_stages + 1)
 
 
 def note_context_loss():
     if _sink is not None:
-        _sink.context_losses += 1
+        _sink.context_losses = min(MAX_COUNTER, _sink.context_losses + 1)
 
 
 def shutdown():

@@ -49,7 +49,7 @@ async def run(coro, seconds, label, *, cancel_on_deadline=True, completion_check
     """Observe once and retain results; deadline, settlement and verification differ."""
     from services.cache_admission_diagnostics import startup_context
 
-    with scope() as observation:
+    with scope(origin="startup", actor="system") as observation:
         return await _run(
             coro, seconds, label, cancel_on_deadline, completion_check, observation, startup_context
         )
@@ -62,6 +62,7 @@ async def _run(
     returned = False
     verified = None
     check_error = None
+    check_finished = False
 
     def record(state, **facts):
         outcome = optional(
@@ -69,8 +70,17 @@ async def _run(
             label,
             verified,
             checked=completion_check is not None,
+            pending=completion_check is not None and not check_finished,
+            not_reached=completion_check is not None
+            and not check_finished
+            and state
+            in {"failed", "cancelled_outcome_unconfirmed", "deadline_elapsed_outcome_unconfirmed"},
             error=type(check_error).__name__ if check_error is not None else False,
-        ) or {"feature_outcome": "unknown"}
+        ) or {
+            "feature_outcome": "unknown",
+            "verification_reason": "projection_unavailable",
+            "verification_source": "unavailable",
+        }
         optional(
             _record,
             label,
@@ -82,10 +92,10 @@ async def _run(
             feature=outcome,
             **facts,
         )
-        emit(label, state, error=facts.get("error"), facts=outcome if returned else None)
+        emit(label, state, error=facts.get("error"), facts=outcome)
 
     async def observed():
-        nonlocal result, returned, verified, check_error
+        nonlocal result, returned, verified, check_error, check_finished
         with startup_context(label):
             result = await coro
             returned = True
@@ -100,10 +110,13 @@ async def _run(
             if completion_check is not None:
                 try:
                     verified = await completion_check(result)
-                except asyncio.CancelledError:
+                except asyncio.CancelledError as exc:
+                    check_error = exc
                     raise
                 except Exception as exc:
                     check_error = exc
+                finally:
+                    check_finished = True
 
     task = asyncio.ensure_future(observed())
     record("running", observer="pending", physical="pending", verification_state="pending")

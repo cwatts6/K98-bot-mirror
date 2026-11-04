@@ -28,8 +28,22 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_p012a_correction_hash(root, path):
+def before_p012a_contract_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P012A_EVIDENCE_CONTRACT_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p012a_evidence_contract_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
+def before_p012a_correction_hash(root, path):
+    actual = before_p012a_contract_hash(root, path)
     if path not in prepare_k98_update.P012A_REPORT_CORRECTION_PATHS:
         return actual
     successor = next(

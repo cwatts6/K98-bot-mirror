@@ -420,7 +420,8 @@ async def test_late_verification_replaces_provisional_milestone_after_trim_and_r
 
     try:
         await asyncio.wait_for(observe_deadline(), 1)
-        assert startup.report()[0]["feature"]["feature_outcome"] == "not_checked"
+        assert startup.report()[0]["feature"]["feature_outcome"] == "unknown"
+        assert startup.report()[0]["feature"]["verification_reason"] == "pending"
     finally:
         release.set()
         await pending
@@ -432,7 +433,8 @@ async def test_late_verification_replaces_provisional_milestone_after_trim_and_r
     sink._publish()
     row = sink.records[ref]
     assert row["trimmed"] > 0
-    assert row["milestones"]["deadline"]["feature_outcome"] == "not_checked"
+    assert row["milestones"]["deadline"]["feature_outcome"] == "unknown"
+    assert row["milestones"]["deadline"]["verification_reason"] == "pending"
     assert row["milestones"]["verification"]["feature_outcome"] == outcome
     restored = diagnostics.DiagnosticSink(tmp_path)
     restored._load()
