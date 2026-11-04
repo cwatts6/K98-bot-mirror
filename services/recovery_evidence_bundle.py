@@ -25,6 +25,7 @@ _admission = threading.Lock()
 _active = None
 _stopped = False
 _sessions = {}
+_deliveries = {}
 _plain_guid = re.compile(r"[0-9a-fA-F-]{36}\Z")
 
 
@@ -103,6 +104,10 @@ def report_request():
 
 def redact_report_text(value):
     """Memoize bounded redacted output by digest, within this physical request."""
+    # Exact built-in datetime renders a numeric ISO timestamp/offset, never
+    # credential syntax. Subclasses and arbitrary objects still use the redactor.
+    if type(value) is datetime:
+        return str(value)
     # UUID-shaped text cannot contain assignment, URL-query or bearer syntax.
     # It is unchanged by the canonical redactor and has high report cardinality.
     if type(value) is str and _plain_guid.fullmatch(value):
@@ -110,7 +115,7 @@ def redact_report_text(value):
     lease = _request.get()
     cache = lease.redactions if lease is _active and lease is not None else None
     key = None
-    if cache is not None and type(value) is str and len(value) <= 256:
+    if cache is not None and type(value) is str and len(value) <= 512:
         raw = value.encode("utf-8")
         if len(raw) <= 512:
             key = hashlib.sha256(raw).digest()
@@ -194,6 +199,62 @@ def drain_reports():
     """Shutdown runs this in owned offload after closing admission."""
     with _admission:
         _sessions.clear()
+        _deliveries.clear()
+
+
+def startup_snapshot(limit=131072):
+    """One row contract for both consumers; preserve valid rows and explicit loss."""
+    allowed = {
+        "step",
+        "state",
+        "observed_utc",
+        "reference",
+        "observer",
+        "physical",
+        "returned",
+        "feature",
+        "parent_return",
+        "result",
+        "worker_result",
+        "verification_state",
+    }
+    started = utc()
+    try:
+        rows = loaded_call("core.startup_diagnostics", "report")
+        if type(rows) is not list or len(rows) > 64:
+            raise ValueError("Startup inventory bound")
+    except Exception:
+        return {"status": "unavailable"}, dict(
+            status="unavailable",
+            reason="source_unavailable_or_invalid",
+            available="unknown",
+            included=0,
+            omitted="unknown",
+            captured_from_utc=started,
+            captured_through_utc=utc(),
+        )
+    output, rejected = [], 0
+    for row in rows:
+        try:
+            if type(row) is not dict:
+                raise ValueError("Startup row shape")
+            projected = safe(
+                {key: value for key, value in row.items() if type(key) is str and key in allowed}
+            )
+            if not projected or len(encode(output + [projected])) > limit:
+                raise ValueError("Startup row bound")
+            output.append(projected)
+        except Exception:
+            rejected += 1
+    return output, dict(
+        status="partial" if rejected else "available",
+        reason="startup_rows_invalid_or_bound" if rejected else None,
+        available=len(rows),
+        included=len(output),
+        omitted=rejected,
+        captured_from_utc=started,
+        captured_through_utc=utc(),
+    )
 
 
 def loaded_call(module, function):
@@ -290,7 +351,6 @@ def monitor_snapshot(limit=12288):
 
 def collect_components(*, lease=None):
     from core import operation_evidence
-    from core.startup_diagnostics import report as startup_report
     from services import operation_diagnostics
 
     started = utc()
@@ -348,34 +408,11 @@ def collect_components(*, lease=None):
     else:
         descriptors["operations.jsonl"] = dict(status="unavailable", reason="component_bound")
 
-    def startup_projection():
-        rows = startup_report()
-        if type(rows) is not list or len(rows) > 64:
-            raise ValueError("Startup inventory bound")
-        allowed = {
-            "step",
-            "state",
-            "observed_utc",
-            "reference",
-            "observer",
-            "physical",
-            "returned",
-            "feature",
-            "parent_return",
-            "result",
-            "worker_result",
-            "verification_state",
-        }
-        return [{key: value for key, value in row.items() if key in allowed} for row in rows]
-
-    startup, status = guarded(lambda: checked(startup_projection))
+    if lease is not None:
+        lease.check_active()
+    startup, status = startup_snapshot()
     components["startup.json"] = encode(startup)
     descriptors["startup.json"] = status
-    descriptors["startup.json"].update(
-        included=len(startup) if type(startup) is list else 0,
-        available=len(startup) if type(startup) is list else "unknown",
-        omitted=0 if type(startup) is list else "unknown",
-    )
     health = {}
     for name, module, function in (
         ("monitor", "services.recovery_health", "observation"),
@@ -475,23 +512,42 @@ def binding(service, actor):
     return (actor.user_id, actor.guild_id, actor.channel_id, service.store.scope)
 
 
+def _expire_downloads(now):
+    for inventory in (_sessions, _deliveries):
+        for key, session in list(inventory.items()):
+            if session["expires"] <= now:
+                del inventory[key]
+
+
+def _forget_generation(generation):
+    for inventory in (_sessions, _deliveries):
+        for key, session in list(inventory.items()):
+            if session["generation"] == generation:
+                del inventory[key]
+
+
 def retain(service, actor, components, identity, descriptors=None):
     if not components:
         return None
     if sum(len(data) for data in components.values()) > MAX_SESSION:
         raise SourceConflict("Diagnostic continuation exceeds its retention bound.")
     now = time.monotonic()
-    for key, session in list(_sessions.items()):
-        if session["expires"] <= now:
-            del _sessions[key]
-    while len(_sessions) >= 2:
-        del _sessions[next(iter(_sessions))]
+    _expire_downloads(now)
+    generations = {
+        s["generation"]: (s["expires"], s["created"])
+        for s in (*_sessions.values(), *_deliveries.values())
+    }
+    while len(generations) >= 2:
+        oldest = min(generations, key=generations.get)
+        _forget_generation(oldest)
+        del generations[oldest]
     token = secrets.token_urlsafe(32)
     _sessions[token] = dict(
         binding=binding(service, actor),
         components=components,
         identity=identity,
         expires=now + 600,
+        created=time.perf_counter_ns(),
         generation=secrets.token_hex(16),
         part=1,
         previous_sha256=None,
@@ -519,6 +575,14 @@ def continuation(service, actor, token, max_bytes):
     service.report_authorize(actor)
     budget(max_bytes)
     with report_request():
+        _expire_downloads(time.monotonic())
+        replay = _deliveries.get(token) if type(token) is str else None
+        if replay is not None:
+            if replay["binding"] != binding(service, actor):
+                raise SourceConflict("This diagnostic part belongs to another scope.")
+            if len(replay["report"]["content"]) > max_bytes:
+                raise SourceConflict("The frozen part needs its original attachment budget.")
+            return dict(replay["report"])
         session = _sessions.get(token) if type(token) is str else None
         if (
             session is None
@@ -600,7 +664,9 @@ def continuation(service, actor, token, max_bytes):
             content = output.getvalue()
         if len(content) > max_bytes:
             raise SourceConflict("Diagnostic part exceeds the attachment budget.")
-        # Single use token; the returned successor is the sole next capability.
+        # Advance once, but retain this exact part for failed/uncertain delivery.
+        # Only the latest produced part per generation is retryable; requesting
+        # its successor replaces that retry slot. No expiry extension or reread.
         del _sessions[token]
         session["offsets"][name] += used
         if used == len(remaining):
@@ -613,7 +679,7 @@ def continuation(service, actor, token, max_bytes):
         if session["components"]:
             successor = secrets.token_urlsafe(32)
             _sessions[successor] = session
-        return dict(
+        report = dict(
             content=content,
             filename="K98-diagnostic-continuation.zip",
             diagnostic_token=successor,
@@ -621,3 +687,14 @@ def continuation(service, actor, token, max_bytes):
             count=0,
             complete=False,
         )
+        for key, prior in list(_deliveries.items()):
+            if prior["generation"] == session["generation"]:
+                del _deliveries[key]
+        _deliveries[token] = dict(
+            binding=session["binding"],
+            expires=session["expires"],
+            generation=session["generation"],
+            created=session["created"],
+            report=report,
+        )
+        return dict(report)

@@ -53,7 +53,7 @@ def test_incomplete_collection_never_labels_archive_complete():
     report = service.download_complete_report(ACTOR)
     assert not report["complete"] and report["incident_continuation"]
     with zipfile.ZipFile(io.BytesIO(report["content"])) as archive:
-        assert "incidents.jsonl" not in archive.namelist()
+        assert len(archive.read("incidents.jsonl").splitlines()) == 3
         assert not json.loads(archive.read("summary.json"))["complete"]
 
 

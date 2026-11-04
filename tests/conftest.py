@@ -218,3 +218,4 @@ def _isolate_report_admission(monkeypatch):
 
     monkeypatch.setattr(bundle, "_stopped", False)
     monkeypatch.setattr(bundle, "_sessions", {})
+    monkeypatch.setattr(bundle, "_deliveries", {})

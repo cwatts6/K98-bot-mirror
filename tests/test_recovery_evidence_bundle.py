@@ -143,7 +143,12 @@ def test_ordinary_operation_projection_rejects_invalid_or_oversize_sources(monke
         source["padding"] = ["x" * 100] * 200
     monkeypatch.setattr(diagnostics, "report", lambda: source)
     result = unavailable_report(OSError())
-    assert json.loads(result["content"])["operation_observations"] == {"status": "unavailable"}
+    observation = json.loads(result["content"])["operation_observations"]
+    if damage in {"inventory", "bytes"}:
+        assert observation["status"] == "unavailable" and observation["reason"]
+    else:
+        assert observation["operations"] == []
+        assert observation["coverage"]["rejected"] == 1
     assert b"DO_NOT_EXPORT" not in result["content"]
 
 
@@ -289,7 +294,7 @@ def test_optional_sources_fail_independently_and_store_is_not_empty(monkeypatch)
         assert b"do-not-export" not in archive.read("manifest.json")
 
 
-def test_continuations_are_bound_single_use_expire_and_reconstruct(monkeypatch):
+def test_continuations_are_bound_retryable_expire_and_reconstruct(monkeypatch):
     service, _, _ = report_service()
     original = b'{"row":"' + b"a" * 32000 + b'"}\n'
     with bundle.report_request():
@@ -306,8 +311,7 @@ def test_continuations_are_bound_single_use_expire_and_reconstruct(monkeypatch):
             result += archive.read("operations.jsonl")
         previous = report["sha256"]
         token = report["diagnostic_token"]
-        with pytest.raises(SourceConflict):
-            service.download_diagnostic_part(ACTOR, old, 65536)
+        assert service.download_diagnostic_part(ACTOR, old, 65536) == report
     assert result == original * 3
     with bundle.report_request():
         tokens = [bundle.retain(service, ACTOR, {"startup.json": b"{}"}, {}) for _ in range(3)]
@@ -515,7 +519,7 @@ def test_nonwaiting_runtime_registration_and_default_ownership(monkeypatch):
         assert len(owner._calls) == 1
 
 
-def test_discarded_incident_prefix_does_not_leave_aggregate_counts(monkeypatch):
+def test_retained_incident_prefix_has_matching_partial_aggregate_counts(monkeypatch):
     from services import recovery_complete_report
 
     service, store, records = report_service(271)
@@ -543,16 +547,16 @@ def test_discarded_incident_prefix_does_not_leave_aggregate_counts(monkeypatch):
     report = service.download_complete_report(ACTOR)
     assert store.report_page.call_count == 28
     with zipfile.ZipFile(io.BytesIO(report["content"])) as archive:
-        assert "incidents.jsonl" not in archive.namelist()
+        assert len(archive.read("incidents.jsonl").splitlines()) == 270
         summary = json.loads(archive.read("summary.json"))
         assert summary["complete"] is False
-        assert summary["included_incidents"] == 0
-        assert summary["groups"] == summary["required_repairs"] == summary["linked_recovery"] == []
-        assert summary["omitted_groups"] == 0
-        assert summary["other_contributions"] == {"groups": 0, "repairs": 0, "blockers": 0}
+        assert summary["included_incidents"] == 270
+        assert sum(g["count"] for g in summary["groups"]) == 256
+        assert summary["omitted_groups"] == "unknown"
+        assert summary["other_contributions"] == {"groups": 14, "repairs": 14, "blockers": 14}
 
 
-def test_incident_overflow_discards_prefix_and_does_not_rescan(monkeypatch):
+def test_first_incident_overflow_keeps_cursor_and_does_not_rescan(monkeypatch):
     import random
 
     service, store, records = report_service(2)
@@ -609,7 +613,8 @@ def test_deadline_stops_between_pages_without_native_detach(monkeypatch):
 
     store.report_page.side_effect = page
     report = service.download_complete_report(ACTOR)
-    assert not report["complete"] and report["count"] == 0
+    assert not report["complete"] and report["count"] == 10
+    assert report["incident_after"] is not None
     assert store.report_page.call_count == 1
     assert bundle._active is None
 

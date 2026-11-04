@@ -248,7 +248,10 @@ async def test_slow_incidents_monitor_failure_and_pending_boundary_keep_loop_and
                 json.loads(archive.read("diagnostic-health.json"))["monitor"]["coverage"]["status"]
                 == "available"
             )
-            assert meta["incident_after"] is None
+            assert meta["incident_after"] == result["incident_after"]
+            assert meta["incident_after"] is not None
+            assert result["count"] == 10
+            assert len(archive.read("incidents.jsonl").splitlines()) == 10
             for descriptor in meta["components"].values():
                 assert {
                     "schema",

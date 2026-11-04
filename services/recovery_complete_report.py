@@ -44,77 +44,143 @@ def build_complete_report(service, actor, max_bytes=8388608):
 
 
 def _build(service, actor, max_bytes, lease):
-    import hashlib
-
     # Freeze independent diagnostics before any SQL wait can consume the census
     # budget. Capture time remains distinct from incident and export times.
     lease.check_active()
     service.report_authorize(actor)
     components, descriptors, identity = bundle.collect_components(lease=lease)
-    output = BoundedArchive(max_bytes - 32768)
+    with BoundedArchive(max_bytes) as output, io.BytesIO() as raw:
+        return _assemble(
+            service, actor, max_bytes, lease, components, descriptors, identity, output, raw
+        )
+
+
+def _assemble(service, actor, max_bytes, lease, components, descriptors, identity, output, raw):
+    import hashlib
+
     groups, repairs, blockers = Groups(), Groups(), Groups()
     after = through = total = None
     count = detail_bytes = 0
     digest = hashlib.sha256()
     status, reason = "available", None
     started = bundle.utc()
+    read_calls, read_seconds, projection_seconds = 0, 0.0, 0.0
+    # Bound both uncompressed working memory and the actual compressed prefix.
+    # A trial compressor makes a row atomic: a rejected row never moves the cursor.
+    compressor = zlib.compressobj(1)
+    compressed_bytes = 0
+
+    def append_prepared(items):
+        nonlocal compressor, compressed_bytes, detail_bytes, count, after, reason
+        if not items:
+            return
+        data = b"".join(item[1] for item in items)
+        trial = compressor.copy()
+        emitted = len(trial.compress(data))
+        closed_size = compressed_bytes + emitted + len(trial.copy().flush())
+        if (
+            detail_bytes + len(data) > 32 * 1024 * 1024
+            or closed_size + 512 > max_bytes - 32768
+            or count + len(items) > 1000000
+        ):
+            if len(items) > 1:
+                for item in items:
+                    append_prepared([item])
+                return
+            reason = "incident_collection_byte_bound"
+            raise SourceConflict("Incident prefix bound reached.")
+        raw.write(data)
+        compressor = trial
+        compressed_bytes += emitted
+        detail_bytes += len(data)
+        digest.update(data)
+        for identity, _, group_key, repair_keys, blocker_keys in items:
+            groups.add(group_key)
+            for key in repair_keys:
+                repairs.add(key)
+            for key in blocker_keys:
+                blockers.add(key)
+            count += 1
+            after = identity
+
     try:
-        with zipfile.ZipFile(
-            output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1
-        ) as archive:
-            with archive.open("incidents.jsonl", "w") as detail:
-                while True:
-                    lease.check()
-                    service.report_authorize(actor)
-                    page = service.store.report_page(after=after, through=through, page_size=10)
-                    through = page["through"]
-                    if total is None:
-                        total = page["total"]
-                    elif total != page["total"]:
-                        raise SourceConflict("Incident census changed during collection.")
-                    lease.check()
-                    for row in page["rows"]:
-                        item = incident_report(service, row)
-                        data = bundle.encode(item) + b"\n"
-                        detail_bytes += len(data)
-                        if detail_bytes > 128 * 1024 * 1024 or count >= 1000000:
-                            raise SourceConflict("Incident collection bound reached.")
-                        detail.write(data)
-                        digest.update(data)
-                        groups.add(
-                            (item["source_kind"], item["state"], item["diagnosis"].get("outcome"))
-                        )
-                        for repair in item["required_repairs"]:
-                            repairs.add((repair["action"], repair["availability"]))
-                        for link in item["diagnosis"].get("recovery_links", []):
-                            blockers.add((link["kind"], link["source_id"]))
-                        count += 1
-                        after = row["IncidentID"]
-                    if not page["more"]:
-                        break
-                    if not page["rows"]:
-                        raise SourceConflict("Incident cursor did not advance.")
-                    # Fast reads plus encoding can monopolize the worker's GIL.
-                    # A positive sleep yields to the loop even on Windows, where
-                    # sleep(0) alone did not satisfy the measured heartbeat gate.
-                    # The lease remains owned; its next check observes cancellation.
-                    time.sleep(0.000001)
-                if count != total:
-                    raise SourceConflict("Incident coverage changed during collection.")
+        while True:
+            lease.check()
+            service.report_authorize(actor)
+            read_started = time.perf_counter()
+            read_calls += 1
+            try:
+                page = service.store.report_page(after=after, through=through, page_size=10)
+            finally:
+                read_seconds += time.perf_counter() - read_started
+            through = page["through"]
+            if total is None:
+                total = page["total"]
+            elif total != page["total"]:
+                raise SourceConflict("Incident census changed during collection.")
+            # An entered read remains owned even beyond the budget. Preserve its
+            # bounded returned page before deciding whether to begin another read.
+            lease.check_active()
+            prepared, prepared_bytes, page_error = [], 0, None
+            for row in page["rows"]:
+                lease.check_active()
+                projection_started = time.perf_counter()
+                try:
+                    item = incident_report(service, row)
+                    data = bundle.encode(item) + b"\n"
+                    if detail_bytes + prepared_bytes + len(data) > 32 * 1024 * 1024:
+                        reason = "incident_collection_byte_bound"
+                        raise SourceConflict("Incident staging bound reached.")
+                    # All fallible row interpretation precedes byte/cursor acceptance.
+                    group_key = (
+                        item["source_kind"],
+                        item["state"],
+                        item["diagnosis"].get("outcome"),
+                    )
+                    repair_keys = [
+                        (r["action"], r["availability"]) for r in item["required_repairs"]
+                    ]
+                    blocker_keys = [
+                        (link["kind"], link["source_id"])
+                        for link in item["diagnosis"].get("recovery_links", [])
+                    ]
+                    for key in [group_key, *repair_keys, *blocker_keys]:
+                        hash(key)
+                    prepared.append((row["IncidentID"], data, group_key, repair_keys, blocker_keys))
+                    prepared_bytes += len(data)
+                except Exception as error:
+                    page_error = error
+                    break
+                finally:
+                    projection_seconds += time.perf_counter() - projection_started
+            # One exact compression check per bounded page normally; at a size
+            # boundary fall back to rows to retain the largest fitting prefix.
+            append_prepared(prepared)
+            if page_error is not None:
+                raise page_error
+            if not page["more"]:
+                break
+            if not page["rows"]:
+                raise SourceConflict("Incident cursor did not advance.")
+            time.sleep(0.000001)
+        if count != total:
+            raise SourceConflict("Incident coverage changed during collection.")
     except Exception as error:
         status = "partial" if through is not None else "unavailable"
-        reason = (
+        reason = reason or (
             "incident_collection_time_bound"
             if isinstance(error, bundle.ReportBudgetExceeded)
             else "incident_collection_unavailable_or_bound"
         )
-        output.close()
-        output = BoundedArchive(max_bytes)
-        count = detail_bytes = 0
-        groups, repairs, blockers = Groups(), Groups(), Groups()
-        # No partial ZIP is delivered, so the incident cursor is still None.
-        with zipfile.ZipFile(output, "w"):
-            pass
+    try:
+        with zipfile.ZipFile(
+            output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1
+        ) as archive:
+            if count or status == "available":
+                with raw.getbuffer() as data_view:
+                    archive.writestr("incidents.jsonl", data_view)
+    finally:
+        raw.close()
     try:
         service.report_authorize(actor)
         output.limit = max_bytes
@@ -132,9 +198,14 @@ def _build(service, actor, max_bytes, lease):
             cutoff_utc=str(through) if through is not None else None,
             captured_from_utc=started,
             captured_through_utc=bundle.utc(),
+            collection=dict(
+                read_calls=read_calls,
+                read_seconds=read_seconds,
+                projection_seconds=projection_seconds,
+                budget_seconds=30,
+            ),
         )
-        if status == "available":
-            descriptors["incidents.jsonl"].update(bytes=detail_bytes, sha256=digest.hexdigest())
+        descriptors["incidents.jsonl"].update(bytes=detail_bytes, sha256=digest.hexdigest())
         summary = dict(
             format="k98-recovery-complete-report-v1",
             generated_utc=bundle.utc(),
@@ -228,7 +299,7 @@ def _build(service, actor, max_bytes, lease):
                 identity,
                 diagnostic_continuation=bool(token),
                 incident_continuation=status != "available",
-                incident_after=None,
+                incident_after=after,
                 cutoff_utc=str(through) if through is not None else None,
                 **bundle.initial_chain(token),
             )
@@ -246,6 +317,8 @@ def _build(service, actor, max_bytes, lease):
         count=count,
         complete=status == "available",
         incident_continuation=status != "available",
+        incident_after=after,
+        total=total,
         diagnostic_token=token,
         through=through,
         sha256=bundle.sha(content),

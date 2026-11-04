@@ -11,7 +11,7 @@ from scripts import prepare_k98_update as updater
 
 def test_all_59_deployed_transitions_remain_immutable():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 60
+    assert len(transitions) == 61
     assert (
         hashlib.sha256(json.dumps(transitions[:59], sort_keys=True).encode()).hexdigest()
         == "49496e4236045e02b03ef392b51f5021d16c217ad30ae518bd49b627c79418e6"
@@ -30,7 +30,7 @@ def pair(monkeypatch):
         path = member["path"]
         assert member["before_sha256"] == next(
             m["after_sha256"]
-            for t in reversed(transitions[:-1])
+            for t in reversed(transitions[:59])
             for m in t["members"]
             if m["path"] == path
         )

@@ -199,44 +199,62 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
 
 
 def _monitor_report():
-    from services.recovery_evidence_bundle import guarded, loaded_call, monitor_snapshot
+    from services.recovery_evidence_bundle import (
+        guarded,
+        loaded_call,
+        monitor_snapshot,
+        startup_snapshot,
+    )
 
-    result = monitor_snapshot(limit=6000)[0]
-    # Preserve the ordinary report's established fields, isolating each provider
-    # instead of letting the legacy aggregate hide every healthy observation.
-    providers = (
-        ("startup", "core.startup_diagnostics", "report"),
+    result, monitor_coverage = monitor_snapshot(limit=6000)
+    coverage, details = {}, {"monitor": monitor_coverage}
+
+    def include(name, value, state, *, cache=False):
+        # Reserve room for all coverage descriptors in the final pretty JSON.
+        candidate = dict(result)
+        if cache:
+            candidate["cache_outcomes_v1"] = dict(
+                result.get("cache_outcomes_v1", {}), **{name: value}
+            )
+        else:
+            candidate[name] = value
+        if len(encode(candidate)) > 24576:
+            value = {"status": "omitted_report_budget"}
+            state = dict(
+                state,
+                source_status=state["status"],
+                status="partial",
+                reason="ordinary_report_byte_bound",
+                included=0,
+                omitted=state.get("available", "unknown"),
+            )
+        if cache:
+            result.setdefault("cache_outcomes_v1", {})[name] = value
+        else:
+            result[name] = value
+        coverage[name] = state["status"]
+        details[name] = state
+
+    include("startup", *startup_snapshot(limit=8192))
+    for name, module, function in (
         ("admission_observations_v1", "services.cache_admission_diagnostics", "report"),
         ("event_cache", "event_cache", "report"),
         ("event_startup", "core.scheduler_lifecycle", "event_startup_report"),
         ("event_dm_startup", "event_scheduler", "dm_startup_report"),
         ("event_delivery_v1", "services.event_delivery_service", "report"),
-    )
-    coverage = {}
-    for name, module, function in providers:
-        value, state = guarded(lambda m=module, f=function: loaded_call(m, f), limit=2048)
-        if len(encode(result | {name: value})) > 14336:
-            value = {"status": "omitted_report_budget"}
-            state = {"status": "partial", "reason": "ordinary_report_byte_bound"}
-        result[name] = value
-        coverage[name] = state["status"]
-    caches = {}
+    ):
+        include(name, *guarded(lambda m=module, f=function: loaded_call(m, f), limit=2048))
     for name, module, function in (
         ("stats", "services.player_stats_cache_service", "report"),
         ("profile", "profile_cache", "get_cache_stats"),
         ("name", "target_utils", "name_outcome_report"),
     ):
         value, state = guarded(lambda m=module, f=function: loaded_call(m, f), limit=1024)
-        caches[name] = (
-            value.get("outcome", value) if name == "profile" and type(value) is dict else value
-        )
-        coverage[name] = state["status"]
-    result["cache_outcomes_v1"] = (
-        caches
-        if len(encode(result | {"cache_outcomes_v1": caches})) <= 15360
-        else {"status": "omitted_report_budget"}
-    )
+        if name == "profile" and type(value) is dict:
+            value = value.get("outcome", value)
+        include(name, value, state, cache=True)
     result["source_coverage"] = coverage
+    result["component_coverage"] = details
     return result
 
 
@@ -255,21 +273,39 @@ def _operation_report():
         if len(encode(result)) > 16384:
             raise ValueError("Operation report byte bound")
         validator = operation_diagnostics.DiagnosticSink()
+        rejected = 0
         for row in source["operations"]:
-            if type(row) is not dict:
-                raise ValueError("Invalid operation summary")
-            latest = row.get("latest")
-            projected = validator._restore_row(
-                dict(row, transitions=[] if latest is None else [latest])
-            )
-            projected.pop("transitions")
-            projected["latest"] = latest
-            result["operations"].append(projected)
-            if len(encode(result)) > 16384:
-                raise ValueError("Operation report byte bound")
+            try:
+                if type(row) is not dict:
+                    raise ValueError("Invalid operation summary")
+                latest = row.get("latest")
+                projected = validator._restore_row(
+                    dict(row, transitions=[] if latest is None else [latest])
+                )
+                projected.pop("transitions")
+                projected["latest"] = latest
+                if len(encode(dict(result, operations=result["operations"] + [projected]))) > 15360:
+                    raise ValueError("Operation report byte bound")
+                result["operations"].append(projected)
+            except Exception:
+                rejected += 1
+        omitted = source.get("omitted_operations", 0)
+        if type(omitted) is not int or omitted < 0:
+            omitted = 0
+        result["omitted_operations"] = omitted + rejected
+        result["coverage"] = dict(
+            status="partial" if omitted or rejected else "available",
+            reason="operation_preview_invalid_or_bound" if omitted or rejected else None,
+            available=len(source["operations"]) + omitted,
+            included=len(result["operations"]),
+            omitted=omitted + rejected,
+            rejected=rejected,
+        )
+        if len(encode(result)) > 16384:
+            raise ValueError("Final operation component bound")
         return result
     except Exception:
-        return {"status": "unavailable"}
+        return {"status": "unavailable", "reason": "source_unavailable_invalid_or_bound"}
 
 
 def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 * 1024 * 1024):
@@ -312,6 +348,9 @@ def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 
             document.pop("operation_observations", None)
             observations_omitted = True
             encoded_size = len(encode(document))
+            if encoded_size + addition > max_bytes - 1024:
+                document["monitor"] = {"status": "omitted_attachment_budget"}
+                encoded_size = len(encode(document))
         if encoded_size + addition > max_bytes - 1024:
             if not document["incidents"]:
                 raise SourceConflict(
@@ -329,8 +368,11 @@ def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 
     document["included_incidents"] = len(document["incidents"])
     if observations_omitted:
         document["operation_observations"] = {"status": "omitted_attachment_budget"}
+    content = encode(document)
+    if len(content) > max_bytes:
+        raise SourceConflict("Report exceeds its attachment budget; cursor has not advanced.")
     return dict(
-        content=encode(document),
+        content=content,
         filename=f"K98-recovery-report-part-{part}.json",
         next_after=next_after if more else None,
         through=page["through"],

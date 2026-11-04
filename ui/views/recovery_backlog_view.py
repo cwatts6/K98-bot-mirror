@@ -71,6 +71,7 @@ class EvidenceReportPartsView(discord.ui.View):
         super().__init__(timeout=600)
         self.token = report.get("diagnostic_token")
         self.through = report.get("through")
+        self.after = report.get("incident_after")
         self.diagnostics.disabled = self.token is None
         self.incidents.disabled = not report.get("incident_continuation")
 
@@ -82,7 +83,9 @@ class EvidenceReportPartsView(discord.ui.View):
     async def incidents(self, button, interaction):
         from ui.views.recovery_view import show_report
 
-        await show_report(interaction, through=self.through)
+        await show_report(
+            interaction, after=self.after, through=self.through, part=2 if self.after else 1
+        )
 
 
 async def show_complete_report(interaction, *, token=None):
@@ -102,7 +105,8 @@ async def show_complete_report(interaction, *, token=None):
                 else await report_call("download_diagnostic_part", actor, token, limit)
             )
             text = (
-                f"Report: {report['count']} recorded incidents. "
+                f"Report: {report['count']} incidents included; "
+                f"{report.get('total') if report.get('total') is not None else 'unknown'} recorded in scope. "
                 if token is None
                 else "Diagnostic continuation. "
             )
