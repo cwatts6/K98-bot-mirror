@@ -34,6 +34,42 @@ def forbidden(*args, **kwargs):
     pytest.fail("Presentation performed work or acquired a lock")
 
 
+def test_never_observed_scoped_probes_are_not_reported_as_scope_mismatch(monkeypatch):
+    from services import gsheets_health_service as sheets
+
+    monkeypatch.setattr(status, "_probe", HealthProbe(label="SQL"))
+    monkeypatch.setattr(sheets, "_probe", HealthProbe())
+    monkeypatch.setitem(
+        sys.modules,
+        "constants",
+        SimpleNamespace(
+            SERVER="sql", DATABASE="db", CREDENTIALS_FILE="credentials", SHEET_ID="sheet"
+        ),
+    )
+    for row, latest, failure in (status.sql_snapshot(), sheets.health_snapshot()):
+        assert row.reason == "not_observed"
+        assert row.outcome == "unknown"
+        assert latest is None and failure is None
+        assert (
+            "No observation yet"
+            in build_health_embed(
+                {"components": {"sql": row.project(NOW)}, "captured_utc": NOW.isoformat()}
+            )
+            .fields[3]
+            .value
+        )
+
+
+@pytest.mark.asyncio
+async def test_unscoped_completed_probe_does_not_certify_configured_target():
+    probe = HealthProbe()
+    await probe.observe(AsyncMock(return_value=(True, "OK")), timeout=1)
+    row, latest, failure = probe.snapshot(scope="configured-target")
+    assert row.reason == "scope_mismatch"
+    assert row.outcome == "unknown"
+    assert latest is None and failure is None
+
+
 @pytest.mark.parametrize(
     "minutes,freshness", [(0, "fresh"), (60, "fresh"), (61, "stale"), (-1, "unknown")]
 )

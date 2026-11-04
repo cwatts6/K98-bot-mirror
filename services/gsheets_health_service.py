@@ -30,7 +30,15 @@ class HealthProbe:
         bound, current, latest, failure = self._published
         if scope is not None and scope != bound:
             return (
-                Observation(self._label, "configured check", reason="scope_mismatch"),
+                Observation(
+                    self._label,
+                    "configured check",
+                    reason=(
+                        "not_observed"
+                        if bound is None and current.reason == "not_observed"
+                        else "scope_mismatch"
+                    ),
+                ),
                 None,
                 None,
             )
@@ -148,9 +156,21 @@ def health_snapshot():
     targets = tuple(
         getattr(config, key, None) for key in ("SHEET_ID", "KVK_SHEET_ID", "STATS_SHEET_ID")
     )
-    bound = _probe._published[0]
+    bound, current, _, _ = _probe._published
     if bound not in tuple((credentials, target) for target in targets if target):
-        return (Observation("GSheets", "configured check", reason="scope_mismatch"), None, None)
+        return (
+            Observation(
+                "GSheets",
+                "configured check",
+                reason=(
+                    "not_observed"
+                    if bound is None and current.reason == "not_observed"
+                    else "scope_mismatch"
+                ),
+            ),
+            None,
+            None,
+        )
     return _probe.snapshot(scope=bound)
 
 
