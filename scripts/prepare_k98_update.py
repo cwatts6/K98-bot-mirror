@@ -616,6 +616,24 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P013_PASSIVE_HEALTH_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "commands/admin_cmds.py",
+        "core/startup_diagnostics.py",
+        "profile_cache.py",
+        "services/event_delivery_service.py",
+        "services/gsheets_health_service.py",
+        "services/health_observation.py",
+        "services/operator_status_service.py",
+        "services/profile_cache_service.py",
+        "services/recovery_evidence_bundle.py",
+        "services/recovery_health.py",
+        "services/recovery_report.py",
+        "ui/views/health_view.py",
+    }
+)
+
 P012A_RECOVERABLE_REPORT_PATHS = frozenset(
     {
         "services/recovery_complete_report.py",
@@ -763,12 +781,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    if len(raw) > 131072:
+    # Fixed P01.3 family plus Windows newlines; still a bounded installed file.
+    if len(raw) > 139264:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 61:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 62:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -860,6 +879,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_p013 = (
+                item["id"] == "p013_passive_health_v1" and path in P013_PASSIVE_HEALTH_PATHS
             )
             fixed_p012a = (
                 (
@@ -978,6 +1000,7 @@ def reviewed_transitions():
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
                     or fixed_p012a
+                    or fixed_p013
                     or fixed_p011
                     or fixed_mge_final
                     or fixed_mge_a1b
@@ -1117,6 +1140,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p013_passive_health_v1" and paths != P013_PASSIVE_HEALTH_PATHS:
+            raise ValueError("Complete fixed P01.3 passive-health transition required.")
         if item["id"] == "p012a_evidence_bundle_v1" and paths != P012A_EVIDENCE_BUNDLE_PATHS:
             raise ValueError("Complete fixed P01.2a evidence-bundle transition required.")
         if item["id"] == "p012a_report_correction_v1" and paths != P012A_REPORT_CORRECTION_PATHS:

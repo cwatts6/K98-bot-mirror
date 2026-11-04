@@ -57,7 +57,12 @@ def _record(label, state, seconds, *, error=None, **facts):
                 "startup",
                 label,
                 row["observed_utc"],
-                "in_progress" if state == "running" else "settled",
+                (
+                    "in_progress"
+                    if row.get("physical") == "pending"
+                    or state in {"running", "deadline_elapsed_pending", "deadline_elapsed_draining"}
+                    else "settled"
+                ),
                 feature,
                 "startup_activity",
                 reference=(

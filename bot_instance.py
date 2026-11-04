@@ -668,6 +668,7 @@ def _health_card(projection=None):
     local = dict(
         connected=bool(bot.is_ready() and not bot.is_closed()),
         shutting_down=_shutdown_once.is_set(),
+        notify_channel_id=NOTIFY_CHANNEL_ID,
         uptime_seconds=max(0, (_aware(utcnow()) - START_TIME).total_seconds()),
         tasks=(
             sum(1 for e in entries if not e["done"] and not e["cancelled"]),

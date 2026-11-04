@@ -560,3 +560,62 @@ def test_startup_publication_is_bounded_and_does_not_copy_arbitrary_payloads(mon
     assert len(records) == 4
     assert records[-1].outcome == "partial"
     assert "secret" not in repr(records)
+
+
+@pytest.mark.parametrize(
+    "state", ["running", "deadline_elapsed_pending", "deadline_elapsed_draining"]
+)
+def test_startup_deadline_does_not_settle_owned_work(monkeypatch, state):
+    from core import startup_diagnostics as startup
+
+    monkeypatch.setattr(startup, "_health", ())
+    monkeypatch.setattr(startup, "_steps", {})
+    startup._record("warm_profile_cache", state, 1, physical="pending")
+    assert startup.health_snapshot()[0].execution == "in_progress"
+    assert startup.health_snapshot()[0].outcome == "unknown"
+    startup._record(
+        "warm_profile_cache",
+        "completed",
+        1,
+        physical="settled",
+        feature={"feature_outcome": "succeeded"},
+    )
+    assert startup.health_snapshot()[0].execution == "settled"
+    assert startup.health_snapshot()[0].outcome == "success"
+
+
+def test_profile_in_progress_and_invalidation_preserve_truth():
+    from services.cache_outcomes import CacheOutcome
+    from services.profile_cache_service import ProfileCacheService
+
+    profile = ProfileCacheService()
+    profile._outcome = CacheOutcome("profile", "test", execution="running")
+    profile._publish_health()
+    row = profile.health_snapshot()
+    assert row.execution == "in_progress"
+    assert row.reason == "owned_operation"
+    profile._players = {"1": {"GovernorID": 1}}
+    profile._outcome = CacheOutcome(
+        "profile",
+        "test",
+        execution="succeeded",
+        source="refreshed",
+        count=1,
+        source_time=NOW.timestamp(),
+    )
+    profile._publish_health()
+    assert profile.health_snapshot().outcome == "success"
+    stamp = profile.health_snapshot().source_utc
+    profile.invalidate(1)
+    row = profile.health_snapshot()
+    assert row.outcome == "unknown"
+    assert row.reason == "cache_invalidated"
+    assert row.count == 0
+    assert row.source_utc == stamp
+
+
+def test_recovery_navigation_uses_existing_notify_channel():
+    embed = build_health_embed(status.snapshot(NOW, 100), local={"notify_channel_id": 456})
+    recovery = next(field for field in embed.fields if field.name == "Recovery monitor")
+    assert "`/ops dl_bot_status` in <#456>" in recovery.value
+    assert "456" not in embed.footer.text

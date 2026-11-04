@@ -31,6 +31,7 @@ _REASONS = {
     "memory_reused": "Cache reused",
     "retained_last_known_good": "Previous cache retained",
     "unavailable": "Cache unavailable",
+    "cache_invalidated": "Cache changed; previous refresh no longer verifies this snapshot",
     "journal_observed": "Last journal observation",
     "changed_since_observation": "Delivery state changed; previous observation only",
     "monitor_stalled": "Monitoring stalled; investigate retained work",
@@ -129,6 +130,10 @@ def build_health_embed(projection, *, local=None):
             )
         else:
             value = _line(row)
+        if key == "recovery":
+            channel_id = local.get("notify_channel_id")
+            route = f" in <#{channel_id}>" if type(channel_id) is int and channel_id > 0 else ""
+            value = value[:850] + f"\nRecovery centre: `/ops dl_bot_status`{route}."
         embed.add_field(name=label, value=value, inline=False)
     tasks = local.get("tasks")
     if type(tasks) is tuple and len(tasks) == 3 and all(type(n) is int and n >= 0 for n in tasks):

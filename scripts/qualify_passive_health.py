@@ -150,6 +150,7 @@ async def main(args):
         ],
         "states": {},
         "runs": [],
+        "timer_resolution_ms": args.timer_resolution_ms,
         "failures": [],
     }
     try:
@@ -268,7 +269,11 @@ async def main(args):
             async def business():
                 for _ in range(25):
                     start = time.perf_counter()
-                    await asyncio.sleep(0.002)
+                    # asyncio timers may wake early on Windows. A simulated
+                    # external operation must not complete before its deadline.
+                    deadline = start + 0.002
+                    while (remaining := deadline - time.perf_counter()) > 0:
+                        await asyncio.sleep(remaining)
                     lag.append(max(0, (time.perf_counter() - start - 0.002) * 1000))
                     outcome = cache.refresh(
                         path="unused",
@@ -359,5 +364,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--timer-resolution-ms",
+        type=int,
+        choices=[1],
+        default=None,
+        help="Windows-only controlled timer resolution; always released on exit",
+    )
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(main(args)))
+    timer = None
+    try:
+        if args.timer_resolution_ms is not None:
+            if sys.platform != "win32":
+                raise ValueError("Timer-resolution control is Windows-only")
+            import ctypes
+
+            timer = ctypes.WinDLL("winmm")
+            if timer.timeBeginPeriod(args.timer_resolution_ms) != 0:
+                timer = None
+                raise RuntimeError("Timer-resolution request failed")
+        raise SystemExit(asyncio.run(main(args)))
+    finally:
+        if timer is not None:
+            timer.timeEndPeriod(args.timer_resolution_ms)

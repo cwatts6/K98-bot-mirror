@@ -120,6 +120,7 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     namespace = {
         "__builtins__": {**vars(builtins), "__import__": controlled_import},
         "_shutdown_once": asyncio.Event(),
+        "_stop_health_dashboard": AsyncMock(),
         "_event_bundle": lambda: event_bundle,
         "logger": Mock(),
         "daily_summary": Mock(),
@@ -139,6 +140,7 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
         compile(ast.Module(body=[teardown], type_ignores=[]), "bot_instance.py", "exec"), namespace
     )
     await namespace["_graceful_teardown"]()
+    namespace["_stop_health_dashboard"].assert_awaited_once()
     cache_owner.close_admission.assert_called_once()
     profile_owner.close.assert_called_once()
     name_close.assert_called_once()

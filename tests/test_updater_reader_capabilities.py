@@ -88,16 +88,27 @@ def test_unreviewed_or_partial_protocol_bundle_is_refused(transition, damage):
 def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
+    from tests.updater_source_assertions import before_p013_hash
+
     for transition in update.reviewed_transitions():
-        if transition["id"] == "p012a_recoverable_reports_v1":
+        if transition["id"] == "p013_passive_health_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
             continue
+        if transition["id"] == "p012a_recoverable_reports_v1":
+            for member in transition["members"]:
+                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
+                assert before_p013_hash(root, member["path"]) == member["after_sha256"], member[
+                    "path"
+                ]
+            continue
         if transition["id"] == "p012a_evidence_contract_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"], member["path"]
+                assert before_p013_hash(root, member["path"]) == member["after_sha256"], member[
+                    "path"
+                ]
             continue
         if transition["id"] == "p012a_report_correction_v1":
             from tests.updater_source_assertions import before_p012a_contract_hash

@@ -51,17 +51,34 @@ class ProfileCacheService:
                 "profiles",
                 "cached profiles",
                 utc(),
-                outcome.execution,
+                "in_progress" if outcome.execution == "running" else "settled",
                 (
-                    "failure"
-                    if outcome.execution == "failed"
-                    else "success" if outcome.execution == "succeeded" else "unknown"
+                    "unknown"
+                    if outcome.verification == "superseded"
+                    else (
+                        "failure"
+                        if outcome.execution == "failed"
+                        else "success" if outcome.execution == "succeeded" else "unknown"
+                    )
                 ),
                 (
-                    outcome.source
-                    if outcome.source
-                    in {"refreshed", "disk_loaded", "memory_reused", "retained_last_known_good"}
-                    else "unavailable"
+                    "cache_invalidated"
+                    if outcome.verification == "superseded"
+                    else (
+                        "owned_operation"
+                        if outcome.execution == "running"
+                        else (
+                            outcome.source
+                            if outcome.source
+                            in {
+                                "refreshed",
+                                "disk_loaded",
+                                "memory_reused",
+                                "retained_last_known_good",
+                            }
+                            else "unavailable"
+                        )
+                    )
                 ),
                 reference=f"profile-{outcome.generation}",
                 count=outcome.count,

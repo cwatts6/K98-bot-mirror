@@ -2730,6 +2730,76 @@
           "after_sha256": "c20307b4908c45488927d9a435645d9905b4290baef64c94a2343bf4dd731635"
         }
       ]
+    },
+    {
+      "id": "p013_passive_health_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "82814f9a8f2b8461557b6c13fad3690baa72cdb194d0705b27a8e2806d229463",
+          "after_sha256": "13618a830568d2e4f61eb8ef320ab27219f1c9c90371e95a7336728dbcf8277a"
+        },
+        {
+          "path": "commands/admin_cmds.py",
+          "before_sha256": "ef6381ff09fa80e74351b3416bc96b8e4f8c0cebcf17cb04cbe1858f348e0208",
+          "after_sha256": "49ac660beee8d80027990046c71b49650370b5226fdc37a518cf6e79526d3f97"
+        },
+        {
+          "path": "core/startup_diagnostics.py",
+          "before_sha256": "5c19f2030644541e84ae27108b172465f84c7afba5480e6e9503d6301fc17117",
+          "after_sha256": "03220123b2b173d8fa43b116600da64cf6b6708ac09004e8441c3db0081d2741"
+        },
+        {
+          "path": "profile_cache.py",
+          "before_sha256": "fed6628d6cec5dba90dbd95118b9b76c09edf3b9850b7b27d3402ae80485e1eb",
+          "after_sha256": "3d3f3e2ea6c065c7eef7a6605a41a1ad5a39babe15a26a44c615490c949f0246"
+        },
+        {
+          "path": "services/event_delivery_service.py",
+          "before_sha256": "797ef4e3745f4c6357f96334012057d25afa7edde21db6a15961ab23caddb87b",
+          "after_sha256": "5ff8f3b77d5eecc71974830b510214dc51bdb5029cb77a293385d6c4e24b091d"
+        },
+        {
+          "path": "services/gsheets_health_service.py",
+          "before_sha256": "25cf62a74f75fff29ff29e207ddfc2968edc4dbba6bfd77e51943616f95d4339",
+          "after_sha256": "83a441f43dcdc843790af6eaed9c0cffb412f3212147ffdd6d8498b946e70966"
+        },
+        {
+          "path": "services/health_observation.py",
+          "before_sha256": null,
+          "after_sha256": "fb6cc3d6b4386976fa22ba8e5e6e7fb0384f7701736b38f76405f49301133960"
+        },
+        {
+          "path": "services/operator_status_service.py",
+          "before_sha256": "a83ffd7f0f9a25eb46f614c7b3643632b63912984bab1ce2d7f6b44263dd943b",
+          "after_sha256": "b0e0b16f63cb1084a87a270b01d72b7b253f22bb4549bc70d69b1628df0a9715"
+        },
+        {
+          "path": "services/profile_cache_service.py",
+          "before_sha256": "3c5316aedab78e723d307f7ac5e564e072047779c4575673d64b8abca5d415c3",
+          "after_sha256": "8fcf27184d0f6dfe61bd8338fc9442437c7fb2df86881bbd4f7f4c01d619fb66"
+        },
+        {
+          "path": "services/recovery_evidence_bundle.py",
+          "before_sha256": "ed02868c3492ae6c3f6a959b7059b5deed319b4d7c5db7cd68bc970b639b29a9",
+          "after_sha256": "43c50c832318e76c3f82d806abdbe623955c6068fdbd4b60e8cdfc6ff3216a09"
+        },
+        {
+          "path": "services/recovery_health.py",
+          "before_sha256": "5c0dad5e932a001d3541ce2985a264a9bbc039014f53af917e6d1715a0de4d36",
+          "after_sha256": "34c3f0c3da9bf25f919c055e4753ccd4d320c94a4d14c6bf9136c8c5cc59102f"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "613ae9171db005dd7634dae82469b12d49d9fefd4df16ad0d5931ed6d6e0d9ca",
+          "after_sha256": "6dc48e246bec5ebee177052f4dcebf193898d77e5dcd55b70532798a1727eb62"
+        },
+        {
+          "path": "ui/views/health_view.py",
+          "before_sha256": null,
+          "after_sha256": "c45bccbff79a2cdfda060d4fb16f702418c6cbd7cf6d957f1ac1f6640aa8ca21"
+        }
+      ]
     }
   ]
 }
