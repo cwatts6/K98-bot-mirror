@@ -552,8 +552,10 @@ def _call_report(method, *args):
     actor = args[0]
     _authorize_report_actor(actor)
     with report_request(), ExitStack() as stack:
+        admitted = False
         try:
             service = stack.enter_context(recovery_service(report=True))
+            admitted = True
         except Exception:
             service = RecoveryService(
                 _UnavailableReportStore(),
@@ -565,13 +567,16 @@ def _call_report(method, *args):
         from services.export_runtime_composition import _caller
 
         call = _caller.get()
-        if call is not None:
+        if admitted and call is not None:
             import re
 
-            client = getattr(call.bundle.legacy, "client", None)
+            client = getattr(call.bundle.legacy, "recovery_client", None)
             deployment = getattr(client, "deployment_hash", None)
             if type(deployment) is str and re.fullmatch(r"[0-9a-fA-F]{64}", deployment):
-                service.report_identity = {"authority_deployment_hash": deployment}
+                service.report_identity = {
+                    "authority_deployment_hash": deployment,
+                    "authority_identity_source": "authority_deployment_hash_from_loaded_runtime",
+                }
         service.current_report_authorizer = _authorize_report_actor
         return getattr(service, method)(*args)
 

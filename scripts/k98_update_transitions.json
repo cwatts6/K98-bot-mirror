@@ -2650,6 +2650,36 @@
           "after_sha256": "87ec3d1cf1f531c08ac8d2e6ab4685122be424e04f357f71b77ae2cf677ce557"
         }
       ]
+    },
+    {
+      "id": "p012a_report_correction_v1",
+      "members": [
+        {
+          "path": "services/operation_diagnostics.py",
+          "before_sha256": "d01a375064892f683bcda240e691fa0c0ab0135e35afa4354f7eb0a09f96b73a",
+          "after_sha256": "b3ea2727a1140ccbe971366085d1f643f830b8fa8193fd690db642957cc00e44"
+        },
+        {
+          "path": "services/recovery_complete_report.py",
+          "before_sha256": "c818b8da81bb315ecb32ac770416bb56fab3cd73dc13179627297a72e58769a4",
+          "after_sha256": "f62479e1abfd336e3cc670060a5deb592d8ed70f3337911b9cfeb2a18cb1dc66"
+        },
+        {
+          "path": "services/recovery_evidence_bundle.py",
+          "before_sha256": "14be75d637f660d4a44d753f5255f7b2fcbfbf3d697ebaaa3f90e4d8101574ae",
+          "after_sha256": "ad51c0ff7989ff5f77e44f29f8cebcc6b936b0584f1b41a62b791f6ee2de4466"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "890303a6f2ee2ad9d1308a330b0beb8266e6b54375b997f40aac56243e38ee00",
+          "after_sha256": "588b4b9e3b59d144e9a87894cd7aa7cbac3fa2bde7e8bf87a3f2cb3d6a34a8fa"
+        },
+        {
+          "path": "services/recovery_runtime.py",
+          "before_sha256": "1401ae9e3faf672bfb05c0852b56614f9295555cdbb4b52cb1f2e8afb4b9e35c",
+          "after_sha256": "e4e6e572cc2604beeddc6126fbcda94ede768e493e6e2cbda4f07bbb3bd69e4e"
+        }
+      ]
     }
   ]
 }

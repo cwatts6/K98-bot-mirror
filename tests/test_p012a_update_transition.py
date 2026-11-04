@@ -26,6 +26,12 @@ def source_pair(monkeypatch):
     historical_hashes = {
         old[m["path"]]: m["before_sha256"] for m in members if old[m["path"]] is not None
     }
+    from tests.updater_source_assertions import before_p012a_correction_hash
+
+    # Authenticate current bytes through the new successor before exercising
+    # the immutable historical transition. Drift never becomes a valid fixture.
+    for path, raw in after.items():
+        historical_hashes[raw.replace(b"\r\n", b"\n")] = before_p012a_correction_hash(root, path)
     monkeypatch.setattr(
         updater, "sha256", lambda raw: historical_hashes.get(raw, original_hash(raw))
     )

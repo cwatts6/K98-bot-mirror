@@ -48,17 +48,26 @@ def budget(value):
     return value
 
 
+class ReportBudgetExceeded(SourceConflict):
+    """Only collection is bounded; entered work retains physical ownership."""
+
+
 class ReportLease:
     def __init__(self):
         self.cancelled = threading.Event()
         self.deadline = time.monotonic() + 30
         self.redactions = {}
 
-    def check(self):
+    def check_active(self):
         if self.cancelled.is_set() or _stopped:
             raise SourceConflict("Report collection stopped; download again when available.")
+
+    def check(self):
+        self.check_active()
         if time.monotonic() >= self.deadline:
-            raise SourceConflict("Report collection reached its time bound; use report parts.")
+            raise ReportBudgetExceeded(
+                "Report collection reached its time bound; use report parts."
+            )
 
 
 @contextmanager
@@ -122,9 +131,12 @@ def stop_admission():
         _active.cancelled.set()
 
 
-def safe(value, depth=0):
+def safe(value, depth=0, *, max_depth=4, remaining=None):
     """Bound primitives without invoking user object repr/properties."""
-    if depth > 4:
+    if remaining is None:
+        remaining = [32768]
+    remaining[0] -= 1
+    if depth > max_depth or remaining[0] < 0:
         raise ValueError("Diagnostic primitive bound")
     if value is None or type(value) is bool:
         return value
@@ -139,18 +151,30 @@ def safe(value, depth=0):
     if type(value) is dict:
         if len(value) > 256 or any(type(key) is not str or len(key) > 80 for key in value):
             raise ValueError("Diagnostic primitive bound")
-        return {key: safe(item, depth + 1) for key, item in value.items()}
+        return {
+            key: safe(item, depth + 1, max_depth=max_depth, remaining=remaining)
+            for key, item in value.items()
+        }
     if type(value) in (list, tuple):
         if len(value) > 256:
             raise ValueError("Diagnostic primitive bound")
-        return [safe(item, depth + 1) for item in value]
+        return [safe(item, depth + 1, max_depth=max_depth, remaining=remaining) for item in value]
     raise ValueError("Diagnostic primitive bound")
 
 
-def guarded(function, limit=131072):
+def guarded(function, limit=131072, *, max_depth=4):
     started = utc()
     try:
-        result = safe(function())
+        source = function()
+    except Exception:
+        return {"status": "unavailable"}, dict(
+            status="unavailable",
+            reason="source_unavailable",
+            captured_from_utc=started,
+            captured_through_utc=utc(),
+        )
+    try:
+        result = safe(source, max_depth=max_depth)
         data = encode(result)
         if len(data) > limit:
             raise ValueError("Component bound")
@@ -160,7 +184,7 @@ def guarded(function, limit=131072):
     except Exception:
         return {"status": "unavailable"}, dict(
             status="unavailable",
-            reason="source_unavailable_or_invalid",
+            reason="source_invalid_or_bound",
             captured_from_utc=started,
             captured_through_utc=utc(),
         )
@@ -176,12 +200,92 @@ def loaded_call(module, function):
     source = sys.modules.get(module)
     if source is None:
         raise ValueError("Source not loaded")
-    result = getattr(source, function)()
+    result = (
+        source.refresh_service.report()
+        if module == "event_cache" and function == "report"
+        else getattr(source, function)()
+    )
     if module == "services.operation_diagnostics" and function == "report":
         # Operation rows have their own validated component. Do not feed their
         # nested milestones through the bounded health primitive projection.
         return {key: value for key, value in result.items() if key != "operations"}
     return result
+
+
+def monitor_snapshot(limit=12288):
+    """Keep monitor state even when one retained history field exceeds its budget.
+
+    Monitor failure frames are deeper than generic cache primitives. Their
+    independent depth/node/byte bounds do not widen other diagnostic schemas.
+    """
+    started = utc()
+    try:
+        source = loaded_call("services.recovery_health", "observation")
+        if type(source) is not dict or len(source) > 64:
+            raise ValueError("Invalid monitor snapshot")
+    except Exception:
+        return {"status": "unavailable"}, dict(
+            status="unavailable",
+            reason="source_unavailable",
+            captured_from_utc=started,
+            captured_through_utc=utc(),
+        )
+    result, omitted, trimmed = {}, [], []
+    names = {
+        "healthy",
+        "status",
+        "last_success_utc",
+        "check_failure",
+        "notification_failure",
+        "cycle",
+        "checks",
+        "observer_state",
+        "check_state",
+        "completed_check_age_seconds",
+        "last_completed_cycle",
+        "last_failed_cycle",
+        "history",
+        "no_progress_seconds",
+        "freshness_seconds",
+        "stall_seconds",
+        "cycle_limit_seconds",
+    }
+    # Current state and original failure precede bulky duplicated cycle histories.
+    history = {"cycle", "checks", "last_completed_cycle", "last_failed_cycle", "history"}
+    for key in sorted(names.intersection(source), key=lambda key: (key in history, key)):
+        try:
+            item = safe({key: source[key]}, max_depth=8)
+            if len(encode(result | item)) > limit - 2048:
+                if (
+                    key not in {"cycle", "last_completed_cycle", "last_failed_cycle"}
+                    or type(source[key]) is not dict
+                ):
+                    raise ValueError("Monitor field bound")
+                bulky = {"checks", "stages", "original_history_failure"}.intersection(source[key])
+                compact = {k: v for k, v in source[key].items() if k not in bulky}
+                compact["report_omitted_fields"] = sorted(bulky)
+                item = safe({key: compact}, max_depth=8)
+                if len(encode(result | item)) > limit - 2048:
+                    raise ValueError("Monitor field bound")
+                trimmed.append(key)
+            result.update(item)
+        except Exception:
+            omitted.append(key)
+    coverage = dict(
+        status="partial" if omitted or trimmed or source.keys() - names else "available",
+        reason=(
+            "monitor_fields_invalid_or_bound"
+            if omitted or trimmed or source.keys() - names
+            else None
+        ),
+        omitted_fields=omitted,
+        trimmed_fields=trimmed,
+        unknown_fields=len(source.keys() - names),
+        captured_from_utc=started,
+        captured_through_utc=utc(),
+    )
+    result["coverage"] = coverage
+    return result, coverage
 
 
 def collect_components(*, lease=None):
@@ -194,7 +298,7 @@ def collect_components(*, lease=None):
 
     def checked(function):
         if lease is not None:
-            lease.check()
+            lease.check_active()
         return function()
 
     try:
@@ -225,8 +329,19 @@ def collect_components(*, lease=None):
                 else "partial" if rejected else "available"
             ),
             included=len(valid),
+            available=len(rows) if snapshot.get("status") != "unavailable" else "unknown",
+            omitted=(
+                max(0, len(rows) - len(valid))
+                if snapshot.get("status") != "unavailable"
+                else "unknown"
+            ),
             rejected=rejected,
             generation=snapshot.get("generation"),
+            source_observed_utc=snapshot.get("observed_utc", "unknown"),
+            publication_watermark=guarded(
+                lambda: snapshot.get("publication", "unknown"), limit=4096
+            )[0],
+            retention_days=snapshot.get("retention_days", "unknown"),
             captured_from_utc=started,
             captured_through_utc=utc(),
         )
@@ -256,6 +371,11 @@ def collect_components(*, lease=None):
     startup, status = guarded(lambda: checked(startup_projection))
     components["startup.json"] = encode(startup)
     descriptors["startup.json"] = status
+    descriptors["startup.json"].update(
+        included=len(startup) if type(startup) is list else 0,
+        available=len(startup) if type(startup) is list else "unknown",
+        omitted=0 if type(startup) is list else "unknown",
+    )
     health = {}
     for name, module, function in (
         ("monitor", "services.recovery_health", "observation"),
@@ -265,12 +385,18 @@ def collect_components(*, lease=None):
         ("profile_cache", "profile_cache", "get_cache_stats"),
         ("name_cache", "target_utils", "name_outcome_report"),
         ("event_startup", "core.scheduler_lifecycle", "event_startup_report"),
+        ("event_cache", "event_cache", "report"),
         ("event_delivery", "services.event_delivery_service", "report"),
         ("event_dm_startup", "event_scheduler", "dm_startup_report"),
     ):
-        value, state = guarded(
-            lambda m=module, f=function: checked(lambda: loaded_call(m, f)), limit=12288
-        )
+        if lease is not None:
+            lease.check_active()
+        if name == "monitor":
+            value, state = monitor_snapshot()
+        else:
+            value, state = guarded(
+                lambda m=module, f=function: checked(lambda: loaded_call(m, f)), limit=12288
+            )
         health[name] = dict(coverage=state, observation=value)
     components["diagnostic-health.json"] = encode(health)
     descriptors["diagnostic-health.json"] = dict(
@@ -281,12 +407,16 @@ def collect_components(*, lease=None):
         ),
         captured_from_utc=started,
         captured_through_utc=utc(),
+        included=len(health),
+        available=len(health),
+        omitted=0,
     )
     identity = dict(
         pid=os.getpid(),
         process_incarnation=operation_evidence._incarnation,
         native_process_creation="unavailable_not_collected",
         bot_commit="unavailable_not_collected",
+        build_descriptor="p012a_passive_evidence_bundle_v1",
     )
     return components, descriptors, identity
 
@@ -296,10 +426,42 @@ def descriptor(data, **facts):
 
 
 def manifest(descriptors, identity, **extra):
+    exported = utc()
+    schemas = {
+        "operations.jsonl": "operation-observations/2",
+        "startup.json": "startup-outcome-projection/1",
+        "diagnostic-health.json": "passive-diagnostic-health/1",
+        "incidents.jsonl": "k98-recovery-report-v1",
+        "summary.json": "k98-recovery-complete-report-v1",
+    }
+    descriptors = {
+        name: dict(
+            {
+                "schema": schemas[name],
+                "source_kind": (
+                    "saved_incident_projection"
+                    if name in {"incidents.jsonl", "summary.json"}
+                    else "passive_memory_projection"
+                ),
+                "reason": (
+                    None if facts.get("status") == "available" else "source_coverage_incomplete"
+                ),
+                "source_observed_utc": "unknown",
+                "publication_watermark": "unknown",
+                "retention_cutoff_utc": "unknown",
+                "included": "unknown",
+                "available": "unknown",
+                "omitted": "unknown",
+                "exported_utc": exported,
+            },
+            **facts,
+        )
+        for name, facts in descriptors.items()
+    }
     return encode(
         dict(
             schema="k98-evidence-bundle/1",
-            generated_utc=utc(),
+            generated_utc=exported,
             authority="diagnostic_only",
             atomic_snapshot=False,
             identity=identity,
@@ -313,7 +475,7 @@ def binding(service, actor):
     return (actor.user_id, actor.guild_id, actor.channel_id, service.store.scope)
 
 
-def retain(service, actor, components, identity):
+def retain(service, actor, components, identity, descriptors=None):
     if not components:
         return None
     if sum(len(data) for data in components.values()) > MAX_SESSION:
@@ -335,6 +497,7 @@ def retain(service, actor, components, identity):
         previous_sha256=None,
         offsets={name: 0 for name in components},
         component_hashes={name: sha(data) for name, data in components.items()},
+        descriptors={name: dict((descriptors or {}).get(name, {})) for name in components},
     )
     return token
 
@@ -380,10 +543,42 @@ def continuation(service, actor, token, max_bytes):
         else:
             used = min(len(remaining), allowance)
         chunk = remaining[:used]
+        original = session["descriptors"][name]
+        included = (
+            len(chunk.splitlines()) if name == "operations.jsonl" else "unknown_byte_fragment"
+        )
+        available = original.get("available", "unknown")
         desc = {
             name: descriptor(
                 chunk,
+                **{
+                    key: value
+                    for key, value in session["descriptors"][name].items()
+                    if key
+                    not in {
+                        "status",
+                        "bytes",
+                        "sha256",
+                        "reason",
+                        "included",
+                        "available",
+                        "omitted",
+                    }
+                },
                 status="partial",
+                reason="diagnostic_continuation",
+                count_scope="this_part",
+                included=included,
+                available=available,
+                omitted=(
+                    available - included
+                    if type(available) is int and type(included) is int
+                    else "unknown"
+                ),
+                component_coverage={
+                    key: original.get(key, "unknown")
+                    for key in ("included", "available", "omitted")
+                },
                 component_sha256=session["component_hashes"][name],
                 offset=session["offsets"][name],
                 encoding="utf8_byte_fragment" if name != "operations.jsonl" else "jsonl_whole_rows",

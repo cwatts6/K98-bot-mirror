@@ -233,7 +233,15 @@ class DiagnosticSink:
         result["operations"] = []
         used = 0
         # Bounded passive report copy. First failures outrank routine completions.
-        rows = sorted(snapshot["operations"], key=lambda row: row["first_failure"] is None)
+        # Newest evidence within each class must not be starved by restored
+        # legacy history. Full first-failure records remain in the archive.
+        rows = sorted(
+            reversed(snapshot["operations"]),
+            key=lambda row: (
+                row.get("schema") == "legacy_projection",
+                row["first_failure"] is None,
+            ),
+        )
         for row in rows:
             # Report first failure and latest state; the bounded disk projection
             # retains the intervening transitions for incident investigation.
@@ -241,7 +249,7 @@ class DiagnosticSink:
             summary["latest"] = row["transitions"][-1] if row["transitions"] else None
             size = len(json.dumps(summary, indent=2)) + 256
             if used + size > 12000:
-                break
+                continue
             result["operations"].append(deepcopy(summary))
             used += size
         result["omitted_operations"] = len(rows) - len(result["operations"])

@@ -2,6 +2,7 @@
 
 from collections import Counter
 import io
+import time
 import zipfile
 import zlib
 
@@ -45,6 +46,11 @@ def build_complete_report(service, actor, max_bytes=8388608):
 def _build(service, actor, max_bytes, lease):
     import hashlib
 
+    # Freeze independent diagnostics before any SQL wait can consume the census
+    # budget. Capture time remains distinct from incident and export times.
+    lease.check_active()
+    service.report_authorize(actor)
+    components, descriptors, identity = bundle.collect_components(lease=lease)
     output = BoundedArchive(max_bytes - 32768)
     groups, repairs, blockers = Groups(), Groups(), Groups()
     after = through = total = None
@@ -88,11 +94,20 @@ def _build(service, actor, max_bytes, lease):
                         break
                     if not page["rows"]:
                         raise SourceConflict("Incident cursor did not advance.")
+                    # Fast reads plus encoding can monopolize the worker's GIL.
+                    # A positive sleep yields to the loop even on Windows, where
+                    # sleep(0) alone did not satisfy the measured heartbeat gate.
+                    # The lease remains owned; its next check observes cancellation.
+                    time.sleep(0.000001)
                 if count != total:
                     raise SourceConflict("Incident coverage changed during collection.")
-    except Exception:
+    except Exception as error:
         status = "partial" if through is not None else "unavailable"
-        reason = "incident_collection_unavailable_or_bound"
+        reason = (
+            "incident_collection_time_bound"
+            if isinstance(error, bundle.ReportBudgetExceeded)
+            else "incident_collection_unavailable_or_bound"
+        )
         output.close()
         output = BoundedArchive(max_bytes)
         count = detail_bytes = 0
@@ -103,9 +118,7 @@ def _build(service, actor, max_bytes, lease):
     try:
         service.report_authorize(actor)
         output.limit = max_bytes
-        if lease.cancelled.is_set():
-            raise SourceConflict("Report collection was cancelled.")
-        components, descriptors, identity = bundle.collect_components(lease=lease)
+        lease.check_active()
         provenance = getattr(service, "report_identity", None)
         if type(provenance) is dict:
             identity.update(provenance)
@@ -114,6 +127,8 @@ def _build(service, actor, max_bytes, lease):
             reason=reason,
             included=count,
             total=total,
+            available=total if total is not None else "unknown",
+            omitted=total - count if total is not None else "unknown",
             cutoff_utc=str(through) if through is not None else None,
             captured_from_utc=started,
             captured_through_utc=bundle.utc(),
@@ -207,7 +222,7 @@ def _build(service, actor, max_bytes, lease):
                         bytes=len(data),
                         sha256=bundle.sha(data),
                     )
-            token = bundle.retain(service, actor, pending, identity)
+            token = bundle.retain(service, actor, pending, identity, descriptors)
             meta = bundle.manifest(
                 descriptors,
                 identity,

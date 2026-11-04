@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 import json
 
-from services import operation_diagnostics, recovery_health
+from services import operation_diagnostics
 from services.recovery_execution_guard import execution_progress
 from services.recovery_service import SourceConflict
 
@@ -178,7 +178,7 @@ def unavailable_report(error):
                 generated_utc=datetime.now(UTC).isoformat(),
                 complete=False,
                 incidents_available=False,
-                monitor=_optional_report(recovery_health.report),
+                monitor=_monitor_report(),
                 operation_observations=_operation_report(),
                 collection_failure={"error_type": type(error).__name__},
                 next_step="Incident collection failed. Share this diagnostic report, then download again after connectivity or registration recovers. This is not an empty incident list.",
@@ -198,10 +198,46 @@ def build_report(service, actor, after=None, through=None, part=1, max_bytes=8 *
         return _build_report(service, actor, after, through, part, max_bytes)
 
 
-def _optional_report(function):
-    from services.recovery_evidence_bundle import guarded
+def _monitor_report():
+    from services.recovery_evidence_bundle import guarded, loaded_call, monitor_snapshot
 
-    return guarded(function, limit=16384)[0]
+    result = monitor_snapshot(limit=6000)[0]
+    # Preserve the ordinary report's established fields, isolating each provider
+    # instead of letting the legacy aggregate hide every healthy observation.
+    providers = (
+        ("startup", "core.startup_diagnostics", "report"),
+        ("admission_observations_v1", "services.cache_admission_diagnostics", "report"),
+        ("event_cache", "event_cache", "report"),
+        ("event_startup", "core.scheduler_lifecycle", "event_startup_report"),
+        ("event_dm_startup", "event_scheduler", "dm_startup_report"),
+        ("event_delivery_v1", "services.event_delivery_service", "report"),
+    )
+    coverage = {}
+    for name, module, function in providers:
+        value, state = guarded(lambda m=module, f=function: loaded_call(m, f), limit=2048)
+        if len(encode(result | {name: value})) > 14336:
+            value = {"status": "omitted_report_budget"}
+            state = {"status": "partial", "reason": "ordinary_report_byte_bound"}
+        result[name] = value
+        coverage[name] = state["status"]
+    caches = {}
+    for name, module, function in (
+        ("stats", "services.player_stats_cache_service", "report"),
+        ("profile", "profile_cache", "get_cache_stats"),
+        ("name", "target_utils", "name_outcome_report"),
+    ):
+        value, state = guarded(lambda m=module, f=function: loaded_call(m, f), limit=1024)
+        caches[name] = (
+            value.get("outcome", value) if name == "profile" and type(value) is dict else value
+        )
+        coverage[name] = state["status"]
+    result["cache_outcomes_v1"] = (
+        caches
+        if len(encode(result | {"cache_outcomes_v1": caches})) <= 15360
+        else {"status": "omitted_report_budget"}
+    )
+    result["source_coverage"] = coverage
+    return result
 
 
 def _operation_report():
@@ -255,7 +291,7 @@ def _build_report(service, actor, after=None, through=None, part=1, max_bytes=8 
             "A healthy monitor does not prove there are no incidents. Undiscovered failures are not included. "
             "Downloading reads saved observations only; it never applies or reconciles a repair."
         ),
-        monitor=_optional_report(recovery_health.report),
+        monitor=_monitor_report(),
         operation_observations=_operation_report(),
         incidents=[],
     )

@@ -111,7 +111,7 @@ def test_optional_observations_cannot_crowd_out_a_fitting_incident(monkeypatch):
     from tests.test_recovery_evidence_bundle import event
 
     service, _, _ = report_service(1)
-    monkeypatch.setattr(recovery_report.recovery_health, "report", lambda: {})
+    monkeypatch.setattr(recovery_report, "_monitor_report", lambda: {})
     monkeypatch.setattr(recovery_report, "incident_report", lambda *_: {"detail": "x" * 62000})
     sink = recovery_report.operation_diagnostics.DiagnosticSink()
     for _ in range(8):
@@ -233,7 +233,7 @@ def test_size_split_resumes_at_last_included_incident_without_omissions(text, mo
 
     # Pagination's fixed attachment budget must not depend on process-global
     # monitor history populated by unrelated tests earlier in the full suite.
-    monkeypatch.setattr(module.recovery_health, "report", lambda: {"status": "fixture"})
+    monkeypatch.setattr(module, "_monitor_report", lambda: {"status": "fixture"})
     service, _, records = report_service(10)
     for row in records:
         row["evidence"]["explanation"] = text * 12000
@@ -249,11 +249,12 @@ def test_size_split_resumes_at_last_included_incident_without_omissions(text, mo
 
 
 def test_report_refuses_budget_consumed_by_monitor_history(monkeypatch):
-    from services import recovery_report as module
 
     service, _, records = report_service()
     records[0]["evidence"]["explanation"] = "é\n" * 12000
-    monkeypatch.setattr(module.recovery_health, "report", lambda: {"history": "x" * 65536})
+    from services import recovery_health
+
+    monkeypatch.setattr(recovery_health, "observation", lambda: {"history": "x" * 65536})
     report = service.download_report(ACTOR, max_bytes=65536)
     assert len(report["content"]) <= 65536
     assert json.loads(report["content"])["included_incidents"] == 1
