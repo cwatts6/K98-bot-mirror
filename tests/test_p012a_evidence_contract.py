@@ -275,6 +275,75 @@ def test_oversized_eviction_history_cannot_claim_available():
 
 
 @pytest.mark.parametrize(
+    "history", ["both_corrupt", "only_v2_corrupt", "quarantined", "load_error"]
+)
+def test_unrestorable_history_stays_unknown_across_reports_and_restarts(
+    tmp_path, monkeypatch, history
+):
+    import io
+    import json
+    import zipfile
+
+    from services.recovery_report import _operation_report
+    from tests.test_guided_recovery import ACTOR
+    from tests.test_recovery_report import report_service
+
+    if history in {"both_corrupt", "only_v2_corrupt"}:
+        (tmp_path / "observations-v2.json").write_text("{malformed", encoding="utf-8")
+    if history == "both_corrupt":
+        (tmp_path / "observations.json").write_text("{malformed", encoding="utf-8")
+    if history == "quarantined":
+        # A crash after invalid-file preservation but before replacement publish.
+        (tmp_path / "observations-v2.invalid").write_text("{malformed", encoding="utf-8")
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    if history == "load_error":
+        with monkeypatch.context() as fault:
+            fault.setattr(
+                diagnostics, "_reject_links", Mock(side_effect=OSError("inert load error"))
+            )
+            with pytest.raises(OSError):
+                sink._load()
+    else:
+        sink._load()
+    for _ in range(2):
+        sink._publish()
+        monkeypatch.setattr(diagnostics, "_sink", sink)
+        ordinary = _operation_report()
+        service, _, _ = report_service(1)
+        archive = service.download_complete_report(ACTOR)
+        with zipfile.ZipFile(io.BytesIO(archive["content"])) as zipped:
+            downloaded = json.loads(zipped.read("diagnostic-health.json"))["sink"]["observation"]
+        for report in (ordinary, downloaded):
+            assert report["eviction_history_available"] is False
+            provenance = report["counter_provenance"]
+            assert provenance["totals_coverage"] == "partial"
+            assert set(provenance["historical"].values()) == {"unknown"}
+            assert provenance["current"]["dropped"] == 0
+        sink = diagnostics.DiagnosticSink(tmp_path)
+        sink._load()
+
+
+@pytest.mark.parametrize("fallback", ["absent", "v1", "v2"])
+def test_absent_history_and_usable_fallback_keep_known_counters(tmp_path, fallback):
+    if fallback != "absent":
+        previous = diagnostics.DiagnosticSink(tmp_path)
+        previous.dropped = 7
+        previous._publish()
+        corrupt = "observations-v2.json" if fallback == "v1" else "observations.json"
+        (tmp_path / corrupt).write_text("{malformed", encoding="utf-8")
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    sink._load()
+    report = sink.report()
+    assert report["eviction_history_available"] is (fallback != "v1")
+    assert report["counter_provenance"]["historical"]["dropped"] == (
+        0 if fallback == "absent" else 7
+    )
+    assert report["counter_provenance"]["totals_coverage"] == (
+        "partial" if fallback == "v1" else "available"
+    )
+
+
+@pytest.mark.parametrize(
     "incarnation",
     ["{" * 100000 + "a" * 32 + "}" * 100000, "-" * 100000 + "a" * 32, None, 1, [], {}],
     ids=["oversized-braces", "oversized-hyphens", "null", "integer", "list", "dict"],

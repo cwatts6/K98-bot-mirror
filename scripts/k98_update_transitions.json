@@ -2697,7 +2697,7 @@
         {
           "path": "services/operation_diagnostics.py",
           "before_sha256": "b3ea2727a1140ccbe971366085d1f643f830b8fa8193fd690db642957cc00e44",
-          "after_sha256": "9bdb85430fc2fbf2abf396f073a5030ca10613347e7f22ff4ebc8d1ad84d46b4"
+          "after_sha256": "56424fdaa45ba0c2d5ed3dd0c47d44c3c7dd57f0649560cc44b43a8c8dfb1a00"
         },
         {
           "path": "services/startup_outcome_projection.py",

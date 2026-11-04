@@ -501,6 +501,10 @@ class DiagnosticSink:
     def _load(self):
         if self.directory is None:
             return
+        # Fail closed on history completeness until a usable document or a
+        # genuinely absent history is established, including filesystem errors.
+        self.eviction_history_available = False
+        self.unknown_historical_counters.update(self._live_counters())
         _reject_links(self.directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         documents = {}
@@ -523,9 +527,18 @@ class DiagnosticSink:
                     self.blocked_files.add(filename)
         selected = documents.get("v2", documents.get("v1"))
         if selected is None:
-            if not self.restore_failures:
+            quarantined = any(
+                (self.directory / name).exists()
+                for name in ("observations-v2.invalid", "observations.invalid")
+            )
+            if not self.restore_failures and not quarantined:
                 self.restore_status = "absent"
+                self.eviction_history_available = True
+                self.unknown_historical_counters.clear()
+            elif not self.restore_failures:
+                self.restore_status = "unavailable_history"
             return
+        self.unknown_historical_counters.clear()
         self.restore_status = ("v2" if "v2" in documents else "legacy_v1") + (
             "_older_fallback" if self.restore_failures else "_restored"
         )
