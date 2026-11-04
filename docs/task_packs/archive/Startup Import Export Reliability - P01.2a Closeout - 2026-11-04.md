@@ -29,7 +29,7 @@ from its outstanding whole-flow functional acceptance.
 
 ## Production acceptance evidence
 
-The [hashed validation receipt](../../../.codex_artifacts/startup-import-export-review-20261102/p012a-recoverable-qualification-20261104/report73-validation.json)
+The hashed validation receipt (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p012a-recoverable-qualification-20261104/report73-validation.json`)
 identifies the exact ZIP, ordinary report, updater transcript and runtime log inputs.
 It is passive supplied-file validation, not a live SQL/provider query.
 

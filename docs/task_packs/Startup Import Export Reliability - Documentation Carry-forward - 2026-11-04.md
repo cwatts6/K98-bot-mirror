@@ -6,10 +6,13 @@ E75 carry-forward clarification: the operator declined proactive P01.2b instrume
 
 E76: P01.2b is closed by scope decision; P01.3 review/scope is current. This active checklist carries all prior documentation obligations forward. The historical P01.2b PR label below does not require reviving that feature.
 
+E81: P01.3 implementation and validation are authorized, including persistent Refresh. Carry the implementation/PR-readiness receipt and updated command/runbook descriptions with the required historical set. Final validation and private preparation status are recorded in that receipt.
+
 ## Required final document paths
 
 Include the current contents of every file below. Reconcile later legitimate P01.2b edits against this minimum manifest rather than overwriting them with an older snapshot. Files can already exist in a target base; verify their intended content is present in the resulting tree even if they produce no new diff.
 
+- [Startup Import Export Reliability - P01.3 Implementation and PR Readiness - 2026-11-04.md](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md)
 - [Startup Import Export Reliability - P01.3 Design and Qualification - 2026-11-04.md](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Design%20and%20Qualification%20-%202026-11-04.md) - E77-E79 scope, agreed design refinements and proposed persistent-button correction; carry the updated handover/tracker with it.
 - [Startup Import Export Reliability - Documentation Carry-forward - 2026-11-04.md](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md)
 - [Startup Import Export Reliability - P01.2b Design and Qualification - 2026-11-04.md](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Design%20and%20Qualification%20-%202026-11-04.md)

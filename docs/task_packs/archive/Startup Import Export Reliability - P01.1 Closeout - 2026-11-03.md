@@ -27,9 +27,9 @@ as a whole, F09/P02, retained continuation/P03 or combined acceptance/P05.
 - The exact installed updater upgrade and recovery/deployment assessment were
   prerequisites within P01.1, completed before the operator stopped the bot.
 
-See the private [merge/qualification receipt](../../../.codex_artifacts/startup-import-export-review-20261102/p011-merge-qualification.json),
-[scope review](../../../.codex_artifacts/startup-import-export-review-20261102/p011-final-scope-review.md)
-and [final delivery receipt](../../../.codex_artifacts/startup-import-export-review-20261102/p011-final-delivery-receipt.json).
+See the private merge/qualification receipt (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-merge-qualification.json`),
+scope review (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-final-scope-review.md`)
+and final delivery receipt (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-final-delivery-receipt.json`).
 These are retained local artifacts, not remotely published documentation or current
 production observations. No SQL migration was part of P01.1.
 
@@ -66,8 +66,8 @@ receipt succeeded. Preserve that evidence as recorded; P01.2a must make the dist
 clear rather than reinterpret historic booleans as authoritative business outcomes.
 
 Private input hashes, correlations and limitations are retained in the
-[Report 69 assessment](../../../.codex_artifacts/startup-import-export-review-20261102/p011-report69-review.json)
-and [live diagnostic validation](../../../.codex_artifacts/startup-import-export-review-20261102/p011-live-diagnostics-validation-20261103.json).
+Report 69 assessment (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-report69-review.json`)
+and live diagnostic validation (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-live-diagnostics-validation-20261103.json`).
 The ordinary report part is not a complete current incident census. No new repair,
 replay, SQL/provider mutation or production restart was performed for this review.
 

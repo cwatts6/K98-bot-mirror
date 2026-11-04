@@ -1,5 +1,7 @@
 # Task Packs
 
+> **P01.3 local implementation (E81):** See the [implementation and PR-readiness receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md) for passive-health, persistent Refresh, exact updater compatibility and final validation status. No publication or deployment has occurred.
+
 > **Current P01.3 implementation checkpoint - 4 November 2026 (E80):** Full passive-health implementation, persistent Refresh and local validation/PR preparation are approved. Earlier design-only holds are historical; publication and production actions remain separate.
 
 > **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.

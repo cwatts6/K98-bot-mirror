@@ -1,5 +1,7 @@
 # P01.3: passive health presentation design and qualification
 
+> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Final validation/private PR preparation are in progress; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
+
 Current E80, 4 November 2026: the operator approved the full P01.3 implementation and validation, explicitly including persistent Refresh, and requested PR preparation with related-caller/value checks throughout. Earlier approval-pending statements below are historical. Publication, merge, deployment, live SQL/provider probes and recovery actions are not included in this authorization.
 
 Status: E77 scope/design authorization; E78 initial design; E79 operator-agreed refinements and reported button-timeout scope, 4 November 2026. Implementation, qualification execution, publication and production actions are not authorized. This document records the agreed design direction and proposed button correction for implementation review.

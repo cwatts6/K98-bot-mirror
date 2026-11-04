@@ -18,7 +18,7 @@ are complete. No PR has been opened and no commit, push or production action occ
 - Mirror worktree: `C:/discord_file_downloader/.codex_artifacts/p1-mge-mirror-review`.
 - Branch: `codex/p012a-evidence-bundle`.
 - Base: `ecaaf2dcfa10b48cea1a088aa7465ab20bd0eb4b`; all changes remain uncommitted.
-- Evidence: [PR-readiness receipts](../../../.codex_artifacts/startup-import-export-review-20261102/p012a-pr-readiness-20261103/final-chunked).
+- Evidence: PR-readiness receipts (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p012a-pr-readiness-20261103/final-chunked`).
 - Earlier [implementation qualification](Startup%20Import%20Export%20Reliability%20-%20P01.2a%20Implementation%20and%20Qualification%20-%202026-11-03.md)
   retains the original failed producer timings and 31 updater-inventory failures.
   Those are historical results, not silently replaced samples.

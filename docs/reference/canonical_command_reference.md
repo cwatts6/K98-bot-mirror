@@ -267,7 +267,7 @@ Legend:
 | Ops | `/ops validate_command_cache` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Command-cache validation. |
 | Ops | `/ops view_restart_log` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Restart log output. |
 | Ops | `/ops import_proc_config` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator plus permission checks | Ephemeral | Standard | Preserve | ProcConfig import. |
-| Ops | `/ops dl_bot_status` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Bot status. |
+| Ops | `/ops dl_bot_status` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Passive retained health observations and recovery-centre entry; no provider checks. |
 | Ops | `/ops logs` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Log tail controls. |
 | Ops | `/ops show_logs` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Log display. |
 | Ops | `/ops last_errors` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Recent errors. |

@@ -1,5 +1,31 @@
 # Diagnostics Runbook
 
+## P01.3 candidate: passive health presentation — 4 November 2026
+
+This implementation is prepared locally; deployment is not established. After deployment,
+`/ops dl_bot_status`, the pinned Bot Health card and **Refresh** share retained observations.
+They do not run SQL/Sheets checks, read logs or acquire source writer locks. Busy sources
+retain their previous observation or show unknown; the existing five-minute update rereads
+available state. An automatic reread is not a failure or an active retry.
+
+Provider observations become stale after 60 minutes. The recovery monitor retains its
+separate 90-second completed-cycle freshness rule and existing in-progress/stall rules.
+Rendering never makes an observation fresh. Unknown, stale and deferred alone do not
+send alerts. Known access failures requiring action use the existing admin route with a
+link to the dashboard; recovery incidents retain their existing notification route.
+The card directs admins to `/ops dl_bot_status` in the configured notify channel for the
+recovery centre. Failed delivery remains unconfirmed, not proof of delivery.
+
+Refresh is persistent and acknowledged before editing. Existing cards are rebound and
+migrated by editing the recorded message; transient fetch failures retain its identity.
+An uncertain initial send is not retried automatically in the same process. Recovery of
+an unrecorded send across process restarts remains outside this change.
+Automatic log scans, error-count summaries and **Show last 20 errors** are removed.
+Explicit `/ops logs` remains available. Evidence reports optionally include the same
+bounded health observations; these are neither receipts nor authority to repeat work.
+There is no external whole-bot outage detector.
+
+
 > **Current MGE checkpoint — 29 October 2026:** A1b and its updater correction are
 > delivered; Report63 verifies the exercised actions and response-before-refresh
 > ordering. Exact running SHA remains operator-reported. See the [deployed closeout](../task_packs/P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).

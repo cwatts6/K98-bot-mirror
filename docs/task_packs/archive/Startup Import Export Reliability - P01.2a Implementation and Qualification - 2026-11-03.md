@@ -20,7 +20,7 @@ this approval. P01.1 acceptance and P01.2b/P02-P05 ownership remain unchanged.
   Its runtime source matched the previously reviewed mirror base `607f6a81`.
 - Private deployed-source baseline: `0247371d90ec88d4c0639e9200164f4256086037`, read-only.
 - SQL source: `C:/K98-bot-SQL-Server`, `7e91989f619deb46836194c7e705b0a9eb2ebe11`, read-only.
-- Private receipts/scripts/logs: [implementation evidence](../../../.codex_artifacts/startup-import-export-review-20261102/p012a-implementation-20261103).
+- Private receipts/scripts/logs: implementation evidence (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p012a-implementation-20261103`).
   Source inventories retain SHA-256 hashes; source files are uncommitted. The root
   programme checkout's unrelated documentation/navigation changes are preserved.
 

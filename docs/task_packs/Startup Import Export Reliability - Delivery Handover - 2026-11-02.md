@@ -1,5 +1,7 @@
 # Startup, import and export reliability: delivery handover
 
+> E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Final validation/private PR preparation are in progress; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
+
 > **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
 
 > **Current programme checkpoint - 4 November 2026 (E68/E69):** P01.2a is deployed and accepted for its declared reporting/evidence scope at private `67c4e12a8ecf0c25280770860480ac65a6826602`.
@@ -14,7 +16,7 @@
 
 > **Current checkpoint - 3 November (E55/E56):** P01.1 is deployed at private
 > `0247371d90ec88d4c0639e9200164f4256086037`; exercised startup/result-preservation and
-> diagnostic persistence checks pass. See the [live validation receipt](../../.codex_artifacts/startup-import-export-review-20261102/p011-live-diagnostics-validation-20261103.json).
+> diagnostic persistence checks pass. See the live validation receipt (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-live-diagnostics-validation-20261103.json`).
 > The user requests scope amendment now and early evidence-collection delivery.
 > Next: P01.2a combined collection, child/parent outcome clarity and key milestones;
 > then separately qualified P01.2b early issuer evidence and offline collection.
@@ -27,8 +29,8 @@
 > **P01.1 reviewed and merged — 3 November (E54):** Mirror #480/#481 and private #721
 > are merged; private target `0247371d90ec88d4c0639e9200164f4256086037`. Final full Windows suite:
 > 11,057 passed, 1,112 skipped, 8 subtests; operational logs unchanged.
-> Final CI/reviews and exact updater package checks pass. See the [operator guide](../../.codex_artifacts/startup-import-export-review-20261102/K98-P011-Deployment-20261103/README.md)
-> and [scope review](../../.codex_artifacts/startup-import-export-review-20261102/p011-final-scope-review.md). No production operation was performed. Assess recovery
+> Final CI/reviews and exact updater package checks pass. See the operator guide (private evidence: `.codex_artifacts/startup-import-export-review-20261102/K98-P011-Deployment-20261103/README.md`)
+> and scope review (private evidence: `.codex_artifacts/startup-import-export-review-20261102/p011-final-scope-review.md`). No production operation was performed. Assess recovery
 > dependencies before stop within P01.1; F09 remains P02 and continuation P03.
 > Earlier P01.1 packages are superseded; dated checkpoints below retain history.
 
