@@ -11,6 +11,7 @@ from threading import Lock
 import time
 
 from services.cache_outcomes import PROCESS_ID, CacheOutcome
+from services.health_observation import Observation, utc
 
 
 def validate_players(players):
@@ -37,6 +38,41 @@ class ProfileCacheService:
         self._snapshot_persistence = "not_applicable"
         self._snapshot_omitted = ()
         self._outcome = CacheOutcome("profile", "initial")
+        self._health = Observation("profiles", "cached profiles")
+
+    def health_snapshot(self):
+        return self._health
+
+    def _publish_health(self):
+        # Called inside existing writer ownership, never by a presentation reader.
+        try:
+            outcome = self._outcome
+            self._health = Observation(
+                "profiles",
+                "cached profiles",
+                utc(),
+                outcome.execution,
+                (
+                    "failure"
+                    if outcome.execution == "failed"
+                    else "success" if outcome.execution == "succeeded" else "unknown"
+                ),
+                (
+                    outcome.source
+                    if outcome.source
+                    in {"refreshed", "disk_loaded", "memory_reused", "retained_last_known_good"}
+                    else "unavailable"
+                ),
+                reference=f"profile-{outcome.generation}",
+                count=outcome.count,
+                source_utc=(
+                    datetime.fromtimestamp(outcome.source_time, UTC).isoformat()
+                    if outcome.source_time
+                    else None
+                ),
+            )
+        except Exception:
+            pass
 
     def stats(self):
         with self._state:
@@ -93,6 +129,7 @@ class ProfileCacheService:
                     verification="superseded",
                     persistence="unconfirmed",
                 )
+                self._publish_health()
 
     def refresh(
         self, *, path, ttl, parse_time, build, save, force=False, fresh=False, origin="legacy"
@@ -128,6 +165,7 @@ class ProfileCacheService:
                         generation=generation,
                     )
                     self._outcome = outcome
+                    self._publish_health()
                     break
             result = flight.result()
             if not fresh:
@@ -224,6 +262,7 @@ class ProfileCacheService:
                 )
                 with self._state:
                     self._outcome = outcome
+                    self._publish_health()
             flight.set_result(outcome)
             return outcome
         except BaseException as exc:

@@ -1,5 +1,18 @@
 # Task Packs
 
+> **Current P01.3 implementation checkpoint - 4 November 2026 (E80):** Full passive-health implementation, persistent Refresh and local validation/PR preparation are approved. Earlier design-only holds are historical; publication and production actions remain separate.
+
+> **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
+
+## Startup, import and export reliability - current programme
+
+Start with the [overall programme scope](Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md) and [progress tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md).
+
+P01 shared lifecycle evidence: **P01.1 delivered -> P01.2a delivered -> P01.2b proactive instrumentation declined (E75) -> P01.3-P01.6 outstanding**. Then P02 contention/admission, remaining P03 durable recovery/continuation, P04 convergence/history and P05 combined confirmation. Earlier P03a.1 recovery is complete; P03a.2 startup is accepted with whole-flow acceptance still open.
+
+Use existing evidence and simple issue-driven collection; preserve bot/startup safety. The [P01.2b handover](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Handover%20and%20Scope%20-%202026-11-04.md) records the decision and accepted coverage limits. Delivered P01.1/P01.2a documents are now in the [archive register](archive/Startup%20Import%20Export%20Reliability%20-%20Archive%20Register%20-%202026-11-04.md). Active scope, design, census, tracing, tracker and cross-package validation remain here. Archived evidence retains its qualifications and unresolved obligations remain owned by active packets.
+
+
 Current MGE release preparation: [native SQL and updater qualification packet](P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).
 This names the exact local targets, unsupported updater capabilities, native check
 matrix and separate publication/deployment approvals; no execution is authorized.

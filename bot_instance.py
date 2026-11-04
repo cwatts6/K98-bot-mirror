@@ -1,6 +1,5 @@
 # bot_instance.py
 import asyncio
-from collections import deque
 from collections.abc import Awaitable, Callable
 import csv
 from datetime import datetime, timedelta
@@ -25,6 +24,7 @@ from bot_config import (
     ADMIN_USER_ID,
     CALENDAR_PINNED_CHANNEL_ID,
     CHANNEL_IDS,
+    GUILD_ID,
     KVK_EVENT_CHANNEL_ID,
     KVK_NOTIFICATION_CHANNEL_ID,
     MEMBER_COUNT_CHANNEL_ID,
@@ -43,15 +43,12 @@ from bot_helpers import (
 from bot_loader import bot
 from bot_startup_gate import claim_startup_once
 from constants import (
-    CREDENTIALS_FILE,
     CSV_LOG,
     FAILED_LOG,
     INPUT_LOG,
-    KVK_SHEET_ID,
     LAST_RESTART_INFO,
     LAST_SHUTDOWN_INFO,
     RESTART_LOG_FILE,
-    STATS_SHEET_ID,
     SUMMARY_LOG,
 )
 from core.command_lifecycle import run_ready_command_sync
@@ -94,7 +91,6 @@ from logging_setup import (
 )
 from mge.mge_scheduler import schedule_mge_lifecycle
 from proc_config_import import run_proc_config_import, run_proc_config_import_offload
-from profile_cache import get_cache_stats
 from server_activity import register_activity_listeners
 from server_activity.activity_store import ensure_activity_schema
 from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
@@ -645,446 +641,209 @@ async def heartbeat_loop():
         await asyncio.sleep(30)
 
 
-# === Health dashboard (Phase 1) =============================================
+# === Passive health dashboard =============================================
 HEALTH_MSG_ID_PATH = os.path.join(LOG_DIR, "health_msg_id.json")
-ERROR_SPIKE_THRESHOLD = 5  # DM admin if >= this many ERROR lines in last 60m
-STALENESS_THRESHOLD_MIN = 15  # DM admin if health embed wasn't updated within N minutes (rare)
-HEALTH_REFRESH_MINUTES = 5  # embed update cadence
-
-# state for alerts/debounce
+STALENESS_THRESHOLD_MIN = 15  # Card delivery age, not provider-observation freshness.
+HEALTH_REFRESH_MINUTES = 5
 _last_health_alert_ts: datetime | None = None
 _last_health_embed_update_ts: datetime | None = None
-
-# record of last discord session state (for the card)
+_health_alert_attempts = {}
+_health_view = None
+_health_registered_id = None
+_health_creation_unconfirmed = False
 LAST_DISCONNECT_UTC: datetime | None = None
 LAST_RESUME_UTC: datetime | None = None
 
 
-def _safe_error_log_path() -> str:
+def _health_projection():
+    from services.operator_status_service import snapshot
+
+    return snapshot()
+
+
+def _health_card(projection=None):
+    from ui.views.health_view import build_health_embed
+
+    entries = task_monitor.list()
+    local = dict(
+        connected=bool(bot.is_ready() and not bot.is_closed()),
+        shutting_down=_shutdown_once.is_set(),
+        uptime_seconds=max(0, (_aware(utcnow()) - START_TIME).total_seconds()),
+        tasks=(
+            sum(1 for e in entries if not e["done"] and not e["cancelled"]),
+            sum(1 for e in entries if e["done"] and e.get("last_error")),
+            sum(int(e.get("restarts", 0) or 0) for e in entries),
+        ),
+    )
+    return build_health_embed(
+        projection if projection is not None else _health_projection(), local=local
+    )
+
+
+def _get_health_view():
+    global _health_view
+    from ui.views.health_view import HealthView
+
+    if _health_view is None:
+        _health_view = HealthView(
+            guild_id=GUILD_ID, channel_id=STATUS_CHANNEL_ID, render=_health_card
+        )
+    return _health_view
+
+
+def _bind_health_view(message_id):
+    global _health_registered_id, _health_view
+    if _health_registered_id is not None and _health_registered_id != message_id:
+        _health_view.stop()
+        _health_view = None
+    view = _get_health_view()
+    view.message_id = message_id
+    if _health_registered_id != message_id:
+        bot.add_view(view, message_id=message_id)
+        _health_registered_id = message_id
+    return view
+
+
+def _restore_health_view():
+    # Existing identity bookkeeping only; not part of passive snapshot assembly.
     try:
-        from logging_setup import ERROR_LOG_PATH
-
-        if ERROR_LOG_PATH and os.path.exists(ERROR_LOG_PATH):
-            return ERROR_LOG_PATH
-    except Exception:
-        pass
-    # common fallbacks
-    for name in ("error_log.txt", "error.log"):
-        candidate = os.path.join(LOG_DIR, name)
-        if os.path.exists(candidate):
-            return candidate
-    # last resort
-    return os.path.join(LOG_DIR, "error_log.txt")
-
-
-async def _count_errors_last_minutes(
-    minutes: int = 60, level: str = "ERROR", cap: int = 50000
-) -> int:
-    """
-    Count only real [LEVEL] lines within the last N minutes.
-    Expected prefix: 'YYYY-MM-DD HH:MM:SS,fff ' (23 chars) before the level token.
-    """
-    if is_pytest_logging_mode():
-        return 0
-
-    path = _safe_error_log_path()
-    if not os.path.exists(path) or minutes <= 0:
-        return 0
-
-    cutoff = _aware(utcnow()) - timedelta(minutes=minutes)
-    ts_len = 23  # len('YYYY-MM-DD HH:MM:SS,%f')
-    pat = f"[{(level or 'ERROR').upper()}]"
-
-    try:
-        # Read and keep only the last `cap` lines (cap<=0 means keep all)
-        if cap and cap > 0:
-            buf = deque(maxlen=cap)
-            with open(path, encoding="utf-8", errors="replace", newline="") as f:
-                for ln in f:
-                    buf.append(ln)
-            lines = buf
-        else:
-            with open(path, encoding="utf-8", errors="replace", newline="") as f:
-                lines = f.readlines()
-
-        count = 0
-        for ln in lines:
-            if pat not in ln:
-                continue
-            # parse timestamp prefix if present
-            ts_str = ln[:ts_len]
+        with open(HEALTH_MSG_ID_PATH, encoding="utf-8") as source:
+            message_id = json.load(source).get("id")
+        if type(message_id) is int and message_id > 0:
             try:
-                ts = _aware(datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S,%f"))
-            except Exception:
-                # skip lines with no/invalid timestamp
-                continue
-            if ts >= cutoff:
-                count += 1
-
-        return count
-
-    except Exception:
-        return 0
-
-
-async def _check_sql_health(timeout_sec: float = 3.0) -> tuple[bool | None, str]:
-    """Share the retained SQL worker with operator status; never block the loop."""
-    from services.operator_status_service import check_sql
-
-    return await check_sql(timeout=timeout_sec)
-
-
-def _pick_health_sheet_id() -> str | None:
-    """
-    Choose a representative Sheet to probe for health.
-    Prefer KVK_SHEET_ID; fall back to STATS_SHEET_ID.
-    """
-    try:
-        if KVK_SHEET_ID:
-            return KVK_SHEET_ID
-    except Exception:
-        pass
-    try:
-        if STATS_SHEET_ID:
-            return STATS_SHEET_ID
-    except Exception:
+                _bind_health_view(message_id)
+            except Exception as exc:
+                logger.warning(
+                    "health_view_registration_unavailable error_type=%s", type(exc).__name__
+                )
+            return message_id
+    except (OSError, ValueError, TypeError, AttributeError):
         pass
     return None
 
 
-async def _check_gsheets_health(timeout_sec: float = 5.0):
-    """True/False/None denotes healthy/failed/deferred; retain any active work."""
-    from services.gsheets_health_service import check_health
+async def _ensure_pinned_health_message(channel):
+    global _health_creation_unconfirmed
+    message_id = _health_registered_id or _restore_health_view()
+    if message_id:
+        try:
+            await channel.fetch_message(message_id)
+            return message_id
+        except discord.NotFound:
+            pass  # Confirmed deletion alone permits the existing replacement path.
+        except Exception as exc:
+            logger.warning("health_message_unavailable error_type=%s", type(exc).__name__)
+            return None
+    if _shutdown_once.is_set() or _health_creation_unconfirmed:
+        return None
+    # An uncertain send must not post another card on every scheduled render.
+    _health_creation_unconfirmed = True
+    message = await channel.send(embed=_health_card(), view=_get_health_view())
+    _bind_health_view(message.id)
+    _health_creation_unconfirmed = False
+    try:
+        with open(HEALTH_MSG_ID_PATH, "w", encoding="utf-8") as target:
+            json.dump({"id": message.id}, target)
+    except Exception as exc:
+        logger.warning("health_identity_save_unavailable error_type=%s", type(exc).__name__)
+    try:
+        await message.pin()
+    except Exception as exc:
+        logger.warning("health_pin_unavailable error_type=%s", type(exc).__name__)
+    return message.id
 
-    return await check_health(CREDENTIALS_FILE, _pick_health_sheet_id(), timeout=timeout_sec)
 
-
-def _uptime_hms() -> tuple[int, int, int, int]:
-    """Return uptime as (days, hours, minutes, seconds)."""
+async def _health_alerts(projection):
+    global _last_health_alert_ts
+    if is_pytest_logging_mode() or _shutdown_once.is_set():
+        return
     now = _aware(utcnow())
-    sec = int((now - START_TIME).total_seconds())
-    d = sec // 86400
-    h = (sec % 86400) // 3600
-    m = (sec % 3600) // 60
-    s = sec % 60
-    return d, h, m, s
-
-
-def _get_queue_depth_safe() -> int:
-    """Hook point for your real in-memory queue depth if exposed; fallback to 0."""
-    try:
-        # if you expose a global or helper returning the count, call it here
-        from utils import get_live_queue_depth  # if you made one
-
-        return int(get_live_queue_depth())
-    except Exception:
-        return 0
-
-
-def _summarize_tasks() -> str:
-    """Short status for TaskMonitor tasks: running count + crashed count + restarts."""
-    entries = task_monitor.list()
-    if not entries:
-        return "none"
-    running = sum(1 for e in entries if not e["done"] and not e["cancelled"])
-    crashed = sum(1 for e in entries if e["done"] and e.get("last_error"))
-    restarts = sum(int(e.get("restarts", 0) or 0) for e in entries)
-    return f"running {running} • crashed {crashed} • restarts {restarts}"
-
-
-class HealthView(discord.ui.View):
-    def __init__(self, *, timeout: float = 30):
-        super().__init__(timeout=timeout)
-
-    @discord.ui.button(label="Refresh", style=discord.ButtonStyle.primary, emoji="🔄")
-    async def do_refresh(self, _button: discord.ui.Button, interaction: discord.Interaction):
-        try:
-            # build latest embed exactly as you do in _update_health_embed()
-            d, h, m, s = _uptime_hms()
-            sql_ok, sql_reason = await _check_sql_health(timeout_sec=5)
-            gs_ok, gs_message = await _check_gsheets_health(timeout_sec=5)
-            err_10m = await _count_errors_last_minutes(10)
-            err_60m = await _count_errors_last_minutes(60)
-            queue_depth = _get_queue_depth_safe()
-            latency = getattr(bot, "latency", None)
-            latency_ms = int(latency * 1000) if latency is not None else None
-
-            # Profile cache stats (best-effort)
-            try:
-                pc_stats = get_cache_stats()
-                pc_count = pc_stats.get("count", 0)
-                pc_loaded = pc_stats.get("loaded_at_iso")
-                profile_line = f"\n**Profiles:** {pc_count} cached" + (
-                    f" • as_of {pc_loaded}" if pc_loaded else ""
-                )
-            except Exception:
-                profile_line = "\n**Profiles:** n/a"
-
-            sess = "🟢 connected"
-            if LAST_DISCONNECT_UTC and (
-                not LAST_RESUME_UTC or LAST_RESUME_UTC < LAST_DISCONNECT_UTC
-            ):
-                sess = "🟠 disconnected"
-            elif LAST_RESUME_UTC and LAST_DISCONNECT_UTC and LAST_RESUME_UTC > LAST_DISCONNECT_UTC:
-                sess = "🟡 resumed"
-
-            desc = (
-                f"**Uptime:** {d}d {h}h {m}m {s}s\n"
-                f"**Discord:** {sess}"
-                + (f" • ping ~{latency_ms} ms" if latency_ms is not None else "")
-                + "\n"
-                f"**Database:** {'🟢 OK' if sql_ok is True else '🟠 Pending' if sql_ok is None else '🔴 Error'}"
-                + (f" — `{(sql_reason or '')[:120]}`" if sql_ok is not True else "")
-                + "\n"
-                f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
-                f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
-                f"**Queue depth:** {queue_depth}\n"
-                f"{profile_line}\n"
-                f"**Tasks:** {_summarize_tasks()}\n"
+    if _last_health_alert_ts and (now - _last_health_alert_ts).total_seconds() < 1800:
+        return
+    pending = []
+    for name in ("sql", "sheets"):
+        row = projection["components"][name]
+        # Raw failure text is not an action classifier. Generic failures stay on the card.
+        if (
+            row.get("action") != "verify_access"
+            or row.get("outcome") != "failure"
+            or row.get("freshness") != "fresh"
+        ):
+            continue
+        key = row.get("reference")
+        if key and _health_alert_attempts.get(name, (None,))[0] != key:
+            pending.append(
+                (name, key, f"{name}: access denied; verify the configured access permissions.")
             )
-            if sql_ok and gs_ok and sess == "🟢 connected" and err_10m == 0 and err_60m == 0:
-                color = 0x2ECC71
-            elif err_10m > 0 and sql_ok and gs_ok:
-                color = 0xF39C12
-            else:
-                color = (
-                    0xE74C3C
-                    if (
-                        sql_ok is False
-                        or gs_ok is False
-                        or err_60m >= ERROR_SPIKE_THRESHOLD
-                        or sess != "🟢 connected"
-                    )
-                    else 0xF39C12
+    if (
+        _last_health_embed_update_ts
+        and (now - _last_health_embed_update_ts).total_seconds() >= STALENESS_THRESHOLD_MIN * 60
+    ):
+        key = _last_health_embed_update_ts.isoformat()
+        if _health_alert_attempts.get("delivery", (None,))[0] != key:
+            pending.append(
+                (
+                    "delivery",
+                    key,
+                    "The health card could not be updated; check the status-channel permissions and message availability.",
                 )
-
-            embed = discord.Embed(title="🤖 Bot Health", description=desc, color=color)
-            embed.set_footer(text="Auto-updates every 5 minutes • Use /logs for details")
-            embed.timestamp = _aware(utcnow())
-
-            # This both ACKs the interaction and edits the message in one go.
-            await interaction.response.edit_message(embed=embed, view=HealthView())
-
-        except discord.errors.InteractionResponded:
-            # Fallback: if somehow already acked, edit the message object
-            await interaction.message.edit(embed=embed, view=HealthView())
-        except Exception as e:
-            # As a last resort, send an ephemeral error (ensures no 'interaction failed')
-            msg = f"Refresh failed: `{type(e).__name__}: {e}`"
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-            logger.warning(f"[HEALTH] refresh failed: {e}")
-
-    @discord.ui.button(label="Show last 20 errors", style=discord.ButtonStyle.secondary, emoji="📜")
-    async def show_last_errors(self, _button: discord.ui.Button, interaction: discord.Interaction):
-        try:
-            path = _safe_error_log_path()
-            if not os.path.exists(path):
-                content = "No error log file found."
-            else:
-                lines = []
-                with open(path, encoding="utf-8", errors="replace", newline="") as f:
-                    for ln in f:
-                        if "[ERROR]" in ln:
-                            lines.append(ln.rstrip("\n"))
-
-                # newest first, up to 20
-                lines = list(reversed(lines))[:20]
-
-                if not lines:
-                    content = "(no [ERROR] lines found in log)"
-                else:
-                    body = "\n".join(lines).replace("```", "`\u200b``")
-
-                    # Tip shown after code block
-                    tip = "\nTip: use `/logs source:error level:ERROR page_size:50` for paging."
-                    # Strict budget: 2000 total, minus fences (6 chars) and tip
-                    BUDGET = 2000 - len(tip) - 6
-                    if BUDGET < 0:
-                        BUDGET = 0
-                    if len(body) > BUDGET:
-                        # leave room for truncation marker
-                        body = body[: max(0, BUDGET - 14)] + "\n…(truncated)"
-
-                    content = f"```{body}```{tip}"
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(content, ephemeral=True)
-            else:
-                await interaction.followup.send(content, ephemeral=True)
-
-        except Exception as e:
-            msg = f"❌ Failed to load last errors: `{type(e).__name__}: {e}`"
-            if not interaction.response.is_done():
-                await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await interaction.followup.send(msg, ephemeral=True)
-
-
-async def _ensure_pinned_health_message(channel: discord.TextChannel) -> int:
-    """Create or fetch the pinned health message; returns message ID."""
-    msg_id = None
+            )
+    if not pending:
+        return
+    _last_health_alert_ts = now
+    for name, key, _ in pending:
+        _health_alert_attempts[name] = (key, "attempted_unconfirmed")
+    text = "Bot Health: action required\n" + "\n".join(reason for _, _, reason in pending)
+    if _health_registered_id:
+        text += (
+            f"\nhttps://discord.com/channels/{GUILD_ID}/{STATUS_CHANNEL_ID}/{_health_registered_id}"
+        )
     try:
-        if os.path.exists(HEALTH_MSG_ID_PATH):
-            msg_id = json.load(open(HEALTH_MSG_ID_PATH, encoding="utf-8")).get("id")
-    except Exception:
-        msg_id = None
-
-    if msg_id:
-        try:
-            msg = await channel.fetch_message(int(msg_id))
-            return msg.id
-        except Exception:
-            msg_id = None
-
-    # Create a placeholder message and pin it
-    m = await channel.send(
-        embed=discord.Embed(title="🤖 Bot Health", description="Initializing…", color=0x95A5A6),
-        view=HealthView(),
-    )
-    try:
-        await m.pin()
-    except Exception:
-        pass
-    try:
-        json.dump({"id": m.id}, open(HEALTH_MSG_ID_PATH, "w", encoding="utf-8"))
-    except Exception:
-        pass
-    return m.id
+        owner = await bot.fetch_user(ADMIN_USER_ID)
+        await owner.send(text, allowed_mentions=discord.AllowedMentions.none())
+        for name, key, _ in pending:
+            _health_alert_attempts[name] = (key, "acknowledged")
+    except Exception as exc:
+        logger.warning("health_alert_unconfirmed error_type=%s", type(exc).__name__)
 
 
 async def _update_health_embed():
-    """Build and push the latest health card, optionally DM admin on alerts."""
-    global _last_health_embed_update_ts, _last_health_alert_ts
-
-    ch = bot.get_channel(STATUS_CHANNEL_ID)
-    if not isinstance(ch, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
-        logger.warning("[HEALTH] status channel not found or invalid")
+    global _last_health_embed_update_ts
+    if _shutdown_once.is_set():
         return
-
-    msg_id = await _ensure_pinned_health_message(ch)
-
-    # Collect metrics
-    d, h, m, s = _uptime_hms()
-    sql_ok, sql_reason = await _check_sql_health(timeout_sec=5.0)
-    gs_ok, gs_message = await _check_gsheets_health(timeout_sec=5.0)
-    err_60m = await _count_errors_last_minutes(60)
-    err_10m = await _count_errors_last_minutes(10)
-    queue_depth = _get_queue_depth_safe()
-
-    latency = getattr(bot, "latency", None)
-    latency_ms = int(latency * 1000) if latency is not None else None
-
-    # Profile cache stats (best-effort)
+    projection = _health_projection()
+    channel = bot.get_channel(STATUS_CHANNEL_ID)
+    if channel is None or getattr(getattr(channel, "guild", None), "id", None) != GUILD_ID:
+        logger.warning("health_status_channel_unavailable")
+        await _health_alerts(projection)
+        return
     try:
-        pc_stats = get_cache_stats()
-        pc_count = pc_stats.get("count", 0)
-        pc_loaded = pc_stats.get("loaded_at_iso")
-        profile_line = f"\n**Profiles:** {pc_count} cached" + (
-            f" • as_of {pc_loaded}" if pc_loaded else ""
-        )
-    except Exception:
-        profile_line = "\n**Profiles:** n/a"
-
-    # Discord session state
-    sess = "🟢 connected"
-    if LAST_DISCONNECT_UTC and (not LAST_RESUME_UTC or LAST_RESUME_UTC < LAST_DISCONNECT_UTC):
-        sess = "🟠 disconnected"
-    elif LAST_RESUME_UTC and LAST_DISCONNECT_UTC and LAST_RESUME_UTC > LAST_DISCONNECT_UTC:
-        sess = "🟡 resumed"
-
-    # Description
-    desc = (
-        f"**Uptime:** {d}d {h}h {m}m {s}s\n"
-        f"**Discord:** {sess}"
-        + (f" • ping ~{latency_ms} ms" if latency_ms is not None else "")
-        + "\n"
-        f"**Database:** {'🟢 OK' if sql_ok is True else '🟠 Pending' if sql_ok is None else '🔴 Error'}"
-        + (f" — `{(sql_reason or '')[:120]}`" if sql_ok is not True else "")
-        + "\n"
-        f"**GSheets:** {'🟢 ' if gs_ok is True else '🟠 ' if gs_ok is None else '🔴 '}{gs_message}\n"
-        f"**Errors:** 10m **{err_10m}** • 60m **{err_60m}**\n"
-        f"**Queue depth:** {queue_depth}\n"
-        f"{profile_line}\n"
-        f"**Tasks:** {_summarize_tasks()}\n"
-    )
-
-    # Green = all good, no recent errors
-    if sql_ok and gs_ok and sess == "🟢 connected" and err_10m == 0 and err_60m == 0:
-        color = 0x2ECC71
-    # Amber = there are recent errors (last 10m) but no major outages
-    elif err_10m > 0 and sql_ok and gs_ok:
-        color = 0xF39C12
-    # Red = major (DB/Sheets down) OR large spike in last 60m OR disconnected
-    else:
-        color = (
-            0xE74C3C
-            if (
-                sql_ok is False
-                or gs_ok is False
-                or err_60m >= ERROR_SPIKE_THRESHOLD
-                or sess != "🟢 connected"
+        message_id = await _ensure_pinned_health_message(channel)
+        if message_id is not None and not _shutdown_once.is_set():
+            message = await channel.fetch_message(message_id)
+            await message.edit(
+                embed=_health_card(projection), view=_bind_health_view(message_id), attachments=[]
             )
-            else 0xF39C12
-        )
+            _last_health_embed_update_ts = _aware(utcnow())
+    except Exception as exc:
+        logger.warning("health_card_update_unavailable error_type=%s", type(exc).__name__)
+    await _health_alerts(projection)
 
-    embed = discord.Embed(title="🤖 Bot Health", description=desc, color=color)
-    embed.set_footer(text="Auto-updates every 5 minutes • Use /logs for details")
-    embed.timestamp = _aware(utcnow())
 
-    try:
-        msg = await ch.fetch_message(int(msg_id))
-        await msg.edit(embed=embed, view=HealthView(), attachments=[])
-        _last_health_embed_update_ts = _aware(utcnow())
-    except Exception as e:
-        logger.warning(f"[HEALTH] edit failed: {e}")
+async def _stop_health_dashboard():
+    from core.owned_work import drain_awaitable
 
-    # Alerting (debounced)
-    try:
-        need_alert = False
-        reasons = []
-
-        if is_pytest_logging_mode():
-            return
-
-        if sql_ok is False:
-            need_alert = True
-            reasons.append("DB check failed" + (f": {sql_reason}" if sql_reason else ""))
-
-        if gs_ok is False:
-            need_alert = True
-            reasons.append("GSheets check failed" + (f": {gs_message}" if gs_message else ""))
-            logger.warning("[HEALTH][GS] Probe failed: %s", gs_message)
-
-        if err_60m >= ERROR_SPIKE_THRESHOLD:
-            need_alert = True
-            reasons.append(f"error spike ({err_60m} in 60m)")
-
-        if err_10m > 0:
-            reasons.append(f"errors in last 10m ({err_10m})")
-
-        if _last_health_embed_update_ts:
-            age_min = (_aware(utcnow()) - _last_health_embed_update_ts).total_seconds() / 60.0
-            if age_min >= STALENESS_THRESHOLD_MIN:
-                need_alert = True
-                reasons.append(f"health stale {int(age_min)}m")
-
-        # Debounce: only once per 30 minutes
-        if need_alert:
-            now = _aware(utcnow())
-            if not _last_health_alert_ts or (now - _last_health_alert_ts).total_seconds() >= 1800:
-                _last_health_alert_ts = now
-                try:
-                    owner = await bot.fetch_user(ADMIN_USER_ID)
-                    text = "⚠️ **Bot Health Alert**\n" + "\n".join(f"- {r}" for r in reasons)
-                    await owner.send(text)
-                    logger.warning("[HEALTH] Admin DM sent: %s", ", ".join(reasons))
-                except Exception as e:
-                    logger.warning(f"[HEALTH] Failed to DM admin: {e}")
-    except Exception as e:
-        logger.warning(f"[HEALTH] alert block error: {e}")
+    task = health_dashboard_task.get_task()
+    if _health_view is not None:
+        _health_view.close_admission()
+    if task is asyncio.current_task():
+        health_dashboard_task.stop()
+    else:
+        health_dashboard_task.cancel()
+    if task is not None and task is not asyncio.current_task():
+        await drain_awaitable(asyncio.gather(task, return_exceptions=True))
+    if _health_view is not None:
+        await _health_view.shutdown()
 
 
 @tasks.loop(minutes=HEALTH_REFRESH_MINUTES)
@@ -1288,6 +1047,7 @@ async def _graceful_teardown():
     if _shutdown_once.is_set():
         return
     _shutdown_once.set()
+    await _stop_health_dashboard()
     from event_cache import refresh_service
     from profile_cache import _service as profile_service
     from target_utils import close_name_admission
@@ -1692,7 +1452,8 @@ async def _run_ready_runtime_services() -> None:
         logger.exception("[BOOT] Failed to start heartbeat loop")
 
     try:
-        if not health_dashboard_task.is_running():
+        if not _shutdown_once.is_set() and not health_dashboard_task.is_running():
+            _restore_health_view()
             health_dashboard_task.start()
             logger.info("[BOOT] Health dashboard task started")
     except Exception:

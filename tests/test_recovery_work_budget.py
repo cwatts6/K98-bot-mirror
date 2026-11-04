@@ -1,12 +1,9 @@
 """Offline workload/barrier checks; no SQL, provider or production history."""
 
-import ast
 import asyncio
 from contextlib import contextmanager
-from datetime import UTC, datetime
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -164,17 +161,10 @@ def test_active_history_overlap_advances_cursor_without_reinspection(workload):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_and_operator_share_one_retained_sql_worker(monkeypatch):
-    from services import operator_status_service as service
+async def test_explicit_operators_share_one_retained_sql_worker(monkeypatch):
+    from services import legacy_export_snapshot_service as owner, operator_status_service as service
     from services.gsheets_health_service import HealthProbe
 
-    # Load just the thin dashboard adapter; importing the bot starts lifecycles.
-    source = ast.parse(
-        (Path(__file__).parents[1] / "bot_instance.py").read_text(encoding="utf-8-sig")
-    )
-    node = next(n for n in source.body if getattr(n, "name", None) == "_check_sql_health")
-    namespace = {}
-    exec(compile(ast.Module(body=[node], type_ignores=[]), "dashboard-adapter", "exec"), namespace)
     entered, release = asyncio.Event(), asyncio.Event()
     calls = []
 
@@ -185,8 +175,8 @@ async def test_dashboard_and_operator_share_one_retained_sql_worker(monkeypatch)
         return True, "SQL connected"
 
     monkeypatch.setattr(service, "_probe", HealthProbe(label="SQL"))
-    monkeypatch.setattr(service, "drain_thread", worker)
-    first = asyncio.create_task(namespace["_check_sql_health"](0.001))
+    monkeypatch.setattr(owner, "drain_thread", worker)
+    first = asyncio.create_task(service.check_sql(timeout=0.001))
     await entered.wait()
     second = await service.check_sql(timeout=0.001)
     assert (await first)[0] is None and second[0] is None and calls == [1]
@@ -222,67 +212,3 @@ def test_active_summary_uses_scoped_counts_without_historical_json(monkeypatch):
     assert "State='open'" in calls[0].args[0]
     assert "'dispatched','unknown'" in calls[1].args[0]
     assert all("JSON_VALUE" not in call.args[0] for call in calls)
-
-
-@pytest.mark.asyncio
-async def test_dashboard_pending_probe_preserves_alert_for_actual_failure():
-    import discord
-
-    source = ast.parse(
-        (Path(__file__).parents[1] / "bot_instance.py").read_text(encoding="utf-8-sig")
-    )
-    node = next(n for n in source.body if getattr(n, "name", None) == "_update_health_embed")
-    message = SimpleNamespace(edit=AsyncMock())
-    owner = SimpleNamespace(send=AsyncMock())
-
-    class Channel:
-        fetch_message = AsyncMock(return_value=message)
-
-    channel = Channel()
-    now = datetime(2026, 10, 26, tzinfo=UTC)
-    namespace = dict(
-        bot=SimpleNamespace(
-            get_channel=Mock(return_value=channel),
-            fetch_user=AsyncMock(return_value=owner),
-            latency=None,
-        ),
-        discord=SimpleNamespace(
-            TextChannel=Channel, Thread=Channel, VoiceChannel=Channel, Embed=discord.Embed
-        ),
-        STATUS_CHANNEL_ID=1,
-        ADMIN_USER_ID=2,
-        ERROR_SPIKE_THRESHOLD=10,
-        STALENESS_THRESHOLD_MIN=10,
-        LAST_DISCONNECT_UTC=None,
-        LAST_RESUME_UTC=None,
-        _ensure_pinned_health_message=AsyncMock(return_value=3),
-        _uptime_hms=lambda: (0, 0, 0, 0),
-        _check_sql_health=AsyncMock(
-            side_effect=[(None, "Pending"), (True, "OK"), (False, "Unavailable")]
-        ),
-        _check_gsheets_health=AsyncMock(return_value=(True, "OK")),
-        _count_errors_last_minutes=AsyncMock(return_value=0),
-        _get_queue_depth_safe=lambda: 0,
-        get_cache_stats=lambda: {},
-        _summarize_tasks=lambda: "idle",
-        HealthView=lambda: None,
-        _aware=lambda value: value,
-        utcnow=lambda: now,
-        _last_health_embed_update_ts=None,
-        _last_health_alert_ts=None,
-        is_pytest_logging_mode=lambda: False,
-        logger=Mock(),
-    )
-    exec(compile(ast.Module(body=[node], type_ignores=[]), "dashboard-alert", "exec"), namespace)
-    update = namespace["_update_health_embed"]
-    await update()
-    assert "Pending" in message.edit.call_args.kwargs["embed"].description
-    owner.send.assert_not_awaited()
-    assert namespace["_last_health_alert_ts"] is None
-    await update()
-    owner.send.assert_not_awaited()
-    assert namespace["_last_health_alert_ts"] is None
-    await update()
-    owner.send.assert_awaited_once()
-    assert "DB check failed: Unavailable" in owner.send.call_args.args[0]
-    assert namespace["_last_health_alert_ts"] == now

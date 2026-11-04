@@ -5,9 +5,21 @@ from copy import deepcopy
 from datetime import UTC, datetime
 
 from core.operation_evidence import emit, optional, result_facts, scope, typed_result
+from services.health_observation import Observation
 from services.startup_outcome_projection import project
 
 _steps = {}
+_health = ()
+_HEALTH_STEPS = (
+    "warm_profile_cache",
+    "warm_name_cache",
+    "build_player_stats_cache",
+    "proc_config_import",
+)
+
+
+def health_snapshot():
+    return _health
 
 
 def report():
@@ -15,6 +27,7 @@ def report():
 
 
 def _record(label, state, seconds, *, error=None, **facts):
+    global _health
     if label not in _steps and len(_steps) >= 64:
         return
     row = dict(
@@ -30,6 +43,32 @@ def _record(label, state, seconds, *, error=None, **facts):
 
         row["diagnostic"] = optional(failure_detail, error) or {"status": "unavailable"}
     _steps[label] = row
+    # Fixed labels/fields only. Arbitrary diagnostic payloads never enter a card.
+    if label in _HEALTH_STEPS:
+        try:
+            feature = row.get("feature", {}).get("feature_outcome")
+            feature = (
+                feature
+                if feature in {"success", "failure", "succeeded", "failed", "partial", "unknown"}
+                else "unknown"
+            )
+            feature = {"succeeded": "success", "failed": "failure"}.get(feature, feature)
+            item = Observation(
+                "startup",
+                label,
+                row["observed_utc"],
+                "in_progress" if state == "running" else "settled",
+                feature,
+                "startup_activity",
+                reference=(
+                    row.get("reference")
+                    if type(row.get("reference")) is str and len(row["reference"]) <= 64
+                    else None
+                ),
+            )
+            _health = tuple(r for r in _health if r.scope_label != label) + (item,)
+        except Exception:
+            pass
 
 
 async def _drain_cancel(task):

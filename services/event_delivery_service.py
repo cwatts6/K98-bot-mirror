@@ -11,6 +11,7 @@ from weakref import WeakValueDictionary
 from constants import DATA_DIR
 from core.owned_work import drain_thread
 from services.event_delivery_store import EventDeliveryStore
+from services.health_observation import Observation
 
 logger = logging.getLogger(__name__)
 store = EventDeliveryStore(Path(DATA_DIR) / "event_delivery_receipts.json")
@@ -19,12 +20,23 @@ _children = set()
 _closed = False
 _observation = {"observed_utc": None, "counts": {}, "changes_since_observation": False}
 _observation_revision = 0
+_health = Observation("events", "selected event delivery")
+
+
+def health_snapshot():
+    return _health
 
 
 def _changed():
-    global _observation_revision
+    global _observation_revision, _health
     _observation_revision += 1
     _observation["changes_since_observation"] = True
+    try:
+        from dataclasses import replace
+
+        _health = replace(_health, reason="changed_since_observation")
+    except Exception:
+        pass
 
 
 def operation_lock(scope):
@@ -98,6 +110,7 @@ async def finish(key, state, **receipt):
 
 
 async def receipt_rows():
+    global _health
     revision = _observation_revision
     rows = await drain_thread(store.rows)
     _observation.update(
@@ -105,6 +118,26 @@ async def receipt_rows():
         counts=dict(Counter(row["state"] for row in rows)),
         changes_since_observation=revision != _observation_revision,
     )
+    try:
+        _health = Observation(
+            "events",
+            "selected event delivery",
+            _observation["observed_utc"],
+            "settled",
+            "unknown",
+            (
+                "changed_since_observation"
+                if _observation["changes_since_observation"]
+                else "journal_observed"
+            ),
+            count=sum(_observation["counts"].values()),
+            counts=tuple(
+                (key, _observation["counts"].get(key, 0))
+                for key in ("acknowledged", "entered", "refused", "not_found")
+            ),
+        )
+    except Exception:
+        pass
     return rows
 
 
@@ -118,14 +151,17 @@ def report():
 
 
 async def evidence_summary():
-    """Read evidence only: never refresh, dispatch, reconcile or discard work."""
+    """Format the retained report only; never read/lock the receipt journal."""
     try:
-        rows = await receipt_rows()
-        counts = Counter(row["state"] for row in rows)
+        saved = report()
+        if saved["observed_utc"] is None:
+            return "Selected event delivery evidence not yet observed; current counts unknown."
+        counts = Counter(saved["counts"])
         return (
             f"Selected event deliveries: acknowledged={counts['acknowledged']}, "
             f"unconfirmed={counts['entered']}, refused={counts['refused']}, "
             f"confirmed absent={counts['not_found']}. "
+            f"Observed {saved['observed_utc']}; changes since observation={saved['changes_since_observation']}. "
             "Acknowledgement is not visual or end-to-end acceptance."
         )
     except Exception as exc:

@@ -80,6 +80,13 @@ def _isolate_recovery_observation(monkeypatch):
             monkeypatch.setattr(module, name, None)
         monkeypatch.setattr(module, "_checks", [])
         monkeypatch.setattr(module, "_failure_streak", 0)
+        from services.health_observation import Observation
+
+        monkeypatch.setattr(
+            module,
+            "_health",
+            (Observation("recovery", "recovery monitor"), None, None, None, False, False),
+        )
 
 
 @pytest.fixture(autouse=True)

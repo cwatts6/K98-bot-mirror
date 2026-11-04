@@ -74,6 +74,11 @@ def get_cache_stats() -> dict[str, Any]:
     return _service.stats()
 
 
+def health_snapshot():
+    """Immutable published summary; no reader lock, load or refresh."""
+    return _service.health_snapshot()
+
+
 def _save(path, payload):
     from file_utils import atomic_json_write
     from utils import json_default

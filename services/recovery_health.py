@@ -11,6 +11,8 @@ from threading import RLock
 import time
 import traceback
 
+from services.health_observation import Observation, utc
+
 logger = logging.getLogger(__name__)
 _lock = RLock()
 # Diagnostic limits only: never cancel, release or replay an operation.
@@ -25,13 +27,47 @@ _failure_streak = 0
 _history = None
 _episode_fingerprint = None
 _logged_checks = set()
+_health = (Observation("recovery", "recovery monitor"), None, None, None, False, False)
+
+
+def health_snapshot():
+    """One coherent immutable publication; no lock or monitor invocation."""
+    return _health
+
+
+def _publish_health():
+    global _health
+    try:
+        active = bool(_cycle and _cycle.get("in_progress"))
+        _health = (
+            Observation(
+                "recovery", "recovery monitor", utc(), "in_progress" if active else "settled"
+            ),
+            _last_success.isoformat() if _last_success else None,
+            _cycle_started if active else None,
+            _progress_at if active else None,
+            bool(_failure or (_cycle and _cycle.get("failed_checks"))),
+            bool(_notification_failure),
+        )
+    except Exception:
+        pass
 
 
 def synchronized(fn):
     @wraps(fn)
     def locked(*args, **kwargs):
         with _lock:
-            return fn(*args, **kwargs)
+            result = fn(*args, **kwargs)
+            if fn.__name__ in {
+                "begin_cycle",
+                "record_check",
+                "record_progress",
+                "record_success",
+                "record_failure",
+                "record_notifications",
+            }:
+                _publish_health()
+            return result
 
     return locked
 

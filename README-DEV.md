@@ -1,5 +1,16 @@
 # Developer Quickstart
 
+> **Current P01.3 implementation checkpoint - 4 November 2026 (E80):** Full passive-health implementation, persistent Refresh and local validation/PR preparation are approved. Earlier design-only holds are historical; publication and production actions remain separate.
+
+> **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](docs/task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](docs/task_packs/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
+
+> **Active reliability checkpoint - 4 November 2026 (E75):** P01.1 and P01.2a are deployed and accepted for their declared evidence/startup scope. Private target: `67c4e12a8ecf0c25280770860480ac65a6826602`.
+> Use the [P01.2a closeout](docs/task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.2a%20Closeout%20-%202026-11-04.md) and [P01.2b handover](docs/task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Handover%20and%20Scope%20-%202026-11-04.md) for current delivery, learnings, validation limits and remaining owners.
+> E75 closes the proactive P01.2b instrumentation proposal without deployment. Keep existing evidence and simple issue-driven collection; bot/startup safety takes priority. P01.3-P01.6 and P02-P05 remain open.
+> F09 prevention/holder evidence is P02; original-intent continuation and F28 recovery are P03 with P04 convergence. Supported exact recovery may be needed earlier, but no blanket incident clearance or replay is authorized.
+> P03a.1 remains complete; P03a.2 startup is accepted, whole-flow acceptance open. P05 repository-wide confirmation remains mandatory.
+> Older dated status blocks retain history; do not repeat accepted deployment or business actions.
+
 > **Current MGE checkpoint — 29 October 2026:** A1b and its updater correction are
 > delivered; Report63 verifies the exercised actions and response-before-refresh
 > ordering. Exact running SHA remains operator-reported. See the [deployed closeout](docs/task_packs/P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).

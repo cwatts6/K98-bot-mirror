@@ -236,6 +236,7 @@ def _monitor_report():
         details[name] = state
 
     include("startup", *startup_snapshot(limit=8192))
+
     for name, module, function in (
         ("admission_observations_v1", "services.cache_admission_diagnostics", "report"),
         ("event_cache", "event_cache", "report"),
@@ -253,6 +254,14 @@ def _monitor_report():
         if name == "profile" and type(value) is dict:
             value = value.get("outcome", value)
         include(name, value, state, cache=True)
+    include(
+        "health_observations_v1",
+        *guarded(
+            lambda: loaded_call("services.operator_status_service", "snapshot"),
+            limit=16384,
+            max_depth=8,
+        ),
+    )
     result["source_coverage"] = coverage
     result["component_coverage"] = details
     return result

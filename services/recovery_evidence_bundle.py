@@ -413,6 +413,13 @@ def collect_components(*, lease=None):
     startup, status = startup_snapshot()
     components["startup.json"] = encode(startup)
     descriptors["startup.json"] = status
+    value, status = guarded(
+        lambda: checked(lambda: loaded_call("services.operator_status_service", "snapshot")),
+        limit=16384,
+        max_depth=8,
+    )
+    components["health-observations.json"] = encode(value)
+    descriptors["health-observations.json"] = status
     health = {}
     for name, module, function in (
         ("monitor", "services.recovery_health", "observation"),
@@ -467,6 +474,7 @@ def manifest(descriptors, identity, **extra):
     schemas = {
         "operations.jsonl": "operation-observations/2",
         "startup.json": "startup-outcome-projection/1",
+        "health-observations.json": "health_observations_v1",
         "diagnostic-health.json": "passive-diagnostic-health/1",
         "incidents.jsonl": "k98-recovery-report-v1",
         "summary.json": "k98-recovery-complete-report-v1",

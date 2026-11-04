@@ -57,7 +57,7 @@ from core.restart_operations import (
 from embed_utils import FailuresView, HistoryView, generate_summary_embed
 from event_calendar.service import get_calendar_service
 from file_utils import append_csv_line, read_json_safe, read_summary_log_rows
-from gsheet_module import check_basic_gsheets_access, run_all_exports
+from gsheet_module import run_all_exports
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH, flush_logs
 from proc_config_import import run_proc_config_import_offload
 from stats_module import run_stats_copy_archive
@@ -1123,91 +1123,23 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
     @ops_group.command(
         name="dl_bot_status",
-        description="Check if the bot is running and connected to SQL.",
+        description="View retained bot observations without running health checks.",
     )
     @versioned("v1.10")
     @safe_command
     @is_admin_and_notify_channel()
     @track_usage()
     async def status_command(ctx):
+        from bot_instance import _health_card
         from core.private_status_response import PrivateStatusResponse
-        from services.operator_status_service import check_sql
+        from ui.views.recovery_view import RecoveryEntryView
 
         response = PrivateStatusResponse(ctx)
         if not await response.acknowledge():
             return
-
-        # --- Check DB connection
-        try:
-            db_ok, db_message = await check_sql()
-            db_status = f"{'🟢' if db_ok is True else '🟠' if db_ok is None else '🔴'} {db_message}"
-        except Exception as e:
-            db_ok = False
-            db_status = _safe_operator_field(
-                f"🔴 SQL ERROR: {type(e).__name__}: {e}", label="database errors"
-            )
-
-        # --- Check Google Sheets
-        try:
-            from services.gsheets_health_service import check_health
-
-            success, message = await check_health(CREDENTIALS_FILE, SHEET_ID)
-            gsheets_ok = success
-            gsheets_status = (
-                f"{'🟢' if success is True else '🟠' if success is None else '🔴'} {message}"
-            )
-        except Exception as e:
-            gsheets_ok = False
-            gsheets_status = _safe_operator_field(
-                f"🔴 ERROR: {type(e).__name__}: {e}", label="Google Sheets errors"
-            )
-
-        # --- Uptime + latency
-        now = datetime.now(UTC)
-        delta = now - start_bot_time
-        total_seconds = int(delta.total_seconds())
-        days, rem_hours = divmod(total_seconds // 3600, 24)
-        minutes = (total_seconds % 3600) // 60
-        uptime = f"{int(days)}d {int(rem_hours)}h {int(minutes)}m"
-
-        ws_latency_ms = int(getattr(bot, "latency", 0) * 1000)
-
-        # Overall status colour
-        if db_ok is None or gsheets_ok is None:
-            colour = discord.Color.orange()
-            headline = "Health checks still in progress"
-        elif db_ok and gsheets_ok:
-            colour = discord.Color.green()
-            headline = "All systems operational ✅"
-        elif db_ok or gsheets_ok:
-            colour = discord.Color.orange()
-            headline = "Degraded performance ⚠️"
-        else:
-            colour = discord.Color.red()
-            headline = "Multiple issues detected ❌"
-
-        embed = discord.Embed(title="📡 DL_Bot Status", description=headline, color=colour)
-        embed.add_field(name="DL_Bot", value=f"✅ Online • {ws_latency_ms} ms latency", inline=True)
-        embed.add_field(name="Database", value=db_status, inline=True)
-        embed.add_field(name="Google Sheets", value=gsheets_status, inline=True)
-        embed.add_field(name="Uptime", value=uptime, inline=False)
-        embed.set_footer(text=f"Checked by {ctx.user.name} • {SERVER}/{DATABASE}")
-        embed.timestamp = now
-
-        from services.recovery_health import status as recovery_status
-        from ui.views.recovery_view import RecoveryEntryView
-
-        recovery_ok, recovery_text = recovery_status()
-        embed.add_field(name="Recovery monitoring", value=recovery_text, inline=False)
-        if not recovery_ok:
-            embed.description = "Recovery monitoring needs attention"
-            embed.colour = discord.Color.orange()
-        from services.event_delivery_service import evidence_summary
-
-        embed.add_field(
-            name="Event delivery evidence", value=await evidence_summary(), inline=False
+        await response.complete(
+            embed=_validated_operator_embed(_health_card()), view=RecoveryEntryView()
         )
-        await response.complete(embed=_validated_operator_embed(embed), view=RecoveryEntryView())
 
     @ops_group.command(
         name="logs",
