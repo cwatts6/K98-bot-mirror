@@ -275,6 +275,108 @@ def test_oversized_eviction_history_cannot_claim_available():
 
 
 @pytest.mark.parametrize(
+    "incarnation",
+    ["{" * 100000 + "a" * 32 + "}" * 100000, "-" * 100000 + "a" * 32, None, 1, [], {}],
+    ids=["oversized-braces", "oversized-hyphens", "null", "integer", "list", "dict"],
+)
+def test_invalid_restored_incarnation_cannot_hide_reports(tmp_path, monkeypatch, incarnation):
+    import io
+    import json
+    from uuid import uuid4
+    import zipfile
+
+    from services.recovery_report import _operation_report
+    from tests.test_guided_recovery import ACTOR
+    from tests.test_recovery_evidence_bundle import event
+    from tests.test_recovery_report import report_service
+
+    reference = uuid4().hex
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    sink._accept(event(reference, "failed", "worker_execution", error_type="OSError"))
+    sink.dropped = 3
+    sink._publish()
+    path = tmp_path / "observations-v2.json"
+    document = json.loads(path.read_bytes())
+    document["eviction_history_available"] = True
+    document["eviction_provenance"] = {
+        "capacity": dict(
+            count=1,
+            observed_utc=diagnostics.utc(),
+            process_incarnation=incarnation,
+            cutoff_utc="not_applicable",
+        )
+    }
+    path.write_text(json.dumps(document), encoding="utf-8")
+    restored = diagnostics.DiagnosticSink(tmp_path)
+    restored._load()
+    restored._publish()
+    monkeypatch.setattr(diagnostics, "_sink", restored)
+    ordinary = _operation_report()
+    service, _, _ = report_service(1)
+    archive = service.download_complete_report(ACTOR)
+    with zipfile.ZipFile(io.BytesIO(archive["content"])) as zipped:
+        downloaded = json.loads(zipped.read("diagnostic-health.json"))["sink"]["observation"]
+    for report in (ordinary, downloaded):
+        assert report["eviction_history_available"] is False
+        assert report["eviction_provenance"] == {}
+        assert report["invalid"] == 1
+        assert report["dropped"] == 3
+    assert ordinary["operations"][0]["first_failure"]["error_type"] == "OSError"
+    assert len(path.read_bytes()) < 20000
+    again = diagnostics.DiagnosticSink(tmp_path)
+    again._load()
+    assert again.report()["invalid"] == 1
+    assert again.report()["eviction_history_available"] is False
+
+
+@pytest.mark.asyncio
+async def test_verified_import_failure_survives_restart_and_reports(tmp_path, monkeypatch):
+    import io
+    import json
+    import zipfile
+
+    from services.configuration_attempt_recovery import ProcConfigImportFailed
+    from services.recovery_report import _operation_report
+    from tests.test_guided_recovery import ACTOR
+    from tests.test_recovery_report import report_service
+
+    sink = diagnostics.DiagnosticSink(tmp_path)
+    monkeypatch.setattr(diagnostics, "_sink", sink)
+    monkeypatch.setattr(startup, "_steps", {})
+
+    async def work():
+        return False
+
+    async def checked(_):
+        raise ProcConfigImportFailed("inert verified failure")
+
+    assert await startup.run(work(), 5, "proc_config_import", completion_check=checked) is False
+    reference = startup.report()[0]["reference"]
+    assert startup.report()[0]["state"] == "failed"
+    sink.start().close()
+    restored = diagnostics.DiagnosticSink(tmp_path)
+    restored._load()
+    restored._publish()
+    monkeypatch.setattr(diagnostics, "_sink", restored)
+    startup._steps.clear()
+    ordinary = _operation_report()["operations"][0]
+    service, _, _ = report_service(1)
+    archive = service.download_complete_report(ACTOR)
+    with zipfile.ZipFile(io.BytesIO(archive["content"])) as zipped:
+        downloaded = next(
+            r
+            for r in map(json.loads, zipped.read("operations.jsonl").splitlines())
+            if r["reference"] == reference
+        )
+    for row in (ordinary, downloaded):
+        result = row["milestones"]["verification"]
+        assert result["feature_outcome"] == "failed"
+        assert result["verification_reason"] == "verified"
+        assert result["verification_source"] == "proc_config_import"
+        assert row["milestones"]["parent_return"]["value_boolean"] is False
+
+
+@pytest.mark.parametrize(
     "label,field",
     [
         ("warm_profile_cache", "execution"),

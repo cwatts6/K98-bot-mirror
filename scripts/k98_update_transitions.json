@@ -2697,12 +2697,12 @@
         {
           "path": "services/operation_diagnostics.py",
           "before_sha256": "b3ea2727a1140ccbe971366085d1f643f830b8fa8193fd690db642957cc00e44",
-          "after_sha256": "85d9fc113b86dec769d1cc7ff085f82a7f23fa3e21fa15c4fb03176cf7e8e2b1"
+          "after_sha256": "9bdb85430fc2fbf2abf396f073a5030ca10613347e7f22ff4ebc8d1ad84d46b4"
         },
         {
           "path": "services/startup_outcome_projection.py",
           "before_sha256": "b0b747231908aee8735eca97122cab441bea3ffc32a10085678269c2802ac35c",
-          "after_sha256": "97d7967aef536d383932579c5674501ed9f046611dda7a92f3f9e9e23fac4a70"
+          "after_sha256": "743c0107659ba22d945c4c38094f9d822937ad43f8d5d07490643b34317f77ed"
         }
       ]
     }

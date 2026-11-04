@@ -300,8 +300,11 @@ class DiagnosticSink:
                     raise ValueError("Invalid eviction count")
                 from uuid import UUID
 
-                if row["process_incarnation"] != "unavailable":
-                    UUID(row["process_incarnation"])
+                incarnation = row["process_incarnation"]
+                if type(incarnation) is not str or len(incarnation) > 36:
+                    raise ValueError("Invalid eviction identity")
+                if incarnation != "unavailable":
+                    UUID(incarnation)
                 for key in ("observed_utc", "cutoff_utc"):
                     stamp = row[key]
                     if key == "cutoff_utc" and stamp == "not_applicable":

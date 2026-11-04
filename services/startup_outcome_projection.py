@@ -29,6 +29,7 @@ def project(label, completion, *, checked=False, error=False, pending=False, not
         )
     if label == "proc_config_import" and error == "ProcConfigImportFailed":
         result["feature_outcome"] = "failed"
+        result["verification_reason"] = "verified"
         return result
     if error or not checked or pending or not_reached or type(completion) is not dict:
         return result
