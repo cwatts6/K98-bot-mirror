@@ -685,6 +685,9 @@ def _get_health_view():
     global _health_view
     from ui.views.health_view import HealthView
 
+    if _health_view is not None and _health_view._closed and _health_view._active is None:
+        _health_view.stop()
+        _health_view = None
     if _health_view is None:
         _health_view = HealthView(
             guild_id=GUILD_ID, channel_id=STATUS_CHANNEL_ID, render=_health_card

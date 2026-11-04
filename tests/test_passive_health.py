@@ -648,12 +648,16 @@ async def test_deleted_card_replacement_drains_admitted_refresh(tmp_path, mode):
     )
     ns = bot_functions(
         "_ensure_pinned_health_message",
+        "_get_health_view",
+        "_bind_health_view",
+        bot=discord.Client(intents=discord.Intents.none()),
+        GUILD_ID=1,
+        STATUS_CHANNEL_ID=2,
+        _health_view=view,
         _health_registered_id=3,
         _restore_health_view=lambda: 3,
         _shutdown_once=stopped,
         _health_creation_unconfirmed=False,
-        _get_health_view=lambda: view,
-        _bind_health_view=Mock(),
         _health_card=lambda: None,
         discord=discord,
         logger=Mock(),
@@ -666,6 +670,7 @@ async def test_deleted_card_replacement_drains_admitted_refresh(tmp_path, mode):
         channel.send.assert_not_awaited()
         assert view._closed
         assert not replacing.done()
+        assert ns["_get_health_view"]() is view
         if mode == "shutdown":
             stopped.set()
         if mode == "cancel":
@@ -681,6 +686,54 @@ async def test_deleted_card_replacement_drains_admitted_refresh(tmp_path, mode):
             result = await replacing
             assert result == (None if mode == "shutdown" else 4)
             assert channel.send.await_count == (0 if mode == "shutdown" else 1)
+            if mode == "replace":
+                assert ns["_health_view"] is not view
+                assert not ns["_health_view"]._closed
+                assert view.is_finished()
+                assert len(ns["bot"].persistent_views) == 1
     finally:
         release.set()
         await asyncio.gather(callback, replacing, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_deleted_card_after_failed_registration_gets_open_successor(tmp_path):
+    client = discord.Client(intents=discord.Intents.none())
+    old = HealthView(guild_id=1, channel_id=2, render=lambda: None)
+    old.message_id = 3
+    ns = bot_functions(
+        "_get_health_view",
+        "_bind_health_view",
+        "_ensure_pinned_health_message",
+        bot=client,
+        GUILD_ID=1,
+        STATUS_CHANNEL_ID=2,
+        _health_view=old,
+        _health_registered_id=None,
+        _restore_health_view=lambda: 3,
+        _shutdown_once=asyncio.Event(),
+        _health_creation_unconfirmed=False,
+        _health_card=lambda: None,
+        discord=discord,
+        logger=Mock(),
+        json=json,
+        HEALTH_MSG_ID_PATH=tmp_path / "health.json",
+    )
+    message = SimpleNamespace(id=4, pin=AsyncMock())
+    channel = SimpleNamespace(
+        fetch_message=AsyncMock(
+            side_effect=discord.NotFound(
+                SimpleNamespace(status=404, reason="gone"), {"message": "gone", "code": 10008}
+            )
+        ),
+        send=AsyncMock(return_value=message),
+    )
+    assert await ns["_ensure_pinned_health_message"](channel) == 4
+    successor = ns["_health_view"]
+    assert successor is not old
+    assert not successor._closed
+    click = interaction()
+    click.message.id = 4
+    await successor.children[0].callback(click)
+    click.message.edit.assert_awaited_once()
+    assert len(client.persistent_views) == 1

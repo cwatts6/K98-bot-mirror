@@ -2737,7 +2737,7 @@
         {
           "path": "bot_instance.py",
           "before_sha256": "82814f9a8f2b8461557b6c13fad3690baa72cdb194d0705b27a8e2806d229463",
-          "after_sha256": "5936a916b2b713d19905416381066dccd48a31c648befa2f75e61998b790fc03"
+          "after_sha256": "667e7f8d156464179cc80a3c54249a01bad4d6e27ffa1681faf66af8d7d7064e"
         },
         {
           "path": "commands/admin_cmds.py",
